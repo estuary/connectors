@@ -1,5 +1,5 @@
 ---
-description: Capture OracleDB changes into Estuary with LogMiner for container or non-container databases. Setup guidance includes configuring dictionary modes and SCN tuning.
+description: Capture OracleDB changes into Estuary with LogMiner for container or non-container databases. Setup guidance includes configuring dictionary modes and network tunnels.
 ---
 
 import ReactPlayer from "react-player";
@@ -8,6 +8,21 @@ import ReactPlayer from "react-player";
 This connector captures data from OracleDB into Estuary collections using [Oracle Logminer](https://docs.oracle.com/en/database/oracle/oracle-database/19/sutil/oracle-logminer-utility.html#GUID-2555A155-01E3-483E-9FC6-2BDC2D8A4093).
 
 <ReactPlayer controls url="https://www.youtube.com/watch?v=mE7LFSqfwY8" />
+
+## Features
+
+This connector includes the following features:
+
+| Feature | Availability | Notes |
+| --- | --- | --- |
+| Real-time capture | ✅ | Destination sync cadence can still be controlled on the materialization side |
+| [SSH tunneling](/guides/connect-network) | ✅ | [Private and BYOC](/private-byoc) deployments can also support [reverse SSH](/guides/connect-network/#expose-ports-on-a-reverse-ssh-tunnel-bastion) |
+| [Private networking](/private-byoc/privatelink) | ✅<br/>Only available for [private/BYOC](/private-byoc) deployments | Support for AWS PrivateLink, Azure Private Link, and GCP Private Service Connect |
+| [Supports non-container instances](#non-container-databases) | ✅ | |
+| [Supports container instances](#container-databases) | ✅ | |
+| [Support for RAC](#oracle-rac) | ✅ | Automatic support for single- or multi-threaded use cases |
+| [Automatic dictionary mode](#dictionary-modes) | ✅ | Swaps between efficient and more resource-intensive modes to handle schema changes |
+| [History mode](/guides/customize-dataflows/#history-mode) | ✅ | |
 
 ## Prerequisites
 * Oracle 11g or above
@@ -144,35 +159,43 @@ To allow secure connections via SSH tunneling:
 ### Properties
 
 #### Endpoint
-| Property                           | Title                  | Description                                                                                                                                                                                                                                                                                                                                     | Type    | Required/Default               |
-| -----------                        | --------               | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------                                                                 | ------  | ----------------               |
-| `/address`                         | Address                | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                     | string  | Required                       |
-| `/user`                            | Username               | The database user to authenticate as.                                                                                                                                                                                                                                                                                                           | string  | Required                       |
-| `/password`                        | Password               | Password for the specified database user.                                                                                                                                                                                                                                                                                                       | string  | Required                       |
-| `/database`                        | Database               | Logical database name to capture from. Defaults to ORCL. In multi-container environments use the PDB name.                                                                                                                                                                                                                                      | string  | Required                       |
-| `/historyMode`                     | History Mode           | Capture each change event, without merging.                                                                                                                                                                                                                                                                                   | boolean | `false`                        |
-| `/advanced/skip_backfills`         | Skip Backfills         | A comma-separated list of fully-qualified table names which should not be backfilled.                                                                                                                                                                                                                                                           | string  |                                |
-| `/advanced/watermarksTable`        | Watermarks Table       | The name of the table used for watermark writes during backfills. Must be fully-qualified in '&lt;schema&gt;.table' form.                                                                                                                                                                                                                       | string  | `&lt;USER&gt;.FLOW_WATERMARKS` |
-| `/advanced/backfill_chunk_size`    | Backfill Chunk Size    | The number of rows which should be fetched from the database in a single backfill query.                                                                                                                                                                                                                                                        | integer | `50000`                        |
-| `/advanced/incremental_chunk_size` | Incremental Chunk Size | The number of rows which should be fetched from the database in a single incremental query.                                                                                                                                                                                                                                                     | integer | `10000`                        |
-| `/advanced/incremental_scn_range`  | Incremental SCN Range  | The SCN range captured at every iteration.                                                                                                                                                                                                                                                                                                      | integer | `50000`                        |
-| `/advanced/dictionary_mode`        | Dictionary Mode        | How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to extract. | string  | `extract`                      |
-| `/advanced/discover_schemas`       | Discover Schemas       | If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.                                                                                                                                                                                              | string  |                                |
-| `/advanced/node_id`                | Node ID                | Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value.                                                                                                                                          | integer |                                |
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/address`** | Address | The host or host:port at which the database can be reached. | string | Required |
+| **`/user`** | Username | The database user to authenticate as. | string | Required |
+| **`/password`** | Password | Password for the specified database user. | string | Required |
+| **`/database`** | Database | Logical database name to capture from. Defaults to ORCL. In multi-container environments use the PDB name. | string | Required |
+| `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
+
+##### Advanced options
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| `/advanced/skip_backfills` | Skip Backfills | A comma-separated list of fully-qualified table names which should not be backfilled. | string |  |
+| `/advanced/watermarksTable` | Watermarks Table | The name of the table used for watermark writes during backfills. Must be fully-qualified in `<schema>.<table>` form. | string  | `<USER>.FLOW_WATERMARKS` |
+| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query. | integer | `50000` |
+| `/advanced/incremental_chunk_size` | Incremental Chunk Size | The number of rows which should be fetched from the database in a single incremental query. | integer | `10000` |
+| `/advanced/dictionary_mode` | Dictionary Mode | How should dictionaries be used in Logminer: one of `online`, `extract`, or `smart`. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two. | string | `smart` |
+| `/advanced/discover_schemas` | Discover Schemas | If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas. | string |  |
+| `/advanced/node_id` | Node ID | Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value. | integer |  |
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
 
+##### Network tunnel
+
+You may use `networkTunnel` properties with this capture to configure an SSH
+tunnel. See [secure networks](/concepts/connectors/#connecting-to-endpoints-on-secure-networks)
+for property names and usage.
 
 #### Bindings
 
-| Property         | Title     | Description                                                                                | Type   | Required/Default |
-|------------------|-----------|--------------------------------------------------------------------------------------------|--------|------------------|
-| **`/namespace`** | Namespace | The [owner/schema](https://docs.oracle.com/database/121/CNCPT/intro.htm#CNCPT940) of the table.                                                         | string | Required         |
-| **`/stream`**    | Stream    | Table name.                                                                                | string | Required         |
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/namespace`** | Namespace | The [owner/schema](https://docs.oracle.com/database/121/CNCPT/intro.htm#CNCPT940) of the table. | string | Required |
+| **`/stream`** | Stream | Table name. | string | Required |
 | `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
 | `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
 | `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
-
 
 ### Sample
 
@@ -183,14 +206,13 @@ captures:
       connector:
         image: ghcr.io/estuary/source-oracle:v1
         config:
-          address: database-1.ukqdmzdqvvsz.us-east-2.rds.amazonaws.com:1521
+          address: database-1.abc.us-east-2.rds.amazonaws.com:1234
           user: "flow_capture"
           password: secret
           database: ORCL
           historyMode: false
           advanced:
-            incremental_scn_range: 50000
-            dictionary_mode: extract
+            dictionary_mode: smart
           networkTunnel:
             sshForwarding:
               privateKey: -----BEGIN RSA PRIVATE KEY-----\n...
@@ -203,23 +225,33 @@ captures:
         target: ${PREFIX}/${COLLECTION_NAME}
 ```
 
-### Dictionary Modes
+## Dictionary Modes
 
 Oracle writes redo log files using triplet object ID, data object ID and object versions to identify different objects in the database, rather than their name. This applies to table names as well as column names. When reading data from the redo log files using Logminer, a "dictionary" is used to translate the object identification data into user-facing names of those objects. When interacting with the database directly an _online_ dictionary, which is essentially the latest dictionary that knows how to translate currently existing table and column names is used by the database and by Logminer, however when capturing historical data, it is possible that the names of these objects or even their identifiers have changed (due to an `ALTER TABLE` statement for example). In these instances the _online_ dictionary will be insufficient for translating the object identifiers into names and Logminer will complain about a dictionary mismatch.
 
 To resolve this issue, it is possible to _extract_ a dictionary into the redo log files themselves, so that when there are schema changes, Logminer can automatically handle using the appropriate dictionary for the time period an event is from. This operation however uses CPU and RAM, as well as consuming disk over time.
 
-Using Estuary's Oracle connector you get to choose which mode to operate it:
+By default, Estuary's Oracle connector will automatically switch between these
+two modes as needed. It starts in _online_ mode until it hits a dictionary
+mismatch, switches to _extract_ mode just until covering the latest DDLs on all
+tables, and then switches back to online mode for efficiency.
 
-1. To extract the dictionary into the redo log files, the `extract` mode can be used (this is the default mode). Be aware that this mode leads to more resource usage (CPU, RAM and disk).
+This _smart_ mode is the recommended dictionary mode for the Oracle connector.
+However, you may also configure the dictionary mode as an advanced setting:
+
+1. To extract the dictionary into the redo log files, the `extract` mode can be used. Be aware that this mode leads to more resource usage (CPU, RAM and disk).
 2. To always use the online dictionary, the `online` mode can be used. This mode is more efficient, but it cannot handle schema changes in tables, so only use this mode with caution and when table schemas are known not to change.
+3. To automatically switch between these two modes, use `smart` mode (the default mode). This is the default mode and combines efficiency with infrequent extraction when schemas change.
 
-### Incremental SCN Range and Events Rate
+## Oracle RAC
 
-At every iteration, the connector fetches changes in a specific SCN (System Change Number) range, this is roughly equivalent to a specific time range. Depending on how many events happen on the captured tables in a database (by default, a 50,000 range is captured in each iteration), the `advanced.incremental_scn_range` option can be updated to fit your needs:
+This connector is compatible with Oracle RAC (Real Application Clusters)
+deployments. With Oracle RAC, each instance writes its own redo thread.
+Estuary's connector automatically handles multi-threaded Oracle deployments,
+sorting SCN ranges across threads into global bounds.
 
-1. If the database processes a large amount of events per unit of time, the connector and/or the database may experience resource shortages while trying to process the data. For example you may see the error `PGA memory used by the instance exceeds PGA_AGGREGATE_LIMIT` which indicates that the memory usage of the database instance has hit a limit. This can happen if too many events are being processed in one iteration. In these cases we recommend lowering the SCN range until the database and the connector are able to handle the load.
-2. If the database does not have many events per time unit, a higher value can help with faster processing, although this is usually not necessary.
+No special configuration is required to select between single- or multi-threaded
+use cases.
 
 ## Troubleshooting
 
