@@ -1,9 +1,7 @@
+from collections.abc import Awaitable, Callable
 from logging import Logger
-from typing import Callable, Awaitable, override
+from typing import override
 
-from estuary_cdk.flow import (
-    ConnectorSpec,
-)
 from estuary_cdk.capture import (
     BaseCaptureConnector,
     Request,
@@ -12,18 +10,22 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.flow import (
+    ConnectorSpec,
+)
 
-from .resources import all_resources, validate_credentials
 from .models import (
     ConnectorState,
     EndpointConfig,
     ResourceConfig,
 )
+from .resources import all_resources, validate_credentials, validate_intervals
 
 
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
 ):
+    @override
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
@@ -50,6 +52,7 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
+        validate_intervals(binding.resourceConfig for binding in validate.bindings)
         await validate_credentials(log, self, validate.config)
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
