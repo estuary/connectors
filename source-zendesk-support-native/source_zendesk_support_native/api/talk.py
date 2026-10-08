@@ -17,8 +17,8 @@ from .shared import (
     INCREMENTAL_LAG,
     INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT,
     url_base,
-    _dt_to_s,
-    _s_to_dt,
+    dt_to_s,
+    s_to_dt,
 )
 
 # Talk API incremental exports (calls, legs) have a different response structure than other incremental exports.
@@ -44,7 +44,7 @@ async def _fetch_talk_incremental_export_resources(
     # checking if end_time == start_time (no newer records exist).
     url = f"{url_base(subdomain)}/channels/voice/stats/incremental/{path}"
 
-    params = {"start_time": _dt_to_s(start_date)}
+    params = {"start_time": dt_to_s(start_date)}
 
     last_seen_dt = start_date
     count = 0
@@ -151,13 +151,13 @@ async def backfill_talk_incremental_export_resources(
         start = start_date
     else:
         assert isinstance(page, int)
-        start = _s_to_dt(page)
+        start = s_to_dt(page)
 
     generator = _fetch_talk_incremental_export_resources(http, subdomain, name, path, response_model, start, log)
 
     async for result in generator:
         if isinstance(result, datetime):
-            yield _dt_to_s(result)
+            yield dt_to_s(result)
         elif result.updated_at > cutoff:
             return
         else:

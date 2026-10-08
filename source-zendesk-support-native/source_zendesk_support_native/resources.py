@@ -69,7 +69,7 @@ from .api import (
     snapshot_offset_paginated_resources,
     snapshot_cursor_paginated_resources,
     url_base,
-    _dt_to_s,
+    dt_to_s,
     INCREMENTAL_LAG,
     TICKET_METRIC_EVENTS_LAG,
     TIME_PARAMETER_DELAY,
@@ -255,7 +255,7 @@ def ticket_metrics(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     return common.Resource(
         name="ticket_metrics",
@@ -776,7 +776,7 @@ def incremental_cursor_export_resources(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     resources = [
             common.Resource(
@@ -837,7 +837,7 @@ def ticket_child_resources(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     resources = [
             common.Resource(
@@ -892,7 +892,7 @@ def side_conversations(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as a Unix timestamp.
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     return common.Resource(
         name="side_conversations",

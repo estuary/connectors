@@ -2,7 +2,7 @@ from .shared import (
     TIME_PARAMETER_DELAY,
     INCREMENTAL_LAG,
     url_base,
-    _dt_to_s,
+    dt_to_s,
 )
 from .snapshots import (
     snapshot_resources,
@@ -78,7 +78,7 @@ __all__ = [
     "snapshot_offset_paginated_resources",
     "snapshot_cursor_paginated_resources",
     "url_base",
-    "_dt_to_s",
+    "dt_to_s",
     "INCREMENTAL_LAG",
     "TICKET_METRIC_EVENTS_LAG",
     "TIME_PARAMETER_DELAY",

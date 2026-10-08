@@ -14,7 +14,7 @@ from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     INCREMENTAL_LAG,
     url_base,
-    _dt_to_s,
+    dt_to_s,
 )
 
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
@@ -69,8 +69,8 @@ async def fetch_satisfaction_ratings(
     generator = _fetch_satisfaction_ratings_between(
         http=http,
         subdomain=subdomain,
-        start=_dt_to_s(log_cursor),
-        end=_dt_to_s(end),
+        start=dt_to_s(log_cursor),
+        end=dt_to_s(end),
         log=log,
     )
 
@@ -89,10 +89,10 @@ async def backfill_satisfaction_ratings(
     cutoff: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | PageCursor, None]:
     assert isinstance(cutoff, datetime)
-    cutoff_ts = _dt_to_s(cutoff)
+    cutoff_ts = dt_to_s(cutoff)
 
     if page is None:
-        start = _dt_to_s(start_date)
+        start = dt_to_s(start_date)
     else:
         assert isinstance(page, int)
         start = page

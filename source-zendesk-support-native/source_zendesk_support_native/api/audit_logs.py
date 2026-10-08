@@ -14,7 +14,7 @@ from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     INCREMENTAL_LAG,
     url_base,
-    _dt_to_str,
+    dt_to_str,
 )
 
 
@@ -33,8 +33,8 @@ async def fetch_audit_logs(
     if horizon <= log_cursor:
         return
 
-    start = _dt_to_str(log_cursor)
-    end = _dt_to_str(horizon)
+    start = dt_to_str(log_cursor)
+    end = dt_to_str(horizon)
 
     params = {
         "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
@@ -85,8 +85,8 @@ async def backfill_audit_logs(
 
     url = f"{url_base(subdomain)}/audit_logs"
 
-    start = _dt_to_str(start_date)
-    end = _dt_to_str(cutoff)
+    start = dt_to_str(start_date)
+    end = dt_to_str(cutoff)
 
     params = {
         "page[size]": CURSOR_PAGINATION_PAGE_SIZE,

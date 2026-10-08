@@ -19,25 +19,25 @@ def url_base(subdomain: str) -> str:
     return f"https://{subdomain}.zendesk.com/api/v2"
 
 
-def _dt_to_s(dt: datetime) -> int:
+def dt_to_s(dt: datetime) -> int:
     return int(dt.timestamp())
 
 
-def _s_to_dt(s: int) -> datetime:
+def s_to_dt(s: int) -> datetime:
     return datetime.fromtimestamp(s, tz=UTC)
 
 
-def _dt_to_str(dt: datetime) -> str:
+def dt_to_str(dt: datetime) -> str:
     return dt.strftime(DATETIME_STRING_FORMAT)
 
 
-def _str_to_dt(string: str) -> datetime:
+def str_to_dt(string: str) -> datetime:
     return datetime.fromisoformat(string)
 
 
-def _is_timestamp(string: str) -> bool:
+def is_timestamp(string: str) -> bool:
     try:
-        _s_to_dt(int(string))
+        s_to_dt(int(string))
         return True
     except ValueError:
         return False

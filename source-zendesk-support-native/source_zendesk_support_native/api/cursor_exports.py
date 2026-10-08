@@ -16,9 +16,9 @@ from ..models import (
 
 from .shared import (
     url_base,
-    _dt_to_s,
-    _s_to_dt,
-    _is_timestamp,
+    dt_to_s,
+    s_to_dt,
+    is_timestamp,
 )
 
 MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
@@ -108,7 +108,7 @@ async def _fetch_incremental_cursor_export_resources(
 
     if cursor is None:
         assert isinstance(start_date, datetime)
-        params["start_time"] = _dt_to_s(start_date)
+        params["start_time"] = dt_to_s(start_date)
     else:
         params["cursor"] = _base64_encode(cursor)
 
@@ -154,8 +154,8 @@ async def fetch_incremental_cursor_export_resources(
 
     start_date: datetime | None = None
 
-    if _is_timestamp(cursor):
-        start_date = _s_to_dt(int(cursor))
+    if is_timestamp(cursor):
+        start_date = s_to_dt(int(cursor))
         cursor = None
 
     generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, cursor, log)

@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from estuary_cdk.http import HTTPError
-from source_zendesk_support_native.api.shared import _dt_to_s
+from source_zendesk_support_native.api.shared import dt_to_s
 from source_zendesk_support_native.api.ticket_children import (
     _fetch_side_conversations,
     fetch_side_conversations,
@@ -127,7 +127,7 @@ class TestFetchSideConversationsPerTicket:
 @pytest.mark.asyncio
 class TestFetchSideConversationsIncremental:
     async def test_yields_side_conversations_for_updated_tickets(self):
-        start_time = _dt_to_s(datetime(2026, 1, 1, tzinfo=UTC))
+        start_time = dt_to_s(datetime(2026, 1, 1, tzinfo=UTC))
         cursor = (str(start_time),)
         next_page = "some-export-cursor"
 
@@ -147,7 +147,7 @@ class TestFetchSideConversationsIncremental:
         assert cursors == [(next_page,)]
 
     async def test_skips_deleted_tickets(self):
-        start_time = _dt_to_s(datetime(2026, 1, 1, tzinfo=UTC))
+        start_time = dt_to_s(datetime(2026, 1, 1, tzinfo=UTC))
         cursor = (str(start_time),)
         next_page = "some-export-cursor"
 
@@ -170,7 +170,7 @@ class TestFetchSideConversationsIncremental:
         assert len(http.urls) == 1, "should only have fetched side conversations for one ticket"
 
     async def test_no_tickets_yields_nothing(self):
-        start_time = _dt_to_s(datetime(2026, 1, 1, tzinfo=UTC))
+        start_time = dt_to_s(datetime(2026, 1, 1, tzinfo=UTC))
         cursor = (str(start_time),)
 
         http = MockHTTP()
