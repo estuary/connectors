@@ -25,7 +25,19 @@ FIELDS_TO_REDACT = [
     "controller",
     "connector",
     "summary",
+    "type",
+    "isDisabled",
 ]
+
+# Incremental streams run their backfill and incremental tasks concurrently, so
+# emission order varies. Snapshot the document that sorts first by these fields
+# instead: the backfill's first window or page always contains it.
+SAMPLE_SORT_FIELDS = {
+    "acmeCo/catalog_stats_hourly": ("timestamp", "catalogName"),
+    "acmeCo/catalog_stats_daily": ("timestamp", "catalogName"),
+    "acmeCo/catalog_stats_monthly": ("timestamp", "catalogName"),
+    "acmeCo/publication_history": ("catalogName", "publishedAt", "publicationId"),
+}
 
 
 def redact_nested_fields(
@@ -62,16 +74,22 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    # The first document of each stream: the live control plane changes too
-    # often to snapshot whole streams.
-    unique_stream_lines = []
-    seen = set()
+    # One document per stream: the live control plane changes too often to
+    # snapshot whole streams. Snapshot streams emit in a deterministic order,
+    # so their first document is stable.
+    samples: dict[str, list] = {}
     for line in lines:
-        stream = line[0]
-        if stream not in seen:
-            redact_nested_fields(line[1], FIELDS_TO_REDACT)
-            unique_stream_lines.append(line)
-            seen.add(stream)
+        stream, doc = line[0], line[1]
+        if stream not in samples:
+            samples[stream] = line
+        elif (fields := SAMPLE_SORT_FIELDS.get(stream)) and (
+            [doc[f] for f in fields] < [samples[stream][1][f] for f in fields]
+        ):
+            samples[stream] = line
+
+    unique_stream_lines = [samples[stream] for stream in sorted(samples)]
+    for line in unique_stream_lines:
+        redact_nested_fields(line[1], FIELDS_TO_REDACT)
 
     snapshot_path = (
         Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__stdout.json"

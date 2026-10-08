@@ -605,7 +605,8 @@ query CatalogStats($names: [String!]!, $grain: CatalogStatsGrain!, $start: DateT
 """
     # catalogStats accepts at most 100 names, and errors past 10,000 buckets.
     names_per_query: ClassVar[int] = 100
-    # Kept well under the cap because task rows carry per-binding stats.
+    # Rows per query, kept well under the cap because task rows carry
+    # per-binding stats.
     bucket_budget: ClassVar[int] = 2_000
 
     catalogName: str

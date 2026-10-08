@@ -4,6 +4,7 @@ from logging import Logger
 
 from estuary_cdk.capture import common, Task
 from estuary_cdk.capture.common import (
+    FetchSnapshotFn,
     Resource,
     ResourceConfig,
     ResourceState,
@@ -30,9 +31,7 @@ from .models import (
     SNAPSHOT_STREAMS,
     EndpointConfig,
     CatalogStats,
-    EstuarySnapshot,
     Grain,
-    LiveSpecRefDocument,
     PublicationHistoryItem,
 )
 
@@ -73,7 +72,7 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
 
 
 def _create_snapshot_resource(
-    cls: type[EstuarySnapshot], http: HTTPMixin, config: EndpointConfig
+    name: str, interval: timedelta, fetch_snapshot: FetchSnapshotFn
 ) -> common.Resource:
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -82,44 +81,12 @@ def _create_snapshot_resource(
         task: Task,
         all_bindings,
     ):
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_snapshot=functools.partial(snapshot_stream, cls, http, config),
-        )
+        open_binding(binding, binding_index, state, task, fetch_snapshot=fetch_snapshot)
 
     return SnapshotResource(
-        name=cls.name,
+        name=name,
         open=open,
-        initial_config=ResourceConfig(name=cls.name, interval=cls.interval),
-        schema_inference=True,
-    )
-
-
-def _create_live_spec_snapshot_resource(
-    cls: type[LiveSpecRefDocument], http: HTTPMixin, config: EndpointConfig
-) -> common.Resource:
-    def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_snapshot=functools.partial(snapshot_live_spec_refs, cls, http, config),
-        )
-
-    return SnapshotResource(
-        name=cls.name,
-        open=open,
-        initial_config=ResourceConfig(name=cls.name, interval=timedelta(minutes=5)),
+        initial_config=ResourceConfig(name=name, interval=interval),
         schema_inference=True,
     )
 
@@ -202,7 +169,19 @@ async def all_resources(
     cutoff = datetime.now(tz=UTC).replace(microsecond=0)
     return [
         *(_create_catalog_stats_resource(g, http, config, cutoff) for g in CATALOG_STATS_GRAINS),
-        *(_create_live_spec_snapshot_resource(cls, http, config) for cls in LIVE_SPEC_SNAPSHOT_STREAMS),
+        *(
+            _create_snapshot_resource(
+                cls.name,
+                timedelta(minutes=5),
+                functools.partial(snapshot_live_spec_refs, cls, http, config),
+            )
+            for cls in LIVE_SPEC_SNAPSHOT_STREAMS
+        ),
         _create_publication_history_resource(http, config),
-        *(_create_snapshot_resource(cls, http, config) for cls in SNAPSHOT_STREAMS),
+        *(
+            _create_snapshot_resource(
+                cls.name, cls.interval, functools.partial(snapshot_stream, cls, http, config)
+            )
+            for cls in SNAPSHOT_STREAMS
+        ),
     ]

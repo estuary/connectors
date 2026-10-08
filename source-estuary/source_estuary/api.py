@@ -438,8 +438,10 @@ async def _catalog_stats_names(
     return sorted(names)
 
 
-def _window_buckets() -> int:
-    return CatalogStats.bucket_budget // CatalogStats.names_per_query
+def _window_buckets(names: list[str]) -> int:
+    """Buckets per window, so the largest name chunk stays within the bucket budget."""
+    largest_chunk = max(1, min(len(names), CatalogStats.names_per_query))
+    return CatalogStats.bucket_budget // largest_chunk
 
 
 async def _fetch_catalog_stats_window(
@@ -504,10 +506,11 @@ async def fetch_catalog_stats(
     window_start = max(grain.floor(config.start_date), grain.floor(log_cursor - lookback))
     stop = grain.add(grain.floor(now), 1)
     names = await _catalog_stats_names(http, log, config, grain)
+    window_buckets = _window_buckets(names)
 
     cursor = log_cursor
     while window_start < stop:
-        window_end = min(grain.add(window_start, _window_buckets()), stop)
+        window_end = min(grain.add(window_start, window_buckets), stop)
 
         async for row in _fetch_catalog_stats_window(http, log, grain, names, window_start, window_end):
             yield row
@@ -548,8 +551,8 @@ async def backfill_catalog_stats(
     if start >= end:
         return
 
-    window_end = min(grain.add(start, _window_buckets()), end)
     names = await _catalog_stats_names(http, log, config, grain)
+    window_end = min(grain.add(start, _window_buckets(names)), end)
 
     async for row in _fetch_catalog_stats_window(http, log, grain, names, start, window_end):
         yield row
