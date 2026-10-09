@@ -2,8 +2,9 @@
 
 ## 2026-10-09
 ### Changed
-- Load and merge queries on tables with a `TIMESTAMP` key column now restrict
-  the scan to the key range of each transaction.
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to each transaction's key range, exact for `TIMESTAMP` keys and
+  by date for `STRING` keys.
 
 ## 2026-10-07
 ### Changed

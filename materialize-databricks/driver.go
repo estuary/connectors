@@ -428,8 +428,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
-	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithDatetimeBounds(isTimestampColumn))
-	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithDatetimeBounds(isTimestampColumn))
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
 
 	t.bindings = append(t.bindings, b)
 
