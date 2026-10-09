@@ -85,7 +85,13 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 // pushTableMetadata records a listed table and its fields in is.
 func pushTableMetadata(ctx context.Context, is *boilerplate.InfoSchema, mu *sync.Mutex, table *bigquery.Table) error {
 	md, err := tableMetadataWithRetry(ctx, table)
-	if err != nil {
+	var gErr *googleapi.Error
+	if errors.As(err, &gErr) && gErr.Code == 404 {
+		// The table was dropped after the listing returned it, so it is
+		// simply not part of the information schema.
+		log.WithField("table", fmt.Sprintf("%s.%s", table.DatasetID, table.TableID)).Debug("listed table no longer exists; skipping")
+		return nil
+	} else if err != nil {
 		return fmt.Errorf("getting metadata for %s.%s: %w", table.DatasetID, table.TableID, err)
 	}
 
