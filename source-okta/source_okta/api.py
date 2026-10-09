@@ -11,11 +11,14 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel
 
 from .models import (
+    ApplicationUser,
     DeleteEvent,
     Group,
     IdEntityDocument,
     OktaApplication,
     OktaFilterableEntity,
+    ParentIdContext,
+    ParentRef,
     SystemLogEvent,
     User,
 )
@@ -75,15 +78,20 @@ async def paginate[T: BaseModel](
     url: str,
     params: dict[str, str | int],
     model: type[T],
+    validation_context: object | None = None,
 ) -> AsyncGenerator[T, None]:
     """Stream every item of a Link-paginated list, following next links
-    verbatim. The list ends when a page carries no next link, never when a
-    page is short: a full last page without a next link has been observed."""
+    verbatim. The list ends when a page carries no next link, never when a page
+    is short: a full last page without a next link has been observed."""
+
     next_url: str | None = url
     request_params: dict[str, str | int] | None = params
+
     while next_url:
         headers, body = await http.request_stream(log, next_url, params=request_params)
-        async for item in IncrementalJsonProcessor(body(), "item", model):
+        async for item in IncrementalJsonProcessor(
+            body(), "item", model, validation_context=validation_context
+        ):
             yield item
         next_url = next_link(headers)
         request_params = None
@@ -385,12 +393,53 @@ async def snapshot_applications(
     excluding non-active apps, even though the observed default lists them.
     """
     url = f"{base_url(domain)}/{OktaApplication.PATH}"
-    params: dict[str, str | int] = {
-        "limit": OktaApplication.PAGE_SIZE,
-        "includeNonDeleted": "true",
-    }
-    async for app in paginate(http, log, url, params, OktaApplication):
+    async for app in paginate(
+        http, log, url, OktaApplication.LIST_PARAMS, OktaApplication
+    ):
         yield app
+
+
+async def snapshot_application_users(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> AsyncGenerator[ApplicationUser, None]:
+    """Every user assignment of every app, ACTIVE or INACTIVE, each stamped
+    with its app and granting group.
+
+    Apps are listed in full before any assignment request. An app deleted
+    between the two steps answers 404 E0000007 and is skipped."""
+
+    root = base_url(domain)
+    app_ids = [
+        app.id
+        async for app in paginate(
+            http,
+            log,
+            f"{root}/{OktaApplication.PATH}",
+            OktaApplication.LIST_PARAMS,
+            ParentRef,
+        )
+    ]
+
+    emitted = 0
+    for app_id in app_ids:
+        url = f"{root}/{ApplicationUser.PATH_TEMPLATE.format(app_id=app_id)}"
+        params: dict[str, str | int] = {"limit": ApplicationUser.PAGE_SIZE}
+        try:
+            async for doc in paginate(
+                http, log, url, params, ApplicationUser, ParentIdContext(app_id)
+            ):
+                yield doc
+                emitted += 1
+        except HTTPError as err:
+            if err.code != 404 or "E0000007" not in err.message:
+                raise
+            log.info("app vanished during snapshot", {"app_id": app_id})
+
+    log.debug(
+        "snapshotted application users", {"apps": len(app_ids), "emitted": emitted}
+    )
 
 
 async def _read_log_page(

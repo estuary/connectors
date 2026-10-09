@@ -2,13 +2,21 @@ import abc
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import ClassVar, Literal, override
+from typing import ClassVar, Literal, Self, override
 
 from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
 from estuary_cdk.capture.common import ResourceState
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import AccessToken
-from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    AwareDatetime,
+    BaseModel,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from .utils import to_rfc3339_ms
 
@@ -175,6 +183,20 @@ class OktaFilterableEntity(IdEntityDocument, abc.ABC):
         return f'eventType eq "{cls.DELETE_EVENT_TYPE}" and outcome.result eq "SUCCESS"'
 
 
+@dataclass(frozen=True, slots=True)
+class ParentIdContext:
+    """The id of the parent a child row was listed under."""
+
+    parent_id: str
+
+
+class ParentRef(BaseModel):
+    """A parent row reduced to the one field the child listing needs."""
+
+    # An empty id would template a malformed child path that lists nothing.
+    id: str = Field(min_length=1)
+
+
 class User(OktaFilterableEntity):
     """One user in any lifecycle status, DEPROVISIONED included."""
 
@@ -230,8 +252,83 @@ class OktaApplication(OktaDocument):
     PATH: ClassVar[str] = "apps"
     # Documented maximum; larger values are silently clamped to 200.
     PAGE_SIZE: ClassVar[int] = 200
+    LIST_PARAMS: ClassVar[dict[str, str | int]] = {
+        "limit": PAGE_SIZE,
+        "includeNonDeleted": "true",
+    }
 
     id: str
+
+
+class GroupLink(BaseModel):
+    """`_links.group` on a group-granted assignment: the group it came through."""
+
+    PATH_PREFIX: ClassVar[str] = "/api/v1/groups/"
+
+    href: AnyHttpUrl
+
+    @field_validator("href")
+    @classmethod
+    def check_group_path(cls, href: AnyHttpUrl) -> AnyHttpUrl:
+        # The href is Okta's own resource path for the group; any other shape
+        # fails validation rather than yielding a wrong id.
+        path = href.path or ""
+        group_id = path.removeprefix(cls.PATH_PREFIX)
+        if group_id == path or not group_id or "/" in group_id:
+            raise ValueError(f"unexpected group link {href}")
+        return href
+
+    @property
+    def id(self) -> str:
+        return (self.href.path or "").removeprefix(self.PATH_PREFIX)
+
+
+class AppUserLinks(BaseModel):
+    """The one HAL link of an AppUser the connector reads."""
+
+    group: GroupLink | None = None
+
+
+class ApplicationUser(BaseDocument, extra="allow"):
+    """One user's assignment to one app, direct (`scope: USER`) or via a group
+    (`scope: GROUP`); a user assigned both ways appears once, as USER, with no
+    granting group."""
+
+    class Meta(BaseDocument.Meta):
+        app_id: str = Field(description="The app the user is assigned to.")
+        group_id: str | None = Field(
+            description="The group the assignment was granted through; null when direct (`scope: USER`).",
+        )
+
+    # Set by stamp_meta on every validated row.
+    meta_: Meta | None = Field(default=None, alias="_meta")
+
+    NAME: ClassVar[str] = "application_users"
+    PATH_TEMPLATE: ClassVar[str] = f"{OktaApplication.PATH}/{{app_id}}/users"
+    # Documented maximum; 501 is silently clamped to 500.
+    PAGE_SIZE: ClassVar[int] = 500
+
+    # The Okta user id; unique only together with `_meta.app_id`.
+    id: str
+    # Not a Literal: Okta may add scopes, and only GROUP changes the stamp.
+    scope: str
+    # Read for the granting group, then dropped like every other `_links`:
+    # `_meta.group_id` is what the document keeps.
+    links: AppUserLinks = Field(alias="_links", exclude=True)
+
+    @model_validator(mode="after")
+    def stamp_meta(self, info: ValidationInfo) -> Self:
+        assert isinstance(info.context, ParentIdContext)
+        # `_links.group` appears only on group-granted rows and is the only
+        # place Okta names the granting group.
+        group = self.links.group
+        if self.scope == "GROUP" and group is None:
+            raise ValueError(f"GROUP-scoped assignment {self.id} has no group link")
+        self.meta_ = self.Meta(  # pyright: ignore[reportIncompatibleVariableOverride]
+            app_id=info.context.parent_id,
+            group_id=group.id if group else None,
+        )
+        return self
 
 
 class SystemLogEvent(BaseDocument, extra="allow"):
