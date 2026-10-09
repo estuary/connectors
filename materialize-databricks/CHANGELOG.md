@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-09
+### Changed
+- Load and merge queries on tables with a `TIMESTAMP` key column now restrict
+  the scan to the key range of each transaction.
+
 ## 2026-10-07
 ### Changed
 - A transaction's tables are committed concurrently, up to five at a time,

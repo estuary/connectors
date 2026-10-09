@@ -190,3 +190,54 @@ func TestRootLevelColumns(t *testing.T) {
 		require.True(t, strings.Count(col.Ptr, "/") == 1, "Column %s should be root-level", col.Field)
 	}
 }
+
+func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
+	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}},
+	}}}
+	id := Column{Identifier: "id"}
+	always := func(Column) bool { return true }
+	never := func(Column) bool { return false }
+
+	// Valid RFC3339 forms of three instants, in neither text nor time order.
+	keys := [][]any{
+		{"2025-05-05T02:00:00+02:00", "k"}, // 00:00:00Z
+		{"2025-05-05T00:00:01.5Z", "k"},    // the latest
+		{"2025-05-04T23:59:59.999999999Z", "k"},
+		{"2025-05-05T00:00:00.000Z", "k"},  // 00:00:00Z again, different precision
+		{"2025-05-04T22:59:59-01:00", "k"}, // 23:59:59Z, the earliest
+	}
+
+	for _, tt := range []struct {
+		name string
+		opts []MergeBoundsOption
+		keys [][]any
+		want MergeBound
+	}{
+		{"excluded by default", nil, keys, MergeBound{datetime, "", ""}},
+		{"excluded when the dialect declines", []MergeBoundsOption{WithDatetimeBounds(never)}, keys, MergeBound{datetime, "", ""}},
+		{"bounded by instant, keeping the original literals", []MergeBoundsOption{WithDatetimeBounds(always)}, keys,
+			MergeBound{datetime, literaler("2025-05-04T22:59:59-01:00"), literaler("2025-05-05T00:00:01.5Z")}},
+		{"a single key bounds itself", []MergeBoundsOption{WithDatetimeBounds(always)}, keys[:1],
+			MergeBound{datetime, literaler("2025-05-05T02:00:00+02:00"), literaler("2025-05-05T02:00:00+02:00")}},
+		{"an unparseable value drops the bound", []MergeBoundsOption{WithDatetimeBounds(always)},
+			append(append([][]any{}, keys...), []any{"2025-05-05 00:00:00", "k"}), MergeBound{datetime, "", ""}},
+		{"a null key drops the bound", []MergeBoundsOption{WithDatetimeBounds(always)},
+			append(append([][]any{}, keys...), []any{nil, "k"}), MergeBound{datetime, "", ""}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewMergeBoundsBuilder([]Column{datetime, id}, literaler, tt.opts...)
+			for _, k := range tt.keys {
+				b.NextKey(k)
+			}
+			got := b.Build()
+			require.Equal(t, tt.want, got[0])
+			require.Equal(t, MergeBound{id, literaler("k"), literaler("k")}, got[1], "other keys are unaffected")
+
+			// The next transaction starts clean.
+			b.NextKey([]any{"2025-06-01T00:00:00Z", "k"})
+			require.Equal(t, tt.opts != nil && tt.name != "excluded when the dialect declines", b.Build()[0].LiteralLower != "")
+		})
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -100,16 +101,35 @@ type MergeBound struct {
 type MergeBoundsBuilder struct {
 	keyColumns []Column
 	literaler  func(any) string
+	// datetimeBounds reports whether a date-time key column gets bounds.
+	datetimeBounds func(Column) bool
 
 	lower []any
 	upper []any
+	// unbounded marks key columns whose observed values can't be ordered,
+	// such as a date-time that doesn't parse.
+	unbounded []bool
 }
 
-func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string) *MergeBoundsBuilder {
-	return &MergeBoundsBuilder{
+type MergeBoundsOption func(*MergeBoundsBuilder)
+
+// WithDatetimeBounds enables bounds on date-time keys whose column satisfies
+// fn. Date-time keys are otherwise excluded, since a value's precision can
+// exceed the column's and an endpoint may compare a bound literal differently
+// from the stored value.
+func WithDatetimeBounds(fn func(Column) bool) MergeBoundsOption {
+	return func(b *MergeBoundsBuilder) { b.datetimeBounds = fn }
+}
+
+func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts ...MergeBoundsOption) *MergeBoundsBuilder {
+	var b = &MergeBoundsBuilder{
 		keyColumns: keyColumns,
 		literaler:  literaler,
 	}
+	for _, o := range opts {
+		o(b)
+	}
+	return b
 }
 
 // NextKey updates the observed minimum and maximum key for a transaction.
@@ -127,12 +147,55 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 		// MergeBoundsBuilder, and also after calls to `Build`.
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
+		b.unbounded = make([]bool, len(key))
 	}
 
 	for idx, k := range key {
+		if b.isDatetime(idx) {
+			// Date-time strings order by their instant, which text order
+			// doesn't follow across offsets and precisions.
+			if lower, upper, ok := minMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
+				b.lower[idx], b.upper[idx] = lower, upper
+			} else {
+				b.unbounded[idx] = true
+			}
+			continue
+		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
+}
+
+func (b *MergeBoundsBuilder) isDatetime(idx int) bool {
+	var col = b.keyColumns[idx]
+	var ft, _ = col.AsFlatType()
+	return ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" && b.datetimeBounds != nil && b.datetimeBounds(col)
+}
+
+// minMaxDatetime returns the earlier of lower and k, and the later of upper
+// and k, compared as instants. It reports false if any isn't a date-time.
+func minMaxDatetime(lower, upper, k any) (any, any, bool) {
+	var parse = func(v any) (time.Time, bool) {
+		s, ok := v.(string)
+		if !ok {
+			return time.Time{}, false
+		}
+		t, _, err := ParseRFC3339Nano(s)
+		return t, err == nil
+	}
+	tl, okL := parse(lower)
+	tu, okU := parse(upper)
+	tk, okK := parse(k)
+	if !okL || !okU || !okK {
+		return nil, nil, false
+	}
+	if tk.Before(tl) {
+		lower = k
+	}
+	if tk.After(tu) {
+		upper = k
+	}
+	return lower, upper, true
 }
 
 func minKey(k1 any, k2 any) any {
@@ -188,12 +251,13 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 			// the complexity and overhead of comparing their binary values is
 			// probably not worth it.
 			continue
-		} else if ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" {
+		} else if ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" && !b.isDatetime(idx) {
 			// At least one destination (BigQuery) has known issues with keys
 			// that are date-times with sub-microsecond precision when used as a
-			// merge bound. For simplicity such formatted strings will never
-			// appear in merge bounds, although we should figure out how to do
-			// this more selectively in the future.
+			// merge bound, so date-time keys get bounds only where the dialect
+			// opts in.
+			continue
+		} else if b.unbounded[idx] {
 			continue
 		}
 
@@ -211,4 +275,5 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 func (b *MergeBoundsBuilder) Reset() {
 	b.lower = nil
 	b.upper = nil
+	b.unbounded = nil
 }
