@@ -48,10 +48,10 @@ Some data can only be captured while it exists:
 To set up the Estuary source connector, you'll need an Estuary refresh token or service account API key. The connector captures prefixes the credential can read. Some resources need more access:
 
 - `alert_subscriptions` requires admin access to a prefix.
-- `invoices` requires billing access to a tenant, which admins have.
+- `invoices` requires billing access to a tenant, which admins have. Invoices are captured per tenant, so the tenant prefix itself (for example, `acmeCo/`) must be configured, or `prefixes` left empty.
 - `service_accounts` requires access to query service accounts, which admins have.
 
-Prefixes the credential lacks access to are skipped for these resources.
+Prefixes the credential lacks access to are skipped for these resources. If the credential loses read access to a configured prefix entirely, the capture fails rather than skipping it, so no data is missed while access is lost.
 
 Short-lived access tokens, which expire after an hour, are not accepted.
 
