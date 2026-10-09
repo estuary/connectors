@@ -1,17 +1,16 @@
+import abc
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, override
 
-from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-)
-from estuary_cdk.capture.common import (
-    ResourceConfig,
-    ResourceState,
-)
+from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
+from estuary_cdk.capture.common import ResourceState
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import AccessToken
-from pydantic import AwareDatetime, BaseModel, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
+
+from .utils import to_rfc3339_ms
 
 
 class ApiToken(AccessToken):
@@ -63,6 +62,22 @@ class EndpointConfig(BaseModel):
         title="Authentication",
     )
 
+    class Advanced(BaseModel):
+        window_size: timedelta = Field(
+            description="Date window size for the users and groups backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
+            title="Window Size",
+            default=timedelta(days=30),
+            ge=timedelta(hours=1),
+            le=timedelta(days=365),
+        )
+
+    advanced: Advanced = Field(
+        default_factory=Advanced,
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
+
     @field_validator("domain", mode="before")
     @classmethod
     def normalize_domain(cls, value: object) -> object:
@@ -91,7 +106,125 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class OktaApplication(BaseDocument, extra="allow"):
+class OktaDocument(BaseDocument):
+    """A document built from an Okta API row.
+
+    The row's `_links` is dropped: it is HAL navigation whose every href embeds
+    the tenant domain, and it can be rebuilt from `id`. Keeping it would only
+    add a dozen hostname-bearing strings to every captured document.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_links(cls, data: object) -> object:
+        if isinstance(data, dict):
+            _ = data.pop("_links", None)
+        return data
+
+
+class IdEntityDocument(OktaDocument):
+    """Write schema of the users and groups collections."""
+
+    id: str
+
+    @classmethod
+    def deleted(cls, id: str) -> "IdEntityDocument":
+        """The delete document for `id`: nothing but the key, since the delete
+        time is already stamped on the document by Flow."""
+        doc = cls(id=id)
+        # Assigned rather than defaulted so that it survives the CDK's
+        # exclude_unset serialization.
+        doc.meta_ = cls.Meta(op="d")
+        return doc
+
+
+class OktaFilterableEntity(IdEntityDocument, abc.ABC):
+    """A top-level Okta object captured by server-side `filter` windows.
+
+    Abstract: subclasses own the filter expression, the list path, the page
+    size and the System Log event that records their hard deletion. The window
+    is bounded server-side, so no timestamp is read client-side and the model
+    declares nothing beyond the key; the timestamps a row carries are passed
+    through untouched.
+
+    Okta `filter` timestamps must carry milliseconds (a bare-second bound is a
+    400 E0000020) and the comparison is millisecond-precise, while the stored
+    timestamps are whole seconds (`Users / lastUpdated boundary`). A window
+    `(since, until]` on whole-second bounds therefore covers exactly the
+    seconds strictly after `since` through `until` inclusive.
+    """
+
+    NAME: ClassVar[str]
+    PATH: ClassVar[str]
+    FILTER_PARAM: ClassVar[str] = "filter"
+    PAGE_SIZE: ClassVar[int]
+    DELETE_EVENT_TYPE: ClassVar[str]
+    TARGET_TYPE: ClassVar[str]
+
+    @classmethod
+    @abc.abstractmethod
+    def window_filter(cls, since: datetime, until: datetime) -> str:
+        """Okta `filter` expression selecting objects changed in
+        `(since, until]`, on every timestamp the object reports change on."""
+
+    @classmethod
+    def delete_filter(cls) -> str:
+        """System Log `filter` expression selecting the events that record a
+        finished hard delete of one of these objects. A failed delete must not
+        tombstone an object that still exists, hence the outcome clause."""
+        return f'eventType eq "{cls.DELETE_EVENT_TYPE}" and outcome.result eq "SUCCESS"'
+
+
+class User(OktaFilterableEntity):
+    """One user in any lifecycle status, DEPROVISIONED included."""
+
+    NAME: ClassVar[str] = "users"
+    PATH: ClassVar[str] = "users"
+    # Documented maximum; larger values are silently clamped to 200.
+    PAGE_SIZE: ClassVar[int] = 200
+    # A hard delete emits `.initiated` then `.completed`; only the latter
+    # confirms the user is gone.
+    DELETE_EVENT_TYPE: ClassVar[str] = "user.lifecycle.delete.completed"
+    TARGET_TYPE: ClassVar[str] = "User"
+
+    @override
+    @classmethod
+    def window_filter(cls, since: datetime, until: datetime) -> str:
+        return (
+            f'lastUpdated gt "{to_rfc3339_ms(since)}" '
+            f'and lastUpdated le "{to_rfc3339_ms(until)}"'
+        )
+
+
+class Group(OktaFilterableEntity):
+    """One group of any type (OKTA_GROUP, APP_GROUP or BUILT_IN).
+
+    Profile edits move `lastUpdated`; membership adds and removes move only
+    `lastMembershipUpdated`, which is set to `created` on a new group and is
+    never null. A window must test both, or every membership change is missed.
+    """
+
+    NAME: ClassVar[str] = "groups"
+    PATH: ClassVar[str] = "groups"
+    # Above Okta's recommended 200 and below the 10000 maximum (10001 is
+    # silently clamped); the standard retry covers the timeout risk Okta
+    # names for large pages.
+    PAGE_SIZE: ClassVar[int] = 1000
+    DELETE_EVENT_TYPE: ClassVar[str] = "group.lifecycle.delete"
+    TARGET_TYPE: ClassVar[str] = "UserGroup"
+
+    @override
+    @classmethod
+    def window_filter(cls, since: datetime, until: datetime) -> str:
+        lo = to_rfc3339_ms(since)
+        hi = to_rfc3339_ms(until)
+        return (
+            f'(lastUpdated gt "{lo}" and lastUpdated le "{hi}") '
+            f'or (lastMembershipUpdated gt "{lo}" and lastMembershipUpdated le "{hi}")'
+        )
+
+
+class OktaApplication(OktaDocument):
     """One app integration, ACTIVE or INACTIVE; deleted apps are never listed."""
 
     PATH: ClassVar[str] = "apps"
@@ -115,6 +248,7 @@ class SystemLogEvent(BaseDocument, extra="allow"):
     # The `after` token is a position, `<persistence epoch-ms>_<n>`, never a
     # session handle (`System Log / polling resume after`).
     AFTER_TOKEN: ClassVar[re.Pattern[str]] = re.compile(r"\d+_\d+")
+    FILTER_PARAM: ClassVar[str] = "filter"
     # Okta rejects anything above 1000 with a 400 (System Log / limit over max).
     PAGE_SIZE: ClassVar[int] = 1000
 
@@ -123,3 +257,15 @@ class SystemLogEvent(BaseDocument, extra="allow"):
 
     def get_cursor(self) -> AwareDatetime:
         return self.published
+
+
+class DeleteEvent(BaseModel):
+    """The slice of a System Log delete event needed to build a delete
+    document.
+    """
+
+    class Target(BaseModel):
+        id: str
+        type: str
+
+    target: list[Target]
