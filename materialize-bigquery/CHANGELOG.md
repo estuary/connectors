@@ -1,5 +1,11 @@
 # materialize-bigquery
 
+## 2026-10-09
+
+### Fixed
+- Validating or applying a materialization no longer fails when another task
+  or shard drops a table in the dataset while the connector is listing it.
+
 ## 2026-09-22
 
 ### Fixed
