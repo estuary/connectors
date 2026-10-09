@@ -48,7 +48,7 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         ])
 
     try:
-        authorized = [a.prefix for a in await fetch_authorized_prefixes(http, log)]
+        authorized = [a.prefix for a in await fetch_authorized_prefixes(log, http)]
     except HTTPError as err:
         if err.code == 401:
             msg = f"Invalid API key. Please confirm the provided API key is correct and has not expired.\n\n{err.message}"
@@ -110,8 +110,10 @@ def _create_publication_history_resource(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_publication_history, http, config),
-            fetch_page=functools.partial(backfill_publication_history, http, config),
+            fetch_changes=functools.partial(fetch_publication_history, http, config.prefixes),
+            fetch_page=functools.partial(
+                backfill_publication_history, http, config.prefixes, config.start_date
+            ),
         )
 
     return Resource(
@@ -143,8 +145,17 @@ def _create_catalog_stats_resource(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_catalog_stats, http, config, grain),
-            fetch_page=functools.partial(backfill_catalog_stats, http, config, grain),
+            fetch_changes=functools.partial(
+                fetch_catalog_stats,
+                http,
+                config.prefixes,
+                config.start_date,
+                timedelta(hours=config.advanced.catalog_stats_lookback_hours),
+                grain,
+            ),
+            fetch_page=functools.partial(
+                backfill_catalog_stats, http, config.prefixes, config.start_date, grain
+            ),
         )
 
     return Resource(
@@ -173,14 +184,14 @@ async def all_resources(
             _create_snapshot_resource(
                 cls.name,
                 timedelta(minutes=5),
-                functools.partial(snapshot_live_spec_refs, cls, http, config),
+                functools.partial(snapshot_live_spec_refs, cls, http, config.prefixes),
             )
             for cls in LIVE_SPEC_SNAPSHOT_STREAMS
         ),
         _create_publication_history_resource(http, config),
         *(
             _create_snapshot_resource(
-                cls.name, cls.interval, functools.partial(snapshot_stream, cls, http, config)
+                cls.name, cls.interval, functools.partial(snapshot_stream, cls, http, config.prefixes)
             )
             for cls in SNAPSHOT_STREAMS
         ),

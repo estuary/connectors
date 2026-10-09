@@ -1,24 +1,32 @@
-import json
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator
-
-from estuary_cdk.http import HTTPSession
+from typing import Any, AsyncGenerator, TypeVar
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.flow import ValidationError
+from estuary_cdk.http import HTTPSession
+from pydantic import BaseModel
 
 from .models import (
     AuthorizedPrefix,
+    AuthorizedPrefixesData,
     CapabilityBit,
     CatalogStats,
-    EndpointConfig,
+    CatalogStatsData,
+    Connection,
     EstuarySnapshot,
+    GraphQLResponse,
     Grain,
     LiveSpecRefDocument,
+    LiveSpecsByNameData,
+    LiveSpecsData,
     Pager,
     PublicationHistoryItem,
+    RawData,
     Scope,
 )
+
+DataT = TypeVar("DataT", bound=BaseModel)
 
 API_BASE_URL = "https://api.estuary.dev"
 
@@ -34,27 +42,31 @@ class GraphQLError(RuntimeError):
 
 
 async def graphql_request(
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     query: str,
-    variables: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """POST a query and return its `data`. GraphQL failures arrive as HTTP 200 with an `errors` array.
+    variables: dict[str, Any],
+    data_model: type[DataT],
+) -> DataT:
+    """POST a query and return its `data` as `data_model`, raising GraphQLError
+    on any GraphQL error.
 
     A provisional authorization failure is an HTTP 307 back to /api/graphql;
     aiohttp follows it with the same method, body and Authorization header.
     """
-    body = json.loads(
+    response = GraphQLResponse.model_validate_json(
         await http.request(
             log,
             GRAPHQL_URL,
             method="POST",
-            json={"query": query, "variables": variables or {}},
+            json={"query": query, "variables": variables},
         )
     )
-    if errors := body.get("errors"):
-        raise GraphQLError(f"Estuary API returned errors: {[e.get('message') for e in errors]}")
-    return body["data"]
+    if response.errors:
+        raise GraphQLError(f"Estuary API returned errors: {[e.message for e in response.errors]}")
+    if response.data is None:
+        raise GraphQLError("Estuary API returned no data")
+    return data_model.model_validate(response.data)
 
 
 AUTHORIZED_PREFIXES_QUERY = """
@@ -66,10 +78,10 @@ query AuthorizedPrefixes {
 """
 
 
-async def fetch_authorized_prefixes(http: HTTPSession, log: Logger) -> list[AuthorizedPrefix]:
+async def fetch_authorized_prefixes(log: Logger, http: HTTPSession) -> list[AuthorizedPrefix]:
     # `prefixes` returns every row when `first` is omitted.
-    data = await graphql_request(http, log, AUTHORIZED_PREFIXES_QUERY)
-    return [AuthorizedPrefix.model_validate(edge["node"]) for edge in data["prefixes"]["edges"]]
+    data = await graphql_request(log, http, AUTHORIZED_PREFIXES_QUERY, {}, AuthorizedPrefixesData)
+    return [edge.node for edge in data.prefixes.edges]
 
 
 def _prune_nested(prefixes: set[str]) -> list[str]:
@@ -81,26 +93,40 @@ def _prune_nested(prefixes: set[str]) -> list[str]:
 
 
 async def resolve_scopes(
-    http: HTTPSession,
     log: Logger,
-    config: EndpointConfig,
+    http: HTTPSession,
+    prefixes: list[str],
     stream: str,
     required: frozenset[CapabilityBit],
 ) -> list[str]:
-    """Return the disjoint prefixes to query: the configured prefixes (or every
-    authorized prefix) where the API key holds every `required` capability.
+    """Return the disjoint prefixes to query: the configured `prefixes` (or every
+    authorized prefix when none are configured) where the API key holds every
+    `required` capability.
 
-    Scopes are planned rather than probed because an unauthorized query fails
-    as a whole, and skipping a scope mid-sweep would tombstone its rows.
+    A configured prefix the key can't read at all raises, rather than being
+    skipped: skipping would tombstone its snapshot rows and let incremental
+    cursors move past data that can't be re-read once access returns. A
+    configured prefix the key can read, but without a stream's extra
+    capabilities, is skipped for that stream.
     """
-    authorized = await fetch_authorized_prefixes(http, log)
+    authorized = await fetch_authorized_prefixes(log, http)
     holders = [a.prefix for a in authorized if required <= set(a.capabilities)]
 
-    if not config.prefixes:
+    if not prefixes:
         return _prune_nested(set(holders))
 
+    readable = [a.prefix for a in authorized]
+    lost = [
+        c for c in prefixes
+        if not any(c.startswith(r) or r.startswith(c) for r in readable)
+    ]
+    if lost:
+        raise ValidationError([
+            f"The API key can no longer read the configured prefixes {lost}. Restore the key's access, or remove these prefixes from the capture."
+        ])
+
     candidates: set[str] = set()
-    for c in config.prefixes:
+    for c in prefixes:
         matched = False
         for h in holders:
             if c.startswith(h):
@@ -116,9 +142,9 @@ async def resolve_scopes(
 
 
 async def _walk(
-    cls: type[EstuarySnapshot],
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
+    cls: type[EstuarySnapshot],
     variables: dict[str, Any],
 ) -> AsyncGenerator[dict[str, Any], None]:
     cursor: str | None = None
@@ -132,28 +158,30 @@ async def _walk(
                 # backward. Edges are newest-first: `endCursor` is the oldest.
                 page_vars |= {"last": PAGE_SIZE, "before": cursor}
 
-        connection: Any = await graphql_request(http, log, cls.query, page_vars)
+        result: Any = (await graphql_request(log, http, cls.query, page_vars, RawData)).root
         for key in cls.connection_path:
             # `tenant(name)` is null for an unknown tenant.
-            if connection is None:
+            if result is None:
                 return
-            connection = connection[key]
+            result = result[key]
 
         if cls.pager == Pager.LIST:
-            for node in connection:
+            for node in result:
                 yield node
             return
 
-        for edge in connection["edges"]:
-            yield edge["node"]
+        connection = Connection.model_validate(result)
+        for edge in connection.edges:
+            yield edge.node
 
-        page_info = connection["pageInfo"]
         has_more = (
-            page_info["hasNextPage"]
+            connection.pageInfo.hasNextPage
             if cls.pager == Pager.FORWARD
-            else page_info["hasPreviousPage"]
+            else connection.pageInfo.hasPreviousPage
         )
-        cursor = page_info["endCursor"]
+        if has_more is None:
+            raise GraphQLError(f"{cls.name}: the query's pageInfo is missing the field its pager reads")
+        cursor = connection.pageInfo.endCursor
         if not has_more or cursor is None:
             return
 
@@ -161,12 +189,12 @@ async def _walk(
 async def snapshot_stream(
     cls: type[EstuarySnapshot],
     http: HTTPSession,
-    config: EndpointConfig,
+    prefixes: list[str],
     log: Logger,
 ) -> AsyncGenerator[EstuarySnapshot, None]:
     scopes: list[str] = []
     if cls.scope != Scope.GLOBAL:
-        scopes = await resolve_scopes(http, log, config, cls.name, cls.required)
+        scopes = await resolve_scopes(log, http, prefixes, cls.name, cls.required)
         if not scopes:
             log.info(f"{cls.name}: the API key lacks the required capabilities on every configured prefix")
             return
@@ -177,6 +205,8 @@ async def snapshot_stream(
         case Scope.TENANT:
             # Billing is checked on the exact tenant prefix.
             tenants = sorted({s.split("/")[0] + "/" for s in scopes} & set(scopes))
+            if not tenants:
+                log.info(f"{cls.name}: no tenant prefix (e.g. acmeCo/) is configured; {cls.name} are only captured for a configured tenant prefix")
             queries = [({"tenant": t}, {"tenant": t}) for t in tenants]
         case _:
             queries = [({}, {})]
@@ -185,9 +215,9 @@ async def snapshot_stream(
     # to avoid re-committing unchanged snapshots.
     rows: dict[tuple[Any, ...], EstuarySnapshot] = {}
     for variables, stamp in queries:
-        async for node in _walk(cls, http, log, variables):
+        async for node in _walk(log, http, cls, variables):
             doc = cls.model_validate({**node, **stamp})
-            if cls.scope == Scope.GLOBAL_FILTERED and config.prefixes and not doc.in_scope(scopes):
+            if cls.scope == Scope.GLOBAL_FILTERED and prefixes and not doc.in_scope(scopes):
                 continue
             rows[doc.identity()] = doc
 
@@ -218,8 +248,8 @@ query LiveSpecRefs($prefix: Prefix!, $first: Int!, $after: String{params}) {{
 
 
 async def walk_live_spec_refs(
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     query: str,
     variables: dict[str, Any],
     first: int,
@@ -229,28 +259,28 @@ async def walk_live_spec_refs(
     ascending by catalog name, starting after the catalog name `after`."""
     while True:
         data = await graphql_request(
-            http, log, query, {**variables, "first": first, "after": after}
+            log, http, query, {**variables, "first": first, "after": after}, LiveSpecsData
         )
-        connection = data["liveSpecs"]
-        nodes = [edge["node"] for edge in connection["edges"]]
+        connection = data.liveSpecs
+        nodes = [edge.node for edge in connection.edges]
         if nodes:
             yield nodes
         # `hasNextPage` is `rows == first`, so an exact multiple ends with an empty page.
-        if not connection["pageInfo"]["hasNextPage"] or not nodes:
+        if not connection.pageInfo.hasNextPage or not nodes:
             return
-        after = connection["pageInfo"]["endCursor"]
+        after = connection.pageInfo.endCursor
 
 
 async def snapshot_live_spec_refs(
     cls: type[LiveSpecRefDocument],
     http: HTTPSession,
-    config: EndpointConfig,
+    prefixes: list[str],
     log: Logger,
 ) -> AsyncGenerator[LiveSpecRefDocument, None]:
     query = _live_spec_refs_query(cls.node_selection, cls.fragments)
-    for prefix in await resolve_scopes(http, log, config, cls.name, LIVE_SPECS_REQUIRED):
+    for prefix in await resolve_scopes(log, http, prefixes, cls.name, LIVE_SPECS_REQUIRED):
         async for nodes in walk_live_spec_refs(
-            http, log, query, {"prefix": prefix}, LIVE_SPECS_PAGE_SIZE
+            log, http, query, {"prefix": prefix}, LIVE_SPECS_PAGE_SIZE
         ):
             for node in nodes:
                 if (doc := cls.from_ref(node)) is not None:
@@ -281,10 +311,10 @@ def _rfc3339(dt: datetime) -> str:
 
 
 async def _drain_spec_history(
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     name: str,
-    history: dict[str, Any] | None,
+    history: Connection | None,
     until: datetime,
 ) -> list[PublicationHistoryItem]:
     """Collect one spec's publications up to and including `until`, following
@@ -292,31 +322,37 @@ async def _drain_spec_history(
     forward paging has no upper-bound filter, so stop at the first item past `until`."""
     items: list[PublicationHistoryItem] = []
     while history is not None:
-        for edge in history["edges"]:
-            item = PublicationHistoryItem.model_validate({**edge["node"], "catalogName": name})
+        for edge in history.edges:
+            item = PublicationHistoryItem.model_validate({**edge.node, "catalogName": name})
             if item.publishedAt > until:
                 return items
             items.append(item)
 
-        if not history["pageInfo"]["hasNextPage"]:
+        if not history.pageInfo.hasNextPage:
             break
 
         data = await graphql_request(
-            http,
             log,
+            http,
             PUBLICATION_HISTORY_DRAIN_QUERY,
-            {"name": name, "after": history["pageInfo"]["endCursor"], "first": HISTORY_DRAIN_PAGE_SIZE},
+            {"name": name, "after": history.pageInfo.endCursor, "first": HISTORY_DRAIN_PAGE_SIZE},
+            LiveSpecsByNameData,
         )
-        edges = data["liveSpecs"]["edges"]
+        edges = data.liveSpecs.edges
         # A spec hard-deleted since the page was read takes its history with it.
-        history = edges[0]["node"]["publicationHistory"] if edges else None
+        history = _history_connection(edges[0].node) if edges else None
 
     return items
 
 
+def _history_connection(node: dict[str, Any]) -> Connection | None:
+    history = node["publicationHistory"]
+    return None if history is None else Connection.model_validate(history)
+
+
 async def _publication_history_pages(
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     prefixes: list[str],
     since: datetime,
     until: datetime,
@@ -334,8 +370,8 @@ async def _publication_history_pages(
 
     for i, prefix in enumerate(prefixes[start:], start):
         async for nodes in walk_live_spec_refs(
-            http,
             log,
+            http,
             PUBLICATION_HISTORY_PAGE_QUERY,
             {"prefix": prefix, "since": _rfc3339(since)},
             HISTORY_REFS_PAGE_SIZE,
@@ -345,7 +381,7 @@ async def _publication_history_pages(
             for node in nodes:
                 items.extend(
                     await _drain_spec_history(
-                        http, log, node["catalogName"], node["publicationHistory"], until
+                        log, http, node["catalogName"], _history_connection(node), until
                     )
                 )
             yield nodes[-1]["catalogName"], items
@@ -353,7 +389,7 @@ async def _publication_history_pages(
 
 async def fetch_publication_history(
     http: HTTPSession,
-    config: EndpointConfig,
+    prefixes: list[str],
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[PublicationHistoryItem | LogCursor, None]:
@@ -376,8 +412,8 @@ async def fetch_publication_history(
     if horizon <= log_cursor:
         return
 
-    prefixes = await resolve_scopes(http, log, config, PublicationHistoryItem.name, LIVE_SPECS_REQUIRED)
-    async for _, items in _publication_history_pages(http, log, prefixes, log_cursor, horizon, None):
+    scopes = await resolve_scopes(log, http, prefixes, PublicationHistoryItem.name, LIVE_SPECS_REQUIRED)
+    async for _, items in _publication_history_pages(log, http, scopes, log_cursor, horizon, None):
         for item in items:
             yield item
 
@@ -386,7 +422,8 @@ async def fetch_publication_history(
 
 async def backfill_publication_history(
     http: HTTPSession,
-    config: EndpointConfig,
+    prefixes: list[str],
+    start_date: datetime,
     log: Logger,
     page_cursor: PageCursor,
     cutoff: LogCursor,
@@ -400,12 +437,12 @@ async def backfill_publication_history(
     assert isinstance(cutoff, datetime)
     assert page_cursor is None or isinstance(page_cursor, str)
 
-    prefixes = await resolve_scopes(http, log, config, PublicationHistoryItem.name, LIVE_SPECS_REQUIRED)
-    if not prefixes:
+    scopes = await resolve_scopes(log, http, prefixes, PublicationHistoryItem.name, LIVE_SPECS_REQUIRED)
+    if not scopes:
         return
 
     async for last_name, items in _publication_history_pages(
-        http, log, prefixes, config.start_date, cutoff, page_cursor
+        log, http, scopes, start_date, cutoff, page_cursor
     ):
         for item in items:
             yield item
@@ -418,7 +455,7 @@ CATALOG_STATS_NAMES_QUERY = _live_spec_refs_query("liveSpec { catalogType }")
 
 
 async def _catalog_stats_names(
-    http: HTTPSession, log: Logger, config: EndpointConfig, grain: Grain
+    log: Logger, http: HTTPSession, prefixes: list[str], grain: Grain
 ) -> list[str]:
     """Each scope's own rollup name plus every live, non-test spec under it.
 
@@ -426,10 +463,10 @@ async def _catalog_stats_names(
     sub-prefix rollups are left out: they are sums of rows already captured.
     """
     names: set[str] = set()
-    for prefix in await resolve_scopes(http, log, config, grain.stream_name, LIVE_SPECS_REQUIRED):
+    for prefix in await resolve_scopes(log, http, prefixes, grain.stream_name, LIVE_SPECS_REQUIRED):
         names.add(prefix)
         async for nodes in walk_live_spec_refs(
-            http, log, CATALOG_STATS_NAMES_QUERY, {"prefix": prefix}, CATALOG_STATS_NAMES_PAGE_SIZE
+            log, http, CATALOG_STATS_NAMES_QUERY, {"prefix": prefix}, CATALOG_STATS_NAMES_PAGE_SIZE
         ):
             for node in nodes:
                 spec = node["liveSpec"]
@@ -445,8 +482,8 @@ def _window_buckets(names: list[str]) -> int:
 
 
 async def _fetch_catalog_stats_window(
-    http: HTTPSession,
     log: Logger,
+    http: HTTPSession,
     grain: Grain,
     names: list[str],
     start: datetime,
@@ -455,8 +492,8 @@ async def _fetch_catalog_stats_window(
     """Fetch buckets in [start, end) for every name. Both bounds are grain-aligned."""
     for i in range(0, len(names), CatalogStats.names_per_query):
         data = await graphql_request(
-            http,
             log,
+            http,
             CatalogStats.query,
             {
                 "names": names[i : i + CatalogStats.names_per_query],
@@ -464,14 +501,17 @@ async def _fetch_catalog_stats_window(
                 "start": _rfc3339(start),
                 "end": _rfc3339(end),
             },
+            CatalogStatsData,
         )
-        for edge in data["catalogStats"]["edges"]:
-            yield CatalogStats.model_validate(edge["node"])
+        for edge in data.catalogStats.edges:
+            yield edge.node
 
 
 async def fetch_catalog_stats(
     http: HTTPSession,
-    config: EndpointConfig,
+    prefixes: list[str],
+    start_date: datetime,
+    lookback: timedelta,
     grain: Grain,
     log: Logger,
     log_cursor: LogCursor,
@@ -502,17 +542,16 @@ async def fetch_catalog_stats(
     if now <= log_cursor:
         return
 
-    lookback = timedelta(hours=config.advanced.catalog_stats_lookback_hours)
-    window_start = max(grain.floor(config.start_date), grain.floor(log_cursor - lookback))
+    window_start = max(grain.floor(start_date), grain.floor(log_cursor - lookback))
     stop = grain.add(grain.floor(now), 1)
-    names = await _catalog_stats_names(http, log, config, grain)
+    names = await _catalog_stats_names(log, http, prefixes, grain)
     window_buckets = _window_buckets(names)
 
     cursor = log_cursor
     while window_start < stop:
         window_end = min(grain.add(window_start, window_buckets), stop)
 
-        async for row in _fetch_catalog_stats_window(http, log, grain, names, window_start, window_end):
+        async for row in _fetch_catalog_stats_window(log, http, grain, names, window_start, window_end):
             yield row
 
         window_start = window_end
@@ -528,7 +567,8 @@ async def fetch_catalog_stats(
 
 async def backfill_catalog_stats(
     http: HTTPSession,
-    config: EndpointConfig,
+    prefixes: list[str],
+    start_date: datetime,
     grain: Grain,
     log: Logger,
     page_cursor: PageCursor,
@@ -543,7 +583,7 @@ async def backfill_catalog_stats(
     assert page_cursor is None or isinstance(page_cursor, str)
 
     start = (
-        grain.floor(config.start_date)
+        grain.floor(start_date)
         if page_cursor is None
         else datetime.fromisoformat(page_cursor)
     )
@@ -551,10 +591,10 @@ async def backfill_catalog_stats(
     if start >= end:
         return
 
-    names = await _catalog_stats_names(http, log, config, grain)
+    names = await _catalog_stats_names(log, http, prefixes, grain)
     window_end = min(grain.add(start, _window_buckets(names)), end)
 
-    async for row in _fetch_catalog_stats_window(http, log, grain, names, start, window_end):
+    async for row in _fetch_catalog_stats_window(log, http, grain, names, start, window_end):
         yield row
 
     if window_end < end:

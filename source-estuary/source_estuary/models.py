@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, UTC
 from enum import StrEnum
 from typing import Annotated, Any, ClassVar, Literal, Self
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, RootModel
 
 from estuary_cdk.capture.common import (
     BaseDocument,
@@ -124,9 +124,63 @@ ADMIN_BUNDLE = frozenset({
 })
 
 
+class GraphQLErrorEntry(BaseModel, extra="allow"):
+    message: str
+
+
+class GraphQLResponse(BaseModel, extra="allow"):
+    """The GraphQL envelope. Failures arrive as HTTP 200 with `errors`."""
+
+    data: dict[str, Any] | None = None
+    errors: list[GraphQLErrorEntry] = []
+
+
+class RawData(RootModel[dict[str, Any]]):
+    """`data` for queries whose shape is described by a stream's descriptor."""
+
+
+class PageInfo(BaseModel, extra="allow"):
+    # Forward pagers select `hasNextPage` and backward pagers `hasPreviousPage`.
+    hasNextPage: bool | None = None
+    hasPreviousPage: bool | None = None
+    endCursor: str | None
+
+
+class Edge(BaseModel, extra="allow"):
+    node: dict[str, Any]
+
+
+class EdgeList(BaseModel, extra="allow"):
+    edges: list[Edge]
+
+
+class Connection(EdgeList):
+    pageInfo: PageInfo
+
+
 class AuthorizedPrefix(BaseModel, extra="allow"):
     prefix: str
     capabilities: list[str]
+
+
+class AuthorizedPrefixEdge(BaseModel, extra="allow"):
+    node: AuthorizedPrefix
+
+
+class AuthorizedPrefixConnection(BaseModel, extra="allow"):
+    edges: list[AuthorizedPrefixEdge]
+
+
+class AuthorizedPrefixesData(BaseModel, extra="allow"):
+    prefixes: AuthorizedPrefixConnection
+
+
+class LiveSpecsData(BaseModel, extra="allow"):
+    liveSpecs: Connection
+
+
+class LiveSpecsByNameData(BaseModel, extra="allow"):
+    liveSpecs: EdgeList
 
 
 class Pager(StrEnum):
@@ -431,31 +485,17 @@ class LiveSpec(LiveSpecRefDocument):
 class TaskStatus(LiveSpecRefDocument):
     name: ClassVar[str] = "task_status"
     node_selection: ClassVar[str] = "status { ...TaskStatusFields }"
+    # The status summary, connector status, and shard activation including
+    # the recent failure count. Other controller sub-statuses can be added as
+    # they are needed: every added field can fail the whole request.
     fragments: ClassVar[str] = """
 fragment Shard on ShardRef { name keyBegin rClockBegin build }
-fragment Job on JobStatus { type lockFailures { catalogName expected actual } }
-fragment Err on Error { catalogName scope detail }
-fragment Change on DiscoverChange { resourcePath target disable }
-fragment Outcome on AutoDiscoverOutcome {
-  ts added { ...Change } modified { ...Change } removed { ...Change } errors { ...Err } publishResult { ...Job }
-}
 fragment TaskStatusFields on LiveSpecStatus {
   type summary
   connector { shard { ...Shard } ts message fields }
   controller {
-    nextRun error failures updatedAt alerts
-    activation { lastActivated lastActivatedAt recentFailureCount nextRetry
-      shardStatus { count lastTs firstTs status }
-      lastFailure { shard { ...Shard } ts message fields } }
-    publications { nextAfter maxObservedPubId
-      history { id created completed detail isTouch count result { ...Job } errors { ...Err } }
-      pendingRepublish { receivedAt reason lastBuildId } }
-    autoDiscover { nextAt pendingPublish { ...Outcome } lastSuccess { ...Outcome }
-      failure { count firstTs lastOutcome { ...Outcome } } }
-    sourceCapture { upToDate addBindings }
-    inferredSchema { schemaLastUpdated schemaMd5 nextMd5 nextUpdateAfter }
-    configUpdate { nextAttempt build }
-    abandon { lastEvaluated }
+    error failures
+    activation { lastActivatedAt recentFailureCount shardStatus { status count firstTs lastTs } }
   }
 }
 """
@@ -615,6 +655,18 @@ query CatalogStats($names: [String!]!, $grain: CatalogStatsGrain!, $start: DateT
     statsSummary: CatalogStatsSummary
     # Null on prefix rollup rows and plain collection rows.
     taskStats: CatalogTaskStats | None = None
+
+
+class CatalogStatsEdge(BaseModel, extra="allow"):
+    node: CatalogStats
+
+
+class CatalogStatsConnection(BaseModel, extra="allow"):
+    edges: list[CatalogStatsEdge]
+
+
+class CatalogStatsData(BaseModel, extra="allow"):
+    catalogStats: CatalogStatsConnection
 
 
 LIVE_SPEC_SNAPSHOT_STREAMS: list[type[LiveSpecRefDocument]] = [LiveSpec, TaskStatus]
