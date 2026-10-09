@@ -283,10 +283,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// A BSON date holds milliseconds, so the boundary is floored to
 		// match the stored precision.
 		var before = primitive.NewDateTimeFromTime(boundary)
-		res, err := b.collection.DeleteMany(ctx, bson.D{{
-			Key:   publishedAtField,
-			Value: bson.D{{Key: "$lt", Value: before}},
-		}})
+		res, err := b.collection.DeleteMany(ctx, bson.D{{Key: "$or", Value: bson.A{
+			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$lt", Value: before}}}},
+			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$exists", Value: false}}}},
+		}}})
 		if err != nil {
 			return nil, fmt.Errorf("truncating %s after backfill: %w", b.path, err)
 		}
