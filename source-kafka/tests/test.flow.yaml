@@ -15,6 +15,9 @@ captures:
             endpoint: http://localhost:8081
             username: user
             password: password
+          # Exercise the transcoder path end to end; it is off by default.
+          advanced:
+            feature_flags: protobuf_transcoder
     bindings:
       - resource:
           topic: avro-topic

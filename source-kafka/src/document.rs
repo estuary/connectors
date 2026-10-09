@@ -446,7 +446,7 @@ mod tests {
 /// `DynamicMessage`s decoded from wire bytes like production payloads. The one
 /// intentional difference, f32 representation, is pinned by its own test.
 #[cfg(test)]
-mod differential {
+pub(crate) mod differential {
     use super::MergeSerializer;
     use crate::protobuf::decode_protobuf_message;
     use prost_reflect::{
@@ -456,7 +456,7 @@ mod differential {
     use serde_json::{json, Map, Value};
     use std::collections::{BTreeMap, HashMap, HashSet};
 
-    fn pool() -> DescriptorPool {
+    pub(crate) fn pool() -> DescriptorPool {
         let file_descriptor_set = protox::compile(
             ["differential_corpus.proto"],
             [concat!(env!("CARGO_MANIFEST_DIR"), "/src/testdata")],
@@ -466,7 +466,7 @@ mod differential {
             .expect("corpus descriptors must load")
     }
 
-    fn serialize_options() -> SerializeOptions {
+    pub(crate) fn serialize_options() -> SerializeOptions {
         SerializeOptions::new().use_proto_field_name(true)
     }
 
@@ -474,7 +474,7 @@ mod differential {
     /// serialization: build a `serde_json::Value` DOM, insert `_meta`, then
     /// append the key fields over it. This is the oracle the streaming output
     /// is compared against.
-    fn merge_via_value_dom(
+    pub(crate) fn merge_via_value_dom(
         message: &DynamicMessage,
         key: Option<&Map<String, Value>>,
         meta: &Value,
@@ -493,7 +493,7 @@ mod differential {
     }
 
     /// The streaming path exactly as `pull.rs` drives it for protobuf payloads.
-    fn merge_via_streaming(
+    pub(crate) fn merge_via_streaming(
         message: &DynamicMessage,
         key: Option<&Map<String, Value>>,
         meta: &Value,
@@ -512,7 +512,7 @@ mod differential {
     /// Extracts the top-level object keys from serialized JSON without
     /// collapsing duplicates, which parsing to a `serde_json::Value` would
     /// silently do.
-    fn top_level_keys(bytes: &[u8]) -> Vec<String> {
+    pub(crate) fn top_level_keys(bytes: &[u8]) -> Vec<String> {
         struct Keys;
         impl<'de> serde::de::Visitor<'de> for Keys {
             type Value = Vec<String>;
@@ -537,7 +537,7 @@ mod differential {
             .expect("streamed document must be a JSON object")
     }
 
-    fn message_of(pool: &DescriptorPool, name: &str, fields: Vec<(&str, PValue)>) -> DynamicMessage {
+    pub(crate) fn message_of(pool: &DescriptorPool, name: &str, fields: Vec<(&str, PValue)>) -> DynamicMessage {
         let desc = pool
             .get_message_by_name(name)
             .unwrap_or_else(|| panic!("missing descriptor {name}"));
@@ -550,13 +550,13 @@ mod differential {
         decode_protobuf_message(&desc, &msg.encode_to_vec()).unwrap()
     }
 
-    fn everything(pool: &DescriptorPool, fields: Vec<(&str, PValue)>) -> DynamicMessage {
+    pub(crate) fn everything(pool: &DescriptorPool, fields: Vec<(&str, PValue)>) -> DynamicMessage {
         message_of(pool, "differential.Everything", fields)
     }
 
     /// Builds a corpus sub-message from its prost-types counterpart by
     /// decoding its encoded bytes under the pool's descriptor.
-    fn from_prost<T: prost_reflect::prost::Message>(
+    pub(crate) fn from_prost<T: prost_reflect::prost::Message>(
         pool: &DescriptorPool,
         name: &str,
         value: &T,
@@ -567,7 +567,7 @@ mod differential {
         decode_protobuf_message(&desc, &value.encode_to_vec()).unwrap()
     }
 
-    fn wrapper(pool: &DescriptorPool, name: &str, value: PValue) -> PValue {
+    pub(crate) fn wrapper(pool: &DescriptorPool, name: &str, value: PValue) -> PValue {
         let desc = pool
             .get_message_by_name(name)
             .unwrap_or_else(|| panic!("missing descriptor {name}"));
@@ -576,7 +576,7 @@ mod differential {
         PValue::Message(msg)
     }
 
-    fn nested(pool: &DescriptorPool, name: &str, ratio: f32, samples: Vec<f64>) -> DynamicMessage {
+    pub(crate) fn nested(pool: &DescriptorPool, name: &str, ratio: f32, samples: Vec<f64>) -> DynamicMessage {
         message_of(
             pool,
             "differential.Nested",
@@ -591,14 +591,14 @@ mod differential {
         )
     }
 
-    fn pv(kind: prost_types::value::Kind) -> prost_types::Value {
+    pub(crate) fn pv(kind: prost_types::value::Kind) -> prost_types::Value {
         prost_types::Value { kind: Some(kind) }
     }
 
     /// Corpus messages. f32 values here are limited to ones whose f64 widening
     /// prints identically, like 0.5 and -1.25. The divergent representations
     /// are covered by `f32_representation_differs_from_value_dom_path`.
-    fn corpus(pool: &DescriptorPool) -> Vec<(&'static str, DynamicMessage)> {
+    pub(crate) fn corpus(pool: &DescriptorPool) -> Vec<(&'static str, DynamicMessage)> {
         use prost_types::value::Kind;
 
         let any = prost_types::Any {
@@ -903,7 +903,7 @@ mod differential {
         ]
     }
 
-    fn key_variants() -> Vec<(&'static str, Option<Map<String, Value>>)> {
+    pub(crate) fn key_variants() -> Vec<(&'static str, Option<Map<String, Value>>)> {
         let obj = |v: Value| Some(v.as_object().unwrap().clone());
         vec![
             ("no-key", None),
@@ -923,7 +923,7 @@ mod differential {
         ]
     }
 
-    fn meta() -> Value {
+    pub(crate) fn meta() -> Value {
         json!({"topic": "t", "partition": 3, "offset": 42, "op": "u"})
     }
 

@@ -1,0 +1,53 @@
+// proto2 corpus for the transcoder tests in src/transcode/tests. proto2 gives
+// every singular field explicit presence, so defaults that are set on the
+// wire must be emitted. `Plain` runs on the fast path; `Legacy` has a group
+// and extensions, which the transcoder hands back to the DynamicMessage path.
+syntax = "proto2";
+
+package differential2;
+
+enum Aliased {
+  option allow_alias = true;
+  ALIASED_UNKNOWN = 0;
+  ALIASED_ONE = 1;
+  ALIASED_UNO = 1;
+  ALIASED_TWO = 2;
+}
+
+// A first value that is not zero: proto2's default for the enum.
+enum Nonzero {
+  NONZERO_FIVE = 5;
+  NONZERO_SIX = 6;
+}
+
+message Plain {
+  optional int32 opt_int32 = 1 [default = 7];
+  optional string opt_string = 2 [default = "dflt"];
+  optional bool opt_bool = 3;
+  required int64 req_int64 = 4;
+  repeated int32 unpacked = 5;
+  repeated int32 packed = 6 [packed = true];
+  optional Aliased alias = 7;
+  repeated Aliased aliases = 8;
+  map<string, Nonzero> nonzero_map = 9;
+}
+
+message Legacy {
+  optional int32 a = 1;
+  optional group Grp = 2 {
+    optional string inner = 1;
+  }
+  extensions 100 to 199;
+}
+
+extend Legacy {
+  optional string ext_string = 100;
+}
+
+// A group with no extensions beside it, so the group fallback itself fires.
+message GroupOnly {
+  optional int32 a = 1;
+  optional group G = 2 {
+    optional string s = 1;
+  }
+}
