@@ -121,6 +121,38 @@ Instead of defining connector configuration in `test.flow.yaml`, the `config` fi
   ```
 3. From here on, you must use sops to edit this encrypted file. Even if you only change an unencrypted field, the `mac` will no longer be valid and the file will fail to decrypt. To edit the file using your terminal's built-in editor, simply run `sops path/to/config.yaml`, make changes, save, and `sops` will re-encrypt the file for you.
 
+## Documentation updates
+
+Customer-facing docs live in two places, and a connector change can need
+both:
+
+- Connector pages: `docs/reference/Connectors/` in this repo.
+- Platform pages: the [estuary/docs](https://github.com/estuary/docs) repo,
+  `content/`. Behavior shared across connectors is described there, for
+  example backfills (`content/guides/backfilling-data.md`), feature flags
+  (`content/guides/advanced-usage/feature-flags.md`), and dbt Cloud
+  triggers (`content/transformations/dbt-integration.md`).
+
+Update the affected page when your change impacts customer-facing
+behaviour, e.g.:
+
+- Adds or changes a config field, resource field, or a feature flag
+  customers set
+- Changes a default, including a flag that turns on for new tasks
+- Adds a requirement, such as a permission, version, or network rule
+- Makes anything on either page untrue
+
+Before you merge, search both repos for the field, flag, or behavior you
+changed. A change to shared code (`materialize-sql`, `sqlcapture`,
+`estuary-cdk`, `go/dbt`) is the most likely to make a platform page wrong.
+
+Connector page updates go in the same PR. An estuary/docs change needs its
+own PR there; link it in the checklist. If the docs can't be done yet,
+link an issue instead. Don't write "docs to follow" without a link.
+
+PRs that change `docs/` get a preview link in a comment; check it before
+merging. Style: [documentation conventions](https://docs.google.com/document/d/1SRC9VS9zyCzWl3n4HXHbc4wPB1eLxJHkA2rtu9ZNokM/edit?usp=sharing).
+
 ## Changelog entries
 
 Each connector has its own `CHANGELOG.md` at the root of its directory
@@ -177,17 +209,22 @@ those belong in the PR, the connector docs, and support.
 
 Use **Changed** for behavior that differs but wasn't broken, and **Fixed** for something a customer could have filed a bug about.
 
-### Seeding a connector's changelog
+### Connectors without a changelog
 
-If a connector doesn't have a `CHANGELOG.md` yet, create the file with a
-single header (`# Changelog`) alongside your first user-visible change to
-it. The PR template checklist below will prompt you when that's warranted.
+If your change is user-visible and the connector has no `CHANGELOG.md`,
+create one with a `# Changelog` header and add your entry. A missing file
+is not a reason to skip the entry.
+
+A CHANGELOG entry does not replace a doc update. The entry says what
+changed; the doc says how the connector works now.
 
 ## Docs / CHANGELOG checklist
 
-The PR template carries a checklist item for `CHANGELOG.md` and one for
-documentation. There's no automated check: whether an entry is warranted
+The PR template carries a checklist item for documentation and one for
+`CHANGELOG.md`. There's no automated check: whether an update is warranted
 is a judgment call for the author, backstopped by whoever reviews the PR.
+
+Tick an item only when it is done. Otherwise write N/A and a reason.
 
 ### Claude Code skill
 
