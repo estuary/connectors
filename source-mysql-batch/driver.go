@@ -13,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -164,6 +165,15 @@ func (drv *BatchSQLDriver) Validate(ctx context.Context, req *pc.Request_Validat
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
+	var lastCreatedAt string // A task which hasn't been published yet has no creation date
+	if req.LastCapture != nil {
+		lastCreatedAt = req.LastCapture.CreatedAt
+	}
+	if createdAt, err := common.ParseCreatedAt(lastCreatedAt); err != nil {
+		return nil, fmt.Errorf("resolving feature flags: %w", err)
+	} else {
+		cfg.resolveFeatureFlags(createdAt)
+	}
 
 	var db, err = drv.Connect(ctx, &cfg)
 	if err != nil {
@@ -193,6 +203,11 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
+	if createdAt, err := common.ParseCreatedAt(open.Capture.CreatedAt); err != nil {
+		return fmt.Errorf("resolving feature flags: %w", err)
+	} else {
+		cfg.resolveFeatureFlags(createdAt)
+	}
 
 	var db, err = drv.Connect(stream.Context(), &cfg)
 	if err != nil {
