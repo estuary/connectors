@@ -1,0 +1,98 @@
+info:
+  name: page 1
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Connectors {
+        connectors(first: 2) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node { id imageName title detail protocol recommended externalUrl logoUrl createdAt defaultImageTag } }
+        }
+      }
+    variables: |-
+      {}
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const ec = res.getBody()?.data?.connectors?.pageInfo?.endCursor;
+        if (ec) bru.setVar('connectors_after', ec);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/connectors.rs
+
+  **WHY:** Shape + forward Relay contract (`id` asc; cursor = id). Captures
+  `endCursor` into `connectors_after` for `Connectors / page 2`. `spec` /
+  `defaultSpec` deliberately not selected (large endpoint/resource JSON schemas
+  per connector; not needed for a catalog listing).
+
+  **VERIFIED (2026-10-07):** `first: 2` gives 2 connectors in ascending `id`, `hasNextPage: true`, `endCursor` = last id (hex `Id`). `defaultImageTag` is populated (e.g. `:v3`).
+
+examples:
+  - name: 200 - first 2, hasNextPage true
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "connectors": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "05f363e5aa800c00"
+                },
+                "edges": [
+                  {
+                    "cursor": "05f363e5a8800400",
+                    "node": {
+                      "id": "05f363e5a8800400",
+                      "imageName": "ghcr.io/estuary/source-hello-world",
+                      "title": "Hello World",
+                      "detail": "A flood of real-time greetings",
+                      "protocol": "capture",
+                      "recommended": false,
+                      "externalUrl": "https://github.com/estuary/connectors/tree/main/source-hello-world",
+                      "logoUrl": "https://storage.googleapis.com/estuary-marketing-strapi-uploads/uploads//366c26_Group_4_300x300_ed4ef061f5/366c26_Group_4_300x300_ed4ef061f5.png",
+                      "createdAt": "2022-04-28T03:28:13.617220+00:00",
+                      "defaultImageTag": ":v2"
+                    }
+                  },
+                  {
+                    "cursor": "05f363e5aa800c00",
+                    "node": {
+                      "id": "05f363e5aa800c00",
+                      "imageName": "ghcr.io/estuary/source-postgres",
+                      "title": "PostgreSQL",
+                      "detail": "Real-time (100ms), first party",
+                      "protocol": "capture",
+                      "recommended": true,
+                      "externalUrl": "https://postgresql.org",
+                      "logoUrl": "https://storage.googleapis.com/estuary-marketing-strapi-uploads/uploads//bb49f7_Group_22397_1_300x300_347ea958ce/bb49f7_Group_22397_1_300x300_347ea958ce.png",
+                      "createdAt": "2022-04-28T03:28:13.617220+00:00",
+                      "defaultImageTag": ":v3"
+                    }
+                  }
+                ]
+              }
+            }
+          }

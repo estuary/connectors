@@ -103,6 +103,7 @@ lookback_window
 lookback_window_size
 lookback_window_minutes
 calls_lookback_window
+catalog_stats_lookback_hours
 insights_lookback_window
 conversion_window_days
 attribution_window

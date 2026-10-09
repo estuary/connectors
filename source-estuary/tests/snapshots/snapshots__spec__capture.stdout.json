@@ -1,0 +1,128 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "catalog_stats_lookback_hours": {
+              "default": 24,
+              "description": "Hours before the cursor that every catalog stats sweep re-reads, so buckets that keep accruing after they close are captured in full. Estuary's stats pipeline normally settles within minutes; raise this only to recover from a stats pipeline delay.",
+              "maximum": 8760,
+              "minimum": 1,
+              "title": "Catalog Stats Lookback (Hours)",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "API Key",
+              "default": "API Key",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "description": "An Estuary service account API key or refresh token.",
+              "order": 1,
+              "secret": true,
+              "title": "API Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "API Key": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "prefixes": {
+          "description": "Catalog prefixes to capture, each ending in '/' (e.g. acmeCo/). If left empty, every prefix the API key can read is captured.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Prefixes",
+          "type": "array"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-estuary",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

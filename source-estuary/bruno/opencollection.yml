@@ -1,0 +1,120 @@
+opencollection: 1.0.0
+
+info:
+  name: Estuary
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Estuary control-plane auth via the connector's sops-encrypted config.yaml.
+        // The API key is re-derived from sops on every request and lives only on
+        // `req` — never persisted to a var or env file. Requires the developer JS
+        // sandbox:
+        //   CLI: `bru run <request>.yml --env Estuary --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the
+        // platform strips it at runtime, sops itself does not) — accept both.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const token = creds?.access_token ?? creds?.access_token_sops;
+        if (!token) throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        // Mirrors the ApiKey(AccessToken) Bearer TokenSource in source_estuary/models.py.
+        req.setHeader('Authorization', `Bearer ${token}`);
+    - type: after-response
+      code: |-
+        // Redact PII / bearer-capability URLs so saved examples are safe to commit.
+        // Keep in sync with the connector's snapshot-test redaction list once it
+        // exists (plan.md "Test redactions"). Minimal on purpose: only fields we
+        // never need to eyeball during verification.
+        const REDACTED_FIELDS = [
+          'email', 'createdByEmail', 'destination', 'recipients', 'userEmail', 'userFullName',
+          'invoicePdf', 'hostedInvoiceUrl', 'receiptUrl',
+        ];
+        // Server error strings embed the caller's email (PermissionDenied messages).
+        const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+        function redact(v) {
+          if (typeof v === 'string') return v.replace(EMAIL, 'REDACTED_EMAIL');
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) && v[k] !== null ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        if (body && (typeof body === 'object' || typeof body === 'string')) res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Single endpoint:** `POST https://api.estuary.dev/api/graphql`. Every
+      read is a GraphQL `query` sent as a POST; nothing in this collection
+      outside `Seeding/` is a mutation, and agents never run `Seeding/`.
+    - **Errors arrive as HTTP 200** with a non-empty `errors` array
+      (`graphql_request` in `source_estuary/api.py` raises `GraphQLError`).
+    - **Rate limits (DOCUMENTED 2026-10-07, from flow origin/master server
+      source):** no governor / rate-limit layer, no GraphQL depth or
+      complexity limits. 16 MiB request-body cap. Most list resolvers have a
+      default page size and no maximum.
+    - **Stripe-backed fields are rate limited (VERIFIED 2026-10-07):** invoice
+      `status` / `amountDue` / `invoicePdf` / `hostedInvoiceUrl` /
+      `paymentDetails` are fetched live from Stripe per invoice. Selecting them
+      for 42 invoices returned `error reported by stripe: ... (429)`. The
+      connector selects database fields only.
+    - **Provisional authorization → HTTP 307** with `Location` (+ `started` /
+      `retryAfter` query) and `Retry-After`; the client must re-POST the same
+      body. aiohttp (the CDK's HTTP client) follows 307 immediately with the
+      method, body and same-origin `Authorization` preserved, up to 10
+      redirects; the server blocks server-side until its authz snapshot
+      refreshes (crates/control-plane-api/src/envelope.rs). An unauthorized
+      query ends as HTTP 200 with a `PermissionDenied` error.
+    - **Credential type (VERIFIED 2026-10-07):** use a refresh token / API key
+      (no `.`). The server exchanges dot-free bearers per request; a JWT access
+      token is verified as-is and expires (`401 failed to verify token:
+      ExpiredSignature` about 1 h after issue).
+    - **Scalars:** `UInt64` serializes as a decimal string; `Id` as a
+      16-hex-digit string; `DateTime` as RFC3339.
+
+    ## LIMITATION index
+
+    - `_shared / authorized prefixes` — authorized prefixes nest; querying both
+      a prefix and its child double-reads every spec under the child.
+    - `Live Specs / pagination walk` — hasNextPage is `rows == first`, so an
+      exact-multiple result ends with an empty page.
+    - `Live Specs / graph edges` — empty edge lists are `null`; names can be
+      outside the walked prefix.
+    - `Publication History / after boundary probe` — forward cursor is strict
+      `publishedAt >`; there is no upper-bound param in forward mode.
+    - `CatalogStats / over 100 names` — `names` is 1..100.
+    - `CatalogStats / misaligned start` — start/end must be grain-aligned.
+    - `CatalogStats / bucket cap` — >10,000 buckets per query is an error.
+    - `CatalogStats / unauthorized name` — one unreadable name fails the query.
+    - `Alerts / first without after` — `first` ignored without `after`; page
+      backward with `last` + `before: endCursor`.
+    - `AlertSubscriptions / non-admin prefix` — unauthorized scope → whole-request
+      HTTP 307 provisional denial (terminal: 200 + `PermissionDenied` error after
+      ~6 s); pre-filter scopes by capability bit.
+    - `Invoices / read-only tenant` — billing needs `ViewBilling` on the exact
+      tenant prefix; a miss is a whole-request 307, not a partial response.
+    - `Invoices / stripe fields` — Stripe-backed fields trip Stripe's rate limit.
+    - `alertConfigs` / `storageMappings` / `serviceAccounts` error past 20
+      authorized prefixes (DOCUMENTED from source; UNOBSERVABLE with a
+      15-prefix key) — always pass a `startsWith` filter where one exists.
+
+    Conventions (REFERENCE / WHY / VERIFIED / PENDING / UNOBSERVABLE) are the
+    `bruno-probe-endpoint` skill's.

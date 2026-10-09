@@ -1,0 +1,129 @@
+info:
+  name: after boundary probe
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query PubHistoryAfter($name: Name!, $after: String!) {\n  liveSpecs(by: { names: [$name] }) {\n    edges { node {\n      catalogName\n      publicationHistory(after: $after, first: 1000) {\n        pageInfo { hasNextPage }\n        edges { cursor node { publicationId publishedAt } }\n      }\n    } }\n  }\n}",
+        "variables": {
+          "name": "{{ph_spec}}",
+          "after": "{{ph_after}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — after = item #2 publishedAt returns items #3..#10"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "publicationHistory": {
+                        "pageInfo": {
+                          "hasNextPage": false
+                        },
+                        "edges": [
+                          {
+                            "cursor": "2024-07-31T19:08:12.106771+00:00",
+                            "node": {
+                              "publicationId": "0e415851f28003d8",
+                              "publishedAt": "2024-07-31T19:08:12.106771+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-08-22T16:10:30.494634+00:00",
+                            "node": {
+                              "publicationId": "0e79b5e44079fc00",
+                              "publishedAt": "2024-08-22T16:10:30.494634+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-09-06T08:15:23.226595+00:00",
+                            "node": {
+                              "publicationId": "0e9f7c2947630800",
+                              "publishedAt": "2024-09-06T08:15:23.226595+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-09-06T10:20:26.509431+00:00",
+                            "node": {
+                              "publicationId": "0e9fb56c568b6c00",
+                              "publishedAt": "2024-09-06T10:20:26.509431+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-09-06T14:33:41.124214+00:00",
+                            "node": {
+                              "publicationId": "0ea02950a670a000",
+                              "publishedAt": "2024-09-06T14:33:41.124214+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2024-10-15T18:06:58.247852+00:00",
+                            "node": {
+                              "publicationId": "0f04f706ba8001d4",
+                              "publishedAt": "2024-10-15T18:06:58.247852+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2025-03-27T00:49:48.391360+00:00",
+                            "node": {
+                              "publicationId": "10a6d288358001ee",
+                              "publishedAt": "2025-03-27T00:49:48.391360+00:00"
+                            }
+                          },
+                          {
+                            "cursor": "2025-03-27T00:50:03.537997+00:00",
+                            "node": {
+                              "publicationId": "10a6d2a5a1800260",
+                              "publishedAt": "2025-03-27T00:50:03.537997+00:00"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [publicationHistory resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/publication_history.rs)
+
+  **WHY:** Pins the inclusivity of the only server-side boundary that forward
+  pagination offers. `after` = the exact `publishedAt` of item #2 from
+  `Publication History / full history` should return items #3..n, which means
+  `after` is exclusive (`published_at > after`). This is the incremental
+  cursor's filter param (`FETCH-SERVER-SIDE-BOUNDARIES`).
+
+  Run `Publication History / full history` first.
+
+  **LIMITATION (VERIFIED 2026-10-07):** `after: "2024-06-27T14:23:35.129414+00:00"` (item #2's exact `publishedAt`) returned 8 items starting at item #3, so `after` is **exclusive** (`published_at > after`). Forward mode has no upper-bound param, so the incremental horizon must be enforced client-side.

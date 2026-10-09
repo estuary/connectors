@@ -1,0 +1,66 @@
+info:
+  name: boundary inclusivity
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { a: catalogStats(by:{names:[\"Jonathan_Wihl/\"],grain:HOURLY,start:\"2026-10-07T12:00:00Z\",end:\"2026-10-07T13:00:00Z\"}){ edges{ node{ timestamp } } } b: catalogStats(by:{names:[\"Jonathan_Wihl/\"],grain:HOURLY,start:\"2026-10-07T11:00:00Z\",end:\"2026-10-07T12:00:00Z\"}){ edges{ node{ timestamp } } } }"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs` (`CatalogStatsQuery::catalog_stats`, `MAX_BUCKETS = 10_000`, 30 s timeout)
+  
+  **WHY:** pins `start` inclusive / `end` exclusive (FETCH-SERVER-SIDE-BOUNDARIES):
+  `a` = [12:00,13:00) must return exactly the 12:00 bucket; `b` =
+  [11:00,12:00) must return exactly 11:00 and not 12:00.
+
+  **VERIFIED (2026-10-07):** `a` [12:00,13:00) → exactly 12:00; `b` [11:00,12:00) →
+  exactly 11:00. `start` is inclusive and `end` exclusive.
+
+examples:
+  - name: "200 — start inclusive, end exclusive"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "a": {
+                "edges": [
+                  {
+                    "node": {
+                      "timestamp": "2026-10-07T12:00:00+00:00"
+                    }
+                  }
+                ]
+              },
+              "b": {
+                "edges": [
+                  {
+                    "node": {
+                      "timestamp": "2026-10-07T11:00:00+00:00"
+                    }
+                  }
+                ]
+              }
+            }
+          }

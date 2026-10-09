@@ -1,0 +1,104 @@
+info:
+  name: partitions and volume
+  type: graphql
+  seq: 5
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query AlertVolume($p1: String!, $p2: String!) {
+        all1: alerts(by: { prefix: $p1 }, last: 1000) {
+          pageInfo { hasPreviousPage }
+          edges { node { catalogName alertType firedAt resolvedAt } }
+        }
+        active1: alerts(by: { prefix: $p1, active: true }, last: 1000) {
+          pageInfo { hasPreviousPage }
+          edges { node { firedAt } }
+        }
+        resolved1: alerts(by: { prefix: $p1, active: false }, last: 1000) {
+          pageInfo { hasPreviousPage }
+          edges { node { firedAt } }
+        }
+        all2: alerts(by: { prefix: $p2 }, last: 1000) {
+          pageInfo { hasPreviousPage }
+          edges { node { firedAt } }
+        }
+      }
+    variables: |-
+      {
+        "p1": "{{test_prefix}}",
+        "p2": "{{test_prefix_nested}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alerts.rs
+
+  **WHY:** Three questions in one call (aliases): (1) does `active` unset really
+  return fired+resolved (all = active + resolved)? — the silent-data-loss audit
+  for the only partition-by-state default in this cluster; (2) total history
+  volume per prefix, which decides whether re-listing all alerts each snapshot
+  is cheap; (3) `last: 1000` — no documented max; observe whether it is honored
+  or clamped (`hasPreviousPage` false and count < 1000 ⇒ complete).
+  Saved example is a projection (counts + first/last firedAt).
+
+  **VERIFIED (2026-10-07):** `active` unset returns fired+resolved: all=15 = active 4 + resolved 11 for `Jonathan_Wihl/`, so no partition is silently hidden. `Artificial-Industries/` has 36 (above the default 20), and `last: 1000` returned all 36 with `hasPreviousPage: false`, so no clamp at that size. Total history volume is small (oldest is 2024-02). One active alert dates from 2024-02, so active alerts can be old.
+
+examples:
+  - name: 200 - projection - all 15 = active 4 + resolved 11; nested tenant 36
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "projection": "counts per alias (last: 1000)",
+            "data": {
+              "all1": {
+                "pageInfo": {
+                  "hasPreviousPage": false
+                },
+                "count": 15,
+                "newestFiredAt": "2026-06-02T13:14:14.852195+00:00",
+                "oldestFiredAt": "2024-02-13T21:58:23.429321+00:00"
+              },
+              "active1": {
+                "pageInfo": {
+                  "hasPreviousPage": false
+                },
+                "count": 4,
+                "newestFiredAt": "2026-05-27T00:42:41.566979+00:00",
+                "oldestFiredAt": "2024-02-13T21:58:23.429321+00:00"
+              },
+              "resolved1": {
+                "pageInfo": {
+                  "hasPreviousPage": false
+                },
+                "count": 11,
+                "newestFiredAt": "2026-06-02T13:14:14.852195+00:00",
+                "oldestFiredAt": "2025-03-13T20:00:00.018903+00:00"
+              },
+              "all2": {
+                "pageInfo": {
+                  "hasPreviousPage": false
+                },
+                "count": 36,
+                "newestFiredAt": "2026-08-01T08:21:49.902178+00:00",
+                "oldestFiredAt": "2024-12-08T23:30:00.018218+00:00"
+              }
+            }
+          }

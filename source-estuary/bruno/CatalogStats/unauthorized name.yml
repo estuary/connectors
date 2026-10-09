@@ -1,0 +1,61 @@
+info:
+  name: unauthorized name
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { catalogStats(by:{names:[\"Jonathan_Wihl/\",\"acmeCo/\"],grain:DAILY,start:\"2026-10-06T00:00:00Z\",end:\"2026-10-07T00:00:00Z\"}){ edges{ node{ catalogName } } } }"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs` (`CatalogStatsQuery::catalog_stats`, `MAX_BUCKETS = 10_000`, 30 s timeout)
+  
+  **WHY:** one unreadable name alongside a readable one — does the whole query
+  fail (connector must only ever send names under authorized prefixes)?
+
+  **LIMITATION (VERIFIED 2026-10-07):** `PermissionDenied: user is not authorized to
+  access prefix or name 'acmeCo/'` — the readable `Jonathan_Wihl/` in the same
+  request returns nothing. One bad name fails the whole query.
+
+examples:
+  - name: "200 — errors: PermissionDenied fails whole query"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": null,
+            "errors": [
+              {
+                "message": "PermissionDenied: user is not authorized to access prefix or name 'acmeCo/' with required capability read",
+                "locations": [
+                  {
+                    "line": 1,
+                    "column": 9
+                  }
+                ],
+                "path": [
+                  "catalogStats"
+                ]
+              }
+            ]
+          }
