@@ -31,6 +31,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"skip_cleanup":                     common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type AuthType string

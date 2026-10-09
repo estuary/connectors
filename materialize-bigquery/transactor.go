@@ -38,6 +38,11 @@ type checkpointItem struct {
 	Bounds     []mergeBoundLiterals `json:",omitempty"`
 	SourceURIs []string             `json:",omitempty"`
 	JobPrefix  string               `json:",omitempty"`
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. The entry's apply deletes the target's rows published
+	// before it, after the entry's stores. It is omitted when unset, so
+	// that the entry stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 
 	// round is the transaction round this session staged the entry in, for
 	// attributing its commit's row stats. Recovered and peer entries are
@@ -123,6 +128,12 @@ type transactor struct {
 	peerShardsCheckpoints rangeCheckpoints
 	primaryShard          bool
 	rangeKey              string
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging by Store.
+	truncations map[int]time.Time
 
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool
@@ -184,6 +195,7 @@ func prepareNewTransactor(
 			peerShardsCheckpoints: make(rangeCheckpoints),
 			primaryShard:          primaryShard,
 			rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 			loadFiles:             boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
 			storeFiles:            boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
 		}
@@ -247,6 +259,10 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	}
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < %%s;", target.Identifier, col.Identifier)
 	}
 
 	for _, m := range []struct {
@@ -530,6 +546,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		b.storeMergeBounds.Reset()
 	}
 
+	for binding, boundary := range t.truncations {
+		var b = t.bindings[binding]
+		if t.cp[b.target.StateKey] == nil {
+			t.cp[b.target.StateKey] = &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round}
+		}
+		t.cp[b.target.StateKey].TruncateBefore = &boundary
+	}
+	t.truncations = nil
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Nest under this shard's range key: range keys are disjoint across
 		// shards, so concurrent patches never clobber when the runtime
@@ -592,7 +617,35 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 	return nil
 }
 
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged work.
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	if !t.primaryShard {
+		return nil
+	}
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -669,11 +722,18 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			round := items[0].item.round
 			needsMerge := false
 			var coalesce []*checkpointItem
+			var coalescedURIs []string
 			var sourceURIs []string
+			var truncateBefore *time.Time
+			var truncateJobPrefix string
 			for _, e := range items {
 				sourceURIs = append(sourceURIs, e.item.SourceURIs...)
+				if e.item.TruncateBefore != nil && (truncateBefore == nil || e.item.TruncateBefore.After(*truncateBefore)) {
+					truncateBefore, truncateJobPrefix = e.item.TruncateBefore, e.item.JobPrefix
+				}
 				if e.item.Query == "" {
 					coalesce = append(coalesce, e.item)
+					coalescedURIs = append(coalescedURIs, e.item.SourceURIs...)
 					if e.item.NeedsMerge {
 						needsMerge = true
 					}
@@ -690,7 +750,9 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 				}).Debug("acknowledge legacy query executed")
 			}
 
-			if len(coalesce) > 0 {
+			// A truncation-only entry stages no files.
+			var stats = m.TotalRowStats(0)
+			if len(coalescedURIs) > 0 {
 				query := b.storeInsertSQL
 				if needsMerge {
 					var err error
@@ -700,19 +762,41 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 						return fmt.Errorf("rendering merge query template: %w", err)
 					}
 				}
-				var coalescedURIs []string
-				for _, item := range coalesce {
-					coalescedURIs = append(coalescedURIs, item.SourceURIs...)
-				}
 				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
-				t.be.ReportRowStats(round, b.target.Path, dmlRowStats(stat))
+				stats = dmlRowStats(stat)
 				log.WithFields(log.Fields{
 					"query":         query,
 					"external_data": map[string][]string{b.tempTableName: coalescedURIs},
 				}).Debug("acknowledge query executed")
+			}
+
+			// The truncation runs after the stores, so that it keeps the rows
+			// they just wrote, which were published after the boundary.
+			if truncateBefore == nil {
+				// Pass.
+			} else if b.truncateSQL == "" {
+				var _, reason = b.target.PublishedAtColumn()
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": *truncateBefore,
+					"reason":   reason.Error(),
+				}).Warn("skipping staged truncation because the binding no longer supports it")
+			} else if stat, err := t.client.queryIdempotent(groupCtx, nil, fmt.Sprintf(b.truncateSQL, timestampLiteral(*truncateBefore)), truncateJobPrefix+"-truncate", nil, ""); err != nil {
+				return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+			} else {
+				var n = dmlRowStats(stat).Deleted
+				stats = stats.WithTruncated(n)
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": *truncateBefore,
+					"deleted":  n,
+				}).Info("truncated rows published before the backfill")
+			}
+			if len(coalescedURIs) > 0 || stats.Truncated != nil {
+				t.be.ReportRowStats(round, b.target.Path, stats)
 			}
 
 			if t.skipCleanup {
@@ -764,6 +848,12 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+}
+
+// timestampLiteral renders a TIMESTAMP literal floored to microseconds, the
+// precision of the column it is compared against.
+func timestampLiteral(ts time.Time) string {
+	return fmt.Sprintf("TIMESTAMP '%s UTC'", ts.UTC().Format("2006-01-02 15:04:05.000000"))
 }
 
 func (t *transactor) Destroy() {
