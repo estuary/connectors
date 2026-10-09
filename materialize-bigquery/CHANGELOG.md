@@ -1,5 +1,11 @@
 # materialize-bigquery
 
+## 2026-10-09
+
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to the date range of each transaction's keys.
+
 ## 2026-09-22
 
 ### Fixed

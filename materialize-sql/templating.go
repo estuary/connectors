@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -100,16 +101,36 @@ type MergeBound struct {
 type MergeBoundsBuilder struct {
 	keyColumns []Column
 	literaler  func(any) string
+	// exactDatetime reports whether a date-time key column can be bounded by
+	// the observed values themselves rather than by whole dates.
+	exactDatetime func(Column) bool
 
 	lower []any
 	upper []any
+	// unbounded marks key columns whose observed values can't be ordered,
+	// such as a date-time that doesn't parse.
+	unbounded []bool
 }
 
-func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string) *MergeBoundsBuilder {
-	return &MergeBoundsBuilder{
+type MergeBoundsOption func(*MergeBoundsBuilder)
+
+// WithExactDatetimeBounds bounds date-time keys whose column satisfies fn by
+// the observed values. Other date-time keys are bounded by whole dates, one
+// day either side of the observed range, which no RFC3339 spelling or
+// precision of a stored value can fall outside of.
+func WithExactDatetimeBounds(fn func(Column) bool) MergeBoundsOption {
+	return func(b *MergeBoundsBuilder) { b.exactDatetime = fn }
+}
+
+func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts ...MergeBoundsOption) *MergeBoundsBuilder {
+	var b = &MergeBoundsBuilder{
 		keyColumns: keyColumns,
 		literaler:  literaler,
 	}
+	for _, o := range opts {
+		o(b)
+	}
+	return b
 }
 
 // NextKey updates the observed minimum and maximum key for a transaction.
@@ -127,12 +148,70 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 		// MergeBoundsBuilder, and also after calls to `Build`.
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
+		b.unbounded = make([]bool, len(key))
 	}
 
 	for idx, k := range key {
+		if isDatetimeColumn(b.keyColumns[idx]) {
+			// Date-time strings order by their instant, which text order
+			// doesn't follow across offsets and precisions.
+			if lower, upper, ok := minMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
+				b.lower[idx], b.upper[idx] = lower, upper
+			} else {
+				b.unbounded[idx] = true
+			}
+			continue
+		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
+}
+
+func isDatetimeColumn(col Column) bool {
+	var ft, _ = col.AsFlatType()
+	return ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time"
+}
+
+func parseDatetime(v any) (time.Time, bool) {
+	s, ok := v.(string)
+	if !ok {
+		return time.Time{}, false
+	}
+	t, _, err := ParseRFC3339Nano(s)
+	return t, err == nil
+}
+
+// minMaxDatetime returns the earlier of lower and k, and the later of upper
+// and k, compared as instants. It reports false if any isn't a date-time.
+func minMaxDatetime(lower, upper, k any) (any, any, bool) {
+	tl, okL := parseDatetime(lower)
+	tu, okU := parseDatetime(upper)
+	tk, okK := parseDatetime(k)
+	if !okL || !okU || !okK {
+		return nil, nil, false
+	}
+	if tk.Before(tl) {
+		lower = k
+	}
+	if tk.After(tu) {
+		upper = k
+	}
+	return lower, upper, true
+}
+
+// dateBounds widens lower..upper to date literals that enclose every spelling
+// of an instant in range: a value's text starts with its wall-clock date,
+// which its offset can move up to a day from the instant. The upper literal
+// is one day further so that values on the last day, which sort after the
+// bare date as text, still fall inside. The bounds are dropped if they would
+// leave the years an endpoint accepts.
+func dateBounds(lower, upper time.Time) (string, string, bool) {
+	var lo = lower.UTC().AddDate(0, 0, -1)
+	var hi = upper.UTC().AddDate(0, 0, 2)
+	if lo.Year() < 1 || hi.Year() > 9999 {
+		return "", "", false
+	}
+	return lo.Format(time.DateOnly), hi.Format(time.DateOnly), true
 }
 
 func minKey(k1 any, k2 any) any {
@@ -188,12 +267,18 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 			// the complexity and overhead of comparing their binary values is
 			// probably not worth it.
 			continue
-		} else if ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" {
-			// At least one destination (BigQuery) has known issues with keys
-			// that are date-times with sub-microsecond precision when used as a
-			// merge bound. For simplicity such formatted strings will never
-			// appear in merge bounds, although we should figure out how to do
-			// this more selectively in the future.
+		} else if b.unbounded[idx] {
+			continue
+		} else if isDatetimeColumn(col) && (b.exactDatetime == nil || !b.exactDatetime(col)) {
+			// Endpoints compare a date-time literal to a stored value with
+			// differing precision or, for text columns, as text, so the bound
+			// is widened to dates to be safe under either.
+			lower, _ := parseDatetime(b.lower[idx])
+			upper, _ := parseDatetime(b.upper[idx])
+			if lo, hi, ok := dateBounds(lower, upper); ok {
+				conditions[idx].LiteralLower = b.literaler(lo)
+				conditions[idx].LiteralUpper = b.literaler(hi)
+			}
 			continue
 		}
 
@@ -211,4 +296,5 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 func (b *MergeBoundsBuilder) Reset() {
 	b.lower = nil
 	b.upper = nil
+	b.unbounded = nil
 }

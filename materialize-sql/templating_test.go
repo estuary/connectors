@@ -2,8 +2,10 @@ package sql
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -188,5 +190,101 @@ func TestRootLevelColumns(t *testing.T) {
 	// Verify each returned column is indeed root-level
 	for _, col := range rootLevelCols {
 		require.True(t, strings.Count(col.Ptr, "/") == 1, "Column %s should be root-level", col.Field)
+	}
+}
+
+func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
+	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}},
+	}}}
+	id := Column{Identifier: "id"}
+	exact := []MergeBoundsOption{WithExactDatetimeBounds(func(Column) bool { return true })}
+	declined := []MergeBoundsOption{WithExactDatetimeBounds(func(Column) bool { return false })}
+
+	// Valid RFC3339 forms of three instants, in neither text nor time order.
+	keys := [][]any{
+		{"2025-05-05T02:00:00+02:00", "k"}, // 00:00:00Z
+		{"2025-05-05T00:00:01.5Z", "k"},    // the latest
+		{"2025-05-04T23:59:59.999999999Z", "k"},
+		{"2025-05-05T00:00:00.000Z", "k"},  // 00:00:00Z again, different precision
+		{"2025-05-04T22:59:59-01:00", "k"}, // 23:59:59Z, the earliest
+	}
+	withKey := func(k ...any) [][]any { return append(append([][]any{}, keys...), k) }
+
+	for _, tt := range []struct {
+		name string
+		opts []MergeBoundsOption
+		keys [][]any
+		want MergeBound
+	}{
+		{"dates by default", nil, keys, MergeBound{datetime, literaler("2025-05-03"), literaler("2025-05-07")}},
+		{"dates when the dialect declines exact bounds", declined, keys, MergeBound{datetime, literaler("2025-05-03"), literaler("2025-05-07")}},
+		{"exact bounds keep the original literals", exact, keys,
+			MergeBound{datetime, literaler("2025-05-04T22:59:59-01:00"), literaler("2025-05-05T00:00:01.5Z")}},
+		{"a single key bounds itself", exact, keys[:1],
+			MergeBound{datetime, literaler("2025-05-05T02:00:00+02:00"), literaler("2025-05-05T02:00:00+02:00")}},
+		{"a single key widens around its instant, not its wall clock", nil, keys[:1],
+			MergeBound{datetime, literaler("2025-05-04"), literaler("2025-05-07")}},
+		{"an unparseable value drops the bound", exact, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", ""}},
+		{"an unparseable value drops the date bound", nil, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", ""}},
+		{"a null key drops the bound", exact, withKey(nil, "k"), MergeBound{datetime, "", ""}},
+		{"dates before year 1 drop the bound", nil, withKey("0001-01-01T00:00:00Z", "k"), MergeBound{datetime, "", ""}},
+		{"dates after year 9999 drop the bound", nil, withKey("9999-12-31T00:00:00Z", "k"), MergeBound{datetime, "", ""}},
+		{"year edges still get exact bounds", exact, withKey("0001-01-01T00:00:00Z", "k"),
+			MergeBound{datetime, literaler("0001-01-01T00:00:00Z"), literaler("2025-05-05T00:00:01.5Z")}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewMergeBoundsBuilder([]Column{datetime, id}, literaler, tt.opts...)
+			for _, k := range tt.keys {
+				b.NextKey(k)
+			}
+			got := b.Build()
+			require.Equal(t, tt.want, got[0])
+			require.Equal(t, MergeBound{id, literaler("k"), literaler("k")}, got[1], "other keys are unaffected")
+
+			// The next transaction starts clean.
+			b.NextKey([]any{"2025-06-01T00:00:00Z", "k"})
+			require.Contains(t, []string{literaler("2025-05-31"), literaler("2025-06-01T00:00:00Z")}, b.Build()[0].LiteralLower)
+		})
+	}
+}
+
+// TestDateBoundsEncloseEverySpelling checks the property the date widening
+// relies on: any RFC3339 spelling of an instant within a transaction's range
+// sorts, as text, between the widened bounds.
+func TestDateBoundsEncloseEverySpelling(t *testing.T) {
+	rng := rand.New(rand.NewSource(1))
+	spell := func(ts time.Time) string {
+		offset := (rng.Intn(2*24*60) - 24*60 + 1) * 60 // -23:59 .. +23:59 in seconds
+		if rng.Intn(4) == 0 {
+			offset = 0
+		}
+		ts = ts.In(time.FixedZone("", offset))
+		sep := []string{"T", "t", " "}[rng.Intn(3)]
+		s := ts.Format("2006-01-02") + sep + ts.Format("15:04:05")
+		if digits := rng.Intn(10); digits > 0 {
+			s += "." + fmt.Sprintf("%09d", ts.Nanosecond())[:digits]
+		}
+		if offset == 0 && rng.Intn(2) == 0 {
+			s += []string{"Z", "z"}[rng.Intn(2)]
+		} else {
+			s += ts.Format("-07:00")
+		}
+		return s
+	}
+
+	for i := 0; i < 20000; i++ {
+		base := time.Unix(rng.Int63n(4e9)-1e9, rng.Int63n(1e9)).UTC()
+		span := time.Duration(rng.Int63n(int64(72 * time.Hour)))
+		lo, hi, ok := dateBounds(base, base.Add(span))
+		require.True(t, ok)
+
+		for j := 0; j < 5; j++ {
+			inRange := base.Add(time.Duration(rng.Int63n(int64(span) + 1)))
+			s := spell(inRange)
+			require.GreaterOrEqual(t, s, lo, "%s spelled as %s", inRange, s)
+			require.LessOrEqual(t, s, hi, "%s spelled as %s", inRange, s)
+		}
 	}
 }

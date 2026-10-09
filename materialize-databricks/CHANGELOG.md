@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-09
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to each transaction's key range, exact for `TIMESTAMP` keys and
+  by date for `STRING` keys.
+
 ## 2026-10-07
 ### Changed
 - A transaction's tables are committed concurrently, up to five at a time,
