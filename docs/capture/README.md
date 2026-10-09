@@ -460,6 +460,8 @@ The full cycle is:
 `Response.SourcedSchema` may be sent anywhere `Response.Captured` may, and
 `Request.Acknowledge` follows each commit when the connector has asked for
 it.
+[`Response.BackfillBegin` and `Response.BackfillComplete`][backfill-markers]
+may be sent between checkpoint sequences, each in a sequence of its own.
 When the connector exits between checkpoints, the cycle starts over from
 `Request.Open` after `interval`.
 
@@ -770,6 +772,107 @@ nothing a later sourced schema says can narrow it again.
    Any fields omitted from a sourced schema become optional in the inferred
    schema.
 
+## Response.BackfillBegin and Response.BackfillComplete
+
+`Response.BackfillBegin` and `Response.BackfillComplete` tell the runtime
+that the connector is restating a binding in full.
+Each carries the `binding` index it applies to.
+Together they let the runtime infer deletions from a backfill.
+Anything the backfill does not capture again is treated as deleted from the
+source.
+
+`Response.BackfillBegin` marks the start of a backfill that restates the
+binding's source resource in full.
+The runtime commits it in a transaction of its own, with no documents.
+It then stamps the commit time on every partition journal of the binding's
+collection, as the `estuary.dev/truncated-at` label.
+Readers of the collection treat every document published before that time as
+stale.
+The runtime re-applies the label after each commit until the matching
+`Response.BackfillComplete` arrives.
+The label only ever moves forward.
+
+`Response.BackfillComplete` marks the end of that restatement.
+The runtime forwards it to materializations, which then treat the rows that the backfill did not write again as deleted.
+Whether materializations remove them from the destination or marks them as soft deleted
+depends on the materialization and its configuration.
+The [runtime-next README][runtime-next-truncation] describes both halves in
+detail.
+
+Note that a marker cannot be taken back.
+Once `Response.BackfillBegin` commits, future readers of the collection never
+see the documents published before it.
+This means a marker sent in error loses data.
+
+Each marker must stand alone in its checkpoint sequence.
+The marker is followed directly by a `Response.Checkpoint`, with no
+`Response.Captured`, `Response.SourcedSchema`, or other marker in the same
+sequence.
+The runtime fails the session otherwise.
+The rule keeps documents captured before a `Response.BackfillBegin` from
+being reduced with documents of the same key captured after it.
+A backfill of the `users` binding therefore looks like this:
+
+```
+{"checkpoint": {"state": {...}}}
+{"backfillBegin": {"binding": 0}}
+{"checkpoint": {"state": {...}}}
+{"captured": {"binding": 0, "doc": {"id": 1, "name": "Ada", ...}}}
+{"captured": {"binding": 0, "doc": {"id": 2, "name": "Grace", ...}}}
+{"checkpoint": {"state": {...}}}
+...
+{"backfillComplete": {"binding": 0}}
+{"checkpoint": {"state": {...}}}
+```
+
+`Response.BackfillBegin` is sent once per backfill before the connector
+captures any of the backfill's documents.
+The connector may restart before the backfill finishes, so a backfill can span several sessions.
+A resumed session must not send `Response.BackfillBegin` again.
+A second one would move the truncation time forward past the documents the
+backfill already captured.
+Readers would then discard those documents as stale.
+To prevent this, the checkpoint that follows `Response.BackfillBegin`
+records in the connector state that the backfill has begun.
+`Response.BackfillComplete` is sent once after the backfill's last document.
+
+### When to send backfill markers
+
+A connector should send the markers only when it is certain that the
+backfill captures every document of the resource, each in full.
+If in doubt, it should send neither.
+
+A backfill is complete when nothing limits what it reads.
+Some examples follow.
+- A database table read with no filter.
+- A snapshot that fetches the whole resource on every poll.
+
+A backfill is not complete when the connector's configuration or the source
+limits what it reads.
+Some examples follow.
+- A start date or lookback window in the connector's configuration.
+- An API that retains only recent data, e.g. the last 30 days of events.
+- A filter in the query the connector runs, such as a `WHERE` clause in a
+  user-supplied query template.
+- A refresh of only some fields of each document, such as the formula fields
+  of `source-salesforce-native`.
+
+Connectors that send backfill markers should offer the
+[feature flags][feature-flags] `backfill_signals` and `no_backfill_signals` to
+override this rule.
+- `backfill_signals` makes the connector ignore its configuration when it
+  determines whether a backfill is complete.
+  Setting it means the user accepts truncation even though the configuration
+  may limit a backfill.
+  Limits that do not come from the configuration, such as source retention or
+  the connector's own periodic backfills of partial documents, still prevent
+  markers.
+- `no_backfill_signals` makes the connector never send markers.
+  It covers setups the capture connector cannot account for, e.g. a
+  collection written by more than one capture.
+
+With neither flag set, the connector follows the rule above.
+
 # Delivery guarantees and resumption patterns
 
 The connector must decide what to put in a checkpoint so that a session
@@ -1015,3 +1118,5 @@ is how connectors are developed and tested locally.
 [filesource]: ../../filesource
 [feature-flags]: ../feature_flags.md
 [captures-concept]: https://docs.estuary.dev/concepts/captures/
+[backfill-markers]: #responsebackfillbegin-and-responsebackfillcomplete
+[runtime-next-truncation]: https://github.com/estuary/flow/blob/master/crates/runtime-next/README.md#backfill-truncation-capture
