@@ -1,3 +1,4 @@
+import abc
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -6,10 +7,11 @@ from urllib.parse import parse_qs, urlparse
 
 from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
 from estuary_cdk.capture.common import LogCursor, ResourceState
-from estuary_cdk.capture.common import ResourceConfig as GenericResourceConfig
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import AccessToken
-from pydantic import AwareDatetime, BaseModel, Field, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
+
+from .utils import to_rfc3339_ms
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -78,19 +80,178 @@ class EndpointConfig(BaseModel):
         return host
 
 
-class ResourceConfig(GenericResourceConfig):
-    # The CDK's `PT0S` default is below the minimum interval.
-    interval: timedelta = Field(
-        default=timedelta(minutes=5),
-        description="Interval between updates for this resource",
-        json_schema_extra={"nonsensitive": True},
-    )
-
-
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class OktaApplication(BaseDocument, extra="allow"):
+class BaseOktaDocument(BaseDocument, metaclass=abc.ABCMeta):
+    """A document built from an Okta API row.
+
+    The row's `_links` is dropped: it is HAL navigation whose every href embeds
+    the tenant domain, and it can be rebuilt from `id`. Keeping it would only
+    add a dozen hostname-bearing strings to every captured document.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def strip_links(cls, data: object) -> object:
+        if isinstance(data, dict):
+            _ = data.pop("_links", None)
+        return data
+
+
+class IdEntityDocument(BaseOktaDocument):
+    """Write schema of the users and groups collections."""
+
+    id: str
+
+    @classmethod
+    def deleted(cls, id: str) -> "IdEntityDocument":
+        """The delete document for `id`: nothing but the key, since the delete
+        time is already stamped on the document by Flow."""
+        doc = cls(id=id)
+        # Assigned rather than defaulted so that it survives the CDK's
+        # exclude_unset serialization.
+        doc.meta_ = cls.Meta(op="d")
+        return doc
+
+
+class DeleteEvent(BaseModel):
+    """The slice of a System Log delete event needed to build a delete
+    document and to hold it back until its updates are committed.
+    """
+
+    class Outcome(BaseModel):
+        result: str
+
+    class Target(BaseModel):
+        id: str
+        type: str
+
+    event_type: str = Field(alias="eventType")
+    outcome: Outcome
+    published: AwareDatetime
+    target: list[Target]
+
+
+class OktaSearchableEntity(IdEntityDocument, abc.ABC):
+    """A top-level Okta object captured through server-side `search` windows,
+    listed in id order.
+
+    Abstract: subclasses own the window expression, the list path, the page
+    size and the System Log event that records their hard deletion. The window
+    is bounded server-side, so no timestamp is read client-side and the model
+    declares nothing beyond the key; the timestamps a row carries are passed
+    through untouched.
+
+    `search` timestamp bounds are millisecond-precise while the stored
+    timestamps are whole seconds. A window `(since, until]` on whole-second
+    bounds therefore covers exactly the seconds strictly after `since` through
+    `until` inclusive.
+
+    `search` sorts and compares ids case-insensitively, the same way for both,
+    so `id gt <last id>` resumes an id-ordered walk exactly where it stopped.
+    """
+
+    NAME: ClassVar[str]
+    PATH: ClassVar[str]
+    SEARCH_PARAM: ClassVar[str] = "search"
+    SORT_PARAMS: ClassVar[dict[str, str | int]] = {"sortBy": "id", "sortOrder": "asc"}
+    PAGE_SIZE: ClassVar[int]
+    DELETE_EVENT_TYPE: ClassVar[str]
+    SUCCESSFUL_DELETION: ClassVar[str] = "SUCCESS"
+    TARGET_TYPE: ClassVar[str]
+
+    @classmethod
+    @abc.abstractmethod
+    def window_search(cls, since: datetime, until: datetime) -> str:
+        """Okta `search` expression selecting objects changed in
+        `(since, until]`, on every timestamp the object reports change on."""
+
+    @classmethod
+    def page_search(cls, since: datetime, until: datetime, after_id: str | None) -> str:
+        """`window_search`, narrowed to ids after `after_id` when given."""
+        window = cls.window_search(since, until)
+        if after_id is None:
+            return window
+        return f'({window}) and id gt "{after_id}"'
+
+    @classmethod
+    def delete_filter(cls) -> str:
+        """System Log `filter` expression selecting the events that record a
+        finished hard delete of one of these objects. A failed delete must not
+        tombstone an object that still exists, hence the outcome clause."""
+        return (
+            f'eventType eq "{cls.DELETE_EVENT_TYPE}" '
+            f'and outcome.result eq "{cls.SUCCESSFUL_DELETION}"'
+        )
+
+    @classmethod
+    def deleted_ids(cls, event: DeleteEvent) -> list[str]:
+        """Ids of these objects that `event` records as hard-deleted: none
+        for an event `delete_filter` does not select."""
+        if (
+            event.event_type != cls.DELETE_EVENT_TYPE
+            or event.outcome.result != cls.SUCCESSFUL_DELETION
+        ):
+            return []
+        return [target.id for target in event.target if target.type == cls.TARGET_TYPE]
+
+
+class User(OktaSearchableEntity):
+    """One user in any lifecycle status, DEPROVISIONED included."""
+
+    NAME: ClassVar[str] = "users"
+    PATH: ClassVar[str] = "users"
+    # Documented maximum; larger values are silently clamped to 200.
+    PAGE_SIZE: ClassVar[int] = 200
+    # A hard delete emits `.initiated` then `.completed`; only the latter
+    # confirms the user is gone.
+    DELETE_EVENT_TYPE: ClassVar[str] = "user.lifecycle.delete.completed"
+    TARGET_TYPE: ClassVar[str] = "User"
+
+    @override
+    @classmethod
+    def window_search(cls, since: datetime, until: datetime) -> str:
+        return (
+            f'lastUpdated gt "{to_rfc3339_ms(since)}" '
+            f'and lastUpdated le "{to_rfc3339_ms(until)}"'
+        )
+
+
+class Group(OktaSearchableEntity):
+    """One group of any type (OKTA_GROUP, APP_GROUP or BUILT_IN).
+
+    Profile edits move `lastUpdated`; membership adds and removes move only
+    `lastMembershipUpdated`, which is set to `created` on a new group and is
+    never null. A window must test both, or every membership change is missed.
+
+    `search` matches on that profile-only `lastUpdated`, but the row it
+    returns carries the search index's own stamp, which also advances on
+    membership changes. The captured `lastUpdated` is therefore the group's
+    last change of either kind.
+    """
+
+    NAME: ClassVar[str] = "groups"
+    PATH: ClassVar[str] = "groups"
+    # Above Okta's recommended 200 and below the documented 10000 maximum;
+    # `search` takes 1000 unclamped. The standard retry covers the timeout
+    # risk Okta names for large pages.
+    PAGE_SIZE: ClassVar[int] = 1000
+    DELETE_EVENT_TYPE: ClassVar[str] = "group.lifecycle.delete"
+    TARGET_TYPE: ClassVar[str] = "UserGroup"
+
+    @override
+    @classmethod
+    def window_search(cls, since: datetime, until: datetime) -> str:
+        lo = to_rfc3339_ms(since)
+        hi = to_rfc3339_ms(until)
+        return (
+            f'(lastUpdated gt "{lo}" and lastUpdated le "{hi}") '
+            f'or (lastMembershipUpdated gt "{lo}" and lastMembershipUpdated le "{hi}")'
+        )
+
+
+class OktaApplication(BaseOktaDocument):
     """One app integration, ACTIVE or INACTIVE; deleted apps are never listed."""
 
     PATH: ClassVar[str] = "apps"
@@ -111,6 +272,7 @@ class SystemLogEvent(BaseDocument, extra="allow"):
     SINCE_PARAM: ClassVar[str] = "since"
     UNTIL_PARAM: ClassVar[str] = "until"
     AFTER_PARAM: ClassVar[str] = "after"
+    FILTER_PARAM: ClassVar[str] = "filter"
     # Okta rejects anything above 1000 with a 400 (System Log / limit over max).
     PAGE_SIZE: ClassVar[int] = 1000
 
