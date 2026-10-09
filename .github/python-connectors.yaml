@@ -247,6 +247,10 @@
   type: capture
   version: v1
   usage_rate: "1.0"
+- name: source-aircall-native
+  type: capture
+  version: v1
+  usage_rate: "1.0"
 - name: source-smartsheet
   type: capture
   version: v1

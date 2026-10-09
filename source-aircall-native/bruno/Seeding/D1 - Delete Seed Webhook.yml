@@ -1,0 +1,23 @@
+info:
+  name: D1 - Delete Seed Webhook
+  type: http
+  seq: 8
+http:
+  method: DELETE
+  url: '{{base_url}}/webhooks/{{seed_webhook_id}}'
+  auth: inherit
+runtime:
+  scripts:
+  - type: before-request
+    code: if (!bru.getVar('seed_webhook_id')) throw new Error('run B1 first (seed_webhook_id unset)');
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#delete-a-webhook
+    **ONLY THE USER RUNS THIS — never the assistant** (state-mutating).
+    **WHY:** cleanup for B1, to run *after* the assistant has re-run `Webhooks / bare` and saved the populated example. Optional: keeping the webhook keeps the `webhooks` stream non-empty for capture snapshots (recommended to keep).
+  type: text/markdown
