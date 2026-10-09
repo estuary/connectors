@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -78,6 +79,60 @@ func TestIntegration(t *testing.T) {
 				leaked = append(leaked, tbl.TableID)
 			}
 			require.Empty(t, leaked, "leaked load results tables")
+		})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
+			var bq = bqTestClient(t, cfg, tables...)
+
+			flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+			require.NoError(t, err)
+			materializer, err := NewMaterializer(ctx, taskName, cfg, flags)
+			require.NoError(t, err)
+			defer materializer.Close(ctx)
+			require.NoError(t, materializer.CleanupTestTask(ctx, taskName))
+
+			// Two shards, so that the primary truncates after applying a peer's
+			// staged stores.
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", taskName,
+				"--source", "testdata/truncate.flow.yaml",
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "2",
+				"--timeout", "10m",
+				"--network", "flow-test",
+				"--log-json",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var query = bq.Query(fmt.Sprintf("SELECT id FROM `%s.%s.%s` ORDER BY id;", cfg.ProjectID, cfg.Dataset, table))
+				query.Location = cfg.Region
+				it, err := query.Read(ctx)
+				require.NoError(t, err)
+				var ids []int64
+				for {
+					var row []bigquery.Value
+					if err := it.Next(&row); err == iterator.Done {
+						break
+					}
+					require.NoError(t, err)
+					ids = append(ids, row[0].(int64))
+				}
+				require.Equal(t, want, ids, table)
+			}
 		})
 	})
 
