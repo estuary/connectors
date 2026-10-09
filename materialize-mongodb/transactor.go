@@ -14,7 +14,9 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"go.gazette.dev/core/message"
 	"golang.org/x/sync/errgroup"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -26,6 +28,11 @@ import (
 const (
 	idField    = "_id"
 	idFieldAlt = "_flow" + idField
+
+	// publishedAtField holds a stored document's publication time as a BSON
+	// date, so that the documents published before a boundary can be
+	// selected by a query.
+	publishedAtField = "_flow_published_at"
 
 	batchByteLimit = 5 * 1024 * 1024
 
@@ -69,6 +76,13 @@ type transactor struct {
 	client   *mongo.Client
 	bindings []*binding
 	be       *m.BindingEvents
+
+	// truncateAfterBackfill permits deleting the documents published before
+	// a completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion after this transaction's stores.
+	truncations map[int]time.Time
 }
 
 type binding struct {
@@ -97,7 +111,22 @@ func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.Materializat
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.deltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			logrus.WithFields(logrus.Fields{
+				"collection": b.path,
+				"boundary":   boundary,
+			}).Info("documents published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -241,7 +270,36 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	close(sendBatches)
-	return nil, group.Wait()
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	// Truncations run after the stores, because a store of an existing
+	// document replaces it in place and would match nothing once deleted.
+	var truncations = t.truncations
+	t.truncations = nil
+	for binding, boundary := range truncations {
+		var b = t.bindings[binding]
+		// A BSON date holds milliseconds, so the boundary is floored to
+		// match the stored precision.
+		var before = primitive.NewDateTimeFromTime(boundary)
+		res, err := b.collection.DeleteMany(ctx, bson.D{{Key: "$or", Value: bson.A{
+			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$lt", Value: before}}}},
+			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$exists", Value: false}}}},
+		}}})
+		if err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.path, err)
+		}
+		logrus.WithFields(logrus.Fields{
+			"collection": b.path,
+			"boundary":   boundary,
+			"before":     before.Time().UTC(),
+			"deleted":    res.DeletedCount,
+		}).Info("truncated documents published before the backfill")
+		t.be.ReportRowStats(it.Round, b.path, m.ExactRowStats(0, 0, 0).WithTruncated(res.DeletedCount))
+	}
+
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {}
@@ -566,9 +624,31 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 	// _id for each record we insert
 	if !deltaUpdates {
 		doc[idField] = idValue
+		if err := setPublishedAt(doc); err != nil {
+			return nil, err
+		}
 	}
 
 	return doc, nil
+}
+
+// setPublishedAt stores the publication time carried by the document's
+// /_meta/uuid under publishedAtField. A document without a UUID is stored
+// without the field.
+func setPublishedAt(doc bson.M) error {
+	if _, ok := doc[publishedAtField]; ok {
+		return fmt.Errorf("document has a field named %q which collides with the reserved name used to materialize its publication time", publishedAtField)
+	}
+	if meta, ok := doc["_meta"].(map[string]any); !ok {
+		return nil
+	} else if raw, ok := meta["uuid"].(string); !ok {
+		return nil
+	} else if id, err := uuid.Parse(raw); err != nil {
+		return fmt.Errorf("parsing /_meta/uuid %q: %w", raw, err)
+	} else {
+		doc[publishedAtField] = primitive.NewDateTimeFromTime(message.GetClock(id).AsTime())
+		return nil
+	}
 }
 
 // parsePointerTokens splits an RFC6901 JSON pointer into its decoded reference
@@ -649,6 +729,9 @@ func arrayIndex(token string, length int) (int, bool) {
 }
 
 func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} {
+	// The publication time is the connector's own field, which the
+	// collection's schema may forbid.
+	delete(doc, publishedAtField)
 	if idValAlt, ok := doc[idFieldAlt]; ok {
 		// Reverse the renaming of a collection's _id field to _flow_id by
 		// putting the original value back as _id and removing the alternate

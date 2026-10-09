@@ -134,6 +134,9 @@ func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bi
 type materialization struct {
 	cfg    config
 	client *mongo.Client
+	// truncateAfterBackfill permits deleting the documents published before
+	// a completed backfill.
+	truncateAfterBackfill bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
@@ -145,8 +148,9 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	}
 
 	return &materialization{
-		cfg:    cfg,
-		client: client,
+		cfg:                   cfg,
+		client:                client,
+		truncateAfterBackfill: featureFlags["truncate_after_backfill"],
 	}, nil
 }
 
@@ -288,10 +292,11 @@ func (d *materialization) NewTransactor(
 	}
 
 	return &transactor{
-		cfg:      &d.cfg,
-		client:   d.client,
-		bindings: bindings,
-		be:       be,
+		cfg:                   &d.cfg,
+		client:                d.client,
+		bindings:              bindings,
+		be:                    be,
+		truncateAfterBackfill: d.truncateAfterBackfill,
 	}, nil
 }
 
