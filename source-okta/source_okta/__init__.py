@@ -10,6 +10,7 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.capture.common import ResourceConfig
 from estuary_cdk.flow import (
     ConnectorSpec,
 )
@@ -17,7 +18,6 @@ from estuary_cdk.flow import (
 from .models import (
     ConnectorState,
     EndpointConfig,
-    ResourceConfig,
 )
 from .resources import all_resources, validate_credentials, validate_intervals
 
