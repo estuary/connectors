@@ -146,6 +146,33 @@ async def _is_talk_enabled(
     return True
 
 
+async def _is_talk_export_available(
+        log: Logger, http: HTTPMixin, config: EndpointConfig, name: str, path: str
+) -> bool:
+    # Zendesk is ending third-party access to its incremental exports, and we
+    # don't know which client error it will return once it does. So any client
+    # error counts as the export being unavailable.
+    start_time = dt_to_s(datetime.now(tz=UTC) - 2 * TIME_PARAMETER_DELAY)
+    try:
+        await http.request(
+            log,
+            f"{url_base(config.subdomain)}/channels/voice/stats/incremental/{path}",
+            params={"start_time": start_time},
+        )
+    except HTTPError as err:
+        if 400 <= err.code < 500:
+            log.warning("Talk incremental export is not accessible, so the stream will not be discovered", {
+                "stream": name,
+                "status_code": err.code,
+                "error": err.message,
+            })
+            return False
+        else:
+            raise err
+
+    return True
+
+
 # I'm not sure if this is the best way to determine if side conversations are enabled
 # for a given Zendesk instance, but I couldn't find a better check. If we see lots of
 # tasks attempting to capture side_conversations but are hitting 4xx errors, we should
@@ -1036,6 +1063,10 @@ async def all_resources(
 
     if not await _is_talk_enabled(log, http, config):
         excluded_streams.update(TALK_STREAMS)
+    else:
+        for (name, path, _) in TALK_INCREMENTAL_EXPORT_RESOURCES:
+            if not await _is_talk_export_available(log, http, config, name, path):
+                excluded_streams.add(name)
 
     if not await _is_side_conversations_enabled(log, http, config):
         excluded_streams.update(SIDE_CONVERSATION_STREAMS)
