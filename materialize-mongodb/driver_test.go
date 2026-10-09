@@ -76,8 +76,12 @@ func TestIntegration(t *testing.T) {
 			defer client.Disconnect(ctx)
 			var db = client.Database(cfg.Database)
 
+			// Each collection starts with a document stored by a connector
+			// version that predates the publication time field.
 			for _, name := range []string{"truncate_standard", "truncate_delta"} {
 				require.NoError(t, db.Collection(name).Drop(ctx))
+				_, err = db.Collection(name).InsertOne(ctx, bson.D{{Key: "id", Value: int64(99)}, {Key: "_meta", Value: bson.D{}}})
+				require.NoError(t, err)
 			}
 
 			boilerplate.RunFlowctl(t, "raw", "preview-next",
@@ -90,10 +94,11 @@ func TestIntegration(t *testing.T) {
 
 			// The fixture stores ids 1-3, then re-stores only id 1 during a
 			// backfill. Only the standard-updates collection loses the
-			// documents published before the backfill.
+			// documents published before the backfill, including the one
+			// without a publication time.
 			for name, want := range map[string][]int64{
 				"truncate_standard": {1},
-				"truncate_delta":    {1, 1, 2, 3},
+				"truncate_delta":    {1, 1, 2, 3, 99},
 			} {
 				cur, err := db.Collection(name).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "id", Value: 1}}))
 				require.NoError(t, err)
