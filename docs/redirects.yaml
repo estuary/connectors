@@ -23,3 +23,21 @@
 # noindex meta tag, which keeps the URL working and drops it from the sitemap.
 - from: /reference/Connectors/capture-connectors/facebook-marketing/
   to: /reference/Connectors/capture-connectors/facebook-marketing-native/
+- from: /reference/Connectors/capture-connectors/amazon-redshift/
+  to: /reference/Connectors/capture-connectors/redshift-batch/
+- from: /reference/Connectors/capture-connectors/amazon-sqs/
+  to: /reference/Connectors/capture-connectors/amazon-sqs-native/
+- from: /reference/Connectors/capture-connectors/google-analytics/
+  to: /reference/Connectors/capture-connectors/google-analytics-data-api-native/
+- from: /reference/Connectors/capture-connectors/greenhouse/
+  to: /reference/Connectors/capture-connectors/greenhouse-native/
+- from: /reference/Connectors/capture-connectors/jira-legacy/
+  to: /reference/Connectors/capture-connectors/jira-native/
+- from: /reference/Connectors/capture-connectors/Salesforce/salesforce-real-time/
+  to: /reference/Connectors/capture-connectors/Salesforce/salesforce-native/
+- from: /reference/Connectors/capture-connectors/shopify/
+  to: /reference/Connectors/capture-connectors/shopify-native/
+- from: /reference/Connectors/capture-connectors/stripe/
+  to: /reference/Connectors/capture-connectors/stripe-realtime/
+- from: /reference/Connectors/materialization-connectors/Rockset/
+  to: /reference/Connectors/materialization-connectors/
