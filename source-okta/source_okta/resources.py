@@ -29,10 +29,12 @@ from .api import (
     fetch_system_log,
     fetch_user_deletes,
     fetch_user_updates,
+    snapshot_application_users,
     snapshot_applications,
 )
 from .models import (
     AfterToken,
+    ApplicationUser,
     EndpointConfig,
     Group,
     IdEntityDocument,
@@ -46,7 +48,7 @@ from .utils import floor_to_ms
 # Okta API tokens use their own authorization scheme in place of `Bearer`.
 AUTHORIZATION_TOKEN_TYPE = "SSWS"
 
-OktaDocument = IdEntityDocument | OktaApplication | SystemLogEvent
+OktaDocument = IdEntityDocument | OktaApplication | ApplicationUser | SystemLogEvent
 OktaResource = common.Resource[OktaDocument, ResourceConfig, ResourceState]
 OktaSnapshotResource = common.SnapshotResource[OktaDocument, ResourceConfig]
 
@@ -232,6 +234,39 @@ def applications_resource(
     )
 
 
+def application_users_resource(
+    http: HTTPMixin, config: EndpointConfig
+) -> OktaSnapshotResource:
+    """The application_users stream: a full re-list of every app's assignments
+    every interval."""
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_application_users, http, config.domain
+            ),
+        )
+
+    return OktaSnapshotResource(
+        name=ApplicationUser.NAME,
+        open=open,
+        initial_config=ResourceConfig(
+            name=ApplicationUser.NAME, interval=timedelta(hours=1)
+        ),
+        schema_inference=True,
+    )
+
+
 def system_log_resource(
     http: HTTPMixin, config: EndpointConfig, cutoff: datetime
 ) -> OktaResource:
@@ -301,6 +336,7 @@ async def all_resources(
         id_entity_resource(http, config, entity_cutoff, log_access, USERS),
         id_entity_resource(http, config, entity_cutoff, log_access, GROUPS),
         applications_resource(http, config),
+        application_users_resource(http, config),
     ]
 
     if await log_access.allowed(log, http):
