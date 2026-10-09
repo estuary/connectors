@@ -24,14 +24,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// When true, the fallback collection key for keyless source tables will be
 	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
-	"keyless_row_id": true,
+	"keyless_row_id": common.FlagEnabled,
 
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
-	"emit_sourced_schemas": true,
+	"emit_sourced_schemas": common.FlagEnabled,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -80,13 +80,16 @@ func (c *Config) Validate() error {
 	if err := c.sslSettings().Validate(); err != nil {
 		return err
 	}
-	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
-	// method that we can be sure always gets called before the config is used.
-	c.Advanced.parsedFeatureFlags = common.ParseFeatureFlags(c.Advanced.FeatureFlags, featureFlagDefaults)
+	return nil
+}
+
+// resolveFeatureFlags resolves the feature flags of a task created on createdAt.
+// It must be called before parsedFeatureFlags is read.
+func (c *Config) resolveFeatureFlags(createdAt common.CreatedAt) {
+	c.Advanced.parsedFeatureFlags = common.ResolveFlags(c.Advanced.FeatureFlags, featureFlagDefaults, createdAt)
 	if c.Advanced.FeatureFlags != "" {
 		log.WithField("flags", c.Advanced.parsedFeatureFlags).Info("parsed feature flags")
 	}
-	return nil
 }
 
 // sslSettings returns the TLS settings for connections to the database. An
