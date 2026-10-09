@@ -27,7 +27,7 @@ With standard updates, each materialized document also carries a
 published. When a backfill of the source collection completes, the connector
 deletes the documents published before the backfill began, because the backfill
 re-sent every document the source still has. Documents stored by connector
-versions that predate this field have no such field, and they are kept.
+versions that predate this field have no such field, and they are deleted too.
 Delta-updates collections keep every document.
 
 ## Prerequisites

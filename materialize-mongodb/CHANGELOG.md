@@ -7,8 +7,9 @@
   deleted from standard-updates collections once it completes, so documents
   removed from the source no longer linger in the destination. Delta-updates
   collections keep every document. Each stored document now carries its
-  publication time in a `_flow_published_at` field, and documents stored
-  before this version have no such field, so they are kept.
+  publication time in a `_flow_published_at` field. Documents stored before
+  this version have no such field, and the first completed backfill deletes
+  them along with the others the backfill did not re-send.
   Disable it with the `no_truncate_after_backfill` feature flag.
 
 ## 2026-09-25
