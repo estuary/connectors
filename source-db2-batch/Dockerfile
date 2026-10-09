@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM golang:1.25-trixie AS builder
+FROM golang:1.27-trixie AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends libxml2
 

@@ -10,7 +10,7 @@ RUN cargo build --release --manifest-path bson-transcoder/Cargo.toml
 
 # Go Build Stage
 ################################################################################
-FROM golang:1.25-trixie AS builder
+FROM golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
