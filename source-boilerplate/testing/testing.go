@@ -237,7 +237,7 @@ func (cs *CaptureSpec) Summary() string {
 	fmt.Fprintf(w, "# ================================\n")
 	fmt.Fprintf(w, "# Final State Checkpoint\n")
 	fmt.Fprintf(w, "# ================================\n")
-	fmt.Fprintf(w, "%s\n", sanitize(cs.Sanitizers, cs.Checkpoint))
+	fmt.Fprintf(w, "%s\n", string(sanitize(cs.Sanitizers, cs.Checkpoint)))
 
 	// If the error result is non-nil, add that to the summary as well
 	if len(cs.Errors) != 0 {
