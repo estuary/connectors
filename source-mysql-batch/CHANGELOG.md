@@ -2,6 +2,9 @@
 
 ## 2026-10-19
 
+### Added
+- Bindings without a query template override now signal when a backfill re-reads their whole table or view. This allows materializations to remove rows that have been deleted from the source. Signals are on by default for new captures created on or after 2026-10-21, and existing captures can turn them on with the `emit_backfill_signals` feature flag.
+
 ### Fixed
 - An incremental binding no longer stops capturing the rest of the table when it restarts during its initial backfill right after a long run of rows whose cursor is NULL.
 
