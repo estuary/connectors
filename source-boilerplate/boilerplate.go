@@ -352,6 +352,37 @@ func (out *PullOutput) SourcedSchema(binding int, schema json.RawMessage) error 
 	return nil
 }
 
+// BackfillBegin signals that the binding is about to restate all of its source
+// data, followed by the given state checkpoint. Everything the binding captured
+// before this point is considered stale once the backfill completes.
+//
+// The runtime requires that the marker is sent alone in its own checkpoint. The
+// caller must checkpoint any output it has sent first.
+func (out *PullOutput) BackfillBegin(binding int, checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Send(&pc.Response{
+		BackfillBegin: &pc.Response_BackfillBegin{Binding: uint32(binding)},
+	}); err != nil {
+		return fmt.Errorf("writing backfill begin: %w", err)
+	}
+	return out.sendCheckpoint(checkpoint, merge)
+}
+
+// BackfillComplete signals that the binding has finished restating all of its
+// source data, followed by the given state checkpoint. The caller has the same
+// requirements as for BackfillBegin.
+func (out *PullOutput) BackfillComplete(binding int, checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Send(&pc.Response{
+		BackfillComplete: &pc.Response_BackfillComplete{Binding: uint32(binding)},
+	}); err != nil {
+		return fmt.Errorf("writing backfill complete: %w", err)
+	}
+	return out.sendCheckpoint(checkpoint, merge)
+}
+
 type streamCodec interface {
 	pc.Connector_CaptureServer
 
