@@ -5,7 +5,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 FROM golang:1.27-trixie AS builder
 
 RUN apt-get update \
-    && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev libclang-dev \
+    && apt-get install -y --no-install-recommends curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.91

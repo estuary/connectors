@@ -12,7 +12,7 @@ RUN python -m venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 
 WORKDIR /opt/${CONNECTOR_NAME}
-COPY ${CONNECTOR_NAME}/pyproject.toml ${CONNECTOR_NAME}/poetry.lock /opt/${CONNECTOR_NAME}
+COPY ${CONNECTOR_NAME}/pyproject.toml ${CONNECTOR_NAME}/poetry.lock /opt/${CONNECTOR_NAME}/
 COPY estuary-cdk /opt/estuary-cdk
 
 RUN poetry install --no-root
@@ -38,6 +38,10 @@ RUN apt-get update && \
   tzdata \
   tzdata-legacy
 
+# Create a non-privileged "nonroot" user to run the connector, as base-image does.
+RUN useradd nonroot --create-home --shell /usr/sbin/nologin && \
+  install -d -m 700 -o nonroot -g nonroot /home/nonroot/.ssh
+
 LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
 LABEL FLOW_RUNTIME_CODEC=json
 LABEL dev.estuary.usage-rate=${USAGE_RATE}
@@ -53,5 +57,9 @@ ENV CONNECTOR_NAME=${CONNECTOR_NAME}
 
 EXPOSE 8080
 LABEL dev.estuary.port-public.8080=true
+
+# Keep package installs and other root-only steps above this line. Images built
+# FROM this one can switch back with `USER root`.
+USER nonroot:nonroot
 
 CMD ["/bin/sh", "-c", "/opt/venv/bin/python -m $(echo \"$CONNECTOR_NAME\" | tr '-' '_')"]

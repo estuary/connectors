@@ -2,6 +2,9 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 # Patched TPC-DS generator from https://github.com/estuary/tpcds-kit.
 ARG DSDGEN_IMAGE=ghcr.io/estuary/dsdgen:latest
 
+# dsdgen tracks :latest from our own fork on purpose; it only generates
+# synthetic TPC-DS test data, so following the fork's master is intended.
+# trivy:ignore:DS-0001
 FROM ${DSDGEN_IMAGE} AS dsdgen
 
 # Build Stage

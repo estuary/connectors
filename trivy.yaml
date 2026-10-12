@@ -1,0 +1,2 @@
+# Picked up automatically by Trivy when run from the repo root.
+ignorefile: .trivyignore.yaml

@@ -1,0 +1,48 @@
+# Trivy ignore list. Each entry needs a statement giving its rationale.
+# Loaded through trivy.yaml, so a plain `trivy config .` from the repo root
+# applies it. Prefer an inline `# trivy:ignore:<ID>` comment when the finding
+# points at a specific line.
+
+misconfigurations:
+  - id: DS-0026
+    statement: >-
+      No HEALTHCHECK defined. Connector images are not long-running services.
+      Flow's runtime launches each connector as a child process and talks to it
+      over stdin/stdout (or a local gRPC socket) using the capture/materialize
+      protocol. The runtime already monitors the process directly: a crash,
+      non-zero exit, or protocol error is detected immediately and handled by
+      its own restart/backoff logic. There is no port or endpoint for a
+      HEALTHCHECK to probe, Docker/Kubernetes never use the image's HEALTHCHECK
+      to make scheduling decisions here, and a probe command would only add a
+      periodic exec inside the container with nothing to check.
+
+  - id: DS-0002
+    paths:
+      - connector-variant.Dockerfile
+    statement: >-
+      No USER command. The variant only adds env vars on top of an existing
+      connector image and keeps that image's user, which is already nonroot.
+      The finding has no line number, so it cannot be ignored inline.
+
+vulnerabilities:
+  - id: CVE-2025-68664
+    paths:
+      - estuary-cdk/poetry.lock
+    statement: >-
+      langchain-core 0.1.42 is locked only in estuary-cdk's own development
+      lockfile, pinned exactly by airbyte-cdk for the optional airbyte-shim
+      extra and the dev group. No connector image ships it: the connectors
+      that use the shim lock airbyte-cdk 0.52.10, which does not depend on
+      langchain-core, and nothing in the repo uses langchain serialization.
+      Upgrading airbyte-cdk to a version without the pin is ruled out for
+      licensing reasons.
+
+  - id: GO-2026-5932
+    paths:
+      - go.mod
+    statement: >-
+      Covers the golang.org/x/crypto/openpgp packages in every version of
+      golang.org/x/crypto, with no fixed release. Trivy matches on the module,
+      which we need for SSH and other crypto, but no package in the repo
+      imports openpgp: `go list -deps -test ./...` contains no openpgp
+      package. Re-check this if a new dependency on OpenPGP is added.
