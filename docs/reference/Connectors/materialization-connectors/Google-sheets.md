@@ -118,7 +118,7 @@ The connector keeps its state in the hidden first column of each sheet.
 A new materialization cannot use a sheet that another materialization wrote, even if you clear the visible cells.
 To move a sheet to a new materialization:
 
-1. Delete or disable the old materialization, or remove the sheet's binding from it.
+1. Delete the old materialization, or remove the sheet's binding from it.
 2. In Google Sheets, delete the sheet's tab.
 3. Publish the new materialization. If it is already published, it picks up the change on its next restart.
    The connector creates the missing tab when the task starts, and fills it from the source collection.
