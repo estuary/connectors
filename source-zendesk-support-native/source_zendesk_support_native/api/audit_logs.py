@@ -13,6 +13,7 @@ from ..models import (
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     INCREMENTAL_LAG,
+    MIN_INCREMENTAL_WINDOW_SIZE,
     url_base,
     dt_to_str,
 )
@@ -30,7 +31,7 @@ async def fetch_audit_logs(
 
     horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
-    if horizon <= log_cursor:
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
         return
 
     start = dt_to_str(log_cursor)
