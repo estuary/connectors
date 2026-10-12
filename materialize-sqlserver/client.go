@@ -58,30 +58,39 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
-		// Provide a more user-friendly representation of some common error causes.
-		var sqlServerErr *mssqldb.Error
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &sqlServerErr) {
-			// See SQLServer error reference: https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-2017
-			switch sqlServerErr.Number {
-			}
-		} else if errors.As(err, &netConnErr) {
-			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
-			}
-		} else if errors.As(err, &netOpErr) {
-			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
-			}
-		}
-
+	if err := ping(ctx, db, cfg); err != nil {
 		errs.Err(err)
 	}
 
 	return errs
+}
+
+// ping connects to the database and maps common connection failures to a readable error.
+func ping(ctx context.Context, db *stdsql.DB, cfg config) error {
+	err := db.PingContext(ctx)
+	if err == nil {
+		return nil
+	}
+
+	// Provide a more user-friendly representation of some common error causes.
+	var sqlServerErr *mssqldb.Error
+	var netConnErr *net.DNSError
+	var netOpErr *net.OpError
+
+	if errors.As(err, &sqlServerErr) {
+		// See SQLServer error reference: https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-2017
+		switch sqlServerErr.Number {
+		}
+	} else if errors.As(err, &netConnErr) {
+		if netConnErr.IsNotFound {
+			err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
+		}
+	} else if errors.As(err, &netOpErr) {
+		if netOpErr.Timeout() {
+			err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+		}
+	}
+	return err
 }
 
 // datetimeFieldMeta is attached to the ExistingField.Meta of a DATETIME,

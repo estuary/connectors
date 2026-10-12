@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -321,6 +322,11 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 
 			db := stdsql.OpenDB(connector)
 			defer db.Close()
+
+			// sql.OpenDB does not connect, so ping to report a connection failure as one.
+			if err := ping(ctx, db, cfg); err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+err.Error())
+			}
 
 			collation, err := getCollation(ctx, db)
 			if err != nil {
