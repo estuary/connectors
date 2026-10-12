@@ -666,7 +666,11 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			var shouldEmit = false
 			if isFullRefresh {
 				shouldEmit = true
-			} else if prevCursorValues != nil && !cursorValuesEqual(prevCursorValues, currentCursorValues) {
+			} else if prevCursorValues != nil && !cursorValuesEqual(prevCursorValues, currentCursorValues) && !slices.Contains(prevCursorValues, nil) {
+				// The checkpointed cursor must not contain NULL. The resume query compares
+				// with `>` and that's never true for NULL, so it would skip rows this pass
+				// hasn't reached yet. A later boundary without NULLs is checkpointed instead.
+
 				// Update CursorValues and DocumentCount in lockstep
 				state.CursorValues = prevCursorValues
 				state.DocumentCount = nextRowID

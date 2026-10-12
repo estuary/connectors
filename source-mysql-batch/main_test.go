@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -787,6 +788,46 @@ func TestCaptureWithNullCursor(t *testing.T) {
 		cs.Capture(ctx, t, nil)
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
+}
+
+// TestNullCursorNotPersisted verifies that a partial-progress checkpoint never
+// persists a NULL cursor value, which would make a resumed query match no rows.
+func TestNullCursorNotPersisted(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, sort_col INTEGER)")
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "sort_col")
+	setShutdownAfterQuery(t, true)
+
+	// Insert more NULL-cursor rows than documentsPerCheckpoint, then rows with
+	// non-NULL cursors. MySQL returns the NULL rows first, so a partial-progress
+	// checkpoint is due right where the cursor changes from NULL to non-NULL. Without
+	// the check, that checkpoint would save a NULL cursor.
+	var values []string
+	for i := 0; i < documentsPerCheckpoint+500; i++ {
+		values = append(values, fmt.Sprintf("(%d, NULL)", i))
+	}
+	for i := 0; i < 100; i++ {
+		values = append(values, fmt.Sprintf("(%d, %d)", documentsPerCheckpoint+500+i, i))
+	}
+	executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES %s", tableName, strings.Join(values, ", ")))
+
+	var cursorCheckpoints int
+	cs.Capture(ctx, t, func(data json.RawMessage) {
+		var state captureState
+		if err := json.Unmarshal(data, &state); err != nil || state.Streams == nil {
+			return // Not a checkpoint
+		}
+		var stream = state.Streams[boilerplate.StateKey(cs.Bindings[0].StateKey)]
+		if stream == nil || len(stream.CursorValues) == 0 {
+			return
+		}
+		require.NotContains(t, stream.CursorValues, nil, "persisted a NULL cursor value")
+		cursorCheckpoints++
+	})
+	require.Empty(t, cs.Errors)
+	require.Greater(t, cursorCheckpoints, 1, "expected a partial-progress checkpoint as well as the final one")
 }
 
 // TestQueryTemplateOverride exercises a capture configured with an explicit query template
