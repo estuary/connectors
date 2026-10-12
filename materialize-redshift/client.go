@@ -149,6 +149,34 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
+// ping connects to the database and maps common connection failures to a readable error.
+func ping(ctx context.Context, db *stdsql.DB, cfg config) error {
+	err := db.PingContext(ctx)
+	if err == nil {
+		return nil
+	}
+
+	// Provide a more user-friendly representation of some common error causes.
+	var pgErr *pgconn.ConnectError
+
+	if errors.As(err, &pgErr) {
+		err = pgErr.Unwrap()
+		if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
+			err = fmt.Errorf("incorrect username or password")
+		} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
+			err = fmt.Errorf("database %q does not exist", cfg.Database)
+		} else if strings.Contains(errStr, "context deadline exceeded") {
+			errStr := `connection to host at address %q timed out, possible causes:
+				* Redshift endpoint is not set to be publicly accessible
+				* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
+				* the configured address is incorrect, possibly with an incorrect host or port
+				* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
+			err = fmt.Errorf(errStr, cfg.Address)
+		}
+	}
+	return err
+}
+
 func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
@@ -164,26 +192,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := db.PingContext(pingCtx); err != nil {
-		// Provide a more user-friendly representation of some common error causes.
-		var pgErr *pgconn.ConnectError
-
-		if errors.As(err, &pgErr) {
-			err = pgErr.Unwrap()
-			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
-				err = fmt.Errorf("incorrect username or password")
-			} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
-				err = fmt.Errorf("database %q does not exist", cfg.Database)
-			} else if strings.Contains(errStr, "context deadline exceeded") {
-				errStr := `connection to host at address %q timed out, possible causes:
-					* Redshift endpoint is not set to be publicly accessible
-					* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
-					* the configured address is incorrect, possibly with an incorrect host or port
-					* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
-				err = fmt.Errorf(errStr, cfg.Address)
-			}
-		}
-
+	if err := ping(pingCtx, db, cfg); err != nil {
 		errs.Err(err)
 	}
 

@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -269,6 +270,11 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("opening db: %w", err)
 			}
 			defer db.Close()
+
+			// sql.Open does not connect, so ping to report a connection failure as one.
+			if err := ping(ctx, db, cfg); err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+err.Error())
+			}
 
 			var caseSensitiveIdentifier string
 			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
