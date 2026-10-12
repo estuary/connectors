@@ -149,14 +149,8 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-// ping connects to the database and maps common connection failures to a readable error.
-func ping(ctx context.Context, db *stdsql.DB, cfg config) error {
-	err := db.PingContext(ctx)
-	if err == nil {
-		return nil
-	}
-
-	// Provide a more user-friendly representation of some common error causes.
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
 	var pgErr *pgconn.ConnectError
 
 	if errors.As(err, &pgErr) {
@@ -192,8 +186,8 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := ping(pingCtx, db, cfg); err != nil {
-		errs.Err(err)
+	if err := db.PingContext(pingCtx); err != nil {
+		errs.Err(connectError(err, cfg))
 	}
 
 	s3client, err := cfg.toS3Client(ctx, featureFlags)

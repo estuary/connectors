@@ -17,7 +17,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	mssqldb "github.com/microsoft/go-mssqldb"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -58,30 +57,19 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := ping(ctx, db, cfg); err != nil {
-		errs.Err(err)
+	if err := db.PingContext(ctx); err != nil {
+		errs.Err(connectError(err, cfg))
 	}
 
 	return errs
 }
 
-// ping connects to the database and maps common connection failures to a readable error.
-func ping(ctx context.Context, db *stdsql.DB, cfg config) error {
-	err := db.PingContext(ctx)
-	if err == nil {
-		return nil
-	}
-
-	// Provide a more user-friendly representation of some common error causes.
-	var sqlServerErr *mssqldb.Error
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
 	var netConnErr *net.DNSError
 	var netOpErr *net.OpError
 
-	if errors.As(err, &sqlServerErr) {
-		// See SQLServer error reference: https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-2017
-		switch sqlServerErr.Number {
-		}
-	} else if errors.As(err, &netConnErr) {
+	if errors.As(err, &netConnErr) {
 		if netConnErr.IsNotFound {
 			err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 		}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -452,6 +453,19 @@ func TestPrereqs(t *testing.T) {
 			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+// NewEndpoint runs before the prerequisite checks, so a login failure must be
+// reported by its connection ping rather than by the first query it runs.
+func TestNewEndpointConnectError(t *testing.T) {
+	cfg := mustGetCfg(t)
+	cfg.User = "wrong" + cfg.User
+
+	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	require.ErrorContains(t, err, "unable to connect to database: incorrect username or password")
+
+	var userErr *cerrors.UserError
+	require.ErrorAs(t, err, &userErr)
 }
 
 // testFlags resolves feature flags for a test that has no runtime spec to take a

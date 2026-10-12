@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -187,4 +188,27 @@ func TestPrereqs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// NewEndpoint runs before the prerequisite checks, so a login failure must be
+// reported by its connection ping rather than by the first query it runs.
+func TestNewEndpointConnectError(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	t.Cleanup(func() {
+		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
+	})
+
+	cfg := testConfig()
+	cfg.Password = "wrong" + cfg.Password
+
+	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	require.ErrorContains(t, err, "unable to connect to database: ")
+	require.ErrorContains(t, err, "Login failed for user 'sa'")
+
+	var userErr *cerrors.UserError
+	require.ErrorAs(t, err, &userErr)
 }

@@ -291,8 +291,6 @@ func connectError(err error, cfg config) error {
 	if errors.As(err, &netOpErr) {
 		err = fmt.Errorf("could not connect to endpoint: ensure the connection string '%s' is correct", cfg.ConnectionString)
 	} else if errors.As(err, &authErr) && authErr.RawResponse != nil {
-		// This now also runs when a task starts, so a body it can't parse
-		// returns the original error rather than crashing the connector.
 		var res badRequestResponseBody
 		if decodeErr := json.NewDecoder(authErr.RawResponse.Body).Decode(&res); decodeErr != nil {
 			return err

@@ -324,8 +324,8 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			defer db.Close()
 
 			// sql.OpenDB does not connect, so ping to report a connection failure as one.
-			if err := ping(ctx, db, cfg); err != nil {
-				return nil, cerrors.NewUserError(err, "unable to connect to database: "+err.Error())
+			if err := db.PingContext(ctx); err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
 			}
 
 			collation, err := getCollation(ctx, db)
