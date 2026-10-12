@@ -10,6 +10,7 @@ class DiscoveredBinding(BaseModel, Generic[ResourceConfig]):
     resourceConfig: ResourceConfig
     documentSchema: dict
     key: list[str]
+    isFallbackKey: bool = False
     disable: bool = False
 
 
