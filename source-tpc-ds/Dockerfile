@@ -36,8 +36,6 @@ FROM ${BASE_IMAGE}
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
-COPY --from=busybox:latest /bin/sh /bin/sh
-
 # The generator and its distributions file sit next to the connector, on PATH.
 COPY --from=dsdgen /dsdgen /tpcds.idx ./
 
