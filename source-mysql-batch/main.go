@@ -32,6 +32,15 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
 	"emit_sourced_schemas": common.FlagEnabled,
+
+	// When set, backfills certain to restate a binding's source in full are bracketed by
+	// BackfillBegin and BackfillComplete messages. See shouldEmitBackfillSignals.
+	"emit_backfill_signals": common.FlagEnabledForTasksCreatedAfter("2026-10-16"),
+
+	// When set, backfill signals are sent even when the endpoint or resource configuration
+	// means a backfill might not capture every row of the source, e.g. a query template
+	// override.
+	"ignore_config_for_backfill_signals": common.FlagDisabled,
 }
 
 // Config tells the connector how to connect to and interact with the source database.

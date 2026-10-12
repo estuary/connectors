@@ -50,8 +50,8 @@ const (
 	// ought to be getting a consistent stream of results until the query completes.
 	pollingWatchdogTimeout = 5 * time.Minute
 
-	// Maximum number of concurrent polling operations to run at once. Might be
-	// worth making this configurable in the advanced endpoint settings.
+	// Polls must run one at a time so a checkpoint only commits its own poll's
+	// documents, and backfill markers stay alone in their checkpoints.
 	maxConcurrentQueries = 1
 
 	// The minimum time between schema discovery operations. This avoids situations
@@ -226,6 +226,8 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 			index:         idx,
 			stateKey:      boilerplate.StateKey(binding.StateKey),
 			collectionKey: binding.Collection.Key,
+
+			shouldEmitBackfillSignals: shouldEmitBackfillSignals(&cfg, &res),
 		})
 	}
 
@@ -276,6 +278,13 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 		if stream == nil {
 			stream = &streamState{CursorNames: res.Cursor}
 		}
+		if stream.IsAwaitingBackfillComplete != nil && !binding.shouldEmitBackfillSignals {
+			// This binding no longer sends backfill signals, so the BackfillComplete
+			// it's awaiting must never be sent. The binding's next checkpoint saves
+			// the cleared field.
+			log.WithField("name", res.Name).Warn("binding no longer sends backfill signals, its backfill will not send a BackfillComplete")
+			stream.IsAwaitingBackfillComplete = nil
+		}
 		newState.Streams[sk] = stream
 	}
 	return newState, nil
@@ -301,6 +310,26 @@ type bindingInfo struct {
 	index         int
 	stateKey      boilerplate.StateKey
 	collectionKey []string // The key of the output collection, as an array of JSON pointers.
+
+	// Whether this binding's backfills are bracketed by BackfillBegin and
+	// BackfillComplete. Decided once at startup by shouldEmitBackfillSignals.
+	shouldEmitBackfillSignals bool
+}
+
+// shouldEmitBackfillSignals reports whether backfills of the resource should be
+// bracketed by BackfillBegin and BackfillComplete. That requires emit_backfill_signals.
+// It also requires a backfill that's certain to capture every row of the source,
+// unless ignore_config_for_backfill_signals is set.
+func shouldEmitBackfillSignals(cfg *Config, res *Resource) bool {
+	if !cfg.Advanced.parsedFeatureFlags["emit_backfill_signals"] {
+		return false
+	}
+	if cfg.Advanced.parsedFeatureFlags["ignore_config_for_backfill_signals"] {
+		return true
+	}
+	// The default template's first query reads the whole table or view without a
+	// filter. A template override might not.
+	return res.Template == ""
 }
 
 type captureState struct {
@@ -312,6 +341,11 @@ type streamState struct {
 	CursorValues  []any
 	LastPolled    time.Time
 	DocumentCount int64 // A count of the number of documents emitted since the last full refresh started.
+
+	// True from when BackfillBegin is sent until BackfillComplete is sent, or until
+	// the configuration says backfill signals should no longer be sent. It's what
+	// tells a poll resuming an incremental backfill to send BackfillComplete.
+	IsAwaitingBackfillComplete *bool
 }
 
 func (s *captureState) Validate() error {
@@ -597,6 +631,20 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	}
 	defer stmt.Close()
 
+	// Begin only when the query starts from the first row. A second BackfillBegin
+	// while resuming an incremental backfill would move the truncation point past
+	// the rows already captured, and materializations would delete them at
+	// BackfillComplete.
+	if binding.shouldEmitBackfillSignals && isInitialBackfill {
+		var isAwaiting = true
+		state.IsAwaitingBackfillComplete = &isAwaiting
+		if checkpointJSON, err := marshalStreamState(stateKey, state); err != nil {
+			return err
+		} else if err := c.Output.BackfillBegin(binding.index, checkpointJSON, true); err != nil {
+			return fmt.Errorf("error emitting backfill begin: %w", err)
+		}
+	}
+
 	var result mysql.Result
 	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
 
@@ -786,6 +834,17 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	}
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
+	}
+
+	// No need to check shouldEmitBackfillSignals here. updateResourceStates clears
+	// IsAwaitingBackfillComplete at startup when shouldEmitBackfillSignals is false.
+	if state.IsAwaitingBackfillComplete != nil {
+		state.IsAwaitingBackfillComplete = nil
+		if checkpointJSON, err := marshalStreamState(stateKey, state); err != nil {
+			return err
+		} else if err := c.Output.BackfillComplete(binding.index, checkpointJSON, true); err != nil {
+			return fmt.Errorf("error emitting backfill complete: %w", err)
+		}
 	}
 	return nil
 }
