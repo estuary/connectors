@@ -640,8 +640,15 @@ func compareValues(a, b any) int {
 		}
 	}
 
-	sa := fmt.Sprintf("%v", a)
-	sb := fmt.Sprintf("%v", b)
+	// A json.RawMessage is compared by its byte slice formatting, which is how
+	// fmt printed it before Go 1.27 made it a fmt.Stringer. This keeps the row
+	// order of existing snapshots.
+	fmtValue := func(v any) string {
+		if raw, ok := v.(json.RawMessage); ok {
+			return fmt.Sprintf("%v", []byte(raw))
+		}
+		return fmt.Sprintf("%v", v)
+	}
 
-	return cmp.Compare(sa, sb)
+	return cmp.Compare(fmtValue(a), fmtValue(b))
 }
