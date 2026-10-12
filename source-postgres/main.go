@@ -490,6 +490,13 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return nil
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err == nil {
+		// The pool connects lazily, so without a ping a connection failure
+		// surfaces from whichever query happens to run first.
+		if err = pool.Ping(ctx); err != nil {
+			pool.Close()
+		}
+	}
 	if err != nil {
 		var pgErr *pgconn.PgError
 
