@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -152,6 +153,11 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("opening database connection: %w", err)
 			}
 			defer db.Close()
+
+			// sql.Open does not connect, so ping to report a connection failure as one.
+			if err := db.PingContext(ctx); err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
 
 			caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
 			if err != nil {
