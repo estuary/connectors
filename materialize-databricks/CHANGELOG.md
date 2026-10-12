@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-12
+### Fixed
+- A materialization that restarts partway through a commit no longer fails on
+  every restart after it when a table's staging data was already cleaned up.
+
 ## 2026-10-07
 ### Changed
 - A transaction's tables are committed concurrently, up to five at a time,

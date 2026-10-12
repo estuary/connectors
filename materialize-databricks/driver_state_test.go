@@ -532,6 +532,16 @@ func TestAcknowledge(t *testing.T) {
 		_, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.Error(t, err) // no longer a recovery apply
 	})
+
+	t.Run("recovery tolerates a staging table without its transaction log", func(t *testing.T) {
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
+		d.cpRecovery = true
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("[DELTA_MISSING_TRANSACTION_LOG] Incompatible format detected")), allKeys)
+		require.NoError(t, err)
+		require.False(t, d.cpRecovery)
+	})
 }
 
 // renderableTable builds a table realistic enough for the commit query
