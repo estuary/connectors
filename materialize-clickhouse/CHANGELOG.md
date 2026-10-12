@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-10-09
+## 2026-10-12
 
 ### Added
 - When a collection is backfilled, rows the backfill did not re-send are deleted
