@@ -328,7 +328,7 @@ func (db *oracleDatabase) switchToPDB(ctx context.Context) error {
 	return nil
 }
 
-func (db *oracleDatabase) connect(_ context.Context) error {
+func (db *oracleDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":        db.config.Address,
 		"user":           db.config.User,
@@ -338,6 +338,11 @@ func (db *oracleDatabase) connect(_ context.Context) error {
 
 	var conn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.BackfillChunkSize+1))
 	if err != nil {
+		return fmt.Errorf("unable to connect to database: %w", err)
+	}
+	// sql.Open does not connect, so ping to report a connection failure as one.
+	if err := conn.PingContext(ctx); err != nil {
+		conn.Close()
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
