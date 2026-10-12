@@ -1,0 +1,132 @@
+# ================================
+# Collection "acmeCo/test/test/backfillmarkers_fullrefresh_828152": 12 Documents
+# ================================
+{
+  "backfillBegin": {}
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 0",
+  "id": 0
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 1",
+  "id": 1
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 2",
+  "id": 2
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 3",
+  "id": 3
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 4",
+  "id": 4
+}
+{
+  "backfillComplete": {}
+}
+{
+  "backfillBegin": {}
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 0",
+  "id": 0
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 2",
+  "id": 2
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test_backfillmarkers_fullrefresh_828152",
+      "schema": "test",
+      "table": "backfillmarkers_fullrefresh_828152"
+    }
+  },
+  "data": "Value for row 4",
+  "id": 4
+}
+{
+  "backfillComplete": {}
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_backfillmarkers_fullrefresh_828152":{"DocumentCount":3,"LastPolled":"<TIMESTAMP>"}}}
+
