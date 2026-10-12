@@ -1,5 +1,5 @@
 use anyhow::Result;
-use aws_sdk_iam::config::Credentials;
+use aws_credential_types::Credentials;
 use aws_sigv4::http_request::{
     sign, SignableBody, SignableRequest, SignatureLocation, SigningSettings,
 };
