@@ -26,8 +26,15 @@ into a collection with a bounded set of keys.
 * The URL of a Google spreadsheet that *does not* contain the output of a prior Estuary materialization.
 
 :::caution
-Materializing data to a spreadsheet that already contains the output of another Estuary materialization can result in an error.
-Use a new spreadsheet for each materialization, or completely clear the output of prior materializations from the spreadsheet before you continue.
+Only one materialization can write to each sheet. This includes disabled materializations.
+If a sheet contains the output of another materialization, the connector fails with an error such as:
+
+```
+PrevRound must have been committed (less or equal to loadRound). This most commonly happens if there are multiple materializations writing to the same sheet.
+```
+
+Use a new spreadsheet or sheet for each materialization.
+To give a sheet to a different materialization, see [Move a sheet to a new materialization](#move-a-sheet-to-a-new-materialization).
 :::
 
 There are two ways to authenticate with Google when using this connector:
@@ -115,3 +122,20 @@ materializations:
           sheet: my_sheet
       source: ${PREFIX}/${source_collection}
 ```
+
+## Move a sheet to a new materialization
+
+The connector keeps its state in the hidden first column of each sheet.
+A new materialization cannot use a sheet that another materialization wrote, even if you clear the visible cells.
+To move a sheet to a new materialization:
+
+1. Delete the old materialization, or remove the sheet's binding from it.
+2. In Google Sheets, delete the sheet's tab.
+3. Publish the new materialization. If it is already published, it picks up the change on its next restart.
+   The connector creates the missing tab when the task starts, and fills it from the source collection.
+
+:::caution
+Do not delete a tab while its own materialization still writes to it.
+The connector creates the tab again, but writes only the rows whose documents change after that.
+To fill the tab again, [backfill](/reference/backfilling-data/#materialization-backfill) the binding.
+:::
