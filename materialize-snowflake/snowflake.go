@@ -15,6 +15,7 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -130,6 +131,11 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("newSnowflakeDriver stdsql.Open: %w", err)
 			}
 			defer db.Close()
+
+			// sql.Open does not connect, so ping to report a connection failure as one.
+			if err := db.PingContext(ctx); err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
 
 			timestampTypeMapping, isExplicit, err := getTimestampTypeMapping(ctx, db)
 			if err != nil {

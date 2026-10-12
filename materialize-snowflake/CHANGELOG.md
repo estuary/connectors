@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as a
+  `TIMESTAMP_TYPE_MAPPING` query error. This also applies when the
+  materialization is saved, so messages such as "incorrect username or
+  password" are shown again.
+
 ## 2026-09-28
 
 ### Fixed
