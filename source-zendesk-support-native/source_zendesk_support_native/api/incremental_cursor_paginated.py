@@ -13,6 +13,7 @@ from ..models import (
 
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
+    MIN_INCREMENTAL_WINDOW_SIZE,
     url_base,
     dt_to_s,
     dt_to_str,
@@ -62,7 +63,7 @@ async def fetch_incremental_cursor_paginated_resources(
     last_checkpointed = log_cursor
     horizon = datetime.now(tz=UTC) - lag
 
-    if horizon <= log_cursor:
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
         return
 
     while True:

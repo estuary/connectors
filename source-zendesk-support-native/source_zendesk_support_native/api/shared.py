@@ -11,6 +11,13 @@ TIME_PARAMETER_DELAY = timedelta(seconds=61)
 # over records younger than INCREMENTAL_LAG, giving late arrivals time to appear
 # before the cursor moves past their timestamp.
 INCREMENTAL_LAG = timedelta(minutes=5)
+# After a poll that checkpoints, the CDK polls again right away if the cursor is
+# older than the binding's interval, assuming the stream has fallen behind. Our
+# cursors trail the present by at least INCREMENTAL_LAG on purpose, so at intervals
+# of 5 minutes or less the CDK always thinks we're behind. Fetchers return without
+# a request when their window is smaller than this. That makes the extra poll a
+# no-op, and the next real poll waits a full interval.
+MIN_INCREMENTAL_WINDOW_SIZE = timedelta(minutes=1)
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT = 10
 
