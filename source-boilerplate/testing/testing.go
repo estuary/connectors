@@ -265,6 +265,9 @@ type pullAdapter struct {
 		transactionSchemas []pc.Response_SourcedSchema // Reusable list of sourced schemas in the current transaction
 	}
 
+	// The backfill marker awaiting its checkpoint, if any.
+	pendingMarker *backfillMarker
+
 	// pendingCheckpoints is a counter of checkpoints emitted by the capture,
 	// used to produce valid Acknowledge messages upon request.
 	pendingCheckpoints atomic.Int64
@@ -296,7 +299,30 @@ func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
 	return json.Marshal(x)
 }
 
+type backfillMarker struct {
+	binding uint32
+	kind    string
+}
+
 func (a *pullAdapter) Send(m *pc.Response) error {
+	// Like the runtime, require that a backfill marker is the only output in
+	// its checkpoint.
+	var marker *backfillMarker
+	if m.BackfillBegin != nil {
+		marker = &backfillMarker{binding: m.BackfillBegin.Binding, kind: "backfillBegin"}
+	} else if m.BackfillComplete != nil {
+		marker = &backfillMarker{binding: m.BackfillComplete.Binding, kind: "backfillComplete"}
+	}
+	if marker != nil {
+		if a.pendingMarker != nil || len(a.reused.transactionDocs) > 0 || len(a.reused.transactionSchemas) > 0 {
+			return fmt.Errorf("test error: %s for binding %d is not alone in its checkpoint", marker.kind, marker.binding)
+		}
+		a.pendingMarker = marker
+	}
+	if a.pendingMarker != nil && (m.Captured != nil || m.SourcedSchema != nil) {
+		return fmt.Errorf("test error: output sent in the same checkpoint as %s for binding %d", a.pendingMarker.kind, a.pendingMarker.binding)
+	}
+
 	if m.Captured != nil {
 		var docStartIndex = len(a.reused.dataBuffer)
 		a.reused.dataBuffer = append(a.reused.dataBuffer, m.Captured.DocJson...)
@@ -327,6 +353,18 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 		}
 		a.pendingCheckpoints.Add(1)
 
+		if a.pendingMarker != nil {
+			if v, ok := a.validator.(BackfillMarkerValidator); ok {
+				var bindingName string
+				if idx := a.pendingMarker.binding; int(idx) < len(a.bindings) {
+					bindingName = string(a.bindings[idx].Collection.Name)
+				} else {
+					bindingName = fmt.Sprintf("Invalid Binding %d", idx)
+				}
+				v.BackfillMarker(bindingName, a.pendingMarker.kind)
+			}
+			a.pendingMarker = nil
+		}
 		for _, sourcedSchema := range a.reused.transactionSchemas {
 			var bindingName string
 			if idx := sourcedSchema.Binding; int(idx) < len(a.bindings) {
@@ -376,6 +414,12 @@ type CaptureValidator interface {
 	SourcedSchema(collection string, schema json.RawMessage)
 	Summarize(w io.Writer) error
 	Reset()
+}
+
+// BackfillMarkerValidator is optionally implemented by a CaptureValidator which
+// records backfill markers. Markers are dropped for validators which don't.
+type BackfillMarkerValidator interface {
+	BackfillMarker(collection string, kind string)
 }
 
 // SortedCaptureValidator maintains a list of every document emitted to each output
@@ -485,9 +529,10 @@ func (v *SortedCaptureValidator) Reset() {
 // OrderedCaptureValidator maintains a list of every document emitted to each output
 // collection in the order they were emitted.
 type OrderedCaptureValidator struct {
-	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
-	PrettyDocuments       bool // When true, pretty-prints output documents
-	NormalizeJSON         bool // When true, sorts JSON object keys in output documents
+	IncludeSourcedSchemas  bool // When true, collection data includes sourced schema updates
+	IncludeBackfillMarkers bool // When true, collection data includes backfill markers
+	PrettyDocuments        bool // When true, pretty-prints output documents
+	NormalizeJSON          bool // When true, sorts JSON object keys in output documents
 
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
@@ -509,6 +554,13 @@ func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage
 	}
 	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
 	v.documents[collection] = append(v.documents[collection], data)
+}
+
+// BackfillMarker records a backfill marker in order with the collection's documents.
+func (v *OrderedCaptureValidator) BackfillMarker(collection string, kind string) {
+	if v.IncludeBackfillMarkers {
+		v.Output(collection, json.RawMessage(fmt.Sprintf(`{%q:{}}`, kind)))
+	}
 }
 
 // Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
