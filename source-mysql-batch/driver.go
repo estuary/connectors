@@ -789,13 +789,22 @@ func cursorValuesEqual(a, b []any) bool {
 }
 
 func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
-	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
-	checkpointPatch.Streams[sk] = state
-
-	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
-		return fmt.Errorf("error serializing state checkpoint: %w", err)
+	if checkpointJSON, err := marshalStreamState(sk, state); err != nil {
+		return err
 	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 		return fmt.Errorf("error emitting checkpoint: %w", err)
 	}
 	return nil
+}
+
+// marshalStreamState serializes a merge-patch checkpoint updating one stream's state.
+func marshalStreamState(sk boilerplate.StateKey, state *streamState) (json.RawMessage, error) {
+	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
+	checkpointPatch.Streams[sk] = state
+
+	var checkpointJSON, err = json.Marshal(checkpointPatch)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
+	}
+	return checkpointJSON, nil
 }
