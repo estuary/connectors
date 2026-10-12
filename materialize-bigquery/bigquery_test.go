@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -18,6 +19,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
 
@@ -58,24 +60,39 @@ func TestIntegration(t *testing.T) {
 
 			prefix := loadResultsTablePrefix + translateFlowIdentifier(taskName)
 			cutoff := started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
-			var leaked []string
-			it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
-			for {
-				tbl, err := it.Next()
-				if err == iterator.Done {
-					break
+			listLeaked := func() []string {
+				var leaked []string
+				it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
+				for {
+					tbl, err := it.Next()
+					if err == iterator.Done {
+						break
+					}
+					require.NoError(t, err)
+					if !strings.HasPrefix(tbl.TableID, prefix) {
+						continue
+					}
+					md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
+					var gErr *googleapi.Error
+					if errors.As(err, &gErr) && gErr.Code == 404 {
+						continue // Deleted after the listing returned it.
+					}
+					require.NoError(t, err)
+					if md.CreationTime.Before(cutoff) {
+						t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
+						continue
+					}
+					leaked = append(leaked, tbl.TableID)
 				}
-				require.NoError(t, err)
-				if !strings.HasPrefix(tbl.TableID, prefix) {
-					continue
-				}
-				md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
-				require.NoError(t, err)
-				if md.CreationTime.Before(cutoff) {
-					t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
-					continue
-				}
-				leaked = append(leaked, tbl.TableID)
+				return leaked
+			}
+			// A table listing can lag a delete by several seconds, so a
+			// table is only leaked if it is still listed after the lag has
+			// had time to clear.
+			leaked := listLeaked()
+			for deadline := time.Now().Add(time.Minute); len(leaked) > 0 && time.Now().Before(deadline); {
+				time.Sleep(5 * time.Second)
+				leaked = listLeaked()
 			}
 			require.Empty(t, leaked, "leaked load results tables")
 		})
