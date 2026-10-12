@@ -1,5 +1,10 @@
 # source-mysql-batch
 
+## 2026-10-16
+
+### Fixed
+- An incremental binding no longer stops capturing the rest of the table when it restarts during its initial backfill right after a long run of rows whose cursor is NULL.
+
 ## 2026-09-29
 
 ### Changed
