@@ -377,6 +377,13 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 			return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
 		}
 	}
+
+	// Checkpoint the sourced schemas now rather than leaving them for the next
+	// checkpoint, which might not come until the next poll. An empty merge patch
+	// commits them without changing any binding's state.
+	if err := c.Output.Checkpoint(json.RawMessage("{}"), true); err != nil {
+		return fmt.Errorf("error checkpointing sourced schemas: %w", err)
+	}
 	return nil
 }
 
