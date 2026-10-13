@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 /// An Iceberg snapshot. Since table metadata.json is not written yet, this
 /// isn't persisted anywhere durable in Iceberg terms — it's logged, and its
@@ -36,10 +37,7 @@ pub fn build_snapshot(
         added_files_count.to_string(),
     );
     summary.insert("added-records".to_string(), added_rows_count.to_string());
-    summary.insert(
-        "added-files-size".to_string(),
-        added_files_size.to_string(),
-    );
+    summary.insert("added-files-size".to_string(), added_files_size.to_string());
 
     Snapshot {
         snapshot_id,

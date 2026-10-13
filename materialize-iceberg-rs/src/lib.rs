@@ -1,13 +1,23 @@
 use anyhow::Result;
 use apply::do_apply;
 use bytes::BytesMut;
-use configuration::{EndpointConfig, Resource, schema_for};
+use configuration::EndpointConfig;
+use configuration::Resource;
+use configuration::schema_for;
 use prost::Message;
-use proto_flow::materialize::{
-    Request, Response, request, response,
-    response::{Applied, Spec, Validated},
-};
-use std::io::{self, BufRead, BufReader, Read, StdoutLock, Write};
+use proto_flow::materialize::Request;
+use proto_flow::materialize::Response;
+use proto_flow::materialize::request;
+use proto_flow::materialize::response;
+use proto_flow::materialize::response::Applied;
+use proto_flow::materialize::response::Spec;
+use proto_flow::materialize::response::Validated;
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
+use std::io::StdoutLock;
+use std::io::Write;
+use std::io::{self};
 use transactor::run_transactions;
 use validate::do_validate;
 

@@ -1,6 +1,9 @@
 use anyhow::Context;
-use axum::{Json, Router, routing::get};
-use serde_json::{Value, json};
+use axum::Json;
+use axum::Router;
+use axum::routing::get;
+use serde_json::Value;
+use serde_json::json;
 
 pub async fn run_server() -> anyhow::Result<()> {
     let router = Router::new().route("/v1/config", get(config));

@@ -1,33 +1,48 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use anyhow::{Context, Result};
-use arrow::array::{ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder};
-use arrow::datatypes::{DataType, Field, Schema};
+use anyhow::Context;
+use anyhow::Result;
+use arrow::array::ArrayRef;
+use arrow::array::BooleanBuilder;
+use arrow::array::Float64Builder;
+use arrow::array::Int64Builder;
+use arrow::array::StringBuilder;
+use arrow::datatypes::DataType;
+use arrow::datatypes::Field;
+use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use object_store::{
-    ObjectStore, ObjectStoreExt, PutPayload, aws::AmazonS3Builder, path::Path as ObjectPath,
-};
+use object_store::ObjectStore;
+use object_store::ObjectStoreExt;
+use object_store::PutPayload;
+use object_store::aws::AmazonS3Builder;
+use object_store::path::Path as ObjectPath;
 use parquet::arrow::ArrowWriter;
-use proto_flow::{
-    flow::{self, Projection, materialization_spec},
-    materialize::{
-        Response, request,
-        request::Open,
-        response,
-        response::{Acknowledged, Flushed, Opened, StartedCommit},
-    },
-};
+use proto_flow::flow::Projection;
+use proto_flow::flow::materialization_spec;
+use proto_flow::flow::{self};
+use proto_flow::materialize::Response;
+use proto_flow::materialize::request;
+use proto_flow::materialize::request::Open;
+use proto_flow::materialize::response;
+use proto_flow::materialize::response::Acknowledged;
+use proto_flow::materialize::response::Flushed;
+use proto_flow::materialize::response::Opened;
+use proto_flow::materialize::response::StartedCommit;
 use serde_json::json;
 use tuple::Element;
 use uuid::Uuid;
 
-use crate::configuration::{EndpointConfig, Store as StoreConfig};
-use crate::iceberg::manifest::{self, DataFileInfo};
+use crate::Input;
+use crate::Output;
+use crate::configuration::EndpointConfig;
+use crate::configuration::Store as StoreConfig;
+use crate::iceberg::manifest::DataFileInfo;
+use crate::iceberg::manifest::{self};
 use crate::iceberg::manifest_list;
 use crate::iceberg::snapshot::build_snapshot;
-use crate::iceberg::state::{BindingCheckpoint, ConnectorState};
-use crate::{Input, Output};
+use crate::iceberg::state::BindingCheckpoint;
+use crate::iceberg::state::ConnectorState;
 
 pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open) -> Result<()> {
     let spec = open

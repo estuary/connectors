@@ -1,11 +1,11 @@
 use anyhow::Result;
-use proto_flow::{
-    flow::{Projection, SerPolicy},
-    materialize::{
-        request::Validate,
-        response::validated::{Binding, Constraint, ProjectionConstraint, constraint},
-    },
-};
+use proto_flow::flow::Projection;
+use proto_flow::flow::SerPolicy;
+use proto_flow::materialize::request::Validate;
+use proto_flow::materialize::response::validated::Binding;
+use proto_flow::materialize::response::validated::Constraint;
+use proto_flow::materialize::response::validated::ProjectionConstraint;
+use proto_flow::materialize::response::validated::constraint;
 
 use crate::configuration::Resource;
 

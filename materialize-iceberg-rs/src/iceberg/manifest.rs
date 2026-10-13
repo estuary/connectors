@@ -1,8 +1,12 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::Context;
+use anyhow::Result;
 use apache_avro::Writer;
-use object_store::{ObjectStore, ObjectStoreExt, PutPayload, path::Path as ObjectPath};
+use object_store::ObjectStore;
+use object_store::ObjectStoreExt;
+use object_store::PutPayload;
+use object_store::path::Path as ObjectPath;
 use serde::Serialize;
 use uuid::Uuid;
 

@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Connector checkpoint, persisted via the Flow runtime's `state_json` /
 /// `ConnectorState` mechanism. It tracks, per binding, enough to extend the

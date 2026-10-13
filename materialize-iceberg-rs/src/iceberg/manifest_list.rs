@@ -1,9 +1,15 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
-use apache_avro::{Reader, Writer};
-use object_store::{ObjectStore, ObjectStoreExt, PutPayload, path::Path as ObjectPath};
-use serde::{Deserialize, Serialize};
+use anyhow::Context;
+use anyhow::Result;
+use apache_avro::Reader;
+use apache_avro::Writer;
+use object_store::ObjectStore;
+use object_store::ObjectStoreExt;
+use object_store::PutPayload;
+use object_store::path::Path as ObjectPath;
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 use super::schema::manifest_list_schema;
@@ -30,7 +36,11 @@ pub struct ManifestFile {
 }
 
 impl ManifestFile {
-    fn from_pending(pending: &PendingManifest, snapshot_id: i64, sequence_number: i64) -> ManifestFile {
+    fn from_pending(
+        pending: &PendingManifest,
+        snapshot_id: i64,
+        sequence_number: i64,
+    ) -> ManifestFile {
         ManifestFile {
             manifest_path: pending.path.clone(),
             manifest_length: pending.length,
@@ -91,7 +101,8 @@ pub async fn write_manifest_list(
     }
 
     let schema = manifest_list_schema();
-    let mut writer = Writer::new(schema, Vec::new()).context("creating Avro manifest-list writer")?;
+    let mut writer =
+        Writer::new(schema, Vec::new()).context("creating Avro manifest-list writer")?;
     writer.add_user_metadata("format-version".to_string(), "2")?;
     writer.add_user_metadata("snapshot-id".to_string(), snapshot_id.to_string())?;
     for entry in &prior_entries {

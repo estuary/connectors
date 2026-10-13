@@ -1,5 +1,8 @@
 use anyhow::Context;
-use materialize_iceberg_rs::{Input, Output, run_connector, server};
+use materialize_iceberg_rs::Input;
+use materialize_iceberg_rs::Output;
+use materialize_iceberg_rs::run_connector;
+use materialize_iceberg_rs::server;
 
 fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
