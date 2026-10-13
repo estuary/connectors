@@ -11,21 +11,30 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
+// composeStack is one docker-compose file and the lazily-started state of its
+// services, so a test file brings the stack up at most once per `go test` run.
+type composeStack struct {
+	file string
+	once sync.Once
+	up   bool
+}
+
 var (
-	dockerOnce sync.Once
-	dockerUp   bool
+	// singleNode is the one-server stack every existing test uses.
+	singleNode = &composeStack{file: "docker-compose.yaml"}
+	// cluster is two ClickHouse shards of two replicas each plus one Keeper.
+	cluster = &composeStack{file: "docker-compose.cluster.yaml"}
 )
 
-// ensureDockerUp starts the ClickHouse docker-compose services and waits until
-// the server accepts Go client connections. Tests that need a running database
-// must call this after their testing.Short() check. The docker-compose
-// healthcheck uses clickhouse-client, which can succeed before the native TCP
-// endpoint is ready to handshake with ch-go, so we poll with the real client
-// before returning.
-func ensureDockerUp(t *testing.T) {
+// ensureUp starts the stack and waits until the given address accepts Go
+// client connections. Tests that need a running database must call this after
+// their testing.Short() check. The docker-compose healthcheck uses
+// clickhouse-client, which can succeed before the native TCP endpoint is ready
+// to handshake with ch-go, so we poll with the real client before returning.
+func (s *composeStack) ensureUp(t *testing.T, cfg config) {
 	t.Helper()
-	dockerOnce.Do(func() {
-		out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
+	s.once.Do(func() {
+		out, err := exec.Command("docker", "compose", "-f", s.file, "up", "--wait").CombinedOutput()
 		if err != nil {
 			t.Fatalf("docker compose up failed: %s\n%s", err, out)
 		}
@@ -35,11 +44,11 @@ func ensureDockerUp(t *testing.T) {
 
 		var lastErr error
 		for ctx.Err() == nil {
-			conn, err := clickhouse.Open(testConfig().newClickhouseOptions())
+			conn, err := clickhouse.Open(cfg.newClickhouseOptions())
 			if err == nil {
 				if err = conn.Ping(ctx); err == nil {
 					conn.Close()
-					dockerUp = true
+					s.up = true
 					return
 				}
 				conn.Close()
@@ -49,15 +58,30 @@ func ensureDockerUp(t *testing.T) {
 		}
 		t.Fatalf("clickhouse not accepting connections: %s", lastErr)
 	})
-	if !dockerUp {
+	if !s.up {
 		t.Fatal("docker compose setup previously failed")
 	}
 }
 
+func (s *composeStack) down() {
+	if s.up {
+		exec.Command("docker", "compose", "-f", s.file, "down", "-v").Run()
+	}
+}
+
+func ensureDockerUp(t *testing.T) {
+	t.Helper()
+	singleNode.ensureUp(t, testConfig())
+}
+
+func ensureClusterUp(t *testing.T) {
+	t.Helper()
+	cluster.ensureUp(t, testClusterConfig())
+}
+
 func TestMain(m *testing.M) {
 	code := m.Run()
-	if dockerUp {
-		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
-	}
+	singleNode.down()
+	cluster.down()
 	os.Exit(code)
 }
