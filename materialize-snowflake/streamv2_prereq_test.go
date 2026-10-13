@@ -268,6 +268,25 @@ func TestRequireStreamingV2RuntimeWithState(t *testing.T) {
 		require.ErrorContains(t, err, channel)
 	})
 
+	// A range entry of staged work beside the streaming v2 state neither hides
+	// it nor counts as streaming v2 state of its own.
+	t.Run("streaming v2 state beside a range entry is rejected", func(t *testing.T) {
+		var state = json.RawMessage(`{"sk.v1": {
+			"00000000-ffffffff": {"Table": "TBL", "Query": "MERGE INTO tbl"},
+			"StreamV2": {"00000000-ffffffff": {"ChannelName": "chan-1", "Routed": 3}}
+		}}`)
+		var err = requireStreamingV2Runtime(specOf(t, false), state)
+		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
+		require.ErrorContains(t, err, channel)
+	})
+
+	t.Run("a range entry alone is allowed", func(t *testing.T) {
+		var state = json.RawMessage(`{"sk.v1": {
+			"00000000-ffffffff": {"Table": "TBL", "Query": "MERGE INTO tbl"}
+		}}`)
+		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), state))
+	})
+
 	t.Run("an unreadable state document is tolerated", func(t *testing.T) {
 		require.NoError(t, requireStreamingV2Runtime(specOf(t, false), json.RawMessage(`not json`)))
 	})

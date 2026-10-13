@@ -73,6 +73,45 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 	require.NotContains(t, string(state), channel)
 }
 
+// A binding that leaves the streaming v2 write path for the staged path
+// records its first staged transaction beside the streaming v2 state, and
+// acknowledging that transaction clears both: the state key is patched to null
+// whole.
+func TestCheckpointStagedPathSwitchClearsStreamV2(t *testing.T) {
+	const stateKey, channel = "switch.v1", "task_00000000_switch_v1"
+
+	var persisted, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
+		Table:    "TBL",
+		StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}},
+	}})
+	require.NoError(t, err)
+
+	var d = &transactor{rangeKey: "00000000-ffffffff"}
+	require.NoError(t, d.UnmarshalState(persisted))
+	d.cp[stateKey] = &checkpointItem{Table: "TBL", Query: "MERGE INTO tbl", StagedDir: "dir"}
+
+	stored, err := d.encodeCheckpoint()
+	require.NoError(t, err)
+	state, err := jsonpatch.MergePatch(persisted, stored)
+	require.NoError(t, err)
+	require.Contains(t, string(state), channel)
+
+	var recovered = &transactor{rangeKey: d.rangeKey}
+	require.NoError(t, recovered.UnmarshalState(state))
+	require.Equal(t, "MERGE INTO tbl", recovered.cp[stateKey].Query)
+	require.Equal(t, int64(3), recovered.cp[stateKey].StreamV2[fullKeyRange].Routed)
+
+	cleared, err := recovered.encodeCheckpointClear([]string{stateKey})
+	require.NoError(t, err)
+	state, err = jsonpatch.MergePatch(state, cleared)
+	require.NoError(t, err)
+
+	cp, err := decodeCheckpoint(state, d.rangeKey)
+	require.NoError(t, err)
+	require.NotContains(t, cp, stateKey)
+	require.NotContains(t, string(state), channel)
+}
+
 // TestStreamV2ReturningToTheWritePathSkipsNewDocuments is the consequence of
 // that loss, and the outcome this connector must never reach: a binding which
 // leaves the streaming v2 write path and later returns to it drops as many of
