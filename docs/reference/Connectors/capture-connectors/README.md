@@ -154,6 +154,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### Other applications
 
 - [Apple App Store](./apple-app-store.md)
+- [Estuary](./estuary.md)
 - [Google Play](./google-play.md)
 - [Iterate](./iterate.md)
 - [Pendo](./pendo.md)
@@ -180,7 +181,6 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - [Freshdesk](./freshdesk.md)
 - [GitLab](./gitlab.md)
 - [Google Analytics 4](./google-analytics-4.md)
-- [Google Universal Analytics](./google-analytics.md)
 - [Google Search Console](./google-search-console.md)
 - [Harvest](./harvest.md)
 - [Instagram](./instagram.md)

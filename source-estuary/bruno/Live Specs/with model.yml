@@ -1,0 +1,118 @@
+info:
+  name: with model
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query LiveSpecModel($prefix: Prefix!) {\n  liveSpecs(by: { prefix: $prefix, catalogType: capture }, first: 1) {\n    edges { node { catalogName liveSpec { catalogName catalogType model } } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — capture model (projection: every leaf REDACTED, keys kept)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/snowflake-gpt/source-snowflake",
+                      "liveSpec": {
+                        "catalogName": "Jonathan_Wihl/snowflake-gpt/source-snowflake",
+                        "catalogType": "capture",
+                        "model": {
+                          "autoDiscover": {
+                            "addNewBindings": "REDACTED",
+                            "evolveIncompatibleCollections": "REDACTED"
+                          },
+                          "endpoint": {
+                            "connector": {
+                              "image": "REDACTED",
+                              "config": {
+                                "credentials": {
+                                  "auth_type": "REDACTED",
+                                  "host": "REDACTED",
+                                  "password_sops": "REDACTED"
+                                },
+                                "database": "REDACTED",
+                                "user": "REDACTED",
+                                "sops": {
+                                  "kms": [],
+                                  "gcp_kms": [
+                                    {
+                                      "resource_id": "REDACTED",
+                                      "created_at": "REDACTED",
+                                      "enc": "REDACTED"
+                                    }
+                                  ],
+                                  "azure_kv": [],
+                                  "hc_vault": [],
+                                  "age": [],
+                                  "lastmodified": "REDACTED",
+                                  "mac": "REDACTED",
+                                  "pgp": [],
+                                  "encrypted_suffix": "REDACTED",
+                                  "version": "REDACTED"
+                                }
+                              }
+                            }
+                          },
+                          "bindings": [
+                            {
+                              "resource": {
+                                "schema": "REDACTED",
+                                "table": "REDACTED"
+                              },
+                              "disable": "REDACTED",
+                              "target": "REDACTED"
+                            }
+                          ],
+                          "shards": {
+                            "disable": "REDACTED"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [liveSpecs resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs)
+
+  **WHY:** `model` is the user-authored catalog spec. For tasks it includes
+  `endpoint.<connector>.config`, which holds SOPS ciphertext for secret fields.
+  This probe shows what would land in the destination if `live_specs` kept
+  `model`, which is the input to the keep/drop/strip decision in the plan.
+  The saved example redacts `config` values.
+
+  **VERIFIED (2026-10-07):** a capture's `model` carries `endpoint.connector.config` with SOPS ciphertext (`password_sops`, plus a `sops` block holding the GCP KMS `resource_id`, `enc`, and `mac`). Raw 1.5 KB for a small Postgres capture. **LIMITATION:** keeping `model` lands encrypted secrets and KMS key ids in the destination.

@@ -121,8 +121,12 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"truncate_after_backfill": common.FlagEnabled,
+}
+
 func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
-	return c.Advanced.FeatureFlags, nil
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 func (c config) resolvedAddress() string {
@@ -297,6 +301,13 @@ type transactor struct {
 	ensured           chan struct{}
 	state             connectorState
 	runtimeCheckpoint m.RuntimeCheckpoint
+
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion once this transaction's staged rows are moved.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -336,6 +347,11 @@ type stateItem struct {
 	// from the stage table entirely) from rows that were never staged (present,
 	// but short) -- a distinction a single total cannot make.
 	MovePartitions []stagedPartition
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. The commit deletes the target's rows published before it,
+	// after the partition moves. It is omitted when unset, so that the entry
+	// stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 }
 
 type connectorState map[string]*stateItem
@@ -369,6 +385,8 @@ func newTransactor(
 		ensured:           make(chan struct{}),
 		state:             make(connectorState, len(bindings)),
 		runtimeCheckpoint: fence.Checkpoint,
+
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	var err error
@@ -509,6 +527,13 @@ type binding struct {
 		movePartitionSQL string
 		dropTableSQL     string
 	}
+	// truncate deletes the target rows published before a boundary, after
+	// counting them, because a lightweight DELETE reports no affected rows.
+	// Both are empty when the binding has no usable flow_published_at column.
+	truncate struct {
+		countSQL  string
+		deleteSQL string
+	}
 }
 
 func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
@@ -557,6 +582,14 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	}
 	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropStoreTable); err != nil {
 		return fmt.Errorf("rendering dropStoreTable template: %w", err)
+	}
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		// The boundary is bound as a string, because the driver formats a
+		// time.Time parameter without its fractional seconds.
+		var where = fmt.Sprintf("WHERE %s < toDateTime64(?, 6, 'UTC')", col.Identifier)
+		b.truncate.countSQL = fmt.Sprintf("SELECT count() FROM %s %s SETTINGS select_sequential_consistency = 1;", target.Identifier, where)
+		b.truncate.deleteSQL = fmt.Sprintf("DELETE FROM %s %s;", target.Identifier, where)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -865,6 +898,18 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		return nil, err
 	}
 
+	// A truncation travels in the binding's state item so that it survives
+	// a restart, and so that a binding which stored nothing still has one.
+	for binding, boundary := range t.truncations {
+		stateKey := t.bindings[binding].target.StateKey
+		if _, found := t.state[stateKey]; !found {
+			t.state[stateKey] = &stateItem{Round: it.Round}
+			storedKeys = append(storedKeys, stateKey)
+		}
+		t.state[stateKey].TruncateBefore = &boundary
+	}
+	t.truncations = nil
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Returning a pre-resolved error here makes the runtime fail without
 		// sending StartedCommit, so this checkpoint never becomes durable and the
@@ -891,7 +936,30 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 	return nil, false
 }
 
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncate.deleteSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -1210,9 +1278,59 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 	if si.StoredRows > 0 {
 		stats = stats.WithStaged(si.StoredRows)
 	}
+
+	// The truncation follows the moves, so that it keeps the rows they just
+	// carried in, which were published after the boundary.
+	if si.TruncateBefore != nil {
+		if truncated, err := t.truncateTarget(ctx, b, *si.TruncateBefore); err != nil {
+			return err
+		} else if truncated != nil {
+			stats = stats.WithTruncated(*truncated)
+		}
+	}
 	t.be.ReportRowStats(si.Round, b.target.Path, stats)
 
 	return nil
+}
+
+// truncateTarget deletes the binding's target rows published before boundary
+// and returns how many there were, or nil when the binding no longer has a
+// usable flow_published_at column.
+func (t *transactor) truncateTarget(ctx context.Context, b *binding, boundary time.Time) (*int64, error) {
+	if b.truncate.deleteSQL == "" {
+		var _, reason = b.target.PublishedAtColumn()
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": boundary,
+			"reason":   reason.Error(),
+		}).Warn("skipping staged truncation because the binding no longer supports it")
+		return nil, nil
+	}
+
+	// The boundary is floored to microseconds to match DateTime64(6), so
+	// that a live row never rounds below it.
+	var before = boundary.UTC().Truncate(time.Microsecond).Format("2006-01-02 15:04:05.000000")
+
+	// Counting then deleting is idempotent, so a transient connection drop
+	// restarts the pair: rows deleted by a first attempt are absent from the
+	// second count.
+	var count uint64
+	if err := transientRetryPolicy.retry(ctx, "truncating target table", isTransientErr, func() error {
+		if err := t.store.conn.QueryRow(ctx, b.truncate.countSQL, before).Scan(&count); err != nil {
+			return fmt.Errorf("counting rows to truncate: %w", err)
+		}
+		return t.store.conn.Exec(ctx, b.truncate.deleteSQL, before)
+	}); err != nil {
+		return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+	}
+
+	var truncated = int64(count)
+	log.WithFields(log.Fields{
+		"table":    b.target.Identifier,
+		"boundary": boundary,
+		"deleted":  truncated,
+	}).Info("truncated rows published before the backfill")
+	return &truncated, nil
 }
 
 // reconcileStagedPartitions returns the partition IDs to move, or an error when

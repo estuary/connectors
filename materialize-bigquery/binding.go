@@ -13,6 +13,7 @@ type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
 	storeInsertSQL    string
+	truncateSQL       string
 
 	loadSchema       bigquery.Schema
 	storeSchema      bigquery.Schema

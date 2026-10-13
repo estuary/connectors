@@ -16,6 +16,7 @@ from .shared import (
     CHECKPOINT_INTERVAL,
     INCREMENTAL_LAG,
     INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT,
+    MIN_INCREMENTAL_WINDOW_SIZE,
     url_base,
     dt_to_s,
     s_to_dt,
@@ -125,9 +126,14 @@ async def fetch_talk_incremental_export_resources(
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
+        return
+
     generator = _fetch_talk_incremental_export_resources(
         http, subdomain, name, path, response_model, log_cursor, log,
-        datetime.now(tz=UTC) - INCREMENTAL_LAG,
+        horizon,
     )
 
     async for result in generator:

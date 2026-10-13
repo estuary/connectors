@@ -1,6 +1,6 @@
 # materialize-motherduck
 
-## 2026-10-09
+## 2026-10-13
 
 ### Changed
 - Load and merge queries on tables with a date-time key column now restrict

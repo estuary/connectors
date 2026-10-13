@@ -1,0 +1,149 @@
+info:
+  name: graph edges
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query LiveSpecEdges($prefix: Prefix!) {\n  liveSpecs(by: { prefix: $prefix }, first: 200) {\n    edges { node {\n      catalogName\n      liveSpec {\n        catalogType\n        readsFrom { pageInfo { hasNextPage } edges { node { catalogName } } }\n        writesTo { pageInfo { hasNextPage } edges { node { catalogName } } }\n        sourceCapture { catalogName }\n      }\n    } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — edge names (projection: 3 tasks + 1 derivation)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "refCount": 55,
+                "sample": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "liveSpec": {
+                        "catalogType": "materialization",
+                        "readsFrom": {
+                          "pageInfo": {
+                            "hasNextPage": false
+                          },
+                          "edges": [
+                            {
+                              "node": {
+                                "catalogName": "Artificial-Industries/postgres-shipments/public/shipments"
+                              }
+                            }
+                          ]
+                        },
+                        "writesTo": null,
+                        "sourceCapture": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/notion-to-pinecone-demo/materialize-pinecone",
+                      "liveSpec": {
+                        "catalogType": "materialization",
+                        "readsFrom": {
+                          "pageInfo": {
+                            "hasNextPage": false
+                          },
+                          "edges": [
+                            {
+                              "node": {
+                                "catalogName": "Jonathan_Wihl/notion-input"
+                              }
+                            }
+                          ]
+                        },
+                        "writesTo": null,
+                        "sourceCapture": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/pinecone_notion/materialize-pinecone",
+                      "liveSpec": {
+                        "catalogType": "materialization",
+                        "readsFrom": {
+                          "pageInfo": {
+                            "hasNextPage": false
+                          },
+                          "edges": [
+                            {
+                              "node": {
+                                "catalogName": "Jonathan_Wihl/notion-input"
+                              }
+                            }
+                          ]
+                        },
+                        "writesTo": null,
+                        "sourceCapture": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "liveSpec": {
+                        "catalogType": "collection",
+                        "readsFrom": {
+                          "pageInfo": {
+                            "hasNextPage": false
+                          },
+                          "edges": [
+                            {
+                              "node": {
+                                "catalogName": "Jonathan_Wihl/notion-demo/blocks"
+                              }
+                            }
+                          ]
+                        },
+                        "writesTo": null,
+                        "sourceCapture": null
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [LiveSpec resolver (readsFrom / writesTo / sourceCapture)](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_specs.rs)
+
+  **WHY:** These are the alternative to shipping `model` in `live_specs`. They
+  are the spec graph's edges as catalog names: the collections a task reads
+  from or writes to, and a materialization's `sourceCapture`. They come from
+  the `live_specs.reads_from` / `writes_to` arrays, not the model. With no
+  `first`, the nested connection returns every edge
+  (`paginate_live_specs_refs`, `first.unwrap_or(usize::MAX)`). Fields are null
+  when empty (`if self.reads_from.is_empty() { return Ok(None) }`).
+
+  **VERIFIED (2026-10-07):** 55 refs in one request. Materializations and derivations return `readsFrom` as full catalog names, including names under prefixes outside the walked one (`Jonathan_Wihl/motherduck/materialize-motherduck` reads `Artificial-Industries/postgres-shipments/public/shipments`). The capture returns `writesTo`. Empty edge lists are `null`, not `{edges: []}`. `sourceCapture` is null for every spec here (none use `source`). With no `first`, `hasNextPage` was false everywhere: the nested connection returns all edges.
