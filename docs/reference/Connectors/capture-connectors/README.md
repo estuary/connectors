@@ -154,6 +154,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### Other applications
 
 - [Apple App Store](./apple-app-store.md)
+- [Estuary](./estuary.md)
 - [Google Play](./google-play.md)
 - [Iterate](./iterate.md)
 - [Pendo](./pendo.md)

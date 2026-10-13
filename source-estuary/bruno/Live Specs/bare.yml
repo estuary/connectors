@@ -1,0 +1,133 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query LiveSpecsBare($prefix: Prefix!) {\n  liveSpecs(by: { prefix: $prefix }, first: 3) {\n    pageInfo { hasNextPage endCursor }\n    edges { cursor node { catalogName liveSpec { liveSpecId catalogName catalogType lastBuildId lastPubId createdAt updatedAt isDisabled dataPlaneId } } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const b = res.getBody();
+        const e = b?.data?.liveSpecs?.edges ?? [];
+        if (e.length) bru.setVar('ls_first_name', e[0].node.catalogName);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — first 3 specs (full live_specs field set)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Jonathan_Wihl/motherduck/materialize-motherduck"
+                },
+                "edges": [
+                  {
+                    "cursor": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                      "liveSpec": {
+                        "liveSpecId": "0d2049f29fd12c00",
+                        "catalogName": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                        "catalogType": "collection",
+                        "lastBuildId": "10a6d2be430001ee",
+                        "lastPubId": "0d2049ef35507000",
+                        "createdAt": "2024-04-10T12:36:23.756450+00:00",
+                        "updatedAt": "2025-03-27T00:50:15.779761+00:00",
+                        "isDisabled": false,
+                        "dataPlaneId": "11900caf66f59800"
+                      }
+                    }
+                  },
+                  {
+                    "cursor": "Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "liveSpec": {
+                        "liveSpecId": "0d10fbbf52bf9000",
+                        "catalogName": "Jonathan_Wihl/gpt-notion",
+                        "catalogType": "collection",
+                        "lastBuildId": "16420b12bb0004c3",
+                        "lastPubId": "10a6d2a5a1800260",
+                        "createdAt": "2024-04-04T13:56:57.454633+00:00",
+                        "updatedAt": "2026-10-05T10:03:28.411546+00:00",
+                        "isDisabled": false,
+                        "dataPlaneId": "11900caf66f59800"
+                      }
+                    }
+                  },
+                  {
+                    "cursor": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "liveSpec": {
+                        "liveSpecId": "1492cd575100028f",
+                        "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                        "catalogType": "materialization",
+                        "lastBuildId": "14ac79e3ba8003c6",
+                        "lastPubId": "14ac79e3a08003c6",
+                        "createdAt": "2026-04-20T22:35:53.416852+00:00",
+                        "updatedAt": "2026-04-30T21:53:53.667377+00:00",
+                        "isDisabled": true,
+                        "dataPlaneId": "11900caf66f59800"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [liveSpecs resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs)
+
+  **WHY:** Shape of the `live_specs` snapshot document — the exact field set the
+  connector will request (no `builtSpec`, no `model`; see
+  `Live Specs / with model`). Confirms the edge `cursor` equals `catalogName`,
+  `Id` scalars are 16-hex strings, and `DateTime` is RFC3339.
+
+  **VERIFIED (2026-10-07):** edges ascend by `catalogName`; edge `cursor` == `catalogName`; `Id` scalars are 16-hex strings; `createdAt`/`updatedAt` are RFC3339 with microseconds and `+00:00`. `updatedAt` moves without a publication (`Jonathan_Wihl/gpt-notion`: `updatedAt` 2026-10-05, but `lastPubId` is the 2025-03-27 publication), because controller/build activity bumps it.
+
+  **UNOBSERVABLE:** tombstoned (deleted) specs. A deletion publication sets
+  `live_specs.spec_type = NULL` but keeps the row until the spec's controller
+  hard-deletes it (`agent/src/controllers/executor.rs`, `hard_delete_live_spec`;
+  `publication_specs` cascades away with it). During that window (normally
+  seconds to minutes) the name still appears in `liveSpecs(prefix)` (the list
+  query has no `spec_type` filter), but `liveSpec` and `status` resolve to
+  `null` (their loaders filter `spec_type is not null`). The flow test
+  `publication_history.rs::publication_for_id` asserts this shape. We cannot
+  provoke it without deleting a spec, and the window is too short to probe
+  reliably. The connector relies on the source: skip refs whose `liveSpec`
+  (or `status`) is null. Fallback if wrong: a null-`liveSpec` ref would fail
+  model validation loudly, never silently.
