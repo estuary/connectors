@@ -4,32 +4,96 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
 
-[dependencies]
-proto-flow = { git = "https://github.com/estuary/flow", rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce" }
+[dependencies.proto-flow]
+git = "https://github.com/estuary/flow"
+rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce"
+default-features = false
 
-anyhow = "1.0"
-axum = "0.8"
-bytes = "1.11"
-prost = "0.14"
-schemars = "1.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [
-    "json",
-    "env-filter",
-    "time",
-] }
-object_store = { version = "0.14.2", features = ["aws"] }
-parquet = { version = "60.0.0", features = ["arrow"] }
-arrow = "60.0.0"
-uuid = { version = "1.26.1", features = ["v4"] }
-tuple = { git = "https://github.com/estuary/flow", rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce" }
-apache-avro = "0.22.0"
+[dependencies.tuple]
+git = "https://github.com/estuary/flow"
+rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce"
+default-features = false
 
-[dev-dependencies]
-aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
-aws-sdk-s3 = { version = "1.149.0", features = ["behavior-version-latest"] }
-insta = { version = "1", features = ["json", "serde"] }
-parquet = { version = "60.0.0", features = ["json"] }
+[dependencies.anyhow]
+version = "1.0"
+default-features = false
+
+[dependencies.apache-avro]
+version = "0.22.0"
+default-features = false
+
+[dependencies.arrow]
+version = "60.0.0"
+default-features = false
+
+[dependencies.axum]
+version = "0.8"
+default-features = false
+features = ["json", "tokio", "http1"]
+
+[dependencies.bytes]
+version = "1.11"
+default-features = false
+
+[dependencies.object_store]
+version = "0.14.2"
+default-features = false
+features = ["aws"]
+
+[dependencies.parquet]
+version = "60.0.0"
+default-features = false
+features = ["arrow"]
+
+[dependencies.prost]
+version = "0.14"
+default-features = false
+
+[dependencies.schemars]
+version = "1.2"
+default-features = false
+
+[dependencies.serde]
+version = "1.0"
+default-features = false
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1.0"
+default-features = false
+
+[dependencies.tokio]
+version = "1"
+default-features = false
+features = ["rt-multi-thread", "net"]
+
+[dependencies.tracing]
+version = "0.1"
+default-features = false
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+default-features = false
+features = ["std", "fmt", "json", "env-filter", "time"]
+
+[dependencies.uuid]
+version = "1.26.1"
+default-features = false
+features = ["v4"]
+
+[dev-dependencies.aws-config]
+version = "1.12.0"
+default-features = false
+
+[dev-dependencies.aws-sdk-s3]
+version = "1.149.0"
+default-features = false
+
+[dev-dependencies.insta]
+version = "1"
+default-features = false
+
+[dev-dependencies.parquet]
+version = "60.0.0"
+default-features = false
+features = ["json"]
