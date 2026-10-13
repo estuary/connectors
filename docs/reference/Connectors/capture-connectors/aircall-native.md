@@ -27,13 +27,13 @@ By default, each resource is mapped to an Estuary collection through a separate 
 :::tip
 Aircall limits every list request to 10,000 results. The connector requests `calls` in time windows that each stay under that limit, so accounts with any number of calls can be captured in full.
 
-Calls keep changing after they start: they are ended, tagged, commented, assigned, and gain recordings. The connector re-reads each call 24 hours after it started to capture those changes. Changes made more than 24 hours later are only captured by backfilling the `calls` binding.
+Calls keep changing after they start: they are ended, tagged, commented, assigned, and gain recordings. The connector re-reads each call 24 hours after it started to capture those changes. Changes made more than 24 hours later are only captured by backfilling the `calls` binding, which can be scheduled with the `schedule` resource config setting. `calls` has no schedule by default, since each backfill re-reads up to six months of calls.
 
 Aircall only serves the last six months of calls through its API, so `calls` is backfilled from the later of the configured start date and roughly six months ago. The `recording` and `voicemail` links on calls are signed URLs that expire within a few hours of being captured.
 :::
 
 :::tip
-The `contacts` stream re-captures all contacts with periodic backfills. These backfills can be scheduled with the `schedule` resource config setting. By default, `contacts`'s schedule is `0 0 * * *`, which means the stream attempts to backfill every day at 00:00 UTC. If more than 10,000 contacts change between two polls, the most recent 10,000 are captured right away and the rest are captured by the next scheduled backfill.
+The `contacts` stream re-captures all contacts with periodic backfills. These backfills can be scheduled with the `schedule` resource config setting. By default, `contacts`'s schedule is `0 0 * * *`, which means the stream attempts to backfill every day at 00:00 UTC. If more than 10,000 contacts change between two polls, the connector re-reads every contact to capture them.
 
 Aircall doesn't expose deleted contacts, so contacts deleted in Aircall remain in the collection. Only shared contacts are available through the Aircall API; users' personal contacts are not captured.
 :::
