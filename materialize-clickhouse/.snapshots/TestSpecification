@@ -15,13 +15,19 @@
         "description": "Name of the ClickHouse database to materialize to.",
         "order": 1
       },
+      "cluster": {
+        "type": "string",
+        "title": "Cluster",
+        "description": "Name of a ClickHouse cluster, as listed in system.clusters. When set, each table is created as a Distributed table over a local table on every shard, rows are written directly to the shard that owns them, and the connector must be able to reach every node of the cluster. Leave blank for a single server or ClickHouse Cloud.",
+        "order": 2
+      },
       "hardDelete": {
         "type": "boolean",
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
         "nonsensitive": true,
-        "order": 2
+        "order": 3
       },
       "credentials": {
         "oneOf": [
@@ -61,7 +67,7 @@
         "discriminator": {
           "propertyName": "auth_type"
         },
-        "order": 3
+        "order": 4
       },
       "syncSchedule": {
         "properties": {
@@ -146,6 +152,29 @@
             "description": "When enabled the root document will not be required for standard updates.",
             "default": false,
             "nonsensitive": true
+          },
+          "local_table_suffix": {
+            "type": "string",
+            "title": "Local Table Suffix",
+            "description": "Suffix appended to each table name to name the per-shard local table that backs it. Only used when a cluster is set.",
+            "default": "_local",
+            "nonsensitive": true
+          },
+          "topology_refresh_interval": {
+            "type": "string",
+            "title": "Topology Refresh Interval",
+            "description": "How often the connector re-reads the cluster's shard layout from system.clusters. When the layout changes the connector restarts. Accepts duration strings like '5m' or '1h'. Only used when a cluster is set.",
+            "default": "5m",
+            "nonsensitive": true,
+            "pattern": "^[0-9]+(ms|s|m|h)$"
+          },
+          "insert_quorum_timeout": {
+            "type": "string",
+            "title": "Insert Quorum Timeout",
+            "description": "How long a write waits for a majority of a shard's replicas to acknowledge it before failing. Accepts duration strings like '10m' or '30s'. Only used when a cluster is set.",
+            "default": "10m",
+            "nonsensitive": true,
+            "pattern": "^[0-9]+(ms|s|m|h)$"
           }
         },
         "additionalProperties": false,
@@ -187,6 +216,15 @@
         "description": "Optional expression to use as the table's PARTITION BY clause, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding, which drops and re-creates the table.",
         "advanced": true,
         "nonsensitive": true
+      },
+      "sharding_key": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "title": "Sharding Key",
+        "description": "Fields whose values choose which shard of the cluster a row is stored on. Must be a subset of the fields selected as the table's key. Leave blank to shard by the whole key. Only used when the endpoint names a cluster. Changing this value requires backfilling the binding.",
+        "advanced": true
       }
     },
     "type": "object",

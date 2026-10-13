@@ -3,6 +3,7 @@ package connector
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -35,6 +36,34 @@ func TestClickHouseConfig(t *testing.T) {
 	noDatabase := validConfig
 	noDatabase.Database = ""
 	require.Error(t, noDatabase.Validate())
+
+	clustered := validConfig
+	clustered.Cluster = "flow_cluster"
+	require.NoError(t, clustered.Validate())
+	require.True(t, clustered.distributed())
+	require.False(t, validConfig.distributed())
+
+	badRefresh := clustered
+	badRefresh.Advanced.TopologyRefreshInterval = "soon"
+	require.ErrorContains(t, badRefresh.Validate(), "invalid topology_refresh_interval")
+
+	zeroQuorum := clustered
+	zeroQuorum.Advanced.InsertQuorumTimeout = "0s"
+	require.ErrorContains(t, zeroQuorum.Validate(), "must be positive")
+}
+
+func TestClusterConfigDefaults(t *testing.T) {
+	var cfg = config{Cluster: "flow_cluster"}
+	require.Equal(t, "_local", cfg.localTableSuffix())
+	require.Equal(t, 5*time.Minute, cfg.topologyRefreshInterval())
+	require.Equal(t, 10*time.Minute, cfg.insertQuorumTimeout())
+
+	cfg.Advanced.LocalTableSuffix = "_shard"
+	cfg.Advanced.TopologyRefreshInterval = "90s"
+	cfg.Advanced.InsertQuorumTimeout = "1h"
+	require.Equal(t, "_shard", cfg.localTableSuffix())
+	require.Equal(t, 90*time.Second, cfg.topologyRefreshInterval())
+	require.Equal(t, time.Hour, cfg.insertQuorumTimeout())
 }
 
 func TestDefaultNamespace(t *testing.T) {
@@ -56,6 +85,15 @@ func TestTableConfigValidation(t *testing.T) {
 
 	valid = tableConfig{Table: "my_table_@你好-`-\"especiál"}
 	require.NoError(t, valid.Validate())
+
+	valid = tableConfig{Table: "my_table", ShardingKey: []string{"tenant_id", "region"}}
+	require.NoError(t, valid.Validate())
+
+	var dup = tableConfig{Table: "my_table", ShardingKey: []string{"tenant_id", "tenant_id"}}
+	require.ErrorContains(t, dup.Validate(), "more than once")
+
+	var blank = tableConfig{Table: "my_table", ShardingKey: []string{""}}
+	require.ErrorContains(t, blank.Validate(), "empty field name")
 }
 
 func TestResolvedAddress(t *testing.T) {

@@ -77,8 +77,9 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 type config struct {
 	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Default is 9000 if SSL is disabled\\, 9440 if SSL is enabled." jsonschema_extras:"order=0"`
 	Database    string           `json:"database" jsonschema:"title=Database,description=Name of the ClickHouse database to materialize to." jsonschema_extras:"order=1"`
-	HardDelete  bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=2,nonsensitive=true"`
-	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=3"`
+	Cluster     string           `json:"cluster,omitempty" jsonschema:"title=Cluster,description=Name of a ClickHouse cluster\\, as listed in system.clusters. When set\\, each table is created as a Distributed table over a local table on every shard\\, rows are written directly to the shard that owns them\\, and the connector must be able to reach every node of the cluster. Leave blank for a single server or ClickHouse Cloud." jsonschema_extras:"order=2"`
+	HardDelete  bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3,nonsensitive=true"`
+	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=4"`
 	Schedule    m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
@@ -88,6 +89,50 @@ type advancedConfig struct {
 	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Controls the TLS connection behavior.,enum=disable,enum=require,enum=verify-full,default=verify-full"`
 	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+
+	LocalTableSuffix        string `json:"local_table_suffix,omitempty" jsonschema:"title=Local Table Suffix,description=Suffix appended to each table name to name the per-shard local table that backs it. Only used when a cluster is set.,default=_local" jsonschema_extras:"nonsensitive=true"`
+	TopologyRefreshInterval string `json:"topology_refresh_interval,omitempty" jsonschema:"title=Topology Refresh Interval,description=How often the connector re-reads the cluster's shard layout from system.clusters. When the layout changes the connector restarts. Accepts duration strings like '5m' or '1h'. Only used when a cluster is set.,default=5m" jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$,nonsensitive=true"`
+	InsertQuorumTimeout     string `json:"insert_quorum_timeout,omitempty" jsonschema:"title=Insert Quorum Timeout,description=How long a write waits for a majority of a shard's replicas to acknowledge it before failing. Accepts duration strings like '10m' or '30s'. Only used when a cluster is set.,default=10m" jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$,nonsensitive=true"`
+}
+
+const (
+	defaultLocalTableSuffix        = "_local"
+	defaultTopologyRefreshInterval = 5 * time.Minute
+	defaultInsertQuorumTimeout     = 10 * time.Minute
+)
+
+// distributed reports whether tables are written through a ClickHouse cluster
+// rather than to a single server.
+func (c config) distributed() bool {
+	return c.Cluster != ""
+}
+
+func (c config) localTableSuffix() string {
+	if c.Advanced.LocalTableSuffix == "" {
+		return defaultLocalTableSuffix
+	}
+	return c.Advanced.LocalTableSuffix
+}
+
+func (c config) topologyRefreshInterval() time.Duration {
+	return durationOrDefault(c.Advanced.TopologyRefreshInterval, defaultTopologyRefreshInterval)
+}
+
+func (c config) insertQuorumTimeout() time.Duration {
+	return durationOrDefault(c.Advanced.InsertQuorumTimeout, defaultInsertQuorumTimeout)
+}
+
+// durationOrDefault parses a duration that Validate has already accepted, so
+// a parse failure here is a programming error.
+func durationOrDefault(s string, def time.Duration) time.Duration {
+	if s == "" {
+		return def
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		panic(fmt.Sprintf("unvalidated duration %q: %v", s, err))
+	}
+	return d
 }
 
 func (c config) Validate() error {
@@ -112,6 +157,20 @@ func (c config) Validate() error {
 	case "", "disable", "require", "verify-full":
 	default:
 		return fmt.Errorf("invalid sslmode %q (expected disable, require, or verify-full)", c.Advanced.SSLMode)
+	}
+
+	for _, d := range []struct{ name, value string }{
+		{"topology_refresh_interval", c.Advanced.TopologyRefreshInterval},
+		{"insert_quorum_timeout", c.Advanced.InsertQuorumTimeout},
+	} {
+		if d.value == "" {
+			continue
+		}
+		if parsed, err := time.ParseDuration(d.value); err != nil {
+			return fmt.Errorf("invalid %s %q: %w", d.name, d.value, err)
+		} else if parsed <= 0 {
+			return fmt.Errorf("invalid %s %q: must be positive", d.name, d.value)
+		}
 	}
 
 	return nil
@@ -185,11 +244,26 @@ type tableConfig struct {
 	// database, so it is the same trust plane as the rest of the endpoint
 	// config; malformed input fails the dry-run CREATE TABLE at Validate time.
 	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions\\, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true,nonsensitive=true"`
+	// ShardingKey names the key fields whose hash chooses the ClickHouse shard
+	// a row lives on. It must be a subset of the binding's key so that rows
+	// sharing a key always land on the same shard, where ReplacingMergeTree
+	// can deduplicate them.
+	ShardingKey []string `json:"sharding_key,omitempty" jsonschema:"title=Sharding Key,description=Fields whose values choose which shard of the cluster a row is stored on. Must be a subset of the fields selected as the table's key. Leave blank to shard by the whole key. Only used when the endpoint names a cluster. Changing this value requires backfilling the binding." jsonschema_extras:"advanced=true"`
 }
 
 func (r tableConfig) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
+	}
+	var seen = make(map[string]struct{}, len(r.ShardingKey))
+	for _, f := range r.ShardingKey {
+		if f == "" {
+			return fmt.Errorf("sharding_key contains an empty field name")
+		}
+		if _, dup := seen[f]; dup {
+			return fmt.Errorf("sharding_key lists field %q more than once", f)
+		}
+		seen[f] = struct{}{}
 	}
 	return nil
 }
