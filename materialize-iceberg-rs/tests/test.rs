@@ -1,6 +1,7 @@
 use core::str;
 use std::process::Command;
 
+use apache_avro::types::Value as AvroValue;
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::error::ProvideErrorMetadata;
@@ -133,4 +134,98 @@ async fn test_materialization() {
             .collect();
 
     assert_eq!(rows.len(), 3, "expected the fixture's 3 rows: {rows:#?}");
+
+    let metadata = s3
+        .list_objects_v2()
+        .bucket(BUCKET)
+        .prefix("warehouse/test_table/metadata/")
+        .send()
+        .await
+        .unwrap();
+    let metadata_keys: Vec<&str> = metadata.contents().iter().filter_map(|o| o.key()).collect();
+
+    let manifest_keys: Vec<&&str> = metadata_keys
+        .iter()
+        .filter(|k| k.ends_with("-m0.avro"))
+        .collect();
+    assert_eq!(
+        manifest_keys.len(),
+        1,
+        "expected exactly one manifest file, found {metadata_keys:?}"
+    );
+
+    let manifest_list_keys: Vec<&&str> = metadata_keys
+        .iter()
+        .filter(|k| k.rsplit('/').next().unwrap().starts_with("snap-"))
+        .collect();
+    assert_eq!(
+        manifest_list_keys.len(),
+        1,
+        "expected exactly one manifest-list file, found {metadata_keys:?}"
+    );
+
+    let manifest_entries = avro_records(&s3, manifest_list_keys[0]).await;
+    assert_eq!(manifest_entries.len(), 1, "expected one manifest-list row");
+    assert_eq!(
+        avro_str(&manifest_entries[0], "manifest_path"),
+        *manifest_keys[0],
+    );
+    assert_eq!(avro_int(&manifest_entries[0], "added_files_count"), 1);
+    assert_eq!(avro_long(&manifest_entries[0], "added_rows_count"), 3);
+
+    let manifest_entries = avro_records(&s3, manifest_keys[0]).await;
+    assert_eq!(manifest_entries.len(), 1, "expected one manifest entry");
+    let data_file = avro_field(&manifest_entries[0], "data_file");
+    assert_eq!(avro_str(data_file, "file_path"), keys[0]);
+    assert_eq!(avro_long(data_file, "record_count"), 3);
+}
+
+async fn avro_records(s3: &aws_sdk_s3::Client, key: &str) -> Vec<AvroValue> {
+    let object = s3
+        .get_object()
+        .bucket(BUCKET)
+        .key(key)
+        .send()
+        .await
+        .unwrap();
+    let bytes = object.body.collect().await.unwrap().into_bytes();
+
+    apache_avro::Reader::new(&bytes[..])
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+fn avro_field<'a>(value: &'a AvroValue, name: &str) -> &'a AvroValue {
+    match value {
+        AvroValue::Record(fields) => {
+            &fields
+                .iter()
+                .find(|(field, _)| field == name)
+                .unwrap_or_else(|| panic!("missing field {name} in {fields:?}"))
+                .1
+        }
+        other => panic!("expected an Avro record, got {other:?}"),
+    }
+}
+
+fn avro_str(value: &AvroValue, name: &str) -> String {
+    match avro_field(value, name) {
+        AvroValue::String(s) => s.clone(),
+        other => panic!("expected field {name} to be a string, got {other:?}"),
+    }
+}
+
+fn avro_int(value: &AvroValue, name: &str) -> i32 {
+    match avro_field(value, name) {
+        AvroValue::Int(v) => *v,
+        other => panic!("expected field {name} to be an int, got {other:?}"),
+    }
+}
+
+fn avro_long(value: &AvroValue, name: &str) -> i64 {
+    match avro_field(value, name) {
+        AvroValue::Long(v) => *v,
+        other => panic!("expected field {name} to be a long, got {other:?}"),
+    }
 }

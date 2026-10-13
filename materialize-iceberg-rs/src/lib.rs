@@ -13,6 +13,7 @@ use validate::do_validate;
 
 pub mod apply;
 pub mod configuration;
+pub mod iceberg;
 pub mod server;
 pub mod transactor;
 pub mod validate;
