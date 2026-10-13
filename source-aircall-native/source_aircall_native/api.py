@@ -152,7 +152,7 @@ async def snapshot_company(
 
 
 def _calls_params(lo: int, hi: int) -> dict[str, str | int]:
-    return {"from": lo, "to": hi, "order": "asc"}
+    return {"from": lo, "to": hi, "order": "asc", "fetch_contact": "true"}
 
 
 async def _count_calls(log: Logger, http: HTTPSession, lo: int, hi: int) -> int:

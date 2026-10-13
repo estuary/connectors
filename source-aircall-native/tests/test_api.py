@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 import source_aircall_native.api as api
-from source_aircall_native.models import Webhook
+from source_aircall_native.models import Call, Webhook
 
 LOG = logging.getLogger("test")
 NOW = 2_000_000
@@ -220,4 +220,13 @@ def test_fetch_contacts_restarts_after_deletion():
 def test_webhook_token_is_never_captured():
     assert (
         "token" not in Webhook.model_validate({"id": 1, "token": "secret"}).model_dump()
+    )
+
+
+def test_call_keeps_only_contact_id():
+    call = Call.model_validate({"id": 1, "contact": {"id": 7, "first_name": "Ada"}})
+
+    assert call.model_dump()["contact"] == {"id": 7}
+    assert (
+        Call.model_validate({"id": 2, "contact": None}).model_dump()["contact"] is None
     )

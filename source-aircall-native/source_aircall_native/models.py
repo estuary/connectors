@@ -88,6 +88,16 @@ class CompanyResponse(BaseModel):
 class Call(BaseDocument, extra="allow"):
     id: int
 
+    # Calls reference their contact by id, since contacts are captured in their
+    # own stream.
+    @model_validator(mode="before")
+    @classmethod
+    def _contact_id_only(cls, data: dict[str, JsonValue]) -> dict[str, JsonValue]:
+        contact = data.get("contact")
+        if isinstance(contact, dict):
+            return {**data, "contact": {"id": contact["id"]}}
+        return data
+
 
 class Contact(BaseDocument, extra="allow"):
     id: int
