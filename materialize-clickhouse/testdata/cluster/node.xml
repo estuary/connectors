@@ -64,5 +64,21 @@
                 </replica>
             </shard>
         </flow_cluster>
+        <!-- The same four nodes with unequal shard weights, so tests can check
+             placement across weighted shards. -->
+        <flow_cluster_weighted>
+            <shard>
+                <weight>1</weight>
+                <internal_replication>true</internal_replication>
+                <replica><host>127.0.0.1</host><port>9101</port><user>flow</user><password>flow</password></replica>
+                <replica><host>127.0.0.1</host><port>9102</port><user>flow</user><password>flow</password></replica>
+            </shard>
+            <shard>
+                <weight>3</weight>
+                <internal_replication>true</internal_replication>
+                <replica><host>127.0.0.1</host><port>9103</port><user>flow</user><password>flow</password></replica>
+                <replica><host>127.0.0.1</host><port>9104</port><user>flow</user><password>flow</password></replica>
+            </shard>
+        </flow_cluster_weighted>
     </remote_servers>
 </clickhouse>
