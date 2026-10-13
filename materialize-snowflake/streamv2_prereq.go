@@ -77,8 +77,8 @@ func requireStreamingV2Runtime(spec *pf.MaterializationSpec, stateJson json.RawM
 	if len(stateJson) == 0 {
 		return nil
 	}
-	var cp checkpoint
-	if err := json.Unmarshal(stateJson, &cp); err != nil {
+	cp, err := decodeCheckpoint(stateJson, "")
+	if err != nil {
 		return nil
 	}
 
