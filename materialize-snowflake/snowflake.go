@@ -761,12 +761,19 @@ func decodeCheckpoint(state json.RawMessage, rangeKey string) (checkpoint, error
 			}
 			item = stagedItem
 		}
-		if item != nil {
+		if item != nil && item.holdsWork() {
 			cp[stateKey] = item
 		}
 	}
 
 	return cp, nil
+}
+
+// holdsWork reports whether the item records anything to drain or recover.
+// Fields left beside drained work, such as a table name or an emptied streaming
+// v2 map, are no item.
+func (item *checkpointItem) holdsWork() bool {
+	return len(item.Query) > 0 || len(item.StreamBlobs) > 0 || len(item.PipeFiles) > 0 || len(item.StreamV2) > 0
 }
 
 // encodeCheckpoint renders the working checkpoint as a merge patch of the
@@ -791,11 +798,48 @@ func (d *transactor) encodeCheckpoint() (json.RawMessage, error) {
 }
 
 // encodeCheckpointClear renders a merge patch that removes the drained state
-// keys whole.
+// keys' work. Staged work is removed by clearing this shard's range entry, the
+// bare fields that held staged work before range scoping, and the streaming v2
+// entries whose range begins in this shard's range, since those are the
+// channels this shard swept when the binding left that path. Another shard's
+// range entry and streaming v2 entries are left for that shard to drain. Every
+// other item is removed with its state key.
 func (d *transactor) encodeCheckpointClear(drained []string) (json.RawMessage, error) {
 	var out = make(map[string]any, len(drained))
 	for _, stateKey := range drained {
-		out[stateKey] = nil
+		var item = d.cp[stateKey]
+		if item == nil || len(item.Query) == 0 {
+			out[stateKey] = nil
+			continue
+		}
+		if d.rangeKey == "" {
+			return nil, fmt.Errorf("staged work cannot be drained without the shard's range key")
+		}
+		var shard streamV2Range
+		if err := shard.UnmarshalText([]byte(d.rangeKey)); err != nil {
+			return nil, fmt.Errorf("parsing the shard's range key: %w", err)
+		}
+
+		var entry = map[string]any{
+			d.rangeKey:  nil,
+			"Table":     nil,
+			"Query":     nil,
+			"StagedDir": nil,
+			"Version":   nil,
+			"Round":     nil,
+			"Rows":      nil,
+		}
+		var streamV2 = make(map[string]any)
+		for keyRange := range item.StreamV2 {
+			if shard.contains(keyRange.keyBegin) {
+				text, _ := keyRange.MarshalText()
+				streamV2[string(text)] = nil
+			}
+		}
+		if len(streamV2) > 0 {
+			entry["StreamV2"] = streamV2
+		}
+		out[stateKey] = entry
 	}
 	return json.Marshal(out)
 }

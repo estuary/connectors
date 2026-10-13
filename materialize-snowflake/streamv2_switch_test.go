@@ -75,8 +75,7 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 
 // A binding that leaves the streaming v2 write path for the staged path
 // records its first staged transaction beside the streaming v2 state, and
-// acknowledging that transaction clears both: the state key is patched to null
-// whole.
+// acknowledging that transaction clears both.
 func TestCheckpointStagedPathSwitchClearsStreamV2(t *testing.T) {
 	const stateKey, channel = "switch.v1", "task_00000000_switch_v1"
 
@@ -708,4 +707,47 @@ func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 	delete(sm.tableStreams, 0)
 	require.NoError(t, m.sweep(ctx, "DB", "SCH", "TBL", nil))
 	require.Equal(t, []string{listed}, drops())
+}
+
+// With more than one shard, each shard's first staged transaction after the
+// switch clears the streaming v2 entries of its own range, and the other
+// shard's entries stay until that shard drains them.
+func TestCheckpointStagedPathSwitchClearsOwnRangeStreamV2(t *testing.T) {
+	const stateKey = "switch.v1"
+	var lowerRange = streamV2Range{keyBegin: 0x00000000, keyEnd: 0x7fffffff}
+	var upperRange = streamV2Range{keyBegin: 0x80000000, keyEnd: 0xffffffff}
+
+	var state, err = json.Marshal(checkpoint{stateKey: &checkpointItem{
+		Table: "TBL",
+		StreamV2: streamV2Checkpoint{
+			lowerRange: {ChannelName: "chan-lower", Routed: 3},
+			upperRange: {ChannelName: "chan-upper", Routed: 5},
+		},
+	}})
+	require.NoError(t, err)
+
+	var lower = &transactor{rangeKey: "00000000-7fffffff"}
+	require.NoError(t, lower.UnmarshalState(state))
+	lower.cp[stateKey] = &checkpointItem{Table: "TBL", Query: "MERGE INTO tbl", StagedDir: "dir-lower", StreamV2: lower.cp[stateKey].StreamV2}
+
+	stored, err := lower.encodeCheckpoint()
+	require.NoError(t, err)
+	state, err = jsonpatch.MergePatch(state, stored)
+	require.NoError(t, err)
+
+	cleared, err := lower.encodeCheckpointClear([]string{stateKey})
+	require.NoError(t, err)
+	state, err = jsonpatch.MergePatch(state, cleared)
+	require.NoError(t, err)
+
+	cp, err := decodeCheckpoint(state, lower.rangeKey)
+	require.NoError(t, err)
+	require.Contains(t, cp, stateKey)
+	require.Empty(t, cp[stateKey].Query)
+	require.Len(t, cp[stateKey].StreamV2, 1)
+	require.Equal(t, "chan-upper", cp[stateKey].StreamV2[upperRange].ChannelName)
+
+	cp, err = decodeCheckpoint(state, "80000000-ffffffff")
+	require.NoError(t, err)
+	require.Equal(t, "chan-upper", cp[stateKey].StreamV2[upperRange].ChannelName)
 }

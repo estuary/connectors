@@ -122,20 +122,86 @@ func TestCheckpointEncodeRequiresRangeKeyForStagedWork(t *testing.T) {
 	require.Error(t, err)
 }
 
-// A drained state key is patched to null whole, which takes its range entries,
-// any item persisted before range scoping, and its streaming v2 state.
-func TestCheckpointEncodeClearNullsStateKey(t *testing.T) {
+// Draining staged work removes this shard's range entry, the bare staged
+// fields a build predating range scoping wrote, and the streaming v2 entries
+// of this shard's range. Another shard's range entry and streaming v2 entries
+// are untouched, because they are that shard's to drain. An item of every
+// other write path is patched to null whole.
+func TestCheckpointEncodeClearRemovesOnlyThisShardsWork(t *testing.T) {
 	var d = &transactor{
-		rangeKey: "00000000-ffffffff",
+		rangeKey: "00000000-7fffffff",
 		cp: checkpoint{
-			"a.v1": {Query: "MERGE INTO a"},
+			"a.v1": {Table: "A", Query: "MERGE INTO a", StreamV2: streamV2Checkpoint{
+				{keyBegin: 0x00000000, keyEnd: 0x3fffffff}: {ChannelName: "chan-0"},
+				{keyBegin: 0x40000000, keyEnd: 0x7fffffff}: {ChannelName: "chan-1"},
+				{keyBegin: 0x80000000, keyEnd: 0xffffffff}: {ChannelName: "chan-2"},
+			}},
 			"c.v1": {StreamBlobs: []*blobMetadata{{Path: "blob"}}},
 		},
 	}
 
 	out, err := d.encodeCheckpointClear([]string{"a.v1", "c.v1"})
 	require.NoError(t, err)
-	require.JSONEq(t, `{"a.v1":null,"c.v1":null}`, string(out))
+	require.JSONEq(t, `{
+		"a.v1": {
+			"00000000-7fffffff": null,
+			"Table": null, "Query": null, "StagedDir": null, "Version": null, "Round": null, "Rows": null,
+			"StreamV2": {"00000000-3fffffff": null, "40000000-7fffffff": null}
+		},
+		"c.v1": null
+	}`, string(out))
+}
+
+// One shard's clearing patch leaves the other shard's staged work pending,
+// even when the runtime applies it after that shard's next checkpoint.
+func TestCheckpointClearLeavesPeerStagedWork(t *testing.T) {
+	var lower = &transactor{rangeKey: "00000000-7fffffff", cp: checkpoint{
+		"a.v1": {Table: "A", Query: "MERGE INTO a (lower)", StagedDir: "dir-lower"},
+	}}
+	var upper = &transactor{rangeKey: "80000000-ffffffff", cp: checkpoint{
+		"a.v1": {Table: "A", Query: "MERGE INTO a (upper)", StagedDir: "dir-upper"},
+	}}
+
+	var state = []byte(`{}`)
+	for _, d := range []*transactor{lower, upper} {
+		patch, err := d.encodeCheckpoint()
+		require.NoError(t, err)
+		state, err = jsonpatch.MergePatch(state, patch)
+		require.NoError(t, err)
+	}
+
+	cleared, err := lower.encodeCheckpointClear([]string{"a.v1"})
+	require.NoError(t, err)
+	state, err = jsonpatch.MergePatch(state, cleared)
+	require.NoError(t, err)
+
+	cp, err := decodeCheckpoint(state, lower.rangeKey)
+	require.NoError(t, err)
+	require.Empty(t, cp)
+
+	cp, err = decodeCheckpoint(state, upper.rangeKey)
+	require.NoError(t, err)
+	require.Equal(t, "MERGE INTO a (upper)", cp["a.v1"].Query)
+	require.Equal(t, "dir-upper", cp["a.v1"].StagedDir)
+}
+
+// Staged work persisted before range scoping is drained by clearing the bare
+// fields that hold it.
+func TestCheckpointClearDrainsLegacyStagedWork(t *testing.T) {
+	var state = []byte(`{"a.v1": {"Table": "A", "Query": "MERGE INTO a", "StagedDir": "dir-a", "Version": "v", "Round": 3, "Rows": 7}}`)
+
+	var d = &transactor{rangeKey: "00000000-ffffffff"}
+	require.NoError(t, d.UnmarshalState(state))
+	require.Equal(t, "MERGE INTO a", d.cp["a.v1"].Query)
+
+	cleared, err := d.encodeCheckpointClear([]string{"a.v1"})
+	require.NoError(t, err)
+	state, err = jsonpatch.MergePatch(state, cleared)
+	require.NoError(t, err)
+
+	cp, err := decodeCheckpoint(state, d.rangeKey)
+	require.NoError(t, err)
+	require.Empty(t, cp)
 }
 
 func TestCheckpointDecodeRangeScoped(t *testing.T) {
