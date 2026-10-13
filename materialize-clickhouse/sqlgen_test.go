@@ -15,7 +15,7 @@ import (
 var testDialect = clickHouseDialect("test_db")
 
 func TestSQLGeneration(t *testing.T) {
-	var testTemplates = renderTemplates(testDialect, true)
+	var testTemplates = renderTemplates(testDialect, true, clusterDDL{})
 
 	// Load/store templates require a RangeKey field that RunSqlGenTests does not
 	// provide, so only the target template goes through the standard test harness.
@@ -69,7 +69,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGenerationNoHardDelete(t *testing.T) {
-	var noDeleteTemplates = renderTemplates(testDialect, false)
+	var noDeleteTemplates = renderTemplates(testDialect, false, clusterDDL{})
 
 	_, tables := sql.RunSqlGenTests(
 		t,
@@ -110,7 +110,7 @@ func TestSQLGenerationNoHardDelete(t *testing.T) {
 }
 
 func TestSQLGenerationQuotedTableNames(t *testing.T) {
-	var testTemplates = renderTemplates(testDialect, true)
+	var testTemplates = renderTemplates(testDialect, true, clusterDDL{})
 
 	rangeKeyTemplates := []*template.Template{
 		testTemplates.createLoadTable,
@@ -236,4 +236,55 @@ func TestClickHouseClampDate(t *testing.T) {
 			require.True(t, tt.want.Equal(got.(time.Time)))
 		})
 	}
+}
+
+// TestSQLGenerationDistributed pins the DDL rendered for a cluster: a
+// Replicated local table, a Distributed proxy over it, and ON CLUSTER on
+// every temp-table statement. The single-server snapshots above must not
+// move when this one does.
+func TestSQLGenerationDistributed(t *testing.T) {
+	var cluster = clusterDDL{Cluster: "flow_cluster", Database: "test_db", LocalSuffix: "_local"}
+	var tpls = renderTemplates(testDialect, true, cluster)
+
+	var snap strings.Builder
+	for _, tc := range []struct {
+		name        string
+		shardingKey []string
+		delta       bool
+	}{
+		{"all keys", nil, false},
+		{"subset of keys", []string{"id"}, false},
+		{"delta updates", nil, true},
+	} {
+		var tbl = buildTestTable(t, testDialect, "target_table")
+		tbl.DeltaUpdates = tc.delta
+		tbl.ResourceConfigJson = mustMarshal(t, tableConfig{Table: "target_table", ShardingKey: tc.shardingKey, Delta: tc.delta})
+
+		for _, tpl := range []*template.Template{
+			tpls.createTargetTable,
+			tpls.createLoadTable, tpls.truncateLoadTable, tpls.dropLoadTable,
+			tpls.createStoreTable, tpls.truncateStoreTable, tpls.moveStorePartition, tpls.dropStoreTable,
+		} {
+			var testcase = tc.name + " " + tpl.Name()
+			snap.WriteString("--- Begin " + testcase + " ---\n")
+			// The transactor renders its temp-table templates against the
+			// local table, as newTransactor re-addresses each binding.
+			var in = tbl
+			if tpl != tpls.createTargetTable {
+				in = localTable(tbl, testDialect, cluster)
+			}
+			rendered, err := renderTableAndRangeKey(in, 0, tpl)
+			require.NoError(t, err, testcase)
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
+	}
+
+	// A sharding key naming a non-key field is caught at render time.
+	var bad = buildTestTable(t, testDialect, "target_table")
+	bad.ResourceConfigJson = mustMarshal(t, tableConfig{Table: "target_table", ShardingKey: []string{"value"}})
+	_, err := renderTableAndRangeKey(bad, 0, tpls.createTargetTable)
+	require.ErrorContains(t, err, `sharding_key field "value" is not a key`)
+
+	cupaloy.SnapshotT(t, snap.String())
 }

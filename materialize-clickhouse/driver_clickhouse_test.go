@@ -393,7 +393,7 @@ func TestAddBinding(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_add_binding"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -500,7 +500,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_data_path"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -556,7 +556,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 
 	var ep = &sql.Endpoint[config]{
 		Config:  cfg,
@@ -609,7 +609,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var be = &m.BindingEvents{}
 	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
@@ -704,7 +704,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_hard_delete"
 
 	// Build a table with a mix of nullable and non-nullable value columns.
@@ -925,7 +925,7 @@ func TestLoadNonExistentKey(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_load_nonexistent"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -944,7 +944,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_load_multi"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -987,7 +987,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_composite_key"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
@@ -1034,7 +1034,7 @@ func TestVersionDeduplication(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_version_dedup"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -1071,7 +1071,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_store_batch"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -1098,7 +1098,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 
 	var tableNameA = "test_multi_bind_a"
 	var tableNameB = "test_multi_bind_b"
@@ -1177,7 +1177,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_composite_tombstone"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
@@ -1207,7 +1207,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_move_partition_missing_target"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -1273,7 +1273,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 
 	var cfg = testConfig()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var table = buildTestTable(t, dialect, tableName)
 
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
@@ -1503,7 +1503,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_recovery_partial_move"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 	var storeName = storeTableName(table, 0)
@@ -1580,7 +1580,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_recovery_truncated_commit"
 	var table = buildTestTable(t, dialect, tableName)
 	var storeName = storeTableName(table, 0)

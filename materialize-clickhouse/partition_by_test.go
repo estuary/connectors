@@ -84,7 +84,7 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 		{name: "standard soft-delete", hardDelete: false},
 		{name: "delta", hardDelete: true, delta: true},
 	} {
-		var tpls = renderTemplates(testDialect, tc.hardDelete)
+		var tpls = renderTemplates(testDialect, tc.hardDelete, clusterDDL{})
 		var table = buildTestTable(t, testDialect, "target_table")
 		table.DeltaUpdates = tc.delta
 		table.ResourceConfigJson = rawConfig
@@ -112,7 +112,7 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 	// PARTITION BY clause.
 	var composite = buildTestTable(t, testDialect, "composite_table")
 	composite.ResourceConfigJson = json.RawMessage(`{"table":"composite_table","partition_by":"value, toYYYYMM(flow_published_at)"}`)
-	rendered, err := sql.RenderTableTemplate(composite, renderTemplates(testDialect, true).createTargetTable)
+	rendered, err := sql.RenderTableTemplate(composite, renderTemplates(testDialect, true, clusterDDL{}).createTargetTable)
 	require.NoError(t, err)
 	snap.WriteString("--- Begin composite expression createTargetTable ---\n")
 	snap.WriteString(rendered)
@@ -318,7 +318,7 @@ func TestPartitionByDataPath(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_partition_by_data_path"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
@@ -389,7 +389,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_recovery_partition_backfill"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
@@ -477,7 +477,7 @@ func TestAlterTableRejectsPartitionKeyColumnMigration(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_partition_key_migration"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
@@ -546,7 +546,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_partition_drift"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 

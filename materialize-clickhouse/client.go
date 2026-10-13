@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -129,20 +130,68 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
-		return fmt.Errorf("creating table: %w", err)
+	// On a cluster the template renders two statements, the local table and
+	// then its Distributed proxy, which the driver cannot send as one query.
+	for _, stmt := range splitStatements(tc.TableCreateSql) {
+		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("creating table: %w", err)
+		}
 	}
 	return nil
 }
 
-func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmt = fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(path...))
-	return stmt, func(ctx context.Context) error {
-		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("executing delete table: %w", err)
+// splitStatements separates the statements of a rendered template, which end
+// each statement with a semicolon at the end of a line.
+func splitStatements(rendered string) []string {
+	var out []string
+	for _, s := range strings.Split(rendered, ";\n") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s+";")
+		}
+	}
+	return out
+}
+
+// tableStatements renders a DDL statement against the one table of a
+// single-server binding, or against the proxy and local tables of a
+// distributed binding, with ON CLUSTER and SYNC so that it completes on
+// every node before returning.
+func (c *client) tableStatements(path []string, verb string, singleServerSync bool) []string {
+	var cluster = c.ep.Config.clusterDDL()
+	if !cluster.distributed() {
+		var sync string
+		if singleServerSync {
+			sync = " SYNC"
+		}
+		return []string{fmt.Sprintf("%s %s%s;", verb, c.ep.Dialect.Identifier(path...), sync)}
+	}
+	var onCluster = "ON CLUSTER " + c.ep.Dialect.Identifier(cluster.Cluster)
+	var local = c.ep.Dialect.Identifier(localTableName(path[0], cluster))
+	if verb == "TRUNCATE TABLE" {
+		// A Distributed table holds no rows to truncate.
+		return []string{fmt.Sprintf("%s %s %s SYNC;", verb, local, onCluster)}
+	}
+	// Proxy first, so that no reader ever sees a proxy over a missing table.
+	return []string{
+		fmt.Sprintf("%s %s %s SYNC;", verb, c.ep.Dialect.Identifier(path...), onCluster),
+		fmt.Sprintf("%s %s %s SYNC;", verb, local, onCluster),
+	}
+}
+
+func (c *client) execStatements(stmts []string, what string) boilerplate.ActionApplyFn {
+	return func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("executing %s: %w", what, err)
+			}
 		}
 		return nil
-	}, nil
+	}
+}
+
+func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	var stmts = c.tableStatements(path, "DROP TABLE IF EXISTS", false)
+	return strings.Join(stmts, "\n"), c.execStatements(stmts, "delete table"), nil
 }
 
 var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
@@ -158,7 +207,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigrateAddColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigrateAddColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate add column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -181,7 +230,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigratePopulateColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigratePopulateColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate populate column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -206,7 +255,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigrateDropColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigrateDropColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate drop column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -229,7 +278,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigrateRenameColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigrateRenameColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate rename column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -277,7 +326,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete).alterTargetColumns.Execute(&alterStmtBuilder, ta); err != nil {
+		if err := renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete, c.ep.Config.clusterDDL()).alterTargetColumns.Execute(&alterStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table statement: %w", err)
 		}
 		var alterStmt = alterStmtBuilder.String()
@@ -352,13 +401,8 @@ func (c *client) TruncateTable(_ context.Context, path []string) (string, boiler
 	// SYNC because a replicated table (every table on ClickHouse Cloud)
 	// otherwise truncates asynchronously, and a queued truncate would drop the
 	// rows the shard materializes once this backfill has been applied.
-	var stmt = fmt.Sprintf("TRUNCATE TABLE %s SYNC;", c.ep.Dialect.Identifier(path...))
-	return stmt, func(ctx context.Context) error {
-		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("executing truncate table: %w", err)
-		}
-		return nil
-	}, nil
+	var stmts = c.tableStatements(path, "TRUNCATE TABLE", true)
+	return strings.Join(stmts, "\n"), c.execStatements(stmts, "truncate table"), nil
 }
 
 func (c *client) InstallFence(_ context.Context, _ sql.Table, _ sql.Fence) (sql.Fence, error) {
@@ -370,10 +414,13 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
-// MustRecreateResource reports a changed partition_by, which can only be
-// applied by dropping and re-creating the table: ClickHouse never accepts
-// PARTITION BY via ALTER, and TRUNCATE preserves the partition key.
-func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+// MustRecreateResource reports a change that can only be applied by dropping
+// and re-creating the table: a changed partition_by, because ClickHouse never
+// accepts PARTITION BY via ALTER and TRUNCATE preserves the partition key; a
+// changed sharding_key, because it is fixed in the Distributed table's engine
+// definition; or a binding moving between a single server and a cluster,
+// because that changes which engines the tables need.
+func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	if lastBinding == nil || newBinding == nil {
 		return false, nil
 	}
@@ -384,7 +431,22 @@ func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBindi
 	if err := json.Unmarshal(newBinding.ResourceConfigJson, &newRC); err != nil {
 		return false, fmt.Errorf("parsing new binding resource config: %w", err)
 	}
-	return strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy), nil
+	if strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy) {
+		return true, nil
+	}
+	if !slices.Equal(lastRC.ShardingKey, newRC.ShardingKey) {
+		return true, nil
+	}
+	if req != nil && req.LastMaterialization != nil {
+		var lastCfg config
+		if err := json.Unmarshal(req.LastMaterialization.ConfigJson, &lastCfg); err != nil {
+			return false, fmt.Errorf("parsing last endpoint config: %w", err)
+		}
+		if lastCfg.distributed() != c.ep.Config.distributed() {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {

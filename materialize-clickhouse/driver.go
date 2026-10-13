@@ -297,7 +297,7 @@ func NewDriver() *driver {
 			}).Info("opening database")
 
 			var dialect = clickHouseDialect(cfg.Database)
-			var tpls = renderTemplates(dialect, cfg.HardDelete)
+			var tpls = renderTemplates(dialect, cfg.HardDelete, cfg.clusterDDL())
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -457,7 +457,7 @@ func newTransactor(
 	var cfg = ep.Config
 	t := &transactor{
 		dialect:           ep.Dialect,
-		templates:         renderTemplates(ep.Dialect, cfg.HardDelete),
+		templates:         renderTemplates(ep.Dialect, cfg.HardDelete, cfg.clusterDDL()),
 		cfg:               cfg,
 		be:                be,
 		_range:            open.Range,
@@ -490,6 +490,9 @@ func newTransactor(
 	}
 
 	for _, target := range bindings {
+		if cfg.distributed() {
+			target = localTable(target, ep.Dialect, cfg.clusterDDL())
+		}
 		if err = t.addBinding(ctx, target); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
@@ -511,6 +514,16 @@ func newTransactor(
 	}
 
 	return t, nil
+}
+
+// localTable re-addresses a binding's table at the local table that stores
+// its rows, so that every read, stage and commit of a session goes to the
+// shard's own storage rather than through the Distributed proxy.
+func localTable(target sql.Table, dialect sql.Dialect, cluster clusterDDL) sql.Table {
+	var local = target
+	local.Path = []string{localTableName(target.Path[0], cluster)}
+	local.Identifier = dialect.Identifier(local.Path...)
+	return local
 }
 
 // requireSortingKeysMatchBindings fails with a clear, actionable error when a
