@@ -191,7 +191,7 @@ func TestPrereqs(t *testing.T) {
 }
 
 // NewEndpoint runs before the prerequisite checks, so a login failure must be
-// reported by its connection ping rather than by the first query it runs.
+// reported as a connection failure rather than as the first query it runs.
 func TestNewEndpointConnectError(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")

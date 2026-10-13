@@ -323,12 +323,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			db := stdsql.OpenDB(connector)
 			defer db.Close()
 
-			// sql.OpenDB does not connect, so ping to report a connection failure as one.
-			if err := db.PingContext(ctx); err != nil {
+			// sql.OpenDB does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure and costs no extra round trip.
+			conn, err := db.Conn(ctx)
+			if err != nil {
 				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
 			}
+			defer conn.Close()
 
-			collation, err := getCollation(ctx, db)
+			collation, err := getCollation(ctx, conn)
 			if err != nil {
 				return nil, fmt.Errorf("check collations: %w", err)
 			}
@@ -337,7 +340,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			// for the configured user.
 			schema := cfg.Schema
 			if schema == "" {
-				if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
+				if err := conn.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
 					return nil, fmt.Errorf("querying schema for current user: %w", err)
 				}
 			}

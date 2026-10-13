@@ -319,19 +319,9 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := db.PingContext(pingCtx); err != nil {
-		errs.Err(connectError(err, cfg))
-		return errs
-	}
-
-	// Query database collation to determine if resources are case-insensitive
-	caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
-	if err != nil {
-		errs.Err(err)
-		return errs
-	}
-
-	dialect := createDialect(featureFlags, caseInsensitiveResources)
+	// This is the first query, so it also reports connection failures. Literal
+	// quoting does not depend on the database collation, so none is queried.
+	dialect := createDialect(featureFlags, false)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {

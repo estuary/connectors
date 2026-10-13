@@ -128,11 +128,11 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 // isCaseInsensitiveDatabase checks if the database uses a case-insensitive collation
 // by querying DATABASEPROPERTYEX and looking for _CI_ in the collation name.
 // SQL Server collations use _CI_ for case-insensitive and _CS_ for case-sensitive.
-func isCaseInsensitiveDatabase(ctx context.Context, db *stdsql.DB, warehouse string) (bool, error) {
+func isCaseInsensitiveDatabase(ctx context.Context, conn *stdsql.Conn, warehouse string) (bool, error) {
 	// Create a temporary dialect just to get the Literal function for the query
 	tmpDialect := createDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}), false)
 	var collation string
-	if err := db.QueryRowContext(ctx, fmt.Sprintf(
+	if err := conn.QueryRowContext(ctx, fmt.Sprintf(
 		"SELECT DATABASEPROPERTYEX(%s, 'Collation')",
 		tmpDialect.Literal(warehouse),
 	)).Scan(&collation); err != nil {
@@ -154,12 +154,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 			defer db.Close()
 
-			// sql.Open does not connect, so ping to report a connection failure as one.
-			if err := db.PingContext(ctx); err != nil {
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure and costs no extra round trip.
+			conn, err := db.Conn(ctx)
+			if err != nil {
 				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
 			}
+			defer conn.Close()
 
-			caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
+			caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, conn, cfg.Warehouse)
 			if err != nil {
 				return nil, err
 			}
