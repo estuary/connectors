@@ -353,6 +353,11 @@ type transactor struct {
 	store struct {
 		conn chdriver.Conn
 	}
+	// topology and shards are set only in distributed mode: the cluster
+	// layout this session places rows under, and a connection pair to one
+	// replica of each shard.
+	topology *topology
+	shards   []*shardConns
 	bindings []*binding
 	be       *m.BindingEvents
 	_range   *pf.RangeSpec
@@ -472,6 +477,16 @@ func newTransactor(
 	storeOptions := cfg.newClickhouseOptions()
 	if t.store.conn, err = clickhouse.Open(storeOptions); err != nil {
 		return nil, fmt.Errorf("openNativeConn (store): %w", err)
+	}
+
+	if cfg.distributed() {
+		if t.topology, err = readTopology(ctx, t.store.conn, cfg.Cluster); err != nil {
+			return nil, err
+		}
+		if t.shards, err = openShardConns(ctx, cfg, t.topology); err != nil {
+			return nil, err
+		}
+		log.WithFields(t.topology.logFields()).Info("connected to every shard of the cluster")
 	}
 
 	for _, target := range bindings {
@@ -888,6 +903,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
+
+	if err := t.refreshTopology(ctx); err != nil {
+		return nil, err
+	}
 
 	lastBinding := -1
 	batch := make([][]any, 0, maxBatchSize)
@@ -1688,4 +1707,7 @@ func (t *transactor) Destroy() {
 	// their schema has drifted from the target's.
 	_ = t.store.conn.Close()
 	_ = t.load.conn.Close()
+	for _, s := range t.shards {
+		s.close()
+	}
 }
