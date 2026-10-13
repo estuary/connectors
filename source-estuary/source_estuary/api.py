@@ -103,11 +103,11 @@ async def resolve_scopes(
     authorized prefix when none are configured) where the API key holds every
     `required` capability.
 
-    A configured prefix the key can't read at all raises, rather than being
-    skipped: skipping would tombstone its snapshot rows and let incremental
-    cursors move past data that can't be re-read once access returns. A
-    configured prefix the key can read, but without a stream's extra
-    capabilities, is skipped for that stream.
+    A configured prefix the key can't read in full raises, rather than being
+    skipped or narrowed: either would tombstone snapshot rows and let
+    incremental cursors move past data that can't be re-read once access
+    returns. A configured prefix the key can read, but without a stream's
+    extra capabilities, is skipped for that stream.
     """
     authorized = await fetch_authorized_prefixes(log, http)
     holders = [a.prefix for a in authorized if required <= set(a.capabilities)]
@@ -118,7 +118,7 @@ async def resolve_scopes(
     readable = [a.prefix for a in authorized]
     lost = [
         c for c in prefixes
-        if not any(c.startswith(r) or r.startswith(c) for r in readable)
+        if not any(c.startswith(r) for r in readable)
     ]
     if lost:
         raise ValidationError([
