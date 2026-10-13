@@ -1,0 +1,223 @@
+info:
+  name: with sub-statuses
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query TaskStatusFull($a: Prefix!, $b: Prefix!) {\n  a: liveSpecs(by: { prefix: $a }, first: 200) { pageInfo { hasNextPage } edges { node { catalogName status { ...S } } } }\n  b: liveSpecs(by: { prefix: $b }, first: 200) { pageInfo { hasNextPage } edges { node { catalogName status { ...S } } } }\n}\nfragment Shard on ShardRef { name keyBegin rClockBegin build }\nfragment Job on JobStatus { type lockFailures { catalogName expected actual } }\nfragment Err on Error { catalogName scope detail }\nfragment Change on DiscoverChange { resourcePath target disable }\nfragment Outcome on AutoDiscoverOutcome { ts added { ...Change } modified { ...Change } removed { ...Change } errors { ...Err } publishResult { ...Job } }\nfragment S on LiveSpecStatus {\n  type summary\n  connector { shard { ...Shard } ts message fields }\n  controller {\n    nextRun error failures updatedAt alerts\n    activation { lastActivated lastActivatedAt recentFailureCount nextRetry\n      shardStatus { count lastTs firstTs status }\n      lastFailure { shard { ...Shard } ts message fields } }\n    publications { nextAfter maxObservedPubId\n      history { id created completed detail isTouch count result { ...Job } errors { ...Err } }\n      pendingRepublish { receivedAt reason lastBuildId } }\n    autoDiscover { nextAt pendingPublish { ...Outcome } lastSuccess { ...Outcome } failure { count firstTs lastOutcome { ...Outcome } } }\n    sourceCapture { upToDate addBindings }\n    inferredSchema { schemaLastUpdated schemaMd5 nextMd5 nextUpdateAfter }\n    configUpdate { nextAttempt build }\n    abandon { lastEvaluated }\n  }\n}",
+        "variables": {
+          "a": "{{test_prefix}}",
+          "b": "{{nested_parent_prefix}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — 121 statuses, all sub-statuses (projection: counts + largest autoDiscover sample)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "refCount": 121,
+              "typeCounts": {
+                "OK": 48,
+                "TASK_DISABLED": 29,
+                "WARNING": 43,
+                "ERROR": 1
+              },
+              "sample (largest autoDiscover capture)": {
+                "node": {
+                  "catalogName": "Artificial-Industries/postgres-shipments/source-google-cloud-sql-postgres",
+                  "status": {
+                    "type": "OK",
+                    "summary": "Streaming CDC Events",
+                    "connector": {
+                      "shard": {
+                        "name": "Artificial-Industries/postgres-shipments/source-google-cloud-sql-postgres",
+                        "keyBegin": "00000000",
+                        "rClockBegin": "00000000",
+                        "build": "1642f9ac11000616"
+                      },
+                      "ts": "2026-10-05T18:44:48+00:00",
+                      "message": "Streaming CDC Events",
+                      "fields": {
+                        "eventTarget": "Artificial-Industries/postgres-shipments/source-google-cloud-sql-postgres",
+                        "eventType": "connectorStatus"
+                      }
+                    },
+                    "controller": {
+                      "nextRun": "2026-10-07T23:11:03.528461+00:00",
+                      "error": null,
+                      "failures": 0,
+                      "updatedAt": "2026-10-07T22:35:56.528461+00:00",
+                      "alerts": {},
+                      "activation": {
+                        "lastActivated": "1642f9ac11000616",
+                        "lastActivatedAt": "2026-10-05T18:44:44.494962563+00:00",
+                        "recentFailureCount": 0,
+                        "nextRetry": null,
+                        "shardStatus": {
+                          "count": 33,
+                          "lastTs": "2026-10-07T22:35:55.984433447+00:00",
+                          "firstTs": "2026-10-05T18:45:21.311730958+00:00",
+                          "status": "OK"
+                        },
+                        "lastFailure": {
+                          "shard": {
+                            "name": "Artificial-Industries/postgres-shipments/source-google-cloud-sql-postgres",
+                            "keyBegin": "00000000",
+                            "rClockBegin": "00000000",
+                            "build": "15dbf9f206000406"
+                          },
+                          "ts": "2026-08-29T08:18:12.924095212+00:00",
+                          "message": "shard failed",
+                          "fields": {
+                            "assignment": {
+                              "AssignmentValue": {
+                                "code": 300
+                              },
+                              "ItemID": "capture/Artificial-Industries/postgres-shipments/source-google-cloud-sql-postgres/10fd4e9091000201/00000000-00000000",
+                              "MemberSuffix": "reactor-rns2qli0eas74h0r-011",
+                              "MemberZone": "gcp-us-central1c",
+                              "Slot": 0
+                            },
+                            "error": "runTransactions: readMessage: receiving Opened: Capture error (expected Opened) from connector\n\nCaused by:\n    the capture cannot run due to the following error(s):\n     - unable to query 'wal_level' system variable: failed to connect to `user=flow_capture database=postgres`:\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n     - error querying REPLICATION role for user \"flow_capture\": failed to connect to `user=flow_capture database=postgres`:\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n     - error querying replication slots: failed to connect to `user=flow_capture database=postgres`:\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n     - error querying publications: failed to connect to `user=flow_capture database=postgres`:\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n     - user \"flow_capture\" cannot write to the watermarks table \"public.flow_watermarks\"\n     - error checking publication status for table \"public.flow_watermarks\": error listing tables in publication \"flow_publication\": failed to connect to `user=flow_capture database=postgres`:\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n    \t35.222.155.222:5432 (35.222.155.222): dial error: dial tcp 35.222.155.222:5432: connect: connection refused\n     - user \"flow_capture\" cannot read from table \"public.shipments\"",
+                            "eventTarget": "Artificial-Industries/postgres-shipments/source-google-cloud-sql-postgres",
+                            "eventType": "shardFailure"
+                          }
+                        }
+                      },
+                      "publications": {
+                        "nextAfter": null,
+                        "maxObservedPubId": "1642f9ac11000216",
+                        "history": [
+                          {
+                            "id": "1642f9ac11000216",
+                            "created": "2025-11-05T18:45:09.886080748+00:00",
+                            "completed": "2026-10-05T18:44:43.345496879+00:00",
+                            "detail": "periodic publication",
+                            "isTouch": true,
+                            "count": 17,
+                            "result": {
+                              "type": "success",
+                              "lockFailures": []
+                            },
+                            "errors": []
+                          },
+                          {
+                            "id": "12b3740ce5800068",
+                            "created": "2025-10-16T18:44:36.939187412+00:00",
+                            "completed": "2025-10-16T18:44:46.107478458+00:00",
+                            "detail": "auto-discover changes (0 added, 1 modified, 0 removed)",
+                            "isTouch": false,
+                            "count": 1,
+                            "result": {
+                              "type": "success",
+                              "lockFailures": []
+                            },
+                            "errors": []
+                          },
+                          {
+                            "id": "12687f4a8d000131",
+                            "created": "2025-09-17T16:06:07.898065640+00:00",
+                            "completed": "2025-09-17T16:06:18.733775316+00:00",
+                            "detail": "periodic publication",
+                            "isTouch": true,
+                            "count": 1,
+                            "result": {
+                              "type": "success",
+                              "lockFailures": []
+                            },
+                            "errors": []
+                          },
+                          {
+                            "id": "1234ff50e8000358",
+                            "created": "2025-08-28T16:05:17.904613107+00:00",
+                            "completed": "2025-08-28T16:05:29.684590786+00:00",
+                            "detail": "auto-discover changes (0 added, 1 modified, 0 removed)",
+                            "isTouch": false,
+                            "count": 1,
+                            "result": {
+                              "type": "success",
+                              "lockFailures": []
+                            },
+                            "errors": []
+                          },
+                          {
+                            "id": "0000000000000000",
+                            "created": null,
+                            "completed": "2025-08-28T15:55:03.587394773+00:00",
+                            "detail": "auto-discover changes (0 added, 1 modified, 0 removed)",
+                            "isTouch": false,
+                            "count": 1,
+                            "result": null,
+                            "errors": [
+                              {
+                                "catalogName": "",
+                                "scope": null,
+                                "detail": "publish error: error returned from database: canceling statement due to statement timeout: canceling statement due to statement timeout"
+                              }
+                            ]
+                          }
+                        ],
+                        "pendingRepublish": null
+                      },
+                      "autoDiscover": {
+                        "nextAt": "2026-10-07T23:11:03.456831503+00:00",
+                        "pendingPublish": null,
+                        "lastSuccess": {
+                          "ts": "2026-10-07T21:11:03.456831503+00:00",
+                          "added": [],
+                          "modified": [],
+                          "removed": [],
+                          "errors": [],
+                          "publishResult": null
+                        },
+                        "failure": null
+                      },
+                      "sourceCapture": null,
+                      "inferredSchema": null,
+                      "configUpdate": null,
+                      "abandon": {
+                        "lastEvaluated": "2026-10-07T09:01:48.320734016+00:00"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [status resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/status.rs) (the `Controller` flattens `models::status::ControllerStatus`)
+
+  **WHY:** The gate (2026-10-07) chose to include the controller sub-statuses in
+  `task_status`. GraphQL has no wildcard, so every leaf must be selected. This is
+  the full selection the connector will send, as `TaskStatus.NODE_SELECTION`,
+  via fragments. It is probed over two tenants to cover captures,
+  materializations, derivations, and collections, and to check that no
+  sub-selection errors for any catalog type.
+
+  **VERIFIED (2026-10-07):** 121 refs across `Jonathan_Wihl/` + `Artificial-Industries/`, `errors` absent. The full fragment selection resolves for every catalog type. Types: OK 48, TASK_DISABLED 29, WARNING 43, ERROR 1. Non-null on: activation and publications (all 121), abandon 62, nextRun 45, inferredSchema 33 (collections), connector 22, autoDiscover 12, alerts 6, sourceCapture 6, error 1. Per-type sub-statuses are `null` where they don't apply. `publications.history` holds 0–5 entries (controller-bounded). Status object 598 B min / 973 B median / 5.7 KB max. No null `status` (no tombstones present). Re-run after the credential swap; the first attempt returned 401 `ExpiredSignature` on a JWT access token (see root docs).

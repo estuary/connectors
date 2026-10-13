@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-12
+
+### Fixed
+- `satisfaction_ratings`, `audit_logs`, `ticket_skips`, `ticket_metric_events`, `ticket_activities`, `organizations`, `calls`, and `call_legs` now wait to poll Zendesk until at least 1 minute of new data is available.
+
 ## 2026-10-08
 
 ### Changed

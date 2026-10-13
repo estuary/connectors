@@ -1,0 +1,63 @@
+info:
+  name: full sweep
+  type: graphql
+  seq: 3
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Connectors {
+        connectors(first: 1000) {
+          pageInfo { hasNextPage endCursor }
+          edges { node { id imageName } }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/connectors.rs
+
+  **WHY:** No documented max page size: does `first: 1000` return the whole
+  catalog in one page (`hasNextPage` false), or clamp? Decides the page size the
+  connector uses. Saved example is a projection (count + first/last id).
+
+  **VERIFIED (2026-10-07):** `first: 1000` returns all **223** connectors in one page, `hasNextPage: false`, ids strictly ascending. No max page size is enforced at 1000.
+
+examples:
+  - name: 200 - projection - first 1000 returns all 223, not clamped
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "projection": "count + first/last id",
+            "data": {
+              "connectors": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "1642b850a475f800"
+                },
+                "count": 223,
+                "firstId": "05f363e5a8800400",
+                "lastId": "1642b850a475f800",
+                "idsStrictlyAscending": true
+              }
+            }
+          }

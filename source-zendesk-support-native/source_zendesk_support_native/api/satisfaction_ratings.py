@@ -13,6 +13,7 @@ from ..models import (
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     INCREMENTAL_LAG,
+    MIN_INCREMENTAL_WINDOW_SIZE,
     url_base,
     dt_to_s,
 )
@@ -63,7 +64,7 @@ async def fetch_satisfaction_ratings(
         log_cursor + MAX_SATISFACTION_RATINGS_WINDOW_SIZE,
     )
 
-    if end <= log_cursor:
+    if end - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
         return
 
     generator = _fetch_satisfaction_ratings_between(
