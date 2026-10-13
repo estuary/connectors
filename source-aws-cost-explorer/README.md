@@ -1,6 +1,6 @@
 # AWS Cost Explorer
 
-Captures `daily_costs`, `daily_costs_by_service`, and `daily_costs_by_linked_account` with daily natural-key upserts. Every poll refreshes all configured history still available from AWS. Older and omitted rows retain their last captured values; the connector never infers deletions from missing data.
+Captures `daily_costs`, `daily_costs_by_service`, and `daily_costs_by_linked_account` with daily natural-key upserts. The first poll reads from the start date; later polls reread from the month before the previous poll. Older and omitted rows retain their last captured values; the connector never infers deletions from missing data.
 
 See [connector documentation](../docs/reference/Connectors/capture-connectors/aws-cost-explorer.md) for IAM permissions, fields, retention, and API costs.
 
@@ -13,7 +13,6 @@ credentials:
   credentials_title: AWS Access Key
   access_key_id_sops: <access-key-id>
   secret_access_key_sops: <secret-access-key>
-  # session_token_sops: <temporary-session-token>
 # Optional; when omitted, each poll rereads the last 30 days.
 # start_date: 2026-01-01T00:00:00Z
 ```

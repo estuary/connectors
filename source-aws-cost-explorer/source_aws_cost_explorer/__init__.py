@@ -19,7 +19,7 @@ from .models import (
     CostResourceConfig,
     EndpointConfig,
 )
-from .resources import all_resources, validate_credentials
+from .resources import all_resources, validate_credentials, validate_intervals
 
 
 class Connector(
@@ -55,6 +55,7 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, CostResourceConfig],
     ) -> response.Validated:
+        validate_intervals(binding.resourceConfig for binding in validate.bindings)
         await validate_credentials(log, self, validate.config)
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)

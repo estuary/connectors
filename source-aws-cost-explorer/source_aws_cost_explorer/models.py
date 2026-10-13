@@ -28,12 +28,6 @@ class AWSAccessKey(BaseModel):
         min_length=1,
         json_schema_extra={"secret": True, "order": 2},
     )
-    session_token: str | None = Field(
-        default=None,
-        title="Session Token",
-        description="The session token for your temporary AWS credentials. Leave this empty if you use a long-term access key.",
-        json_schema_extra={"secret": True, "order": 3},
-    )
 
 
 class EndpointConfig(BaseModel):
@@ -49,12 +43,14 @@ class EndpointConfig(BaseModel):
     )
 
 
+MIN_INTERVAL = timedelta(days=1)
+
+
 class CostResourceConfig(ResourceConfig):
-    # Every refresh rereads the whole window and AWS bills each request, so
-    # the CDK's zero default would poll continuously.
+    # Rows are whole days and AWS bills each request, so polling more often
+    # than daily only adds cost. `validate_intervals` enforces the minimum.
     interval: timedelta = Field(
-        default=timedelta(days=1),
-        ge=timedelta(days=1),
+        default=MIN_INTERVAL,
         description="Interval between updates for this resource. Must be at least one day.",
         json_schema_extra={"nonsensitive": True},
     )

@@ -27,21 +27,6 @@
               "secret": true,
               "title": "Secret Access Key",
               "type": "string"
-            },
-            "session_token": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "The session token for your temporary AWS credentials. Leave this empty if you use a long-term access key.",
-              "order": 3,
-              "secret": true,
-              "title": "Session Token"
             }
           },
           "required": [

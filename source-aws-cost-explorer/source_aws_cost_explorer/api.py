@@ -60,7 +60,6 @@ async def query_cost_and_usage(
                 endpoint_url=API,
                 aws_access_key_id=credentials.access_key_id,
                 aws_secret_access_key=credentials.secret_access_key,
-                aws_session_token=credentials.session_token,
                 config=Config(
                     connect_timeout=10,
                     read_timeout=60,
@@ -84,11 +83,15 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def months_before(day: date, months: int) -> date:
+    """Return the 1st of the month `months` before `day`'s month."""
+    index = day.year * 12 + day.month - 1 - months
+    return date(index // 12, index % 12 + 1, 1)
+
+
 def available_start(start: date, today: date) -> date:
     """Clamp a requested date to AWS's current month plus 13 prior months."""
-    month_index = today.year * 12 + today.month - 1 - 13
-    retention_floor = date(month_index // 12, month_index % 12 + 1, 1)
-    return max(start, retention_floor)
+    return max(start, months_before(today, 13))
 
 
 def cost_rows(
@@ -134,18 +137,21 @@ async def poll_costs(
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[DailyCost | datetime, None]:
-    """Reread every complete UTC day from `start` through yesterday.
+    """Reread complete UTC days through yesterday.
 
-    Without a configured start, the window is the last `DEFAULT_LOOKBACK`
-    days. The cursor is the poll's start time and only paces refreshes.
-    Rows that leave the window keep their last captured values.
+    The first poll reads from `start`, or the last `DEFAULT_LOOKBACK` days
+    without one. Later polls reread from the month before the previous poll,
+    since AWS finalizes a month's costs early in the next; anchoring on the
+    cursor also covers days missed while the capture was paused. Rows that
+    leave the window keep their last captured values.
     """
     assert isinstance(cursor, datetime)
     poll_started = utc_now()
     if poll_started <= cursor:
         return
     today = poll_started.date()
-    lower = available_start(start or today - DEFAULT_LOOKBACK, today)
+    refresh_from = months_before(cursor.date(), 1)
+    lower = available_start(max(start or today - DEFAULT_LOOKBACK, refresh_from), today)
     if lower < today:
         pages = await query_cost_and_usage(credentials, lower, today, model.group_by)
         count = 0

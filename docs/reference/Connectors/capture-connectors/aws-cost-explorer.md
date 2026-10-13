@@ -19,14 +19,14 @@ Each resource is mapped to its own collection. Keys are `date`, `date` plus `ser
 All resources include `date`, exclusive `period_end`, `estimated`, and a `metrics` object with `UnblendedCost`, `BlendedCost`, `AmortizedCost`, `NetUnblendedCost`, and `NetAmortizedCost`. Each metric contains `amount` as an exact decimal string and `unit`. Usage quantities are excluded because combining services can combine incompatible units.
 
 :::tip
-Each sync rereads the configured history that AWS still exposes, through yesterday UTC. This refreshes historical estimates and billing corrections. Without a start date, each sync rereads the last 30 days, and older rows keep their last captured values. Set a start date to keep refreshing a longer history.
+Each sync reads complete days through yesterday UTC. The first sync, and any backfill, reads from the start date. Later syncs reread from the first day of the month before the previous sync, which picks up estimates and billing corrections until AWS finalizes each month. Without a start date, each sync rereads the last 30 days.
 
 Older captured rows remain as last observed when they leave AWS's available history. Missing rows do not produce deletion events, including missing service or account groups within the available range. Explicit zero-cost values returned by AWS update existing rows. Costs outside AWS's retention can no longer be refreshed, and data that expired before the connector first captured it cannot be recovered through this API.
 :::
 
 AWS provides daily data for the current month and previous 13 months. Each poll clamps its query to that available range. See [Cost Explorer API best practices](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-api-best-practices.html).
 
-Each resource syncs once every 24 hours by default, and no more often. AWS charges $0.01 per requested API page. Each resource requests at least one page per sync; a longer history, especially for `daily_costs_by_service`, needs more pages. Retries and validation add requests. See [Cost Explorer pricing](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html).
+Each resource syncs once every 24 hours by default, and no more often. AWS charges $0.01 per requested API page. Each resource requests at least one page per sync. The first sync and backfills read the whole start-date range, which takes more pages, especially for `daily_costs_by_service`. Retries and validation add requests. See [Cost Explorer pricing](https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html).
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ A minimal IAM policy is:
 }
 ```
 
-The connector signs requests using the AWS SDK and the configured credentials. Temporary credentials additionally require a session token; replace them when they expire. The Cost Explorer endpoint is `https://ce.us-east-1.amazonaws.com`, regardless of the regions where usage occurred.
+The connector signs requests using the AWS SDK and a long-term access key. The Cost Explorer endpoint is `https://ce.us-east-1.amazonaws.com`, regardless of the regions where usage occurred.
 
 ## Configuration
 
@@ -62,7 +62,6 @@ Configure the connector in the Estuary web app or a catalog specification.
 | `/credentials/credentials_title` | Authentication | Set to `AWS Access Key`. | string | `AWS Access Key` |
 | **`/credentials/access_key_id`** | Access Key ID | AWS access key ID. | string | Required |
 | **`/credentials/secret_access_key`** | Secret Access Key | AWS secret access key. | string | Required |
-| `/credentials/session_token` | Session Token | Required for temporary credentials. | string | Optional |
 | `/start_date` | Start Date | Timestamp whose containing UTC date is the first usage day to capture. | string | The last 30 days |
 
 ### Binding properties

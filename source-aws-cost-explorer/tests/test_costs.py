@@ -4,7 +4,7 @@ from logging import getLogger
 
 import pytest
 from estuary_cdk.capture import common
-from pydantic import ValidationError
+from estuary_cdk.flow import ValidationError
 
 from source_aws_cost_explorer import api, resources
 from source_aws_cost_explorer.models import (
@@ -179,8 +179,32 @@ def test_default_window_rolls_with_each_poll(monkeypatch):
 
 def test_interval_defaults_to_and_requires_one_day():
     assert CostResourceConfig(name="daily_costs").interval == timedelta(days=1)
-    with pytest.raises(ValidationError):
-        CostResourceConfig(name="daily_costs", interval="PT0S")
+    resources.validate_intervals([CostResourceConfig(name="daily_costs")])
+    with pytest.raises(ValidationError, match="daily_costs_by_service"):
+        resources.validate_intervals(
+            [
+                CostResourceConfig(name="daily_costs"),
+                CostResourceConfig(name="daily_costs_by_service", interval="PT1H"),
+            ]
+        )
+
+
+def test_later_polls_reread_from_month_before_last_poll(monkeypatch):
+    queried = []
+
+    async def query(_credentials, start, end, group_by):
+        queried.append(start)
+        return []
+
+    monkeypatch.setattr(api, "query_cost_and_usage", query)
+    freeze_clock(monkeypatch, datetime(2026, 10, 13, 12, tzinfo=UTC))
+    start = date(2025, 9, 1)
+    poll(api.fetch_daily_costs, start, datetime(2026, 10, 12, 12, tzinfo=UTC))
+    # Paused since June: the window reaches back to cover the missed days.
+    poll(api.fetch_daily_costs, start, datetime(2026, 6, 10, 12, tzinfo=UTC))
+    # A backfill resets the cursor and rereads from the start date.
+    poll(api.fetch_daily_costs, start, EPOCH)
+    assert queried == [date(2026, 9, 1), date(2026, 5, 1), date(2025, 9, 1)]
 
 
 def test_old_history_survives_retention_and_explicit_zero_updates(monkeypatch):

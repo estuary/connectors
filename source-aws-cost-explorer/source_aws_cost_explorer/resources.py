@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from functools import partial
@@ -21,6 +21,7 @@ from .api import (
 from .models import (
     AccountCost,
     AWSAccessKey,
+    MIN_INTERVAL,
     CostResourceConfig,
     DailyCost,
     EndpointConfig,
@@ -69,7 +70,7 @@ async def validate_credentials(
         }:
             raise ValidationError(
                 [
-                    f"AWS rejected the credentials or Cost Explorer permissions ({code}). Check the access key, secret, optional session token, and ce:GetCostAndUsage permission."
+                    f"AWS rejected the credentials or Cost Explorer permissions ({code}). Check the access key, secret, and ce:GetCostAndUsage permission."
                 ]
             ) from err
         if code in {"DataUnavailableException", "OptInRequired"}:
@@ -79,6 +80,16 @@ async def validate_credentials(
                 ]
             ) from err
         raise
+
+
+def validate_intervals(configs: Iterable[CostResourceConfig]) -> None:
+    too_short = [config.name for config in configs if config.interval < MIN_INTERVAL]
+    if too_short:
+        raise ValidationError(
+            [
+                f"Interval must be at least P1D for: {', '.join(too_short)}. Cost Explorer rows are whole days and AWS bills each request."
+            ]
+        )
 
 
 def configured_start(config: EndpointConfig) -> date | None:

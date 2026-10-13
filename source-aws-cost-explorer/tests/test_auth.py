@@ -19,7 +19,7 @@ def test_credentials_schema():
         == "credentials_title"
     )
     fields = schema["$defs"]["AWSAccessKey"]["properties"]
-    for name in ("access_key_id", "secret_access_key", "session_token"):
+    for name in ("access_key_id", "secret_access_key"):
         assert fields[name]["secret"] is True
 
 
@@ -42,13 +42,12 @@ def test_query_uses_explicit_credentials(monkeypatch):
             }
         ],
     )
-    credentials = CREDENTIALS.model_copy(update={"session_token": "test-token"})
     result = asyncio.run(
-        api.query_cost_and_usage(credentials, date(2026, 9, 1), date(2026, 9, 2))
+        api.query_cost_and_usage(CREDENTIALS, date(2026, 9, 1), date(2026, 9, 2))
     )
     assert fake.client_options["aws_access_key_id"] == "test-key"
     assert fake.client_options["aws_secret_access_key"] == "test-secret"
-    assert fake.client_options["aws_session_token"] == "test-token"
+    assert "aws_session_token" not in fake.client_options
     assert fake.client_options["region_name"] == "us-east-1"
     assert fake.calls == [
         {
