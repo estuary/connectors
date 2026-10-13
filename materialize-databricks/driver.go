@@ -399,6 +399,14 @@ type binding struct {
 	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
+// isTimestampColumn reports whether a date-time key is a TIMESTAMP column,
+// which parses any RFC3339 form of a bound literal to the same instant. A
+// STRING column, which datetime_keys_as_string selects, compares values as
+// text, where equal instants in different forms don't sort together.
+func isTimestampColumn(col sql.Column) bool {
+	return col.BareDDL == "TIMESTAMP"
+}
+
 func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
 
@@ -420,8 +428,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
-	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
-	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
 
 	t.bindings = append(t.bindings, b)
 
