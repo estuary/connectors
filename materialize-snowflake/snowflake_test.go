@@ -146,6 +146,14 @@ func TestIntegration(t *testing.T) {
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
 	})
 
+	// The staged write path is the one that scales out. With Snowpipe
+	// Streaming disabled the delta binding takes COPY INTO, so every binding
+	// is on that path and the sharded run exercises nothing else.
+	t.Run("materialize-sharded", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 2, ExtraFeatureFlags: []string{"no_" + flagSnowpipeStreaming}, Fidelity: m.FidelityExact})
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
