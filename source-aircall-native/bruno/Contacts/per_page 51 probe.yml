@@ -64,6 +64,6 @@ docs:
 
     **VERIFIED (2026-09-28):** not rejected; `meta.per_page` echoes 51. Clamp vs honor
     is **UNOBSERVABLE** with 3 contacts (seeding > 50 exceeds the ~10-request
-    seeding budget). Connector sends `per_page=50`, the documented max, and pages by
-    `next_page_link` / `count`, so either mode is safe.
+    seeding budget). Connector sends `per_page=50`, the documented max, and stops
+    once `current_page * per_page >= total`, so either mode is safe.
   type: text/markdown

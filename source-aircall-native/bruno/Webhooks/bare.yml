@@ -20,7 +20,7 @@ docs:
     **REFERENCE:** https://developers.aircall.io/api-references#list-all-webhooks
     **WHY:** the `webhooks` stream; decides the key (`webhook_id` UUID vs deprecated integer `id`) and confirms the `token` secret is present (redacted by the collection after-response script).
 
-    **LIMITATION (VERIFIED 2026-09-28):** the `meta` (empty **and** populated) is `{count,total,current_page,per_page}`, with **no** `next_page_link`/`previous_page_link` keys at all. The connector must treat an absent `next_page_link` as null (model it `str | None = None`).
+    **LIMITATION (VERIFIED 2026-09-28):** the `meta` (empty **and** populated) is `{count,total,current_page,per_page}`, with **no** `next_page_link`/`previous_page_link` keys at all. The connector therefore completes on `current_page * per_page >= total`, never on the link.
     (Initially empty, then seeded via `Seeding / B1 - Create Webhook`.)
 
     **VERIFIED (2026-09-28):** items carry **both** `id` (int, deprecated 2024-04-15) and `webhook_id` (UUID; `direct_link` is built on it), plus `url`, `active`, `events`, `token`, `created_at`. `custom_name` wasn't echoed back even though B1 sent it. `token` (signing secret) **is returned on list** and is redacted here by the collection after-response script; the connector strips it at the model layer.

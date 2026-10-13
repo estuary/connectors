@@ -47,6 +47,6 @@ docs:
     **WHY:** Completion signal one page past the last.
 
     **VERIFIED (2026-09-28):** 200 with `count: 0`, `next_page_link: null`. The last real
-    page also has `next_page_link: null` — the connector stops on
-    `next_page_link is None` and never requests past it.
+    page also has `next_page_link: null`. The connector stops once
+    `current_page * per_page >= total`, so it never requests past it.
   type: text/markdown
