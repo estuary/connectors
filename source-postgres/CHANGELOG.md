@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-12
+
+### Fixed
+- An unreachable database or an incorrect password is now reported as that,
+  instead of as a list of failed prerequisite checks.
+
 ## 2026-09-14
 
 ### Fixed

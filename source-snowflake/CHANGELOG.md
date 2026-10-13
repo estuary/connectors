@@ -1,5 +1,11 @@
 # source-snowflake
 
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as a table
+  discovery error.
+
 ## 2026-09-02
 
 ### Fixed
