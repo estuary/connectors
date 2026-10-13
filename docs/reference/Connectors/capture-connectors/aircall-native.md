@@ -29,7 +29,7 @@ Aircall limits every list request to 10,000 results. The connector requests `cal
 
 Calls keep changing after they start: they are ended, tagged, commented, assigned, and gain recordings. The connector re-reads each call 24 hours after it started to capture those changes. Changes made more than 24 hours later are only captured by backfilling the `calls` binding, which can be scheduled with the `schedule` resource config setting. `calls` has no schedule by default, since each backfill re-reads up to six months of calls.
 
-Aircall only serves the last six months of calls through its API, so `calls` is backfilled from the later of the configured start date and roughly six months ago. The `recording` and `voicemail` links on calls are signed URLs that expire within a few hours of being captured.
+Aircall only serves the last six months of calls through its API, so `calls` is backfilled from the later of the configured start date and roughly six months ago. The `recording` and `voicemail` links on calls are signed URLs that expire within a few hours of being captured. Each call's `contact` holds only the `id` of the matching contact in the `contacts` collection. Aircall matches it by phone number when the call is read, so it reflects contacts that existed when the call was last captured.
 :::
 
 :::tip
