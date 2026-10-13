@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -275,6 +276,8 @@ type transactor struct {
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
+	// rangeKey is the key under which this shard's staged work is persisted.
+	rangeKey string
 
 	// If this is still the recovery (first after startup) commit, where special
 	// handling may be needed for registering streaming files.
@@ -286,9 +289,11 @@ func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	if err := json.Unmarshal(state, &d.cp); err != nil {
+	cp, err := decodeCheckpoint(state, d.rangeKey)
+	if err != nil {
 		return err
 	}
+	d.cp = cp
 
 	return nil
 }
@@ -343,6 +348,7 @@ func newTransactor(
 		snowpipeStreamingV2: sv2,
 		pipeClient:          pipeClient,
 		_range:              open.Range,
+		rangeKey:            fmt.Sprintf("%08x-%08x", open.Range.KeyBegin, open.Range.KeyEnd),
 		version:             open.Version,
 		be:                  be,
 		cp:                  make(checkpoint),
@@ -709,6 +715,91 @@ func (item *checkpointItem) streamV2Only() bool {
 	return len(item.StreamV2) > 0 && len(item.Query) == 0 && len(item.StreamBlobs) == 0 && len(item.PipeFiles) == 0
 }
 
+// rangeKeyRe matches the key under which a shard records its staged work
+// within a state key's entry. Disjoint key ranges give disjoint keys.
+var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
+
+// decodeCheckpoint parses persisted connector state into the working checkpoint
+// of the shard whose range key is rangeKey. Within a state key's entry, the keys
+// matching rangeKeyRe hold shards' staged work and every other key is a field
+// of the item at the bare state key. This shard's staged item is laid over the
+// bare item and takes its streaming v2 state, so the two stay one working item.
+// Other shards' entries are skipped.
+func decodeCheckpoint(state json.RawMessage, rangeKey string) (checkpoint, error) {
+	var raw map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(state, &raw); err != nil {
+		return nil, err
+	}
+
+	var cp = make(checkpoint)
+	for stateKey, entry := range raw {
+		var bare = make(map[string]json.RawMessage)
+		var staged json.RawMessage
+		for key, val := range entry {
+			if !rangeKeyRe.MatchString(key) {
+				bare[key] = val
+			} else if key == rangeKey {
+				staged = val
+			}
+		}
+
+		var item *checkpointItem
+		if len(bare) > 0 {
+			bareJSON, _ := json.Marshal(bare)
+			item = new(checkpointItem)
+			if err := json.Unmarshal(bareJSON, item); err != nil {
+				return nil, fmt.Errorf("parsing checkpoint item %q: %w", stateKey, err)
+			}
+		}
+		if staged != nil && string(staged) != "null" {
+			var stagedItem = new(checkpointItem)
+			if err := json.Unmarshal(staged, stagedItem); err != nil {
+				return nil, fmt.Errorf("parsing checkpoint item %q of %q: %w", rangeKey, stateKey, err)
+			}
+			if item != nil && len(stagedItem.StreamV2) == 0 {
+				stagedItem.StreamV2 = item.StreamV2
+			}
+			item = stagedItem
+		}
+		if item != nil {
+			cp[stateKey] = item
+		}
+	}
+
+	return cp, nil
+}
+
+// encodeCheckpoint renders the working checkpoint as a merge patch of the
+// persisted state. Staged work goes under the state key and then this shard's
+// range key, without the streaming v2 state that the bare fields already hold.
+// Every other item is the state key's bare fields.
+func (d *transactor) encodeCheckpoint() (json.RawMessage, error) {
+	var out = make(map[string]any, len(d.cp))
+	for stateKey, item := range d.cp {
+		if len(item.Query) == 0 {
+			out[stateKey] = item
+			continue
+		}
+		if d.rangeKey == "" {
+			return nil, fmt.Errorf("staged work cannot be checkpointed without the shard's range key")
+		}
+		var staged = *item
+		staged.StreamV2 = nil
+		out[stateKey] = map[string]any{d.rangeKey: &staged}
+	}
+	return json.Marshal(out)
+}
+
+// encodeCheckpointClear renders a merge patch that removes the drained state
+// keys whole.
+func (d *transactor) encodeCheckpointClear(drained []string) (json.RawMessage, error) {
+	var out = make(map[string]any, len(drained))
+	for _, stateKey := range drained {
+		out[stateKey] = nil
+	}
+	return json.Marshal(out)
+}
+
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 	var round = it.Round
@@ -897,7 +988,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 	}
 
-	var checkpointJSON, err = json.Marshal(d.cp)
+	var checkpointJSON, err = d.encodeCheckpoint()
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint json: %w", err)
 	}
@@ -1289,15 +1380,12 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// that have been committed in this transaction. The reason is that it may be the case that a binding
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
-	var checkpointClear = make(checkpoint)
-	for _, sk := range drained {
-		checkpointClear[sk] = nil
-		delete(d.cp, sk)
-	}
-
-	checkpointJSON, err := json.Marshal(checkpointClear)
+	checkpointJSON, err := d.encodeCheckpointClear(drained)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+	for _, sk := range drained {
+		delete(d.cp, sk)
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
