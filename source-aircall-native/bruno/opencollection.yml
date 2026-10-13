@@ -106,6 +106,7 @@ docs:
     - `Calls / page past cap` — the 10k cap is positional; narrow `from`/`to`, never page past 200×50.
     - `Calls / window asc` — calls are rewritten ~minutes after they end (cost, duration, even `started_at` +1s); no update cursor.
     - `Calls / to bound minus 1 probe` — `from`/`to` filter `started_at` as `(from, to]`.
+    - `Calls / fetch contact` — the embedded contact is matched by phone number at read time.
     - `_top-level / out of bound page probe` — the 10k offset cap on reference lists.
     - `Webhooks / bare` — meta never has `next_page_link`, so completion uses `total`.
     - `Company / bare` — no `id`/`created_at` (docs wrong), so there's no natural key.
