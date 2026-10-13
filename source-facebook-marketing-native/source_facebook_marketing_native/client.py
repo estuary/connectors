@@ -220,6 +220,7 @@ class FacebookAPIClient:
         self.base_url = BASE_URL
         self.log = log
         self.permission_manager = PermissionManager(http, BASE_URL, log)
+        self._page_size_limits: dict[str, int] = {}
 
     def _make_should_retry(
         self,
@@ -303,14 +304,24 @@ class FacebookAPIClient:
                 )
 
         request_params = params.model_dump(exclude_none=True)
-        response = adapter.validate_json(
-            await self.http.request(
-                self.log,
-                url,
-                params=request_params,
-                should_retry=self._make_should_retry(request_params),
-            )
+        if learned_limit := self._page_size_limits.get(url):
+            request_params["limit"] = min(request_params["limit"], learned_limit)
+
+        response_body = await self.http.request(
+            self.log,
+            url,
+            params=request_params,
+            should_retry=self._make_should_retry(request_params),
         )
+
+        current_limit = request_params.get("limit")
+        if current_limit:
+            self._page_size_limits[url] = min(
+                current_limit,
+                self._page_size_limits.get(url, current_limit),
+            )
+
+        response = adapter.validate_json(response_body)
 
         if response.error:
             raise FacebookAPIError(response.error)
