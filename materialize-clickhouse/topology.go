@@ -73,7 +73,8 @@ func (t *topology) shardCount() int {
 	return int(t.Replicas[len(t.Replicas)-1].Shard)
 }
 
-// weights returns each shard's weight, indexed by shard number minus one.
+// weights returns each shard's weight, indexed by shard number minus one. A
+// weight of 0 is legal and means the shard receives no rows.
 func (t *topology) weights() []uint32 {
 	var out = make([]uint32, t.shardCount())
 	for _, r := range t.Replicas {

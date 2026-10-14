@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -41,14 +42,46 @@ func chHash128to64(lo, hi uint64) uint64 {
 	return b
 }
 
+// chInt128, chInt256 and chDate32 mark a value with the column type it is
+// stored in, because the hash depends on the column's width and not on the
+// Go value alone.
+type chInt128 struct{ *big.Int }
+type chInt256 struct{ *big.Int }
+type chDate32 struct{ time.Time }
+
+// twosComplementLE renders v as a little-endian two's complement integer of
+// the given byte width.
+func twosComplementLE(v *big.Int, width int) []byte {
+	var n = new(big.Int).Set(v)
+	if n.Sign() < 0 {
+		n.Add(n, new(big.Int).Lsh(big.NewInt(1), uint(width*8)))
+	}
+	var out = make([]byte, width)
+	var be = n.Bytes()
+	for i, b := range be {
+		out[len(be)-1-i] = b
+	}
+	return out
+}
+
 // chCityHash64 computes cityHash64(args...) as ClickHouse does for the column
-// types this connector materializes keys into: Int64, Bool, Float64, String
-// and DateTime64(6, 'UTC').
+// types this connector materializes keys into: Int64, Int128, Int256, Bool,
+// Float64, String, Date32 and DateTime64(6, 'UTC').
 func chCityHash64(args ...any) uint64 {
 	var one = func(a any) uint64 {
 		switch v := a.(type) {
 		case int64:
 			return chIntHash64(uint64(v))
+		case chInt128:
+			// Wide integers are not plain PODs to ClickHouse, so they hash
+			// their little-endian bytes like a string would.
+			return city.CH64(twosComplementLE(v.Int, 16))
+		case chInt256:
+			return city.CH64(twosComplementLE(v.Int, 32))
+		case chDate32:
+			// Date32 is an Int32 day count, zero-extended to 64 bits.
+			var days = int32(v.Unix() / 86400)
+			return chIntHash64(uint64(uint32(days)))
 		case bool:
 			if v {
 				return chIntHash64(1)
@@ -83,6 +116,9 @@ func chShardFor(hash uint64, weights []uint32) int {
 	for _, w := range weights {
 		total += uint64(w)
 	}
+	if total == 0 {
+		panic("every shard has weight 0")
+	}
 	var slot = hash % total
 	for i, w := range weights {
 		if slot < uint64(w) {
@@ -91,6 +127,14 @@ func chShardFor(hash uint64, weights []uint32) int {
 		slot -= uint64(w)
 	}
 	panic("unreachable")
+}
+
+func bigFromString(s string) *big.Int {
+	var n, ok = new(big.Int).SetString(s, 10)
+	if !ok {
+		panic(s)
+	}
+	return n
 }
 
 func clusterConn(t *testing.T, port int) chdriver.Conn {
@@ -139,6 +183,14 @@ func TestClusterSpikePlacement(t *testing.T) {
 		{"cityHash64('tenant-00017')", []any{"tenant-00017"}},
 		{"cityHash64('" + long + "')", []any{long}},
 		{"cityHash64(toDateTime64('2020-01-01 00:00:00.123456', 6, 'UTC'))", []any{ts}},
+		{"cityHash64(toDate32('2020-01-01'))", []any{chDate32{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}}},
+		{"cityHash64(toDate32('1960-01-01'))", []any{chDate32{time.Date(1960, 1, 1, 0, 0, 0, 0, time.UTC)}}},
+		{"cityHash64(toInt128(1))", []any{chInt128{big.NewInt(1)}}},
+		{"cityHash64(toInt128(-1))", []any{chInt128{big.NewInt(-1)}}},
+		{"cityHash64(toInt128('170141183460469231731687303715884105727'))", []any{chInt128{bigFromString("170141183460469231731687303715884105727")}}},
+		{"cityHash64(toInt256(1))", []any{chInt256{big.NewInt(1)}}},
+		{"cityHash64(toInt256('-57896044618658097711785492504343953926634992332820282019728792003956564819968'))", []any{chInt256{bigFromString("-57896044618658097711785492504343953926634992332820282019728792003956564819968")}}},
+		{"cityHash64(toInt128(7), 'x', toDate32('2020-01-01'))", []any{chInt128{big.NewInt(7)}, "x", chDate32{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}}},
 		{"cityHash64('a', 'b')", []any{"a", "b"}},
 		{"cityHash64(toInt64(1), 'b')", []any{int64(1), "b"}},
 		{"cityHash64('b', toInt64(1))", []any{"b", int64(1)}},
