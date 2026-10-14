@@ -152,3 +152,20 @@ func TestMustRecreateResourceCluster(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, must)
 }
+
+func TestClusterDropAndTruncateStatements(t *testing.T) {
+	var single = testConfig()
+	var clustered = single
+	clustered.Cluster = "flow_cluster"
+
+	var c = &client{ep: &sql.Endpoint[config]{Dialect: testDialect, Config: single}}
+	require.Equal(t, []string{"DROP TABLE IF EXISTS t;"}, c.dropStatements([]string{"t"}))
+	require.Equal(t, []string{"TRUNCATE TABLE t SYNC;"}, c.truncateStatements([]string{"t"}))
+
+	c.ep.Config = clustered
+	require.Equal(t, []string{
+		"DROP TABLE IF EXISTS t ON CLUSTER flow_cluster SYNC;",
+		"DROP TABLE IF EXISTS t_local ON CLUSTER flow_cluster SYNC;",
+	}, c.dropStatements([]string{"t"}))
+	require.Equal(t, []string{"TRUNCATE TABLE t_local ON CLUSTER flow_cluster SYNC;"}, c.truncateStatements([]string{"t"}))
+}

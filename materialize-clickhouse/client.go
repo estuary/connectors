@@ -130,52 +130,49 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	// On a cluster the template renders two statements, the local table and
-	// then its Distributed proxy, which the driver cannot send as one query.
-	for _, stmt := range splitStatements(tc.TableCreateSql) {
-		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("creating table: %w", err)
-		}
+	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
+		return fmt.Errorf("creating table: %w", err)
+	}
+	if !c.ep.Config.distributed() {
+		return nil
+	}
+	var tpls = renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete, c.ep.Config.clusterDDL())
+	proxy, err := sql.RenderTableTemplate(tc.Table, tpls.createDistributedTable)
+	if err != nil {
+		return fmt.Errorf("rendering Distributed table: %w", err)
+	}
+	if _, err := c.db.ExecContext(ctx, proxy); err != nil {
+		return fmt.Errorf("creating Distributed table: %w", err)
 	}
 	return nil
 }
 
-// splitStatements separates the statements of a rendered template, which end
-// each statement with a semicolon at the end of a line.
-func splitStatements(rendered string) []string {
-	var out []string
-	for _, s := range strings.Split(rendered, ";\n") {
-		if s = strings.TrimSpace(s); s != "" {
-			out = append(out, s+";")
-		}
-	}
-	return out
-}
-
-// tableStatements renders a DDL statement against the one table of a
-// single-server binding, or against the proxy and local tables of a
-// distributed binding, with ON CLUSTER and SYNC so that it completes on
-// every node before returning.
-func (c *client) tableStatements(path []string, verb string, singleServerSync bool) []string {
+// dropStatements drops a binding's table, or on a cluster its Distributed
+// proxy and then its local table on every node, so that no reader ever sees
+// a proxy over a missing table.
+func (c *client) dropStatements(path []string) []string {
 	var cluster = c.ep.Config.clusterDDL()
 	if !cluster.distributed() {
-		var sync string
-		if singleServerSync {
-			sync = " SYNC"
-		}
-		return []string{fmt.Sprintf("%s %s%s;", verb, c.ep.Dialect.Identifier(path...), sync)}
+		return []string{fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(path...))}
 	}
 	var onCluster = "ON CLUSTER " + c.ep.Dialect.Identifier(cluster.Cluster)
-	var local = c.ep.Dialect.Identifier(localTableName(path[0], cluster))
-	if verb == "TRUNCATE TABLE" {
-		// A Distributed table holds no rows to truncate.
-		return []string{fmt.Sprintf("%s %s %s SYNC;", verb, local, onCluster)}
-	}
-	// Proxy first, so that no reader ever sees a proxy over a missing table.
 	return []string{
-		fmt.Sprintf("%s %s %s SYNC;", verb, c.ep.Dialect.Identifier(path...), onCluster),
-		fmt.Sprintf("%s %s %s SYNC;", verb, local, onCluster),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s %s SYNC;", c.ep.Dialect.Identifier(path...), onCluster),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s %s SYNC;", c.ep.Dialect.Identifier(localTableName(path[0], cluster)), onCluster),
 	}
+}
+
+// truncateStatements empties a binding's table, or on a cluster the local
+// table that holds its rows on every node. SYNC because a replicated table
+// otherwise truncates asynchronously, and a queued truncate would drop the
+// rows the shard materializes once this backfill has been applied.
+func (c *client) truncateStatements(path []string) []string {
+	var cluster = c.ep.Config.clusterDDL()
+	if !cluster.distributed() {
+		return []string{fmt.Sprintf("TRUNCATE TABLE %s SYNC;", c.ep.Dialect.Identifier(path...))}
+	}
+	return []string{fmt.Sprintf("TRUNCATE TABLE %s ON CLUSTER %s SYNC;",
+		c.ep.Dialect.Identifier(localTableName(path[0], cluster)), c.ep.Dialect.Identifier(cluster.Cluster))}
 }
 
 func (c *client) execStatements(stmts []string, what string) boilerplate.ActionApplyFn {
@@ -190,7 +187,7 @@ func (c *client) execStatements(stmts []string, what string) boilerplate.ActionA
 }
 
 func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmts = c.tableStatements(path, "DROP TABLE IF EXISTS", false)
+	var stmts = c.dropStatements(path)
 	return strings.Join(stmts, "\n"), c.execStatements(stmts, "delete table"), nil
 }
 
@@ -398,10 +395,7 @@ func (c *client) partitionKeyColumns(ctx context.Context, table string) (map[str
 }
 
 func (c *client) TruncateTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	// SYNC because a replicated table (every table on ClickHouse Cloud)
-	// otherwise truncates asynchronously, and a queued truncate would drop the
-	// rows the shard materializes once this backfill has been applied.
-	var stmts = c.tableStatements(path, "TRUNCATE TABLE", true)
+	var stmts = c.truncateStatements(path)
 	return strings.Join(stmts, "\n"), c.execStatements(stmts, "truncate table"), nil
 }
 
