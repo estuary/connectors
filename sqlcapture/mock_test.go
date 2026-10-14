@@ -118,6 +118,20 @@ func (db *mockDatabase) SetupTablePrerequisites(ctx context.Context, tables []Ta
 func (db *mockDatabase) ReplicationDiagnostics(ctx context.Context) error { return nil }
 func (db *mockDatabase) PeriodicChecks(ctx context.Context) error         { return nil }
 
+// startMockCapture does the in-memory setup which capture startup performs, for a
+// capture built directly from its state, bindings and discovery results. Rediscovery
+// and periodic checks are scheduled an hour out so main loop iterations don't run them.
+func startMockCapture(c *Capture, discovery map[StreamID]*DiscoveryInfo) {
+	c.dirtyStreams = make(map[boilerplate.StateKey]struct{})
+	for stateKey, state := range c.State.Streams {
+		c.updateBackfillSet(stateKey, state.Mode)
+	}
+	c.replStream = &mockReplicationStream{}
+	c.lastDiscovery = discovery
+	c.rediscoverAfter = time.Now().Add(time.Hour)
+	c.periodicChecksAfter = time.Now().Add(time.Hour)
+}
+
 // mockReplicationStream is a configurable in-memory implementation of the
 // ReplicationStream interface.
 type mockReplicationStream struct {
