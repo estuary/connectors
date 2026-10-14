@@ -1,0 +1,25 @@
+info:
+  name: Ad Report Daily (campaign_ids filter)
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["ad_id","stat_time_day"]&metrics=["spend"]&page=1&page_size=1000&start_date=2026-09-14&end_date=2026-10-13&filtering=[{"field_name":"ad_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"},{"field_name":"campaign_ids","filter_type":"IN","filter_value":"[\"1800000000000000001\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** TikTok's documented answer to the 20,000-ad truncation is to batch a report by `campaign_ids` (up to 100 per request). Pins the filter field name beside the ad-level include-deleted filter, with an ID that is not in the account.
+
+  **VERIFIED (2026-10-14, sandbox):** `code 0`: `campaign_ids` is accepted beside the `ad_status` include-deleted filter. Unknown report filter fields are rejected (see the invalid filter field probe), so the field name is right. An ID that is not in the account is accepted, not rejected.
+
+  **PENDING:** that the filter narrows the rows, and that a filtered request under 20,000 ads carries no truncation header; both need an account with delivered ads.

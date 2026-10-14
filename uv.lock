@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = "==3.14.*"
 
 [manifest]
@@ -68,6 +68,7 @@ members = [
     "source-shopify-native",
     "source-smartsheet",
     "source-stripe-native",
+    "source-tiktok-ads-native",
     "source-twilio",
     "source-zendesk-support",
     "source-zendesk-support-native",
@@ -2680,6 +2681,23 @@ dependencies = [
 requires-dist = [
     { name = "estuary-cdk", editable = "estuary-cdk" },
     { name = "pycares", specifier = ">=4.9.0" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-tiktok-ads-native"
+version = "0.1.0"
+source = { editable = "source-tiktok-ads-native" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.12,<4.0.0" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]
 
