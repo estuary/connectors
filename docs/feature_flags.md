@@ -67,7 +67,7 @@ setting which opts into the new behavior.
 Materialization connectors can gate a flag's default on when a task was created,
 which changes the default for new tasks only, with no config edits and no
 coordinated merge. This is the preferred approach; the manual bulk-editing process in
-the next section remains for captures, which don't yet resolve flags this way.
+the next section remains for most captures, which don't yet resolve flags this way.
 
 The default-values map holds `common.FlagDefault` values rather than plain booleans:
 
