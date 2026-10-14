@@ -1,0 +1,52 @@
+info:
+  name: Create Staged User
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/users?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "firstName": "Estuary",
+          "lastName": "Deprovisioned",
+          "email": "nicolas+okta-updated-deprov@estuary.dev",
+          "login": "nicolas+okta-updated-deprov@estuary.dev"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('seed_deprov_user_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create a user](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/createUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`, against the
+  Integrator Free sandbox only.
+
+  **WHY:** creates the user that `Seeding / Deactivate User` moves to
+  DEPROVISIONED, so `Users / deprovisioned coverage` can show whether the bare
+  list and the `lastUpdated` filter include that status. `activate=false` leaves
+  the user STAGED and sends no activation email.
+
+  **Cleanup:** `DELETE /users/{id}` on the now-DEPROVISIONED user.
+
+  **Outcome:** ran 2026-10-07 and created `00u18gzxz10URexK9698` (16:20:03). The
+  finding is VERIFIED in `Users / deprovisioned coverage`.

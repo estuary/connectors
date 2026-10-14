@@ -1,0 +1,271 @@
+opencollection: 1.0.0
+
+info:
+  name: Okta
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Okta auth via the connector's sops-encrypted config.yaml. The token is
+        // re-derived from sops on every request and lives only on `req` — it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Okta --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = JSON.parse(execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        ));
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = decrypted?.credentials;
+        const token = creds?.access_token ?? creds?.access_token_sops;
+        if (!token) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+
+        // Okta serves every org from its own domain. Request URLs use the literal
+        // `okta-domain` placeholder host; rewrite it from the config's `domain`, with
+        // the same scheme/trailing-slash tolerance as `source_okta.api.base_url`.
+        let host = String(decrypted?.domain ?? decrypted?.domain_sops ?? '').trim();
+        if (!host) throw new Error('domain missing from decrypted config');
+        host = host.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+        const resolved = `https://${host}/api/v1`;
+        req.setUrl(
+          req.getUrl()
+            .replace('{{base_url}}', resolved)
+            .replace('https://okta-domain/api/v1', resolved),
+        );
+
+        // Okta API tokens use the SSWS scheme in place of Bearer.
+        req.setHeader('Authorization', `SSWS ${token}`);
+        req.setHeader('Accept', 'application/json');
+    - type: after-response
+      code: |-
+        // Redact IP addresses and IP-derived geolocation from every response, so any
+        // Response Example saved from a run is already clean. There is no matching
+        // list in tests/test_snapshots.py: System_Log, the only stream carrying these
+        // fields, is excluded from the capture test (see the "Redaction" docs note
+        // below). If a captured stream ever carries them, add the same list there,
+        // with the same "REDACTED" marker. In System Log events, IPs
+        // occur only in `client.ipAddress` and `request.ipChain[].ip`; a scan of 447
+        // events found none embedded in other strings. `geographicalContext` (city,
+        // state, country, postal code, lat/lon) sits next to each of them.
+        // `_links` is kept, because `_links.app.href` and `_links.group.href` are the
+        // only places an AppUser names its app and its granting group
+        // (`Application users / bare`). Its hrefs (and a few profile fields) embed the
+        // tenant host, which is rewritten to a placeholder so saved examples read the
+        // same whichever tenant ran them. The domain is not secret: `config.yaml`
+        // carries it in plaintext.
+        const FIELDS_TO_REDACT = ['ipAddress', 'ip', 'geographicalContext'];
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = JSON.parse(execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        ));
+        const host = String(decrypted?.domain ?? decrypted?.domain_sops ?? '').trim()
+          .replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+        // On an Okta-owned domain the org label also names sibling hosts such as
+        // `<org>.workflows.okta.com`; scrub it there too. A custom domain's first
+        // label (`login.acme.com`) is too generic to scrub on its own.
+        const org = /\.(okta|oktapreview|okta-emea)\.com$/i.test(host) ? host.split('.')[0] : '';
+        function scrubHost(v) {
+          const out = host ? v.split(host).join('okta-domain') : v;
+          return org ? out.split(`${org}.`).join('okta-org.') : out;
+        }
+        function redact(v) {
+          if (typeof v === 'string') return scrubHost(v);
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = FIELDS_TO_REDACT.includes(k) ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        // Only JSON object/array bodies; leave empty and non-JSON error bodies alone.
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Base URL (per org):** `https://{domain}/api/v1`; the domain comes from the
+      connector config (`source_okta.api.base_url`). Requests here use the
+      placeholder host `okta-domain`, rewritten by the pre-request script.
+    - **Auth:** `Authorization: SSWS <api token>`.
+    - **Rate limits:** org-wide per-endpoint buckets in requests per minute,
+      as given in the orchestrator brief (Integrator Free / Enterprise):
+      `/api/v1/users` 100/600; `/api/v1/groups` 100/600;
+      `/api/v1/groups/{id}*` 100/600; `/api/v1/apps*` 20/100; `/api/v1/logs`
+      20/120; catch-all `/api/v1` 100/600. Each API token defaults to 50% of
+      its bucket. Headers: `X-Rate-Limit-Limit` / `-Remaining` / `-Reset`
+      (epoch seconds).
+      **VERIFIED (2026-10-07)** on this Integrator Free org, the
+      `X-Rate-Limit-Limit` headers are *higher* than the brief's figures:
+      `GET /logs` 60, `GET /users` 300, `GET /users/{id}` 1000 (2026-10-09,
+      `Group members / user by id`), `POST /groups` 250,
+      `DELETE /groups/{id}` 500, `GET /apps` 50 (`Applications / bare`),
+      the shared buckets `/apps` + `/apps/{id}/*` 50 and `/groups` +
+      `/groups/{id}/*` 250 (`Application users / *`, `Group members / *`),
+      `/meta/types/user` and `/meta/schemas/user/*` 500
+      (`User Custom Profile / *`). Treat the headers as authoritative and the
+      brief's table as a conservative floor.
+    - **Throttling:** HTTP 429, body `errorCode: E0000047`; wait until
+      `X-Rate-Limit-Reset`.
+    - **Pagination (all list endpoints):** `Link` header `rel="next"` carrying an
+      opaque `after` cursor; end of list = no next link (exception: System Log
+      polling mode — see `System Log / polling first page`). Follow the header,
+      never construct cursors.
+    - **LIMITATION (DOCUMENTED 2026-10-07): `self` and `next` arrive as separate
+      `Link` header lines.** Bruno (Node) joins repeated headers with ", ", so
+      saved examples show one comma-joined value. Parse every `Link` value: in
+      Python `headers.getall("Link", [])`; a `headers.get("Link")` returns only
+      the `rel="self"` line and ends every walk after page 1.
+    - **Timestamps:** ISO-8601 UTC with milliseconds and a `Z` suffix. `filter`
+      bounds must carry the milliseconds or the request gets a 400
+      (`Users / lastUpdated boundary`).
+    - **Page size:** over-limit `limit` values are silently clamped (`/users` and
+      `/apps` to 200, `/groups` to 10000, `/apps/{id}/users` to 500,
+      `/groups/{id}/users` to 1000); only `/logs` rejects (1001 → 400).
+
+    ## Docs sources
+
+    The per-endpoint `**REFERENCE:**` pages on developer.okta.com are JS-rendered
+    and come back empty to fetchers (checked 2026-10-07). DOCUMENTED claims cite
+    the OpenAPI spec instead:
+    https://raw.githubusercontent.com/okta/okta-management-openapi-spec/master/dist/current/management-oneOfInheritance.yaml
+    (v2026.09.2, read 2026-10-07).
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions: a
+    `**WHY:**` opener plus dated findings (`**VERIFIED (YYYY-MM-DD):**` /
+    `**DOCUMENTED (YYYY-MM-DD):**` / `**PENDING:**` / `**UNOBSERVABLE:**`), with
+    `**LIMITATION**` marking endpoint-specific constraints that carry connector
+    consequences. The marker definitions live in the repo's
+    `.claude/shared/evidence-markers.md`.
+
+    ### Per-endpoint limitations
+
+    - `System Log / polling first page`: polling withholds fresh events for
+      ~45–65 s after persistence (server-side settle), which bounds
+      incremental latency.
+    - `System Log / stale after probe`: a token older than 180 days is
+      silently clamped to now − 180 d; events that aged past 90-day retention
+      during a pause are lost without any error.
+    - `System Log / limit over max` (not tagged): `limit` > 1000 is rejected
+      with 400 E0000001.
+    - `Applications / lastUpdated filter`: `lastUpdated` is not a filterable
+      field (400 E0000031), so Applications is a snapshot stream.
+    - `Applications / limit 201 probe` (not tagged): `limit` > 200 is silently
+      clamped to 200.
+    - `Users / bare`: the unfiltered list omits DEPROVISIONED users, so always
+      send a `filter` or `search` (the connector sends `search`).
+    - `Groups / cursor filter`: membership changes bump only
+      `lastMembershipUpdated`, so the Groups cursor spans both fields.
+    - `Groups / after page`: `filter` order is not id order and `filter`
+      can't sort, so Users and Groups read through `search` with
+      `sortBy=id`, and backfills checkpoint the last id.
+    - `Users / sort probe`: `filter` rejects `sortBy` (400); only the eventually
+      consistent `search` sorts, so the connector reads through `search`,
+      held behind the 10-minute index settle.
+    - `Users / id gt collation probe`, `Groups / id gt collation probe`:
+      `id gt` compares case-insensitively and strictly. Whether `sortBy=id`
+      orders the same way is UNOBSERVABLE (`Users / id sort probe`), so the
+      backfill raises on a page that doesn't ascend case-insensitively.
+    - `Users / get by id`: deleting a custom attribute from the user schema
+      strips user values without moving `lastUpdated`.
+    - `Application users / bare`: no app id in the body (only inside
+      `_links.app.href`); deprovisioned and unassigned users vanish with no
+      tombstone, so Application_users is a snapshot stream.
+    - `Group members / bare`: full User objects with no group id and no
+      membership timestamp; removed members vanish with no tombstone, so
+      Group_members is a snapshot stream.
+    - `Application users / unknown app 404 probe`, `Group members / unknown
+      group 404 probe`: a parent deleted mid-sweep answers 404 E0000007, which
+      the connector skips.
+    - `Group members / membership events`: Everyone joins and leaves log no
+      `group.user_membership.*` events, only `user.lifecycle.create` /
+      `user.lifecycle.delete.completed`, so Group_members derives Everyone from those.
+    - `Group members / membership events group delete`: a group delete logs only
+      `group.lifecycle.delete`, no per-member removal, so a deleted group's
+      memberships are never tombstoned (the Groups stream's delete is the record).
+    - `User Custom Profile / *`: kept as evidence only. The User_Custom_Profile
+      stream was dropped (2026-10-09): custom attribute values already arrive in
+      each Users row's `profile`, so a separate stream would duplicate Users.
+
+    ## Seeding
+
+    `Seeding/` holds mutations (sandbox tenant only). `Create Group` /
+    `Delete Group` emit System Log events on demand, for latency and
+    head-token probes; every group created was deleted. `Create Inactive
+    Bookmark App`, `Add Custom User Attribute` and `Create User Type` ran once
+    on 2026-10-07 and their fixtures stay in the sandbox on purpose: app
+    `0oa18gus6s1DyA92Z698` (INACTIVE, BOOKMARK), custom attribute
+    `estuarySeedCostCode` on the default user type, and user type
+    `estuarySeedContractor` (`oty18gusqxw7j8TeA698`).
+    The Users/Groups requests created the fixtures the capture snapshot relies
+    on: users `00u18gzxz10URexK9698` (DEPROVISIONED) and `00u18h00o173Yc9fV698`
+    (STAGED), group `00g18h004ubJFvh3C698` via `Create Fixture Group`; their
+    delete-probe throwaways were hard-deleted. `Create Group` / `Delete Group`
+    remain the System Log probes' pair.
+    The members requests (seq 20–29) ran once on 2026-10-07 and their
+    fixtures stay on purpose as snapshot-test data: STAGED users
+    `estuary-members-a@example.com` and `estuary-members-b@example.com` (B
+    deactivated to DEPROVISIONED), group `estuary-members-group` holding both,
+    and the INACTIVE BOOKMARK app `estuary-members-bookmark` with A assigned
+    directly and the group assigned (B `scope: GROUP`). Rerunning a create
+    request makes a duplicate record.
+    The Group_members requests (seq 30–37, 2026-10-09) are self-cleaning:
+    User C is created, added (twice), removed, deactivated and hard-deleted for
+    the remove and delete-cascade events; `Create Doomed Group` / `Add User A to
+    Doomed Group` / `Delete Doomed Group` produce the group-delete events. Both
+    the user and the group are gone. Their probes pin `member_user_id` (User A)
+    and `everyone_group_id` in `environments/Okta.yml`.
+
+    ## Redaction
+
+    The after-response script above replaces every `ipAddress`, `ip` and
+    `geographicalContext` value with `"REDACTED"`, so saved examples never
+    carry IP addresses or IP-derived locations, and rewrites the tenant host
+    to `okta-domain` in every string (and, on Okta-owned domains, the org
+    label to `okta-org` in sibling hosts such as `<org>.workflows.okta.com`),
+    so `_links` hrefs keep their structure and examples read the same on any
+    tenant (the domain itself is plaintext in `config.yaml`, not a secret).
+    Examples saved before 2026-10-09 are not rewritten: some show `_links` as
+    `"REDACTED"` from the earlier whole-field redaction, and some show the
+    real tenant host. The connector strips
+    `_links` from Users and Groups documents itself. The snapshot tests carry no
+    copy of this list, because System_Log is excluded from the capture test (a
+    user decision on 2026-10-07: 90-day rolling retention, and PII). If a
+    captured stream ever carries these fields, mirror the list in
+    `tests/test_snapshots.py`.
+    Keep both lists minimal: the script also hides these fields from live
+    `bru run` output.
+
+    ## Format
+
+    OpenCollection YAML (Bruno / bru CLI >= 3.0.0). Run requests with:
+    `bru run "<folder>/<request>.yml" --env Okta --sandbox developer`
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

@@ -1,0 +1,32 @@
+info:
+  name: Delete Doomed Group
+  type: http
+  seq: 37
+
+http:
+  method: DELETE
+  url: "{{base_url}}/groups/{{members_doomed_group_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_doomed_group_id')) await bru.runRequest('Seeding/Add User A to Doomed Group');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/deleteGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** deletes a group that still has a member; read the result in
+  `Group members / membership events group delete`.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

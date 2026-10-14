@@ -1,0 +1,62 @@
+info:
+  name: limit 1 page
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/groups/{{group_id}}/users?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('group_id')) await bru.runRequest('Group members/parent groups');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/#pagination
+
+  **WHY:** Pagination contract below the cap: with more members than `limit`, the
+  response must carry `Link: <…after=…>; rel="next"`.
+
+  **VERIFIED (2026-10-07):** `limit=1` over 2 members returns 1 row and
+  `Link: <…?after=00u18gupu552EU005698&limit=1>; rel="next"` — the `after` token is
+  the last returned user id (members ordered by user id). Followed within one sweep
+  only, never checkpointed.
+
+examples:
+  - name: "200 \u2014 limit=1 of 2, rel=next present (projection: id/status/login)"
+    request:
+      url: "{{base_url}}/groups/00g18gur2rc3zz7MS698/users?limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups/00g18gur2rc3zz7MS698/users?limit=1>; rel=\"self\", <https://okta-domain/api/v1/groups/00g18gur2rc3zz7MS698/users?after=00u18gupu552EU005698&limit=1>; rel=\"next\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "status": "STAGED",
+              "profile.login": "estuary-members-a@example.com"
+            }
+          ]

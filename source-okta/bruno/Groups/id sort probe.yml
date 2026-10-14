@@ -1,0 +1,86 @@
+info:
+  name: id sort probe
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?limit=200&search=created gt \"1970-01-01T00:00:00.000Z\"&sortBy=id&sortOrder=asc"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: search
+      value: created gt "1970-01-01T00:00:00.000Z"
+      type: query
+    - name: sortBy
+      value: id
+      type: query
+    - name: sortOrder
+      value: asc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - 4 groups in sortBy=id order (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&search=created gt \"1970-01-01T00:00:00.000Z\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00g176zmw9j1Wyxqf698",
+              "created": "2026-09-03T19:36:27.000Z",
+              "type": "BUILT_IN"
+            },
+            {
+              "id": "00g176zmw9kqvHDny698",
+              "created": "2026-09-03T19:36:27.000Z",
+              "type": "BUILT_IN"
+            },
+            {
+              "id": "00g18gur2rc3zz7MS698",
+              "created": "2026-10-07T14:36:50.000Z",
+              "type": "OKTA_GROUP"
+            },
+            {
+              "id": "00g18h004ubJFvh3C698",
+              "created": "2026-10-07T16:20:22.000Z",
+              "type": "OKTA_GROUP"
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all groups](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroups)
+
+  **WHY:** the groups backfill walks `search` with `sortBy=id&sortOrder=asc` and
+  resumes each page on `id gt "<last id>"`. That is gapless only if `sortBy=id`
+  really orders by id (not by `created`), under the same comparison `id gt`
+  applies (`Groups / id gt collation probe`). This lists every group in
+  `sortBy=id` order next to `created`, to tell id order from creation order and
+  byte order from case-insensitive order.
+
+  **VERIFIED (2026-10-19):** all 4 groups come back in id order, which is also
+  their `created` order. `Everyone` and `Okta Administrators` share a `created`
+  second and still come back in id order (`…9j1W…` before `…9kqv…`). Every
+  pair of ids first differs on a digit or a lowercase letter, so these groups
+  cannot tell byte order from case-insensitive order.
+
+  **UNOBSERVABLE:** whether `sortBy=id` orders case-insensitively, as `id gt`
+  compares (`Groups / id gt collation probe`). Same reason and fallback as
+  `Users / id sort probe`: ids differing first on a mixed-case character are
+  minted only within the same instant, which one-at-a-time seeding never does.

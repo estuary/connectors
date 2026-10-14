@@ -1,0 +1,49 @@
+info:
+  name: Create Bookmark App
+  type: http
+  seq: 25
+
+http:
+  method: POST
+  url: "{{base_url}}/apps"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "bookmark",
+        "label": "estuary-members-bookmark",
+        "signOnMode": "BOOKMARK",
+        "settings": {
+          "app": {
+            "url": "https://example.com/estuary-members"
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('members_seed_app_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/createApplication
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** the simplest app type (BOOKMARK, no provisioning) to hold assignments —
+  the tenant's built-in apps have none. Feeds `Application users / bare` and, once
+  deactivated by `Seeding / Deactivate Bookmark App`, the INACTIVE-app partition
+  probes.
+
+  **Cleanup:** deactivate, then `DELETE /apps/{id}`.
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

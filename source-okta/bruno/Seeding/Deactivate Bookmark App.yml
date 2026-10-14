@@ -1,0 +1,34 @@
+info:
+  name: Deactivate Bookmark App
+  type: http
+  seq: 29
+
+http:
+  method: POST
+  url: "{{base_url}}/apps/{{members_seed_app_id}}/lifecycle/deactivate"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_app_id')) await bru.runRequest('Seeding/Create Bookmark App');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/ApplicationLifecycle/#tag/ApplicationLifecycle/operation/deactivateApplication
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** puts the app in the INACTIVE partition. Then `Application users / parent apps`
+  vs. `Application users / parent apps includeNonDeleted` shows whether the default
+  parent listing hides it, and `Application users / bare` shows whether an inactive
+  app's assignments remain listable.
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

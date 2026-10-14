@@ -1,0 +1,45 @@
+info:
+  name: Clear Custom Value
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_user_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "estuarySeedCostCode": null
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id') && !bru.getEnvVar('seed_user_id')) {
+          await bru.runRequest('Seeding/Set Custom Value');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user (partial)](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/updateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** clears the value set by `Seeding / Set Custom Value`. It shows
+  whether clearing a custom value moves the user's `lastUpdated` (so the Users
+  incremental task sees the change) and whether the key is then omitted from
+  `profile` or kept as `null`. Read the result with `Users / get by id`.
+
+  **Outcome:** ran 2026-10-08. The key was omitted from `profile` (not `null`)
+  and `lastUpdated` moved to 12:28:59. `Users / incremental window` over
+  `(12:28:50, 12:28:59]` returned the user. VERIFIED in `Users / get by id`.
