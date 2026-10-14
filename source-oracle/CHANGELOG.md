@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-14
+
+### Changed
+- Backfill progress in the connector status now counts the tables backfilled
+  across the whole backfill, instead of only the tables still in progress.
+
 ## 2026-09-29
 
 ### Changed
