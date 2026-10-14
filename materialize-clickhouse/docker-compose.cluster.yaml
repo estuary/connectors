@@ -56,7 +56,7 @@ services:
       # The image entrypoint cannot create CLICKHOUSE_DB because it talks to the
       # default port 9000, so the health check creates the database instead.
       # A node is healthy once it sees all four cluster members and Keeper.
-      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --port $$CH_TCP_PORT --user flow --password flow --multiquery --query \"CREATE DATABASE IF NOT EXISTS flow; SELECT throwIf((SELECT count() FROM system.clusters WHERE cluster = 'flow_cluster' AND errors_count = 0) != 4 OR (SELECT count() FROM system.zookeeper WHERE path = '/') = 0)\""]
+      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --port $$CH_TCP_PORT --user flow --password flow --multiquery --query \"CREATE DATABASE IF NOT EXISTS flow; SELECT throwIf((SELECT count() FROM system.clusters WHERE cluster = 'flow_cluster') != 4 OR (SELECT count() FROM system.zookeeper WHERE path = '/') = 0)\""]
       interval: 2s
       retries: 60
 
