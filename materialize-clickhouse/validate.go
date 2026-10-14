@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -38,17 +39,22 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	defer db.Close()
 
 	if cfg.distributed() {
-		if err := checkCluster(ctx, db, cfg.Cluster); err != nil {
+		if err := checkCluster(ctx, cfg); err != nil {
 			return nil, err
 		}
 	}
-	var lastDistributed bool
 	if req.LastMaterialization != nil {
 		var lastCfg config
 		if err := json.Unmarshal(req.LastMaterialization.ConfigJson, &lastCfg); err != nil {
 			return nil, fmt.Errorf("parsing last endpoint config: %w", err)
 		}
-		lastDistributed = lastCfg.distributed()
+		// Dropping the tables of a clustered binding is a cluster-wide
+		// operation, and the single-server path only ever drops one table on
+		// one node, so the switch is not something a backfill can perform.
+		if lastCfg.distributed() && !cfg.distributed() {
+			return nil, cerrors.NewUserError(nil, fmt.Sprintf(
+				"the 'cluster' setting cannot be removed once a materialization has used cluster %q; create a new materialization instead, after dropping the tables on the cluster", lastCfg.Cluster))
+		}
 	}
 
 	tableMetas, err := readTableKeyMeta(ctx, db, dialect, cfg.Database)
@@ -93,6 +99,9 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		if err := checkShardingKey(rc, cfg, keys); err != nil {
 			return nil, err
 		}
+		if cfg.distributed() {
+			requireShardingKeyFields(resp.Bindings[i], rc, keys)
+		}
 
 		var last = boilerplate.FindLastBinding([]string{rc.Table}, req.LastMaterialization)
 		var lastExpr string
@@ -120,8 +129,6 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		case last == nil || rb.Backfill != last.Backfill:
 		case newExpr != lastExpr:
 			recreateReason = fmt.Sprintf("'partition_by' changed from %q to %q; changing the partition key requires re-creating the table", lastExpr, newExpr)
-		case cfg.distributed() != lastDistributed:
-			recreateReason = "the endpoint's 'cluster' setting changed; switching between a single server and a cluster requires re-creating the table"
 		case !slices.Equal(rc.ShardingKey, lastShardingKey):
 			recreateReason = fmt.Sprintf("'sharding_key' changed from %v to %v; changing the sharding key moves rows between shards, which requires re-creating the table", lastShardingKey, rc.ShardingKey)
 		}
@@ -156,26 +163,50 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	return resp, nil
 }
 
-// checkCluster rejects a cluster that cannot host Distributed tables: one
-// that the server does not know, or any cluster on ClickHouse Cloud, where
-// the Distributed engine is unavailable and there are no shards to target.
-func checkCluster(ctx context.Context, db *stdsql.DB, cluster string) error {
+// checkCluster rejects a cluster that cannot host Distributed tables: any
+// cluster on ClickHouse Cloud, where the Distributed engine is unavailable
+// and there are no shards to target, or one the server does not know.
+func checkCluster(ctx context.Context, cfg config) error {
+	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	if err != nil {
+		return fmt.Errorf("connecting to check cluster %q: %w", cfg.Cluster, err)
+	}
+	defer conn.Close()
+
 	var cloudMode string
-	if err := db.QueryRowContext(ctx, "SELECT value FROM system.settings WHERE name = 'cloud_mode'").Scan(&cloudMode); err != nil && err != stdsql.ErrNoRows {
+	if err := conn.QueryRow(ctx, "SELECT value FROM system.settings WHERE name = 'cloud_mode'").Scan(&cloudMode); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
 		return fmt.Errorf("querying cloud_mode: %w", err)
 	}
 	if cloudMode == "1" {
 		return cerrors.NewUserError(nil, "ClickHouse Cloud does not support Distributed tables. Remove the 'cluster' setting to materialize to ClickHouse Cloud.")
 	}
-
-	var shards int
-	if err := db.QueryRowContext(ctx, "SELECT count(DISTINCT shard_num) FROM system.clusters WHERE cluster = ?", cluster).Scan(&shards); err != nil {
-		return fmt.Errorf("querying system.clusters: %w", err)
-	}
-	if shards == 0 {
-		return cerrors.NewUserError(nil, fmt.Sprintf("cluster %q is not defined on this server; it must appear in system.clusters", cluster))
+	if _, err := readTopology(ctx, conn, cfg.Cluster); err != nil {
+		return cerrors.NewUserError(err, fmt.Sprintf("cluster %q is not usable: %v", cfg.Cluster, err))
 	}
 	return nil
+}
+
+// requireShardingKeyFields marks the fields the Distributed table hashes as
+// required, so that a field selection can never leave the sharding
+// expression without a column. Without a configured sharding key every key
+// field is hashed.
+func requireShardingKeyFields(vb *pm.Response_Validated_Binding, rc tableConfig, keys []string) {
+	var required = rc.ShardingKey
+	if len(required) == 0 {
+		required = keys
+	}
+	for _, pc := range vb.ProjectionConstraints {
+		if !slices.Contains(required, pc.Field) {
+			continue
+		}
+		switch pc.Constraint.Type {
+		case pm.Response_Validated_Constraint_FIELD_OPTIONAL, pm.Response_Validated_Constraint_LOCATION_RECOMMENDED:
+			pc.Constraint = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+				Reason: "This field is part of the table's sharding key on the cluster and must be materialized",
+			}
+		}
+	}
 }
 
 // checkClusterTables rejects a pre-existing table at either name a
