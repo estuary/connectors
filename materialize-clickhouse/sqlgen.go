@@ -287,6 +287,7 @@ var clickHouseDialect = func(database string) sql.Dialect {
 
 type templates struct {
 	createTargetTable                *template.Template
+	createDistributedTable           *template.Template
 	alterTargetColumns               *template.Template
 	alterTargetMigrateAddColumn      *template.Template
 	alterTargetMigratePopulateColumn *template.Template
@@ -492,10 +493,13 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1
 {{- end -}}
 ;
-{{ if Distributed }}
+{{ end }}
+
+-- On a cluster the table readers query is a Distributed proxy over the
+-- local table that createTargetTable made on every shard.
+{{ define "createDistributedTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}}`+onCluster+` AS {{ LocalIdentifier $ }}
 ENGINE = {{ DistributedEngine $ }};
-{{ end -}}
 {{ end }}
 
 -- ClickHouse permits adding non-nullable columns. The default value for a
@@ -788,6 +792,7 @@ DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }}`+onCluster+` SY
 
 	return templates{
 		createTargetTable:                tplAll.Lookup("createTargetTable"),
+		createDistributedTable:           tplAll.Lookup("createDistributedTable"),
 		alterTargetColumns:               tplAll.Lookup("alterTargetColumns"),
 		alterTargetMigrateAddColumn:      tplAll.Lookup("alterTargetMigrateAddColumn"),
 		alterTargetMigratePopulateColumn: tplAll.Lookup("alterTargetMigratePopulateColumn"),

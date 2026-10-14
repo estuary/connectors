@@ -15,10 +15,13 @@ SETTINGS
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End all keys createTargetTable ---
+
+--- Begin all keys createDistributedTable ---
 
 CREATE TABLE IF NOT EXISTS target_table ON CLUSTER flow_cluster AS target_table_local
 ENGINE = Distributed('flow_cluster', 'test_db', 'target_table_local', cityHash64(`id`));
---- End all keys createTargetTable ---
+--- End all keys createDistributedTable ---
 
 --- Begin all keys createLoadTable ---
 
@@ -79,10 +82,13 @@ SETTINGS
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End subset of keys createTargetTable ---
+
+--- Begin subset of keys createDistributedTable ---
 
 CREATE TABLE IF NOT EXISTS target_table ON CLUSTER flow_cluster AS target_table_local
 ENGINE = Distributed('flow_cluster', 'test_db', 'target_table_local', cityHash64(`id`));
---- End subset of keys createTargetTable ---
+--- End subset of keys createDistributedTable ---
 
 --- Begin subset of keys createLoadTable ---
 
@@ -138,10 +144,13 @@ CREATE TABLE IF NOT EXISTS target_table_local ON CLUSTER flow_cluster (
 ENGINE = ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')
 ORDER BY (`id`)
 ;
+--- End delta updates createTargetTable ---
+
+--- Begin delta updates createDistributedTable ---
 
 CREATE TABLE IF NOT EXISTS target_table ON CLUSTER flow_cluster AS target_table_local
 ENGINE = Distributed('flow_cluster', 'test_db', 'target_table_local', cityHash64(`id`));
---- End delta updates createTargetTable ---
+--- End delta updates createDistributedTable ---
 
 --- Begin delta updates createLoadTable ---
 

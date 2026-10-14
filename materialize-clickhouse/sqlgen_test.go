@@ -261,7 +261,7 @@ func TestSQLGenerationDistributed(t *testing.T) {
 		tbl.ResourceConfigJson = mustMarshal(t, tableConfig{Table: "target_table", ShardingKey: tc.shardingKey, Delta: tc.delta})
 
 		for _, tpl := range []*template.Template{
-			tpls.createTargetTable,
+			tpls.createTargetTable, tpls.createDistributedTable,
 			tpls.createLoadTable, tpls.truncateLoadTable, tpls.dropLoadTable,
 			tpls.createStoreTable, tpls.truncateStoreTable, tpls.moveStorePartition, tpls.dropStoreTable,
 		} {
@@ -270,7 +270,7 @@ func TestSQLGenerationDistributed(t *testing.T) {
 			// The transactor renders its temp-table templates against the
 			// local table, as newTransactor re-addresses each binding.
 			var in = tbl
-			if tpl != tpls.createTargetTable {
+			if tpl != tpls.createTargetTable && tpl != tpls.createDistributedTable {
 				in = localTable(tbl, testDialect, cluster)
 			}
 			rendered, err := renderTableAndRangeKey(in, 0, tpl)
@@ -283,7 +283,7 @@ func TestSQLGenerationDistributed(t *testing.T) {
 	// A sharding key naming a non-key field is caught at render time.
 	var bad = buildTestTable(t, testDialect, "target_table")
 	bad.ResourceConfigJson = mustMarshal(t, tableConfig{Table: "target_table", ShardingKey: []string{"value"}})
-	_, err := renderTableAndRangeKey(bad, 0, tpls.createTargetTable)
+	_, err := renderTableAndRangeKey(bad, 0, tpls.createDistributedTable)
 	require.ErrorContains(t, err, `sharding_key field "value" is not a key`)
 
 	cupaloy.SnapshotT(t, snap.String())
