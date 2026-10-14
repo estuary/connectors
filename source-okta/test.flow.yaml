@@ -1,3 +1,5 @@
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-okta:
     endpoint:
@@ -7,4 +9,24 @@ captures:
         - -m
         - source_okta
         config: config.yaml
-    bindings: []
+    bindings:
+    - resource:
+        name: users
+        interval: PT5M
+      target: acmeCo/users
+    - resource:
+        name: groups
+        interval: PT5M
+      target: acmeCo/groups
+    - resource:
+        name: applications
+        interval: PT5M
+      target: acmeCo/applications
+    - resource:
+        name: application_users
+        interval: PT1H
+      target: acmeCo/application_users
+    - resource:
+        name: system_log
+        interval: PT5M
+      target: acmeCo/system_log

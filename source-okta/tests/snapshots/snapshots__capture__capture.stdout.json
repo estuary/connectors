@@ -1,0 +1,140 @@
+[
+  [
+    "acmeCo/application_users",
+    {
+      "_meta": {
+        "app_id": "0oa176zmw7qZJAJpl698",
+        "group_id": null,
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created": "2026-09-03T19:36:29.000Z",
+      "credentials": null,
+      "externalId": null,
+      "id": "00u176zmwbsJ1Uak8698",
+      "lastUpdated": "redacted",
+      "passwordChanged": "redacted",
+      "profile": {},
+      "scope": "USER",
+      "status": "ACTIVE",
+      "statusChanged": "redacted",
+      "syncState": "DISABLED"
+    }
+  ],
+  [
+    "acmeCo/applications",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accessibility": {
+        "errorRedirectUrl": null,
+        "loginRedirectUrl": null,
+        "selfService": false
+      },
+      "created": "2026-09-03T19:36:26.000Z",
+      "credentials": {
+        "signing": {
+          "kid": "AvKBkW3uEUPBhp08oyRT6bhzIkwcD6DGtzHFX_AIt38"
+        },
+        "userNameTemplate": {
+          "template": "${source.login}",
+          "type": "BUILT_IN"
+        }
+      },
+      "features": [],
+      "id": "0oa176zmw7qZJAJpl698",
+      "label": "Okta Admin Console",
+      "lastUpdated": "redacted",
+      "name": "saasure",
+      "orn": "orn:okta:idp:00o176zmw7gF31989698:apps:saasure:0oa176zmw7qZJAJpl698",
+      "settings": {
+        "app": {},
+        "emOptInStatus": "NONE",
+        "implicitAssignment": false,
+        "manualProvisioning": false,
+        "notifications": {
+          "vpn": {
+            "helpUrl": null,
+            "message": null,
+            "network": {
+              "connection": "DISABLED"
+            }
+          }
+        }
+      },
+      "signOnMode": "OPENID_CONNECT",
+      "status": "ACTIVE",
+      "universalLogout": {
+        "status": "UNSUPPORTED"
+      },
+      "visibility": {
+        "appLinks": {
+          "admin": true
+        },
+        "autoSubmitToolbar": false,
+        "hide": {
+          "iOS": false,
+          "web": false
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created": "2026-09-03T19:36:27.000Z",
+      "id": "00g176zmw9j1Wyxqf698",
+      "lastMembershipUpdated": "redacted",
+      "lastUpdated": "redacted",
+      "objectClass": [
+        "okta:user_group"
+      ],
+      "profile": {
+        "description": "All users in your organization",
+        "name": "Everyone"
+      },
+      "type": "BUILT_IN"
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activated": "2026-09-03T19:36:29.000Z",
+      "created": "2026-09-03T19:36:29.000Z",
+      "credentials": {
+        "password": {},
+        "provider": {
+          "name": "OKTA",
+          "type": "OKTA"
+        }
+      },
+      "id": "00u176zmwbsJ1Uak8698",
+      "lastLogin": "redacted",
+      "lastUpdated": "redacted",
+      "passwordChanged": "redacted",
+      "profile": {
+        "email": "connector-dev+okta@estuary.dev",
+        "firstName": "Connector",
+        "lastName": "Dev",
+        "login": "connector-dev+okta@estuary.dev",
+        "mobilePhone": null,
+        "secondEmail": null
+      },
+      "status": "ACTIVE",
+      "statusChanged": "redacted",
+      "type": {
+        "id": "oty176zmw9ti8gVdP698"
+      }
+    }
+  ]
+]
