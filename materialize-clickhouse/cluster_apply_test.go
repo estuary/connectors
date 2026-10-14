@@ -83,6 +83,33 @@ func TestClusterApply(t *testing.T) {
 	require.NoError(t, clusterConn(t, 9101).QueryRow(ctx, fmt.Sprintf("SELECT count() FROM flow.%s", table)).Scan(&total))
 	require.Equal(t, uint64(1), total)
 
+	// A store table created AS the local table gets its own Keeper path from
+	// the {uuid} macro, and a partition moved from it lands in the local
+	// table on both replicas of the shard.
+	var storeTable = "flow_temp_store_0_" + local
+	dropClusterTables(t, storeTable)
+	t.Cleanup(func() { dropClusterTables(t, storeTable) })
+	var tpls = renderTemplates(clickHouseDialect(cfg.Database), cfg.HardDelete, cfg.clusterDDL())
+	var bindingTable = localTable(buildTestTableFromSpec(t, specA, cfg), clickHouseDialect(cfg.Database), cfg.clusterDDL())
+	createStore, err := renderTableAndRangeKey(bindingTable, 0, tpls.createStoreTable)
+	require.NoError(t, err)
+	require.NoError(t, clusterConn(t, 9103).Exec(ctx, createStore))
+	var zkPath = func(port int, name string) string {
+		var p string
+		require.NoError(t, clusterConn(t, port).QueryRow(ctx, "SELECT zookeeper_path FROM system.replicas WHERE database = 'flow' AND table = ?", name).Scan(&p))
+		return p
+	}
+	require.NotEqual(t, zkPath(9103, local), zkPath(9103, storeTable), "store table has its own replication path")
+	require.Equal(t, zkPath(9103, storeTable), zkPath(9104, storeTable), "both replicas of a shard share the store table's path")
+	require.NoError(t, clusterConn(t, 9103).Exec(ctx, fmt.Sprintf(
+		"INSERT INTO flow.%s (key, flow_published_at, flow_document) VALUES ('k-store', now64(6), '{}')", storeTable)))
+	movePartition, err := renderTableAndRangeKey(bindingTable, 0, tpls.moveStorePartition)
+	require.NoError(t, err)
+	require.NoError(t, clusterConn(t, 9103).Exec(ctx, movePartition, "all"))
+	require.NoError(t, clusterConn(t, 9104).Exec(ctx, fmt.Sprintf("SYSTEM SYNC REPLICA flow.%s", local)))
+	require.NoError(t, clusterConn(t, 9104).QueryRow(ctx, fmt.Sprintf("SELECT count() FROM flow.%s WHERE key = 'k-store'", local)).Scan(&total))
+	require.Equal(t, uint64(1), total, "moved partition is visible on the other replica")
+
 	// A partition_by change with a backfill drops and re-creates both tables
 	// on every node.
 	var specB = specWith(t, cfg, tableConfig{Table: table, PartitionBy: "toYYYYMM(flow_published_at)"}, 1)
@@ -168,4 +195,15 @@ func TestClusterDropAndTruncateStatements(t *testing.T) {
 		"DROP TABLE IF EXISTS t_local ON CLUSTER flow_cluster SYNC;",
 	}, c.dropStatements([]string{"t"}))
 	require.Equal(t, []string{"TRUNCATE TABLE t_local ON CLUSTER flow_cluster SYNC;"}, c.truncateStatements([]string{"t"}))
+}
+
+// buildTestTableFromSpec resolves the first binding of a spec into the table
+// the transactor would be handed for it.
+func buildTestTableFromSpec(t *testing.T, spec *pf.MaterializationSpec, cfg config) sql.Table {
+	t.Helper()
+	var b = spec.Bindings[0]
+	var shape = sql.BuildTableShape(spec.Name.String(), b, 0, b.ResourcePath, b.DeltaUpdates)
+	table, err := sql.ResolveTable(shape, clickHouseDialect(cfg.Database))
+	require.NoError(t, err)
+	return table
 }
