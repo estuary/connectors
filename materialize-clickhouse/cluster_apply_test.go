@@ -136,28 +136,19 @@ func TestMustRecreateResourceCluster(t *testing.T) {
 	var bind = func(rc tableConfig) *pf.MaterializationSpec_Binding {
 		return &pf.MaterializationSpec_Binding{ResourceConfigJson: mustMarshal(t, rc)}
 	}
-	var req = func(lastCfg config) *pm.Request_Apply {
-		return &pm.Request_Apply{LastMaterialization: &pf.MaterializationSpec{ConfigJson: mustMarshal(t, lastCfg)}}
-	}
-
-	var single = testConfig()
-	var clustered = single
+	var clustered = testConfig()
 	clustered.Cluster = "flow_cluster"
 	ep.Config = clustered
 
-	must, err := c.MustRecreateResource(req(clustered), bind(tableConfig{Table: "t"}), bind(tableConfig{Table: "t", ShardingKey: []string{"key"}}))
+	must, err := c.MustRecreateResource(nil, bind(tableConfig{Table: "t"}), bind(tableConfig{Table: "t", ShardingKey: []string{"key"}}))
 	require.NoError(t, err)
 	require.True(t, must, "a changed sharding key re-creates")
 
-	must, err = c.MustRecreateResource(req(clustered), bind(tableConfig{Table: "t", ShardingKey: []string{"a", "b"}}), bind(tableConfig{Table: "t", ShardingKey: []string{"b", "a"}}))
+	must, err = c.MustRecreateResource(nil, bind(tableConfig{Table: "t", ShardingKey: []string{"a", "b"}}), bind(tableConfig{Table: "t", ShardingKey: []string{"b", "a"}}))
 	require.NoError(t, err)
 	require.True(t, must, "sharding key order is part of the hash")
 
-	must, err = c.MustRecreateResource(req(single), bind(tableConfig{Table: "t"}), bind(tableConfig{Table: "t"}))
-	require.NoError(t, err)
-	require.True(t, must, "moving onto a cluster re-creates")
-
-	must, err = c.MustRecreateResource(req(clustered), bind(tableConfig{Table: "t", ShardingKey: []string{"key"}}), bind(tableConfig{Table: "t", ShardingKey: []string{"key"}}))
+	must, err = c.MustRecreateResource(nil, bind(tableConfig{Table: "t", ShardingKey: []string{"key"}}), bind(tableConfig{Table: "t", ShardingKey: []string{"key"}}))
 	require.NoError(t, err)
 	require.False(t, must)
 }

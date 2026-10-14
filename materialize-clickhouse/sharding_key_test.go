@@ -116,13 +116,33 @@ func TestValidateClusterShardingKey(t *testing.T) {
 		require.Empty(t, incompatibleFields(resp, ""))
 	})
 
-	t.Run("switching a binding onto a cluster without backfill is INCOMPATIBLE", func(t *testing.T) {
+	t.Run("removing the cluster is a user error", func(t *testing.T) {
 		var single = cfg
 		single.Cluster = ""
-		var last = specWith(t, single, tableConfig{Table: table}, 0)
-		resp, err := NewDriver().Validate(ctx, validateReq(t, cfg, tableConfig{Table: table}, 0, last))
+		var last = specWith(t, cfg, tableConfig{Table: table}, 0)
+		_, err := NewDriver().Validate(ctx, validateReq(t, single, tableConfig{Table: table}, 1, last))
+		require.ErrorContains(t, err, "cannot be removed")
+	})
+
+	t.Run("sharding key fields are required for delta bindings", func(t *testing.T) {
+		var constraintOn = func(resp *pm.Response_Validated, field string) pm.Response_Validated_Constraint_Type {
+			for _, pc := range resp.Bindings[0].ProjectionConstraints {
+				if pc.Field == field {
+					return pc.Constraint.Type
+				}
+			}
+			t.Fatalf("no constraint on %q", field)
+			return 0
+		}
+		resp, err := NewDriver().Validate(ctx, validateReq(t, cfg, tableConfig{Table: table, Delta: true}, 0, nil))
 		require.NoError(t, err)
-		require.Contains(t, incompatibleFields(resp, "'cluster' setting changed"), "key")
+		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraintOn(resp, "key"))
+
+		var single = cfg
+		single.Cluster = ""
+		resp, err = NewDriver().Validate(ctx, validateReq(t, single, tableConfig{Table: table, Delta: true}, 0, nil))
+		require.NoError(t, err)
+		require.NotEqual(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraintOn(resp, "key"), "single-server delta bindings keep optional keys")
 	})
 
 	t.Run("unchanged sharding key needs no backfill", func(t *testing.T) {

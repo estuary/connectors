@@ -416,11 +416,10 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 // MustRecreateResource reports a change that can only be applied by dropping
 // and re-creating the table: a changed partition_by, because ClickHouse never
-// accepts PARTITION BY via ALTER and TRUNCATE preserves the partition key; a
-// changed sharding_key, because it is fixed in the Distributed table's engine
-// definition; or a binding moving between a single server and a cluster,
-// because that changes which engines the tables need.
-func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+// accepts PARTITION BY via ALTER and TRUNCATE preserves the partition key, or
+// a changed sharding_key, because it is fixed in the Distributed table's
+// engine definition.
+func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	if lastBinding == nil || newBinding == nil {
 		return false, nil
 	}
@@ -434,19 +433,7 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	if strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy) {
 		return true, nil
 	}
-	if !slices.Equal(lastRC.ShardingKey, newRC.ShardingKey) {
-		return true, nil
-	}
-	if req != nil && req.LastMaterialization != nil {
-		var lastCfg config
-		if err := json.Unmarshal(req.LastMaterialization.ConfigJson, &lastCfg); err != nil {
-			return false, fmt.Errorf("parsing last endpoint config: %w", err)
-		}
-		if lastCfg.distributed() != c.ep.Config.distributed() {
-			return true, nil
-		}
-	}
-	return false, nil
+	return !slices.Equal(lastRC.ShardingKey, newRC.ShardingKey), nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
