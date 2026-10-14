@@ -1,0 +1,23 @@
+collections:
+  acmeCo/AdGroups:
+    schema: AdGroups.schema.yaml
+    key:
+    - /adgroup_id
+  acmeCo/Ads:
+    schema: Ads.schema.yaml
+    key:
+    - /ad_id
+  acmeCo/Advertisers:
+    schema: Advertisers.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/Campaigns:
+    schema: Campaigns.schema.yaml
+    key:
+    - /campaign_id
+  acmeCo/ad_report_daily:
+    schema: ad_report_daily.schema.yaml
+    key:
+    - /advertiser_id
+    - /ad_id
+    - /stat_time_day

@@ -1,0 +1,23 @@
+info:
+  name: Ad Report Daily (customer conversion metrics)
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["ad_id","stat_time_day"]&metrics=["web_event_add_to_cart","cost_per_web_event_add_to_cart","on_web_subscribe","cost_per_on_web_subscribe","app_event_add_to_cart","total_app_event_add_to_cart","subscribe","total_subscribe","onsite_total_add_to_cart","onsite_total_subscribe"]&page=1&page_size=1000&start_date=2026-09-14&end_date=2026-10-13'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** that the add-to-cart and subscribe metric names a customer asked for (website, app and TikTok onsite variants) are accepted in a daily ad-level report.
+
+  **VERIFIED (2026-10-13, sandbox):** `code 0`: every requested add-to-cart and subscribe metric name is accepted at ad level, daily (`web_event_add_to_cart`, `cost_per_web_event_add_to_cart`, `on_web_subscribe`, `cost_per_on_web_subscribe`, `app_event_add_to_cart`, `total_app_event_add_to_cart`, `subscribe`, `total_subscribe`, `onsite_total_add_to_cart`, `onsite_total_subscribe`).

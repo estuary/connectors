@@ -1,0 +1,32 @@
+info:
+  name: List Ad Groups (bare)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** the Ad Groups stream's backing endpoint, with no filtering, to see
+  the default response shape and which seeded ad groups it returns.
+
+  **VERIFIED (2026-10-12, sandbox):** `code 0`, `total_number 1`: only the live
+  seed ad group (`1878524819318882`). The ad group created under the deleted
+  campaign is not returned by default, which suggests a campaign delete
+  cascades to its ad groups.
+
+  **VERIFIED (2026-10-12, sandbox):** 91 fields per ad group, **including
+  `advertiser_id`** (no stamping needed). `create_time` / `modify_time` use the
+  campaign format ("YYYY-MM-DD HH:MM:SS", UTC). The default listing returns only
+  the live seed ad group: the one under the deleted campaign is hidden.

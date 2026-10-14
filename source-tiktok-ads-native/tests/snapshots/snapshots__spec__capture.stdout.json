@@ -1,0 +1,285 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessTokenCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "Access Token",
+          "type": "object"
+        },
+        "Advanced": {
+          "properties": {
+            "is_sandbox": {
+              "default": false,
+              "description": "Check if you are using a TikTok sandbox ad account. Sandbox access tokens and advertiser IDs come from the Sandbox Ad Account page of a TikTok API for Business developer app.",
+              "title": "Is a Sandbox Environment",
+              "type": "boolean"
+            },
+            "lookback_window_days": {
+              "default": 28,
+              "description": "Days of already-captured report data to re-read on each sync. TikTok keeps attributing conversions to past days for up to the ad group's click attribution window, at most 28 days. A lower value re-reads less data, but misses late conversions from ad groups with a longer window.",
+              "maximum": 28,
+              "minimum": 0,
+              "title": "Report Lookback (Days)",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "Breakdown": {
+          "enum": [
+            "age",
+            "gender",
+            "country_code",
+            "language",
+            "platform",
+            "placement",
+            "ac"
+          ],
+          "title": "Breakdown",
+          "type": "string"
+        },
+        "DataLevel": {
+          "enum": [
+            "AUCTION_ADVERTISER",
+            "AUCTION_CAMPAIGN",
+            "AUCTION_ADGROUP",
+            "AUCTION_AD"
+          ],
+          "title": "DataLevel",
+          "type": "string"
+        },
+        "Granularity": {
+          "enum": [
+            "daily",
+            "hourly",
+            "lifetime"
+          ],
+          "title": "Granularity",
+          "type": "string"
+        },
+        "LongLivedClientCredentialsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "access_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "tiktok"
+        },
+        "ReportConfig": {
+          "properties": {
+            "name": {
+              "description": "Lowercase letters, digits and underscores. The report is captured into a collection named custom_report_<name>.",
+              "order": 0,
+              "title": "Report Name",
+              "type": "string"
+            },
+            "report_type": {
+              "$ref": "#/$defs/ReportType",
+              "default": "BASIC",
+              "description": "BASIC reports break performance down by time. AUDIENCE reports also break it down by audience attributes such as age or country, daily only.",
+              "order": 1,
+              "title": "Report Type"
+            },
+            "data_level": {
+              "$ref": "#/$defs/DataLevel",
+              "default": "AUCTION_AD",
+              "description": "The level rows are reported at. Each row carries that level's ID.",
+              "order": 2,
+              "title": "Level"
+            },
+            "granularity": {
+              "$ref": "#/$defs/Granularity",
+              "default": "daily",
+              "description": "Daily or hourly rows, in each advertiser's time zone, or one lifetime row per entity.",
+              "order": 3
+            },
+            "breakdowns": {
+              "default": [],
+              "description": "AUDIENCE reports need exactly one breakdown, or age and gender together. BASIC reports may break down by country_code, daily only.",
+              "items": {
+                "$ref": "#/$defs/Breakdown"
+              },
+              "order": 4,
+              "title": "Breakdowns",
+              "type": "array"
+            },
+            "metrics": {
+              "description": "A comma-separated list of TikTok report metrics, up to 100.",
+              "examples": [
+                "spend,impressions,clicks,web_event_add_to_cart,on_web_subscribe"
+              ],
+              "order": 5,
+              "title": "Metrics",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "metrics"
+          ],
+          "title": "ReportConfig",
+          "type": "object"
+        },
+        "ReportType": {
+          "enum": [
+            "BASIC",
+            "AUDIENCE"
+          ],
+          "title": "ReportType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
+              "Private App Credentials": "#/$defs/AccessTokenCredentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/AccessTokenCredentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Report data before this date will not be replicated; campaigns, ad groups and ads are captured in full. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "advertiser_ids": {
+          "default": [],
+          "description": "Advertiser IDs to capture. If left empty, every advertiser the authorized TikTok account can access is captured. Required with an access token or a sandbox account.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Advertiser IDs",
+          "type": "array"
+        },
+        "custom_reports": {
+          "default": [],
+          "description": "Reports to capture in addition to the default ad_report_daily. Each becomes its own collection.",
+          "items": {
+            "$ref": "#/$defs/ReportConfig"
+          },
+          "title": "Custom Reports",
+          "type": "array"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-tiktok-ads-native",
+    "oauth2": {
+      "provider": "tiktok",
+      "authUrlTemplate": "https://ads.tiktok.com/marketing_api/auth?app_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/",
+      "accessTokenBody": "{\"app_id\": \"{{{ client_id }}}\", \"secret\": \"{{{ client_secret }}}\", \"auth_code\": \"{{{ code }}}\"}",
+      "accessTokenHeaders": {
+        "content-type": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/data/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

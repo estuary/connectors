@@ -1,0 +1,25 @@
+info:
+  name: List Ads (fields invalid value control)
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: '{{base_url}}/ad/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&fields=["ad_id","not_a_real_field"]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ads"
+  (`GET /open_api/v1.3/ad/get/`).
+
+  **WHY:** an invalid `fields` value is rejected with the accepted fields, which shows whether ads carry `advertiser_id`, `campaign_id`, `adgroup_id`, `create_time` and `modify_time`.
+
+  **VERIFIED (2026-10-13, sandbox):** rejected with 104 accepted fields,
+  including `ad_id`, `adgroup_id`, `campaign_id`, `advertiser_id`,
+  `create_time` and `modify_time`.

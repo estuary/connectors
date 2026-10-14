@@ -1,0 +1,42 @@
+info:
+  name: Token Exchange (POST oauth2 access_token)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/oauth2/access_token/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    # Replaced at runtime by the collection script with the decrypted app_id/secret
+    # and the `auth_code` env var, so no credential is ever written to this file.
+    data: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Obtain a long-term access token"
+  (`POST /open_api/v1.3/oauth2/access_token/`).
+
+  **WHY:** the one-time, manual half of the OAuth flow. Estuary's web app does
+  this automatically for customers via `OAUTH2_SPEC`; for development we run it
+  once to get the token stored in `config.yaml`.
+
+  **How to run:** authorize the development ad account through the app's
+  advertiser authorization URL, copy `auth_code` from the redirect URL, then:
+
+      bru run "OAuth/Token Exchange (POST oauth2 access_token).yml" \
+        --env TikTok --sandbox developer --env-var auth_code=<code>
+
+  Copy `data.access_token` from the response into `config.yaml` with
+  `sops config.yaml`. **Never save this request's response as an example**:
+  it contains the access token (API-TOKEN-EPHEMERAL).
+
+  **PENDING:** response shape (`data.access_token`, `data.advertiser_ids`) and
+  the auth code's lifetime.
