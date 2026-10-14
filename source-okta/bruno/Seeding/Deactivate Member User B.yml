@@ -1,0 +1,37 @@
+info:
+  name: Deactivate Member User B
+  type: http
+  seq: 28
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{members_seed_user_b_id}}/lifecycle/deactivate?sendEmail=false"
+  params:
+    - name: sendEmail
+      value: "false"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_user_b_id')) await bru.runRequest('Seeding/Create Member User B');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/UserLifecycle/#tag/UserLifecycle/operation/deactivateUser
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** moves User B to DEPROVISIONED. Re-running `Group members / bare` and
+  `Application users / bare` afterwards answers whether deprovisioned users remain
+  listed as members / assignees (the brief's open question).
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

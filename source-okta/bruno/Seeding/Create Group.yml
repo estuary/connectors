@@ -1,0 +1,78 @@
+info:
+  name: Create Group
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/groups"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "name": "estuary-syslog-probe",
+          "description": "Throwaway group; its create/delete events feed the System Log head-token probe. Deleted by Seeding / Delete Group."
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Seeding / Delete Group` consumes this id as {{seed_group_id}}.
+        // Runtime var only (resource id, not a credential).
+        if (res.status === 200 && res.body?.id) bru.setVar('seed_group_id', res.body.id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/addGroup
+
+  **WHY:** the sandbox tenant's System Log is quiet and read probes generate no
+  events, so a checkpointed head `after` token can't be shown to pick up new
+  arrivals without provoking one. Creating (then deleting) a throwaway group
+  emits `group.lifecycle.create` / `group.lifecycle.delete` for
+  `System Log / polling resume after` to observe.
+
+  **Prerequisites / cleanup:** none; run `Seeding / Delete Group` right after
+  to remove the group (it chains back here if the id var is missing).
+
+  Outcome: ran 2026-10-07 three times (14:21, 14:23, 14:28 UTC), each paired
+  with `Seeding / Delete Group`, so no group remains. Findings VERIFIED in
+  `System Log / polling resume after`, `System Log / polling first page` and
+  `System Log / bounded recent window`.
+
+examples:
+- name: '200 - group created (projection: id, created, profile)'
+  request:
+    url: '{{base_url}}/groups'
+    method: POST
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '250'
+    - name: x-rate-limit-remaining
+      value: '249'
+    - name: x-rate-limit-reset
+      value: '1791383350'
+    body:
+      type: json
+      data: |-
+        {
+          "id": "00g18gufag5uksKzH698",
+          "created": "2026-10-07T14:28:10.000Z",
+          "profile": {
+            "name": "estuary-syslog-probe",
+            "description": "Throwaway group; its create/delete events feed the System Log head-token probe. Deleted by Seeding / Delete Group."
+          }
+        }

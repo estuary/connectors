@@ -1,0 +1,36 @@
+info:
+  name: Delete Delete-Probe Group
+  type: http
+  seq: 18
+
+http:
+  method: DELETE
+  url: "{{base_url}}/groups/{{delprobe_group_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('delprobe_group_id') && !bru.getEnvVar('delprobe_group_id')) {
+          await bru.runRequest('Seeding/Create Delete-Probe Group');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete a group](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/deleteGroup)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** hard-deletes the throwaway group. Its System Log event, read by
+  `Deletes / delete events`, is what the Groups stream's delete step turns into a
+  delete document.
+
+  **Outcome:** ran 2026-10-08 and returned 204, producing `group.lifecycle.delete`
+  at 17:25:10.332Z with target type `UserGroup`. VERIFIED in
+  `Deletes / delete events`.

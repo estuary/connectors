@@ -1,0 +1,38 @@
+info:
+  name: Assign User A to App
+  type: http
+  seq: 26
+
+http:
+  method: POST
+  url: "{{base_url}}/apps/{{members_seed_app_id}}/users"
+  body:
+    type: json
+    data: |-
+      {
+        "id": "{{members_seed_user_a_id}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_app_id')) await bru.runRequest('Seeding/Create Bookmark App');
+        if (!bru.getVar('members_seed_user_a_id')) await bru.runRequest('Seeding/Create Member User A');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/ApplicationUsers/#tag/ApplicationUsers/operation/assignUserToApplication
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** a direct (`scope: USER`) assignment; feeds `Application users / bare`.
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

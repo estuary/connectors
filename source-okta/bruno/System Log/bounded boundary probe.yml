@@ -1,0 +1,196 @@
+info:
+  name: bounded boundary probe
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since={{logs_since}}&until={{logs_until}}&sortOrder=ASCENDING&limit={{logs_limit}}"
+  params:
+    - name: since
+      value: "{{logs_since}}"
+      type: query
+    - name: until
+      value: "{{logs_until}}"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "{{logs_limit}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** the backfill request: a bounded request (`since` + `until`) filters
+  and orders by `published`. Pins `since`/`until` inclusivity
+  (FETCH-SERVER-SIDE-BOUNDARIES) by setting both to the exact `published` of
+  known events, confirms published ordering, and shows the bounded next-link
+  shape and the absent next link on the last page.
+
+  **VERIFIED (2026-10-07):**
+  - Bounded pages are sorted by `published`; the tick is 1 ms.
+  - `since` and `until` are both inclusive. The window
+    `26.826Z..27.007Z` returns both edge events; `26.827Z..27.006Z` drops
+    both.
+  - The last page has no `rel="next"`. A non-final page's next link
+    carries `since` + `until` + `after=<published epoch-ms>_<n>`, so in
+    bounded mode the token encodes `published`, not persistence.
+  - `since` 189 days back returns 200 (first event in retention), not the
+    documented 400 E0000053.
+
+examples:
+- name: 200 - since=26.826 until=27.007 both edge events included, no next link (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.826Z&until=2026-09-03T19%3A36%3A27.007Z&sortOrder=ASCENDING&limit=1000'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '58'
+    - name: x-rate-limit-reset
+      value: '1791382793'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.826Z&until=2026-09-03T19%3A36%3A27.007Z&limit=1000&sortOrder=ASCENDING>; rel="self"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c0ff62d3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.826Z",
+            "eventType": "system.brand.create"
+          },
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c110ef0d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.941Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c11b012f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.007Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          }
+        ]
+- name: 200 - since=26.827 until=27.006 both edge events excluded (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.827Z&until=2026-09-03T19%3A36%3A27.006Z&sortOrder=ASCENDING&limit=1000'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '56'
+    - name: x-rate-limit-reset
+      value: '1791382793'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.827Z&until=2026-09-03T19%3A36%3A27.006Z&limit=1000&sortOrder=ASCENDING>; rel="self"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c110ef0d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.941Z",
+            "eventType": "application.lifecycle.update"
+          }
+        ]
+- name: 200 - limit 2, bounded next link carries published-ms after token (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.827Z&until=2026-09-03T19%3A36%3A27.006Z&sortOrder=ASCENDING&limit=2'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '57'
+    - name: x-rate-limit-reset
+      value: '1791382793'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.827Z&until=2026-09-03T19%3A36%3A27.006Z&limit=2&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-09-03T19%3A36%3A26.827Z&until=2026-09-03T19%3A36%3A27.006Z&limit=2&sortOrder=ASCENDING&after=1788464186899_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z",
+            "eventType": "application.lifecycle.update"
+          }
+        ]
+- name: 200 - bounded since 189d back accepted, no E0000053 (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-04-01T00%3A00%3A00Z&until=2026-09-04T00%3A00%3A00Z&sortOrder=ASCENDING&limit=1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '57'
+    - name: x-rate-limit-reset
+      value: '1791382870'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-04-01T00%3A00%3A00Z&until=2026-09-04T00%3A00%3A00Z&limit=1&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-04-01T00%3A00%3A00Z&until=2026-09-04T00%3A00%3A00Z&limit=1&sortOrder=ASCENDING&after=1788464186826_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c0ff62d3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.826Z"
+          }
+        ]

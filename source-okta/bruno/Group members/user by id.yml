@@ -1,0 +1,91 @@
+info:
+  name: user by id
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/users/{{member_user_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/getUser
+
+  **WHY:** An event-driven Group_members fetches the added user by id on each
+  `group.user_membership.add`, while its backfill takes users from the member listing
+  (`Group members / bare`). This compares the two shapes for the same user
+  (`member_user_id` is pinned to seeded User A, a member of `estuary-members-group`).
+
+  **VERIFIED (2026-10-09):** the body is identical to User A's row in `Group members / bare`
+  except `_links` (by id: `activate`, `resetFactors`, `schema`, `self`, `type`; listing:
+  `self` only). `GET /users/{id}` reports `X-Rate-Limit-Limit: 1000` on this token.
+
+examples:
+  - name: "200 \u2014 User A by id (full); body identical to its member-listing row except _links"
+    request:
+      url: "{{base_url}}/users/00u18gupu552EU005698"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "1000"
+      body:
+        type: json
+        data: |-
+          {
+            "id": "00u18gupu552EU005698",
+            "status": "STAGED",
+            "created": "2026-10-07T14:36:28.000Z",
+            "activated": null,
+            "statusChanged": null,
+            "lastLogin": null,
+            "lastUpdated": "2026-10-08T12:44:59.000Z",
+            "passwordChanged": null,
+            "type": {
+              "id": "oty176zmw9ti8gVdP698"
+            },
+            "profile": {
+              "firstName": "Estuary",
+              "lastName": "Members A",
+              "mobilePhone": null,
+              "estuarySeedCostCode": "CC-12",
+              "secondEmail": null,
+              "login": "estuary-members-a@example.com",
+              "email": "estuary-members-a@example.com"
+            },
+            "credentials": {
+              "provider": {
+                "type": "OKTA",
+                "name": "OKTA"
+              }
+            },
+            "_links": {
+              "schema": {
+                "href": "https://okta-domain/api/v1/meta/schemas/user/osc176zmw9ti8gVdP698"
+              },
+              "activate": {
+                "href": "https://okta-domain/api/v1/users/00u18gupu552EU005698/lifecycle/activate",
+                "method": "POST"
+              },
+              "self": {
+                "href": "https://okta-domain/api/v1/users/00u18gupu552EU005698"
+              },
+              "resetFactors": {
+                "href": "https://okta-domain/api/v1/users/00u18gupu552EU005698/lifecycle/reset_factors",
+                "method": "POST"
+              },
+              "type": {
+                "href": "https://okta-domain/api/v1/meta/types/user/oty176zmw9ti8gVdP698"
+              }
+            }
+          }

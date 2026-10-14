@@ -1,0 +1,1137 @@
+info:
+  name: polling resume after
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?sortOrder=ASCENDING&limit=1000&after={{logs_after}}"
+  params:
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "1000"
+      type: query
+    - name: after
+      value: "{{logs_after}}"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Pull a token from `polling first page` only when none was supplied: neither
+        // a runtime var from an earlier request in this run nor a real (non-PIN_)
+        // env value, e.g. `--env-var logs_after=...`. Checking only the runtime var
+        // would let the nested call silently replace a token passed on the CLI.
+        const pinned = bru.getEnvVar('logs_after');
+        if (!bru.getVar('logs_after') && (!pinned || pinned.startsWith('PIN_'))) {
+          await bru.runRequest('System Log/polling first page');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** the steady-state incremental request: resume from a checkpointed
+  `after` token. At the head of the log this is the empty polling page — does
+  it still carry a next link, and does that link equal `self` (is the token
+  stable when nothing new arrived)?
+
+  **VERIFIED (2026-10-07):**
+  - At the head, an empty page still carries `rel="next"`, identical to
+    `self`: the token does not move until new events are released, so an
+    empty poll has nothing to checkpoint.
+  - A request rebuilt from the token alone (`after` + `limit` +
+    `sortOrder`, no `since`) resumes exactly where the issuing page ended
+    (241 remaining of 441, contiguous). The connector can checkpoint just
+    the token and need not store the whole next URL.
+  - The head token captured at 14:17 was replayed after two seeded group
+    events (create/delete, 14:21:38/41). It still returned nothing at +14 s
+    and returned both events at +75 s, with the next token advanced to
+    their persistence ms. The token survived unrelated tenant changes
+    between issue and reuse.
+
+  **GATE-OPAQUE-CURSOR evidence.** The provider documents the token only as
+  "Opaque token" ("Retrieves the next page of results. Okta returns a link
+  in the HTTP Header (`rel=next`) that includes the after query
+  parameter" — DOCUMENTED 2026-10-07, OpenAPI `listLogEvents`, v2026.09.2),
+  and states no expiry. Observed: it is a pure position value
+  (`<persistence epoch-ms>_<n>`), not a server session handle. A token
+  positioned 34 days back resumes, and a position 189 days back is clamped
+  rather than rejected (`System Log / stale after probe`).
+  **UNOBSERVABLE:** a literal multi-day wall-clock gap between issue and
+  reuse, and any future change to the token format. Assumed: a value-encoded
+  position cannot expire. Fallback: a 400 on a checkpointed token surfaces
+  as a capture error, and re-backfilling the binding recovers.
+
+examples:
+- name: 200 - head of log, empty page, next == self (token unchanged)
+  request:
+    url: '{{base_url}}/logs?sortOrder=ASCENDING&limit=1000&after=1791382154413_1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '58'
+    - name: x-rate-limit-reset
+      value: '1791382732'
+    - name: link
+      value: <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="self", <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="next"
+    body:
+      type: json
+      data: '[]'
+- name: '200 - resume mid-history token, remaining 241 of 441, contiguous (projection: uuid, published)'
+  request:
+    url: '{{base_url}}/logs?sortOrder=ASCENDING&limit=1000&after=1791376271999_1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '59'
+    - name: x-rate-limit-reset
+      value: '1791382793'
+    - name: link
+      value: <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791376271999_1>; rel="self", <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "fae97c7f-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.817Z"
+          },
+          {
+            "uuid": "527634bd-c24b-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:33:38.701Z"
+          },
+          {
+            "uuid": "552bb7bc-c24b-11f1-b7b7-b3442cb35896",
+            "published": "2026-10-07T12:33:43.246Z"
+          },
+          {
+            "uuid": "5554004a-c24b-11f1-b7b7-b3442cb35896",
+            "published": "2026-10-07T12:33:43.510Z"
+          },
+          {
+            "uuid": "59ce165b-c24b-11f1-bec5-b36eeb547479",
+            "published": "2026-10-07T12:33:51.021Z"
+          },
+          {
+            "uuid": "5cba1320-c24b-11f1-ace2-159d018ae57c",
+            "published": "2026-10-07T12:33:55.923Z"
+          },
+          {
+            "uuid": "5cae052f-c24b-11f1-ace2-159d018ae57c",
+            "published": "2026-10-07T12:33:55.844Z"
+          },
+          {
+            "uuid": "6250e3eb-c24b-11f1-9841-b71be104fcf6",
+            "published": "2026-10-07T12:34:05.300Z"
+          },
+          {
+            "uuid": "62641dce-c24b-11f1-9841-b71be104fcf6",
+            "published": "2026-10-07T12:34:05.426Z"
+          },
+          {
+            "uuid": "62bee77a-c24b-11f1-b7f2-c7f93cfd6ad4",
+            "published": "2026-10-07T12:34:06.021Z"
+          },
+          {
+            "uuid": "64091b2a-c24b-11f1-9441-dfa504afba9f",
+            "published": "2026-10-07T12:34:08.185Z"
+          },
+          {
+            "uuid": "6408f419-c24b-11f1-9441-dfa504afba9f",
+            "published": "2026-10-07T12:34:08.184Z"
+          },
+          {
+            "uuid": "640aefeb-c24b-11f1-9441-dfa504afba9f",
+            "published": "2026-10-07T12:34:08.197Z"
+          },
+          {
+            "uuid": "655bb2fb-c24b-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T12:34:10.404Z"
+          },
+          {
+            "uuid": "656f620f-c24b-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T12:34:10.533Z"
+          },
+          {
+            "uuid": "65f31098-c24b-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T12:34:11.396Z"
+          },
+          {
+            "uuid": "65f2e987-c24b-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T12:34:11.395Z"
+          },
+          {
+            "uuid": "65f4e55a-c24b-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T12:34:11.408Z"
+          },
+          {
+            "uuid": "65fd7179-c24b-11f1-81d2-a3700ca8ea62",
+            "published": "2026-10-07T12:34:11.464Z"
+          },
+          {
+            "uuid": "67c622a3-c24b-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:34:14.457Z"
+          },
+          {
+            "uuid": "67d1e274-c24b-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:34:14.534Z"
+          },
+          {
+            "uuid": "67db3147-c24b-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:34:14.595Z"
+          },
+          {
+            "uuid": "687ca1ad-c24b-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T12:34:15.653Z"
+          },
+          {
+            "uuid": "68d01893-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.200Z"
+          },
+          {
+            "uuid": "68d17825-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.209Z"
+          },
+          {
+            "uuid": "68d01892-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.200Z"
+          },
+          {
+            "uuid": "68d17824-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.209Z"
+          },
+          {
+            "uuid": "933d4d9c-c24b-11f1-b7b7-b3442cb35896",
+            "published": "2026-10-07T12:35:27.380Z"
+          },
+          {
+            "uuid": "9b48c807-c24b-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:35:40.877Z"
+          },
+          {
+            "uuid": "9b5b8cb9-c24b-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:35:41.000Z"
+          },
+          {
+            "uuid": "9b9a6a84-c24b-11f1-b7f2-c7f93cfd6ad4",
+            "published": "2026-10-07T12:35:41.412Z"
+          },
+          {
+            "uuid": "9bfe83dd-c24b-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:35:42.068Z"
+          },
+          {
+            "uuid": "9bfd726b-c24b-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:35:42.061Z"
+          },
+          {
+            "uuid": "9bfd726a-c24b-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:35:42.061Z"
+          },
+          {
+            "uuid": "9c073649-c24b-11f1-a0f4-bffdd986e45b",
+            "published": "2026-10-07T12:35:42.125Z"
+          },
+          {
+            "uuid": "9f47465f-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:35:47.578Z"
+          },
+          {
+            "uuid": "9f476d70-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:35:47.579Z"
+          },
+          {
+            "uuid": "4dff0eb0-c24c-11f1-8847-9d79c87ea4a0",
+            "published": "2026-10-07T12:40:40.706Z"
+          },
+          {
+            "uuid": "505421fb-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:40:44.619Z"
+          },
+          {
+            "uuid": "505e823f-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:40:44.687Z"
+          },
+          {
+            "uuid": "e9a6c645-c24c-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:45:01.852Z"
+          },
+          {
+            "uuid": "ec13a7c0-c24c-11f1-a4a0-2b2f60362a93",
+            "published": "2026-10-07T12:45:05.921Z"
+          },
+          {
+            "uuid": "ec3c3e6e-c24c-11f1-a4a0-2b2f60362a93",
+            "published": "2026-10-07T12:45:06.187Z"
+          },
+          {
+            "uuid": "f9163096-c24c-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:45:27.748Z"
+          },
+          {
+            "uuid": "f926ab5a-c24c-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:45:27.856Z"
+          },
+          {
+            "uuid": "f982fccd-c24c-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T12:45:28.461Z"
+          },
+          {
+            "uuid": "faedd6ae-c24c-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:45:30.839Z"
+          },
+          {
+            "uuid": "faecec4c-c24c-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:45:30.833Z"
+          },
+          {
+            "uuid": "faecec4d-c24c-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:45:30.833Z"
+          },
+          {
+            "uuid": "fc711b3a-c24c-11f1-a051-313a74336e16",
+            "published": "2026-10-07T12:45:33.377Z"
+          },
+          {
+            "uuid": "fc858da9-c24c-11f1-a051-313a74336e16",
+            "published": "2026-10-07T12:45:33.511Z"
+          },
+          {
+            "uuid": "fd02acbc-c24c-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:45:34.331Z"
+          },
+          {
+            "uuid": "fd02acbb-c24c-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:45:34.331Z"
+          },
+          {
+            "uuid": "fd03e53e-c24c-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:45:34.339Z"
+          },
+          {
+            "uuid": "fd0b118e-c24c-11f1-9fa4-379f4584bb1e",
+            "published": "2026-10-07T12:45:34.386Z"
+          },
+          {
+            "uuid": "fe8d44d4-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:45:36.917Z"
+          },
+          {
+            "uuid": "fea4eb89-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:45:37.072Z"
+          },
+          {
+            "uuid": "fe9b75a6-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:45:37.010Z"
+          },
+          {
+            "uuid": "ff3607bc-c24c-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T12:45:38.023Z"
+          },
+          {
+            "uuid": "ffa1e96e-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.730Z"
+          },
+          {
+            "uuid": "ffa1e96f-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.730Z"
+          },
+          {
+            "uuid": "ffa34902-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.739Z"
+          },
+          {
+            "uuid": "ffa34901-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.739Z"
+          },
+          {
+            "uuid": "1490cc07-c24d-11f1-a453-af8a27b3e645",
+            "published": "2026-10-07T12:46:13.850Z"
+          },
+          {
+            "uuid": "1490cc06-c24d-11f1-a453-af8a27b3e645",
+            "published": "2026-10-07T12:46:13.850Z"
+          },
+          {
+            "uuid": "1514c996-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:46:14.715Z"
+          },
+          {
+            "uuid": "1514c995-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:46:14.715Z"
+          },
+          {
+            "uuid": "162b1b7e-c24d-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:46:16.539Z"
+          },
+          {
+            "uuid": "162af46d-c24d-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:46:16.538Z"
+          },
+          {
+            "uuid": "168ac6ff-c24d-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T12:46:17.166Z"
+          },
+          {
+            "uuid": "168aee10-c24d-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T12:46:17.167Z"
+          },
+          {
+            "uuid": "179e3378-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:46:18.971Z"
+          },
+          {
+            "uuid": "179e3379-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:46:18.971Z"
+          },
+          {
+            "uuid": "186ea308-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:46:20.337Z"
+          },
+          {
+            "uuid": "18f7a885-c24d-11f1-9296-7178f00a6621",
+            "published": "2026-10-07T12:46:21.235Z"
+          },
+          {
+            "uuid": "1e9e3126-c24d-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T12:46:30.715Z"
+          },
+          {
+            "uuid": "1eb14403-c24d-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T12:46:30.840Z"
+          },
+          {
+            "uuid": "1f0a12ab-c24d-11f1-b19a-f5d0c13e9bcd",
+            "published": "2026-10-07T12:46:31.422Z"
+          },
+          {
+            "uuid": "1f9f9b5a-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.402Z"
+          },
+          {
+            "uuid": "1f9f9b59-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.402Z"
+          },
+          {
+            "uuid": "1f9e14b7-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.392Z"
+          },
+          {
+            "uuid": "1f9e14b8-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.392Z"
+          },
+          {
+            "uuid": "33ad6d92-c24d-11f1-9178-2f3620e4bf92",
+            "published": "2026-10-07T12:47:06.047Z"
+          },
+          {
+            "uuid": "37569f7d-c24d-11f1-ad7e-2124dee33144",
+            "published": "2026-10-07T12:47:12.189Z"
+          },
+          {
+            "uuid": "3cff233f-c24d-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:47:21.682Z"
+          },
+          {
+            "uuid": "49ec2921-c24d-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:47:43.368Z"
+          },
+          {
+            "uuid": "49f4b4a3-c24d-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:47:43.424Z"
+          },
+          {
+            "uuid": "5c24c5fb-c24d-11f1-959a-bd5140e79657",
+            "published": "2026-10-07T12:48:13.938Z"
+          },
+          {
+            "uuid": "5fd28b43-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:48:20.110Z"
+          },
+          {
+            "uuid": "5fe09507-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:48:20.202Z"
+          },
+          {
+            "uuid": "636b69e0-c24d-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:48:26.145Z"
+          },
+          {
+            "uuid": "63792582-c24d-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:48:26.235Z"
+          },
+          {
+            "uuid": "63d43d44-c24d-11f1-bec5-b36eeb547479",
+            "published": "2026-10-07T12:48:26.832Z"
+          },
+          {
+            "uuid": "64efbf58-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:48:28.690Z"
+          },
+          {
+            "uuid": "64efbf57-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:48:28.690Z"
+          },
+          {
+            "uuid": "64f1bb2a-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:48:28.703Z"
+          },
+          {
+            "uuid": "6627f1dd-c24d-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:48:30.736Z"
+          },
+          {
+            "uuid": "66d28912-c24d-11f1-afe3-85406e610534",
+            "published": "2026-10-07T12:48:31.854Z"
+          },
+          {
+            "uuid": "66e54dcc-c24d-11f1-afe3-85406e610534",
+            "published": "2026-10-07T12:48:31.977Z"
+          },
+          {
+            "uuid": "673ce3a3-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:32.551Z"
+          },
+          {
+            "uuid": "67813f9d-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:48:32.999Z"
+          },
+          {
+            "uuid": "678add14-c24d-11f1-86f3-114741b99ae4",
+            "published": "2026-10-07T12:48:33.062Z"
+          },
+          {
+            "uuid": "67813f9e-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:48:32.999Z"
+          },
+          {
+            "uuid": "678229ff-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:48:33.005Z"
+          },
+          {
+            "uuid": "68d42547-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:48:35.220Z"
+          },
+          {
+            "uuid": "68e0815c-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:48:35.301Z"
+          },
+          {
+            "uuid": "68eba4f3-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:48:35.374Z"
+          },
+          {
+            "uuid": "6982407c-c24d-11f1-a3c7-b71a2ac173c7",
+            "published": "2026-10-07T12:48:36.361Z"
+          },
+          {
+            "uuid": "69be3749-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.754Z"
+          },
+          {
+            "uuid": "69be5e5a-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.755Z"
+          },
+          {
+            "uuid": "69c05a2c-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.768Z"
+          },
+          {
+            "uuid": "69c0813d-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.769Z"
+          },
+          {
+            "uuid": "76d385a6-c24d-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T12:48:58.704Z"
+          },
+          {
+            "uuid": "76d385a7-c24d-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T12:48:58.704Z"
+          },
+          {
+            "uuid": "b6122aa9-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:50:44.811Z"
+          },
+          {
+            "uuid": "b6abab5e-c24d-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:50:45.817Z"
+          },
+          {
+            "uuid": "bb9a06eb-c24d-11f1-8847-9d79c87ea4a0",
+            "published": "2026-10-07T12:50:54.090Z"
+          },
+          {
+            "uuid": "bdf50e9a-c24d-11f1-8604-effc0a7ae1d0",
+            "published": "2026-10-07T12:50:58.042Z"
+          },
+          {
+            "uuid": "be038d8e-c24d-11f1-8604-effc0a7ae1d0",
+            "published": "2026-10-07T12:50:58.137Z"
+          },
+          {
+            "uuid": "be402070-c24d-11f1-b33f-21de9b895bf6",
+            "published": "2026-10-07T12:50:58.534Z"
+          },
+          {
+            "uuid": "bea60e58-c24d-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:50:59.202Z"
+          },
+          {
+            "uuid": "bea80a2a-c24d-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:50:59.215Z"
+          },
+          {
+            "uuid": "bea60e59-c24d-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:50:59.202Z"
+          },
+          {
+            "uuid": "beac4fc8-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:50:59.243Z"
+          },
+          {
+            "uuid": "bf12da68-c24d-11f1-bc6f-4feac054d1c9",
+            "published": "2026-10-07T12:50:59.915Z"
+          },
+          {
+            "uuid": "bf1dd6eb-c24d-11f1-bc6f-4feac054d1c9",
+            "published": "2026-10-07T12:50:59.987Z"
+          },
+          {
+            "uuid": "deadabb1-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:51:52.939Z"
+          },
+          {
+            "uuid": "deae47f3-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:51:52.943Z"
+          },
+          {
+            "uuid": "dedafd90-c24d-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:51:53.236Z"
+          },
+          {
+            "uuid": "0fb8c1e3-c24e-11f1-9225-eda60891f8ad",
+            "published": "2026-10-07T12:53:15.220Z"
+          },
+          {
+            "uuid": "10630b86-c24e-11f1-826e-3f6f2021b37f",
+            "published": "2026-10-07T12:53:16.336Z"
+          },
+          {
+            "uuid": "1358cc3a-c24e-11f1-b33f-21de9b895bf6",
+            "published": "2026-10-07T12:53:21.302Z"
+          },
+          {
+            "uuid": "16422fb0-c24e-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:53:26.187Z"
+          },
+          {
+            "uuid": "16543117-c24e-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:53:26.305Z"
+          },
+          {
+            "uuid": "16924ba7-c24e-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:53:26.712Z"
+          },
+          {
+            "uuid": "171585f3-c24e-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:53:27.572Z"
+          },
+          {
+            "uuid": "171585f2-c24e-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:53:27.572Z"
+          },
+          {
+            "uuid": "1716be75-c24e-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:53:27.580Z"
+          },
+          {
+            "uuid": "171c158c-c24e-11f1-832f-3be49f786063",
+            "published": "2026-10-07T12:53:27.615Z"
+          },
+          {
+            "uuid": "176309a8-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:28.080Z"
+          },
+          {
+            "uuid": "17738470-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:28.188Z"
+          },
+          {
+            "uuid": "229ce045-c24e-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:53:46.914Z"
+          },
+          {
+            "uuid": "25cdae7e-c24e-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:53:52.267Z"
+          },
+          {
+            "uuid": "25c39c59-c24e-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:53:52.201Z"
+          },
+          {
+            "uuid": "279156c9-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:55.227Z"
+          },
+          {
+            "uuid": "27a972af-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:55.385Z"
+          },
+          {
+            "uuid": "28030479-c24e-11f1-bcff-3f375af3cc49",
+            "published": "2026-10-07T12:53:55.972Z"
+          },
+          {
+            "uuid": "291dc3c5-c24e-11f1-977d-3dbb6c8cdd6b",
+            "published": "2026-10-07T12:53:57.825Z"
+          },
+          {
+            "uuid": "291c1613-c24e-11f1-977d-3dbb6c8cdd6b",
+            "published": "2026-10-07T12:53:57.814Z"
+          },
+          {
+            "uuid": "291c1614-c24e-11f1-977d-3dbb6c8cdd6b",
+            "published": "2026-10-07T12:53:57.814Z"
+          },
+          {
+            "uuid": "2a878c75-c24e-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:54:00.196Z"
+          },
+          {
+            "uuid": "2a9d5e70-c24e-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:54:00.339Z"
+          },
+          {
+            "uuid": "2b241afd-c24e-11f1-ae1b-158e049ee200",
+            "published": "2026-10-07T12:54:01.222Z"
+          },
+          {
+            "uuid": "2b25a19e-c24e-11f1-ae1b-158e049ee200",
+            "published": "2026-10-07T12:54:01.232Z"
+          },
+          {
+            "uuid": "2b241afc-c24e-11f1-ae1b-158e049ee200",
+            "published": "2026-10-07T12:54:01.222Z"
+          },
+          {
+            "uuid": "2b2ec904-c24e-11f1-81d2-a3700ca8ea62",
+            "published": "2026-10-07T12:54:01.292Z"
+          },
+          {
+            "uuid": "3edc5d22-c24f-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T13:01:43.803Z"
+          },
+          {
+            "uuid": "41e09c79-c24f-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T13:01:48.864Z"
+          },
+          {
+            "uuid": "41f0c920-c24f-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T13:01:48.970Z"
+          },
+          {
+            "uuid": "4246d880-c24f-11f1-a453-af8a27b3e645",
+            "published": "2026-10-07T13:01:49.534Z"
+          },
+          {
+            "uuid": "42dbc5c6-c24f-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:01:50.510Z"
+          },
+          {
+            "uuid": "42e2f112-c24f-11f1-aee2-8df93fcf6710",
+            "published": "2026-10-07T13:01:50.557Z"
+          },
+          {
+            "uuid": "42ddc198-c24f-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:01:50.523Z"
+          },
+          {
+            "uuid": "42dbc5c7-c24f-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:01:50.510Z"
+          },
+          {
+            "uuid": "45bb8c99-c24f-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T13:01:55.332Z"
+          },
+          {
+            "uuid": "45bb8c98-c24f-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T13:01:55.332Z"
+          },
+          {
+            "uuid": "82cc3b5e-c254-11f1-8c7f-1792e03994cf",
+            "published": "2026-10-07T13:39:25.266Z"
+          },
+          {
+            "uuid": "8c30ddbb-c254-11f1-9bd6-ad097185acaa",
+            "published": "2026-10-07T13:39:41.025Z"
+          },
+          {
+            "uuid": "8c4688a4-c254-11f1-9bd6-ad097185acaa",
+            "published": "2026-10-07T13:39:41.167Z"
+          },
+          {
+            "uuid": "8ca1a09e-c254-11f1-a4a0-2b2f60362a93",
+            "published": "2026-10-07T13:39:41.764Z"
+          },
+          {
+            "uuid": "8d23f047-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:42.618Z"
+          },
+          {
+            "uuid": "8d241758-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:42.619Z"
+          },
+          {
+            "uuid": "8d2576ea-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:42.628Z"
+          },
+          {
+            "uuid": "8d2fb032-c254-11f1-81d2-a3700ca8ea62",
+            "published": "2026-10-07T13:39:42.695Z"
+          },
+          {
+            "uuid": "8ecac267-c254-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T13:39:45.389Z"
+          },
+          {
+            "uuid": "8f7be9fc-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:46.550Z"
+          },
+          {
+            "uuid": "8f90f8a8-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:46.688Z"
+          },
+          {
+            "uuid": "8f8a4239-c254-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T13:39:46.644Z"
+          },
+          {
+            "uuid": "8f886d24-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:46.632Z"
+          },
+          {
+            "uuid": "8f96502b-c254-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T13:39:46.723Z"
+          },
+          {
+            "uuid": "8f9eb3a0-c254-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T13:39:46.778Z"
+          },
+          {
+            "uuid": "906bc7a6-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.122Z"
+          },
+          {
+            "uuid": "906ab634-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.115Z"
+          },
+          {
+            "uuid": "906ab635-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.115Z"
+          },
+          {
+            "uuid": "906bc7a7-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.122Z"
+          },
+          {
+            "uuid": "906dc40a-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.135Z"
+          },
+          {
+            "uuid": "906dc409-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.135Z"
+          },
+          {
+            "uuid": "906fbfdd-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.148Z"
+          },
+          {
+            "uuid": "906fbfdc-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.148Z"
+          },
+          {
+            "uuid": "d533820c-c254-11f1-826e-3f6f2021b37f",
+            "published": "2026-10-07T13:41:43.516Z"
+          },
+          {
+            "uuid": "d5cd51a2-c254-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:41:44.524Z"
+          },
+          {
+            "uuid": "d87c6be7-c254-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T13:41:49.027Z"
+          },
+          {
+            "uuid": "db533259-c254-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T13:41:53.790Z"
+          },
+          {
+            "uuid": "db61632c-c254-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T13:41:53.883Z"
+          },
+          {
+            "uuid": "dbbacdf0-c254-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T13:41:54.469Z"
+          },
+          {
+            "uuid": "dc4497be-c254-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T13:41:55.372Z"
+          },
+          {
+            "uuid": "dc3f18da-c254-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T13:41:55.336Z"
+          },
+          {
+            "uuid": "dc3db948-c254-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T13:41:55.327Z"
+          },
+          {
+            "uuid": "dc3de059-c254-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T13:41:55.328Z"
+          },
+          {
+            "uuid": "dc8d5fc6-c254-11f1-a9b6-db86b38265fe",
+            "published": "2026-10-07T13:41:55.849Z"
+          },
+          {
+            "uuid": "dc865ae2-c254-11f1-a9b6-db86b38265fe",
+            "published": "2026-10-07T13:41:55.803Z"
+          },
+          {
+            "uuid": "6f326c5c-c255-11f1-87f2-4f70815e88b4",
+            "published": "2026-10-07T13:46:01.878Z"
+          },
+          {
+            "uuid": "b5bce4c9-c255-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:48:00.226Z"
+          },
+          {
+            "uuid": "b5bce4c8-c255-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:48:00.226Z"
+          },
+          {
+            "uuid": "4ee0504e-c258-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T14:06:36.143Z"
+          },
+          {
+            "uuid": "5a042edf-c258-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T14:06:54.833Z"
+          },
+          {
+            "uuid": "5a140d68-c258-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T14:06:54.937Z"
+          },
+          {
+            "uuid": "5a7120b4-c258-11f1-99bb-dfb638dee144",
+            "published": "2026-10-07T14:06:55.547Z"
+          },
+          {
+            "uuid": "5af7b682-c258-11f1-80f2-f13bff043800",
+            "published": "2026-10-07T14:06:56.429Z"
+          },
+          {
+            "uuid": "5af7b681-c258-11f1-80f2-f13bff043800",
+            "published": "2026-10-07T14:06:56.429Z"
+          },
+          {
+            "uuid": "5b028c29-c258-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T14:06:56.500Z"
+          },
+          {
+            "uuid": "5af9b254-c258-11f1-80f2-f13bff043800",
+            "published": "2026-10-07T14:06:56.442Z"
+          },
+          {
+            "uuid": "5d147c4a-c258-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T14:06:59.973Z"
+          },
+          {
+            "uuid": "5d836a24-c258-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T14:07:00.700Z"
+          },
+          {
+            "uuid": "5d97dd0c-c258-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T14:07:00.834Z"
+          },
+          {
+            "uuid": "5d903b6a-c258-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T14:07:00.784Z"
+          },
+          {
+            "uuid": "5d89ac38-c258-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T14:07:00.741Z"
+          },
+          {
+            "uuid": "5d998a42-c258-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T14:07:00.845Z"
+          },
+          {
+            "uuid": "5da17a01-c258-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T14:07:00.897Z"
+          },
+          {
+            "uuid": "5e470891-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.982Z"
+          },
+          {
+            "uuid": "5e490462-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.995Z"
+          },
+          {
+            "uuid": "5e470890-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.982Z"
+          },
+          {
+            "uuid": "5e490463-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.995Z"
+          },
+          {
+            "uuid": "5e76a423-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.294Z"
+          },
+          {
+            "uuid": "5e76a424-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.294Z"
+          },
+          {
+            "uuid": "5e77dca7-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.302Z"
+          },
+          {
+            "uuid": "5e77dca8-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.302Z"
+          },
+          {
+            "uuid": "66b6c367-c258-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T14:07:16.136Z"
+          },
+          {
+            "uuid": "7742c13c-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:43.897Z"
+          },
+          {
+            "uuid": "77ee913d-c258-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T14:07:45.023Z"
+          },
+          {
+            "uuid": "7aff061d-c258-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T14:07:50.164Z"
+          },
+          {
+            "uuid": "7d027688-c258-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T14:07:53.542Z"
+          },
+          {
+            "uuid": "7d14ed1e-c258-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T14:07:53.663Z"
+          },
+          {
+            "uuid": "7d6d6dd3-c258-11f1-8c1f-8f3a0d574c30",
+            "published": "2026-10-07T14:07:54.243Z"
+          },
+          {
+            "uuid": "7deed2e3-c258-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T14:07:55.091Z"
+          },
+          {
+            "uuid": "7df5d7c5-c258-11f1-a051-313a74336e16",
+            "published": "2026-10-07T14:07:55.137Z"
+          },
+          {
+            "uuid": "7df0ceb7-c258-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T14:07:55.104Z"
+          },
+          {
+            "uuid": "7deed2e4-c258-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T14:07:55.091Z"
+          },
+          {
+            "uuid": "7e36d7f3-c258-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T14:07:55.563Z"
+          },
+          {
+            "uuid": "7e3d8eb6-c258-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T14:07:55.607Z"
+          },
+          {
+            "uuid": "ad2ddb3b-c258-11f1-bf43-49f73071f241",
+            "published": "2026-10-07T14:09:14.357Z"
+          }
+        ]
+- name: 200 - 14s after seeded group create+delete, still empty
+  request:
+    url: '{{base_url}}/logs?sortOrder=ASCENDING&limit=1000&after=1791382154413_1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '58'
+    - name: x-rate-limit-reset
+      value: '1791382974'
+    - name: link
+      value: <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="self", <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="next"
+    body:
+      type: json
+      data: '[]'
+- name: 200 - 75s after seeded group create+delete, both events returned (projection)
+  request:
+    url: '{{base_url}}/logs?sortOrder=ASCENDING&limit=1000&after=1791382154413_1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '58'
+    - name: x-rate-limit-reset
+      value: '1791383035'
+    - name: link
+      value: <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="self", <{{base_url}}/logs?limit=1000&sortOrder=ASCENDING&after=1791382901202_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "68a53a42-c25a-11f1-afe3-85406e610534",
+            "published": "2026-10-07T14:21:38.370Z",
+            "eventType": "group.lifecycle.create"
+          },
+          {
+            "uuid": "6a3db49b-c25a-11f1-a0f4-bffdd986e45b",
+            "published": "2026-10-07T14:21:41.047Z",
+            "eventType": "group.lifecycle.delete"
+          }
+        ]
