@@ -417,7 +417,7 @@ func TestAddBinding(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer tr.store.conn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 
 	require.Len(t, tr.bindings, 1)
 	require.NotEmpty(t, tr.bindings[0].load.querySQL)
@@ -529,7 +529,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// Store: insert a row via stage table, then move to target.
@@ -804,7 +804,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// Insert a live row.
@@ -851,7 +851,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
 
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	return tr.bindings[0], storeConn, tr.load.conn
 }
 
@@ -1139,8 +1139,8 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.store.conn = storeConn
-	require.NoError(t, tr.addBinding(ctx, tableA))
-	require.NoError(t, tr.addBinding(ctx, tableB))
+	require.NoError(t, tr.addBinding(ctx, tableA, tableA.Path))
+	require.NoError(t, tr.addBinding(ctx, tableB, tableB.Path))
 	require.Len(t, tr.bindings, 2)
 	defer storeConn.Close()
 
@@ -1227,7 +1227,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// Ensure the store stage table is empty and insert a row.
@@ -1297,7 +1297,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	return tr, tr.bindings[0]
 }
 
@@ -1535,7 +1535,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	require.NoError(t, tr.ensureTempTables(ctx, b))
@@ -1624,7 +1624,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	require.NoError(t, tr.ensureTempTables(ctx, b))
@@ -1860,7 +1860,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tr.store.conn.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tr.dialect.Identifier("test_subset_b"))))
 		require.NoError(t, tr.store.conn.Exec(ctx, createSQL))
-		require.NoError(t, tr.addBinding(ctx, table2))
+		require.NoError(t, tr.addBinding(ctx, table2, table2.Path))
 		b2 := tr.bindings[1]
 
 		require.NoError(t, tr.ensureTempTables(ctx, b1))

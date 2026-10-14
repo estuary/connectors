@@ -342,7 +342,7 @@ func TestPartitionByDataPath(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// A single commit spanning three months moves three distinct partitions
@@ -435,7 +435,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	require.NoError(t, err)
 	tr.load.conn = loadConn
 	defer loadConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// A staged row of the pending pre-backfill commit.
@@ -584,7 +584,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 
 	require.NoError(t, tr.ensureTempTables(ctx, tr.bindings[0]))
 

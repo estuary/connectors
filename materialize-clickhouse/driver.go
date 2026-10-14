@@ -490,10 +490,11 @@ func newTransactor(
 	}
 
 	for _, target := range bindings {
+		var resourcePath = target.Path
 		if cfg.distributed() {
 			target = localTable(target, ep.Dialect, cfg.clusterDDL())
 		}
-		if err = t.addBinding(ctx, target); err != nil {
+		if err = t.addBinding(ctx, target, resourcePath); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
 	}
@@ -611,7 +612,11 @@ func (t *transactor) requireIsDeletedColumn(ctx context.Context, b *binding) err
 }
 
 type binding struct {
-	target            sql.Table
+	target sql.Table
+	// resourcePath is the binding's path in the materialization spec, which
+	// stays the user's table name when target is re-addressed at a local
+	// table.
+	resourcePath      []string
 	nullFieldsToStrip []string
 	load              struct {
 		createTableSQL string
@@ -638,8 +643,8 @@ type binding struct {
 	}
 }
 
-func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
-	b := &binding{target: target}
+func (t *transactor) addBinding(_ context.Context, target sql.Table, resourcePath []string) error {
+	b := &binding{target: target, resourcePath: resourcePath}
 
 	var queryLoadTemplate = t.templates.queryLoadTable
 	if t.cfg.Advanced.NoFlowDocument {
@@ -1394,7 +1399,7 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 			stats = stats.WithTruncated(*truncated)
 		}
 	}
-	t.be.ReportRowStats(si.Round, b.target.Path, stats)
+	t.be.ReportRowStats(si.Round, b.resourcePath, stats)
 
 	return nil
 }
