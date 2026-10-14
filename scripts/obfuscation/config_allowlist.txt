@@ -41,6 +41,11 @@ exclusiveCollectionFilter
 disable_real_time
 disable_backfill
 is_free_plan
+lookback_window_days
+report_type
+data_level
+granularity
+breakdowns
 capture_intermediate
 captureMode
 backfillMode
