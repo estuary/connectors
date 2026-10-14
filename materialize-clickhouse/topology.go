@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -37,8 +38,11 @@ type topology struct {
 // readTopology reads the cluster's layout from the server the connection is
 // open to.
 func readTopology(ctx context.Context, conn chdriver.Conn, cluster string) (*topology, error) {
+	// host_name is what the cluster's own members dial and what a TLS
+	// certificate names; host_address is the resolved IP, kept as a fallback.
 	rows, err := conn.Query(ctx, `
-		SELECT shard_num, replica_num, shard_weight, host_address, port, errors_count
+		SELECT shard_num, replica_num, shard_weight,
+			if(host_name = '', host_address, host_name), port, errors_count
 		FROM system.clusters WHERE cluster = ?
 		ORDER BY shard_num, replica_num`, cluster)
 	if err != nil {
@@ -100,20 +104,10 @@ func (t *topology) pickReplicas() []replica {
 	return out
 }
 
-// equal reports whether two layouts place rows identically: the same shards,
-// with the same weights, made of the same members. Error counts are
-// transient and do not affect placement.
+// equal reports whether two layouts place rows identically, which depends
+// only on the number of shards and their weights.
 func (t *topology) equal(o *topology) bool {
-	if t.Cluster != o.Cluster || len(t.Replicas) != len(o.Replicas) {
-		return false
-	}
-	for i := range t.Replicas {
-		var a, b = t.Replicas[i], o.Replicas[i]
-		if a.Shard != b.Shard || a.Replica != b.Replica || a.Weight != b.Weight || a.Host != b.Host || a.Port != b.Port {
-			return false
-		}
-	}
-	return true
+	return t.Cluster == o.Cluster && slices.Equal(t.weights(), o.weights())
 }
 
 func (t *topology) logFields() log.Fields {
