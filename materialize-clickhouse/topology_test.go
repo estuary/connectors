@@ -37,6 +37,12 @@ func TestTopologyPure(t *testing.T) {
 	grown.Replicas = append(append([]replica(nil), topo.Replicas...), replica{Shard: 3, Replica: 1, Weight: 1, Host: "e", Port: 1})
 	require.False(t, topo.equal(&grown))
 	require.Equal(t, 3, grown.shardCount())
+
+	var moved = *topo
+	moved.Replicas = append([]replica(nil), topo.Replicas...)
+	moved.Replicas[1].Host = "b2"
+	moved.Replicas[1].Port = 2
+	require.True(t, topo.equal(&moved), "a replica's address does not change placement")
 }
 
 func TestTopologyCluster(t *testing.T) {
