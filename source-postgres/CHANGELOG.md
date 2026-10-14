@@ -8,6 +8,11 @@
   Enable it in `advanced.feature_flags` for captures with a single large column
   per row. Documents remain subject to the platform's 64 MiB message limit.
 
+### Changed
+- Backfill progress in the connector status now counts tables which finished
+  backfilling since the capture last restarted, and includes an approximate
+  time remaining.
+
 ## 2026-10-12
 
 ### Fixed
