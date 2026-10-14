@@ -1629,21 +1629,23 @@ func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table str
 		return
 	}
 
-	var queuedOverloadTime stdsql.NullInt64
+	var queuedOverloadTime, transactionBlockedTime, executionTime stdsql.NullInt64
 	row = db.QueryRowContext(ctx,
-		`SELECT QUEUED_OVERLOAD_TIME FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) WHERE QUERY_ID = ?`,
+		`SELECT QUEUED_OVERLOAD_TIME, TRANSACTION_BLOCKED_TIME, EXECUTION_TIME FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) WHERE QUERY_ID = ?`,
 		queryID,
 	)
-	if err := row.Scan(&queuedOverloadTime); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch queued overload time")
+	if err := row.Scan(&queuedOverloadTime, &transactionBlockedTime, &executionTime); err != nil {
+		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch query history times")
 	}
 
 	log.WithFields(log.Fields{
-		"table":                   table,
-		"query_id":                queryID,
-		"partitions_scanned":      scanned.Int64,
-		"partitions_total":        total.Int64,
-		"queued_overload_time_ms": queuedOverloadTime.Int64,
+		"table":                       table,
+		"query_id":                    queryID,
+		"partitions_scanned":          scanned.Int64,
+		"partitions_total":            total.Int64,
+		"queued_overload_time_ms":     queuedOverloadTime.Int64,
+		"transaction_blocked_time_ms": transactionBlockedTime.Int64,
+		"execution_time_ms":           executionTime.Int64,
 	}).Debug("query stats")
 }
 
