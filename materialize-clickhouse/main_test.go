@@ -20,7 +20,7 @@ type composeStack struct {
 }
 
 var (
-	// singleNode is the one-server stack every existing test uses.
+	// singleNode is a single ClickHouse server.
 	singleNode = &composeStack{file: "docker-compose.yaml"}
 	// cluster is two ClickHouse shards of two replicas each plus one Keeper.
 	cluster = &composeStack{file: "docker-compose.cluster.yaml"}
