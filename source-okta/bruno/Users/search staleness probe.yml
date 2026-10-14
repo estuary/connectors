@@ -1,0 +1,59 @@
+info:
+  name: search staleness probe
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=200&search=id eq \"{{seed_user_id}}\" and lastUpdated le \"{{users_until}}\"&sortBy=lastUpdated&sortOrder=asc"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: search
+      value: id eq "{{seed_user_id}}" and lastUpdated le "{{users_until}}"
+      type: query
+    - name: sortBy
+      value: lastUpdated
+      type: query
+    - name: sortOrder
+      value: asc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** `search` is eventually consistent, so it can match a user on a
+  stale index entry. This checks how quickly the Users index catches up to a
+  write, and whether a stale match returns a stale or a fresh body. Run immediately
+  after `Seeding / Touch User Nickname`, with `users_until` set to the user's
+  `lastUpdated` from *before* the touch. Possible results:
+  - Empty: the index had already caught up (lag shorter than the gap between
+    the two runs).
+  - The user with the **new** `lastUpdated`: a stale match with a fresh body.
+  - The user with the **old** `lastUpdated`: a stale match with a stale body.
+
+  **VERIFIED (2026-10-08):** the fixture's `lastUpdated` was 12:29:33.
+  `Seeding / Touch User Nickname` moved it to 17:47:24. A search for
+  `lastUpdated le 12:29:33`, finished by 17:47:29, returned nothing, and
+  `le 17:47:24` returned the user at 17:47:24. The Users index caught up within
+  about 3–5 s, which is faster than two back-to-back `bru` runs can observe.
+
+  **UNOBSERVABLE:** whether a stale Users index match returns a stale or a fresh
+  body. The lag window is shorter than this tooling can probe. Groups' `search`
+  demonstrably serves index documents (`Groups / sort probe`), and Okta advises:
+  "Use an ID lookup for records that you update to ensure your results contain
+  the latest data" (`listUsers` `search`, DOCUMENTED 2026-10-07). The
+  connector therefore assumes Users bodies can be stale for that lag, and
+  holds every `search` window behind the 10-minute index settle, far longer
+  than the observed lag. In `Users / sort probe`, Users `search` bodies matched
+  `filter` bodies on `id`, `status`, `created`, `lastUpdated` and
+  `statusChanged` for all 5 users. `profile` and the other fields weren't
+  compared.

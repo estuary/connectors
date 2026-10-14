@@ -1,0 +1,38 @@
+info:
+  name: Delete Member User C
+  type: http
+  seq: 34
+
+http:
+  method: DELETE
+  url: "{{base_url}}/users/{{members_seed_user_c_id}}?sendEmail=false"
+  params:
+    - name: sendEmail
+      value: "false"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_user_c_id')) await bru.runRequest('Seeding/Deactivate Member User C');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/deleteUser
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** hard-deletes User C while it is still a member of `estuary-members-group`.
+  `Group members / membership events cascade` then shows whether Okta logs a
+  `group.user_membership.remove` for the group, or only `user.lifecycle.delete.*` —
+  i.e. whether an event-driven Group_members can retract a deleted user's memberships.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

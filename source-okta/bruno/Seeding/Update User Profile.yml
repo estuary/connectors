@@ -1,0 +1,41 @@
+info:
+  name: Update User Profile
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_user_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "nickName": "estuary-updated-probe"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id')) await bru.runRequest('Seeding/Create Active User');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user (partial)](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/updateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** a no-op-shaped profile write (`nickName`) that advances the user's
+  `lastUpdated` past its `created`. It shows the update cursor moving and feeds
+  `Users / lastUpdated boundary`.
+
+  **Outcome:** ran 2026-10-07 and moved `lastUpdated` to 16:20:17. The finding is
+  VERIFIED in `Users / lastUpdated boundary` and `Users / incremental window`.

@@ -1,0 +1,53 @@
+info:
+  name: Set Custom Value
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_user_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "estuarySeedCostCode": "CC-12"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id') && !bru.getEnvVar('seed_user_id')) {
+          await bru.runRequest('Seeding/Create Active User');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user (partial)](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/updateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** sets the default-schema custom attribute `estuarySeedCostCode`
+  (defined by the snapshots session) on the fixture user. It shows what a set
+  custom value looks like in `profile` and whether the write moves
+  `lastUpdated`. Read the result with `Users / get by id`. It is the first step
+  of the cleared-value probe (`Seeding / Clear Custom Value`).
+
+  **Outcome:** ran 2026-10-08. `profile.estuarySeedCostCode` became `"CC-12"`
+  (a plain top-level profile key) and `lastUpdated` moved to 12:28:50. This
+  closes the snapshots session's PENDING on a set custom value. VERIFIED in
+  `Users / get by id`.
+
+  **Also ran 2026-10-08 against `00u18gupu552EU005698`** (the members cluster's
+  fixture user) through a request-level `seed_user_id` pin added outside the
+  assistant's session; the pin has since been removed. That user now carries
+  `estuarySeedCostCode: "CC-12"`, and its `lastUpdated` moved to
+  2026-10-08T12:44:59.

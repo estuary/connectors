@@ -1,0 +1,148 @@
+info:
+  name: lastUpdated boundary
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=200&filter={{users_filter}}"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: filter
+      value: "{{users_filter}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - gt 16:20:17.000Z excludes the anchor (0 items)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated gt \"2026-10-07T16:20:17.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: "[]"
+  - name: 200 - ge 16:20:17.000Z includes the anchor (projection)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated ge \"2026-10-07T16:20:17.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00u18h00o173Yc9fV698", "status": "STAGED", "lastUpdated": "2026-10-07T16:20:17.000Z" }
+          ]
+  - name: 200 - gt 16:20:16.999Z includes the anchor, ms honored (projection)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated gt \"2026-10-07T16:20:16.999Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00u18h00o173Yc9fV698", "status": "STAGED", "lastUpdated": "2026-10-07T16:20:17.000Z" }
+          ]
+  - name: 200 - lt 16:20:17.000Z excludes the anchor, 4 of 5 (projection)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated lt \"2026-10-07T16:20:17.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00u176zmwbsJ1Uak8698", "status": "ACTIVE", "lastUpdated": "2026-09-03T19:37:36.000Z" },
+            { "id": "00u18gupu552EU005698", "status": "STAGED", "lastUpdated": "2026-10-07T14:36:28.000Z" },
+            { "id": "00u18gut4epTYtsK2698", "status": "DEPROVISIONED", "lastUpdated": "2026-10-07T14:39:17.000Z" },
+            { "id": "00u18gzxz10URexK9698", "status": "DEPROVISIONED", "lastUpdated": "2026-10-07T16:20:07.000Z" }
+          ]
+  - name: 200 - le 16:20:17.000Z includes the anchor, 5 of 5 (projection)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated le \"2026-10-07T16:20:17.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00u176zmwbsJ1Uak8698", "status": "ACTIVE", "lastUpdated": "2026-09-03T19:37:36.000Z" },
+            { "id": "00u18gupu552EU005698", "status": "STAGED", "lastUpdated": "2026-10-07T14:36:28.000Z" },
+            { "id": "00u18gut4epTYtsK2698", "status": "DEPROVISIONED", "lastUpdated": "2026-10-07T14:39:17.000Z" },
+            { "id": "00u18gzxz10URexK9698", "status": "DEPROVISIONED", "lastUpdated": "2026-10-07T16:20:07.000Z" },
+            { "id": "00u18h00o173Yc9fV698", "status": "STAGED", "lastUpdated": "2026-10-07T16:20:17.000Z" }
+          ]
+  - name: 400 - timestamp without milliseconds rejected (E0000020)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated gt \"2026-10-07T16:20:16Z\""
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "errorCode": "E0000020",
+            "errorSummary": "Bad request.",
+            "errorLink": "E0000020",
+            "errorId": "oaeTJ2X_XwMRWeTC5lecFQOEQ",
+            "errorCauses": []
+          }
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** pins the inclusivity of each `lastUpdated` operator and the
+  timestamp's real resolution, using the bound set to a document's exact
+  `lastUpdated` (`FETCH-SERVER-SIDE-BOUNDARIES`). Run it once per variant with
+  `--env-var users_filter=…`; each variant's example is named for its filter.
+  The anchor is user `00u18h00o173Yc9fV698`, `lastUpdated` 16:20:17.000Z, set by
+  `Seeding / Update User Profile`.
+
+  **VERIFIED (2026-10-07):** at the anchor's exact instant, `gt` and `lt` are
+  exclusive and `ge` and `le` are inclusive. `gt 16:20:16.999Z` includes it, so
+  the comparison is millisecond-precise. `gt 16:20:17.000Z` excludes it, so the
+  stored value is exactly `.000` with no hidden sub-second part. Okta stamps
+  whole seconds, so the tick is 1 s.
+
+  **LIMITATION (VERIFIED 2026-10-07):** a filter timestamp without milliseconds
+  (`"2026-10-07T16:20:16Z"`) is rejected with `400 E0000020 Bad request.` The
+  connector must render every filter bound as `YYYY-MM-DDTHH:MM:SS.000Z`.

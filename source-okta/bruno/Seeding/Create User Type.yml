@@ -1,0 +1,77 @@
+info:
+  name: Create User Type
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/meta/types/user"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "estuarySeedContractor",
+        "displayName": "Estuary Seed Contractor",
+        "description": "Seeded by the source-okta Bruno collection: a second user type, with its own profile schema."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - created user type estuarySeedContractor"
+    request:
+      url: "{{base_url}}/meta/types/user"
+      method: POST
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "500"
+      body:
+        type: json
+        data: |-
+          {
+            "id": "oty18gusqxw7j8TeA698",
+            "displayName": "Estuary Seed Contractor",
+            "name": "estuarySeedContractor",
+            "description": "Seeded by the source-okta Bruno collection: a second user type, with its own profile schema.",
+            "createdBy": "00u176zmwbsJ1Uak8698",
+            "lastUpdatedBy": "00u176zmwbsJ1Uak8698",
+            "created": "2026-10-07T14:36:59.000Z",
+            "lastUpdated": "2026-10-07T14:36:59.000Z",
+            "default": false,
+            "_links": {
+              "schema": {
+                "rel": "schema",
+                "href": "https://integrator-9297012.okta.com/api/v1/meta/schemas/user/osc18gusqxw7j8TeA698",
+                "method": "GET"
+              },
+              "self": {
+                "rel": "self",
+                "href": "https://integrator-9297012.okta.com/api/v1/meta/types/user/oty18gusqxw7j8TeA698",
+                "method": "GET"
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Create a user type](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/UserType/#tag/UserType/operation/createUserType)
+
+  **WHY:** the org has only the `default` user type, so per-type schema iteration and
+  the non-default schema's `id` can't be observed. Okta allows nine extra types per org.
+  Feeds `User Custom Profile / user types` (two types) and
+  `User Custom Profile / schema by type` (its after-response picks the non-default type):
+  is a non-default schema's `id` its own URL, distinct from the default's
+  `.../meta/schemas/user/default`? That decides whether `id` can key the document.
+
+  **Cleanup:** `DELETE /api/v1/meta/types/user/{typeId}` (only while no user has the type).
+
+  Outcome: ran 2026-10-07 (assistant, `seeding: assistant`); created `oty18gusqxw7j8TeA698`. Finding VERIFIED in `User Custom Profile / schema by type`.

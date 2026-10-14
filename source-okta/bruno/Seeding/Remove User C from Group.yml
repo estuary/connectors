@@ -1,0 +1,32 @@
+info:
+  name: Remove User C from Group
+  type: http
+  seq: 32
+
+http:
+  method: DELETE
+  url: "{{base_url}}/groups/{{members_seed_group_id}}/users/{{members_seed_user_c_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_user_c_id')) await bru.runRequest('Seeding/Add User C to Group');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/unassignUserFromGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** an explicit membership removal, to capture the shape of the
+  `group.user_membership.remove` event in `Group members / membership events cascade`.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

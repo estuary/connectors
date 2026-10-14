@@ -1,0 +1,32 @@
+info:
+  name: Add User A to Doomed Group
+  type: http
+  seq: 36
+
+http:
+  method: PUT
+  url: "{{base_url}}/groups/{{members_doomed_group_id}}/users/{{member_user_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_doomed_group_id')) await bru.runRequest('Seeding/Create Doomed Group');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/assignUserToGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** gives the doomed group a member (seeded User A, pinned as `member_user_id`)
+  before `Seeding / Delete Doomed Group`.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

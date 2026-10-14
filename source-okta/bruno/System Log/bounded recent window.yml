@@ -1,0 +1,81 @@
+info:
+  name: bounded recent window
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since={{logs_since}}&until={{logs_until}}&sortOrder=ASCENDING&limit=1000"
+  params:
+    - name: since
+      value: "{{logs_since}}"
+      type: query
+    - name: until
+      value: "{{logs_until}}"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** visibility race between the two request modes. Run alongside
+  `System Log / polling resume after` right after `Seeding / Create Group`:
+  if a fresh event shows up in a bounded window before the polling head
+  returns it, Okta holds polling back server-side (polling is the gap-safe
+  mode); if both see it at the same moment, every query lags indexing and a
+  bounded-window design needs a lookback at least that long.
+
+  **VERIFIED (2026-10-07):** bounded queries see fresh events first. The
+  seeded pair (published 14:28:10/14:28:13) appeared here by 14:28:20,
+  while `System Log / polling first page` withheld it until between
+  14:29:00 and 14:29:19. In an earlier run the bounded window showed a pair
+  within ~35 s. Bounded results therefore lag ingestion by only seconds, and
+  Okta's undocumented "may be delayed" caveat is the only bound on how late
+  a `published` value can still appear inside an already-read window.
+
+examples:
+- name: 200 - 14:28:20, ~7s after seeded events, bounded already returns both (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&until=2026-10-07T14%3A59%3A00Z&sortOrder=ASCENDING&limit=1000'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '59'
+    - name: x-rate-limit-reset
+      value: '1791383360'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&until=2026-10-07T14%3A59%3A00Z&limit=1000&sortOrder=ASCENDING>; rel="self"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "524b11e2-c25b-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T14:28:10.366Z",
+            "eventType": "group.lifecycle.create"
+          },
+          {
+            "uuid": "54168337-c25b-11f1-8c1f-8f3a0d574c30",
+            "published": "2026-10-07T14:28:13.377Z",
+            "eventType": "group.lifecycle.delete"
+          }
+        ]
