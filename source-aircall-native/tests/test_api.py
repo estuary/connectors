@@ -230,3 +230,41 @@ def test_call_keeps_only_contact_id():
     assert (
         Call.model_validate({"id": 2, "contact": None}).model_dump()["contact"] is None
     )
+
+
+def test_requests_are_paced_per_minute(monkeypatch):
+    import source_aircall_native as connector
+    from estuary_cdk.http import HTTPMixin
+
+    clock = [0.0]
+    sleeps = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += seconds
+
+    async def fake_send(self, *args):
+        return "response"
+
+    monkeypatch.setattr(connector, "REQUESTS_PER_MINUTE", 3)
+    monkeypatch.setattr(connector.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(connector.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(HTTPMixin, "_establish_connection_and_get_response", fake_send)
+    monkeypatch.setattr(connector.Connector, "_request_times", connector.deque())
+
+    sent = []
+
+    async def send_five():
+        c = connector.Connector()
+        for _ in range(5):
+            await c._establish_connection_and_get_response(
+                LOG, "u", "GET", None, None, None, True, {}, None
+            )
+            sent.append(clock[0])
+            clock[0] += 1
+
+    asyncio.run(send_five())
+
+    assert sleeps == [57.0]
+    assert sent == [0.0, 1.0, 2.0, 60.0, 61.0]
+    assert all(sum(t <= s < t + 60 for s in sent) <= 3 for t in sent)
