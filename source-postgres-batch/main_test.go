@@ -584,6 +584,8 @@ func TestDateAndTimeTypes(t *testing.T) {
 			{11, "500-02-14 BC", "500-02-14 BC 15:30:45",
 				time.Date(-499, 2, 14, 15, 30, 45, 0, time.UTC),
 				nil, nil, nil},
+			{12, "infinity", "infinity", "infinity", nil, nil, nil},
+			{13, "-infinity", "-infinity", "-infinity", nil, nil, nil},
 		} {
 			executeControlQuery(t, control, fmt.Sprintf(`
                 INSERT INTO %s (

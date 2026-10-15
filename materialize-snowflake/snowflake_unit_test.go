@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -157,4 +158,54 @@ func TestAcknowledgeDrainsStagedWorkBesideStreamV2(t *testing.T) {
 	require.NotNil(t, state)
 	require.JSONEq(t, `{"a_table.v1":null}`, string(state.UpdatedJson))
 	require.Nil(t, d.cp["a_table.v1"])
+}
+
+func TestStreamingChannelQuotesSchema(t *testing.T) {
+	for _, tc := range []struct {
+		schema string
+		want   string
+	}{
+		{schema: "simple_schema", want: "SIMPLE_SCHEMA"},
+		{schema: "hyphen-schema", want: `"hyphen-schema"`},
+		{schema: "table", want: `"table"`},
+	} {
+		t.Run(tc.schema, func(t *testing.T) {
+			var gotSchema, gotTable string
+			var mux = http.NewServeMux()
+			mux.HandleFunc("POST /v1/streaming/channels/open", func(w http.ResponseWriter, r *http.Request) {
+				var body struct {
+					Schema string `json:"schema"`
+					Table  string `json:"table"`
+				}
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				gotSchema, gotTable = body.Schema, body.Table
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"message":"Success","status_code":0}`)
+			})
+			var ts = httptest.NewServer(mux)
+			t.Cleanup(ts.Close)
+			pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+			require.NoError(t, err)
+
+			var d = &transactor{
+				cfg:          config{Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT}},
+				featureFlags: map[string]bool{flagSnowpipeStreaming: true},
+				ep:           &sql.Endpoint[config]{Dialect: snowflakeDialect("PUBLIC", timestampTypeLTZ, nil)},
+				snowpipeStreaming: &streamManager{
+					c: &streamClient{
+						r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
+						key:      pkey,
+						user:     "TEST_USER",
+						database: "D",
+						account:  "TEST_ACCOUNT",
+					},
+					tableStreams: make(map[int]*tableStream),
+				},
+			}
+			var target = sql.Table{TableShape: sql.TableShape{Path: []string{tc.schema, "my-table"}, DeltaUpdates: true}}
+			require.NoError(t, d.addBinding(context.Background(), target, checkpointItem{}))
+			require.Equal(t, tc.want, gotSchema)
+			require.Equal(t, `"my-table"`, gotTable)
+		})
+	}
 }

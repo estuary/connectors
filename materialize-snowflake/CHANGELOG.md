@@ -1,5 +1,19 @@
 # materialize-snowflake
 
+## 2026-10-15
+
+### Fixed
+- Delta-updates bindings using Snowpipe Streaming can now write to a schema
+  whose name needs quoting, such as one containing a hyphen. Previously
+  opening the streaming channel failed with "The supplied schema does not
+  exist or is not authorized. (code 9)".
+
+## 2026-10-13
+
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to the date range of each transaction's keys.
+
 ## 2026-10-12
 
 ### Fixed

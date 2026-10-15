@@ -14,15 +14,13 @@ from typing import TypeVar, TypeAlias
 import pydantic
 import datetime
 
-try:
-    import pydantic.v1
-
+if not pydantic.VERSION.startswith("1."):
     VERSION = "v2"
 
     # GenericModel was removed. It's just BaseModel now.
     GenericModel: TypeAlias = pydantic.BaseModel
 
-except ImportError:
+else:
     VERSION = "v1"
 
     import orjson

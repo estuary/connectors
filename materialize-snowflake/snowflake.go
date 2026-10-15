@@ -429,7 +429,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 			// We're upgrading from streams v1, and the v1 path left behind some
 			// blobs that only it can drain.
 
-			if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
+			if err := d.snowpipeStreaming.addBinding(ctx, d.ep.Identifier(loc.TableSchema), d.ep.Identifier(loc.TableName), b.target); err != nil {
 				return fmt.Errorf(
 					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again",
 					b.target.Identifier, len(cp.StreamBlobs), err)
@@ -461,7 +461,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 	}
 
 	if d.cfg.isStreamsV1(b.target.DeltaUpdates, d.featureFlags) {
-		if err := d.snowpipeStreaming.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target); err != nil {
+		if err := d.snowpipeStreaming.addBinding(ctx, d.ep.Identifier(loc.TableSchema), d.ep.Identifier(loc.TableName), b.target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
 			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {

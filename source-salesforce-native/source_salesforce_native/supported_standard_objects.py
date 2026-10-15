@@ -4368,6 +4368,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ServiceContractShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
+    "ServiceCrew": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ServiceCrewMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "ServicePresenceStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },

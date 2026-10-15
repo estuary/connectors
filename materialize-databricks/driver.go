@@ -399,6 +399,14 @@ type binding struct {
 	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
+// isTimestampColumn reports whether a date-time key is a TIMESTAMP column,
+// which parses any RFC3339 form of a bound literal to the same instant. A
+// STRING column, which datetime_keys_as_string selects, compares values as
+// text, where equal instants in different forms don't sort together.
+func isTimestampColumn(col sql.Column) bool {
+	return col.BareDDL == "TIMESTAMP"
+}
+
 func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
 
@@ -420,8 +428,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
-	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
-	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
 
 	t.bindings = append(t.bindings, b)
 
@@ -1114,7 +1122,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
 		if stats, err := d.execQuery(ctx, db, query); err != nil {
-			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES") || strings.Contains(err.Error(), "COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") || strings.Contains(err.Error(), "DELTA_TABLE_NOT_FOUND") || strings.Contains(err.Error(), "DELTA_TRUNCATED_TRANSACTION_LOG") || strings.Contains(err.Error(), "DELTA_FILE_NOT_FOUND") || strings.Contains(err.Error(), "FAILED_READ_FILE")) {
+			if tolerateMissing && isMissingError(err) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
@@ -1123,6 +1131,30 @@ func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []s
 		}
 	}
 	return nil
+}
+
+// missingErrorMessages identify a commit query error caused by its staged
+// files, staging table or target table having been deleted, in whole or in
+// part.
+var missingErrorMessages = []string{
+	"PATH_NOT_FOUND",
+	"Path does not exist",
+	"CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES",
+	"COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED",
+	"Table doesn't exist",
+	"TABLE_OR_VIEW_NOT_FOUND",
+	"DELTA_TABLE_NOT_FOUND",
+	"DELTA_TRUNCATED_TRANSACTION_LOG",
+	"DELTA_MISSING_TRANSACTION_LOG",
+	"DELTA_FILE_NOT_FOUND",
+	"FAILED_READ_FILE",
+}
+
+func isMissingError(err error) bool {
+	var text = err.Error()
+	return slices.ContainsFunc(missingErrorMessages, func(msg string) bool {
+		return strings.Contains(text, msg)
+	})
 }
 
 // retriableErrorClasses are the Databricks error classes of a commit query
@@ -1145,8 +1177,9 @@ var queryRetryDelay = func(attempt int) time.Duration {
 }
 
 func isRetriableError(err error) bool {
+	var text = err.Error()
 	return slices.ContainsFunc(retriableErrorClasses, func(class string) bool {
-		return strings.Contains(err.Error(), class)
+		return strings.Contains(text, class)
 	})
 }
 

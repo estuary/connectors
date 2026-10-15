@@ -39,8 +39,10 @@ func (c client) queryIdempotent(
 ) (*bigquery.JobStatus, error) {
 	q := c.bigqueryClient.Query(query)
 	q.Location = c.cfg.Region
-	q.TableDefinitions = map[string]bigquery.ExternalData{
-		tempTableName: edc(sourceURIs, schema),
+	if tempTableName != "" {
+		q.TableDefinitions = map[string]bigquery.ExternalData{
+			tempTableName: edc(sourceURIs, schema),
+		}
 	}
 
 	var attempt uint32 = 1

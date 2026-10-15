@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-13
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to each transaction's key range, exact for `TIMESTAMP` keys and
+  by date for `STRING` keys.
+
+## 2026-10-12
+### Fixed
+- A materialization that restarts partway through a commit no longer fails on
+  every restart after it when a table's staging data was already cleaned up.
+
 ## 2026-10-07
 ### Changed
 - A transaction's tables are committed concurrently, up to five at a time,

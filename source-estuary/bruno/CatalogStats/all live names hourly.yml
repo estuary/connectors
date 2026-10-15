@@ -1,0 +1,160 @@
+info:
+  name: all live names hourly
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query($names:[String!]!,$grain:CatalogStatsGrain!,$start:DateTime!,$end:DateTime!){ catalogStats(by:{names:$names,grain:$grain,start:$start,end:$end}){ pageInfo{hasNextPage} edges{ node{ catalogName grain timestamp statsSummary{ readByMe{docsTotal bytesTotal} readFromMe{docsTotal bytesTotal} writtenByMe{docsTotal bytesTotal} writtenToMe{docsTotal bytesTotal} warnings errors failures usageSeconds txnCount lastPublishedAt } taskStats{ capture{collection right{docsTotal bytesTotal} out{docsTotal bytesTotal} lastPublishedAt} derive{ transforms{transform source input{docsTotal bytesTotal} lastSourcePublishedAt bytesBehind} published{docsTotal bytesTotal} out{docsTotal bytesTotal} lastPublishedAt } materialize{collection left{docsTotal bytesTotal} right{docsTotal bytesTotal} out{docsTotal bytesTotal} lastSourcePublishedAt bytesBehind} } } } } }","variables":{"names":"{{live_names_json}}","grain":"HOURLY","start":"2026-10-07T20:00:00Z","end":"2026-10-08T00:00:00Z"}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `names` must be a JSON array; the body template holds a string
+        // placeholder, so splice the chained var in as real JSON.
+        const names = bru.getVar("live_names_json");
+        if (!names) throw new Error("run `Enumeration / liveSpecs bare` first");
+        const body = req.getBody();
+        body.variables.names = JSON.parse(names);
+        req.setBody(body);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs`
+
+  **WHY:** every live name under `Jonathan_Wihl/` (55: tasks + collections,
+  including derivations, which liveSpecs types as `collection`) over the
+  last few hours. Shows which names carry rows, whether collection rows carry
+  `taskStats`, and whether derivation rows carry `taskStats.derive`. Run
+  `Enumeration / liveSpecs bare` first in a fresh session: it sets
+  `live_names_json`.
+
+  **VERIFIED (2026-10-07):** 18 rows across 6 of 55 names (3 hours each).
+  Derivation names (e.g. `Jonathan_Wihl/wikipedia/user-fact-table`) carry
+  `taskStats` with `capture: []`, `materialize: []` and `derive` populated;
+  plain collections (`Jonathan_Wihl/gpt-notion`) carry `taskStats: null` and
+  may be all-zero rows. Names with no activity simply return no rows.
+
+examples:
+  - name: "200 — 18 rows over 6 names; derivation rows carry taskStats.derive (projection: one derivation row, one plain-collection row)"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "catalogStats": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/user-fact-table",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T20:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "693",
+                          "bytesTotal": "877237"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "693",
+                          "bytesTotal": "80324"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "693",
+                          "bytesTotal": "80324"
+                        },
+                        "warnings": "719",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "999",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": {
+                        "capture": [],
+                        "derive": {
+                          "transforms": [
+                            {
+                              "transform": "dailychangesbyuser",
+                              "source": "demo/wikipedia/recentchange-sampled",
+                              "input": {
+                                "docsTotal": "693",
+                                "bytesTotal": "877237"
+                              },
+                              "lastSourcePublishedAt": "2026-10-07T20:59:59.719245200+00:00",
+                              "bytesBehind": "0"
+                            }
+                          ],
+                          "published": {
+                            "docsTotal": "693",
+                            "bytesTotal": "41516"
+                          },
+                          "out": {
+                            "docsTotal": "693",
+                            "bytesTotal": "80324"
+                          },
+                          "lastPublishedAt": null
+                        },
+                        "materialize": []
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T20:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "warnings": "0",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "0",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": null
+                    }
+                  }
+                ]
+              }
+            }
+          }

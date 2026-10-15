@@ -460,6 +460,10 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+    # A fallback key is one the connector chose for lack of a natural identifier.
+    # The control plane uses it to create the collection, and the user may change it
+    # afterwards. A key the connector emits deletions for is not a fallback.
+    is_fallback_key: bool = False
     requires_explicit_acks: bool = False
 
 
@@ -484,6 +488,10 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
         assert "/_meta/row_id" in self.key, (
             f"A SnapshotResource must be keyed on /_meta/row_id, which is how "
             f"the CDK addresses the document a deletion removes. Got: {self.key}"
+        )
+        assert not self.is_fallback_key, (
+            "A SnapshotResource's key can't be a fallback key because the CDK "
+            "emits deletions against /_meta/row_id."
         )
 
 
@@ -543,6 +551,7 @@ def discovered(
             response.DiscoveredBinding(
                 documentSchema=schema,
                 key=resource.key,
+                isFallbackKey=resource.is_fallback_key,
                 recommendedName=resource.name,
                 resourceConfig=resource.initial_config,
                 disable=resource.disable,

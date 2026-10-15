@@ -1,0 +1,21 @@
+credentials:
+    credentials_title: API Key
+    access_token_sops: ENC[AES256_GCM,data:Mrje/J5GIq4wMjbNgoxG5IQfmC3He4rrq7v/GNEor/tdi/6G+MOnOZtYC9MkC3IOIhLovaXdODjxn9/u1ae81yYpAwOnZ4zBg5P4wrXeW3z1g/sqfJog32feCjVcZchMam+yjw==,iv:xmpSYQ1nmBoA/49VZqMnkFjsWnz0eoZbYydiUPZEMSw=,tag:9H2qJBD9uAYXOehaG5ljJQ==,type:str]
+prefixes:
+    - Jonathan_Wihl/
+    - Artificial-Industries/
+start_date: "2026-09-01T00:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-10-07T23:34:06Z"
+          enc: CiUAdmEdwgtay9Dr4CXLqYqEd2ZFiLiHzFvvokvDi5jUeXqSfRDsEkkAvE+nkw1gf1VijLmyxtOIo3qTeFHb9WznARydEQbDqHvQM5Nd1cikGOmWXul9Z83pKcMubTJAh/+9FhG3AIuxGG7C6L2P3LbK
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2026-10-07T23:34:06Z"
+    mac: ENC[AES256_GCM,data:/SoAFqb0qFTGIpA+2VVOC8xXCmLpDTZUWQ36vi2mRkh7+BHavXK+/bw5hXCimaWKRfBXN5T21MIcbrXNA1z/BuOwkZ6OdKNbDx032UsRnLnTxYj6Ing4Fv08xid5AwOiNx0ax8oWSJZMkOpnOymTcIcIcrDIzzlsQKcgNDfqeXA=,iv:2mlKh76dS5J3YKBsfWRGZlVkAuncG9rarXcoiWx5qLU=,tag:rhEQB5LJRAGgMRwktURDMQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

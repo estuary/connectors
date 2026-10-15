@@ -34,6 +34,11 @@ func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
+	// sql.Open does not connect, so ping to report a connection failure as one.
+	if err := conn.PingContext(ctx); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("unable to connect to database: %w", err)
+	}
 	return conn, nil
 }
 

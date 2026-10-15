@@ -1,0 +1,83 @@
+info:
+  name: to bound probe
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/calls?from={{pin_from}}&to={{pin_started_at}}&order=asc&per_page=50"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Pinned by `Calls / window asc`'s after-response script. Fail loudly
+        // rather than sending a malformed window.
+        const x = Number(bru.getVar('pin_started_at'));
+        if (!x) throw new Error('pin_started_at not set — run "Calls / window asc" first in this session');
+        bru.setVar('pin_to', String(x + 3599));
+        bru.setVar('pin_from', String(x - 3599));
+        bru.setVar('pin_minus_1', String(x - 1));
+        console.log('PIN', bru.getVar('pin_call_id'), x);
+    - type: after-response
+      code: |-
+        const calls = res.getBody()?.calls || [];
+        const id = Number(bru.getVar('pin_call_id'));
+        console.log('PINNED_CALL_PRESENT', calls.some(c => c.id === id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - to=X includes pinned call (projection)
+    request:
+      url: "{{base_url}}/calls?from=1790599488&to=1790603087&order=asc&per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "calls": [
+              {
+                "id": 4186780376,
+                "started_at": 1790603050,
+                "status": "done"
+              },
+              {
+                "id": 4186784158,
+                "started_at": 1790603087,
+                "status": "done"
+              }
+            ],
+            "meta": {
+              "count": 2,
+              "total": 2,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            }
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-calls
+
+    **WHY:** pins `to` inclusivity: query with `to` set to the pinned call's
+    exact `started_at`. Pinned call present → `to` is inclusive (`<=`); absent
+    → exclusive. Requires `Calls / window asc` first in this session.
+
+
+    **VERIFIED (2026-09-28, all 3 seeded calls):** with `to = started_at` the pinned
+    call is **present**. `to` is **inclusive** — `started_at <= to`.
+  type: text/markdown
