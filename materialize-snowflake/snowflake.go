@@ -132,15 +132,16 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 			defer db.Close()
 
-			// sql.Open does not connect. Connx logs in without running a query,
-			// so a failure here is a connection failure and costs no extra round trip.
-			conn, err := sqlx.NewDb(db, "snowflake").Unsafe().Connx(ctx)
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
 			if err != nil {
 				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
 			}
-			defer conn.Close()
+			conn.Close()
 
-			timestampTypeMapping, isExplicit, err := getTimestampTypeMapping(ctx, conn)
+			timestampTypeMapping, isExplicit, err := getTimestampTypeMapping(ctx, db)
 			if err != nil {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
@@ -214,15 +215,16 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
-// conn must come from an Unsafe sqlx.DB, as SHOW PARAMETERS returns columns paramRow does not map.
-func getTimestampTypeMapping(ctx context.Context, conn *sqlx.Conn) (timestampTypeMapping, bool, error) {
+func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, bool, error) {
+	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
+
 	type paramRow struct {
 		Value string `db:"value"`
 		Level string `db:"level"`
 	}
 
 	got := paramRow{}
-	if err := conn.GetContext(ctx, &got, "SHOW PARAMETERS LIKE 'TIMESTAMP_TYPE_MAPPING';"); err != nil {
+	if err := xdb.GetContext(ctx, &got, "SHOW PARAMETERS LIKE 'TIMESTAMP_TYPE_MAPPING';"); err != nil {
 		return "", false, err
 	}
 
