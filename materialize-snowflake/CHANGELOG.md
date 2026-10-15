@@ -1,5 +1,18 @@
 # materialize-snowflake
 
+## 2026-10-28
+
+### Added
+- The staged-file write path now runs on more than one shard. Each shard
+  stages and merges its own documents, and records its pending work under its
+  own key range in the connector state, so splitting a task no longer makes
+  one shard pick up another's staged files. Snowflake runs the shards' `MERGE`
+  statements one at a time, so splitting raises staging throughput but not
+  merge throughput on a given warehouse.
+- A task running on more than one shard refuses a binding that would take the
+  Snowpipe Streaming write path, with an error naming the remedy. That path
+  keeps its staged blobs at a single key per binding and is not safe to split.
+
 ## 2026-10-22
 
 ### Added
