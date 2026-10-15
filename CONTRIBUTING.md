@@ -224,7 +224,8 @@ The PR template carries a checklist item for documentation and one for
 `CHANGELOG.md`. There's no automated check: whether an update is warranted
 is a judgment call for the author, backstopped by whoever reviews the PR.
 
-Tick an item only when it is done. Otherwise write N/A and a reason.
+Tick an item only when it is done. If the PR has no user-facing changes,
+tick that box instead.
 
 ### Claude Code skill
 
