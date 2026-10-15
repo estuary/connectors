@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/require"
@@ -298,6 +300,40 @@ func TestCheckpointRoundTrip(t *testing.T) {
 	var got = &transactor{rangeKey: d.rangeKey}
 	require.NoError(t, got.UnmarshalState(state))
 	require.Equal(t, d.cp, got.cp)
+}
+
+// A split range marks the shard as scaled out only on the v2 runtime, where
+// the runtime aggregates every shard's connector state into one document.
+func TestIsScaledOut(t *testing.T) {
+	var v2 = testStreamingSpec(t, "", true)
+	var v1 = testStreamingSpec(t, "", false)
+	var full = &pf.RangeSpec{KeyEnd: math.MaxUint32}
+	var lower = &pf.RangeSpec{KeyEnd: 0x7fffffff}
+	var upper = &pf.RangeSpec{KeyBegin: 0x80000000, KeyEnd: math.MaxUint32}
+
+	require.False(t, isScaledOut(v2, full))
+	require.True(t, isScaledOut(v2, lower))
+	require.True(t, isScaledOut(v2, upper))
+	require.False(t, isScaledOut(v1, lower))
+	require.False(t, isScaledOut(v2, nil))
+}
+
+// A scaled-out shard refuses a binding that would take the snowpipe_streaming
+// write path, since that path persists its staged blobs at the bare state key
+// and another shard would read them as its own.
+func TestAddBindingRejectsStreamingWhenScaledOut(t *testing.T) {
+	var d = &transactor{
+		scaledOut:    true,
+		cfg:          config{Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT}},
+		featureFlags: map[string]bool{flagSnowpipeStreaming: true},
+		ep:           &sql.Endpoint[config]{Dialect: snowflakeDialect("", "", nil)},
+	}
+	var err = d.addBinding(context.Background(), sql.Table{
+		TableShape: sql.TableShape{Path: []string{"tbl"}, DeltaUpdates: true},
+		Identifier: "tbl",
+	}, checkpointItem{})
+	require.ErrorContains(t, err, flagSnowpipeStreaming)
+	require.ErrorContains(t, err, "more than one shard")
 }
 
 func TestSpecification(t *testing.T) {

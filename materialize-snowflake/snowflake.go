@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"slices"
@@ -278,6 +279,9 @@ type transactor struct {
 	version string
 	// rangeKey is the key under which this shard's staged work is persisted.
 	rangeKey string
+	// scaledOut is whether this shard is one of several whose connector state
+	// the runtime aggregates into one document.
+	scaledOut bool
 
 	// If this is still the recovery (first after startup) commit, where special
 	// handling may be needed for registering streaming files.
@@ -349,6 +353,7 @@ func newTransactor(
 		pipeClient:          pipeClient,
 		_range:              open.Range,
 		rangeKey:            fmt.Sprintf("%08x-%08x", open.Range.KeyBegin, open.Range.KeyEnd),
+		scaledOut:           isScaledOut(open.Materialization, open.Range),
 		version:             open.Version,
 		be:                  be,
 		cp:                  make(checkpoint),
@@ -467,6 +472,11 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 	}
 
 	if d.cfg.isStreamsV1(b.target.DeltaUpdates, d.featureFlags) {
+		if d.scaledOut {
+			return fmt.Errorf(
+				"binding %s takes the %s write path, which cannot run on more than one shard: join the task's shards back into one, or remove %q from the endpoint configuration's feature_flags so the binding takes the staged-file path",
+				b.target.Identifier, flagSnowpipeStreaming, flagSnowpipeStreaming)
+		}
 		if err := d.snowpipeStreaming.addBinding(ctx, d.ep.Identifier(loc.TableSchema), d.ep.Identifier(loc.TableName), b.target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
@@ -713,6 +723,16 @@ type checkpoint = map[string]*checkpointItem
 // staged work.
 func (item *checkpointItem) streamV2Only() bool {
 	return len(item.StreamV2) > 0 && len(item.Query) == 0 && len(item.StreamBlobs) == 0 && len(item.PipeFiles) == 0
+}
+
+// isScaledOut reports whether the shard owning keyRange is one of several whose
+// connector state the runtime aggregates into one document. That happens only
+// on the v2 runtime, and only once the range is a proper part of the key space.
+func isScaledOut(spec *pf.MaterializationSpec, keyRange *pf.RangeSpec) bool {
+	if keyRange == nil || !boilerplate.IsMaterializationSpecRuntimeV2(spec) {
+		return false
+	}
+	return keyRange.KeyBegin != 0 || keyRange.KeyEnd != math.MaxUint32
 }
 
 // rangeKeyRe matches the key under which a shard records its staged work
