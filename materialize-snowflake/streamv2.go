@@ -398,6 +398,14 @@ type streamV2Manager struct {
 
 	bindings map[int]*streamV2Binding
 	bufBytes int
+
+	// current is the binding that Store writes to, or nil. flushing is the
+	// binding whose flush is in progress, or nil, and flushDone carries that
+	// flush's outcome. At most these two bindings hold rows that Snowflake has
+	// not committed, because the sidecar's memory grows with that number.
+	current   *streamV2Binding
+	flushing  *streamV2Binding
+	flushDone chan error
 }
 
 func newStreamV2Manager(
@@ -424,6 +432,7 @@ func newStreamV2Manager(
 		procCtx:         procCtx,
 		procCancel:      procCancel,
 		bindings:        make(map[int]*streamV2Binding),
+		flushDone:       make(chan error, 1),
 	}
 }
 
@@ -729,6 +738,9 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 // offsets stay aligned with Snowflake's, but it is not written again.
 func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey []byte, converted []any) error {
 	var b = m.bindings[binding]
+	if err := m.admit(ctx, b); err != nil {
+		return err
+	}
 	if err := m.ensureOpened(ctx, b); err != nil {
 		return err
 	}
@@ -765,6 +777,79 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 	return nil
 }
 
+// admit makes b the binding that Store writes to. The binding it replaces
+// starts flushing once the flush in progress completes, so one binding appends
+// while at most one other flushes. A binding whose flush is in progress may
+// append again only once that flush completes, because a commit wait names the
+// last offset appended before it.
+func (m *streamV2Manager) admit(ctx context.Context, b *streamV2Binding) error {
+	if b == m.current {
+		return nil
+	}
+	var prev = m.current
+	m.current = nil
+
+	if prev != nil {
+		if err := m.reapFlush(ctx); err != nil {
+			return err
+		} else if err := m.startFlush(ctx, prev); err != nil {
+			return err
+		}
+	}
+	if b == m.flushing {
+		if err := m.reapFlush(ctx); err != nil {
+			return err
+		}
+	}
+
+	m.current = b
+	return nil
+}
+
+// startFlush appends the binding's buffered batches, then waits in the
+// background until each of its channels has committed through the last offset
+// appended to it. The flush reports its outcome on flushDone.
+func (m *streamV2Manager) startFlush(ctx context.Context, b *streamV2Binding) error {
+	for _, c := range b.activeChannels {
+		if c.batch.empty() {
+			continue
+		} else if err := m.appendBatch(ctx, c); err != nil {
+			return err
+		}
+	}
+
+	m.flushing = b
+	go func() {
+		var group, groupCtx = errgroup.WithContext(ctx)
+		for _, c := range b.activeChannels {
+			group.Go(func() error {
+				if err := c.wait(); err != nil {
+					return fmt.Errorf("appending to channel %q: %w", c.channelName, err)
+				} else if c.progress.routed <= c.progress.committed {
+					return nil
+				}
+				return m.waitCommit(groupCtx, b, c, c.progress.routed)
+			})
+		}
+		m.flushDone <- group.Wait()
+	}()
+	return nil
+}
+
+// reapFlush waits for the flush in progress, if any, to complete.
+func (m *streamV2Manager) reapFlush(ctx context.Context) error {
+	if m.flushing == nil {
+		return nil
+	}
+	select {
+	case err := <-m.flushDone:
+		m.flushing = nil
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // appendAllBatches appends the buffered documents of every channel of every binding.
 // This brings the total of buffered bytes back to zero.
 func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
@@ -796,11 +881,12 @@ func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) e
 	return c.appendBatch(ctx, client, firstOffset, lastOffset, payload, rows)
 }
 
-// flush appends every channel's remaining documents, waits for Snowflake to
-// commit them, and returns a checkpoint entry for each binding that stored anything
-// or whose layout is not yet the target layout. The wait is here because a commit
-// failure must fail the transaction that produced it, and only flush can still do
-// that.
+// flush completes the binding flush in progress, appends every channel's
+// remaining documents, waits for Snowflake to commit them, and returns a
+// checkpoint entry for each binding that stored anything or whose layout is not
+// yet the target layout. Every commit is awaited by the time flush returns,
+// because a commit failure must fail the transaction that produced it, and
+// flush is the last point that can still do that.
 //
 // A binding whose active layout is not the target layout switches: its entry deletes
 // the item of every active channel and records a zero-routed item for every target
@@ -816,6 +902,11 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 	}
 	var waits []commitWait
 	var switching []int
+
+	if err := m.reapFlush(ctx); err != nil {
+		return nil, err
+	}
+	m.current = nil
 
 	for idx, b := range m.bindings {
 		if !b.opened {
