@@ -306,10 +306,24 @@ Keep in mind:
 * The clustering key is applied, and re-applied, every time the materialization restarts, republishes, or backfills, not only when the table is first created. You can add, change, or remove clustering at any time by updating this property and republishing.
 * If you leave `clustering` empty, the connector checks for an existing clustering key on the table and drops it. Clustering keys applied manually in Snowflake, outside this property, will be removed the next time the materialization restarts.
 
+### Running on more than one shard
+
+The staged-file write path, which is the default for standard-updates bindings and the fallback for delta-updates
+bindings, can run on more than one shard when the task runs on
+[Estuary's new runtime](/concepts/advanced/runtime/#runtime-migration). Each shard stages and commits its own documents.
+Snowflake runs the shards' `MERGE` statements one at a time, and each `MERGE` costs time in proportion to the rows it
+carries, so splitting a task raises how fast documents are staged but not how fast they are merged. A task whose
+transactions are dominated by the `MERGE` gains little from more shards on the same warehouse.
+
+Snowpipe Streaming bindings cannot run on more than one shard. A task that has been split and has such a binding fails to
+start, and the error names the remedy: join the shards back together, or set `no_snowpipe_streaming` so the binding uses
+the staged-file path.
+
 ### Snowpipe Streaming
 
 [Snowpipe Streaming](https://docs.snowflake.com/en/user-guide/data-load-snowpipe-streaming-overview) is the lowest-latency method to load data into Snowflake.
 Snowpipe Streaming is used by default for [delta updates](#delta-updates) bindings. This method of ingress writes rows directly to Snowflake tables and scales compute automatically based on load.
+It cannot run on more than one shard; see [Running on more than one shard](#running-on-more-than-one-shard).
 
 ### High-performance Snowpipe Streaming
 
