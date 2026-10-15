@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -205,6 +206,19 @@ func TestPrereqs(t *testing.T) {
 			require.Equal(t, tt.want, preReqs(context.Background(), *tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+// NewEndpoint runs before the prerequisite checks, so a login failure must be
+// reported as a connection failure rather than as the first query it runs.
+func TestNewEndpointConnectError(t *testing.T) {
+	cfg := mustGetCfg(t)
+	cfg.Credentials.User = "wrong" + cfg.Credentials.User
+
+	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	require.ErrorContains(t, err, "unable to connect to database: JWT token is invalid")
+
+	var userErr *cerrors.UserError
+	require.ErrorAs(t, err, &userErr)
 }
 
 func TestQueryCurrentClusterBy(t *testing.T) {

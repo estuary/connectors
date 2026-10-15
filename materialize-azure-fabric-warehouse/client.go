@@ -283,6 +283,30 @@ type badRequestResponseBody struct {
 	ErrorCodes       []int  `json:"error_codes"`
 }
 
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
+	var authErr *azidentity.AuthenticationFailedError
+	var netOpErr *net.OpError
+
+	if errors.As(err, &netOpErr) {
+		err = fmt.Errorf("could not connect to endpoint: ensure the connection string '%s' is correct", cfg.ConnectionString)
+	} else if errors.As(err, &authErr) && authErr.RawResponse != nil {
+		var res badRequestResponseBody
+		if decodeErr := json.NewDecoder(authErr.RawResponse.Body).Decode(&res); decodeErr != nil {
+			return err
+		}
+
+		if slices.Contains(res.ErrorCodes, 700016) {
+			err = fmt.Errorf("invalid client ID '%s': ensure that the client ID for the correct application is configured", cfg.ClientID)
+		} else if slices.Contains(res.ErrorCodes, 7000215) {
+			err = fmt.Errorf("invalid client secret provided: ensure the secret being sent in the request is the client secret value, not the client secret ID, for a secret added to app '%s'", cfg.ClientID)
+		}
+
+		log.WithField("response", res).Error("connection error")
+	}
+	return err
+}
+
 func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
@@ -295,36 +319,15 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	// Query database collation to determine if resources are case-insensitive
-	caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
-	if err != nil {
-		errs.Err(err)
-		return errs
-	}
-
-	dialect := createDialect(featureFlags, caseInsensitiveResources)
+	// This is the first query, so it also reports connection failures. Literal
+	// quoting does not depend on the database collation, so none is queried.
+	dialect := createDialect(featureFlags, false)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
-		var authErr *azidentity.AuthenticationFailedError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &netOpErr) {
-			err = fmt.Errorf("could not connect to endpoint: ensure the connection string '%s' is correct", cfg.ConnectionString)
-		} else if errors.Is(err, stdsql.ErrNoRows) {
+		if errors.Is(err, stdsql.ErrNoRows) {
 			err = fmt.Errorf("warehouse '%s' does not exist", cfg.Warehouse)
-		} else if errors.As(err, &authErr) {
-			var res badRequestResponseBody
-			if err := json.NewDecoder(authErr.RawResponse.Body).Decode(&res); err != nil {
-				panic(err)
-			}
-
-			if slices.Contains(res.ErrorCodes, 700016) {
-				err = fmt.Errorf("invalid client ID '%s': ensure that the client ID for the correct application is configured", cfg.ClientID)
-			} else if slices.Contains(res.ErrorCodes, 7000215) {
-				err = fmt.Errorf("invalid client secret provided: ensure the secret being sent in the request is the client secret value, not the client secret ID, for a secret added to app '%s'", cfg.ClientID)
-			}
-
-			log.WithField("response", res).Error("connection error")
+		} else {
+			err = connectError(err, cfg)
 		}
 
 		errs.Err(err)

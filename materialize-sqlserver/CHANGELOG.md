@@ -1,5 +1,12 @@
 # materialize-sqlserver
 
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as a
+  collation check error. This also applies when the materialization is saved,
+  so messages such as "host cannot be found" are shown again.
+
 ## 2026-10-01
 
 ### Added

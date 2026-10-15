@@ -17,7 +17,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	mssqldb "github.com/microsoft/go-mssqldb"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -59,29 +58,27 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		// Provide a more user-friendly representation of some common error causes.
-		var sqlServerErr *mssqldb.Error
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &sqlServerErr) {
-			// See SQLServer error reference: https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors?view=sql-server-2017
-			switch sqlServerErr.Number {
-			}
-		} else if errors.As(err, &netConnErr) {
-			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
-			}
-		} else if errors.As(err, &netOpErr) {
-			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
-			}
-		}
-
-		errs.Err(err)
+		errs.Err(connectError(err, cfg))
 	}
 
 	return errs
+}
+
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
+	var netConnErr *net.DNSError
+	var netOpErr *net.OpError
+
+	if errors.As(err, &netConnErr) {
+		if netConnErr.IsNotFound {
+			err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
+		}
+	} else if errors.As(err, &netOpErr) {
+		if netOpErr.Timeout() {
+			err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
+		}
+	}
+	return err
 }
 
 // datetimeFieldMeta is attached to the ExistingField.Meta of a DATETIME,
