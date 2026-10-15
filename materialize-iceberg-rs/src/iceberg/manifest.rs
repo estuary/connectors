@@ -55,6 +55,7 @@ pub struct DataFileInfo {
 pub async fn write_manifest(
     object_store: &Arc<dyn ObjectStore>,
     prefix: &str,
+    bucket: &str,
     table: &str,
     table_schema_json: &str,
     snapshot_id: i64,
@@ -106,7 +107,7 @@ pub async fn write_manifest(
         .context("uploading manifest file")?;
 
     Ok(PendingManifest {
-        path: path.to_string(),
+        path: format!("s3://{bucket}/{path}"),
         length,
         added_files_count: 1,
         added_rows_count: file.record_count,

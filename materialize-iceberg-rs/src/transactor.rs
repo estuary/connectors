@@ -64,13 +64,14 @@ pub async fn run_transactions(
         .expect("must have a materialization spec");
 
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
-    let (object_store, prefix) = build_object_store(&config.store)?;
+    let (object_store, prefix, bucket) = build_object_store(&config.store)?;
 
     server::set_catalog(
         &catalog,
         CatalogState {
             object_store: object_store.clone(),
             prefix: prefix.clone(),
+            bucket: bucket.clone(),
         },
     )
     .await;
@@ -133,7 +134,9 @@ pub async fn run_transactions(
             }
             Some(request::Kind::StartCommit(_)) => {
                 for binding in bindings.iter_mut() {
-                    binding.write_and_upload(&object_store, &prefix).await?;
+                    binding
+                        .write_and_upload(&object_store, &prefix, &bucket)
+                        .await?;
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
@@ -146,7 +149,7 @@ pub async fn run_transactions(
             }
             Some(request::Kind::Acknowledge(_)) => {
                 for binding in bindings.iter_mut() {
-                    binding.acknowledge(&object_store, &prefix).await?;
+                    binding.acknowledge(&object_store, &prefix, &bucket).await?;
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
@@ -176,7 +179,7 @@ fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::Connector
     })
 }
 
-fn build_object_store(store: &StoreConfig) -> Result<(Arc<dyn ObjectStore>, String)> {
+fn build_object_store(store: &StoreConfig) -> Result<(Arc<dyn ObjectStore>, String, String)> {
     let StoreConfig::S3(s3) = store;
 
     let mut builder = AmazonS3Builder::new()
@@ -191,7 +194,11 @@ fn build_object_store(store: &StoreConfig) -> Result<(Arc<dyn ObjectStore>, Stri
         builder = builder.with_endpoint(endpoint).with_allow_http(true);
     }
 
-    Ok((Arc::new(builder.build()?), s3.prefix.clone()))
+    Ok((
+        Arc::new(builder.build()?),
+        s3.prefix.clone(),
+        s3.bucket.clone(),
+    ))
 }
 
 struct BindingState {
@@ -211,6 +218,7 @@ impl BindingState {
         &mut self,
         object_store: &Arc<dyn ObjectStore>,
         prefix: &str,
+        bucket: &str,
     ) -> Result<()> {
         if self.rows == 0 {
             return Ok(());
@@ -267,11 +275,12 @@ impl BindingState {
         let pending_manifest = manifest::write_manifest(
             object_store,
             prefix,
+            bucket,
             &self.table,
             &self.table_schema.to_string(),
             snapshot_id,
             DataFileInfo {
-                file_path: path.to_string(),
+                file_path: format!("s3://{bucket}/{path}"),
                 record_count: rows as i64,
                 file_size_in_bytes: bytes as i64,
                 split_offsets,
@@ -289,6 +298,7 @@ impl BindingState {
         &mut self,
         object_store: &Arc<dyn ObjectStore>,
         prefix: &str,
+        bucket: &str,
     ) -> Result<()> {
         if self.checkpoint.pending_manifests.is_empty() {
             return Ok(());
@@ -338,7 +348,7 @@ impl BindingState {
             snapshot_id,
             self.checkpoint.snapshot_id,
             snapshot_id,
-            manifest_list_path.clone(),
+            format!("s3://{bucket}/{manifest_list_path}"),
             added_files_count,
             added_rows_count,
             added_files_size,

@@ -168,7 +168,7 @@ async fn test_materialization() {
     assert_eq!(manifest_entries.len(), 1, "expected one manifest-list row");
     assert_eq!(
         avro_str(&manifest_entries[0], "manifest_path"),
-        *manifest_keys[0],
+        format!("s3://{BUCKET}/{}", manifest_keys[0]),
     );
     assert_eq!(avro_int(&manifest_entries[0], "added_files_count"), 1);
     assert_eq!(avro_long(&manifest_entries[0], "added_rows_count"), 3);
@@ -176,7 +176,10 @@ async fn test_materialization() {
     let manifest_entries = avro_records(&s3, manifest_keys[0]).await;
     assert_eq!(manifest_entries.len(), 1, "expected one manifest entry");
     let data_file = avro_field(&manifest_entries[0], "data_file");
-    assert_eq!(avro_str(data_file, "file_path"), keys[0]);
+    assert_eq!(
+        avro_str(data_file, "file_path"),
+        format!("s3://{BUCKET}/{}", keys[0]),
+    );
     assert_eq!(avro_long(data_file, "record_count"), 3);
 
     let version_hint = get_object_string(&s3, "warehouse/test_table/metadata/version-hint.text")
@@ -212,9 +215,13 @@ async fn test_materialization() {
     assert_eq!(table_metadata["snapshots"][0]["snapshot-id"], snapshot_id,);
     assert_eq!(
         table_metadata["snapshots"][0]["manifest-list"],
-        *manifest_list_keys[0],
+        format!("s3://{BUCKET}/{}", manifest_list_keys[0]),
     );
     assert_eq!(table_metadata["refs"]["main"]["snapshot-id"], snapshot_id,);
+    assert_eq!(
+        table_metadata["location"],
+        format!("s3://{BUCKET}/warehouse/test_table"),
+    );
 }
 
 async fn get_object_string(s3: &aws_sdk_s3::Client, key: &str) -> String {

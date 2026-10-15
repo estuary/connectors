@@ -58,6 +58,7 @@ pub struct MetadataLogEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct SnapshotRef {
     pub snapshot_id: i64,
     #[serde(rename = "type")]

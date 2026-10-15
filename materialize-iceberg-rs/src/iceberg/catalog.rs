@@ -69,6 +69,7 @@ pub enum TableUpdate {
 pub struct CatalogState {
     pub object_store: Arc<dyn ObjectStore>,
     pub prefix: String,
+    pub bucket: String,
 }
 
 impl CatalogState {
@@ -144,14 +145,22 @@ impl CatalogState {
             None => {
                 let schema =
                     schema.context("creating a new table requires an add-schema update")?;
-                TableMetadata::new(format!("{}/{}", self.prefix, table), schema, last_column_id)
+                TableMetadata::new(
+                    format!("s3://{}/{}/{}", self.bucket, self.prefix, table),
+                    schema,
+                    last_column_id,
+                )
             }
         };
 
         let snapshot = snapshot.context("commit requires an add-snapshot update")?;
 
         let next_version = version + 1;
-        let metadata_file = self.metadata_path(table, next_version).to_string();
+        let metadata_file = format!(
+            "s3://{}/{}",
+            self.bucket,
+            self.metadata_path(table, next_version)
+        );
         metadata.add_snapshot(snapshot);
         metadata.metadata_log.push(MetadataLogEntry {
             timestamp_ms: metadata.last_updated_ms,
