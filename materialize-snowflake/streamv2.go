@@ -651,7 +651,7 @@ func (m *streamV2Manager) openChannel(
 		channelName, routed = item.ChannelName, item.Routed
 	}
 
-	status, err := client.OpenChannel(ctx, b.database, b.schema, b.table, channelName)
+	status, err := client.OpenChannel(ctx, b.database, m.dialect.Identifier(b.schema), b.table, channelName)
 	if err != nil {
 		return nil, fmt.Errorf("opening channel %q: %w", channelName, err)
 	}
@@ -689,7 +689,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 		}
 		if keyBegin, ok := m.streamingChannelKeyBegin(channelName); ok {
 			if shard.contains(keyBegin) {
-				if err := m.streaming.dropChannel(ctx, schema, table, channelName); err != nil {
+				if err := m.streaming.dropChannel(ctx, m.dialect.Identifier(schema), table, channelName); err != nil {
 					return err
 				}
 			}
@@ -706,7 +706,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 		var err = client.CloseChannel(ctx, channelName, true)
 		var se *sidecarError
 		if errors.As(err, &se) && se.Code == "unknown_channel" {
-			if _, err = client.OpenChannel(ctx, database, schema, table, channelName); err != nil {
+			if _, err = client.OpenChannel(ctx, database, m.dialect.Identifier(schema), table, channelName); err != nil {
 				return fmt.Errorf("opening channel %q to drop it: %w", channelName, err)
 			}
 			err = client.CloseChannel(ctx, channelName, true)
