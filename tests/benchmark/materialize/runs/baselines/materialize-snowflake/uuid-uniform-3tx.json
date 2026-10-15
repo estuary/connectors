@@ -1,0 +1,94 @@
+{
+  "connector": "materialize-snowflake",
+  "scenario": "uuid-uniform-3tx.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 12.132350976,
+  "wall_seconds": 1060.80212992,
+  "rounds_observed": 4,
+  "scenario_transactions": 4,
+  "total_docs": 7864330,
+  "total_bytes": 32212295680,
+  "observed_docs": 7864330,
+  "observed_bytes": 32212295680,
+  "docs_per_sec": 7413.569202197102,
+  "mb_per_sec": 28.95925469608243,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/wide_uuid",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 0,
+        "count": 2621440,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 170.759956224,
+      "mb_per_sec": 59.96722080771292,
+      "docs_per_sec": 15351.608526774507
+    },
+    {
+      "index": 1,
+      "collection": "bench/wide_uuid",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 2621440,
+        "count": 1572864,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 1048576
+        }
+      ],
+      "wall_seconds": 349.065447936,
+      "mb_per_sec": 29.335472933653033,
+      "docs_per_sec": 7509.8810710151765
+    },
+    {
+      "index": 2,
+      "collection": "bench/wide_uuid",
+      "doc_count": 2621440,
+      "doc_size": 4096,
+      "bytes": 10737418240,
+      "fresh": {
+        "start": 4194304,
+        "count": 1572864,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 1,
+          "count": 1048576
+        }
+      ],
+      "wall_seconds": 355.54951296,
+      "mb_per_sec": 28.80048945855825,
+      "docs_per_sec": 7372.925301390912
+    },
+    {
+      "index": 3,
+      "collection": "bench/wide_uuid",
+      "doc_count": 10,
+      "doc_size": 4096,
+      "bytes": 40960,
+      "fresh": {
+        "start": 5767168,
+        "count": 10,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 185.4272128,
+      "mb_per_sec": 0.0002106621752554326,
+      "docs_per_sec": 0.05392951686539075
+    }
+  ]
+}
