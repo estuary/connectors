@@ -117,7 +117,7 @@ def test_backfill_calls_checkpoints_under_cap(monkeypatch):
             )
         )
         docs = [i for i in items if not isinstance(i, int)]
-        assert len(docs) < 10_000
+        assert len(docs) <= api.CALLS_BACKFILL_WINDOW_SIZE
         ids += [d.id for d in docs]
         if not isinstance(items[-1], int):
             break
