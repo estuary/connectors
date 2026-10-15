@@ -1,0 +1,34 @@
+info:
+  name: B1 - Create Webhook
+  type: http
+  seq: 7
+http:
+  method: POST
+  url: '{{base_url}}/webhooks'
+  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "custom_name": "estuary-bruno-seed",
+        "url": "https://example.com/estuary-bruno-seed",
+        "events": ["number.created"]
+      }
+runtime:
+  scripts:
+  - type: after-response
+    code: if (res.getStatus() === 201) bru.setVar('seed_webhook_id', res.getBody().webhook.webhook_id);
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#create-a-webhook
+    **ONLY THE USER RUNS THIS — never the assistant** (state-mutating).
+    **WHY:** `Webhooks / bare` is empty (2026-09-28). We need one webhook to see whether list items carry `webhook_id` (UUID), the deprecated integer `id`, or both, whether `token` is returned, and whether a populated `meta` carries `next_page_link`.
+    Subscribes only to `number.created` (rare) and points at example.com, so effectively nothing is delivered. Webhooks start active; delete it with D1 once verified.
+    Captures `seed_webhook_id` for D1.
+    Outcome: ran 2026-09-28 by the user (webhook_id 7c97a580-…). Finding VERIFIED in `Webhooks / bare`. Kept, so the `webhooks` stream isn't empty in capture tests.
+  type: text/markdown

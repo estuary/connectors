@@ -1,0 +1,41 @@
+info:
+  name: C3 - Create Contact Charlie
+  type: http
+  seq: 22
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts"
+  body:
+    type: json
+    data: |-
+      {
+        "first_name": "Estuary",
+        "last_name": "Seed Charlie",
+        "information": "estuary connector test seed",
+        "phone_numbers": [{"label": "Work", "value": "+12025550103"}]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() < 300 && res.getBody()?.contact?.id) {
+          bru.setVar('seed_contact_c_id', String(res.getBody().contact.id));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** Newest-created seed. C5 adds an email to it: does a sub-resource change bump the parent `updated_at`? Captures `seed_contact_c_id`.
+
+    Outcome: ran 2026-09-28 by the user; created 518778695 (created_at 1790603982).
+  type: text/markdown

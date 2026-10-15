@@ -1,0 +1,39 @@
+info:
+  name: C5 - Add Email to Contact Charlie
+  type: http
+  seq: 24
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts/{{seed_contact_c_id}}/emails"
+  body:
+    type: json
+    data: |-
+      {
+        "label": "Work",
+        "value": "seed-charlie@example.com"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Out-of-order fallback: run `Seeding / C3 - Create Contact Charlie` first in a
+        // fresh session, or this pins the Charlie seed created 2026-09-28.
+        if (!bru.getVar('seed_contact_c_id')) bru.setVar('seed_contact_c_id', '518778695');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** Run at least a few seconds after C4. Checks whether a sub-resource (email) add bumps the contact-level `updated_at`. If it does not, an updated_at incremental misses email/phone edits. Needs `seed_contact_c_id` from C3.
+
+    Outcome: ran 2026-09-28 by the user (twice) → 404 `{"message":"Not Found"}` on the documented route; no email added. Sub-resource → `updated_at` bump is UNOBSERVABLE (see `Contacts / by id`).
+  type: text/markdown

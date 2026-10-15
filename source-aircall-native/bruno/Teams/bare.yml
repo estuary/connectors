@@ -1,0 +1,87 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/teams?per_page=50'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-teams
+    **WHY:** the `teams` stream; confirms envelope, nested `users` shape, and that there's no update cursor.
+
+    **VERIFIED (2026-09-28):** envelope `{teams:[], meta:{full meta}}`. (Initially empty, then seeded via `Seeding / A1 - Create Team` + `Seeding / A2 - Add User To Team`.)
+
+    **VERIFIED (2026-09-28):** item keys `id` (int), `name`, `direct_link`, `created_at` (RFC3339 ms), `users`. `users[]` items are full user sub-objects (`id, direct_link, name, email, availability_status, default_number_id, created_at, time_zone, language, wrap_up_time`), a superset of the documented set. Membership changes with no cursor, so this stays a snapshot.
+  type: text/markdown
+examples:
+- name: 200 - empty list
+  request:
+    url: '{{base_url}}/teams?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: "{\n  \"teams\": [],\n  \"meta\": {\n    \"count\": 0,\n    \"total\": 0,\n    \"current_page\"\
+        : 1,\n    \"per_page\": 50,\n    \"next_page_link\": null,\n    \"previous_page_link\": null\n\
+        \  }\n}"
+- name: 200 - populated after seeding (1 team, 1 member)
+  request:
+    url: '{{base_url}}/teams?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "teams": [
+            {
+              "id": 262615,
+              "name": "Estuary Bruno Seed Team",
+              "direct_link": "https://api.aircall.io/v1/teams/262615",
+              "created_at": "2026-09-28T14:07:43.000Z",
+              "users": [
+                {
+                  "id": 2078847,
+                  "direct_link": "https://api.aircall.io/v1/users/2078847",
+                  "name": "Jonathan Wihl",
+                  "email": "jonathan@estuary.dev",
+                  "availability_status": "available",
+                  "default_number_id": 1389850,
+                  "created_at": "2026-09-28T10:21:09.000Z",
+                  "time_zone": "Etc/UTC",
+                  "language": "en-US",
+                  "wrap_up_time": 0
+                }
+              ]
+            }
+          ],
+          "meta": {
+            "count": 1,
+            "total": 1,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

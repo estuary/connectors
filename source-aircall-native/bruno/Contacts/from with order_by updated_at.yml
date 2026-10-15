@@ -1,0 +1,53 @@
+info:
+  name: from with order_by updated_at
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/contacts?from={{updated_floor}}&order_by=updated_at&order=desc&per_page=50"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - from=1790603983 & order_by=updated_at -> empty (projection)"
+    request:
+      url: "{{base_url}}/contacts?from={{updated_floor}}&order_by=updated_at&order=desc&per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "contacts": [],
+            "meta": {
+              "count": 0,
+              "total": 0,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            }
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-contacts
+
+    **WHY:** Does `from` filter on `updated_at` when sorting by `updated_at`? Alpha
+    has `created_at` 1790603975 < floor 1790603983 <= `updated_at` 1790603985.
+
+    **LIMITATION (VERIFIED 2026-09-28):** empty → `from` still filters `created_at`.
+    There is **no server-side lower bound on `updated_at`**; the incremental must
+    stop its walk client-side at the cursor.
+  type: text/markdown
