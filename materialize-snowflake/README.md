@@ -16,12 +16,22 @@ warehouse. A binding that cannot use a streaming path falls back to staged files
 
 ## Staged Files
 
-TODO
+This path stages each transaction's rows as files in an internal stage and then
+runs `COPY INTO` for a delta-updates binding or `MERGE` for a standard-updates
+binding.
+
+It is the only path that runs on more than one shard. Each shard stages and
+commits its own documents and keeps its pending work under its own key range in
+the connector state. Snowflake takes a table lock for `MERGE`, so the shards'
+merges run one at a time and a merge's cost grows with the rows it carries.
+Splitting a task therefore raises staging throughput, and it raises end-to-end
+throughput only where staging was the bottleneck.
 
 ## Snowpipe Streaming
 
 This method builds batches with Parquet files in a very particular format.
-It is brittle and is being deprecated.
+It is brittle and is being deprecated. It cannot run on more than one shard,
+and a task that has been split refuses a binding on this path.
 
 ## Snowpipe Streaming v2
 
