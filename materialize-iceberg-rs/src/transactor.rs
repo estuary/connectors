@@ -37,20 +37,43 @@ use crate::Input;
 use crate::Output;
 use crate::configuration::EndpointConfig;
 use crate::configuration::Store as StoreConfig;
+use crate::iceberg::catalog::CATALOG_PREFIX;
+use crate::iceberg::catalog::CatalogState;
+use crate::iceberg::catalog::CommitTransactionRequest;
+use crate::iceberg::catalog::TableChange;
+use crate::iceberg::catalog::TableIdentifier;
+use crate::iceberg::catalog::TableUpdate;
 use crate::iceberg::manifest::DataFileInfo;
 use crate::iceberg::manifest::{self};
 use crate::iceberg::manifest_list;
+use crate::iceberg::snapshot::Snapshot;
 use crate::iceberg::snapshot::build_snapshot;
 use crate::iceberg::state::BindingCheckpoint;
 use crate::iceberg::state::ConnectorState;
+use crate::server;
+use crate::server::SharedCatalog;
 
-pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open) -> Result<()> {
+pub async fn run_transactions(
+    input: &mut Input,
+    output: &mut Output,
+    open: Open,
+    catalog: SharedCatalog,
+) -> Result<()> {
     let spec = open
         .materialization
         .expect("must have a materialization spec");
 
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let (object_store, prefix) = build_object_store(&config.store)?;
+
+    server::set_catalog(
+        &catalog,
+        CatalogState {
+            object_store: object_store.clone(),
+            prefix: prefix.clone(),
+        },
+    )
+    .await;
 
     let mut connector_state = ConnectorState::from_json(open.state_json.as_ref())?;
 
@@ -175,7 +198,8 @@ struct BindingState {
     table: String,
     state_key: String,
     schema: Arc<Schema>,
-    table_schema_json: String,
+    table_schema: serde_json::Value,
+    last_column_id: i32,
     key_builders: Vec<KeyBuilder>,
     doc_builder: StringBuilder,
     rows: usize,
@@ -244,7 +268,7 @@ impl BindingState {
             object_store,
             prefix,
             &self.table,
-            &self.table_schema_json,
+            &self.table_schema.to_string(),
             snapshot_id,
             DataFileInfo {
                 file_path: path.to_string(),
@@ -320,20 +344,70 @@ impl BindingState {
             added_files_size,
         );
 
-        tracing::info!(
-            table = %self.table,
-            snapshot_id = snapshot.snapshot_id,
-            parent_snapshot_id = ?snapshot.parent_snapshot_id,
-            manifest_list = %snapshot.manifest_list,
-            summary = ?snapshot.summary,
-            "committed snapshot (table metadata not yet written)"
-        );
+        self.commit_snapshot(snapshot).await?;
 
         self.checkpoint.snapshot_id = Some(snapshot_id);
         self.checkpoint.sequence_number = snapshot_id;
         self.checkpoint.manifest_list = Some(manifest_list_path);
         self.checkpoint.pending_manifests.clear();
         self.checkpoint.pending_snapshot_id = None;
+
+        Ok(())
+    }
+
+    /// Commits a snapshot by calling the connector's own embedded REST
+    /// catalog server, exercising the same `POST
+    /// /v1/{prefix}/transactions/commit` path a real client would use. The
+    /// table's schema is sent along on every commit — the catalog only
+    /// applies it when the table doesn't exist yet, since schema evolution
+    /// isn't supported.
+    async fn commit_snapshot(&self, snapshot: Snapshot) -> Result<()> {
+        let request = CommitTransactionRequest {
+            table_changes: vec![TableChange {
+                identifier: TableIdentifier {
+                    name: self.table.clone(),
+                },
+                updates: vec![
+                    TableUpdate::AddSchema {
+                        schema: self.table_schema.clone(),
+                        last_column_id: self.last_column_id,
+                    },
+                    TableUpdate::AddSnapshot {
+                        snapshot: snapshot.clone(),
+                    },
+                    TableUpdate::SetSnapshotRef {
+                        ref_name: "main".to_string(),
+                        ref_type: "branch".to_string(),
+                        snapshot_id: snapshot.snapshot_id,
+                    },
+                ],
+            }],
+        };
+
+        let port = server::listen_port();
+        let url = format!("http://127.0.0.1:{port}/v1/{CATALOG_PREFIX}/transactions/commit");
+
+        let response = reqwest::Client::new()
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .context("calling embedded catalog commit endpoint")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("catalog commit failed ({status}): {body}");
+        }
+
+        tracing::info!(
+            table = %self.table,
+            snapshot_id = snapshot.snapshot_id,
+            parent_snapshot_id = ?snapshot.parent_snapshot_id,
+            manifest_list = %snapshot.manifest_list,
+            summary = ?snapshot.summary,
+            "committed snapshot to table metadata"
+        );
 
         Ok(())
     }
@@ -377,17 +451,19 @@ fn binding_state(
         "type": "string",
     }));
 
-    let table_schema_json = serde_json::to_string(&json!({
+    let last_column_id = field_id - 1;
+    let table_schema = json!({
         "type": "struct",
         "schema-id": 0,
         "fields": iceberg_fields,
-    }))?;
+    });
 
     Ok(BindingState {
         table: binding.resource_path[0].clone(),
         state_key: binding.state_key.clone(),
         schema: Arc::new(Schema::new(fields)),
-        table_schema_json,
+        table_schema,
+        last_column_id,
         key_builders,
         doc_builder: StringBuilder::new(),
         rows: 0,

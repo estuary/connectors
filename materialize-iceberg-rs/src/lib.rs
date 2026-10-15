@@ -28,10 +28,15 @@ pub mod server;
 pub mod transactor;
 pub mod validate;
 
-pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
+pub async fn run_connector(
+    mut input: Input,
+    mut output: Output,
+    catalog: server::SharedCatalog,
+) -> Result<()> {
     while let Some(request) = input.read()? {
         match request.kind {
             Some(request::Kind::Spec(_)) => {
+                tracing::warn!("Spec");
                 let res = Response {
                     kind: Some(response::Kind::Spec(Box::new(Spec {
                         protocol: 3032023,
@@ -51,6 +56,7 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
                 output.send(res)?;
             }
             Some(request::Kind::Validate(validate)) => {
+                tracing::warn!("Validate");
                 let res = Response {
                     kind: Some(response::Kind::Validated(Validated {
                         bindings: do_validate(*validate).await?,
@@ -61,6 +67,7 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
                 output.send(res)?;
             }
             Some(request::Kind::Apply(apply)) => {
+                tracing::warn!("Apply");
                 let res = Response {
                     kind: Some(response::Kind::Applied(Applied {
                         action_description: do_apply(*apply).await?,
@@ -72,7 +79,8 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
                 output.send(res)?;
             }
             Some(request::Kind::Open(open)) => {
-                run_transactions(&mut input, &mut output, *open).await?;
+                tracing::warn!("Open");
+                run_transactions(&mut input, &mut output, *open, catalog.clone()).await?;
             }
             _ => {
                 anyhow::bail!("invalid request, expected spec|validate|apply|open");

@@ -7,13 +7,16 @@ use materialize_iceberg_rs::server;
 fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
 
-    runtime.spawn(async {
-        if let Err(err) = server::run_server().await {
+    let catalog = server::new_shared_catalog();
+
+    let server_catalog = catalog.clone();
+    runtime.spawn(async move {
+        if let Err(err) = server::run_server(server_catalog).await {
             tracing::error!(error = %err, "connector-networking server exited");
         }
     });
 
-    let result = runtime.block_on(run_connector(Input::new(), Output::new()));
+    let result = runtime.block_on(run_connector(Input::new(), Output::new(), catalog));
 
     if let Err(err) = result.as_ref() {
         tracing::error!(error = %err, "operation failed");

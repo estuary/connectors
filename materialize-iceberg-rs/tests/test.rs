@@ -178,6 +178,55 @@ async fn test_materialization() {
     let data_file = avro_field(&manifest_entries[0], "data_file");
     assert_eq!(avro_str(data_file, "file_path"), keys[0]);
     assert_eq!(avro_long(data_file, "record_count"), 3);
+
+    let version_hint = get_object_string(&s3, "warehouse/test_table/metadata/version-hint.text")
+        .await
+        .trim()
+        .to_string();
+    assert_eq!(
+        version_hint, "1",
+        "expected the table's first metadata version"
+    );
+
+    let metadata_json_keys: Vec<&&str> = metadata_keys
+        .iter()
+        .filter(|k| k.ends_with(".metadata.json"))
+        .collect();
+    assert_eq!(
+        metadata_json_keys.len(),
+        1,
+        "expected exactly one table metadata file, found {metadata_keys:?}"
+    );
+    assert_eq!(
+        *metadata_json_keys[0],
+        "warehouse/test_table/metadata/v1.metadata.json"
+    );
+
+    let table_metadata: serde_json::Value =
+        serde_json::from_str(&get_object_string(&s3, metadata_json_keys[0]).await).unwrap();
+    assert_eq!(table_metadata["format-version"], 2);
+    assert_eq!(table_metadata["schemas"].as_array().unwrap().len(), 1);
+    assert_eq!(table_metadata["snapshots"].as_array().unwrap().len(), 1);
+
+    let snapshot_id = table_metadata["current-snapshot-id"].as_i64().unwrap();
+    assert_eq!(table_metadata["snapshots"][0]["snapshot-id"], snapshot_id,);
+    assert_eq!(
+        table_metadata["snapshots"][0]["manifest-list"],
+        *manifest_list_keys[0],
+    );
+    assert_eq!(table_metadata["refs"]["main"]["snapshot-id"], snapshot_id,);
+}
+
+async fn get_object_string(s3: &aws_sdk_s3::Client, key: &str) -> String {
+    let object = s3
+        .get_object()
+        .bucket(BUCKET)
+        .key(key)
+        .send()
+        .await
+        .unwrap();
+    let bytes = object.body.collect().await.unwrap().into_bytes();
+    String::from_utf8(bytes.to_vec()).unwrap()
 }
 
 async fn avro_records(s3: &aws_sdk_s3::Client, key: &str) -> Vec<AvroValue> {

@@ -49,6 +49,11 @@ features = ["arrow"]
 version = "0.14"
 default-features = false
 
+[dependencies.reqwest]
+version = "0.13"
+default-features = false
+features = ["json"]
+
 [dependencies.schemars]
 version = "1.2"
 default-features = false

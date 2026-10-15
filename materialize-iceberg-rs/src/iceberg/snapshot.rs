@@ -2,10 +2,15 @@ use std::collections::BTreeMap;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-/// An Iceberg snapshot. Since table metadata.json is not written yet, this
-/// isn't persisted anywhere durable in Iceberg terms — it's logged, and its
-/// identifying fields are folded into the connector's own checkpoint so the
-/// next commit can extend it.
+use serde::Deserialize;
+use serde::Serialize;
+
+/// An Iceberg snapshot, in the same shape as the Iceberg REST/JSON spec
+/// (`{"snapshot-id": ..., "manifest-list": ..., ...}`), so it can be embedded
+/// directly into a `CommitTransactionRequest`'s `add-snapshot` update and
+/// into table metadata's `snapshots` array.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Snapshot {
     pub snapshot_id: i64,
     pub parent_snapshot_id: Option<i64>,
