@@ -1274,3 +1274,76 @@ func TestStreamV2ListChannels(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{opened}, names)
 }
+
+// TestStreamingQuotedSchema streams into a table whose schema name is not a
+// simple identifier, on both the snowpipe_streaming and snowpipe_streaming_v2
+// paths.
+func TestStreamingQuotedSchema(t *testing.T) {
+	var ctx = context.Background()
+	var cfg = mustGetCfg(t)
+	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
+
+	dsn, err := cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	var accountName string
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
+
+	var schema = "quoted-schema-" + testRunNonce
+	var tableName = "QUOTED_SCHEMA_TEST"
+	var fqTable = testDialect.Identifier(schema, tableName)
+	var cleanup = func() {
+		db.ExecContext(ctx, fmt.Sprintf("DROP SCHEMA IF EXISTS %s;", testDialect.Identifier(schema)))
+	}
+	cleanup()
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA %s;", testDialect.Identifier(schema)))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (KEY TEXT, VAL NUMBER);", fqTable))
+	require.NoError(t, err)
+	// Registered before the managers' stops below, so the cleanup stack stops
+	// them while the table they hold channels on still exists.
+	t.Cleanup(cleanup)
+
+	var target = sql.Table{
+		TableShape: sql.TableShape{Path: []string{schema, tableName}, Binding: 0, DeltaUpdates: true},
+		Identifier: fqTable,
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   noncedStateKey("quoted.v1"),
+	}
+
+	t.Run("snowpipe_streaming", func(t *testing.T) {
+		sm, err := newStreamManager(&cfg, "test/streamQuotedSchema-"+testRunNonce, accountName, 0)
+		require.NoError(t, err)
+		var d = &transactor{
+			cfg:               cfg,
+			featureFlags:      map[string]bool{flagSnowpipeStreaming: true},
+			ep:                &sql.Endpoint[config]{Dialect: testDialect},
+			snowpipeStreaming: sm,
+		}
+		require.NoError(t, d.addBinding(ctx, target, checkpointItem{}))
+		require.True(t, d.bindings[0].streaming, "the binding fell back from streaming")
+	})
+
+	t.Run("snowpipe_streaming_v2", func(t *testing.T) {
+		singleChannelLayout(t)
+		sm, err := newStreamManager(&cfg, "test/streamV2QuotedSchema-"+testRunNonce, accountName, 0)
+		require.NoError(t, err)
+		var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, "test/streamV2QuotedSchema-"+testRunNonce, accountName,
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		t.Cleanup(m.stop)
+
+		var loc = testDialect.TableLocator(target.Path)
+		m.addBinding(cfg.Database, loc.TableSchema, testDialect.Identifier(loc.TableName), target, nil)
+		require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", 1}))
+		_, err = m.flush(ctx)
+		require.NoError(t, err)
+
+		var count int
+		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", fqTable)).Scan(&count))
+		require.Equal(t, 1, count)
+	})
+}
