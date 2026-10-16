@@ -22,8 +22,10 @@ from .resources import all_resources, validate_credentials
 
 # Aircall allows about 60 requests per minute per company, and going over it
 # blocks the company's API access for 60 seconds. Pacing requests up front
-# avoids those lockouts, which back-off after a 429 keeps running into.
-REQUESTS_PER_MINUTE = 55
+# avoids those lockouts, which back-off after a 429 keeps running into. The
+# limit is shared with the company's other integrations, so the connector
+# uses only half of it.
+REQUESTS_PER_MINUTE = 30
 
 
 class Connector(
