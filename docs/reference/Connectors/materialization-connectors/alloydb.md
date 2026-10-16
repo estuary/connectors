@@ -47,7 +47,7 @@ See the table below and the [sample config](#sample).
 |-----------------|----------|-------------------------------------------------|---------|------------------|
 | `/database`     | Database | Name of the logical database to materialize to. | string  |                  |
 | **`/address`**  | Address  | Host and port. Set to `127.0.0.1:5432` to enable SSH tunneling.                   | string  | Required         |
-| `/schema` | Database Schema | Database [schema](https://www.postgresql.org/docs/current/ddl-schemas.html) to use for materialized tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables | string | `"public"` |
+| `/schema` | Database Schema | Database [schema](https://www.postgresql.org/docs/current/ddl-schemas.html) to use for materialized tables (unless overridden within the binding resource configuration) as well as the [`flow_checkpoints_v1` metadata table](/concepts/materialization/#the-checkpoints-metadata-table) | string | `"public"` |
 | **`/user`**     | User     | Database user to connect as.                    | string  | Required         |
 | `/hardDelete` | Hard Delete | If enabled, items deleted in the source will also be deleted from the destination. By default, deletions are tracked via `_meta/op` (soft delete). | boolean | `false` |
 | `/networkTunnel` | Network Tunnel | Connect to your system through an SSH server that acts as a bastion host for your network. | Object | |
