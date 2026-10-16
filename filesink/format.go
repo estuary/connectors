@@ -84,3 +84,21 @@ func NewCsvStreamWriter(cfg CsvConfig, b *pf.MaterializationSpec_Binding, w io.W
 
 	return writer.NewCsvWriter(w, b.FieldSelection.AllFields(), opts...)
 }
+
+type JsonConfig struct {
+	SkipNulls bool `json:"skipNulls,omitempty" jsonschema:"title=Skip Nulls,description=Do not write fields with null values to files." jsonschema_extras:"order=0,nonsensitive=true"`
+}
+
+func (c JsonConfig) Validate() error {
+	return nil
+}
+
+func NewJsonStreamWriter(cfg JsonConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) StreamWriter {
+	var opts []writer.JsonOption
+
+	if cfg.SkipNulls {
+		opts = append(opts, writer.WithJsonSkipNulls())
+	}
+
+	return writer.NewJsonWriter(w, b.FieldSelection.AllFields(), opts...)
+}
