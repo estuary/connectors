@@ -405,7 +405,7 @@ available
 Note the following specific details when creating the application to use with
 this connector:
 - Select **Spark** for the **Type**.
-- Use **emr-7.7.0** for the **Release Version**, and **x86_64** for the
+- Use **emr-spark-8.1.0** for the **Release Version**, and **x86_64** for the
   **Architecture**
 - For **Application setup options**, select **Use custom settings**. These options
   can generally be configured as desired, with the specific notes below:
@@ -747,13 +747,13 @@ about how to configure this [here](/reference/materialization-sync-schedule).
 ## Iceberg Column Types
 
 Estuary collection fields are written to Iceberg table columns based on the data type of the field.
-Iceberg [V2 primitive type](https://iceberg.apache.org/spec/#primitive-types) columns are created
+Iceberg [data type](https://iceberg.apache.org/spec/#schemas-and-data-types) columns are created
 for these Estuary collection fields:
 
 | Collection Field Data Type                  | Iceberg Column Type                          |
 |---------------------------------------------|----------------------------------------------|
-| **array**                                   | **string**                                   |
-| **object**                                  | **string**                                   |
+| **array**                                   | **variant** (array)                          |
+| **object**                                  | **variant** (object)                         |
 | **boolean**                                 | **boolean**                                  |
 | **integer**                                 | **long**                                     |
 | **number**                                  | **double**                                   |
@@ -766,8 +766,7 @@ for these Estuary collection fields:
 
 Estuary collection fields with `{type: string, format: time}` and `{type: string, format: uuid}` are
 materialized as **string** columns rather than **time** and **uuid** columns for compatibility with
-Apache Spark. **[Nested types](https://iceberg.apache.org/spec/#nested-types)** are not currently
-supported.
+Apache Spark.
 
 ## Table Maintenance
 
