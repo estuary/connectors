@@ -57,12 +57,9 @@ fn constraint_for_projection(p: &Projection) -> Constraint {
             ..Default::default()
         }
     } else {
-        // Only the key and the root document are currently written; other
-        // fields aren't persisted, so they're optional rather than
-        // recommended.
         Constraint {
-            r#type: constraint::Type::FieldOptional.into(),
-            reason: "This field may be materialized".to_string(),
+            r#type: constraint::Type::LocationRecommended.into(),
+            reason: "This location should usually be materialized".to_string(),
             ..Default::default()
         }
     }

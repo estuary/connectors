@@ -90,6 +90,7 @@ pub async fn run_transactions(
         .collect::<Result<Vec<_>>>()?;
 
     for binding in &mut bindings {
+        tracing::warn!(binding.state_key, "binding found");
         if binding.checkpoint.snapshot_id.is_none() {
             if let Some(current) = catalog_state.current_snapshot(&binding.table).await? {
                 binding.checkpoint.snapshot_id = Some(current.snapshot_id);
@@ -114,13 +115,19 @@ pub async fn run_transactions(
         };
 
         match request.kind {
+            Some(request::Kind::Load(_)) => {
+                tracing::warn!("--> Load");
+            }
             Some(request::Kind::Flush(_)) => {
+                tracing::warn!("--> Flush");
                 output.send(Response {
                     kind: Some(response::Kind::Flushed(Flushed { state: None })),
                     ..Default::default()
                 })?;
+                tracing::warn!("<-- Flushed");
             }
             Some(request::Kind::Store(store)) => {
+                tracing::warn!("--> Store");
                 let binding = &mut bindings[store.binding as usize];
 
                 if store.delete {
@@ -136,12 +143,18 @@ pub async fn run_transactions(
                     builder.append(element)?;
                 }
 
+                let elements: Vec<Element> = tuple::unpack(&store.values_packed)?;
+                for (builder, element) in binding.value_builders.iter_mut().zip(elements.iter()) {
+                    builder.append(element)?;
+                }
+
                 let doc =
                     std::str::from_utf8(&store.doc_json).context("doc_json must be valid UTF-8")?;
                 binding.doc_builder.append_value(doc);
                 binding.rows += 1;
             }
             Some(request::Kind::StartCommit(_)) => {
+                tracing::warn!("--> StartCommit");
                 for binding in bindings.iter_mut() {
                     binding
                         .write_and_upload(&object_store, &prefix, &bucket)
@@ -155,8 +168,10 @@ pub async fn run_transactions(
                     })),
                     ..Default::default()
                 })?;
+                tracing::warn!("<-- StartedCommit");
             }
             Some(request::Kind::Acknowledge(_)) => {
+                tracing::warn!("--> Acknowledge");
                 for binding in bindings.iter_mut() {
                     binding.acknowledge(&object_store, &prefix, &bucket).await?;
                 }
@@ -168,6 +183,7 @@ pub async fn run_transactions(
                     })),
                     ..Default::default()
                 })?;
+                tracing::warn!("<-- Acknowledged");
             }
             _ => {}
         }
@@ -216,7 +232,8 @@ struct BindingState {
     schema: Arc<Schema>,
     table_schema: serde_json::Value,
     last_column_id: i32,
-    key_builders: Vec<KeyBuilder>,
+    key_builders: Vec<ColumnBuilder>,
+    value_builders: Vec<ColumnBuilder>,
     doc_builder: StringBuilder,
     rows: usize,
     checkpoint: BindingCheckpoint,
@@ -236,8 +253,9 @@ impl BindingState {
         let mut columns: Vec<ArrayRef> = self
             .key_builders
             .iter_mut()
-            .map(KeyBuilder::finish)
+            .map(ColumnBuilder::finish)
             .collect();
+        columns.extend(self.value_builders.iter_mut().map(ColumnBuilder::finish));
         columns.push(Arc::new(self.doc_builder.finish()));
 
         let batch = RecordBatch::try_new(self.schema.clone(), columns)?;
@@ -447,20 +465,37 @@ fn binding_state(
 
     let mut fields = Vec::new();
     let mut key_builders = Vec::new();
+    let mut value_builders = Vec::new();
     let mut iceberg_fields = Vec::new();
     let mut field_id = 1;
 
     for key_field in &field_selection.keys {
-        let data_type = arrow_type_for_key_field(&collection.projections, key_field);
+        let data_type = arrow_type_for_field(&collection.projections, key_field);
         fields.push(arrow_field_with_iceberg_id(
             key_field,
             data_type.clone(),
             field_id,
         ));
-        key_builders.push(KeyBuilder::new(&data_type));
+        key_builders.push(ColumnBuilder::new(&data_type));
         iceberg_fields.push(json!({
             "id": field_id,
             "name": key_field,
+            "required": false,
+            "type": iceberg_type_for_arrow(&data_type),
+        }));
+        field_id += 1;
+    }
+    for value_field in &field_selection.values {
+        let data_type = arrow_type_for_field(&collection.projections, value_field);
+        fields.push(arrow_field_with_iceberg_id(
+            value_field,
+            data_type.clone(),
+            field_id,
+        ));
+        value_builders.push(ColumnBuilder::new(&data_type));
+        iceberg_fields.push(json!({
+            "id": field_id,
+            "name": value_field,
             "required": false,
             "type": iceberg_type_for_arrow(&data_type),
         }));
@@ -492,6 +527,7 @@ fn binding_state(
         table_schema,
         last_column_id,
         key_builders,
+        value_builders,
         doc_builder: StringBuilder::new(),
         rows: 0,
         checkpoint,
@@ -509,7 +545,7 @@ fn arrow_field_with_iceberg_id(name: &str, data_type: DataType, field_id: i32) -
     )]))
 }
 
-fn arrow_type_for_key_field(projections: &[Projection], field: &str) -> DataType {
+fn arrow_type_for_field(projections: &[Projection], field: &str) -> DataType {
     let types: Vec<&str> = projections
         .iter()
         .find(|p| p.field == field)
@@ -543,26 +579,26 @@ fn iceberg_type_for_arrow(data_type: &DataType) -> &'static str {
     }
 }
 
-enum KeyBuilder {
+enum ColumnBuilder {
     Utf8(StringBuilder),
     Int64(Int64Builder),
     Float64(Float64Builder),
     Boolean(BooleanBuilder),
 }
 
-impl KeyBuilder {
-    fn new(data_type: &DataType) -> KeyBuilder {
+impl ColumnBuilder {
+    fn new(data_type: &DataType) -> ColumnBuilder {
         match data_type {
-            DataType::Int64 => KeyBuilder::Int64(Int64Builder::new()),
-            DataType::Float64 => KeyBuilder::Float64(Float64Builder::new()),
-            DataType::Boolean => KeyBuilder::Boolean(BooleanBuilder::new()),
-            _ => KeyBuilder::Utf8(StringBuilder::new()),
+            DataType::Int64 => ColumnBuilder::Int64(Int64Builder::new()),
+            DataType::Float64 => ColumnBuilder::Float64(Float64Builder::new()),
+            DataType::Boolean => ColumnBuilder::Boolean(BooleanBuilder::new()),
+            _ => ColumnBuilder::Utf8(StringBuilder::new()),
         }
     }
 
     fn append(&mut self, element: &Element) -> Result<()> {
         match self {
-            KeyBuilder::Utf8(b) => match element {
+            ColumnBuilder::Utf8(b) => match element {
                 Element::Nil => b.append_null(),
                 Element::String(v) => b.append_value(v.as_ref()),
                 Element::Bytes(v) => b.append_value(String::from_utf8_lossy(v).as_ref()),
@@ -570,32 +606,23 @@ impl KeyBuilder {
                 Element::Float(v) => b.append_value(v.to_string()),
                 Element::Double(v) => b.append_value(v.to_string()),
                 Element::Bool(v) => b.append_value(v.to_string()),
-                other => anyhow::bail!("unexpected key tuple element {:?}", other),
+                other => anyhow::bail!("unexpected tuple element {:?}", other),
             },
-            KeyBuilder::Int64(b) => match element {
+            ColumnBuilder::Int64(b) => match element {
                 Element::Nil => b.append_null(),
                 Element::Int(v) => b.append_value(*v),
-                other => anyhow::bail!(
-                    "unexpected key tuple element {:?} for integer column",
-                    other
-                ),
+                other => anyhow::bail!("unexpected tuple element {:?} for integer column", other),
             },
-            KeyBuilder::Float64(b) => match element {
+            ColumnBuilder::Float64(b) => match element {
                 Element::Nil => b.append_null(),
                 Element::Float(v) => b.append_value(*v as f64),
                 Element::Double(v) => b.append_value(*v),
-                other => anyhow::bail!(
-                    "unexpected key tuple element {:?} for numeric column",
-                    other
-                ),
+                other => anyhow::bail!("unexpected tuple element {:?} for numeric column", other),
             },
-            KeyBuilder::Boolean(b) => match element {
+            ColumnBuilder::Boolean(b) => match element {
                 Element::Nil => b.append_null(),
                 Element::Bool(v) => b.append_value(*v),
-                other => anyhow::bail!(
-                    "unexpected key tuple element {:?} for boolean column",
-                    other
-                ),
+                other => anyhow::bail!("unexpected tuple element {:?} for boolean column", other),
             },
         }
 
@@ -604,10 +631,10 @@ impl KeyBuilder {
 
     fn finish(&mut self) -> ArrayRef {
         match self {
-            KeyBuilder::Utf8(b) => Arc::new(b.finish()) as ArrayRef,
-            KeyBuilder::Int64(b) => Arc::new(b.finish()) as ArrayRef,
-            KeyBuilder::Float64(b) => Arc::new(b.finish()) as ArrayRef,
-            KeyBuilder::Boolean(b) => Arc::new(b.finish()) as ArrayRef,
+            ColumnBuilder::Utf8(b) => Arc::new(b.finish()) as ArrayRef,
+            ColumnBuilder::Int64(b) => Arc::new(b.finish()) as ArrayRef,
+            ColumnBuilder::Float64(b) => Arc::new(b.finish()) as ArrayRef,
+            ColumnBuilder::Boolean(b) => Arc::new(b.finish()) as ArrayRef,
         }
     }
 }

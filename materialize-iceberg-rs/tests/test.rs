@@ -189,6 +189,28 @@ async fn test_materialization() {
 
     assert_eq!(rows.len(), 3, "expected the fixture's 3 rows: {rows:#?}");
 
+    // `value` is a selected non-key field (via `fields.recommended: true`),
+    // so it must land as its own column, not only inside flow_document.
+    let mut by_id: Vec<(i64, String)> = rows
+        .iter()
+        .map(|row| {
+            (
+                row["id"].as_i64().unwrap(),
+                row["value"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    by_id.sort();
+    assert_eq!(
+        by_id,
+        vec![
+            (1, "a".to_string()),
+            (2, "b".to_string()),
+            (3, "c".to_string()),
+        ],
+        "expected the value column to carry each row's fixture value: {rows:#?}"
+    );
+
     let metadata = s3
         .list_objects_v2()
         .bucket(BUCKET)

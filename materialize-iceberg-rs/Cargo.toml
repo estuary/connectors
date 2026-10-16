@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97"
 
+[lib]
+doctest = false
+
 [dependencies.proto-flow]
 git = "https://github.com/estuary/flow"
 rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce"
