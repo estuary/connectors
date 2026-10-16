@@ -44,6 +44,9 @@ MIN_CALLS_WINDOW = timedelta(minutes=1)
 # comfortably inside that horizon, since a window straddling the edge would
 # lose rows while being paged and shift the pages after them.
 CALLS_RETENTION_CLAMP = timedelta(days=175)
+# Each backfill invocation checkpoints after one window, so windows hold about
+# this many calls to save progress every few dozen requests.
+CALLS_BACKFILL_WINDOW_SIZE = 1_000
 # Deletions between page reads shift the `updated_at` walk, which then
 # restarts at most this many times.
 MAX_CONTACTS_WALK_ATTEMPTS = 5
@@ -240,8 +243,8 @@ async def backfill_calls(
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Call | PageCursor, None]:
-    """Yields calls started after `start_date` and before `cutoff`, fewer than
-    10,000 at a time. `page` is the upper bound of the last completed window,
+    """Yields calls started after `start_date` and before `cutoff`, about
+    1,000 at a time. `page` is the upper bound of the last completed window,
     in unix seconds.
 
     ```
@@ -251,7 +254,7 @@ async def backfill_calls(
     from ───────────────(═════════════════════╪═════▶
     to ═════════════════╪═════════════════════]
     window ─────────────┼─[═══════════════════]
-                        │                     └─ sized to fit under the cap
+                        │                     └─ sized to hold ~1,000 calls
                         └─ no earlier than 175 days ago
     ```
 
@@ -273,12 +276,12 @@ async def backfill_calls(
     if lo >= end:
         return
 
-    # Size the window from the remaining range's count so it holds about half
-    # the cap, shrinking it further when calls are bunched toward its start.
+    # Size the window from the remaining range's count, shrinking it further
+    # when calls are bunched toward its start.
     hi = end
     total = await _count_calls(log, http, lo, hi)
-    while total >= MAX_OFFSET and hi - lo > 1:
-        hi = lo + max(1, (hi - lo) * (MAX_OFFSET // 2) // total)
+    while total > CALLS_BACKFILL_WINDOW_SIZE and hi - lo > 1:
+        hi = lo + max(1, (hi - lo) * (CALLS_BACKFILL_WINDOW_SIZE // 2) // total)
         total = await _count_calls(log, http, lo, hi)
 
     async for call in _fetch_calls_window(log, http, lo, hi):
