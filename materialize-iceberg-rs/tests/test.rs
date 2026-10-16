@@ -1,5 +1,6 @@
 use core::str;
 use std::process::Command;
+use std::sync::Once;
 
 use apache_avro::types::Value as AvroValue;
 use aws_config::BehaviorVersion;
@@ -9,9 +10,19 @@ use aws_sdk_s3::error::ProvideErrorMetadata;
 const RUSTFS_ENDPOINT: &str = "http://localhost:9603";
 const BUCKET: &str = "test-bucket";
 
+// The connector binds a fixed port for its embedded catalog server
+// (`MATERIALIZE_ICEBERG_RS_PORT`, defaulting to 8080), regardless of the
+// request it's handling (Spec included). `cargo test`'s default parallelism
+// runs tests in this binary concurrently, so each gets its own port to avoid
+// colliding on the same one.
+const TEST_SPEC_PORT: u16 = 8081;
+const TEST_MATERIALIZATION_PORT: u16 = 8082;
+const TEST_RESTART_PORT: u16 = 8083;
+
 #[test]
 fn test_spec() {
     let output = std::process::Command::new("flowctl")
+        .env("MATERIALIZE_ICEBERG_RS_PORT", TEST_SPEC_PORT.to_string())
         .args([
             "raw",
             "spec",
@@ -28,16 +39,31 @@ fn test_spec() {
     insta::assert_snapshot!(serde_json::to_string_pretty(&got).unwrap());
 }
 
-// Starts (and, on drop, tears down) the docker-compose stack backing the
-// local rustfs S3-compatible store used by `test_materialization`.
-struct ComposeGuard;
-
-impl Drop for ComposeGuard {
-    fn drop(&mut self) {
+// Brings up (and leaves running) the docker-compose stack backing the local
+// rustfs S3-compatible store, shared across every test in this binary.
+fn ensure_services_up() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
         let _ = Command::new("docker")
-            .args(["compose", "-f", "docker-compose.yaml", "down", "-v"])
-            .status();
-    }
+            .args(["network", "create", "flow-test"])
+            .output();
+
+        let status = Command::new("docker")
+            .args(["compose", "-f", "docker-compose.yaml", "up", "--wait"])
+            .status()
+            .expect("failed to invoke docker compose");
+        if !status.success() {
+            let logs = Command::new("docker")
+                .args(["compose", "-f", "docker-compose.yaml", "logs"])
+                .output();
+            if let Ok(logs) = logs {
+                eprintln!("--- docker compose logs ---");
+                eprintln!("{}", String::from_utf8_lossy(&logs.stdout));
+                eprintln!("{}", String::from_utf8_lossy(&logs.stderr));
+            }
+            panic!("docker compose up --wait failed");
+        }
+    });
 }
 
 async fn s3_client() -> aws_sdk_s3::Client {
@@ -61,42 +87,70 @@ async fn s3_client() -> aws_sdk_s3::Client {
     )
 }
 
-#[tokio::test]
-async fn test_materialization() {
-    let out = Command::new("docker")
-        .args(["compose", "-f", "docker-compose.yaml", "up", "--wait"])
-        .output()
-        .unwrap();
-    assert!(
-        out.status.success(),
-        "docker compose up failed: {}",
-        str::from_utf8(&out.stderr).unwrap()
-    );
-    let _guard = ComposeGuard;
-
-    let s3 = s3_client().await;
+async fn ensure_bucket(s3: &aws_sdk_s3::Client) {
     match s3.create_bucket().bucket(BUCKET).send().await {
         Ok(_) => {}
         Err(err) if err.code() == Some("BucketAlreadyOwnedByYou") => {}
         Err(err) => panic!("failed to create test bucket: {err}"),
     }
+}
 
+// Deletes every object under a table's prefix, so each test starts from a
+// clean table regardless of what earlier runs against this rustfs instance
+// left behind.
+async fn clear_table(s3: &aws_sdk_s3::Client, table: &str) {
+    let listed = s3
+        .list_objects_v2()
+        .bucket(BUCKET)
+        .prefix(format!("warehouse/{table}/"))
+        .send()
+        .await
+        .unwrap();
+
+    for object in listed.contents() {
+        let Some(key) = object.key() else { continue };
+        s3.delete_object()
+            .bucket(BUCKET)
+            .key(key)
+            .send()
+            .await
+            .unwrap();
+    }
+}
+
+fn run_preview(fixture: &str, name: &str, port: u16) {
     let output = Command::new("flowctl")
+        .env("MATERIALIZE_ICEBERG_RS_PORT", port.to_string())
         .args([
             "raw",
             "preview-next",
             "--source",
             "tests/test.flow.yaml",
             "--fixture",
-            "tests/fixture.json",
+            fixture,
             "--name",
-            "acmeCo/materialize-iceberg-rs",
+            name,
         ])
         .output()
         .unwrap();
 
     println!("{}", str::from_utf8(&output.stderr).unwrap());
     assert!(output.status.success());
+}
+
+#[tokio::test]
+async fn test_materialization() {
+    ensure_services_up();
+
+    let s3 = s3_client().await;
+    ensure_bucket(&s3).await;
+    clear_table(&s3, "test_table").await;
+
+    run_preview(
+        "tests/fixture.json",
+        "acmeCo/materialize-iceberg-rs",
+        TEST_MATERIALIZATION_PORT,
+    );
 
     let listed = s3
         .list_objects_v2()
@@ -215,6 +269,15 @@ async fn test_materialization() {
 
     let snapshot_id = table_metadata["current-snapshot-id"].as_i64().unwrap();
     assert_eq!(table_metadata["snapshots"][0]["snapshot-id"], snapshot_id,);
+    assert!(
+        table_metadata["snapshots"][0]
+            .as_object()
+            .unwrap()
+            .get("parent-snapshot-id")
+            .is_none(),
+        "the table's first snapshot must omit parent-snapshot-id entirely, not set it to null: {}",
+        table_metadata["snapshots"][0]
+    );
     assert_eq!(
         table_metadata["snapshots"][0]["manifest-list"],
         format!("s3://{BUCKET}/{}", manifest_list_keys[0]),
@@ -223,6 +286,158 @@ async fn test_materialization() {
     assert_eq!(
         table_metadata["location"],
         format!("s3://{BUCKET}/warehouse/test_table"),
+    );
+}
+
+// Runs two completely independent `flowctl raw preview-next` processes
+// against the same table, each with no knowledge of the other's connector
+// state (unlike `--sessions`, which carries a checkpoint forward across
+// session boundaries within one process). This reproduces the scenario that
+// exposed a bug where the connector, started with an empty checkpoint,
+// would commit a snapshot that collided with and orphaned a table's
+// already-written data: snapshot ids must stay unique and chain correctly,
+// and the second commit's manifest-list must still carry the first commit's
+// manifest forward, even though the second process never saw the first
+// commit's checkpoint.
+#[tokio::test]
+async fn test_materialization_restart_reconciles_checkpoint_with_catalog() {
+    ensure_services_up();
+
+    let s3 = s3_client().await;
+    ensure_bucket(&s3).await;
+    clear_table(&s3, "test_table_restart").await;
+
+    run_preview(
+        "tests/restart_fixture_1.json",
+        "acmeCo/materialize-iceberg-rs/restart",
+        TEST_RESTART_PORT,
+    );
+    run_preview(
+        "tests/restart_fixture_2.json",
+        "acmeCo/materialize-iceberg-rs/restart",
+        TEST_RESTART_PORT,
+    );
+
+    let listed = s3
+        .list_objects_v2()
+        .bucket(BUCKET)
+        .prefix("warehouse/test_table_restart/data/")
+        .send()
+        .await
+        .unwrap();
+    let data_keys: Vec<&str> = listed
+        .contents()
+        .iter()
+        .filter_map(|o| o.key())
+        .filter(|k| k.ends_with(".parquet"))
+        .collect();
+    assert_eq!(
+        data_keys.len(),
+        2,
+        "expected one parquet data file per commit, found {data_keys:?}"
+    );
+
+    // Every row from both independent commits must carry real document
+    // data: a connector restart must never result in an empty flow_document.
+    let mut total_rows = 0;
+    for key in &data_keys {
+        let object = s3
+            .get_object()
+            .bucket(BUCKET)
+            .key(*key)
+            .send()
+            .await
+            .unwrap();
+        let bytes = object.body.collect().await.unwrap().into_bytes();
+        let reader = parquet::file::reader::SerializedFileReader::new(bytes).unwrap();
+        for row in parquet::file::reader::FileReader::get_row_iter(&reader, None).unwrap() {
+            let row = row.unwrap().to_json_value();
+            let doc = row["flow_document"].as_str().unwrap();
+            assert!(
+                !doc.is_empty() && serde_json::from_str::<serde_json::Value>(doc).is_ok(),
+                "expected a non-empty JSON flow_document, got {doc:?}"
+            );
+            total_rows += 1;
+        }
+    }
+    assert_eq!(
+        total_rows, 3,
+        "expected 2 rows from the first commit plus 1 from the second"
+    );
+
+    let metadata = s3
+        .list_objects_v2()
+        .bucket(BUCKET)
+        .prefix("warehouse/test_table_restart/metadata/")
+        .send()
+        .await
+        .unwrap();
+    let metadata_keys: Vec<&str> = metadata.contents().iter().filter_map(|o| o.key()).collect();
+
+    let metadata_json_keys: Vec<&&str> = metadata_keys
+        .iter()
+        .filter(|k| k.ends_with(".metadata.json"))
+        .collect();
+    assert_eq!(
+        metadata_json_keys.len(),
+        2,
+        "expected one metadata.json per independent commit, found {metadata_keys:?}"
+    );
+
+    // The second, independent process's metadata.json must show both
+    // snapshots chained together under unique ids, never a collision.
+    let second_metadata_key = metadata_json_keys
+        .iter()
+        .find(|k| k.starts_with("warehouse/test_table_restart/metadata/00002-"))
+        .expect("expected a 00002-<uuid>.metadata.json file");
+    let table_metadata: serde_json::Value =
+        serde_json::from_str(&get_object_string(&s3, second_metadata_key).await).unwrap();
+
+    let snapshots = table_metadata["snapshots"].as_array().unwrap();
+    assert_eq!(
+        snapshots.len(),
+        2,
+        "expected both commits' snapshots to be present: {snapshots:#?}"
+    );
+    let first_snapshot_id = snapshots[0]["snapshot-id"].as_i64().unwrap();
+    let second_snapshot_id = snapshots[1]["snapshot-id"].as_i64().unwrap();
+    assert_ne!(
+        first_snapshot_id, second_snapshot_id,
+        "a restarted connector must never reuse a snapshot id that already exists"
+    );
+    assert_eq!(
+        snapshots[1]["parent-snapshot-id"].as_i64().unwrap(),
+        first_snapshot_id,
+        "the second commit's snapshot must chain onto the first, even though \
+         the second process started with no checkpoint of its own"
+    );
+    assert_eq!(
+        table_metadata["current-snapshot-id"].as_i64().unwrap(),
+        second_snapshot_id
+    );
+
+    // The current snapshot's manifest-list must carry both commits' manifests
+    // forward: a restarted connector must not lose track of data the prior
+    // process already committed.
+    let manifest_list_path = snapshots[1]["manifest-list"]
+        .as_str()
+        .unwrap()
+        .strip_prefix(&format!("s3://{BUCKET}/"))
+        .unwrap()
+        .to_string();
+    let manifest_entries = avro_records(&s3, &manifest_list_path).await;
+    assert_eq!(
+        manifest_entries.len(),
+        2,
+        "expected the manifest-list to carry both commits' manifests forward"
+    );
+    let added_rows: i64 = manifest_entries
+        .iter()
+        .map(|entry| avro_long(entry, "added_rows_count"))
+        .sum();
+    assert_eq!(
+        added_rows, 3,
+        "expected all 3 rows across both commits to be reachable"
     );
 }
 

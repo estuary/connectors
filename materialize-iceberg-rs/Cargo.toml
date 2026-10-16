@@ -89,10 +89,12 @@ features = ["v4"]
 [dev-dependencies.aws-config]
 version = "1.12.0"
 default-features = false
+features = ["rt-tokio", "default-https-client"]
 
 [dev-dependencies.aws-sdk-s3]
 version = "1.149.0"
 default-features = false
+features = ["rt-tokio", "http-1x", "default-https-client"]
 
 [dev-dependencies.insta]
 version = "1"

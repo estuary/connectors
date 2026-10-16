@@ -17,8 +17,13 @@ use super::state::PendingManifest;
 
 const CONTENT_DATA: i32 = 0;
 
-/// A row of the manifest-list (the Iceberg `manifest_file` struct).
+/// A row of the manifest-list (the Iceberg `manifest_file` struct). Renamed
+/// to match `manifest_list_schema()`'s Avro record name: `apache_avro`'s
+/// generic struct deserializer rejects a schema whose record name doesn't
+/// match the Rust type name, and the Avro/Iceberg spec names this record
+/// `manifest_file`, not `ManifestFile`.
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename = "manifest_file")]
 pub struct ManifestFile {
     pub manifest_path: String,
     pub manifest_length: i64,
