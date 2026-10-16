@@ -1,0 +1,59 @@
+info:
+  name: validate probe
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers
+
+  **WHY:** the request `validate_credentials` (`source_okta/resources.py`) issues
+  to prove the API token authenticates. Also the smoke test for this
+  collection's sops/SSWS pre-request script.
+
+  **VERIFIED (2026-10-07):** 200 with a one-element array; the
+  `Authorization: SSWS <token>` scheme authenticates. The `/users` bucket
+  reported `X-Rate-Limit-Limit: 300` for this token.
+
+examples:
+- name: '200 - token authenticates (projection: id, status)'
+  request:
+    url: '{{base_url}}/users?limit=1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '300'
+    - name: x-rate-limit-remaining
+      value: '299'
+    - name: x-rate-limit-reset
+      value: '1791382614'
+    - name: link
+      value: <{{base_url}}/users?limit=1>; rel="self"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "id": "00u176zmwbsJ1Uak8698",
+            "status": "ACTIVE"
+          }
+        ]

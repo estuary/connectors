@@ -1,0 +1,126 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "window_size": {
+              "default": "P30D",
+              "description": "Date window size for the users and groups backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
+              "format": "duration",
+              "title": "Window Size",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiToken": {
+          "description": "An Okta API token, sent as `Authorization: SSWS <token>`.\n\nCreated in the Admin Console under Security > API > Tokens. The token\ninherits the admin role of the account that created it and is revoked by\nOkta after 30 days without use.",
+          "properties": {
+            "credentials_title": {
+              "const": "API Token",
+              "default": "API Token",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "order": 1,
+              "secret": true,
+              "title": "API Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiToken",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "domain": {
+          "description": "The Okta org domain the Management API is served from, without a scheme. Examples: dev-123456.okta.com, acme.okta-emea.com, acme.oktapreview.com, or a custom domain such as login.acme.com.",
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Okta Domain",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. users and groups are backfilled from the objects last updated after this instant, and system_log from the events published at or after it; applications and application_users are always captured in full. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "API Token": "#/$defs/ApiToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiToken"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "domain",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-okta",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

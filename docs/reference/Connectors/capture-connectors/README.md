@@ -157,6 +157,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Estuary](./estuary.md)
 - [Google Play](./google-play.md)
 - [Iterate](./iterate.md)
+- [Okta](./okta.md)
 - [Pendo](./pendo.md)
 - [PostHog](./posthog.md)
 - [Qualtrics](./qualtrics.md)

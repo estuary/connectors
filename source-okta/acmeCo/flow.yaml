@@ -1,0 +1,21 @@
+collections:
+  acmeCo/application_users:
+    schema: application_users.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/applications:
+    schema: applications.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/groups:
+    schema: groups.schema.yaml
+    key:
+    - /id
+  acmeCo/system_log:
+    schema: system_log.schema.yaml
+    key:
+    - /uuid
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+    - /id

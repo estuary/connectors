@@ -1,0 +1,81 @@
+info:
+  name: after page
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?limit=2&filter=lastUpdated gt \"1970-01-01T00:00:00.000Z\"&after={{groups_after}}"
+  params:
+    - name: limit
+      value: "2"
+      type: query
+    - name: filter
+      value: lastUpdated gt "1970-01-01T00:00:00.000Z"
+      type: query
+    - name: after
+      value: "{{groups_after}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - page 1 of 2, next after = last id (projection)
+    request:
+      url: "{{base_url}}/groups?limit=2&filter=lastUpdated gt \"1970-01-01T00:00:00.000Z\"&after="
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: link
+          value: <https://okta-domain-from-config/api/v1/groups?limit=2&filter=lastUpdated+gt+%221970-01-01T00%3A00%3A00.000Z%22>; rel="self", <https://okta-domain-from-config/api/v1/groups?after=00g18h004ubJFvh3C698&limit=2&filter=lastUpdated+gt+%221970-01-01T00%3A00%3A00.000Z%22>; rel="next"
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18gur2rc3zz7MS698", "type": "OKTA_GROUP" },
+            { "id": "00g18h004ubJFvh3C698", "type": "OKTA_GROUP" }
+          ]
+  - name: 200 - page 2 of 2, full page yet no next link (projection)
+    request:
+      url: "{{base_url}}/groups?limit=2&filter=lastUpdated gt \"1970-01-01T00:00:00.000Z\"&after=00g18h004ubJFvh3C698"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: link
+          value: <https://okta-domain-from-config/api/v1/groups?after=00g18h004ubJFvh3C698&limit=2&filter=lastUpdated+gt+%221970-01-01T00%3A00%3A00.000Z%22>; rel="self"
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g176zmw9j1Wyxqf698", "type": "BUILT_IN" },
+            { "id": "00g176zmw9kqvHDny698", "type": "BUILT_IN" }
+          ]
+
+docs: |-
+  **REFERENCE:** [Pagination](https://developer.okta.com/docs/api/#pagination)
+
+  **WHY:** walks the filtered group list two at a time by following
+  `Link rel="next"`. It shows the end-of-list signal, whether `after` is the last
+  returned id, and the order of `filter` results. Run with
+  `--env-var groups_after=` (empty) for page 1, then pass each `next` link's
+  `after`.
+
+  **VERIFIED (2026-10-07):** 2 + 2 reassembles all 4 groups with no gap or
+  duplicate. `after` is the last returned group id. The last page is full
+  (2 of `limit=2`) yet carries no `next`, so completion is the absence of
+  `next`, never a short page.
+
+  **LIMITATION (VERIFIED 2026-10-07):** Groups' `filter` order is not id order:
+  both OKTA_GROUPs (`00g18…`) come before the BUILT_IN groups (`00g176…`), which
+  differs from Users. No document field is a usable resume key within a
+  filtered drain. Together with the undocumented cursor lifetime, that is why
+  the connector never checkpoints mid-drain.

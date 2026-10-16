@@ -1,0 +1,104 @@
+info:
+  name: membership events
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since=2026-10-07T14:30:00.000Z&until=2026-10-07T14:45:00.000Z&filter=eventType sw \"group.user_membership\"&sortOrder=ASCENDING&limit=100"
+  params:
+    - name: since
+      value: "2026-10-07T14:30:00.000Z"
+      type: query
+    - name: until
+      value: "2026-10-07T14:45:00.000Z"
+      type: query
+    - name: filter
+      value: eventType sw "group.user_membership"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** An incremental Group_members needs a change feed per membership. The window
+  covers the 2026-10-07 seeding run (`Seeding / Add User A to Group`, `Seeding / Add User B
+  to Group`, both users' creation joining Everyone, User B's deactivation). It answers:
+  which `group.user_membership.*` events were recorded, what their `target[]` carries
+  (user and group ids?), and whether implicit Everyone joins produce events at all.
+
+  **VERIFIED (2026-10-07 events, read 2026-10-09):** each explicit add logs
+  `group.user_membership.add` with `target[]` = one `User` (the member) and one `UserGroup`
+  (the group). Creating Users A and B — which joined Everyone — logged **no** membership
+  event: Everyone membership changes are invisible to `group.user_membership.*`.
+
+  **LIMITATION (VERIFIED 2026-10-09):** Group_members derives Everyone membership from
+  `user.lifecycle.create` / `user.lifecycle.delete.completed` instead (see
+  `Group members / membership events cascade`, `Group members / everyone members`).
+
+examples:
+  - name: "200 \u2014 two explicit adds logged; Everyone joins on user creation logged nothing (projection: eventType/published/outcome/target)"
+    request:
+      url: "{{base_url}}/logs?since=2026-10-07T14%3A30%3A00.000Z&until=2026-10-07T14%3A45%3A00.000Z&filter=eventType%20sw%20%22group.user_membership%22&sortOrder=ASCENDING&limit=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/logs?since=2026-10-07T14%3A30%3A00.000Z&until=2026-10-07T14%3A45%3A00.000Z&limit=100&sortOrder=ASCENDING&filter=eventType+sw+%22group.user_membership%22>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "60"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "eventType": "group.user_membership.add",
+              "published": "2026-10-07T14:37:01.773Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18gupu552EU005698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.add",
+              "published": "2026-10-07T14:37:12.879Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18gut4epTYtsK2698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            }
+          ]

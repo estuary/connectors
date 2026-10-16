@@ -1,0 +1,90 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=200"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - 3 of 5 users, both DEPROVISIONED omitted; full shape of 1, others projected
+    request:
+      url: "{{base_url}}/users?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: link
+          value: <https://okta-domain-from-config/api/v1/users?limit=200>; rel="self"
+        - name: x-rate-limit-limit
+          value: "300"
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00u18gupu552EU005698", "status": "STAGED", "lastUpdated": "2026-10-07T14:36:28.000Z" },
+            {
+              "id": "00u18h00o173Yc9fV698",
+              "status": "STAGED",
+              "created": "2026-10-07T16:20:12.000Z",
+              "activated": null,
+              "statusChanged": null,
+              "lastLogin": null,
+              "lastUpdated": "2026-10-07T16:20:17.000Z",
+              "passwordChanged": null,
+              "type": { "id": "oty176zmw9ti8gVdP698" },
+              "profile": {
+                "firstName": "Estuary",
+                "lastName": "Updated",
+                "mobilePhone": null,
+                "nickName": "estuary-updated-probe",
+                "secondEmail": null,
+                "login": "nicolas+okta-updated-user@estuary.dev",
+                "email": "nicolas+okta-updated-user@estuary.dev"
+              },
+              "credentials": { "provider": { "type": "OKTA", "name": "OKTA" } },
+              "_links": "REDACTED"
+            },
+            { "id": "00u176zmwbsJ1Uak8698", "status": "ACTIVE", "lastUpdated": "2026-09-03T19:37:36.000Z" }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** shows the User object and the response envelope, and fixes the
+  population the unfiltered list returns. The connector never sends the
+  unfiltered form. This is the same endpoint `validate_credentials` probes.
+
+  **VERIFIED (2026-10-07):** the envelope is a bare JSON array. Pagination
+  rides on the `Link` header only; a single page carries just `rel="self"`. SSWS
+  auth from the decrypted `credentials.access_token` works.
+
+  **VERIFIED (2026-10-07):** item keys are `id, status, created, activated,
+  statusChanged, lastLogin, lastUpdated, passwordChanged, type{id}, profile{…},
+  credentials{provider}, _links`. The four lifecycle timestamps besides
+  `created`/`lastUpdated` are `null` until the event happens. Every timestamp
+  observed (about 20) ends in `.000Z`, meaning second resolution in a
+  millisecond-formatted string.
+
+  **LIMITATION (VERIFIED 2026-10-07):** the unfiltered list omits DEPROVISIONED
+  users. It returned 3 users while `Users / deprovisioned coverage` returned 5.
+  The connector must always send a `filter`. The unfiltered order is not id
+  order.
+
+  **VERIFIED (2026-10-07):** `x-rate-limit-limit: 300` on `/users` for this
+  Integrator Free org's token, higher than the 100/min published for the tier.
