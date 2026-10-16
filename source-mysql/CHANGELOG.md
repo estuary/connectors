@@ -1,5 +1,12 @@
 # source-mysql
 
+## 2026-10-14
+
+### Changed
+- Backfill progress in the connector status now covers the whole backfill
+  instead of dropping tables from the count as they finish, and includes an
+  approximate time remaining.
+
 ## 2026-09-29
 
 ### Changed
