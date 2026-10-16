@@ -67,10 +67,19 @@ pub enum TableUpdate {
 /// catalog database, so the current metadata file for a table is located via
 /// a `version-hint.text` pointer file, following the classic Hadoop-catalog
 /// convention.
+#[derive(Clone)]
 pub struct CatalogState {
     pub object_store: Arc<dyn ObjectStore>,
     pub prefix: String,
     pub bucket: String,
+}
+
+/// The head state of an already-committed Iceberg table, as recovered from
+/// its `metadata.json` rather than from a Flow-runtime-persisted checkpoint.
+pub struct CurrentSnapshot {
+    pub snapshot_id: i64,
+    pub sequence_number: i64,
+    pub manifest_list: String,
 }
 
 impl CatalogState {
@@ -152,6 +161,46 @@ impl CatalogState {
         let metadata: TableMetadata =
             serde_json::from_slice(&bytes).context("decoding table metadata")?;
         Ok(Some((version, metadata)))
+    }
+
+    /// Returns the table's current head snapshot, as recorded in its
+    /// `metadata.json`, if the table already exists. A binding's checkpoint
+    /// is seeded from this when it doesn't already know about a prior
+    /// snapshot, so a checkpoint that's empty or behind what's actually been
+    /// committed (e.g. after a connector restart) can never collide with or
+    /// shadow snapshots the table already has.
+    pub async fn current_snapshot(&self, table: &str) -> Result<Option<CurrentSnapshot>> {
+        let Some((_, metadata)) = self.load_metadata(table).await? else {
+            return Ok(None);
+        };
+
+        let Some(snapshot_id) = metadata.current_snapshot_id else {
+            return Ok(None);
+        };
+
+        let snapshot = metadata
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.snapshot_id == snapshot_id)
+            .with_context(|| format!("table metadata is missing current snapshot {snapshot_id}"))?;
+
+        let s3_prefix = format!("s3://{}/", self.bucket);
+        let manifest_list = snapshot
+            .manifest_list
+            .strip_prefix(&s3_prefix)
+            .with_context(|| {
+                format!(
+                    "manifest-list path {} does not start with {s3_prefix}",
+                    snapshot.manifest_list
+                )
+            })?
+            .to_string();
+
+        Ok(Some(CurrentSnapshot {
+            snapshot_id: snapshot.snapshot_id,
+            sequence_number: snapshot.sequence_number,
+            manifest_list,
+        }))
     }
 
     /// Applies a batch of table updates, creating the table's initial

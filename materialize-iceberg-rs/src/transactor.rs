@@ -68,15 +68,12 @@ pub async fn run_transactions(
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let (object_store, prefix, bucket) = build_object_store(&config.store)?;
 
-    server::set_catalog(
-        &catalog,
-        CatalogState {
-            object_store: object_store.clone(),
-            prefix: prefix.clone(),
-            bucket: bucket.clone(),
-        },
-    )
-    .await;
+    let catalog_state = CatalogState {
+        object_store: object_store.clone(),
+        prefix: prefix.clone(),
+        bucket: bucket.clone(),
+    };
+    server::set_catalog(&catalog, catalog_state.clone()).await;
 
     let mut connector_state = ConnectorState::from_json(open.state_json.as_ref())?;
 
@@ -91,6 +88,16 @@ pub async fn run_transactions(
             binding_state(binding, checkpoint)
         })
         .collect::<Result<Vec<_>>>()?;
+
+    for binding in &mut bindings {
+        if binding.checkpoint.snapshot_id.is_none() {
+            if let Some(current) = catalog_state.current_snapshot(&binding.table).await? {
+                binding.checkpoint.snapshot_id = Some(current.snapshot_id);
+                binding.checkpoint.sequence_number = current.sequence_number;
+                binding.checkpoint.manifest_list = Some(current.manifest_list);
+            }
+        }
+    }
 
     output.send(Response {
         kind: Some(response::Kind::Opened(Opened {

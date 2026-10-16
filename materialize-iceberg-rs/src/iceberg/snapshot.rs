@@ -13,6 +13,7 @@ use serde::Serialize;
 #[serde(rename_all = "kebab-case")]
 pub struct Snapshot {
     pub snapshot_id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_snapshot_id: Option<i64>,
     pub sequence_number: i64,
     pub timestamp_ms: i64,

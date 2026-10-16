@@ -49,11 +49,11 @@ fn constraint_for_projection(p: &Projection) -> Constraint {
         }
     } else if p.ptr.is_empty() {
         // The connector stores the root document verbatim alongside the key
-        // columns, so it must be selected for materialization to write
-        // anything.
+        // columns and has no other representation of a row's data, so this
+        // location must always be selected.
         Constraint {
-            r#type: constraint::Type::LocationRecommended.into(),
-            reason: "The root document should usually be materialized".to_string(),
+            r#type: constraint::Type::LocationRequired.into(),
+            reason: "The root document must be materialized".to_string(),
             ..Default::default()
         }
     } else {
