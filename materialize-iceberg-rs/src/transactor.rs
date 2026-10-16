@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -18,6 +19,7 @@ use object_store::PutPayload;
 use object_store::aws::AmazonS3Builder;
 use object_store::path::Path as ObjectPath;
 use parquet::arrow::ArrowWriter;
+use parquet::arrow::PARQUET_FIELD_ID_META_KEY;
 use proto_flow::flow::Projection;
 use proto_flow::flow::materialization_spec;
 use proto_flow::flow::{self};
@@ -443,7 +445,11 @@ fn binding_state(
 
     for key_field in &field_selection.keys {
         let data_type = arrow_type_for_key_field(&collection.projections, key_field);
-        fields.push(Field::new(key_field.clone(), data_type.clone(), true));
+        fields.push(arrow_field_with_iceberg_id(
+            key_field,
+            data_type.clone(),
+            field_id,
+        ));
         key_builders.push(KeyBuilder::new(&data_type));
         iceberg_fields.push(json!({
             "id": field_id,
@@ -453,7 +459,11 @@ fn binding_state(
         }));
         field_id += 1;
     }
-    fields.push(Field::new("flow_document", DataType::Utf8, true));
+    fields.push(arrow_field_with_iceberg_id(
+        "flow_document",
+        DataType::Utf8,
+        field_id,
+    ));
     iceberg_fields.push(json!({
         "id": field_id,
         "name": "flow_document",
@@ -461,7 +471,7 @@ fn binding_state(
         "type": "string",
     }));
 
-    let last_column_id = field_id - 1;
+    let last_column_id = field_id;
     let table_schema = json!({
         "type": "struct",
         "schema-id": 0,
@@ -479,6 +489,17 @@ fn binding_state(
         rows: 0,
         checkpoint,
     })
+}
+
+/// Builds an Arrow field stamped with the Parquet field-id metadata key that
+/// `parquet::arrow::ArrowWriter` reads to assign the physical column's
+/// `field_id`, which Iceberg readers require to map data file columns back
+/// to schema fields.
+fn arrow_field_with_iceberg_id(name: &str, data_type: DataType, field_id: i32) -> Field {
+    Field::new(name, data_type, true).with_metadata(HashMap::from([(
+        PARQUET_FIELD_ID_META_KEY.to_string(),
+        field_id.to_string(),
+    )]))
 }
 
 fn arrow_type_for_key_field(projections: &[Projection], field: &str) -> DataType {

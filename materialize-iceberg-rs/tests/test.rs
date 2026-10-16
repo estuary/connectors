@@ -200,9 +200,11 @@ async fn test_materialization() {
         1,
         "expected exactly one table metadata file, found {metadata_keys:?}"
     );
-    assert_eq!(
-        *metadata_json_keys[0],
-        "warehouse/test_table/metadata/v1.metadata.json"
+    let metadata_json_filename = metadata_json_keys[0].rsplit('/').next().unwrap();
+    assert!(
+        metadata_json_filename.starts_with("00001-")
+            && metadata_json_filename.ends_with(".metadata.json"),
+        "expected a 00001-<uuid>.metadata.json filename, got {metadata_json_filename}"
     );
 
     let table_metadata: serde_json::Value =

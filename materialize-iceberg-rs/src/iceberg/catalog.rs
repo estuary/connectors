@@ -9,6 +9,7 @@ use object_store::path::Path as ObjectPath;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
+use uuid::Uuid;
 
 use super::snapshot::Snapshot;
 use super::table_metadata::MetadataLogEntry;
@@ -80,11 +81,47 @@ impl CatalogState {
         ))
     }
 
-    fn metadata_path(&self, table: &str, version: u64) -> ObjectPath {
+    fn metadata_dir(&self, table: &str) -> ObjectPath {
+        ObjectPath::from(format!("{}/{}/metadata", self.prefix, table))
+    }
+
+    /// Builds the path for a newly-written `metadata.json`, following the
+    /// `<version>-<uuid>.metadata.json` convention (zero-padded to 5 digits)
+    /// used by other Iceberg implementations, rather than the simpler
+    /// `v<version>.metadata.json` form — so that readers which scan the
+    /// metadata directory for the highest version (rather than trusting
+    /// `version-hint.text`) see the same naming they'd see from any other
+    /// writer.
+    fn new_metadata_path(&self, table: &str, version: u64) -> ObjectPath {
         ObjectPath::from(format!(
-            "{}/{}/metadata/v{}.metadata.json",
-            self.prefix, table, version
+            "{}/{}/metadata/{:05}-{}.metadata.json",
+            self.prefix,
+            table,
+            version,
+            Uuid::new_v4()
         ))
+    }
+
+    /// Finds the metadata file for `version` by listing the table's metadata
+    /// directory, since its filename carries a UUID that can't be derived
+    /// from the version number alone.
+    async fn find_metadata_path(&self, table: &str, version: u64) -> Result<ObjectPath> {
+        let listing = self
+            .object_store
+            .list_with_delimiter(Some(&self.metadata_dir(table)))
+            .await
+            .context("listing table metadata directory")?;
+
+        let version_prefix = format!("{version:05}-");
+        listing
+            .objects
+            .into_iter()
+            .map(|meta| meta.location)
+            .find(|path| {
+                path.filename()
+                    .is_some_and(|name| name.starts_with(&version_prefix))
+            })
+            .with_context(|| format!("no metadata file found for version {version}"))
     }
 
     async fn load_metadata(&self, table: &str) -> Result<Option<(u64, TableMetadata)>> {
@@ -101,9 +138,11 @@ impl CatalogState {
             Err(err) => return Err(err.into()),
         };
 
+        let metadata_path = self.find_metadata_path(table, version).await?;
+
         let bytes = self
             .object_store
-            .get(&self.metadata_path(table, version))
+            .get(&metadata_path)
             .await
             .context("fetching table metadata")?
             .bytes()
@@ -156,11 +195,8 @@ impl CatalogState {
         let snapshot = snapshot.context("commit requires an add-snapshot update")?;
 
         let next_version = version + 1;
-        let metadata_file = format!(
-            "s3://{}/{}",
-            self.bucket,
-            self.metadata_path(table, next_version)
-        );
+        let metadata_path = self.new_metadata_path(table, next_version);
+        let metadata_file = format!("s3://{}/{}", self.bucket, metadata_path);
         metadata.add_snapshot(snapshot);
         metadata.metadata_log.push(MetadataLogEntry {
             timestamp_ms: metadata.last_updated_ms,
@@ -169,10 +205,7 @@ impl CatalogState {
 
         let bytes = serde_json::to_vec_pretty(&metadata).context("encoding table metadata")?;
         self.object_store
-            .put(
-                &self.metadata_path(table, next_version),
-                PutPayload::from(bytes),
-            )
+            .put(&metadata_path, PutPayload::from(bytes))
             .await
             .context("uploading table metadata")?;
         self.object_store

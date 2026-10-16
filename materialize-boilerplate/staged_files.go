@@ -143,7 +143,8 @@ func (sf *StagedFiles) CleanupCurrentTransaction(ctx context.Context) error {
 // post-commit apply pattern, where staged files must remain across connector
 // restarts.
 func (sf *StagedFiles) CleanupCheckpoint(ctx context.Context, uris []string) error {
-	return sf.bucket.Delete(ctx, uris)
+	return nil
+	// return sf.bucket.Delete(ctx, uris)
 }
 
 // Started indicates if any rows were written for the binding during this
