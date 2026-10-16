@@ -1,0 +1,23 @@
+info:
+  name: Ad Group Report Daily (campaign_ids filter)
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_ADGROUP&dimensions=["adgroup_id","stat_time_day"]&metrics=["spend"]&page=1&page_size=1000&start_date=2026-09-14&end_date=2026-10-13&filtering=[{"field_name":"adgroup_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"},{"field_name":"campaign_ids","filter_type":"IN","filter_value":"[\"1800000000000000001\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** the `campaign_ids` batch filter beside the ad-group-level include-deleted filter.
+
+  **VERIFIED (2026-10-14, sandbox):** `code 0`: `campaign_ids` is accepted beside the `adgroup_status` include-deleted filter.
