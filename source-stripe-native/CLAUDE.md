@@ -16,9 +16,9 @@ catalog and `source_stripe_native/resources.py` for binding wiring.
 - 429 behavior: exponential backoff with jitter recommended. SDKs auto-retry 429s
   for lock timeouts.
 
-All buckets are well above the 20 req/hr threshold that triggers the add-stream
-skill's budget rule, so `flowctl raw preview-next`, `pytest`, and live captures can run
-freely without per-call consent (subject to `config.yaml` being clean — Law #4).
+All buckets are well above the 20 req/hr threshold of `API-BUDGET-20RPH`, so
+`flowctl raw preview-next`, `pytest`, and live captures can run freely without
+per-call consent (subject to `API-CONFIG-GATE`).
 
 ## Silent-default-filter audit (as of 2026-06-01)
 
@@ -34,7 +34,7 @@ active-only but actually returns both states by default.
 | `/v1/products` | Docs ambiguous on default. | Same caveat as Plans. | Same. |
 | `/v1/promotion_codes` | Docs ambiguous on default. | Same caveat. | Same. |
 | `/v1/coupons` | No `active` parameter at all. `valid` is runtime-computed, not filterable. | N/A. | N/A. |
-| `/v1/subscriptions`, `/v1/subscriptions/{id}` (items) | Defaults filtered, but supports `status=all` sentinel. | Already handled in `api.py:233-234`. | None. |
+| `/v1/subscriptions`, `/v1/subscriptions/{id}` (items) | Defaults filtered, but supports `status=all` sentinel. | Already handled: `status=all` in `fetch_backfill` and `fetch_backfill_substreams` (`api.py`). | None. |
 
 When adding a new stream, run the new endpoint's bare list against an account
 with both states present and inspect the response. If the bare list silently

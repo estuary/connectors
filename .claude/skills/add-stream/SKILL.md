@@ -2,14 +2,14 @@
 name: add-stream
 description: Add a new stream to an existing estuary-cdk connector — classify the endpoint, register it, regenerate flow discovery, refresh snapshots. Use when extending a `source-*` connector with another endpoint.
 argument-hint: "[connector-name] [stream-name]"
-allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch
+allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch Agent Skill
 ---
 
 Add a `stream-name` stream to the `source-$1` connector. Read a few neighboring streams in the same connector before designing the new one — local conventions outrank any generic pattern.
 
-## Laws
+Phases 0–3 and 6–7 are the extend path's own: they baseline an existing suite, design from scratch, and regenerate per stream. An orchestrator that hands you a reviewed plan (`create-capture-connector`) owns those and names the phases you run.
 
-These apply in every phase. Re-read them before each phase boundary.
+## Laws
 
 **Shared laws** — read both before Phase 0; they are the single authority:
 
@@ -25,13 +25,7 @@ These apply in every phase. Re-read them before each phase boundary.
 
 Confirm the connector exists. Locate its `models.py`, `resources.py`, `api.py` (or equivalents — naming varies between Python connectors). Read streams in the same connector before designing anything.
 
-**Baseline check (`CONDUCT-ESTABLISH-BASELINE`).** Kick off the connector's existing test suite in the background as soon as Phase 0 begins. Phases 1–3 are read-only / planning and may proceed in parallel while the suite runs — do **not** block on it. The result is a **gate on Phase 4**: confirm the baseline passes before writing any code for the new stream. Failure handling — including the separate `<connector-name>: update tests` commit for stale snapshots — is in [session-conduct.md](../../shared/session-conduct.md).
-
-If the suite fails:
-
-- **Simple schema drift** (the connector spec/discover output has shifted but the code is unchanged): you may dispatch the `regenerate-flow-discovery` agent to refresh the snapshots, then commit the result on its own with the message `<connector-name>: update tests` — a pure snapshot regeneration, so `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY`'s mechanical-change exception covers it. Keep this commit separate from the new-stream work so the PR diff stays scoped.
-- **Flakey fields in the diff** (timestamps like `updated_at`, ETags, anything that changes between runs): surface them to the user and ask whether to add them to the connector's `FIELDS_TO_REDACT` list in `tests/test_snapshots.py` (name varies between connectors — grep for `FIELDS_TO_REDACT` to find the convention).
-- **Anything else:** stop and surface the failure to the user before entering Phase 4.
+Start the baseline test suite now (`CONDUCT-ESTABLISH-BASELINE`). Phases 1–3 are read-only and run in parallel with it; its result gates Phase 4. Failure handling is in the rule.
 
 ## Phase 1 — Rate Limit Survey
 
@@ -47,10 +41,7 @@ Before researching the requested stream, figure out the provider's API rate limi
 
 Then **record the findings in the collection** so the next stream addition doesn't repeat the work. The block format — and where endpoint-specific limitations go instead (a `**LIMITATION**` finding on the proving request) — is defined in `bruno-probe-endpoint`, which also stands the collection up during verification; if it doesn't exist yet at this point, carry the findings forward and write them there once it's created.
 
-**Set the budget for the rest of the skill** (`API-BUDGET-20RPH`, `API-DISCOVER-STATIC-IS-FREE`, `API-COST-SAVER-DISABLE` in [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md)):
-
-- **All required endpoints > 20 req/hr:** run `flowctl raw preview-next` / `flowctl raw discover` / `pytest` / captures freely.
-- **Any required endpoint ≤ 20 req/hr:** ask before each run — `flowctl raw discover` included, unless this connector's discovery is static (see `API-DISCOVER-STATIC-IS-FREE` above); plan to disable unrelated bindings in `test.flow.yaml` (`disable: true`) before testing.
+The survey's result sets the run budget for the rest of the skill — `API-BUDGET-20RPH` (with `API-DISCOVER-STATIC-IS-FREE` and `API-COST-SAVER-DISABLE`) says what each outcome allows.
 
 ## Phase 2 — Endpoint Survey
 
@@ -72,7 +63,7 @@ The decision test: "what is the thing that, once true, never changes?" That's th
 
 Defer to the `classify-stream-types` skill. Don't re-derive its flowchart here. Bring back: the chosen replication strategy (webhook, incremental+backfill, incremental-only, or snapshot) and the rationale.
 
-**Checkpoint:** present the chosen endpoint (from Phase 2), the document grain, the classification, and the rationale to the user, and ask whether they want to proceed to Phase 4 (Model Implementation). Stop here until they say yes. This is the natural break for the user to course-correct before any connector code gets written.
+**`GATE-STREAM-DESIGN`** ([`interaction-mode.md`](../../shared/interaction-mode.md)): the chosen endpoint, the document grain, the classification and the rationale are the design; nothing in connector code changes until it is settled. Human-in-the-loop: present them and wait for the user's yes. Autonomous: proceed and ledger the three choices with their rejected alternatives.
 
 ## Phase 4 — Model Implementation
 
@@ -98,13 +89,13 @@ After the implementation compiles and before regenerating flow discovery, run ov
    - House-pattern errors (e.g. `request_class`/`spec`/`credentials_title` override complaints inherited from the scaffold/reference idioms) may be pre-existing noise: **verify parity by running the same check on a sibling connector** before ignoring them, and say so out loud.
 2. **Organize imports**: `pipx run ruff==0.16.9 check --select I --fix source_<pkg>/ tests/`. Always use the pinned version: the repo's `ruff.toml` rejects any other.
 3. **Lint**: `pipx run ruff==0.16.9 check source_<pkg>/ tests/`. Fix findings in code this session wrote; report pre-existing ones to the user without fixing them.
-4. **Format**: `black source_<pkg>/ tests/`.
+4. **Format**: `pipx run ruff==0.16.9 format source_<pkg>/ tests/`.
 
 Re-run the test suite if any of these changed code. If a tool isn't on PATH, find it (editor tooling dirs count) or ask — don't skip the step silently.
 
 ## Phase 6 — Flow Regeneration
 
-Dispatch the `regenerate-flow-discovery` agent (runs on Haiku in its own context) via the Agent tool. Pass it the connector name and — since Phase 1 already surveyed the provider's rate limits — whether the budget is cleared (all required endpoints > 20 req/hr) so it can run the snapshot tests without re-asking for consent.
+Dispatch the `regenerate-flow-discovery` agent (runs on Haiku in its own context) via the Agent tool. Pass it the connector name and the Phase 1 budget verdict so it doesn't re-survey.
 
 ## Phase 7 — Snapshot Refresh
 

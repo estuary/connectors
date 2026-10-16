@@ -1,18 +1,16 @@
 # Provider API calls: consent, budget, and credentials
 
+> **Enforced mechanically.** The repo's `PreToolUse` hook (`.claude/hooks/permission-gate.py`) checks `API-CONFIG-GATE` and `API-MUTATE-ONLY-WITH-CONSENT` on every `bru run`, `flowctl raw preview-next|discover|capture` and `pytest`, and refuses mutating `curl`/HTTPie (`API-ROUTE-THROUGH-BRUNO`). Its denial message says what to do instead; follow it.
+
 ### `API-CONFIG-GATE` · conduct-only
 
-**Read-only calls (GET, HEAD):** allowed without per-call consent **iff** `git status --porcelain <connector>/config.yaml` is empty AND the file is tracked. Check this before _every_ read call, not just the first.
-
-**If `config.yaml` shows any uncommitted modification:** stop and ask before the next call, every time. The user may have repointed the credentials at a different account (prod vs. test) — never assume.
-
-**Effectful calls (POST/PUT/PATCH/DELETE, or any GET known to have side effects such as cursor consumption):** _always_ ask, regardless of `config.yaml` state. Even after consent, you do not run them — see `API-NEVER-MUTATE`.
+Live calls run only while `<connector>/config.yaml` is tracked, clean, and — once the run's permission has been stamped to it — unchanged since. An edited or re-committed file may point at a different account (prod vs. test), so the hook refuses every live run until the user re-confirms (`GATE-CONFIG-DIRTY` in [interaction-mode.md](interaction-mode.md)). Effectful calls additionally need `API-MUTATE-ONLY-WITH-CONSENT`.
 
 ---
 
-### `API-NEVER-MUTATE` · conduct-only
+### `API-MUTATE-ONLY-WITH-CONSENT` · conduct-only
 
-Never mutate provider state yourself. If verification needs a mutation, author the request and hand it to the user; resume only after they confirm they've run it. Consent can lift this.
+Mutate provider state only when this run's questionnaire answer is `seeding: assistant`, and then only via requests filed under `bruno/Seeding/`, against a sandbox — no ad-hoc mutation, no request outside that folder. Under any other answer you author the request and the user runs it (`GATE-SEEDING` in [interaction-mode.md](interaction-mode.md) has the per-mode procedure). Consent is per connector and per run: the permissions file is deleted at hand-off, so nothing carries over.
 
 ---
 
@@ -30,7 +28,7 @@ Checkable from a diff: a `curl` invocation against the provider's host in any co
 
 The decrypted token lives on `req` for the in-flight request only. Never `bru.setVar`, never `bru.setEnvVar`, never write it to a committed file — it is re-derived from `sops` on every request, in both the CLI and the GUI.
 
-This is why the per-request OAuth refresh roundtrip in [auth-wiring.md](auth-wiring.md) is intentional rather than wasteful: caching the access token would persist it into a committed environment file.
+This is why the per-request OAuth refresh roundtrip in [auth-wiring.md](../skills/bruno-probe-endpoint/auth-wiring.md) is intentional rather than wasteful: caching the access token would persist it into a committed environment file.
 
 Runtime vars _are_ fine for non-secret resource ids chained between requests — the prohibition is specifically on credentials.
 
@@ -38,7 +36,7 @@ Runtime vars _are_ fine for non-secret resource ids chained between requests —
 
 ### `API-DONT-READ-CREDS` · conduct-only
 
-Don't read the encrypted credentials file directly, even just to check its structure. Ask the user where it lives and what JSON path the token sits at.
+Don't read the encrypted credentials file directly, even just to check its structure. The file is the connector's own `config.yaml`; the token's JSON path and wire scheme come from the credential class in `models.py` and from `api.py` (Phase 2 of `bruno-probe-endpoint`) — never from the file, and never by asking the user to describe it.
 
 ---
 

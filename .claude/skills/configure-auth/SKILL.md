@@ -1,13 +1,13 @@
 ---
 name: configure-auth
-description: Replace the AUTH SEAM left by scaffold-connector with a real authentication scheme — determine the provider's auth method, pick the matching estuary-cdk credentials primitive, wire the discriminated credentials union into models.py, define an OAuth2Spec when offering managed OAuth, set the TokenSource, and implement validate_credentials against a real probe endpoint. Use as the second step of create-capture-connector (after scaffold-connector), or any time a connector's auth needs to be (re)wired.
+description: Wire a connector's authentication — pick the estuary-cdk credentials primitive for the provider's scheme, replace scaffold-connector's AUTH SEAM, implement validate_credentials. Use after scaffold-connector, or whenever a connector's auth is added or rewired.
 argument-hint: "[connector-name]"
 allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch
 ---
 
 Wire authentication into `source-$1`, replacing the `# AUTH SEAM` stubs that `scaffold-connector` left in `models.py`, `resources.py`, and `config.yaml`. The deliverable is a connector whose `flowctl raw spec` advertises the right credential options (and OAuth block, if any) and whose `validate_credentials` probes a real endpoint — **but not a live-verified one**: confirming the probe actually authenticates requires real credentials and is deferred to `bruno-probe-endpoint`.
 
-This skill runs **as its own subagent** so the orchestrator's context stays clean. Its final message is a structured summary (see Output). The CDK auth primitives live in `estuary-cdk/estuary_cdk/flow.py` (`AccessToken`, `BasicAuth`, `OAuth2Spec`, `BaseOAuth2Credentials`, `LongLivedClientCredentialsOAuth2Credentials`, `RotatingOAuth2Credentials`, `ClientCredentialsOAuth2Credentials`, `GoogleServiceAccount`) and `estuary-cdk/estuary_cdk/http.py` (`TokenSource`). Read them before editing.
+Run this skill **inline, in the caller's context**: Phase 2 is a user gate the caller owns. Its final message is a structured summary (see Output). The CDK auth primitives live in `estuary-cdk/estuary_cdk/flow.py` (`AccessToken`, `BasicAuth`, `OAuth2Spec`, `BaseOAuth2Credentials`, `LongLivedClientCredentialsOAuth2Credentials`, `RotatingOAuth2Credentials`, `ClientCredentialsOAuth2Credentials`, `GoogleServiceAccount`) and `estuary-cdk/estuary_cdk/http.py` (`TokenSource`). Read them before editing.
 
 ## Guiding rules
 
@@ -45,11 +45,14 @@ Map the answer to a CDK primitive. In order of preference:
 
 **Default to offering both OAuth and a static key when both are viable** — the prevailing production shape is `OAuth2Credentials | AccessToken` (hubspot-native, intercom). The static arm keeps the connector usable even where managed OAuth isn't set up. Where a service account is also viable, `source-google-sheets-native` runs all three arms (`OAuth2Credentials | GoogleServiceAccount | AccessToken`).
 
-> **Managed-OAuth dependency (surface this!):** `OAuth2Spec.provider` must match an OAuth app **registered on the Estuary side** (the dashboard holds the client_id/secret). If Estuary has no app registered for this provider, the OAuth arm won't work end-to-end in production even though `spec` advertises it — only the static-key arm will. Call this out at the Phase 2 checkpoint as a dependency the user/ops must satisfy; it is not something this skill can resolve in code.
+> **Managed-OAuth dependency (surface this!):** `OAuth2Spec.provider` must match an OAuth app **registered on the Estuary side** (the dashboard holds the client_id/secret). If Estuary has no app registered for this provider, the OAuth arm won't work end-to-end in production even though `spec` advertises it — only the static-key arm will. Call this out at the Phase 2 gate as a dependency the user/ops must satisfy; it is not something this skill can resolve in code.
 
-## Phase 2 — Checkpoint
+## Phase 2 — Scheme gate
 
-Present to the user: the recommended scheme(s), the exact union shape (e.g. `OAuth2Credentials | AccessToken`), the probe endpoint you'll use in `validate_credentials`, and — if OAuth — the managed-OAuth registration dependency. Stop until they confirm. Auth shape and whether to offer OAuth are decisions with downstream cost; don't write code until this is settled.
+This is `GATE-AUTH-SCHEME` ([`interaction-mode.md`](../../shared/interaction-mode.md)).
+
+- **Human-in-the-loop mode:** present to the user the recommended scheme(s), the exact union shape (e.g. `OAuth2Credentials | AccessToken`), the probe endpoint you'll use in `validate_credentials`, and — if OAuth — the managed-OAuth registration dependency. Stop until they confirm. Auth shape and whether to offer OAuth are decisions with downstream cost; don't write code until this is settled.
+- **Autonomous mode:** pick the simplest scheme the provider offers — usually a static API key or token — and wire **only that arm**, no union. Autonomous users want a one-and-done credential, not an OAuth app to register (and managed OAuth needs an Estuary-side registration nobody can do from here); reach for OAuth only when the provider issues nothing static. Ledger the decision, and carry forward for the orchestrator's batched checkpoint: the chosen scheme (the user must produce credentials for it) plus a one-line mention of the provider's other schemes, in case they already hold different credentials.
 
 ## Phase 3 — Wire `models.py`
 
@@ -139,7 +142,7 @@ Copy the `authUrlTemplate`/`accessTokenBody` mustache shapes from the closest re
   - Google: add `google_spec=GOOGLE_SPEC`.
 - Implement `validate_credentials` to hit a **cheap, always-available, read-only** endpoint (e.g. `/me`, `/account`, a 1-item list) and raise `ValidationError` with an actionable message on `401`. Model it on `source-front`'s `validate_credentials` (probe + `HTTPError` → `ValidationError`). Pick the probe endpoint from the provider docs; note it in the Output so `bruno-probe-endpoint` can confirm it live.
 
-**`config.yaml`** — reshape the placeholder to the chosen scheme (e.g. `credentials: {credentials_title: "API Key", access_token: PLACEHOLDER}` or the OAuth/refresh-token fields), still with placeholder values.
+**`config.yaml`** — reshape the encrypted placeholder to the chosen scheme by editing it through `sops edit config.yaml` (decrypts into your editor, re-encrypts on save), still with placeholder values. Every secret key keeps the `_sops` suffix: `credentials: {credentials_title: "API Key", access_token_sops: PLACEHOLDER}`, or `client_secret_sops` / `refresh_token_sops` for OAuth. The file stays in its final shape so the user only replaces values.
 
 ## Phase 5 — Smoke test
 
@@ -149,14 +152,9 @@ poetry run flowctl raw spec --source test.flow.yaml -o json --emit-raw
 
 Confirm the emitted `configSchema` shows the credential option(s) with the right titles and `secret` annotations, and that an `oauth2` block is present iff you defined one. `flowctl raw discover` should still succeed with zero bindings. Do not run `validate` or `preview` (no real creds; live auth is `bruno-probe-endpoint`'s job). Fix any Pydantic/import error before handing off — `for_provider` and `TYPE_CHECKING` mistakes surface here.
 
-## Phase 6 — Hand off for credential entry & encryption
+## Phase 6 — Hand off (`GATE-CREDENTIALS`)
 
-Configuration setup ends here, but **nothing downstream can run against the live API until the user supplies real credentials.** `config.yaml` still holds placeholders. Stop and hand back to the user (or, under `create-capture-connector`, signal the orchestrator to pause) with explicit instructions to:
-
-1. Populate `config.yaml` with their real credential values for the chosen scheme.
-2. Encrypt it with sops (the repo's standard — match a sibling connector's `sops`/KMS setup; e.g. `sops --encrypt --in-place config.yaml` with the project's key).
-
-Do not proceed to `bruno-probe-endpoint` or any authenticated step until the user confirms `config.yaml` is populated and encrypted. This pause is mandatory — the credentials are the user's to provide and this skill must never fabricate or encrypt them on their behalf.
+`config.yaml` still holds placeholders, and the credentials are the user's to provide. Hand back the two facts the gate needs: the fields for the chosen scheme, and the edit command, `sops edit source-$1/config.yaml`, which replaces the placeholder values in place and keeps the file encrypted. Under `create-capture-connector` the orchestrator composes the stop; standalone, resolve it per the gate table in [`interaction-mode.md`](../../shared/interaction-mode.md).
 
 ## Output
 
@@ -169,7 +167,7 @@ configure-auth: source-$1
 - validate_credentials probe endpoint: <path>  (PENDING — confirm via bruno-probe-endpoint)
 - spec smoke test: PASS/FAIL   (oauth2 block present: yes/no)
 - AUTH SEAM markers removed from: models.py, resources.py, config.yaml
-- BLOCKING HANDOFF: user must populate + sops-encrypt config.yaml before anything live runs (Phase 6).
+- BLOCKING HANDOFF: user must replace the placeholder values via `sops edit config.yaml` before anything live runs (Phase 6).
 - NEXT (after credentials are in): bruno-probe-endpoint to confirm the probe authenticates; then classify-stream-types / add-stream per stream.
 ```
 

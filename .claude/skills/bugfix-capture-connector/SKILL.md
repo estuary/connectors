@@ -10,7 +10,7 @@ Fix the reported bug in `source-$1`. This skill is an orchestrator — most step
 ## Laws
 
 - [`.claude/shared/session-conduct.md`](../../shared/session-conduct.md) — TODO list, consent, citing sources.
-- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — the `config.yaml` gate, never running mutations, the budget rule.
+- [`.claude/shared/provider-api-consent.md`](../../shared/provider-api-consent.md) — the `config.yaml` gate, mutations only with consent, the budget rule.
 
 Plus one specific to fixing rather than building:
 
@@ -73,9 +73,9 @@ Report the sweep result either way. "Checked all six streams, only `campaigns` w
 ## Phase 6 — Land
 
 - **Changelog:** invoke the `changelog` skill. Don't pre-judge a fix as too internal to be worth mentioning — if the connector keeps a `CHANGELOG.md`, the fix gets an entry (`REVIEW-CHANGELOG-ENTRY`). Adding the file to a connector that has none stays the user's opt-in call.
-- **Self-review:** invoke `review-connector-change` on the working diff before handing off.
+- **Self-review:** dispatch `pr-review-toolkit:code-reviewer` over the working diff before handing off. Tell it to read `.claude/shared/rules-index.md` first and to report which rule classes it could not check; it has no other route to the house rules.
 - Commit scoped to the fix. Snapshot regeneration unrelated to the bug goes in its own `source-$1: update tests` commit, ordered before the fix (see the Phase 3 baseline gate).
-- **Documentation:** if the fix changes user-visible behavior described in the connector's docs, update them (connector docs are mirrored into the flow repo's `site/docs` via a sibling PR).
+- **Documentation:** if the fix changes user-visible behavior described in the connector's docs, update `docs/reference/Connectors/capture-connectors/<provider>.md` in the same PR.
 - **PR body:** follow [.github/pull_request_template.md](../../../.github/pull_request_template.md). Fill every section — drop **Regression?** only when the fix isn't one; list created or affected docs under **Documentation links affected:**; and state under **Notes for reviewers:** how the change was tested (unit tests, snapshot tests, `flowctl raw preview-next`, local stack tests, or another method — name what actually ran).
 - **Never push or open a PR without asking.** Always stop and confirm with the user before `git push` or `gh pr create` — even when the fix is verified and the user asked for the fix in the first place.
 
