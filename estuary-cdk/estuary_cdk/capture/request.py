@@ -4,13 +4,16 @@ from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from typing import Generic, Any
 
 from ..flow import (
+    UNLINKED,
     CaptureSpec,
     CollectionSpec,
     ConnectorState,
     ConnectorType,
     EndpointConfig,
+    Linked,
     RangeSpec,
     ResourceConfig,
+    link_bindings,
 )
 
 
@@ -28,15 +31,20 @@ class Discover(BaseModel, Generic[EndpointConfig]):
 
 
 class ValidateBinding(BaseModel, Generic[ResourceConfig]):
-    collection: CollectionSpec
+    collection: CollectionSpec = UNLINKED
+    collectionIndex: NonNegativeInt = 0
     resourceConfig: ResourceConfig
     backfill: NonNegativeInt = 0
 
 
-class ValidateBase(BaseModel, Generic[ResourceConfig]):
+class ValidateBase(Linked, BaseModel, Generic[ResourceConfig]):
     name: str
     connectorType: ConnectorType
     bindings: list[ValidateBinding[ResourceConfig]] = []
+    linkedCollections: list[CollectionSpec] = []
+
+    def _link(self) -> None:
+        link_bindings(self.bindings, self.linkedCollections)
 
 
 class ValidateLastCaptureEndpointConfig(BaseModel):
