@@ -48,6 +48,12 @@ The CDK's `common` module implements common strategies for capturing data, inclu
 - **incremental_csv_processor** — Streaming CSV parser
 - **gunzip_stream** / **unzip_stream** — Compressed data handling
 
+### Protocol Models (`flow.py`, `capture/`, `derive/`)
+- **flow** — Specifications shared across protocols (`CollectionSpec`, `CaptureSpec`, `DerivedCollectionSpec`), generic over a connector's endpoint and resource configuration types
+- **capture.request** / **capture.response** — Messages of the capture protocol
+- **derive.request** / **derive.response** — Messages of the derive protocol, generic over a derivation's documents, used by Python derivations (they require Pydantic v2)
+- **Linked collections** — A message whose bindings name collections through `linkedCollections` (the indirect form) links each binding to its entry as it's parsed. `binding.collection` is set in either form, and bindings of one collection share one parsed `CollectionSpec`
+
 ### Third-Party Connector Support
 - **CaptureShim** (`shim_airbyte_cdk.py`) — Wraps Airbyte CDK connectors to run within the Estuary framework
 

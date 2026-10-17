@@ -2,11 +2,16 @@ import abc
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum, auto
-from typing import Any, ClassVar, Generic, Literal, Self, TypeVar
+from typing import Any, ClassVar, Generic, Literal, Self, Sequence, TypeVar, cast
 
+import pydantic
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
 
 from .pydantic_polyfill import GenericModel
+
+# Is pydantic's own API that of v2? `pydantic_polyfill.VERSION` can't say:
+# releases of 1.10 which include a `pydantic.v1` alias also report "v2".
+_PYDANTIC_V2 = pydantic.VERSION.startswith("2.")
 
 # The type of this invoked connector.
 ConnectorType = Literal[
@@ -30,8 +35,72 @@ EndpointConfig = TypeVar("EndpointConfig")
 # Generic type of a connector's resource configuration.
 ResourceConfig = TypeVar("ResourceConfig", bound=BaseModel)
 
-# Generic type of a connector's resource-level state.
-ConnectorState = TypeVar("ConnectorState", bound=BaseModel)
+# Generic type of a connector's state. A capture's is a model, and a
+# derivation's may be a plain `dict`.
+ConnectorState = TypeVar("ConnectorState")
+
+
+class Inference(BaseModel):
+    """Inference of a projected location, from the collection's schema."""
+
+    class String(BaseModel):
+        contentType: str = ""
+        format: str = ""
+        contentEncoding: str = ""
+        maxLength: NonNegativeInt = 0
+        strMinimum: str = ""
+        strMaximum: str = ""
+
+    class Numeric(BaseModel):
+        hasMinimum: bool = False
+        minimum: float = 0
+        hasMaximum: bool = False
+        maximum: float = 0
+
+    class Array(BaseModel):
+        minItems: NonNegativeInt = 0
+        hasMaxItems: bool = False
+        maxItems: NonNegativeInt = 0
+        itemTypes: list[str] = []
+
+    types: list[str] = []
+    string: String | None = None
+    title: str = ""
+    description: str = ""
+    default: Any = None
+    secret: bool = False
+    exists: Literal["INVALID", "MUST", "MAY", "IMPLICIT", "CANNOT"] = "INVALID"
+    numeric: Numeric | None = None
+    array: Array | None = None
+    enum: list[Any] = []
+    reduce: Literal[
+        "REDUCE_UNSET",
+        "REDUCE_MULTIPLE",
+        "REDUCE_APPEND",
+        "REDUCE_FIRST_WRITE_WINS",
+        "REDUCE_LAST_WRITE_WINS",
+        "REDUCE_MAXIMIZE",
+        "REDUCE_MERGE",
+        "REDUCE_MINIMIZE",
+        "REDUCE_SET",
+        "REDUCE_SUM",
+        "REDUCE_JSON_SCHEMA_MERGE",
+    ] = "REDUCE_UNSET"
+    redact: Literal[
+        "REDACT_UNSET", "REDACT_MULTIPLE", "REDACT_BLOCK", "REDACT_SHA256"
+    ] = "REDACT_UNSET"
+    contentMediaType: str = ""
+
+
+class Projection(BaseModel):
+    """A document location, projected as a named field of a collection."""
+
+    ptr: str = ""
+    field: str
+    explicit: bool = False
+    isPartitionKey: bool = False
+    isPrimaryKey: bool = False
+    inference: Inference = Inference()
 
 
 class CollectionSpec(BaseModel):
@@ -39,22 +108,120 @@ class CollectionSpec(BaseModel):
     key: list[str]
     writeSchema: dict[str, Any]
     readSchema: dict[str, Any] | None = None
+    partitionFields: list[str] = []
+    projections: list[Projection] = []
+
+
+# A binding or transform of a message names its collection in one of two forms.
+# In the inline form, it carries its own `collection`. In the indirect form,
+# its message has a `linkedCollections` table, and `collectionIndex` locates
+# the collection within it. The form is a property of the message as a whole:
+# it's indirect if and only if `linkedCollections` is non-empty.
+#
+# Each message which may be indirect links its bindings upon being parsed.
+# A binding's `collection` then references its entry of `linkedCollections`,
+# so that the bindings of one collection share one parsed CollectionSpec, and
+# `collection` is set in either form. A linked message re-serializes inline.
+#
+# `collection` defaults to a placeholder, as it's absent from the indirect
+# form, and linking always replaces it.
+UNLINKED = cast(CollectionSpec, None)
+
+
+def link_bindings(bindings: Sequence[Any], linked_collections: list[CollectionSpec]) -> None:
+    """Link each of `bindings` (or transforms) to its collection within
+    `linked_collections`, or else require that it carries its own."""
+    for index, binding in enumerate(bindings):
+        if not linked_collections:
+            if binding.collection is UNLINKED:
+                raise ValueError(f"binding {index} is missing its collection")
+            continue
+        if binding.collectionIndex >= len(linked_collections):
+            raise ValueError(
+                f"binding {index} has collectionIndex {binding.collectionIndex}, "
+                f"but there are {len(linked_collections)} linked collections"
+            )
+        binding.collection = linked_collections[binding.collectionIndex]
+
+
+class Linked:
+    """Mixin of a message which links the collections of its bindings,
+    as each instance is parsed or constructed."""
+
+    def _link(self) -> None:
+        raise NotImplementedError()
+
+    if _PYDANTIC_V2:
+
+        def model_post_init(self, context: Any, /) -> None:
+            self._link()
+
+    else:
+
+        def __init__(self, **data: Any) -> None:
+            super().__init__(**data)
+            self._link()
 
 
 class CaptureBinding(GenericModel, Generic[ResourceConfig]):
-    collection: CollectionSpec
+    collection: CollectionSpec = UNLINKED
+    collectionIndex: NonNegativeInt = 0
     resourceConfig: ResourceConfig
     resourcePath: list[str]
     stateKey: str
     backfill: NonNegativeInt = 0
 
 
-class CaptureSpec(GenericModel, Generic[EndpointConfig, ResourceConfig]):
+class CaptureSpec(Linked, GenericModel, Generic[EndpointConfig, ResourceConfig]):
     name: str
     connectorType: ConnectorType
     config: EndpointConfig
     intervalSeconds: NonNegativeInt
     bindings: list[CaptureBinding[ResourceConfig]] = []
+    linkedCollections: list[CollectionSpec] = []
+
+    def _link(self) -> None:
+        link_bindings(self.bindings, self.linkedCollections)
+
+
+# JSON type of a component of a derivation's shuffle key.
+ShuffleType = Literal["BOOLEAN", "INTEGER", "STRING"]
+
+
+class DerivationTransform(GenericModel, Generic[ResourceConfig]):
+    name: str
+    collection: CollectionSpec = UNLINKED
+    collectionIndex: NonNegativeInt = 0
+    # The transform's `lambda`, which is null if omitted.
+    lambdaConfig: ResourceConfig
+    shuffleKey: list[str] = []
+    readOnly: bool = False
+    backfill: NonNegativeInt = 0
+
+    # Derivations parse only under pydantic v2.
+    if _PYDANTIC_V2:
+        from pydantic import field_validator
+
+        @field_validator("lambdaConfig", mode="before")
+        @classmethod
+        def _omitted_lambda(cls, value: Any) -> Any:
+            return {} if value is None else value
+
+        del field_validator
+
+
+class Derivation(Linked, GenericModel, Generic[EndpointConfig, ResourceConfig]):
+    config: EndpointConfig
+    transforms: list[DerivationTransform[ResourceConfig]] = []
+    shuffleKeyTypes: list[ShuffleType] = []
+    linkedCollections: list[CollectionSpec] = []
+
+    def _link(self) -> None:
+        link_bindings(self.transforms, self.linkedCollections)
+
+
+class DerivedCollectionSpec(CollectionSpec, Generic[EndpointConfig, ResourceConfig]):
+    derivation: Derivation[EndpointConfig, ResourceConfig]
 
 
 class RangeSpec(BaseModel):
