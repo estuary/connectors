@@ -7,6 +7,11 @@
   whose name needs quoting, such as one containing a hyphen. Previously
   opening the streaming channel failed with "The supplied schema does not
   exist or is not authorized. (code 9)".
+- Snowpipe Streaming v2 bindings now send rows to Snowflake one table at a time
+  by default, and wait for each table's rows to commit before starting the
+  next. Previously every table in a transaction held its rows in the streaming
+  sidecar at once, so a transaction that wrote large batches to many tables
+  could exceed the connector's memory limit and restart the task repeatedly.
 
 ## 2026-10-13
 
