@@ -159,11 +159,9 @@ class WorkspaceRelatedStream(AsanaStream, ABC):
     """
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        workspaces_stream = Workspaces(authenticator=self.authenticator)
-        for workspace in workspaces_stream.read_records(
-            sync_mode=SyncMode.full_refresh
-        ):
-            yield {"workspace_gid": workspace["gid"]}
+        yield from self.read_slices_from_records(
+            stream_class=Workspaces, slice_field="workspace_gid"
+        )
 
 
 class WorkspaceRequestParamsRelatedStream(WorkspaceRelatedStream, ABC):
