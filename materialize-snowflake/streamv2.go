@@ -20,10 +20,11 @@ import (
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
-// streamV2MaxBufferedBytes caps the documents that all bindings buffer at once.
-var streamV2MaxBufferedBytes = 128 * 1024 * 1024
+// streamV2MaxHeldBytes caps the memory that batches and in-flight appends hold.
+var streamV2MaxHeldBytes = 128 * 1024 * 1024
 
 // streamV2ChannelCheckpointItem represents one channel of a binding, and the
 // offset of the last document routed to it as of the checkpoint.
@@ -287,7 +288,8 @@ type streamV2Manager struct {
 	client *streamV2Client
 
 	bindings map[int]*streamV2Binding
-	bufBytes int
+	// heldBytes limits the memory that batches and in-flight appends hold.
+	heldBytes *semaphore.Weighted
 }
 
 func newStreamV2Manager(
@@ -313,6 +315,7 @@ func newStreamV2Manager(
 		streaming:       streaming,
 		client:          client,
 		bindings:        make(map[int]*streamV2Binding),
+		heldBytes:       semaphore.NewWeighted(int64(streamV2MaxHeldBytes)),
 	}, nil
 }
 
@@ -516,7 +519,7 @@ func (m *streamV2Manager) openChannel(
 	if err != nil {
 		return nil, err
 	}
-	return newStreamV2Channel(b, m.client, &m.bufBytes, m.sendAllBatches, channelName, keyRange, routed, committedOffset), nil
+	return newStreamV2Channel(b, m.client, m.heldBytes, m.sendAllBatches, channelName, keyRange, routed, committedOffset), nil
 }
 
 // sweep drops the channels this task derived for the binding's table that it no
@@ -580,7 +583,6 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 }
 
 // sendAllBatches sends the buffered documents of every channel of every binding.
-// This brings the total of buffered bytes back to zero.
 func (m *streamV2Manager) sendAllBatches(ctx context.Context) error {
 	for _, b := range m.bindings {
 		for _, c := range b.activeChannels {
