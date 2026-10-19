@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
+from datetime import UTC, datetime, timedelta
 from typing import Tuple
 
 import requests
@@ -34,3 +35,10 @@ class AsanaOauth2Authenticator(Oauth2Authenticator):
         response.raise_for_status()
         response_body = response.json()
         return response_body["access_token"], response_body["expires_in"]
+
+    def token_has_expired(self) -> bool:
+        # The base class only refreshes once the token has expired, so a
+        # request built just before then is sent with the old token. Retries of
+        # that request reuse the same token for up to 10 minutes. Refreshing 10
+        # minutes early keeps both from reaching Asana with an expired token.
+        return datetime.now(UTC) > self._token_expiry_date - timedelta(minutes=10)
