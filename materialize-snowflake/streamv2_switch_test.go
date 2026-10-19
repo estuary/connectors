@@ -89,9 +89,9 @@ func TestStreamV2CheckpointDoesNotSurviveAnotherWritePath(t *testing.T) {
 func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	var ctx = context.Background()
 
-	// The fake sidecar's channel state outlives its process, so each manager
+	// The fake Snowpipe's channel state outlives the manager, so each manager
 	// here stands for a separate session against one Snowflake.
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var target = sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true, Path: []string{"DB", "SCH", "TBL"}},
@@ -118,7 +118,6 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	require.NoError(t, err)
 	var channel = before.bindings[0].activeChannels[0].channelName
 	require.Equal(t, int64(3), entries[0][fullKeyRange].Routed)
-	before.stop()
 
 	// The task materializes through another write path for a while, which
 	// clears this binding's checkpoint item, and is then moved back. Three
@@ -182,7 +181,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		}
 	}
 
-	// seed runs one streaming v2 session of a binding through the fake sidecar,
+	// seed runs one streaming v2 session of a binding through the fake Snowpipe,
 	// whose state file then holds the committed channel the way Snowflake would,
 	// and returns the checkpoint that session flushed.
 	var seed = func(t *testing.T, stateKey string) (streamV2Checkpoint, string) {
@@ -196,8 +195,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		var channel = m.bindings[0].activeChannels[0].channelName
-		m.stop()
-		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 		return entries[0], channel
 	}
 
@@ -224,13 +222,13 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	}
 
 	t.Run("a binding which has never streamed v2 is added as usual", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		var d = newTransactor(t, "fresh.v1", nil)
 		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), *d.cp["fresh.v1"]))
 	})
 
 	t.Run("staying on the write path keeps the channel", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		const stateKey = "stay.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
@@ -238,11 +236,11 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
 		require.True(t, lastBinding(d).streamingV2)
-		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
 
 	t.Run("turning the feature flag off downgrades to snowpipe_streaming and sweeps the channel", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		const stateKey = "flag.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
@@ -253,11 +251,11 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
 		require.True(t, lastBinding(d).streaming)
-		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
 
 	t.Run("a table the snowpipe_streaming path cannot open falls back to staged files after the sweep", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		const stateKey = "fallback.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
@@ -267,11 +265,11 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
 		require.False(t, lastBinding(d).streaming)
 		require.NotNil(t, lastBinding(d).store.stage)
-		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
 
 	t.Run("moving the binding to standard updates sweeps the channel", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		const stateKey = "delta.v1"
 		var prior, channel = seed(t, stateKey)
 		var d = newTransactor(t, stateKey, prior)
@@ -280,11 +278,11 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey]))
 		require.False(t, lastBinding(d).streaming)
 		require.False(t, lastBinding(d).streamingV2)
-		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SIDECAR_STATE")), channel)
+		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
 
 	t.Run("a binding which leaves and returns starts its channel afresh", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		const stateKey = "roundtrip.v1"
 		var prior, channel = seed(t, stateKey)
 
@@ -305,7 +303,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	})
 
 	t.Run("channels the task has already dropped need no sweep", func(t *testing.T) {
-		t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		// A nil item is the deletion of a channel this task dropped, which the
 		// runtime has not yet reduced away. It records nothing.
 		const stateKey = "dropped.v1"
@@ -326,7 +324,6 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
-	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
 
 	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
@@ -341,7 +338,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 	// The schema is shared with CI, so the table carries a name no other run can
 	// derive. Both write paths store the same two columns into it.
-	var tableName = fmt.Sprintf("STREAMV2_SWITCH_flow_test_%d", time.Now().Unix())
+	var tableName = fmt.Sprintf("STREAMV2_SWITCH_FLOW_TEST_%d", time.Now().Unix())
 	var cleanup = func() {
 		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName))
 	}
@@ -395,8 +392,8 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	}
 
 	var newV2 = func(t *testing.T, tgt sql.Table, prior streamV2Checkpoint) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization, accountName, fullRange)
-		t.Cleanup(m.stop)
+		var m, err = newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization, accountName, fullRange)
+		require.NoError(t, err)
 		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, prior)
 		return m
 	}
@@ -460,18 +457,15 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		entries, err := m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
-		m.stop()
 
 		// The manager alone drops nothing of its own, so Snowflake goes on
 		// reporting the committed offset token to whoever opens the channel next.
 		var later = newV2(t, tgt, nil)
-		client, err := later.ensureStarted(ctx)
-		require.NoError(t, err)
+		var client = later.client
 		status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
 		require.NoError(t, err)
 		require.NotNil(t, status.CommittedToken)
 		require.Equal(t, c.offsetToken(3), *status.CommittedToken)
-		later.stop()
 
 		// The transactor is what moves a binding off the path, and it sweeps the
 		// channel as it does, so a return to the path starts from no token.
@@ -480,20 +474,20 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var off = tgt
 		off.DeltaUpdates = false
 		off.Path = []string{cfg.Schema, tableName}
+		sv2, err := newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization, accountName, fullRange)
+		require.NoError(t, err)
 		var d = &transactor{
 			cfg:                 cfg,
 			ep:                  &sql.Endpoint[config]{Dialect: testDialect},
 			_range:              fullRange,
 			version:             "v1",
 			cp:                  checkpoint{tgt.StateKey: &checkpointItem{StreamV2: entries[0]}},
-			snowpipeStreamingV2: newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization, accountName, fullRange),
+			snowpipeStreamingV2: sv2,
 		}
-		t.Cleanup(d.snowpipeStreamingV2.stop)
 		require.NoError(t, d.addBinding(ctx, off, *d.cp[tgt.StateKey]))
 
 		var back = newV2(t, tgt, nil)
-		client, err = back.ensureStarted(ctx)
-		require.NoError(t, err)
+		client = back.client
 		status, err = client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, c.channelName)
 		require.NoError(t, err)
 		require.Nil(t, status.CommittedToken)
@@ -515,10 +509,9 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		storeV2(t, m, 0, 3)
 		var c = m.bindings[0].activeChannels[0]
 		require.NoError(t, c.wait())
-		_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(3))
+		var _, err = m.client.WaitCommit(ctx, map[string]string{c.channelName: c.offsetToken(3)})
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
-		m.sup.kill()
 
 		// The runtime replays those same three documents. This path skips them,
 		// because Snowflake's committed offset token says it holds them.
@@ -528,7 +521,6 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		_, err = replay.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
-		replay.stop()
 
 		// Had the operator escaped the interruption by moving the binding off
 		// this path instead, the same replay would have been materialized again:
@@ -647,17 +639,19 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 // holds it open, and is dropped once it does not.
 func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 	var ctx = context.Background()
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	// The lower shard of two. Snowflake lists the names upper-cased. Only the first
 	// channel is this shard's to drop.
 	sm, drops := fakeStreamManager(t, "test/onto")
-	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, fakeSnowflakeDB(t), testDialect, sm, "test/onto", "acct",
+	var cfg = config{Credentials: &snowflake_auth.CredentialConfig{}}
+	fakeStreamV2Credentials(&cfg)
+	var m, err = newStreamV2Manager(&cfg, fakeSnowflakeDB(t), testDialect, sm, "test/onto", "acct",
 		&pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32})
-	m.argv = fakeSidecarArgv(t)
-	t.Cleanup(m.stop)
+	require.NoError(t, err)
+	fakeStreamV2Backend(t, m)
 	var listed = strings.ToUpper(sm.channelName)
-	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"), fmt.Appendf(nil, `{"committed":{%q:"1",%q:"1",%q:"1"},"errors":{}}`,
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SNOWPIPE_STATE"), fmt.Appendf(nil, `{"committed":{%q:"1",%q:"1",%q:"1"},"errors":{}}`,
 		listed, strings.ToUpper(newChannelName("test/onto", 0x80000000)), strings.ToUpper(newChannelName("other/task", 0))), 0o644))
 
 	// Held open, to register blobs through: it stands.
