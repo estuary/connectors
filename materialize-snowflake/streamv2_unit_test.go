@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -68,7 +69,9 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 
 	// Appends succeed and the committed token never advances, as a channel whose
 	// rows Snowflake accepted but never committed would report.
-	t.Setenv("FAKE_SIDECAR_MODE", "commit_never_lands")
+	t.Setenv("FAKE_SNOWPIPE_MODE", "commit_never_lands")
+	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
+	streamV2WaitCommitTimeout = 3 * time.Second
 
 	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst",
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
@@ -143,7 +146,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// so a restart replays it. Rejecting as the channel opens — before the
 		// replay can append, and whether or not this session appends at all — is
 		// what stops that replay from acknowledging rows Snowflake does not hold.
-		t.Setenv("FAKE_SIDECAR_ROWS_ERROR_COUNT", "3")
+		t.Setenv("FAKE_SNOWPIPE_ROWS_ERROR_COUNT", "3")
 		var m = newManager(t, &streamV2ChannelCheckpointItem{Routed: 2})
 
 		require.ErrorContains(t, testWriteRow(ctx, m, 0, []any{"kept", "v", nil}), "3 row(s) rejected")
@@ -158,9 +161,9 @@ func TestStreamV2DropChannel(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
 
-	// The fake sidecar's channel state outlives its process, so each manager
+	// The fake Snowpipe's channel state outlives the manager, so each manager
 	// below stands in for a separate session against one Snowflake.
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var target = sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
@@ -190,7 +193,6 @@ func TestStreamV2DropChannel(t *testing.T) {
 	entries, err := first.flush(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
-	first.stop()
 
 	// Undropped, that channel wedges the next shard to derive its name: the
 	// documents it is about to store are taken for a replay of an interrupted
@@ -199,25 +201,21 @@ func TestStreamV2DropChannel(t *testing.T) {
 	require.NoError(t, testWriteRow(ctx, reused, 0, []any{"k", 0}))
 	require.Equal(t, channel, reused.bindings[0].activeChannels[0].channelName)
 	require.Equal(t, int64(3), reused.bindings[0].activeChannels[0].progress.committed)
-	reused.stop()
 
-	// Dropping it is what makes the name reusable. The dropping session opens
-	// the channel first, as a shard absorbing another's key range does.
+	// Dropping it is what makes the name reusable.
 	var dropping = newSession(t)
-	client, err := dropping.ensureStarted(ctx)
-	require.NoError(t, err)
+	var client = dropping.client
 	_, err = client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
 	require.NoError(t, err)
-	require.NoError(t, client.CloseChannel(ctx, channel, true))
+	require.NoError(t, client.DropChannel(ctx, "DB", "SCH", "TBL", channel))
 
-	// A dropped channel is out of service: the handle it was dropped through is
-	// spent, so appending to it fails rather than quietly reviving it.
-	require.ErrorContains(t, client.Append(ctx, channel, "1", "1", []byte("[]"), 0), "is not open")
+	// A dropped channel is out of service, so appending to it fails rather than
+	// quietly reviving it.
+	require.ErrorContains(t, client.AppendRows(ctx, channel, "1", "1", []byte("{}\n")), "is not open")
 
 	status, err := client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
 	require.NoError(t, err)
 	require.Nil(t, status.CommittedToken)
-	dropping.stop()
 
 	// So the name now opens as a channel which has committed nothing, and the
 	// documents of the shard which reused it are appended in full.
@@ -239,7 +237,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 func TestStreamV2RejectsForeignTask(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var fullRange = streamV2Range{keyEnd: math.MaxUint32}
 	var foreignChannel = streamV2FormatChannelName("other/task", 0, fullRange, "theirs.v1")
@@ -260,18 +258,17 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 
 	// A channel of no v2 shape is another high-performance client's. The connector
 	// cannot attribute it, so it is left alone and the table is accepted.
-	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SNOWPIPE_STATE"),
 		fmt.Appendf(nil, `{"committed":{%q:"1"},"errors":{}}`, unattributable), 0o644))
 	var alone = newSession(t, "test/task")
 	require.NoError(t, testWriteRow(ctx, alone, 0, []any{"k", "v"}))
 	_, err := alone.flush(ctx)
 	require.NoError(t, err)
-	alone.stop()
 
 	// The other task's committed channel joins the pipe. The next session of this
 	// task is rejected before it opens a channel, naming the other task and both
 	// remedies, and appending nothing.
-	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SNOWPIPE_STATE"),
 		fmt.Appendf(nil, `{"committed":{%q:"1",%q:"3"},"errors":{}}`, unattributable, foreignChannel), 0o644))
 	var rejected = newSession(t, "test/task")
 	err = testWriteRow(ctx, rejected, 0, []any{"k", "v"})
@@ -281,7 +278,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	require.NotContains(t, err.Error(), unattributable)
 	require.Empty(t, rejected.bindings[0].activeChannels)
 
-	names, err := fakeSidecarChannels()
+	names, err := fakeSnowpipeChannels()
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{unattributable, foreignChannel}, names)
 
@@ -299,7 +296,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var full = streamV2Range{keyEnd: math.MaxUint32}
 	var upper = streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}
@@ -307,7 +304,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	var staleFull = streamV2FormatChannelName("test/task", 0, full, "topology.v0")
 	var staleUpper = streamV2FormatChannelName("test/task", 3, upper, "topology.v0")
 
-	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SIDECAR_STATE"),
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SNOWPIPE_STATE"),
 		fmt.Appendf(nil, `{"committed":{%q:"5",%q:"7"},"errors":{}}`, staleFull, staleUpper), 0o644))
 
 	// The upper shard of the backfill drops the stale channel inside its range, and
@@ -316,9 +313,8 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	storeKeys(t, hi, keysHashingTo(upper, 1, "hi"))
 	_, err := hi.flush(ctx)
 	require.NoError(t, err)
-	hi.stop()
 
-	names, err := fakeSidecarChannels()
+	names, err := fakeSnowpipeChannels()
 	require.NoError(t, err)
 	require.Contains(t, names, staleFull)
 	require.NotContains(t, names, staleUpper)
@@ -330,7 +326,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	_, err = lo.flush(ctx)
 	require.NoError(t, err)
 
-	names, err = fakeSidecarChannels()
+	names, err = fakeSnowpipeChannels()
 	require.NoError(t, err)
 	require.NotContains(t, names, staleFull)
 	require.Len(t, names, 2)
@@ -464,4 +460,48 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			require.Equal(t, tt.wantCommitted, committed)
 		})
 	}
+}
+
+// TestStreamV2WaitCommitRejectsAnOvertakenOffset covers a committed offset token
+// beyond the one awaited, which only another writer can produce: the wait fails
+// at once instead of running to its timeout.
+func TestStreamV2WaitCommitRejectsAnOvertakenOffset(t *testing.T) {
+	var ctx = context.Background()
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/overtaken",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var client = m.client
+	var _, err = client.OpenChannel(ctx, "DB", "SCH", "TBL", "ch")
+	require.NoError(t, err)
+
+	var ahead = streamV2FormatOffsetToken(9, fullKeyRange)
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SNOWPIPE_STATE"), fmt.Appendf(nil, `{"committed":{"ch":%q},"errors":{}}`, ahead), 0o644))
+
+	var start = time.Now()
+	_, err = client.WaitCommit(ctx, map[string]string{"ch": streamV2FormatOffsetToken(3, fullKeyRange)})
+	require.ErrorContains(t, err, "beyond the awaited")
+	require.Less(t, time.Since(start), 5*time.Second)
+}
+
+// TestStreamV2WaitCommitRejectsAForeignToken covers a committed offset token that
+// this write path did not format, which only another writer can produce: the wait
+// fails at once instead of running to its timeout.
+func TestStreamV2WaitCommitRejectsAForeignToken(t *testing.T) {
+	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
+	streamV2WaitCommitTimeout = 10 * time.Second
+
+	var ctx = context.Background()
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/foreign",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var client = m.client
+	var _, err = client.OpenChannel(ctx, "DB", "SCH", "TBL", "ch")
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(os.Getenv("FAKE_SNOWPIPE_STATE"), []byte(`{"committed":{"ch":"foreign-token"},"errors":{}}`), 0o644))
+
+	var start = time.Now()
+	_, err = client.WaitCommit(ctx, map[string]string{"ch": streamV2FormatOffsetToken(3, fullKeyRange)})
+	require.ErrorContains(t, err, "not one this write path formats")
+	require.Less(t, time.Since(start), 5*time.Second)
 }

@@ -327,9 +327,9 @@ func newTransactor(
 			return nil, fmt.Errorf("newStreamManager: %w", err)
 		} else if pipeClient, err = NewPipeClient(&cfg, accountName, materializationName); err != nil {
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
+		} else if sv2, err = newStreamV2Manager(&cfg, db, ep.Dialect, sm, open.Materialization.TaskName(), accountName, open.Range); err != nil {
+			return nil, fmt.Errorf("newStreamV2Manager: %w", err)
 		}
-
-		sv2 = newStreamV2Manager(ctx, &cfg, db, ep.Dialect, sm, open.Materialization.TaskName(), accountName, open.Range)
 	}
 
 	var d = &transactor{
@@ -1481,9 +1481,6 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 }
 
 func (d *transactor) Destroy() {
-	if d.snowpipeStreamingV2 != nil {
-		d.snowpipeStreamingV2.stop()
-	}
 	d.load.conn.Close()
 	d.store.conn.Close()
 	d.db.Close()
