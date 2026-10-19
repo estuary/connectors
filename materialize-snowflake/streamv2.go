@@ -191,6 +191,10 @@ const streamV2DefaultPipeSuffix = "-STREAMING"
 // does not tell the two apart.
 const streamV2ErrObjectNotExistOrAuthorized = 2003
 
+// streamV2ListChannelsTimeout bounds each SHOW CHANNELS, which otherwise runs
+// until the account's STATEMENT_TIMEOUT_IN_SECONDS, two days by default.
+const streamV2ListChannelsTimeout = 5 * time.Minute
+
 // listChannels reports, sorted, the names of channels on a table and on its
 // default pipe. A table nothing has streamed into has no default pipe and lists
 // no channels.
@@ -211,7 +215,10 @@ func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, ta
 	} {
 		var query = fmt.Sprintf("SHOW CHANNELS IN %s;", in)
 		var channelRows []channelRow
-		if err := xdb.SelectContext(ctx, &channelRows, query); err != nil {
+		var queryCtx, cancel = context.WithTimeout(ctx, streamV2ListChannelsTimeout)
+		var err = xdb.SelectContext(queryCtx, &channelRows, query)
+		cancel()
+		if err != nil {
 			// Snowflake reports an absent pipe with the same error as one the role
 			// may not see, so the miss is logged.
 			var sfErr *sf.SnowflakeError

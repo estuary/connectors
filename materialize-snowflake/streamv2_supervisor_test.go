@@ -260,6 +260,33 @@ func TestSidecarHangSurfacesTimeout(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestSidecarStalledReaderSurfacesTimeout covers a sidecar that stops reading
+// its socket: the calls blocked writing to it, and those queued behind that
+// write, must still fail at their deadlines.
+func TestSidecarStalledReaderSurfacesTimeout(t *testing.T) {
+	conn, sidecar := net.Pipe()
+	defer sidecar.Close()
+	var client = newSidecarClient(conn, make(chan struct{}), func() error { return nil })
+
+	var errs = make(chan error, 2)
+	for _, timeout := range []time.Duration{200 * time.Millisecond, 400 * time.Millisecond} {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			errs <- client.Append(ctx, "ch_0", "1", "1", make([]byte, 1<<20), 1)
+		}()
+	}
+
+	for range 2 {
+		select {
+		case err := <-errs:
+			require.Error(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("append blocked writing to a sidecar that is not reading")
+		}
+	}
+}
+
 func TestSidecarStopEscalatesToKill(t *testing.T) {
 	defer func(d time.Duration) { sidecarStopTimeout = d }(sidecarStopTimeout)
 	sidecarStopTimeout = 2 * time.Second
