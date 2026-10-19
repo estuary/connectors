@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-10-20
+
+### Changed
+- The `snowpipe_streaming_v2` write path now calls the Snowpipe Streaming REST
+  API directly from the connector. The Python sidecar holding Snowflake's SDK,
+  and its memory, are gone. Appends travel as zstd-compressed NDJSON of up to
+  3.5 MiB each.
+
 ## 2026-10-15
 
 ### Fixed
