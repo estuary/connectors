@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-19
+
+### Fixed
+- Captures of large workspaces no longer fail with `Your pagination token has expired` while
+  reading `stories` and similar child streams.
+
 ## 2026-07-29
 
 ### Fixed
