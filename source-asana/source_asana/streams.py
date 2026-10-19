@@ -124,10 +124,18 @@ class AsanaStream(HttpStream, ABC):
         stream_slices = stream.stream_slices(sync_mode=SyncMode.full_refresh)
 
         for stream_slice in stream_slices:
-            for record in stream.read_records(
-                sync_mode=SyncMode.full_refresh, stream_slice=stream_slice
-            ):
-                yield {slice_field: record["gid"]}
+            # Asana pagination tokens expire after 15 minutes. The child stream
+            # reads its records for each gid before asking for the next one, so
+            # reading lazily could wait longer than that between pages. Fetch
+            # every page up front.
+            gids = [
+                record["gid"]
+                for record in stream.read_records(
+                    sync_mode=SyncMode.full_refresh, stream_slice=stream_slice
+                )
+            ]
+            for gid in gids:
+                yield {slice_field: gid}
 
     @cache  # Caching this method, so we only make this request once
     def get_current_user_data(self) -> dict:
