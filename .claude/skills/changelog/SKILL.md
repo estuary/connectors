@@ -89,6 +89,14 @@ for the convention.
    - One bullet per distinct effect. Active voice, present tense.
    - Put field names and config keys in backticks.
 
+   **Feature flag switches:** if the diff flips a feature flag's default
+   or changes behavior that kicks in automatically via a feature flag
+   cutoff date, add a bullet with exactly this format:
+
+   ```
+   FEATURE FLAG SWITCH: Starting <date> the feature flag <ff_name> will be on by default for new tasks, while existing tasks created at or before <date> will keep their existing behaviour.
+   ```
+
    **Examples** (illustrative; write each entry for its own change rather
    than copying these shapes):
    - Effect, not implementation
