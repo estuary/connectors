@@ -44,6 +44,49 @@ func TestStreamV2BatchStaysUnderTheCap(t *testing.T) {
 	require.LessOrEqual(t, fakeSnowpipeLargestAppend.Load(), int64(streamV2BatchBytes))
 }
 
+// TestStreamV2SendsReleaseEveryAcquiredByte covers the accounting of heldBytes: a
+// send releases exactly the bytes its batch's rows acquired. Releasing more panics,
+// and releasing less leaves the ceiling short once the transaction is flushed.
+func TestStreamV2SendsReleaseEveryAcquiredByte(t *testing.T) {
+	// A leak exhausts the ceiling, and a write would then wait on it forever.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var restore = streamV2MaxHeldBytes
+	t.Cleanup(func() { streamV2MaxHeldBytes = restore })
+	streamV2MaxHeldBytes = 200
+
+	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/release",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	m.addBinding("DB", "SCH", "TBL", sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+		Identifier: "TBL",
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   "release.v1",
+	}, nil)
+
+	var requireCeilingFree = func() {
+		t.Helper()
+		require.True(t, m.heldBytes.TryAcquire(int64(streamV2MaxHeldBytes)), "a flushed transaction left bytes acquired")
+		m.heldBytes.Release(int64(streamV2MaxHeldBytes))
+	}
+
+	for txn := range 2 {
+		for i := range 40 {
+			// Every tenth row is larger than the whole ceiling, so it acquires a
+			// clamped share, and the rest cross the ceiling every few rows.
+			var val = strings.Repeat("v", 20)
+			if i%10 == 0 {
+				val = strings.Repeat("v", 500)
+			}
+			require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("t%d-k%d", txn, i), val}))
+		}
+		_, err := m.flush(ctx)
+		require.NoError(t, err)
+		requireCeilingFree()
+	}
+}
+
 // TestStreamV2NoAppendAfterAFailedAppend covers the order of a channel's appends:
 // once an append fails, the append queued behind it must not run. It would present
 // the continuation token the failed append left unchanged, and Snowflake would

@@ -93,7 +93,9 @@ appends the buffer to the channel at 10,000 rows or at 3.5 MiB, whichever limit
 it reaches first. The API caps one append at 4 MiB after compression. One append
 per channel is pending at a time. A slow channel therefore applies back pressure
 to the buffer instead of opening more requests.
-All channels together buffer 128 MiB at most.
+All channels together hold 256 MiB of rows at most, counting each batch until its
+append returns. A row that would pass that ceiling first appends every batch, then
+waits for appends to return.
 
 Every append carries an offset token. Snowflake stores the token of the last
 append that it committed, and the connector reads that token back when it starts.

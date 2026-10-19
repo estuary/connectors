@@ -277,14 +277,14 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 150, countRows())
 	})
 
-	t.Run("total buffered bytes are bounded", func(t *testing.T) {
+	t.Run("total held bytes are bounded", func(t *testing.T) {
 		// A ceiling small enough to be crossed by nearly every document appends
 		// buffers far short of a full batch. Batch boundaries are not part of the
 		// contract, so the only thing that may change is the number of appends.
 		truncate(t)
-		var restore = streamV2MaxBufferedBytes
-		t.Cleanup(func() { streamV2MaxBufferedBytes = restore })
-		streamV2MaxBufferedBytes = 200
+		var restore = streamV2MaxHeldBytes
+		t.Cleanup(func() { streamV2MaxHeldBytes = restore })
+		streamV2MaxHeldBytes = 200
 
 		var m = newManager(fullRange)
 		m.addBinding(cfg.Database, cfg.Schema, tableName, target("bounded.v1"), nil)
