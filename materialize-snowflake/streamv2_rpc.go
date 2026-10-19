@@ -146,7 +146,15 @@ func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params a
 	c.pending[id] = ch
 	c.mu.Unlock()
 
+	// A sidecar that stops reading blocks the write, which holds writeMu against
+	// every other call, so the call's deadline must also interrupt the write.
+	var stopInterrupt = context.AfterFunc(ctx, func() { c.conn.SetWriteDeadline(time.Now()) })
 	var err = c.write(rpcRequest{ID: id, Op: op, Params: params}, payload)
+	if !stopInterrupt() && err == nil {
+		// The interrupt fired after the write completed and has left the
+		// deadline set, which would fail the next call's write.
+		err = fmt.Errorf("timed out or cancelled: %w", ctx.Err())
+	}
 	if err != nil {
 		c.fail(fmt.Errorf("writing sidecar request: %w", err))
 		c.mu.Lock()
