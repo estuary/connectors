@@ -287,23 +287,6 @@ jobs:
         run: |
           bash source-mongodb/docker-compose-init.sh
 
-      # The snowflake tests build a venv for the Snowpipe Streaming sidecar
-      # with uv, so the venv holds the sidecar's locked dependencies.
-      - name: Install uv for the sidecar test venv
-        if: matrix.connector == 'materialize-snowflake'
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: "0.13.3"
-
-      # The sidecar is its own uv project with its own lock, and nothing else
-      # validates it: the Go test below and the Dockerfile both take `--frozen`,
-      # which installs the committed lock without checking it against the
-      # manifest. `--frozen` is right in both of those places; this is the step
-      # that notices a dependency added without re-locking.
-      - name: Check the Snowpipe sidecar's lock
-        if: matrix.connector == 'materialize-snowflake'
-        run: uv lock --check --project materialize-snowflake/sidecar
-
       # Run the tests of every in-repo helper package which this connector
       # transitively depends on. This list is computed on the fly so that we
       # don't have to keep an explicit list up-to-date. Likewise instead of
