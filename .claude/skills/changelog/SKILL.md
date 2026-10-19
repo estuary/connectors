@@ -91,10 +91,11 @@ for the convention.
 
    **Feature flag switches:** if the diff flips a feature flag's default
    or changes behavior that kicks in automatically via a feature flag
-   cutoff date, add a bullet with exactly this format:
+   cutoff date, add a bullet with exactly this format, ending with one
+   sentence on what the flag changes for the customer:
 
    ```
-   FEATURE FLAG SWITCH: Starting <date> the feature flag <ff_name> will be on by default for new tasks, while existing tasks created at or before <date> will keep their existing behaviour.
+   FEATURE FLAG SWITCH: Starting <date> the feature flag <ff_name> will be on by default for new tasks, while existing tasks created at or before <date> will keep their existing behaviour. <What the flag changes>
    ```
 
    **Examples** (illustrative; write each entry for its own change rather
