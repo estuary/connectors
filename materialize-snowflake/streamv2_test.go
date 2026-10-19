@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"maps"
 	"math"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -20,41 +17,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
-
-// testSidecarPython returns a python interpreter from a venv with the real
-// sidecar package (and the snowpipe-streaming SDK) installed, building the
-// venv on first use. The venv is shared across test runs; the sidecar package
-// itself is installed editable so source changes are always picked up. The
-// install goes through poetry so that the venv holds the sidecar's locked
-// dependencies.
-func testSidecarPython(t *testing.T) string {
-	t.Helper()
-	systemPython, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 not available")
-	}
-	poetry, err := exec.LookPath("poetry")
-	if err != nil {
-		t.Fatal("poetry is required to build the sidecar test venv but was not found on PATH")
-	}
-
-	var venv = filepath.Join(os.TempDir(), "snowpipe-sidecar-test-venv")
-	var python = filepath.Join(venv, "bin", "python")
-	if _, err := os.Stat(python); err != nil {
-		t.Logf("building sidecar test venv at %s", venv)
-		if out, err := exec.Command(systemPython, "-m", "venv", venv).CombinedOutput(); err != nil {
-			t.Fatalf("creating venv: %v: %s", err, out)
-		}
-		var install = exec.Command(poetry, "install", "--only", "main", "--quiet")
-		install.Dir = "sidecar"
-		install.Env = append(os.Environ(), "VIRTUAL_ENV="+venv)
-		if out, err := install.CombinedOutput(); err != nil {
-			os.RemoveAll(venv)
-			t.Fatalf("installing sidecar package: %v: %s", err, out)
-		}
-	}
-	return python
-}
 
 // testRunNonce distinguishes this run's channels from a previous run's.
 // Snowflake's ingestion keeps serving the channels of a dropped table for some
@@ -78,7 +40,6 @@ func TestStreamV2Manager(t *testing.T) {
 
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
-	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
 
 	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
@@ -128,7 +89,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 	// These subtests follow a single channel's counter, committed offset, and token
 	// against live Snowflake; the multi-channel routing and the split/join
-	// inheritance have fake-sidecar suites of their own.
+	// inheritance have fake-Snowpipe suites of their own.
 	singleChannelLayout(t)
 
 	// priorOf wraps a single-channel item as the checkpoint of a binding on an
@@ -138,8 +99,8 @@ func TestStreamV2Manager(t *testing.T) {
 	}
 
 	var newManager = func(keyRange *pf.RangeSpec) *streamV2Manager {
-		var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization, accountName, keyRange)
-		t.Cleanup(m.stop)
+		m, err := newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization, accountName, keyRange)
+		require.NoError(t, err)
 		return m
 	}
 
@@ -341,7 +302,7 @@ func TestStreamV2Manager(t *testing.T) {
 		var tgt = target("recovery.v1")
 
 		// An interrupted transaction: two batches reach Snowflake and commit,
-		// then the sidecar dies before flush, so no checkpoint is ever written
+		// then the connector dies before flush, so no checkpoint is ever written
 		// for this channel.
 		var m1 = newManager(fullRange)
 		m1.addBinding(cfg.Database, cfg.Schema, tableName, tgt, nil)
@@ -352,7 +313,6 @@ func TestStreamV2Manager(t *testing.T) {
 		_, err = m1.client.WaitCommit(ctx, c1.channelName, c1.offsetToken(4))
 		require.NoError(t, err)
 		require.Equal(t, 4, countRows())
-		m1.sup.kill()
 
 		// The runtime replays the identical document sequence. Snowflake already
 		// holds the first four, so only the fifth is appended.
@@ -375,7 +335,6 @@ func TestStreamV2Manager(t *testing.T) {
 		_, err = m2.client.WaitCommit(ctx, c2.channelName, c2.offsetToken(7))
 		require.NoError(t, err)
 		require.Equal(t, 7, countRows())
-		m2.sup.kill()
 
 		var m3 = newManager(fullRange)
 		m3.addBinding(cfg.Database, cfg.Schema, tableName, tgt, priorOf(checkpointed))
@@ -419,7 +378,6 @@ func TestStreamV2Manager(t *testing.T) {
 			require.Equal(t, int64(5), sv2ChannelCheckpointItem.Routed)
 		}
 		require.Equal(t, 20, countRows())
-		parent.stop()
 
 		// The low child. Its own targets are the low half's quarters, so the
 		// two channels it inherits are not targets: its first flush deletes
@@ -509,7 +467,6 @@ func TestStreamV2Manager(t *testing.T) {
 		storeKeys(t, parent, interleave(second))
 		commitOutstanding(t, parent)
 		require.Equal(t, 16, countRows())
-		parent.sup.kill()
 
 		// Each child replays its half of the interrupted transaction. Every
 		// inherited channel's token stands at four documents against a
@@ -540,7 +497,6 @@ func TestStreamV2Manager(t *testing.T) {
 			}
 			require.Equal(t, 2, deleted)
 			require.Equal(t, 4, recorded)
-			m.stop()
 		}
 		require.Equal(t, 16, countRows(), "the replays appended nothing Snowflake already held")
 	})
@@ -578,7 +534,6 @@ func TestStreamV2Manager(t *testing.T) {
 		var extra = keysHashingInto(lowTargets[0], "join-extra", 2)
 		storeKeys(t, low, extra)
 		commitOutstanding(t, low)
-		low.sup.kill()
 
 		// The high child commits eight and stops cleanly.
 		var high = newManager(highHalf)
@@ -591,7 +546,6 @@ func TestStreamV2Manager(t *testing.T) {
 		highEntries, err := high.flush(ctx)
 		require.NoError(t, err)
 		maps.Copy(prior, highEntries[0])
-		high.stop()
 
 		require.Equal(t, 18, countRows())
 
@@ -632,7 +586,6 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, final[0], 4)
 		require.Equal(t, 26, countRows())
-		parent.stop()
 
 		joinConverged, joinRows = final[0], 26
 	})
@@ -678,8 +631,8 @@ func TestStreamV2Manager(t *testing.T) {
 		// What a channel name outlives is the whole problem the channel drop exists for:
 		// it is derived from (task, key-begin, state key), so a shard deleted today
 		// and a shard given the same key-begin tomorrow derive the same name. This
-		// is the experiment that says which SDK operation actually drops the
-		// channel behind that name, since only Snowflake can answer it.
+		// is the experiment that says what actually drops the channel behind that
+		// name, since only Snowflake can answer it.
 		truncate(t)
 		var tgt = target("drop.v1")
 
@@ -693,27 +646,23 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
 
-		client, err := m.ensureStarted(ctx)
-		require.NoError(t, err)
-		var reopen = func() *channelStatusResult {
+		var client = m.client
+		var reopen = func() *streamV2ChannelStatusResult {
 			status, err := client.OpenChannel(ctx, cfg.Database, cfg.Schema, tableName, channel)
 			require.NoError(t, err)
 			return status
 		}
 
-		t.Run("a close leaves the committed offset token behind, a drop does not", func(t *testing.T) {
-			// Closing without dropping is the operation this connector used to
-			// have, and the one the channel-drop design was provisionally built on.
-			require.NoError(t, client.CloseChannel(ctx, channel, false))
-			var afterClose = reopen()
+		t.Run("a reopen finds the committed offset token, a drop discards it", func(t *testing.T) {
+			var afterReopen = reopen()
 
-			require.NoError(t, client.CloseChannel(ctx, channel, true))
+			require.NoError(t, client.DropChannel(ctx, cfg.Database, cfg.Schema, tableName, channel))
 			var afterDrop = reopen()
 
-			// A close only releases the local handle: Snowflake still holds the
-			// channel, and hands its committed offset token to the next opener.
-			require.NotNil(t, afterClose.CommittedToken)
-			require.Equal(t, dropped.offsetToken(3), *afterClose.CommittedToken)
+			// Snowflake holds the channel across sessions, and hands its committed
+			// offset token to the next opener.
+			require.NotNil(t, afterReopen.CommittedToken)
+			require.Equal(t, dropped.offsetToken(3), *afterReopen.CommittedToken)
 
 			// A drop is what takes it out of service, so the same name reopens as a channel
 			// which has committed nothing.
@@ -746,8 +695,8 @@ func TestStreamV2Manager(t *testing.T) {
 			// The committed offset token is not the only thing a channel
 			// accumulates: the row-error count which rejects a channel for good is
 			// kept for its whole life too. Whether a drop takes that with it
-			// is measured rather than assumed, because it is what the fake sidecar
-			// and the sidecar's own tests model a drop as doing.
+			// is measured rather than assumed, because it is what the fake Snowpipe
+			// models a drop as doing.
 			var notNullTable = "STREAMV2_TEST_DROP_NOT_NULL_" + testRunNonce
 			var rejecting = newManager(fullRange)
 			rejecting.addBinding(cfg.Database, cfg.Schema, notNullTable,
@@ -758,9 +707,8 @@ func TestStreamV2Manager(t *testing.T) {
 			_, err := rejecting.flush(ctx)
 			require.ErrorContains(t, err, "rejected and discarded by Snowflake")
 
-			rejectingClient, err := rejecting.ensureStarted(ctx)
-			require.NoError(t, err)
-			require.NoError(t, rejectingClient.CloseChannel(ctx, rejected, true))
+			var rejectingClient = rejecting.client
+			require.NoError(t, rejectingClient.DropChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected))
 
 			afterRejection, err := rejectingClient.OpenChannel(ctx, cfg.Database, cfg.Schema, notNullTable, rejected)
 			require.NoError(t, err)
@@ -840,8 +788,8 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 3, countRowsIn(sharedTable))
 		var firstChannel = first.bindings[0].activeChannels[0].channelName
 
-		var second = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, testMaterialization+"-second", accountName, fullRange)
-		t.Cleanup(second.stop)
+		second, err := newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization+"-second", accountName, fullRange)
+		require.NoError(t, err)
 		second.addBinding(cfg.Database, cfg.Schema, sharedTable, tgt, nil)
 		var rejection = testWriteRow(ctx, second, 0, []any{"k", 1, json.RawMessage(`{}`)})
 		require.ErrorContains(t, rejection, sanitizeAndAppendHash(testMaterialization))
@@ -882,7 +830,6 @@ func TestStreamV2Manager(t *testing.T) {
 		require.NoError(t, c.wait())
 		_, err = m.client.WaitCommit(ctx, c.channelName, c.offsetToken(4))
 		require.NoError(t, err)
-		m.stop()
 
 		// Each rejection is reported before the document which provoked it can be
 		// appended, and the row count is unchanged by the attempt.
@@ -953,7 +900,6 @@ func TestStreamV2Manager(t *testing.T) {
 		// accounting for none of it: it is rejected as the channel opens rather than
 		// replaying the transaction and acknowledging it with the row still
 		// missing.
-		m.sup.kill()
 		var m2 = newManager(fullRange)
 		m2.addBinding(cfg.Database, cfg.Schema, notNullTable, notNullTarget, nil)
 		require.ErrorContains(t,
@@ -1001,9 +947,9 @@ func TestStreamV2Manager(t *testing.T) {
 		var start = time.Now()
 		_, err = m.flush(ctx)
 		require.Error(t, err)
-		var scErr *sidecarError
-		require.ErrorAs(t, err, &scErr)
-		t.Logf("view ingestion failed after %s: code %s message %s", time.Since(start), scErr.Code, scErr.Message)
+		var apiErr *streamV2APIError
+		require.ErrorAs(t, err, &apiErr)
+		t.Logf("view ingestion failed after %s: code %s message %s", time.Since(start), apiErr.Code, apiErr.Message)
 	})
 }
 
@@ -1025,7 +971,6 @@ func TestStreamV2Datatypes(t *testing.T) {
 
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
-	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
 
 	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
@@ -1040,13 +985,13 @@ func TestStreamV2Datatypes(t *testing.T) {
 
 	singleChannelLayout(t)
 
-	// One manager, and so one sidecar, serves every type: each type is a binding
+	// One manager serves every type: each type is a binding
 	// of its own, with a state key of its own and therefore a channel of its own.
 	sm, err := newStreamManager(&cfg, "test/streamV2Datatypes", accountName, 0)
 	require.NoError(t, err)
-	var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, "test/streamV2Datatypes", accountName,
+	m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2Datatypes", accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-	t.Cleanup(m.stop)
+	require.NoError(t, err)
 
 	// The three timestamp types take the same values: offsets Snowflake must
 	// resolve rather than truncate, and both ends of the range it accepts.
@@ -1194,7 +1139,6 @@ func TestStreamV2ListChannels(t *testing.T) {
 
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
-	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
 	singleChannelLayout(t)
 
 	dsn, err := cfg.toURI(true, "")
@@ -1222,9 +1166,9 @@ func TestStreamV2ListChannels(t *testing.T) {
 
 	sm, err := newStreamManager(&cfg, "test/streamV2List", accountName, 0)
 	require.NoError(t, err)
-	var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, "test/streamV2List", accountName,
+	m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2List", accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-	t.Cleanup(m.stop)
+	require.NoError(t, err)
 
 	// A table nothing has streamed into has no default pipe, so no channels.
 	names, err := m.listChannels(ctx, cfg.Database, cfg.Schema, tableName)
@@ -1281,7 +1225,6 @@ func TestStreamV2ListChannels(t *testing.T) {
 func TestStreamingQuotedSchema(t *testing.T) {
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
-	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
 
 	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
@@ -1332,9 +1275,9 @@ func TestStreamingQuotedSchema(t *testing.T) {
 		singleChannelLayout(t)
 		sm, err := newStreamManager(&cfg, "test/streamV2QuotedSchema-"+testRunNonce, accountName, 0)
 		require.NoError(t, err)
-		var m = newStreamV2Manager(ctx, &cfg, db, testDialect, sm, "test/streamV2QuotedSchema-"+testRunNonce, accountName,
+		m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2QuotedSchema-"+testRunNonce, accountName,
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
-		t.Cleanup(m.stop)
+		require.NoError(t, err)
 
 		var loc = testDialect.TableLocator(target.Path)
 		m.addBinding(cfg.Database, loc.TableSchema, testDialect.Identifier(loc.TableName), target, nil)

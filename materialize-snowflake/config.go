@@ -21,7 +21,7 @@ const (
 	// bindings that use JWT authentication.
 	flagSnowpipeStreaming = "snowpipe_streaming"
 	// flagSnowpipeStreamingV2 enables the high-performance Snowpipe Streaming
-	// architecture, via the Python SDK sidecar, for delta-updates bindings that
+	// architecture, through its REST API, for delta-updates bindings that
 	// use JWT authentication. It requires the v2 materialization runtime; see
 	// requireStreamingV2Runtime.
 	flagSnowpipeStreamingV2 = "snowpipe_streaming_v2"

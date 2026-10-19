@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -21,26 +20,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/time/rate"
-)
-
-// The manager appends a batch when it holds streamV2BatchRows documents or
-// streamV2BatchBytes bytes. These caps are a performance knob, not checkpoint state.
-// Recovery resumes from the offset that Snowflake reports as committed,
-// whatever batch boundaries the interrupted attempt cut.
-var (
-	streamV2BatchRows  = 10_000
-	streamV2BatchBytes = 8 * 1024 * 1024
 )
 
 // streamV2MaxBufferedBytes caps the documents that all bindings buffer at once.
 var streamV2MaxBufferedBytes = 128 * 1024 * 1024
-
-// streamV2PaceBytesPerSecond is the uncompressed byte rate this write path allows
-// itself on one channel.
-//
-// The value is the documented per-channel ceiling.
-const streamV2PaceBytesPerSecond = 20 * 1000 * 1000
 
 // streamV2ChannelCheckpointItem represents one channel of a binding, and the
 // offset of the last document routed to it as of the checkpoint.
@@ -237,98 +220,6 @@ func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, ta
 	return slices.Compact(channelNames), nil
 }
 
-// streamV2Channel is a handle for one Snowpipe channel of one connector binding.
-type streamV2Channel struct {
-	// channelName is the name of the Snowpipe channel.
-	channelName string
-	// keyRange is the key range this channel covers. The key range is embedded in
-	// the channel's name and in every offset token it appends with.
-	keyRange streamV2Range
-
-	// progress tracks the channel's offsets. A document's offset is its 1-based
-	// position among the documents the shard has routed to the channel, over the
-	// whole life of the channel, so the offset of a channel is that of its last
-	// document, and zero means none. Offsets never reset.
-	//
-	// committed exceeds routed only while a replayed transaction routes documents
-	// that an interrupted attempt already committed.
-	progress struct {
-		// routed leads progress. It is the offset of the most recent document that
-		// the shard routed to this channel.
-		routed int64
-		// checkpointed is the offset that the last checkpoint item carried.
-		checkpointed int64
-		// committed is the highest offset that Snowflake durably holds.
-		committed int64
-	}
-
-	// batch is the append under construction.
-	batch streamV2Batch
-
-	// appends runs the channel's appends one at a time, so Store can buffer more rows
-	// while a batch is on the wire and the batches keep their order. It is nil between
-	// transactions, and appendsCtx is cancelled once an appendBatch has failed.
-	appends    *errgroup.Group
-	appendsCtx context.Context
-
-	// limiter meters the uncompressed bytes this channel hands to Snowflake. One limiter
-	// per channel, because Snowflake meters each channel independently.
-	limiter *rate.Limiter
-}
-
-// newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(channelName string, keyRange streamV2Range, enc *streamV2RowEncoder, routed, committed int64) *streamV2Channel {
-	var c = &streamV2Channel{
-		channelName: channelName,
-		keyRange:    keyRange,
-		batch:       newStreamV2Batch(enc),
-		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
-		progress: struct {
-			routed       int64
-			checkpointed int64
-			committed    int64
-		}{
-			routed:       routed,
-			checkpointed: routed,
-			committed:    committed,
-		},
-	}
-	return c
-}
-
-// offsetToken renders the offset token for an offset on this channel.
-func (c *streamV2Channel) offsetToken(offset int64) string {
-	return streamV2FormatOffsetToken(offset, c.keyRange)
-}
-
-// wait waits for the channel's in-flight appendBatch and returns the first error
-// of the appends since the last wait.
-func (c *streamV2Channel) wait() error {
-	if c.appends == nil {
-		return nil
-	}
-	var err = c.appends.Wait()
-	c.appends, c.appendsCtx = nil, nil
-	return err
-}
-
-func (c *streamV2Channel) appendBatch(ctx context.Context, client *sidecarClient, firstOffset, lastOffset int64, payload []byte, rows int) error {
-	if c.appends == nil {
-		c.appends, c.appendsCtx = errgroup.WithContext(ctx)
-		c.appends.SetLimit(1)
-	} else if c.appendsCtx.Err() != nil {
-		return fmt.Errorf("appending to channel %q: %w", c.channelName, c.appends.Wait())
-	}
-
-	c.appends.Go(func() error {
-		if err := c.limiter.WaitN(ctx, len(payload)); err != nil {
-			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
-		}
-		return client.Append(ctx, c.channelName, c.offsetToken(firstOffset), c.offsetToken(lastOffset), payload, rows)
-	})
-	return nil
-}
-
 type streamV2Binding struct {
 	database string
 	schema   string
@@ -379,15 +270,13 @@ func (b *streamV2Binding) route(keyHash uint32) *streamV2Channel {
 }
 
 // streamV2Manager is the Snowpipe Streaming V2 write path. It owns the channels of
-// every binding and the sidecar process that holds the Snowflake SDK.
+// every binding and the client of the Snowpipe Streaming REST API.
 //
 // A row's channel is chosen by the same key hash that chose the row's shard, so a
 // channel's contents depend only on the data and never on the shard topology.
 type streamV2Manager struct {
 	cfg             *config
 	materialization string
-	accountName     string
-	argv            []string
 	keyBegin        uint32
 	keyEnd          uint32
 
@@ -395,20 +284,13 @@ type streamV2Manager struct {
 	dialect   sql.Dialect
 	streaming *streamManager
 
-	// procCtx bounds the lifetime of the sidecar process to the transactor session.
-	procCtx    context.Context
-	procCancel context.CancelFunc
-
-	mu     sync.Mutex // guards sup and client
-	sup    *sidecarSupervisor
-	client *sidecarClient
+	client *streamV2Client
 
 	bindings map[int]*streamV2Binding
 	bufBytes int
 }
 
 func newStreamV2Manager(
-	ctx context.Context,
 	cfg *config,
 	db *stdsql.DB,
 	dialect sql.Dialect,
@@ -416,22 +298,22 @@ func newStreamV2Manager(
 	materialization string,
 	accountName string,
 	keyRange *pf.RangeSpec,
-) *streamV2Manager {
-	procCtx, procCancel := context.WithCancel(ctx)
+) (*streamV2Manager, error) {
+	client, err := newStreamV2Client(cfg, "https://"+cfg.Host, accountName)
+	if err != nil {
+		return nil, err
+	}
 	return &streamV2Manager{
 		cfg:             cfg,
 		materialization: materialization,
-		accountName:     accountName,
-		argv:            defaultSidecarArgv(),
 		keyBegin:        keyRange.KeyBegin,
 		keyEnd:          keyRange.KeyEnd,
 		db:              db,
 		dialect:         dialect,
 		streaming:       streaming,
-		procCtx:         procCtx,
-		procCancel:      procCancel,
+		client:          client,
 		bindings:        make(map[int]*streamV2Binding),
-	}
+	}, nil
 }
 
 func (m *streamV2Manager) shardRange() streamV2Range {
@@ -460,35 +342,6 @@ func (m *streamV2Manager) streamingChannelKeyBegin(channelName string) (uint32, 
 		return 0, false
 	}
 	return uint32(keyBegin), true
-}
-
-// ensureStarted spawns and configures the sidecar exactly once.
-func (m *streamV2Manager) ensureStarted(ctx context.Context) (*sidecarClient, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.client != nil {
-		return m.client, nil
-	}
-
-	// The process uses the session-scoped context of the manager, not the context of
-	// the caller. It therefore survives the return of whichever call started it first.
-	sup, client, err := startSidecar(m.procCtx, m.argv)
-	if err != nil {
-		return nil, err
-	}
-	if err := client.Configure(ctx, sidecarProfile{
-		Account:    m.accountName,
-		User:       m.cfg.Credentials.User,
-		URL:        fmt.Sprintf("https://%s:443", m.cfg.Host),
-		PrivateKey: m.cfg.Credentials.PrivateKey,
-		Role:       m.cfg.Role,
-	}, sup.authToken); err != nil {
-		sup.stop(client)
-		return nil, fmt.Errorf("configuring sidecar: %w", err)
-	}
-
-	m.sup, m.client = sup, client
-	return m.client, nil
 }
 
 // addBinding registers a binding on the streaming v2 write path. ensureOpened builds
@@ -547,11 +400,6 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 
 	if err := m.rejectForeignChannels(ctx, b); err != nil {
-		return err
-	}
-
-	client, err := m.ensureStarted(ctx)
-	if err != nil {
 		return err
 	}
 
@@ -617,7 +465,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	var activeChannels = make([]*streamV2Channel, 0, len(liveKeyRanges))
 	var keep = make(map[string]bool, len(liveKeyRanges))
 	for _, keyRange := range liveKeyRanges {
-		c, err := m.openChannel(ctx, client, b, keyRange, owned[keyRange], priorItems)
+		c, err := m.openChannel(ctx, b, keyRange, owned[keyRange], priorItems)
 		if err != nil {
 			return err
 		}
@@ -646,7 +494,6 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 // not record, which is then named under the target epoch.
 func (m *streamV2Manager) openChannel(
 	ctx context.Context,
-	client *sidecarClient,
 	b *streamV2Binding,
 	keyRange streamV2Range,
 	item *streamV2ChannelCheckpointItem,
@@ -658,7 +505,7 @@ func (m *streamV2Manager) openChannel(
 		channelName, routed = item.ChannelName, item.Routed
 	}
 
-	status, err := client.OpenChannel(ctx, b.database, m.dialect.Identifier(b.schema), b.table, channelName)
+	status, err := m.client.OpenChannel(ctx, b.database, b.schema, unquotedIdentifier(b.table), channelName)
 	if err != nil {
 		return nil, fmt.Errorf("opening channel %q: %w", channelName, err)
 	}
@@ -669,7 +516,7 @@ func (m *streamV2Manager) openChannel(
 	if err != nil {
 		return nil, err
 	}
-	return newStreamV2Channel(channelName, keyRange, b.encoder, routed, committedOffset), nil
+	return newStreamV2Channel(b, m.client, &m.bufBytes, m.sendAllBatches, channelName, keyRange, routed, committedOffset), nil
 }
 
 // sweep drops the channels this task derived for the binding's table that it no
@@ -683,11 +530,6 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 	if err != nil {
 		return err
 	}
-	client, err := m.ensureStarted(ctx)
-	if err != nil {
-		return err
-	}
-
 	var shard = m.shardRange()
 	var own = sanitizeAndAppendHash(m.materialization)
 	for _, channelName := range channelNames {
@@ -707,18 +549,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 			continue
 		}
 
-		// The drop needs an open handle. A channel this session opened already has
-		// one, and re-opening it is an error, so the drop is tried first and the
-		// channel is opened only when the drop reports no handle.
-		var err = client.CloseChannel(ctx, channelName, true)
-		var se *sidecarError
-		if errors.As(err, &se) && se.Code == "unknown_channel" {
-			if _, err = client.OpenChannel(ctx, database, m.dialect.Identifier(schema), table, channelName); err != nil {
-				return fmt.Errorf("opening channel %q to drop it: %w", channelName, err)
-			}
-			err = client.CloseChannel(ctx, channelName, true)
-		}
-		if err != nil {
+		if err := m.client.DropChannel(ctx, database, schema, unquotedIdentifier(table), channelName); err != nil {
 			return fmt.Errorf("dropping channel %q: %w", channelName, err)
 		}
 		log.WithFields(log.Fields{"table": table, "channel": channelName}).Info("swept a snowpipe streaming v2 channel a layout left behind")
@@ -726,14 +557,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 	return nil
 }
 
-// writeRow writes one converted document to the channel its key hash routes to, under
-// that channel's next offset. It sends the channel's batch once the batch reaches its
-// row or byte cap, and every channel's batch once the bytes buffered across the whole
-// manager reach their ceiling.
-//
-// A document at or below the channel's committed offset was already committed by an
-// interrupted attempt of this transaction. It still consumes its offset, so that later
-// offsets stay aligned with Snowflake's, but it is not written again.
+// writeRow writes one converted document to the channel its key hash routes to.
 func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey []byte, converted []any) error {
 	var b = m.bindings[binding]
 	if err := m.ensureOpened(ctx, b); err != nil {
@@ -752,55 +576,20 @@ func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey [
 		)
 	}
 
-	c.progress.routed++
-	var offset = c.progress.routed
-	if offset <= c.progress.committed {
-		return nil
-	}
-
-	var grew, err = c.batch.addRow(offset, converted)
-	if err != nil {
-		return fmt.Errorf("encoding row for %s: %w", b.table, err)
-	}
-	m.bufBytes += grew
-
-	if c.batch.rows >= streamV2BatchRows || c.batch.size() >= streamV2BatchBytes {
-		return m.appendBatch(ctx, c)
-	} else if m.bufBytes >= streamV2MaxBufferedBytes {
-		return m.appendAllBatches(ctx)
-	}
-	return nil
+	return c.writeRow(ctx, converted)
 }
 
-// appendAllBatches appends the buffered documents of every channel of every binding.
+// sendAllBatches sends the buffered documents of every channel of every binding.
 // This brings the total of buffered bytes back to zero.
-func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
+func (m *streamV2Manager) sendAllBatches(ctx context.Context) error {
 	for _, b := range m.bindings {
 		for _, c := range b.activeChannels {
-			if c.batch.empty() {
-				continue
-			} else if err := m.appendBatch(ctx, c); err != nil {
+			if err := c.sendBatch(ctx); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
-}
-
-// appendBatch closes the payload of the batch and hands it to the append pipe of the
-// channel. Ownership of the buffer passes to the append, so the next batch starts a
-// buffer of its own.
-func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) error {
-	var firstOffset, lastOffset = c.batch.firstOffset, c.progress.routed
-	payload, rows, released := c.batch.finish()
-	m.bufBytes -= released
-
-	client, err := m.ensureStarted(ctx)
-	if err != nil {
-		return err
-	}
-
-	return c.appendBatch(ctx, client, firstOffset, lastOffset, payload, rows)
 }
 
 // flush appends every channel's remaining documents, waits for Snowflake to
@@ -867,10 +656,10 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 		switching = append(switching, idx)
 	}
 
-	// Channels commit independently, and the sidecar serializes its operations per
-	// channel and not globally. A wide materialization therefore does not pay the
-	// commit latency of each channel in series. The limit scales with the channels
-	// per shard so that a binding's channels do not queue behind each other.
+	// Channels commit independently, so a materialization with many bindings does
+	// not pay the commit latency of each channel in series. The limit scales with
+	// the channels per shard so that a binding's channels do not queue behind each
+	// other.
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries * streamV2ChannelsPerShard)
 	for _, w := range waits {
@@ -908,13 +697,11 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 func (m *streamV2Manager) settle(ctx context.Context, b *streamV2Binding) (bool, error) {
 	var advanced = false
 	for _, c := range b.activeChannels {
-		if !c.batch.empty() {
-			if err := m.appendBatch(ctx, c); err != nil {
-				return false, err
-			}
+		if err := c.sendBatch(ctx); err != nil {
+			return false, err
 		}
 		if err := c.wait(); err != nil {
-			return false, fmt.Errorf("appending to channel %q: %w", c.channelName, err)
+			return false, fmt.Errorf("appending to channel %q of %s: %w", c.channelName, b.table, err)
 		}
 
 		// A replayed transaction that routed fewer documents to this channel
@@ -938,11 +725,6 @@ func (m *streamV2Manager) settle(ctx context.Context, b *streamV2Binding) (bool,
 // waitCommit blocks until the channel durably holds every document through offset. If
 // Snowflake rejected any of its rows, waitCommit fails the transaction.
 func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c *streamV2Channel, offset int64) error {
-	client, err := m.ensureStarted(ctx)
-	if err != nil {
-		return err
-	}
-
 	log.WithFields(log.Fields{
 		"table":   b.table,
 		"channel": c.channelName,
@@ -951,7 +733,7 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 
 	var started = time.Now()
 	var token = c.offsetToken(offset)
-	status, err := client.WaitCommit(ctx, c.channelName, token)
+	status, err := m.client.WaitCommit(ctx, c.channelName, token)
 	if err != nil {
 		return fmt.Errorf("waiting for commit of offset token %s on channel %q: %w", token, c.channelName, err)
 	}
@@ -970,15 +752,6 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c 
 		"took":    time.Since(started).String(),
 	}).Info("snowpipe streaming v2: committed")
 	return nil
-}
-
-func (m *streamV2Manager) stop() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.sup != nil {
-		m.sup.stop(m.client)
-	}
-	m.procCancel()
 }
 
 // streamV2ValidateCommittedToken checks Snowflake's committed offset token against the channel's checkpoint item and returns the committed offset, at or below which a replay must not append.

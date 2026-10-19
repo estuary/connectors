@@ -53,7 +53,7 @@ func requireEquivalent(t *testing.T, names []string, converted []any) []byte {
 	var want, err = rowViaMap(names, converted)
 	require.NoError(t, err)
 
-	got, err := newStreamV2RowEncoder(names).appendRow(nil, converted)
+	got, err := newStreamV2RowEncoder(names).encodeRow(nil, converted)
 	require.NoError(t, err)
 
 	require.Equal(t, decodedJSON(t, want), decodedJSON(t, got))
@@ -151,17 +151,17 @@ func TestStreamV2RowOmitsNilColumns(t *testing.T) {
 		// null, which answers IS NULL and TYPEOF differently from the SQL NULL an
 		// omitted column defaults to.
 		var got = requireEquivalent(t, names, []any{"a", nil, json.RawMessage(`{"x":1}`), nil})
-		require.Equal(t, `{"A":"a","C":{"x":1}}`, string(got))
+		require.Equal(t, `{"A":"a","C":{"x":1}}`+"\n", string(got))
 	})
 
 	t.Run("a row of nils is an empty object", func(t *testing.T) {
 		var got = requireEquivalent(t, names, []any{nil, nil, nil, nil})
-		require.Equal(t, `{}`, string(got))
+		require.Equal(t, "{}\n", string(got))
 	})
 
 	t.Run("a nil leading column does not leave a separator", func(t *testing.T) {
 		var got = requireEquivalent(t, names, []any{nil, int64(2), int64(3), nil})
-		require.Equal(t, `{"B":2,"C":3}`, string(got))
+		require.Equal(t, `{"B":2,"C":3}`+"\n", string(got))
 	})
 }
 
@@ -183,7 +183,7 @@ func TestStreamV2RowRejectsUnrepresentableFloats(t *testing.T) {
 			// the append rejects in full, failing every row batched alongside it.
 			var prior = append([]byte(nil), `[{"A":1}`...)
 
-			var got, err = enc.appendRow(prior, []any{"a", tc.value})
+			var got, err = enc.encodeRow(prior, []any{"a", tc.value})
 			require.ErrorContains(t, err, "column B")
 			require.ErrorContains(t, err, "as JSON")
 
@@ -199,9 +199,10 @@ func TestStreamV2RowPreEncodedLineBreaks(t *testing.T) {
 	t.Run("a line break is compacted away", func(t *testing.T) {
 		var raw = json.RawMessage("{\"a\": 1,\n  \"b\": \"text\\nwith an escaped break\"\r\n}")
 
-		var got, err = enc.appendRow(nil, []any{raw})
+		var got, err = enc.encodeRow(nil, []any{raw})
 		require.NoError(t, err)
-		require.NotContains(t, string(got), "\n")
+		// The row's only line break is the one that terminates it.
+		require.Equal(t, len(got)-1, bytes.IndexByte(got, '\n'))
 		require.NotContains(t, string(got), "\r")
 		// The escaped break within a string survives, being no threat to framing.
 		require.Contains(t, string(got), `with an escaped break`)
@@ -215,13 +216,13 @@ func TestStreamV2RowPreEncodedLineBreaks(t *testing.T) {
 		// common case free.
 		var raw = json.RawMessage(`{"a": 1,  "b": [ 2 ]}`)
 
-		var got, err = enc.appendRow(nil, []any{raw})
+		var got, err = enc.encodeRow(nil, []any{raw})
 		require.NoError(t, err)
-		require.Equal(t, `{"DOC":`+string(raw)+`}`, string(got))
+		require.Equal(t, `{"DOC":`+string(raw)+"}\n", string(got))
 	})
 
 	t.Run("an unparseable value with one fails the row", func(t *testing.T) {
-		var got, err = enc.appendRow([]byte("{"), []any{json.RawMessage("{\n")})
+		var got, err = enc.encodeRow([]byte("{"), []any{json.RawMessage("{\n")})
 		require.ErrorContains(t, err, "column DOC")
 		require.Equal(t, "{", string(got))
 	})
@@ -231,9 +232,8 @@ func TestStreamV2BatchPayload(t *testing.T) {
 	var enc = newStreamV2RowEncoder([]string{"KEY", "VAL", "DOC"})
 
 	t.Run("rows accumulate into one framed payload", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+		var b = streamV2Batch{}
 
-		var total int
 		for i, row := range [][]any{
 			{"one", int64(1), json.RawMessage(`{"a":1}`)},
 			{"two", nil, json.RawMessage(`{"a":2}`)},
@@ -241,77 +241,61 @@ func TestStreamV2BatchPayload(t *testing.T) {
 		} {
 			// Documents are indexed from the channel's first, so this batch begins
 			// partway through one.
-			var grew, err = b.addRow(int64(100+i), row)
-			require.NoError(t, err)
+			require.NoError(t, addTestRow(&b, enc, int64(100+i), row))
 			require.Equal(t, i+1, b.rows)
-			total += grew
 		}
 
 		// The batch's own first offset, which its offset token is rendered
 		// from, is the one the batch's first row was buffered under.
 		require.Equal(t, int64(100), b.firstOffset)
 
-		// The payload wants only its closing bracket, which finish adds as it
-		// gives the payload up.
 		require.Equal(t,
-			`[{"KEY":"one","VAL":1,"DOC":{"a":1}},{"KEY":"two","DOC":{"a":2}},{"KEY":"three","VAL":3}`,
+			"{\"KEY\":\"one\",\"VAL\":1,\"DOC\":{\"a\":1}}\n{\"KEY\":\"two\",\"DOC\":{\"a\":2}}\n{\"KEY\":\"three\",\"VAL\":3}\n",
 			string(b.payload))
-		require.Equal(t, b.size(), total, "the reported growth must account for every buffered byte")
 	})
 
 	t.Run("a rejected row leaves the rows before it buffered", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+		var b = streamV2Batch{}
 
-		var _, err = b.addRow(1, []any{"one", int64(1), nil})
+		var err = addTestRow(&b, enc, 1, []any{"one", int64(1), nil})
 		require.NoError(t, err)
 
-		grew, err := b.addRow(1, []any{"two", math.NaN(), nil})
+		err = addTestRow(&b, enc, 1, []any{"two", math.NaN(), nil})
 		require.ErrorContains(t, err, "column VAL")
-		require.Zero(t, grew)
 		require.Equal(t, 1, b.rows)
-		require.Equal(t, `[{"KEY":"one","VAL":1}`, string(b.payload))
+		require.Equal(t, "{\"KEY\":\"one\",\"VAL\":1}\n", string(b.payload))
 	})
 
 	t.Run("a rejected first row leaves no batch started", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+		var b = streamV2Batch{}
 
-		var _, err = b.addRow(1, []any{"one", math.Inf(1), nil})
+		var err = addTestRow(&b, enc, 1, []any{"one", math.Inf(1), nil})
 		require.ErrorContains(t, err, "column VAL")
 		require.True(t, b.empty())
 		require.Empty(t, b.payload)
 	})
 
-	t.Run("a batch releases every byte it reported buffering", func(t *testing.T) {
-		// The manager tracks buffered bytes as a running total across bindings, so a
-		// batch which reports more or fewer bytes than it releases drifts that total
-		// for the life of the session, and with it the ceiling which bounds how much
-		// a wide materialization holds in memory at once.
-		var b = newStreamV2Batch(enc)
+	t.Run("finishing hands off the payload and empties the batch", func(t *testing.T) {
+		var b = streamV2Batch{}
 
-		var reported int
 		for i := range 3 {
-			var grew, err = b.addRow(1, []any{fmt.Sprintf("key-%d", i), int64(i), nil})
-			require.NoError(t, err)
-			reported += grew
+			require.NoError(t, addTestRow(&b, enc, 1, []any{fmt.Sprintf("key-%d", i), int64(i), nil}))
 		}
+		require.Equal(t, 3, b.rows)
 
-		var payload, rows, released = b.finish()
-		require.Equal(t, reported, released)
-		require.Equal(t, 3, rows)
-		require.Equal(t, byte(']'), payload[len(payload)-1])
+		var payload = b.finish()
+		require.Equal(t, byte('\n'), payload[len(payload)-1])
 		require.True(t, b.empty())
 		require.Empty(t, b.payload)
 	})
 
 	t.Run("the next batch's payload is sized from the last", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+		var b = streamV2Batch{}
 
-		var _, err = b.addRow(1, []any{strings.Repeat("k", 32*1024), nil, nil})
-		require.NoError(t, err)
-		var payload, _, _ = b.finish()
+		require.NoError(t, addTestRow(&b, enc, 1, []any{strings.Repeat("k", 32*1024), nil, nil}))
+		var payload = b.finish()
 
-		_, err = b.addRow(1, []any{"small", nil, nil})
-		require.NoError(t, err)
+		require.NoError(t, addTestRow(&b, enc, 1, []any{"small", nil, nil}))
 		require.GreaterOrEqual(t, cap(b.payload), len(payload))
 	})
 }
@@ -364,10 +348,10 @@ func BenchmarkStreamV2RowEncoding(b *testing.B) {
 		// The batch is built and framed exactly as the write path has it done, so
 		// what this measures is what ships — including the payload each batch is
 		// sized into.
-		var batch = newStreamV2Batch(enc)
+		var batch = streamV2Batch{}
 		for b.Loop() {
 			for i, row := range rows {
-				if _, err := batch.addRow(int64(i), row); err != nil {
+				if err := addTestRow(&batch, enc, int64(i), row); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -387,20 +371,31 @@ func BenchmarkStreamV2RowEncoding(b *testing.B) {
 				encoded = append(encoded, data)
 			}
 			// The batch's rows were then scanned a second time to frame them.
-			var size = 2
+			var size = 0
 			for _, row := range encoded {
 				size += len(row) + 1
 			}
 			var payload = make([]byte, 0, size)
-			payload = append(payload, '[')
-			for i, row := range encoded {
-				if i > 0 {
-					payload = append(payload, ',')
-				}
+			for _, row := range encoded {
 				payload = append(payload, row...)
+				payload = append(payload, '\n')
 			}
-			payload = append(payload, ']')
 			_ = payload
 		}
 	})
+}
+
+// addTestRow encodes and adds one row, as writeRow does.
+func addTestRow(b *streamV2Batch, enc *streamV2RowEncoder, offset int64, converted []any) error {
+	var row, err = enc.encodeRow(nil, converted)
+	if err != nil {
+		return err
+	}
+	if b.rows == 0 {
+		b.start()
+		b.firstOffset = offset
+	}
+	b.payload = append(b.payload, row...)
+	b.rows++
+	return nil
 }
