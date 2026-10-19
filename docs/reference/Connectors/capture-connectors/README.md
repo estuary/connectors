@@ -105,6 +105,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### CRMs, sales, and support
 
 - [Ada](./ada.md)
+- [Aircall](./aircall-native.md)
 - [Front](./front.md)
 - [Gainsight NXT](./gainsight-nxt.md)
 - [Genesys](./genesys.md)
@@ -133,6 +134,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### Finance, hiring, and operations
 
 - [Ashby](./ashby.md)
+- [AWS Cost Explorer](./aws-cost-explorer.md)
 - [Greenhouse](./greenhouse-native.md)
 - [Microsoft Dynamics 365 Finance and Operations](./dynamics-365-finance-and-operations.md)
 - [Sage Intacct](./sage-intacct.md)
@@ -171,7 +173,6 @@ within the limitations set by the connector itself.
 
 Typically, we enable SaaS connectors from third parties to allow more diverse data flows.
 
-- [Aircall](./aircall.md)
 - [Amazon Ads](./amazon-ads.md)
 - [Amplitude](./amplitude.md)
 - [Bing Ads](./bing-ads.md)

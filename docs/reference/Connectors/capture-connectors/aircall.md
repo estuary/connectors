@@ -1,10 +1,19 @@
 ---
-description: Use the Aircall connector to capture calls, contacts, numbers, tags, users, teams, and webhooks, using an Aircall App ID and token.
+title: Aircall (Deprecated)
+description: Deprecated Aircall capture connector. Use Estuary's native Aircall connector instead to capture Aircall data streams.
 ---
 
-# Aircall
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
+
+# Aircall (Deprecated)
 
 This connector captures data from Aircall into Estuary collections.
+
+:::deprecated
+This connector is deprecated. For the best experience, we recommend using our native [Aircall connector](./aircall-native.md) instead.
+:::
 
 ## Prerequisites
 To set up the Aircall connector, you need the following prerequisite:
