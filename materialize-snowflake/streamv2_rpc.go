@@ -146,15 +146,8 @@ func (c *sidecarClient) callWithPayload(ctx context.Context, op string, params a
 	c.pending[id] = ch
 	c.mu.Unlock()
 
-	// A sidecar that stops reading blocks the write, which holds writeMu against
-	// every other call, so the call's deadline must also interrupt the write.
-	var stopInterrupt = context.AfterFunc(ctx, func() { c.conn.SetWriteDeadline(time.Now()) })
-	var err = c.write(rpcRequest{ID: id, Op: op, Params: params}, payload)
-	if !stopInterrupt() && err == nil {
-		// The interrupt fired after the write completed and has left the
-		// deadline set, which would fail the next call's write.
-		err = fmt.Errorf("timed out or cancelled: %w", ctx.Err())
-	}
+	var deadline, _ = ctx.Deadline()
+	var err = c.write(rpcRequest{ID: id, Op: op, Params: params}, payload, deadline)
 	if err != nil {
 		c.fail(fmt.Errorf("writing sidecar request: %w", err))
 		c.mu.Lock()
@@ -211,8 +204,9 @@ func decodeReply(op string, res *rpcResponse, result any) error {
 }
 
 // write frames one request onto the connection: its header as a JSON line, then
-// the payload whose length its header states, if any.
-func (c *sidecarClient) write(req rpcRequest, payload []byte) error {
+// the payload whose length its header states, if any. The write fails at
+// deadline, so a sidecar that stops reading cannot hold writeMu forever.
+func (c *sidecarClient) write(req rpcRequest, payload []byte, deadline time.Time) error {
 	var line, err = json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("encoding request: %w", err)
@@ -222,7 +216,9 @@ func (c *sidecarClient) write(req rpcRequest, payload []byte) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 
-	if _, err := c.conn.Write(line); err != nil {
+	if err := c.conn.SetWriteDeadline(deadline); err != nil {
+		return err
+	} else if _, err := c.conn.Write(line); err != nil {
 		return err
 	} else if len(payload) > 0 {
 		if _, err := c.conn.Write(payload); err != nil {
