@@ -445,15 +445,23 @@ FILE_NAME IN ('{{ Join $.Files "','" }}')
 	}
 }
 
-var createStageSQL = `
-CREATE STAGE IF NOT EXISTS flow_v1
-FILE_FORMAT = (
+const stageFileFormat = `(
   TYPE = JSON
+  COMPRESSION = GZIP
   BINARY_FORMAT = BASE64
   ALLOW_DUPLICATE = TRUE
-)
+)`
+
+var createStageSQL = `
+CREATE STAGE IF NOT EXISTS flow_v1
+FILE_FORMAT = ` + stageFileFormat + `
 COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
 ;`
+
+// TODO(mahdi): Remove after 2026-11-19, once running tasks have migrated
+// their stages. Stages created before COMPRESSION = GZIP was added rely on
+// Snowflake's AUTO detection of staged files' compression.
+var alterStageFileFormatSQL = `ALTER STAGE flow_v1 SET FILE_FORMAT = ` + stageFileFormat + `;`
 
 type tablePipe struct {
 	Table    sql.Table

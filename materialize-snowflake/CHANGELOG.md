@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-10-19
+
+### Fixed
+- The internal `flow_v1` stage now declares `COMPRESSION = GZIP` instead of
+  relying on Snowflake to detect the compression of staged files, which could
+  fail with "Invalid data encountered during decompression ... compression
+  type used: 'ZSTD'". Existing stages are updated when the connector starts.
+
 ## 2026-10-15
 
 ### Fixed

@@ -371,6 +371,10 @@ func newTransactor(
 	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
 		return nil, fmt.Errorf("creating transfer stage: %w", err)
 	}
+	// TODO(mahdi): Remove after 2026-11-19 along with alterStageFileFormatSQL.
+	if _, err = d.load.conn.ExecContext(ctx, alterStageFileFormatSQL); err != nil {
+		log.WithError(err).Warn("could not set COMPRESSION = GZIP on transfer stage")
+	}
 
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, *cmp.Or(d.cp[binding.StateKey], &checkpointItem{})); err != nil {
