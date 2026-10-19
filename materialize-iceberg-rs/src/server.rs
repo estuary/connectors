@@ -9,27 +9,32 @@ use axum::routing::get;
 use axum::routing::post;
 use serde_json::Value;
 use serde_json::json;
-use tokio::sync::RwLock;
 
 use crate::iceberg::catalog::CATALOG_PREFIX;
-use crate::iceberg::catalog::CatalogState;
+use crate::iceberg::catalog::Catalog;
 use crate::iceberg::catalog::CommitTransactionRequest;
 
-/// Holds the embedded REST catalog's object store + prefix once the
-/// connector's `Open` request is processed. `None` until then, since the
-/// HTTP server starts before the materialization spec (and thus the
-/// endpoint config) is known.
-pub type SharedCatalog = Arc<RwLock<Option<Arc<CatalogState>>>>;
+/// Aborts the embedded catalog server's task when dropped, so it's torn down
+/// as soon as `run_transactions` (which owns this guard) exits.
+pub struct ServerGuard(tokio::task::JoinHandle<()>);
 
-pub fn new_shared_catalog() -> SharedCatalog {
-    Arc::new(RwLock::new(None))
+impl Drop for ServerGuard {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
-pub async fn set_catalog(shared: &SharedCatalog, state: CatalogState) {
-    *shared.write().await = Some(Arc::new(state));
+/// Spawns the embedded REST catalog server, bound to `catalog`'s table data
+/// for the lifetime of the returned guard.
+pub fn spawn(catalog: Arc<Catalog>) -> ServerGuard {
+    ServerGuard(tokio::spawn(async move {
+        if let Err(err) = run_server(catalog).await {
+            tracing::error!(error = %err, "connector-networking server exited");
+        }
+    }))
 }
 
-pub async fn run_server(catalog: SharedCatalog) -> anyhow::Result<()> {
+async fn run_server(catalog: Arc<Catalog>) -> anyhow::Result<()> {
     let router = Router::new()
         .route("/v1/config", get(config))
         .route(
@@ -58,14 +63,9 @@ async fn config() -> Json<Value> {
 }
 
 async fn commit_transaction(
-    State(catalog): State<SharedCatalog>,
+    State(catalog): State<Arc<Catalog>>,
     Json(request): Json<CommitTransactionRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    let catalog = catalog.read().await.clone().ok_or((
-        StatusCode::SERVICE_UNAVAILABLE,
-        "catalog is not yet initialized".to_string(),
-    ))?;
-
     for change in request.table_changes {
         catalog
             .commit(&change.identifier.name, &change.updates)

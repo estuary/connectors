@@ -41,7 +41,7 @@ use crate::Output;
 use crate::configuration::EndpointConfig;
 use crate::configuration::Store as StoreConfig;
 use crate::iceberg::catalog::CATALOG_PREFIX;
-use crate::iceberg::catalog::CatalogState;
+use crate::iceberg::catalog::Catalog;
 use crate::iceberg::catalog::CommitTransactionRequest;
 use crate::iceberg::catalog::TableChange;
 use crate::iceberg::catalog::TableIdentifier;
@@ -59,14 +59,8 @@ use crate::iceberg::snapshot::build_snapshot;
 use crate::iceberg::state::BindingCheckpoint;
 use crate::iceberg::state::ConnectorState;
 use crate::server;
-use crate::server::SharedCatalog;
 
-pub async fn run_transactions(
-    input: &mut Input,
-    output: &mut Output,
-    open: Open,
-    catalog: SharedCatalog,
-) -> Result<()> {
+pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open) -> Result<()> {
     let spec = open
         .materialization
         .expect("must have a materialization spec");
@@ -74,12 +68,14 @@ pub async fn run_transactions(
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let (object_store, prefix, bucket) = build_object_store(&config.store)?;
 
-    let catalog_state = CatalogState {
+    let catalog = Arc::new(Catalog {
         object_store: object_store.clone(),
         prefix: prefix.clone(),
         bucket: bucket.clone(),
-    };
-    server::set_catalog(&catalog, catalog_state.clone()).await;
+    });
+    // Torn down (aborted) when this function returns, since the server is
+    // only meaningful for the lifetime of this materialization's commits.
+    let _server = server::spawn(catalog.clone());
 
     let mut connector_state = ConnectorState::from_json(open.state_json.as_ref())?;
 
@@ -97,7 +93,7 @@ pub async fn run_transactions(
 
     for binding in &mut bindings {
         if binding.checkpoint.snapshot_id.is_none() {
-            if let Some(current) = catalog_state.current_snapshot(&binding.table).await? {
+            if let Some(current) = catalog.current_snapshot(&binding.table).await? {
                 binding.checkpoint.snapshot_id = Some(current.snapshot_id);
                 binding.checkpoint.sequence_number = current.sequence_number;
                 binding.checkpoint.manifest_list = Some(current.manifest_list);
@@ -139,7 +135,7 @@ pub async fn run_transactions(
                         .collect::<Result<_, _>>()?;
 
                     let matches = scan::load(
-                        &catalog_state,
+                        &catalog,
                         &binding.table,
                         &binding.schema,
                         binding.key_builders.len(),

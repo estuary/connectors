@@ -67,8 +67,7 @@ pub enum TableUpdate {
 /// catalog database, so the current metadata file for a table is located via
 /// a `version-hint.text` pointer file, following the classic Hadoop-catalog
 /// convention.
-#[derive(Clone)]
-pub struct CatalogState {
+pub struct Catalog {
     pub object_store: Arc<dyn ObjectStore>,
     pub prefix: String,
     pub bucket: String,
@@ -82,7 +81,7 @@ pub struct CurrentSnapshot {
     pub manifest_list: String,
 }
 
-impl CatalogState {
+impl Catalog {
     fn version_hint_path(&self, table: &str) -> ObjectPath {
         ObjectPath::from(format!(
             "{}/{}/metadata/version-hint.text",

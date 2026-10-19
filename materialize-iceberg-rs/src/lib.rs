@@ -28,11 +28,7 @@ pub mod server;
 pub mod transactor;
 pub mod validate;
 
-pub async fn run_connector(
-    mut input: Input,
-    mut output: Output,
-    catalog: server::SharedCatalog,
-) -> Result<()> {
+pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
     while let Some(request) = input.read()? {
         match request.kind {
             Some(request::Kind::Spec(_)) => {
@@ -80,7 +76,7 @@ pub async fn run_connector(
             }
             Some(request::Kind::Open(open)) => {
                 tracing::warn!("Open");
-                run_transactions(&mut input, &mut output, *open, catalog.clone()).await?;
+                run_transactions(&mut input, &mut output, *open).await?;
             }
             _ => {
                 anyhow::bail!("invalid request, expected spec|validate|apply|open");

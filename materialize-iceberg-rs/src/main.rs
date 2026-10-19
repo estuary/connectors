@@ -2,21 +2,11 @@ use anyhow::Context;
 use materialize_iceberg_rs::Input;
 use materialize_iceberg_rs::Output;
 use materialize_iceberg_rs::run_connector;
-use materialize_iceberg_rs::server;
 
 fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
 
-    let catalog = server::new_shared_catalog();
-
-    let server_catalog = catalog.clone();
-    runtime.spawn(async move {
-        if let Err(err) = server::run_server(server_catalog).await {
-            tracing::error!(error = %err, "connector-networking server exited");
-        }
-    });
-
-    let result = runtime.block_on(run_connector(Input::new(), Output::new(), catalog));
+    let result = runtime.block_on(run_connector(Input::new(), Output::new()));
 
     if let Err(err) = result.as_ref() {
         tracing::error!(error = %err, "operation failed");

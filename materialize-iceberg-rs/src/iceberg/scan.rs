@@ -21,7 +21,7 @@ use parquet::file::metadata::RowGroupMetaData;
 use parquet::file::statistics::Statistics;
 use tuple::Element;
 
-use super::catalog::CatalogState;
+use super::catalog::Catalog;
 use super::manifest;
 use super::manifest::CONTENT_DATA;
 use super::manifest::CONTENT_DELETES;
@@ -46,15 +46,13 @@ pub struct LoadedDoc {
 /// invariant), so a key is removed from consideration as soon as it's
 /// matched.
 pub async fn load(
-    catalog: &CatalogState,
+    catalog: &Catalog,
     table: &str,
     schema: &Schema,
     num_keys: usize,
     requested_keys: &[Vec<Element<'_>>],
 ) -> Result<Vec<LoadedDoc>> {
-
     tracing::warn!(table, ?schema, num_keys, ?requested_keys, "scan::load");
-
 
     let Some(current) = catalog.current_snapshot(table).await? else {
         return Ok(Vec::new());
@@ -186,7 +184,7 @@ fn file_may_contain(
 
 #[allow(clippy::too_many_arguments)]
 async fn scan_file(
-    catalog: &CatalogState,
+    catalog: &Catalog,
     file_path: &str,
     num_keys: usize,
     key_types: &[DataType],
@@ -351,7 +349,7 @@ fn row_matches(
         )
 }
 
-async fn read_delete_positions(catalog: &CatalogState, file_path: &str) -> Result<Vec<i64>> {
+async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec<i64>> {
     let relative_path = strip_bucket_prefix(&catalog.bucket, file_path)?;
     let reader = ParquetObjectReader::new(
         catalog.object_store.clone(),
@@ -401,3 +399,7 @@ fn strip_bucket_prefix<'a>(bucket: &str, path: &'a str) -> Result<&'a str> {
     path.strip_prefix(prefix.as_str())
         .with_context(|| format!("path {path} does not start with {prefix}"))
 }
+
+#[cfg(test)]
+#[path = "tests/test_scan.rs"]
+mod tests;
