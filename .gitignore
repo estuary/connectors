@@ -61,9 +61,8 @@ source-kafka/tests/test.generated.flow.yaml
 .snapshots/*.actual
 
 # The repo-root uv.lock covers every workspace member, so a lock in a member
-# directory is a stray from running uv there and would never be read. The two
-# locks that are real -- the root's and materialize-snowflake/sidecar's, which
-# is its own uv project -- are both outside this one-level pattern.
+# directory is a stray from running uv there and would never be read. The root's
+# lock, the one that is real, is outside this one-level pattern.
 /*/uv.lock
 
 # requests-cache backing files that a few connector test suites write into
