@@ -204,8 +204,7 @@ func decodeReply(op string, res *rpcResponse, result any) error {
 }
 
 // write frames one request onto the connection: its header as a JSON line, then
-// the payload whose length its header states, if any. The write fails at
-// deadline, so a sidecar that stops reading cannot hold writeMu forever.
+// the payload whose length its header states, if any.
 func (c *sidecarClient) write(req rpcRequest, payload []byte, deadline time.Time) error {
 	var line, err = json.Marshal(req)
 	if err != nil {
