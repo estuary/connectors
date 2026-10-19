@@ -18,6 +18,7 @@ const BUCKET: &str = "test-bucket";
 const TEST_SPEC_PORT: u16 = 8081;
 const TEST_MATERIALIZATION_PORT: u16 = 8082;
 const TEST_RESTART_PORT: u16 = 8083;
+const TEST_UPDATE_PORT: u16 = 8084;
 
 #[test]
 fn test_spec() {
@@ -460,6 +461,132 @@ async fn test_materialization_restart_reconciles_checkpoint_with_catalog() {
     assert_eq!(
         added_rows, 3,
         "expected all 3 rows across both commits to be reachable"
+    );
+}
+
+// Exercises real Load -> Store reduction within a single flowctl process:
+// two commits updating the same key, in one preview-next invocation, so the
+// second commit's Load finds the first commit's row and the runtime's
+// document reduction must carry `_meta.file_path`/`_meta.positional_delete`
+// from the Loaded document through to the Store call for this to work at
+// all. If that assumption doesn't hold, the connector errors loudly (see
+// src/transactor.rs's Store handling) rather than silently skipping the
+// delete.
+#[tokio::test]
+async fn test_materialization_update_writes_positional_delete() {
+    ensure_services_up();
+
+    let s3 = s3_client().await;
+    ensure_bucket(&s3).await;
+    clear_table(&s3, "test_table_update").await;
+
+    run_preview(
+        "tests/update_fixture.json",
+        "acmeCo/materialize-iceberg-rs/update",
+        TEST_UPDATE_PORT,
+    );
+
+    let data = s3
+        .list_objects_v2()
+        .bucket(BUCKET)
+        .prefix("warehouse/test_table_update/data/")
+        .send()
+        .await
+        .unwrap();
+    let data_keys: Vec<&str> = data
+        .contents()
+        .iter()
+        .filter_map(|o| o.key())
+        .filter(|k| k.ends_with(".parquet") && !k.ends_with("-deletes.parquet"))
+        .collect();
+    assert_eq!(
+        data_keys.len(),
+        2,
+        "expected one data file per commit, found {data_keys:?}"
+    );
+
+    let delete_keys: Vec<&str> = data
+        .contents()
+        .iter()
+        .filter_map(|o| o.key())
+        .filter(|k| k.ends_with("-deletes.parquet"))
+        .collect();
+    assert_eq!(
+        delete_keys.len(),
+        1,
+        "expected exactly one positional-delete file, found {delete_keys:?}: if this \
+         is 0, _meta.file_path/_meta.positional_delete did not survive Flow's document \
+         reduction from Load to Store"
+    );
+
+    // The delete file masks exactly one row: the first commit's.
+    let delete_object = s3
+        .get_object()
+        .bucket(BUCKET)
+        .key(delete_keys[0])
+        .send()
+        .await
+        .unwrap();
+    let delete_bytes = delete_object.body.collect().await.unwrap().into_bytes();
+    let reader = parquet::file::reader::SerializedFileReader::new(delete_bytes).unwrap();
+    let delete_rows: Vec<serde_json::Value> =
+        parquet::file::reader::FileReader::get_row_iter(&reader, None)
+            .unwrap()
+            .map(|row| row.unwrap().to_json_value())
+            .collect();
+    assert_eq!(
+        delete_rows.len(),
+        1,
+        "expected exactly one deleted position: {delete_rows:#?}"
+    );
+    assert_eq!(delete_rows[0]["pos"].as_i64().unwrap(), 0);
+    let deleted_file_path = delete_rows[0]["file_path"].as_str().unwrap().to_string();
+    assert!(
+        data_keys
+            .iter()
+            .any(|k| format!("s3://{BUCKET}/{k}") == deleted_file_path),
+        "deleted file_path {deleted_file_path} should reference one of the data files {data_keys:?}"
+    );
+
+    // The second (current) data file's row carries the final value, with no
+    // leftover _meta.file_path/_meta.positional_delete from Load.
+    let second_data_key = data_keys
+        .iter()
+        .find(|k| format!("s3://{BUCKET}/{k}") != deleted_file_path)
+        .expect("expected a surviving data file distinct from the deleted one");
+    let object = s3
+        .get_object()
+        .bucket(BUCKET)
+        .key(*second_data_key)
+        .send()
+        .await
+        .unwrap();
+    let bytes = object.body.collect().await.unwrap().into_bytes();
+    let reader = parquet::file::reader::SerializedFileReader::new(bytes).unwrap();
+    let rows: Vec<serde_json::Value> =
+        parquet::file::reader::FileReader::get_row_iter(&reader, None)
+            .unwrap()
+            .map(|row| row.unwrap().to_json_value())
+            .collect();
+    assert_eq!(
+        rows.len(),
+        1,
+        "expected the surviving file's one row: {rows:#?}"
+    );
+    assert_eq!(rows[0]["id"].as_i64().unwrap(), 501);
+    assert_eq!(rows[0]["value"].as_str().unwrap(), "v2");
+
+    let doc: serde_json::Value =
+        serde_json::from_str(rows[0]["flow_document"].as_str().unwrap()).unwrap();
+    assert!(
+        doc.get("_meta").and_then(|m| m.get("file_path")).is_none(),
+        "the stored flow_document should not retain the synthetic _meta.file_path: {doc:#?}"
+    );
+    assert!(
+        doc.get("_meta")
+            .and_then(|m| m.get("positional_delete"))
+            .is_none(),
+        "the stored flow_document should not retain the synthetic _meta.positional_delete: {doc:#?}"
     );
 }
 

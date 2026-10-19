@@ -37,6 +37,9 @@ pub struct BindingCheckpoint {
 pub struct PendingManifest {
     pub path: String,
     pub length: i64,
+    /// `0` for a manifest of added data files, `1` for a manifest of
+    /// position-delete files, per the Iceberg spec's manifest `content`.
+    pub content: i32,
     pub added_files_count: i32,
     pub added_rows_count: i64,
     pub added_files_size: i64,

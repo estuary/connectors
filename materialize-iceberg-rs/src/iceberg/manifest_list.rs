@@ -15,8 +15,6 @@ use uuid::Uuid;
 use super::schema::manifest_list_schema;
 use super::state::PendingManifest;
 
-const CONTENT_DATA: i32 = 0;
-
 /// A row of the manifest-list (the Iceberg `manifest_file` struct). Renamed
 /// to match `manifest_list_schema()`'s Avro record name: `apache_avro`'s
 /// generic struct deserializer rejects a schema whose record name doesn't
@@ -50,7 +48,7 @@ impl ManifestFile {
             manifest_path: pending.path.clone(),
             manifest_length: pending.length,
             partition_spec_id: 0,
-            content: CONTENT_DATA,
+            content: pending.content,
             sequence_number,
             min_sequence_number: sequence_number,
             added_snapshot_id: snapshot_id,

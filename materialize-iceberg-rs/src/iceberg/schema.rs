@@ -6,9 +6,12 @@ use apache_avro::Schema;
 // https://iceberg.apache.org/spec/#appendix-a-avro-schemas
 //
 // Only the fields we currently populate are included. Column-level stats
-// (column_sizes, value_counts, null_value_counts, lower_bounds,
-// upper_bounds), key_metadata, equality_ids, and sort_order_id are all
-// optional per the spec and are omitted for now.
+// other than lower/upper bounds (column_sizes, value_counts,
+// null_value_counts), key_metadata, equality_ids, and sort_order_id are all
+// optional per the spec and are omitted for now. `lower_bounds`/
+// `upper_bounds` and `referenced_data_file` are populated for Load's
+// file/row-group skipping and for positional-delete manifest entries
+// respectively.
 const MANIFEST_ENTRY_SCHEMA: &str = r#"
 {
   "type": "record",
@@ -28,7 +31,20 @@ const MANIFEST_ENTRY_SCHEMA: &str = r#"
         {"name": "partition", "type": {"type": "record", "name": "r102", "fields": []}, "field-id": 102},
         {"name": "record_count", "type": "long", "field-id": 103},
         {"name": "file_size_in_bytes", "type": "long", "field-id": 104},
-        {"name": "split_offsets", "type": ["null", {"type": "array", "items": "long", "element-id": 133}], "default": null, "field-id": 132}
+        {"name": "lower_bounds", "type": ["null", {"type": "array", "items": {
+          "type": "record", "name": "k126_v127", "fields": [
+            {"name": "key", "type": "int", "field-id": 126},
+            {"name": "value", "type": "bytes", "field-id": 127}
+          ]
+        }}], "default": null, "field-id": 125},
+        {"name": "upper_bounds", "type": ["null", {"type": "array", "items": {
+          "type": "record", "name": "k129_v130", "fields": [
+            {"name": "key", "type": "int", "field-id": 129},
+            {"name": "value", "type": "bytes", "field-id": 130}
+          ]
+        }}], "default": null, "field-id": 128},
+        {"name": "split_offsets", "type": ["null", {"type": "array", "items": "long", "element-id": 133}], "default": null, "field-id": 132},
+        {"name": "referenced_data_file", "type": ["null", "string"], "default": null, "field-id": 143}
       ]
     }, "field-id": 2}
   ]

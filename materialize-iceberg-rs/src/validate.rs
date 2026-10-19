@@ -28,7 +28,7 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
                     })
                     .collect(),
                 resource_path: vec![res.table],
-                delta_updates: true,
+                delta_updates: false,
                 case_insensitive_fields: false,
                 ser_policy: Some(SerPolicy {
                     str_truncate_after: 1 << 16,

@@ -30,20 +30,33 @@ pub fn build_snapshot(
     added_files_count: i32,
     added_rows_count: i64,
     added_files_size: i64,
+    added_position_deletes: i64,
 ) -> Snapshot {
     let timestamp_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as i64;
 
+    // "overwrite" when this commit includes position deletes (an
+    // update/delete took effect), "append" for a pure-insert commit.
+    let operation = if added_position_deletes > 0 {
+        "overwrite"
+    } else {
+        "append"
+    };
+
     let mut summary = BTreeMap::new();
-    summary.insert("operation".to_string(), "append".to_string());
+    summary.insert("operation".to_string(), operation.to_string());
     summary.insert(
         "added-data-files".to_string(),
         added_files_count.to_string(),
     );
     summary.insert("added-records".to_string(), added_rows_count.to_string());
     summary.insert("added-files-size".to_string(), added_files_size.to_string());
+    summary.insert(
+        "added-position-deletes".to_string(),
+        added_position_deletes.to_string(),
+    );
 
     Snapshot {
         snapshot_id,

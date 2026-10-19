@@ -13,6 +13,7 @@ use arrow::datatypes::DataType;
 use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use bytes::Bytes;
 use object_store::ObjectStore;
 use object_store::ObjectStoreExt;
 use object_store::PutPayload;
@@ -45,9 +46,14 @@ use crate::iceberg::catalog::CommitTransactionRequest;
 use crate::iceberg::catalog::TableChange;
 use crate::iceberg::catalog::TableIdentifier;
 use crate::iceberg::catalog::TableUpdate;
+use crate::iceberg::manifest::CONTENT_DATA;
+use crate::iceberg::manifest::CONTENT_DELETES;
 use crate::iceberg::manifest::DataFileInfo;
+use crate::iceberg::manifest::DeleteFileInfo;
 use crate::iceberg::manifest::{self};
 use crate::iceberg::manifest_list;
+use crate::iceberg::scan;
+use crate::iceberg::single_value::BoundTracker;
 use crate::iceberg::snapshot::Snapshot;
 use crate::iceberg::snapshot::build_snapshot;
 use crate::iceberg::state::BindingCheckpoint;
@@ -90,7 +96,6 @@ pub async fn run_transactions(
         .collect::<Result<Vec<_>>>()?;
 
     for binding in &mut bindings {
-        tracing::warn!(binding.state_key, "binding found");
         if binding.checkpoint.snapshot_id.is_none() {
             if let Some(current) = catalog_state.current_snapshot(&binding.table).await? {
                 binding.checkpoint.snapshot_id = Some(current.snapshot_id);
@@ -115,32 +120,99 @@ pub async fn run_transactions(
         };
 
         match request.kind {
-            Some(request::Kind::Load(_)) => {
-                tracing::warn!("--> Load");
+            Some(request::Kind::Load(load)) => {
+                tracing::warn!("Load");
+                let binding = &mut bindings[load.binding as usize];
+                binding.pending_loads.push(load.key_packed);
             }
             Some(request::Kind::Flush(_)) => {
-                tracing::warn!("--> Flush");
+                tracing::warn!("Flush");
+                for (index, binding) in bindings.iter_mut().enumerate() {
+                    if binding.pending_loads.is_empty() {
+                        continue;
+                    }
+
+                    let key_bytes: Vec<Bytes> = binding.pending_loads.drain(..).collect();
+                    let requested_keys: Vec<Vec<Element>> = key_bytes
+                        .iter()
+                        .map(|key_packed| tuple::unpack(key_packed))
+                        .collect::<Result<_, _>>()?;
+
+                    let matches = scan::load(
+                        &catalog_state,
+                        &binding.table,
+                        &binding.schema,
+                        binding.key_builders.len(),
+                        &requested_keys,
+                    )
+                    .await?;
+
+                    for loaded in matches {
+                        output.send(Response {
+                            kind: Some(response::Kind::Loaded(response::Loaded {
+                                binding: index as u32,
+                                doc_json: loaded.doc_json.into(),
+                            })),
+                            ..Default::default()
+                        })?;
+                    }
+                }
+
                 output.send(Response {
                     kind: Some(response::Kind::Flushed(Flushed { state: None })),
                     ..Default::default()
                 })?;
-                tracing::warn!("<-- Flushed");
             }
             Some(request::Kind::Store(store)) => {
-                tracing::warn!("--> Store");
+                tracing::warn!("Store");
                 let binding = &mut bindings[store.binding as usize];
 
-                if store.delete {
-                    tracing::warn!(
-                        table = %binding.table,
-                        "dropping deleted document: positional deletes are not implemented yet"
-                    );
-                    continue;
-                }
+                let raw_doc_text =
+                    std::str::from_utf8(&store.doc_json).context("doc_json must be valid UTF-8")?;
+
+                let doc_text: String = if store.exists {
+                    let mut doc: serde_json::Value =
+                        serde_json::from_str(raw_doc_text).context("doc_json is not valid JSON")?;
+                    let meta = doc
+                        .get_mut("_meta")
+                        .and_then(|m| m.as_object_mut())
+                        .context(
+                            "existing document is missing _meta: Load must have populated \
+                             _meta.file_path/_meta.positional_delete",
+                        )?;
+                    let file_path = meta
+                        .remove("file_path")
+                        .and_then(|v| v.as_str().map(str::to_string))
+                        .context("existing document is missing _meta.file_path")?;
+                    let position = meta
+                        .remove("positional_delete")
+                        .and_then(|v| v.as_i64())
+                        .context("existing document is missing _meta.positional_delete")?;
+                    binding
+                        .pending_deletes
+                        .entry(file_path)
+                        .or_default()
+                        .push(position);
+
+                    if store.delete {
+                        continue;
+                    }
+
+                    serde_json::to_string(&doc)
+                        .context("re-serializing document after stripping _meta")?
+                } else {
+                    raw_doc_text.to_string()
+                };
 
                 let elements: Vec<Element> = tuple::unpack(&store.key_packed)?;
-                for (builder, element) in binding.key_builders.iter_mut().zip(elements.iter()) {
+                for ((builder, tracker), element) in binding
+                    .key_builders
+                    .iter_mut()
+                    .zip(binding.key_bound_trackers.iter_mut())
+                    .zip(elements.iter())
+                {
                     builder.append(element)?;
+                    tracker.update(element);
                 }
 
                 let elements: Vec<Element> = tuple::unpack(&store.values_packed)?;
@@ -148,13 +220,11 @@ pub async fn run_transactions(
                     builder.append(element)?;
                 }
 
-                let doc =
-                    std::str::from_utf8(&store.doc_json).context("doc_json must be valid UTF-8")?;
-                binding.doc_builder.append_value(doc);
+                binding.doc_builder.append_value(&doc_text);
                 binding.rows += 1;
             }
             Some(request::Kind::StartCommit(_)) => {
-                tracing::warn!("--> StartCommit");
+                tracing::warn!("StartCommit");
                 for binding in bindings.iter_mut() {
                     binding
                         .write_and_upload(&object_store, &prefix, &bucket)
@@ -168,10 +238,9 @@ pub async fn run_transactions(
                     })),
                     ..Default::default()
                 })?;
-                tracing::warn!("<-- StartedCommit");
             }
             Some(request::Kind::Acknowledge(_)) => {
-                tracing::warn!("--> Acknowledge");
+                tracing::warn!("Acknowledge");
                 for binding in bindings.iter_mut() {
                     binding.acknowledge(&object_store, &prefix, &bucket).await?;
                 }
@@ -183,7 +252,6 @@ pub async fn run_transactions(
                     })),
                     ..Default::default()
                 })?;
-                tracing::warn!("<-- Acknowledged");
             }
             _ => {}
         }
@@ -233,9 +301,18 @@ struct BindingState {
     table_schema: serde_json::Value,
     last_column_id: i32,
     key_builders: Vec<ColumnBuilder>,
+    key_bound_trackers: Vec<BoundTracker>,
     value_builders: Vec<ColumnBuilder>,
     doc_builder: StringBuilder,
     rows: usize,
+    /// Raw `key_packed` from `Load` requests this transaction, buffered
+    /// until `Flush` triggers the actual scan.
+    pending_loads: Vec<Bytes>,
+    /// Positions to mask with a positional delete this transaction, by the
+    /// data file_path they were found in (`_meta.file_path`/
+    /// `_meta.positional_delete` on the existing document, carried forward
+    /// from `Load` through the runtime's document reduction).
+    pending_deletes: HashMap<String, Vec<i64>>,
     checkpoint: BindingCheckpoint,
 }
 
@@ -246,78 +323,117 @@ impl BindingState {
         prefix: &str,
         bucket: &str,
     ) -> Result<()> {
-        if self.rows == 0 {
+        if self.rows == 0 && self.pending_deletes.is_empty() {
             return Ok(());
         }
-
-        let mut columns: Vec<ArrayRef> = self
-            .key_builders
-            .iter_mut()
-            .map(ColumnBuilder::finish)
-            .collect();
-        columns.extend(self.value_builders.iter_mut().map(ColumnBuilder::finish));
-        columns.push(Arc::new(self.doc_builder.finish()));
-
-        let batch = RecordBatch::try_new(self.schema.clone(), columns)?;
-
-        let mut buf = Vec::new();
-        let file_metadata = {
-            let mut writer = ArrowWriter::try_new(&mut buf, self.schema.clone(), None)?;
-            writer.write(&batch)?;
-            writer.close()?
-        };
-
-        let bytes = buf.len();
-        let rows = self.rows;
-        let path = ObjectPath::from(format!(
-            "{}/{}/data/{}.parquet",
-            prefix,
-            self.table,
-            Uuid::new_v4()
-        ));
-
-        let started = Instant::now();
-        object_store.put(&path, PutPayload::from(buf)).await?;
-
-        tracing::info!(
-            table = %self.table,
-            path = %path,
-            rows,
-            bytes,
-            elapsed_ms = started.elapsed().as_millis(),
-            "wrote parquet data file"
-        );
-
-        let split_offsets = file_metadata
-            .row_groups()
-            .iter()
-            .filter_map(|rg| rg.file_offset())
-            .collect();
 
         let snapshot_id = *self
             .checkpoint
             .pending_snapshot_id
             .get_or_insert_with(|| self.checkpoint.sequence_number + 1);
 
-        let pending_manifest = manifest::write_manifest(
-            object_store,
-            prefix,
-            bucket,
-            &self.table,
-            &self.table_schema.to_string(),
-            snapshot_id,
-            DataFileInfo {
-                file_path: format!("s3://{bucket}/{path}"),
-                record_count: rows as i64,
-                file_size_in_bytes: bytes as i64,
-                split_offsets,
-            },
-        )
-        .await?;
+        if self.rows > 0 {
+            let lower_bounds: Vec<(i32, Vec<u8>)> = self
+                .key_bound_trackers
+                .iter()
+                .enumerate()
+                .filter_map(|(i, tracker)| {
+                    tracker.encoded().map(|(lower, _)| (i as i32 + 1, lower))
+                })
+                .collect();
+            let upper_bounds: Vec<(i32, Vec<u8>)> = self
+                .key_bound_trackers
+                .iter()
+                .enumerate()
+                .filter_map(|(i, tracker)| {
+                    tracker.encoded().map(|(_, upper)| (i as i32 + 1, upper))
+                })
+                .collect();
+            for tracker in &mut self.key_bound_trackers {
+                tracker.reset();
+            }
 
-        self.checkpoint.pending_manifests.push(pending_manifest);
+            let mut columns: Vec<ArrayRef> = self
+                .key_builders
+                .iter_mut()
+                .map(ColumnBuilder::finish)
+                .collect();
+            columns.extend(self.value_builders.iter_mut().map(ColumnBuilder::finish));
+            columns.push(Arc::new(self.doc_builder.finish()));
 
-        self.rows = 0;
+            let batch = RecordBatch::try_new(self.schema.clone(), columns)?;
+
+            let mut buf = Vec::new();
+            let file_metadata = {
+                let mut writer = ArrowWriter::try_new(&mut buf, self.schema.clone(), None)?;
+                writer.write(&batch)?;
+                writer.close()?
+            };
+
+            let bytes = buf.len();
+            let rows = self.rows;
+            let path = ObjectPath::from(format!(
+                "{}/{}/data/{}.parquet",
+                prefix,
+                self.table,
+                Uuid::new_v4()
+            ));
+
+            let started = Instant::now();
+            object_store.put(&path, PutPayload::from(buf)).await?;
+
+            tracing::info!(
+                table = %self.table,
+                path = %path,
+                rows,
+                bytes,
+                elapsed_ms = started.elapsed().as_millis(),
+                "wrote parquet data file"
+            );
+
+            let split_offsets = file_metadata
+                .row_groups()
+                .iter()
+                .filter_map(|rg| rg.file_offset())
+                .collect();
+
+            let pending_manifest = manifest::write_manifest(
+                object_store,
+                prefix,
+                bucket,
+                &self.table,
+                &self.table_schema.to_string(),
+                snapshot_id,
+                DataFileInfo {
+                    file_path: format!("s3://{bucket}/{path}"),
+                    record_count: rows as i64,
+                    file_size_in_bytes: bytes as i64,
+                    split_offsets,
+                    lower_bounds,
+                    upper_bounds,
+                },
+            )
+            .await?;
+
+            self.checkpoint.pending_manifests.push(pending_manifest);
+            self.rows = 0;
+        }
+
+        for (file_path, positions) in self.pending_deletes.drain() {
+            let pending_manifest = write_position_delete_file(
+                object_store,
+                prefix,
+                bucket,
+                &self.table,
+                &self.table_schema.to_string(),
+                snapshot_id,
+                &file_path,
+                &positions,
+            )
+            .await?;
+            self.checkpoint.pending_manifests.push(pending_manifest);
+        }
+
         Ok(())
     }
 
@@ -352,23 +468,20 @@ impl BindingState {
         )
         .await?;
 
-        let added_files_count: i32 = self
+        let data_manifests = self
             .checkpoint
             .pending_manifests
             .iter()
-            .map(|m| m.added_files_count)
-            .sum();
-        let added_rows_count: i64 = self
+            .filter(|m| m.content == CONTENT_DATA);
+        let added_files_count: i32 = data_manifests.clone().map(|m| m.added_files_count).sum();
+        let added_rows_count: i64 = data_manifests.clone().map(|m| m.added_rows_count).sum();
+        let added_files_size: i64 = data_manifests.map(|m| m.added_files_size).sum();
+        let added_position_deletes: i64 = self
             .checkpoint
             .pending_manifests
             .iter()
+            .filter(|m| m.content == CONTENT_DELETES)
             .map(|m| m.added_rows_count)
-            .sum();
-        let added_files_size: i64 = self
-            .checkpoint
-            .pending_manifests
-            .iter()
-            .map(|m| m.added_files_size)
             .sum();
 
         let snapshot = build_snapshot(
@@ -379,6 +492,7 @@ impl BindingState {
             added_files_count,
             added_rows_count,
             added_files_size,
+            added_position_deletes,
         );
 
         self.commit_snapshot(snapshot).await?;
@@ -450,6 +564,94 @@ impl BindingState {
     }
 }
 
+/// The reserved Iceberg field-ids for a positional-delete file's two
+/// columns, per the spec's Appendix A.
+const POSITION_DELETE_FILE_PATH_FIELD_ID: i32 = 2147483546;
+const POSITION_DELETE_POS_FIELD_ID: i32 = 2147483545;
+
+fn position_delete_schema() -> Arc<Schema> {
+    Arc::new(Schema::new(vec![
+        arrow_field_with_iceberg_id(
+            "file_path",
+            DataType::Utf8,
+            POSITION_DELETE_FILE_PATH_FIELD_ID,
+        ),
+        arrow_field_with_iceberg_id("pos", DataType::Int64, POSITION_DELETE_POS_FIELD_ID),
+    ]))
+}
+
+/// Writes a positional-delete Parquet file masking `positions` within
+/// `referenced_data_file`, and its manifest entry — one delete file per
+/// referenced data file_path.
+#[allow(clippy::too_many_arguments)]
+async fn write_position_delete_file(
+    object_store: &Arc<dyn ObjectStore>,
+    prefix: &str,
+    bucket: &str,
+    table: &str,
+    table_schema_json: &str,
+    snapshot_id: i64,
+    referenced_data_file: &str,
+    positions: &[i64],
+) -> Result<crate::iceberg::state::PendingManifest> {
+    let schema = position_delete_schema();
+
+    let mut file_path_builder = StringBuilder::new();
+    let mut pos_builder = Int64Builder::new();
+    for &position in positions {
+        file_path_builder.append_value(referenced_data_file);
+        pos_builder.append_value(position);
+    }
+
+    let batch = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(file_path_builder.finish()),
+            Arc::new(pos_builder.finish()),
+        ],
+    )?;
+
+    let mut buf = Vec::new();
+    {
+        let mut writer = ArrowWriter::try_new(&mut buf, schema.clone(), None)?;
+        writer.write(&batch)?;
+        writer.close()?;
+    }
+
+    let file_size_in_bytes = buf.len() as i64;
+    let record_count = positions.len() as i64;
+    let path = ObjectPath::from(format!(
+        "{prefix}/{table}/data/{}-deletes.parquet",
+        Uuid::new_v4()
+    ));
+
+    object_store.put(&path, PutPayload::from(buf)).await?;
+
+    tracing::info!(
+        table = %table,
+        path = %path,
+        record_count,
+        referenced_data_file,
+        "wrote positional-delete file"
+    );
+
+    manifest::write_delete_manifest(
+        object_store,
+        prefix,
+        bucket,
+        table,
+        table_schema_json,
+        snapshot_id,
+        DeleteFileInfo {
+            file_path: format!("s3://{bucket}/{path}"),
+            record_count,
+            file_size_in_bytes,
+            referenced_data_file: referenced_data_file.to_string(),
+        },
+    )
+    .await
+}
+
 fn binding_state(
     binding: &materialization_spec::Binding,
     checkpoint: BindingCheckpoint,
@@ -465,6 +667,7 @@ fn binding_state(
 
     let mut fields = Vec::new();
     let mut key_builders = Vec::new();
+    let mut key_bound_trackers = Vec::new();
     let mut value_builders = Vec::new();
     let mut iceberg_fields = Vec::new();
     let mut field_id = 1;
@@ -477,6 +680,7 @@ fn binding_state(
             field_id,
         ));
         key_builders.push(ColumnBuilder::new(&data_type));
+        key_bound_trackers.push(BoundTracker::new(&data_type));
         iceberg_fields.push(json!({
             "id": field_id,
             "name": key_field,
@@ -527,9 +731,12 @@ fn binding_state(
         table_schema,
         last_column_id,
         key_builders,
+        key_bound_trackers,
         value_builders,
         doc_builder: StringBuilder::new(),
         rows: 0,
+        pending_loads: Vec::new(),
+        pending_deletes: HashMap::new(),
         checkpoint,
     })
 }

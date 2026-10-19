@@ -38,6 +38,11 @@ features = ["json", "tokio", "http1"]
 version = "1.11"
 default-features = false
 
+[dependencies.futures]
+version = "0.3"
+default-features = false
+features = ["std"]
+
 [dependencies.object_store]
 version = "0.14.2"
 default-features = false
@@ -46,7 +51,7 @@ features = ["aws"]
 [dependencies.parquet]
 version = "60.0.0"
 default-features = false
-features = ["arrow"]
+features = ["arrow", "object_store"]
 
 [dependencies.prost]
 version = "0.14"
@@ -65,6 +70,9 @@ default-features = false
 version = "1.0"
 default-features = false
 features = ["derive"]
+
+[dependencies.serde_bytes]
+version = "0.11"
 
 [dependencies.serde_json]
 version = "1.0"
