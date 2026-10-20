@@ -20,7 +20,7 @@ use super::state::PendingManifest;
 /// generic struct deserializer rejects a schema whose record name doesn't
 /// match the Rust type name, and the Avro/Iceberg spec names this record
 /// `manifest_file`, not `ManifestFile`.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename = "manifest_file")]
 pub struct ManifestFile {
     pub manifest_path: String,

@@ -115,3 +115,6 @@ default-features = false
 version = "60.0.0"
 default-features = false
 features = ["json"]
+
+[dev-dependencies.serde_yaml]
+version = "0"

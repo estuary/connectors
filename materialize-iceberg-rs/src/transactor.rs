@@ -134,7 +134,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                         .map(|key_packed| tuple::unpack(key_packed))
                         .collect::<Result<_, _>>()?;
 
-                    let matches = scan::load(
+                    let result = scan::load(
                         &catalog,
                         &binding.table,
                         &binding.schema,
@@ -143,7 +143,15 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     )
                     .await?;
 
-                    for loaded in matches {
+                    binding.load_file_paths = result.file_paths;
+
+                    for loaded in result.docs {
+                        let value: serde_json::Value =
+                            serde_json::from_slice(&loaded.doc_json).unwrap();
+                        tracing::warn!(
+                            doc_json = serde_json::to_string_pretty(&value).unwrap(),
+                            "Loaded"
+                        );
                         output.send(Response {
                             kind: Some(response::Kind::Loaded(response::Loaded {
                                 binding: index as u32,
@@ -169,6 +177,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 let doc_text: String = if store.exists {
                     let mut doc: serde_json::Value =
                         serde_json::from_str(raw_doc_text).context("doc_json is not valid JSON")?;
+                    tracing::warn!(doc = serde_json::to_string_pretty(&doc).unwrap(), "Store");
                     let meta = doc
                         .get_mut("_meta")
                         .and_then(|m| m.as_object_mut())
@@ -176,10 +185,18 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                             "existing document is missing _meta: Load must have populated \
                              _meta.file_path/_meta.positional_delete",
                         )?;
-                    let file_path = meta
+                    let file_index = meta
                         .remove("file_path")
-                        .and_then(|v| v.as_str().map(str::to_string))
-                        .context("existing document is missing _meta.file_path")?;
+                        .and_then(|v| v.as_u64())
+                        .context("existing document is missing _meta.file_path")?
+                        as usize;
+                    let file_path = binding
+                        .load_file_paths
+                        .get(file_index)
+                        .cloned()
+                        .with_context(|| {
+                            format!("_meta.file_path index {file_index} is out of range")
+                        })?;
                     let position = meta
                         .remove("positional_delete")
                         .and_then(|v| v.as_i64())
@@ -268,7 +285,9 @@ fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::Connector
     })
 }
 
-fn build_object_store(store: &StoreConfig) -> Result<(Arc<dyn ObjectStore>, String, String)> {
+pub(crate) fn build_object_store(
+    store: &StoreConfig,
+) -> Result<(Arc<dyn ObjectStore>, String, String)> {
     let StoreConfig::S3(s3) = store;
 
     let mut builder = AmazonS3Builder::new()
@@ -304,6 +323,11 @@ struct BindingState {
     /// Raw `key_packed` from `Load` requests this transaction, buffered
     /// until `Flush` triggers the actual scan.
     pending_loads: Vec<Bytes>,
+    /// The file-path table from this transaction's `Flush`-triggered
+    /// `scan::load` call. `Store`'s `_meta.file_path` (an index into this,
+    /// not a path) is resolved through it — deduplicated by `scan::load`,
+    /// so its size is bounded by distinct files touched, not rows touched.
+    load_file_paths: Vec<String>,
     /// Positions to mask with a positional delete this transaction, by the
     /// data file_path they were found in (`_meta.file_path`/
     /// `_meta.positional_delete` on the existing document, carried forward
@@ -732,6 +756,7 @@ fn binding_state(
         doc_builder: StringBuilder::new(),
         rows: 0,
         pending_loads: Vec::new(),
+        load_file_paths: Vec::new(),
         pending_deletes: HashMap::new(),
         checkpoint,
     })
@@ -741,14 +766,14 @@ fn binding_state(
 /// `parquet::arrow::ArrowWriter` reads to assign the physical column's
 /// `field_id`, which Iceberg readers require to map data file columns back
 /// to schema fields.
-fn arrow_field_with_iceberg_id(name: &str, data_type: DataType, field_id: i32) -> Field {
+pub(crate) fn arrow_field_with_iceberg_id(name: &str, data_type: DataType, field_id: i32) -> Field {
     Field::new(name, data_type, true).with_metadata(HashMap::from([(
         PARQUET_FIELD_ID_META_KEY.to_string(),
         field_id.to_string(),
     )]))
 }
 
-fn arrow_type_for_field(projections: &[Projection], field: &str) -> DataType {
+pub(crate) fn arrow_type_for_field(projections: &[Projection], field: &str) -> DataType {
     let types: Vec<&str> = projections
         .iter()
         .find(|p| p.field == field)

@@ -30,10 +30,44 @@ use super::single_value::Bound;
 
 /// One matched document from [`load`]: the index into the `requested_keys`
 /// slice it answers, and the augmented `flow_document` JSON bytes (with
-/// `_meta.file_path`/`_meta.positional_delete` injected).
+/// `_meta.file_path`/`_meta.positional_delete` injected — `file_path` is an
+/// index into the accompanying [`LoadResult::file_paths`] table, not the
+/// path itself; see that field's doc comment for why).
+#[derive(Debug)]
 pub struct LoadedDoc {
     pub request_index: usize,
     pub doc_json: Vec<u8>,
+}
+
+/// The result of one [`load`] call.
+pub struct LoadResult {
+    pub docs: Vec<LoadedDoc>,
+    /// Distinct data file paths referenced by `docs`' injected
+    /// `_meta.file_path` indices, in assignment order. Deduplicated so the
+    /// table's size is bounded by the number of distinct files touched by
+    /// this call, not the number of matched rows — row count for an
+    /// arbitrarily long transaction isn't bounded, but the files backing a
+    /// table in practice are far fewer than its rows.
+    pub file_paths: Vec<String>,
+}
+
+/// Assigns small integer indices to file paths, deduplicating repeats.
+#[derive(Default)]
+struct FilePathTable {
+    paths: Vec<String>,
+    index: HashMap<String, usize>,
+}
+
+impl FilePathTable {
+    fn intern(&mut self, path: &str) -> usize {
+        if let Some(&i) = self.index.get(path) {
+            return i;
+        }
+        let i = self.paths.len();
+        self.paths.push(path.to_string());
+        self.index.insert(path.to_string(), i);
+        i
+    }
 }
 
 /// Scans `table`'s current snapshot for rows matching any of
@@ -51,15 +85,20 @@ pub async fn load(
     schema: &Schema,
     num_keys: usize,
     requested_keys: &[Vec<Element<'_>>],
-) -> Result<Vec<LoadedDoc>> {
+) -> Result<LoadResult> {
     tracing::warn!(table, ?schema, num_keys, ?requested_keys, "scan::load");
 
     let Some(current) = catalog.current_snapshot(table).await? else {
-        return Ok(Vec::new());
+        return Ok(LoadResult {
+            docs: Vec::new(),
+            file_paths: Vec::new(),
+        });
     };
 
     let manifests =
         manifest_list::read_manifest_list(&catalog.object_store, &current.manifest_list).await?;
+
+    tracing::warn!(?manifests);
 
     let key_field_ids: Vec<i32> = (1..=num_keys as i32).collect();
     let key_types: Vec<DataType> = schema.fields()[..num_keys]
@@ -84,6 +123,7 @@ pub async fn load(
 
     let mut remaining: Vec<usize> = (0..requested_keys.len()).collect();
     let mut found = Vec::new();
+    let mut file_paths = FilePathTable::default();
 
     for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
         if remaining.is_empty() {
@@ -116,10 +156,12 @@ pub async fn load(
             }
 
             let deleted_positions = deleted.get(&entry.file_path).cloned().unwrap_or_default();
+            let file_index = file_paths.intern(&entry.file_path);
 
             let matches = scan_file(
                 catalog,
                 &entry.file_path,
+                file_index,
                 num_keys,
                 &key_types,
                 doc_index,
@@ -139,7 +181,10 @@ pub async fn load(
         }
     }
 
-    Ok(found)
+    Ok(LoadResult {
+        docs: found,
+        file_paths: file_paths.paths,
+    })
 }
 
 fn decode_bounds(
@@ -186,6 +231,7 @@ fn file_may_contain(
 async fn scan_file(
     catalog: &Catalog,
     file_path: &str,
+    file_index: usize,
     num_keys: usize,
     key_types: &[DataType],
     doc_index: usize,
@@ -277,7 +323,7 @@ async fn scan_file(
             let request_index = remaining_candidates.remove(pos);
 
             let doc_text = doc_array.value(row);
-            let doc_json = augment_doc(doc_text, file_path, position)?;
+            let doc_json = augment_doc(doc_text, file_index, position)?;
             matches.push((request_index, doc_json));
         }
     }
@@ -378,7 +424,9 @@ async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec
     Ok(positions)
 }
 
-fn augment_doc(doc_text: &str, file_path: &str, position: i64) -> Result<Vec<u8>> {
+/// `file_index` is an index into the `load()` call's [`LoadResult::file_paths`]
+/// table, not the file path itself — `Store` resolves it back via that table.
+fn augment_doc(doc_text: &str, file_index: usize, position: i64) -> Result<Vec<u8>> {
     let mut doc: serde_json::Value =
         serde_json::from_str(doc_text).context("flow_document is not valid JSON")?;
     let object = doc
@@ -388,7 +436,7 @@ fn augment_doc(doc_text: &str, file_path: &str, position: i64) -> Result<Vec<u8>
         .entry("_meta")
         .or_insert_with(|| serde_json::json!({}));
     let meta_object = meta.as_object_mut().context("_meta must be an object")?;
-    meta_object.insert("file_path".to_string(), serde_json::json!(file_path));
+    meta_object.insert("file_path".to_string(), serde_json::json!(file_index));
     meta_object.insert("positional_delete".to_string(), serde_json::json!(position));
 
     serde_json::to_vec(&doc).context("re-serializing augmented flow_document")
