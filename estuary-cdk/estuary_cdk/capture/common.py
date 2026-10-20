@@ -22,6 +22,7 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from .._background import spawn
 from ..cron import next_fire
+from ..feature_flags import feature_flags_config
 from ..logger import OBSERVABLE_FIELD
 # `from x import Y as Y` marks Y as an explicit re-export: this package ships
 # py.typed, and connectors import these names from this module.
@@ -42,6 +43,9 @@ from ..flow import (
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .backfill_signals import (
+    EMIT_BACKFILL_SIGNALS,
+    IGNORE_CONFIG_FOR_BACKFILL_SIGNALS,
+    BackfillContext,
     BackfillCoverage,
     BackfillCoverageFn,
 )
@@ -294,6 +298,16 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     is_connector_initiated: bool = Field(
         default=False,
         description="Indicates if this backfill was initiated by the connector.",
+    )
+
+    is_awaiting_backfill_begin: bool | None = Field(
+        default=None,
+        description="Set from when a backfill that sends backfill signals is initialized until its BackfillBegin is sent.",
+    )
+
+    is_awaiting_backfill_complete: bool | None = Field(
+        default=None,
+        description="Set from when a BackfillBegin is sent until its BackfillComplete is sent.",
     )
 
 
@@ -681,6 +695,84 @@ def _get_min_incremental_cursor(state: ResourceState) -> datetime | None:
     return None
 
 
+def _coverages_that_emit_backfill_signals(
+    open: request.Open[Any, _ResourceConfig, _ConnectorState],
+    resolved_bindings: list[
+        tuple[
+            CaptureBinding[_ResourceConfig],
+            "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
+        ]
+    ],
+    log: Logger,
+) -> frozenset[BackfillCoverage]:
+    """The coverages this session sends backfill signals for, given the feature
+    flags."""
+    if all(resource.backfill_coverage is None for _, resource in resolved_bindings):
+        return frozenset()
+
+    advanced = feature_flags_config(open.capture.config)
+    if advanced is None:
+        raise RuntimeError(
+            "Implementation error: a resource sets backfill_coverage, but the endpoint config's advanced section isn't a FeatureFlagsConfig"
+        )
+    for name in (EMIT_BACKFILL_SIGNALS, IGNORE_CONFIG_FOR_BACKFILL_SIGNALS):
+        if name not in advanced.FEATURE_FLAG_DEFAULTS:
+            raise RuntimeError(
+                f"Implementation error: a resource sets backfill_coverage, but FEATURE_FLAG_DEFAULTS doesn't declare '{name}'. Declare the flags with backfill_signal_flag_defaults."
+            )
+
+    if not advanced.flag(EMIT_BACKFILL_SIGNALS):
+        if advanced.flag(IGNORE_CONFIG_FOR_BACKFILL_SIGNALS):
+            log.warning(
+                f"{IGNORE_CONFIG_FOR_BACKFILL_SIGNALS} has no effect while {EMIT_BACKFILL_SIGNALS} is off"
+            )
+        return frozenset()
+    if advanced.flag(IGNORE_CONFIG_FOR_BACKFILL_SIGNALS):
+        return frozenset({BackfillCoverage.FULL, BackfillCoverage.BOUNDED_BY_CONFIG})
+    return frozenset({BackfillCoverage.FULL})
+
+
+def _resolve_backfill_coverage(
+    binding: CaptureBinding[_ResourceConfig],
+    resource: "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
+    is_connector_initiated: bool,
+) -> BackfillCoverage | None:
+    """The resource's answer for a backfill of the binding, or None if the resource
+    doesn't set backfill_coverage."""
+    coverage = resource.backfill_coverage
+    if coverage is None:
+        return None
+    if isinstance(coverage, BackfillCoverage):
+        return coverage
+    return coverage(
+        BackfillContext(binding=binding, is_connector_initiated=is_connector_initiated)
+    )
+
+
+def _has_pending_backfill(state: ResourceState) -> bool:
+    if isinstance(state.backfill, dict):
+        return any(state.backfill.values())
+    return state.backfill is not None
+
+
+async def _send_backfill_complete(
+    task: Task,
+    binding: CaptureBinding[_ResourceConfig],
+    binding_index: int,
+    state: ResourceState,
+) -> None:
+    task.log.info("sending BackfillComplete", {"resource": ".".join(binding.resourceConfig.path())})
+    state.is_awaiting_backfill_complete = None
+    await task._backfill_complete(  # pyright: ignore[reportPrivateUsage]
+        binding_index,
+        ConnectorState(
+            bindingStateV1={
+                binding.stateKey: ResourceState(is_awaiting_backfill_complete=None)
+            }
+        ),
+    )
+
+
 def open(
     open: request.Open[Any, _ResourceConfig, _ConnectorState],
     resolved_bindings: list[
@@ -691,6 +783,12 @@ def open(
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
     async def _run(task: Task):
+        # Check the flags before the first checkpoint so a connector that doesn't
+        # declare them fails without changing any state.
+        coverages_that_emit_backfill_signals = _coverages_that_emit_backfill_signals(
+            open, resolved_bindings, task.log
+        )
+
         backfill_requests = []
         if open.state.backfillRequests is not None:
             for stateKey in open.state.backfillRequests.keys():
@@ -716,6 +814,7 @@ def open(
 
             should_initialize = state is None or binding.stateKey in backfill_requests
             is_connector_initiated = False
+            coverage: BackfillCoverage | None = None
 
             if state:
                 if state.last_initialized is None:
@@ -723,6 +822,16 @@ def open(
                     await task.checkpoint(
                         ConnectorState(bindingStateV1={binding.stateKey: state})
                     )
+
+                # A requested backfill already cleared this state and begins again.
+                if (
+                    state.is_awaiting_backfill_complete
+                    and binding.stateKey not in backfill_requests
+                    and not _has_pending_backfill(state)
+                ):
+                    # The capture crashed after the backfill finished but before it
+                    # sent the BackfillComplete.
+                    await _send_backfill_complete(task, binding, index, state)
 
                 if not state.backfill and isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
                     cron_schedule = binding.resourceConfig.schedule
@@ -744,6 +853,13 @@ def open(
                             soonest_future_scheduled_initialization = min(soonest_future_scheduled_initialization, future_scheduled_initialization)
 
             if should_initialize:
+                coverage = (
+                    _resolve_backfill_coverage(binding, resource, is_connector_initiated)
+                    if _has_pending_backfill(resource.initial_state)
+                    else None
+                )
+                should_emit_backfill_signals = coverage in coverages_that_emit_backfill_signals
+
                 if is_connector_initiated:
                     # Attempt to coordinate the initialized backfill's cutoff with the current incremental
                     # state's cursor(s), preserving the incremental cursor position(s).
@@ -760,6 +876,11 @@ def open(
                     ):
                         state.backfill = initial_backfill_state.model_copy(deep=True)
                         state.backfill.cutoff = min_cursor
+                        # The backfill skips records at or after its cutoff, and the
+                        # incremental tasks keep cursors that already passed those.
+                        # Nothing would capture them again after a BackfillBegin, so
+                        # this backfill doesn't send signals.
+                        should_emit_backfill_signals = False
                     # In all other cases, wipe the state back to the initial state.
                     else:
                         state = resource.initial_state.model_copy(deep=True)
@@ -769,6 +890,11 @@ def open(
                     state = resource.initial_state.model_copy(deep=True)
 
                 state.last_initialized = NOW
+
+                if should_emit_backfill_signals:
+                    # open_binding sends the BackfillBegin, once it has a fetch_page
+                    # to run the backfill.
+                    state.is_awaiting_backfill_begin = True
 
                 # Checkpoint the binding's initialized state prior to any processing.
                 await task.checkpoint(
@@ -790,6 +916,7 @@ def open(
             # Support both sync and async open callbacks
             if inspect.iscoroutine(result):
                 await result
+
 
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
@@ -852,6 +979,42 @@ def _tombstone_discriminator_values(
     return tuple(values)
 
 
+@dataclass
+class _BackfillCompletion:
+    """Sends a binding's owed BackfillComplete after its last backfill subtask
+    finishes.
+
+    A dict fetch_page runs one backfill subtask per key concurrently, and the
+    BackfillComplete has to follow all of them and go out once. open_binding counts the
+    subtasks it starts, each one calls subtask_done after its final checkpoint, and the
+    last one sends the BackfillComplete from its own task. A single fetch_page is one
+    subtask."""
+
+    binding: CaptureBinding[Any]
+    binding_index: int
+    state: ResourceState
+    remaining: int = 0
+
+    async def subtask_done(self, task: Task) -> None:
+        self.remaining -= 1
+        if self.remaining == 0:
+            await self.send(task)
+
+    async def send(self, task: Task) -> None:
+        await _send_backfill_complete(task, self.binding, self.binding_index, self.state)
+
+
+def _fetch_page_runs_backfill(
+    fetch_page: FetchPageFn[Any] | RecurringFetchPageFn[Any] | dict[str, FetchPageFn[Any]] | None,
+    state: ResourceState,
+) -> bool:
+    """Whether open_binding starts a backfill task for the state's backfill."""
+    if isinstance(fetch_page, dict):
+        backfills = state.backfill if isinstance(state.backfill, dict) else {}
+        return any(backfills.get(subtask_id) for subtask_id in fetch_page)
+    return fetch_page is not None and isinstance(state.backfill, ResourceState.Backfill)
+
+
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
@@ -883,6 +1046,42 @@ def open_binding(
     task.connector_status.inc_binding_count()
     prefix = ".".join(binding.resourceConfig.path())
 
+    # A backfill that sends backfill signals needs a fetch_page to run it, since only
+    # its end sends the BackfillComplete. It fails here, before its BackfillBegin is
+    # sent. Otherwise the binding's tasks wait until the BackfillBegin is sent.
+    backfill_begin_sent: asyncio.Event | None = None
+    if resource_state.is_awaiting_backfill_begin:
+        if not _fetch_page_runs_backfill(fetch_page, resource_state):
+            raise RuntimeError(
+                f"Implementation error: binding {binding.stateKey} begins a backfill that sends "
+                "backfill signals, but open_binding has no fetch_page to run it"
+            )
+        begin_sent = asyncio.Event()
+
+        async def send_backfill_begin(task: Task) -> None:
+            task.log.info("sending BackfillBegin", {"resource": prefix})
+            resource_state.is_awaiting_backfill_begin = None
+            resource_state.is_awaiting_backfill_complete = True
+            await task._backfill_begin(  # pyright: ignore[reportPrivateUsage]
+                binding_index,
+                ConnectorState(
+                    bindingStateV1={
+                        binding.stateKey: ResourceState(
+                            is_awaiting_backfill_begin=None,
+                            is_awaiting_backfill_complete=True,
+                        )
+                    }
+                ),
+            )
+            begin_sent.set()
+
+        task.spawn_child(f"{prefix}.backfill_begin", send_backfill_begin)
+        backfill_begin_sent = begin_sent
+
+    async def wait_for_backfill_begin() -> None:
+        if backfill_begin_sent is not None:
+            _ = await backfill_begin_sent.wait()
+
     if fetch_changes:
 
         async def incremental_closure(
@@ -892,6 +1091,7 @@ def open_binding(
             subtask_id: str | None = None,
         ):
             assert state and not isinstance(state, dict)
+            await wait_for_backfill_begin()
             await _binding_incremental_task(
                 binding,
                 binding_index,
@@ -928,6 +1128,10 @@ def open_binding(
             )
 
     if fetch_page and resource_state.backfill:
+        completion: _BackfillCompletion | None = None
+        # A backfill still waiting on its BackfillBegin owes its BackfillComplete too.
+        if resource_state.is_awaiting_backfill_begin or resource_state.is_awaiting_backfill_complete:
+            completion = _BackfillCompletion(binding, binding_index, resource_state)
 
         async def backfill_closure(
             task: Task,
@@ -936,6 +1140,7 @@ def open_binding(
             subtask_id: str | None = None,
         ):
             assert state and not isinstance(state, dict)
+            await wait_for_backfill_begin()
             task.connector_status.inc_backfilling(binding_index)
             await _binding_backfill_task(
                 binding,
@@ -946,6 +1151,7 @@ def open_binding(
                 resource_state.is_connector_initiated,
                 task,
                 subtask_id,
+                completion,
             )
             task.connector_status.dec_backfilling(binding_index)
 
@@ -957,6 +1163,8 @@ def open_binding(
                 if not backfill_state:
                     continue
 
+                if completion is not None:
+                    completion.remaining += 1
                 task.spawn_child(
                     f"{prefix}.backfill.{subtask_id}",
                     functools.partial(
@@ -967,8 +1175,19 @@ def open_binding(
                     ),
                 )
 
+            # No subtask runs when every unfinished one belongs to a parent that no
+            # longer has a fetcher, like a removed account. Nothing would then send
+            # the owed BackfillComplete, so a task of its own sends it, since
+            # open_binding isn't async. This only happens after a restart, since a
+            # new backfill that sends signals with nothing to run fails at the top
+            # of open_binding.
+            if completion is not None and completion.remaining == 0:
+                task.spawn_child(f"{prefix}.backfill_complete", completion.send)
+
         else:
             assert resource_state.backfill and not isinstance(resource_state.backfill, dict)
+            if completion is not None:
+                completion.remaining += 1
             task.spawn_child(
                 f"{prefix}.backfill",
                 functools.partial(
@@ -1001,6 +1220,7 @@ def open_binding(
             tombstone: _BaseDocument,
             subtask_id: str | None = None,
         ):
+            await wait_for_backfill_begin()
             await _binding_snapshot_task(
                 binding,
                 binding_index,
@@ -1182,6 +1402,7 @@ async def _binding_backfill_task(
     is_connector_initiated: bool,
     task: Task,
     subtask_id: str | None = None,
+    completion: _BackfillCompletion | None = None,
 ):
     def _initialize_connector_state(state: ResourceState.Backfill) -> ConnectorState:
         if subtask_id is not None:
@@ -1290,6 +1511,9 @@ async def _binding_backfill_task(
             )
         )
     task.log.info("completed backfill", {"subtask_id": subtask_id})
+
+    if completion is not None:
+        await completion.subtask_done(task)
 
     # If this binding has an initialization schedule to adhere to, either stop
     # if we missed a scheduled initialization or schedule a future stop.
