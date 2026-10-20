@@ -465,7 +465,7 @@ these filters exclude will be deactivated the next time discovery runs.
 | Property | Title | Description | Type | Required/Default |
 | --- | --- | --- | --- | --- |
 | `/advanced` | Advanced Options | Options for advanced users. You should not typically need to modify these. | object |  |
-| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query. | integer | `4096` |
+| `/advanced/backfill_chunk_size` | Backfill Chunk Size | The number of rows which should be fetched from the database in a single backfill query. | integer | `50000` |
 | `/advanced/publicationName` | Publication Name | The name of the PostgreSQL publication to replicate from. | string | `"flow_publication"` |
 | `/advanced/skip_backfills` | Skip Backfills | A comma-separated list of fully-qualified table names which should not be backfilled. | string |  |
 | `/advanced/slotName` | Slot Name | The name of the PostgreSQL replication slot to replicate from. | string | `"flow_slot"` |
