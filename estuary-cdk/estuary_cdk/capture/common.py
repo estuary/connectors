@@ -696,6 +696,19 @@ def _get_min_incremental_cursor(state: ResourceState) -> datetime | None:
     return None
 
 
+BACKFILL_SIGNAL_CURSOR_REWIND = timedelta(minutes=1)
+"""How far before its cutoff a scheduled backfill that sends backfill signals moves
+the incremental cursors.
+
+A scheduled backfill keeps its incremental cursors, and skips records modified at or
+after its cutoff since the incremental streams capture those. But the incremental
+streams may have captured some of them before the BackfillBegin, and the
+BackfillComplete deletes every row that isn't captured again after it. Moving the
+cursors back to just before the cutoff makes the incremental streams capture them
+again. It's the same overlap as starting a new binding's incremental cursor at
+`cutoff - 1s`, with a minute to cover APIs that filter at minute precision."""
+
+
 def _coverages_that_emit_backfill_signals(
     open: request.Open[Any, _ResourceConfig, _ConnectorState],
     resolved_bindings: list[
@@ -754,6 +767,15 @@ def _has_pending_backfill(state: ResourceState) -> bool:
     if isinstance(state.backfill, dict):
         return any(state.backfill.values())
     return state.backfill is not None
+
+
+def _rewind_incremental_cursors(state: ResourceState, cursor: datetime) -> None:
+    """Moves every datetime incremental cursor back to `cursor`, for a scheduled
+    backfill that sends backfill signals. See BACKFILL_SIGNAL_CURSOR_REWIND for why."""
+    incrementals = state.inc.values() if isinstance(state.inc, dict) else [state.inc]
+    for inc in incrementals:
+        if isinstance(inc, ResourceState.Incremental) and isinstance(inc.cursor, datetime):
+            inc.cursor = cursor
 
 
 async def _send_backfill_complete(
@@ -903,11 +925,10 @@ def open(
                     ):
                         state.backfill = initial_backfill_state.model_copy(deep=True)
                         state.backfill.cutoff = min_cursor
-                        # The backfill skips records at or after its cutoff, and the
-                        # incremental tasks keep cursors that already passed those.
-                        # Nothing would capture them again after a BackfillBegin, so
-                        # this backfill doesn't send signals.
-                        should_emit_backfill_signals = False
+                        if should_emit_backfill_signals:
+                            _rewind_incremental_cursors(
+                                state, min_cursor - BACKFILL_SIGNAL_CURSOR_REWIND
+                            )
                     # In all other cases, wipe the state back to the initial state.
                     else:
                         state = resource.initial_state.model_copy(deep=True)
