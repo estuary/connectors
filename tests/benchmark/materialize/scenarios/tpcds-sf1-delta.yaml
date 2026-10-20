@@ -1,0 +1,7 @@
+# tpcds-sf1.yaml as delta updates: no loads, and commits append rather than
+# merge, so the run measures the connector's store path more than the
+# destination's merge.
+tpcds:
+  scale: 1
+  transaction_size: 1GB
+  resource: { delta_updates: true }
