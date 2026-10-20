@@ -1,6 +1,5 @@
-# Spark 3.5.6 + Iceberg 1.10: the pairing shipped by EMR release emr-7.12.0,
-# with the latest Iceberg 1.10 patch release.
-FROM apache/spark:3.5.6-python3
+# Spark 3.5.3 + Iceberg 1.7.1: the pairing shipped by EMR release emr-7.7.0.
+FROM apache/spark:3.5.3-python3
 
 # The PySpark scripts use boto3 for reading job inputs and writing status
 # files to S3. The base image only has the Spark Python bindings.
@@ -17,7 +16,7 @@ USER spark
 RUN echo "pass" > /tmp/warmup.py && \
     /opt/spark/bin/spark-submit \
         --master "local[1]" \
-        --packages "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.2,org.apache.iceberg:iceberg-aws-bundle:1.10.2,org.apache.hadoop:hadoop-aws:3.3.4" \
+        --packages "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.7.1,org.apache.iceberg:iceberg-aws-bundle:1.7.1,org.apache.hadoop:hadoop-aws:3.3.4" \
         --conf "spark.jars.ivy=/opt/jars-cache" \
         /tmp/warmup.py && \
     rm /tmp/warmup.py

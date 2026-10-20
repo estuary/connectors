@@ -23,10 +23,12 @@ import (
 )
 
 // TestMergeOnRead runs the connector's merge and load queries against a table
-// whose write modes are merge-on-read, on both Spark sets of the compose
-// stack. Each table is created by the connector, so it carries the keys as
-// identifier fields, and the Spark 4 set's table is format v3 because its
-// document column is a variant.
+// whose write modes are merge-on-read, on the Spark 4 set of the compose stack.
+// Merge-on-read needs Iceberg 1.10 or later, because earlier releases fail
+// every merge into a merge-on-read table with identifier fields. Each table is
+// created by the connector, so it carries the keys as identifier fields. The
+// table is format v3 when its document column is a variant, and format v2
+// otherwise.
 //
 // What it pins:
 //
@@ -44,35 +46,28 @@ func TestMergeOnRead(t *testing.T) {
 
 	ensureDockerUp(t)
 
-	for name, configPath := range localConfigTemplates {
-		name := strings.TrimSuffix(strings.TrimPrefix(path.Base(name), "config."), ".yaml")
-		t.Run(name, func(t *testing.T) {
-			raw, err := boilerplate.ReadConfigFile(configPath)
-			require.NoError(t, err)
-			var cfg config
-			require.NoError(t, json.Unmarshal(raw, &cfg))
+	raw, err := boilerplate.ReadConfigFile(localConfigTemplates["testdata/config.rest-local-spark4.yaml"])
+	require.NoError(t, err)
+	var cfg config
+	require.NoError(t, json.Unmarshal(raw, &cfg))
+	require.Contains(t, strings.Split(cfg.Advanced.FeatureFlags, ","), "variant_columns")
 
-			t.Run("as-created", func(t *testing.T) { runMergeOnRead(t, cfg, false) })
-			t.Run("upgraded-v3", func(t *testing.T) { runMergeOnRead(t, cfg, true) })
-		})
-	}
+	t.Run("v3", func(t *testing.T) { runMergeOnRead(t, cfg, 3) })
+
+	v2 := cfg
+	v2.Advanced.FeatureFlags = strings.Replace(cfg.Advanced.FeatureFlags, "variant_columns", "no_variant_columns", 1)
+	t.Run("v2", func(t *testing.T) { runMergeOnRead(t, v2, 2) })
 }
 
-func runMergeOnRead(t *testing.T, cfg config, upgradeToV3 bool) {
+func runMergeOnRead(t *testing.T, cfg config, wantFormatVersion int) {
 	h := newMORHarness(t, cfg)
 	mb, tablePath := h.createTable(fmt.Sprintf("mor_flow_test_%d", time.Now().UnixNano()))
 	table := morFQN(tablePath)
 
 	h.exec(fmt.Sprintf("ALTER TABLE %s SET TBLPROPERTIES ('write.merge.mode'='merge-on-read', 'write.update.mode'='merge-on-read', 'write.delete.mode'='merge-on-read')", table))
-	if upgradeToV3 {
-		h.exec(fmt.Sprintf("ALTER TABLE %s SET TBLPROPERTIES ('format-version'='3')", table))
-	}
 
 	formatVersion := h.formatVersion(tablePath)
-	t.Logf("format version %d", formatVersion)
-	if upgradeToV3 {
-		require.Equal(t, 3, formatVersion)
-	}
+	require.Equal(t, wantFormatVersion, formatVersion)
 
 	// want is the live table contents by id, kept in step with each merge.
 	want := map[string]int64{}
