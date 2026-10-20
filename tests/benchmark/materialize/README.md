@@ -85,9 +85,10 @@ docker build --platform linux/amd64 -t ghcr.io/estuary/source-tpc-ds:local -f so
 TPCDS_IMAGE=ghcr.io/estuary/source-tpc-ds:local ./tests/benchmark/materialize/run.sh ...
 ```
 
-A live capture shares the machine with the materialization and produces
-about 40 MB/s on an M-series Mac (the image runs emulated), so a fast
-connector can end up measuring the capture. Pass `--tpcds-cache DIR` to
+A live capture produces about 45 MB/s, bounded by the capture preview's
+single busy flowctl thread on an M-series Mac and a c3-standard-22 VM alike,
+and shares the machine with the materialization, so a fast connector can end
+up measuring the capture. Pass `--tpcds-cache DIR` to
 generate the fixture into `DIR` before the preview starts and replay it from
 disk; later runs of the same workload and image reuse the file, so every
 connector sees the same transactions. It needs the dataset's size in free disk.
