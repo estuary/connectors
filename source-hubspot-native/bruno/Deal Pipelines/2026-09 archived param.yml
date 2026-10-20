@@ -1,0 +1,97 @@
+info:
+  name: 2026-09 archived param
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/pipelines/2026-09/deals?archived=true"
+  params:
+    - name: archived
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - param ignored, non-archived pipeline returned (projection - ids and archived only)
+    request:
+      url: "{{base_url}}/crm/pipelines/2026-09/deals?archived=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "id": "default",
+                "archived": false,
+                "stages": [
+                  {
+                    "id": "appointmentscheduled",
+                    "archived": false
+                  },
+                  {
+                    "id": "qualifiedtobuy",
+                    "archived": false
+                  },
+                  {
+                    "id": "presentationscheduled",
+                    "archived": false
+                  },
+                  {
+                    "id": "decisionmakerboughtin",
+                    "archived": false
+                  },
+                  {
+                    "id": "contractsent",
+                    "archived": false
+                  },
+                  {
+                    "id": "closedwon",
+                    "archived": false
+                  },
+                  {
+                    "id": "closedlost",
+                    "archived": false
+                  }
+                ]
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all pipelines (2026-09)](https://developers.hubspot.com/docs/api-reference/latest/crm/pipelines/get-pipelines)
+
+  **WHY:** silent-data-loss audit of the new call. The 2026-09 list endpoint documents
+  no query parameters, but other HubSpot CRM list endpoints accept `archived=true`.
+  This shows whether archived pipelines are reachable at all, and so whether the
+  migrated binding can match `Deal Pipelines / v1 include deleted`.
+
+  **DOCUMENTED (2026-10-19):** the endpoint lists only the `objectType` path
+  parameter.
+
+  **VERIFIED (2026-10-19):** `archived=true` is silently **ignored**. The response is
+  `200` with the same non-archived pipeline (`archived: false`) as
+  `Deal Pipelines / 2026-09 bare`, not an empty list or only archived items. The
+  migrated binding therefore has no way to ask for archived pipelines, and sends no
+  parameters.
+
+  **UNOBSERVABLE:** whether archived pipelines would ever appear in the default
+  response. That would require archiving a pipeline in the test account. Search
+  snippets of a 2022 HubSpot changelog post say the v3 `archived` parameter was sunset
+  and archived pipelines are no longer returned. That post now returns 404, so this is
+  unconfirmed. The old V1 call excluded deleted pipelines by default, so either way
+  there is no regression. If archived pipelines did appear, the snapshot would carry
+  them with `archived: true`.

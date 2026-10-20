@@ -1,0 +1,58 @@
+info:
+  name: limit 1001 probe
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/email/public/v1/events?endTimestamp=1792454399999&limit=1001"
+  params:
+    - name: endTimestamp
+      value: "1792454399999"
+      type: query
+    - name: limit
+      value: "1001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - limit 1001 accepted, empty list"
+    request:
+      url: "{{base_url}}/email/public/v1/events?endTimestamp=1792454399999&limit=1001"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "hasMore": false,
+            "offset": "CgoY__________9_",
+            "events": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get email events (v1, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/reporting/email-analytics/events/get-email-public-v1-events)
+
+  **WHY:** every email-events call the connector makes uses `limit=1000`, the
+  documented maximum. One past it shows how HubSpot enforces the maximum: by rejecting
+  the request or by clamping it.
+
+  **VERIFIED (2026-10-20):** `limit=1001` is **accepted**: `200` with the same empty
+  envelope (and the same end-of-stream `offset`) as `Email Events / backfill page bare`,
+  not a `400`.
+
+  **UNOBSERVABLE:** whether HubSpot clamps to 1000, serves 1001, or truncates without
+  setting `hasMore`. The account has no email events, and producing over 1000 means
+  bulk email sends. The connector never sends more than 1000 and pages on
+  `hasMore`/`offset`, so a clamp or a 1001-item page are equally safe for it.

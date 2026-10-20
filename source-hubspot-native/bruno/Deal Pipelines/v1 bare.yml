@@ -1,0 +1,162 @@
+info:
+  name: v1 bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/crm-pipelines/v1/pipelines/deals"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - one default pipeline, 7 stages
+    request:
+      url: "{{base_url}}/crm-pipelines/v1/pipelines/deals"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "label": " Sample Pipeline",
+                "displayOrder": 0,
+                "active": true,
+                "stages": [
+                  {
+                    "label": "Appointment Scheduled",
+                    "displayOrder": 0,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.2"
+                    },
+                    "stageId": "appointmentscheduled",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  },
+                  {
+                    "label": "Qualified To Buy",
+                    "displayOrder": 1,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.4"
+                    },
+                    "stageId": "qualifiedtobuy",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  },
+                  {
+                    "label": "Decision Maker Bought-In",
+                    "displayOrder": 3,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.8"
+                    },
+                    "stageId": "decisionmakerboughtin",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  },
+                  {
+                    "label": "Contract Sent",
+                    "displayOrder": 4,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.9"
+                    },
+                    "stageId": "contractsent",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  },
+                  {
+                    "label": "Closed Lost",
+                    "displayOrder": 6,
+                    "metadata": {
+                      "isClosed": "true",
+                      "probability": "0.0"
+                    },
+                    "stageId": "closedlost",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  },
+                  {
+                    "label": "Closed Won",
+                    "displayOrder": 5,
+                    "metadata": {
+                      "isClosed": "true",
+                      "probability": "1.0"
+                    },
+                    "stageId": "closedwon",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  },
+                  {
+                    "label": "Presentation Scheduled",
+                    "displayOrder": 2,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.6"
+                    },
+                    "stageId": "presentationscheduled",
+                    "createdAt": 1743685132529,
+                    "updatedAt": 1743685150749,
+                    "active": true
+                  }
+                ],
+                "objectType": "DEAL",
+                "objectTypeId": "0-3",
+                "pipelineId": "default",
+                "createdAt": 0,
+                "updatedAt": "REDACTED",
+                "default": true
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Get pipelines (v1, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/pipelines/v1/get-pipelines)
+
+  **WHY:** the exact call the `deal_pipelines` binding made before the 2026-09
+  migration (no query params). It is the "before" side of the document-shape diff
+  against `Deal Pipelines / 2026-09 bare`.
+
+  **VERIFIED (2026-10-19):** `{"results": [...]}` with one pipeline (`pipelineId:
+  "default"`, `default: true`, `objectType: "DEAL"`, `objectTypeId: "0-3"`,
+  `active: true`) and 7 stages. Pipeline `createdAt` is the epoch-ms integer `0`, which
+  the connector's `DealPipeline` model turns into `1970-01-01T00:00:00Z`. Stage
+  `createdAt`/`updatedAt` are epoch-ms integers that pass through untouched. Stages
+  are **not** in `displayOrder` order (`closedlost` at 6 comes before `closedwon` at 5,
+  and `presentationscheduled` at 2 comes last).
+
+  **LIMITATION (DOCUMENTED 2026-10-19):** Pipelines API V1 is sunset. The V1 reference
+  page says November 2, 2026; the
+  [changelog](https://developers.hubspot.com/changelog/pipelines-api-v1-sunset) says
+  December 4, 2026. This request exists only as the "before" record.
+
+  **VERIFIED (2026-10-20):** the response carries no `Sunset`, `Deprecation` or
+  `Warning` header, so the API itself doesn't announce a date. The only HubSpot headers
+  are `x-hubspot-correlation-id` and the `x-hubspot-ratelimit-*` set.
+
+  **DOCUMENTED (2026-10-20):** December 4 is the authoritative date. It comes from
+  HubSpot's dedicated changelog post (published 2026-08-14; RSS `pubDate` Fri, 14 Aug
+  2026 14:37:13 GMT), which has no edit notes. November 2 appears only on the V1
+  reference page and in a third-party article published 2026-07-27, before that
+  changelog post. It looks like an earlier date that was pushed back without the
+  reference page's banner being updated.

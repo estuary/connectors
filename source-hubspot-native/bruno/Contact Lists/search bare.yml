@@ -1,0 +1,99 @@
+info:
+  name: search bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/lists/search"
+  body:
+    type: json
+    data: |-
+      {
+        "count": 500,
+        "offset": 0,
+        "sort": "HS_LIST_ID",
+        "additionalProperties": ["hs_lastmodifieddate"]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain a contact list id (objectTypeId "0-1", the only lists the connector
+        // keeps) into the membership requests in this folder. Prefer the contact
+        // list with the most members, so the join-order probe sees several
+        // membershipTimestamps. Runtime var only.
+        const lists = (res.getBody()?.lists || []).filter((l) => l.objectTypeId === '0-1');
+        const size = (l) => Number(l.additionalProperties?.hs_list_size ?? 0);
+        lists.sort((a, b) => size(b) - size(a));
+        if (res.getStatus() === 200 && lists.length) {
+          bru.setVar('contact_list_id', String(lists[0].listId));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - no lists, total 0"
+    request:
+      url: "{{base_url}}/crm/v3/lists/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "offset": 0,
+            "hasMore": false,
+            "lists": [],
+            "total": 0
+          }
+
+docs: |-
+  **REFERENCE:** [Search lists (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/lists/search-lists)
+
+  **WHY:** the call `_request_list_page` (`api/contact_lists.py`) makes, with
+  `count=500`, `offset` taken from the previous page, and `sort: "HS_LIST_ID"`. The
+  `contact_lists` binding requests every list property in `additionalProperties`. The
+  `contact_list_memberships` binding and both discovery access checks request only
+  `hs_lastmodifieddate`, as here. The connector keeps lists whose `objectTypeId` is
+  `"0-1"` (contacts) and uses `hs_lastmodifieddate` as their cursor. The memberships
+  backfill checkpoints the last `listId` it finished and relies on ascending `listId`
+  order. The after-response script chains a contact list id into
+  `Contact Lists / join-order bare`.
+
+  **DOCUMENTED (2026-10-20):**
+  - `count`: "Defaults to `20` if no value is provided. The max `count` is `500`."
+  - `query`: "If no `query` is provided, then the results will include all lists."
+  - `processingTypes`: "If not specified, all lists with all processing types will be
+    included." So there is no default partition to audit.
+  - `additionalProperties`: "Properties that do not exist or that are empty for a
+    particular list are not included in the response."
+  - `sort`: "Sort field and order". No values are listed.
+
+  **VERIFIED (2026-10-20):** `200`,
+  `{"offset": 0, "hasMore": false, "lists": [], "total": 0}`. `sort: "HS_LIST_ID"` is
+  accepted. The test account has no lists of any object type or processing type, which
+  matches the capture snapshot having no `contact_lists` or `contact_list_memberships`
+  documents.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** a list whose `hs_lastmodifieddate` is empty
+  has no such key in `additionalProperties`. `ContactList.get_cursor_value` falls back
+  to `updatedAt`, but `fetch_contact_lists` reads
+  `additionalProperties["hs_lastmodifieddate"]` directly and would raise `KeyError`.
+
+  **UNOBSERVABLE:** the per-list shape, whether `HS_LIST_ID` sorts ascending, and
+  whether `hs_lastmodifieddate` is ever missing. The account has no lists, and this
+  collection creates none. If the sort weren't ascending, the memberships backfill
+  (which picks the first list with `listId` greater than its checkpoint) could skip
+  lists. Fallback: re-run on an account that has at least two contact lists.

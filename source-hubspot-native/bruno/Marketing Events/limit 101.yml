@@ -1,0 +1,57 @@
+info:
+  name: limit 101
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/marketing-events?limit=101"
+  params:
+    - name: limit
+      value: "101"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - limit 101 rejected"
+    request:
+      url: "{{base_url}}/marketing/v3/marketing-events?limit=101"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "Limit should be in range from 1 to 100",
+            "correlationId": "01a15b8b-c700-7037-85a2-f5e2e5bfb536",
+            "category": "VALIDATION_ERROR",
+            "subCategory": "PagingErrors.INVALID_LIMIT"
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all events (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/get-marketing-events)
+
+  **WHY:** `+1` probe on `PAGE_SIZE = 100`. The reference page gives only the default
+  (10), not a maximum (DOCUMENTED 2026-10-20), so this finds the ceiling and how it is
+  enforced.
+
+  **VERIFIED (2026-10-20):** `400`, `category: "VALIDATION_ERROR"`,
+  `subCategory: "PagingErrors.INVALID_LIMIT"`, "Limit should be in range from 1 to 100".
+  The request is **rejected**, not clamped.
+
+  **LIMITATION (VERIFIED 2026-10-20):** `limit` is capped at 100 and anything above is a
+  hard 400. The connector's `PAGE_SIZE = 100` is exactly at the ceiling. It is shared
+  with the participations call (`Marketing Events / participations limit 101`), and
+  raising it would fail every marketing-events request.

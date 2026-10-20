@@ -1,0 +1,76 @@
+info:
+  name: batch read 101 inputs probe
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/batch/read"
+  body:
+    type: json
+    data: |-
+      {
+        "inputs": [
+          {"id": "72810357568"}, {"id": "72811506244"}, {"id": "225877317544"}, {"id": "1"}, {"id": "2"}, {"id": "3"},
+          {"id": "4"}, {"id": "5"}, {"id": "6"}, {"id": "7"}, {"id": "8"}, {"id": "9"},
+          {"id": "10"}, {"id": "11"}, {"id": "12"}, {"id": "13"}, {"id": "14"}, {"id": "15"},
+          {"id": "16"}, {"id": "17"}, {"id": "18"}, {"id": "19"}, {"id": "20"}, {"id": "21"},
+          {"id": "22"}, {"id": "23"}, {"id": "24"}, {"id": "25"}, {"id": "26"}, {"id": "27"},
+          {"id": "28"}, {"id": "29"}, {"id": "30"}, {"id": "31"}, {"id": "32"}, {"id": "33"},
+          {"id": "34"}, {"id": "35"}, {"id": "36"}, {"id": "37"}, {"id": "38"}, {"id": "39"},
+          {"id": "40"}, {"id": "41"}, {"id": "42"}, {"id": "43"}, {"id": "44"}, {"id": "45"},
+          {"id": "46"}, {"id": "47"}, {"id": "48"}, {"id": "49"}, {"id": "50"}, {"id": "51"},
+          {"id": "52"}, {"id": "53"}, {"id": "54"}, {"id": "55"}, {"id": "56"}, {"id": "57"},
+          {"id": "58"}, {"id": "59"}, {"id": "60"}, {"id": "61"}, {"id": "62"}, {"id": "63"},
+          {"id": "64"}, {"id": "65"}, {"id": "66"}, {"id": "67"}, {"id": "68"}, {"id": "69"},
+          {"id": "70"}, {"id": "71"}, {"id": "72"}, {"id": "73"}, {"id": "74"}, {"id": "75"},
+          {"id": "76"}, {"id": "77"}, {"id": "78"}, {"id": "79"}, {"id": "80"}, {"id": "81"},
+          {"id": "82"}, {"id": "83"}, {"id": "84"}, {"id": "85"}, {"id": "86"}, {"id": "87"},
+          {"id": "88"}, {"id": "89"}, {"id": "90"}, {"id": "91"}, {"id": "92"}, {"id": "93"},
+          {"id": "94"}, {"id": "95"}, {"id": "96"}, {"id": "97"}, {"id": "98"}
+        ],
+        "properties": ["lastmodifieddate"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - 101 inputs rejected"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/batch/read"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "The maximum number of inputs supported in a batch is 100. Please reduce the number of items and try again",
+            "correlationId": "01a15b8d-98f6-72ea-8760-140cda0cf276",
+            "category": "VALIDATION_ERROR"
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve a batch of contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/batch/get-contacts)
+
+  **WHY:** one past the 100 ids the connector puts in each batch read without history
+  (`itertools.batched` in `_emit_batches`). After the three real contacts, the ids are
+  placeholders `1` to `98`, because only the count matters for the limit.
+
+  **DOCUMENTED (2026-10-20):** "Object API batch endpoints are limited to 100 inputs per
+  request." ([Using object APIs](https://developers.hubspot.com/docs/api-reference/legacy/crm/using-object-apis))
+
+  **LIMITATION (VERIFIED 2026-10-20):** 101 inputs are **rejected** with
+  `400 VALIDATION_ERROR`, "The maximum number of inputs supported in a batch is 100.
+  Please reduce the number of items and try again". Nothing is read, so an oversized
+  batch fails as a whole. The connector's 100 is exactly the maximum.

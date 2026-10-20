@@ -1,0 +1,70 @@
+info:
+  name: unknown form probe
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/form-integrations/v1/submissions/forms/00000000-0000-0000-0000-000000000000?limit=50"
+  params:
+    - name: limit
+      value: "50"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "404 - NO_FORM for an unknown form guid"
+    request:
+      url: "{{base_url}}/form-integrations/v1/submissions/forms/00000000-0000-0000-0000-000000000000?limit=50"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "message": "No form with guid '00000000-0000-0000-0000-000000000000' exists on this portal",
+            "errorType": "NO_FORM",
+            "correlationId": "01a15b8f-b840-77f3-ae38-69bd505bc624"
+          }
+
+docs: |-
+  **REFERENCE:** [Get submissions for a form (v1, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/forms/v1/get-form-integrations-v1-submissions-forms-form_guid)
+
+  **WHY:** the call `_fetch_form_submissions_between` (`api/form_submissions.py`) makes
+  for each form, with the same `limit=50`. The test account has no forms
+  (`Form Submissions / forms list`), so this uses the all-zero GUID. It shows that the
+  endpoint is still live, and what HubSpot returns for a form that doesn't exist. The
+  backfill (`fetch_form_submissions_page`) treats a `404` here as "form deleted since
+  it was listed" and skips the form.
+
+  **DOCUMENTED (2026-10-20):** `limit` "Defaults to 20, supports a maximum of 50."
+  `after` gets the next page. "Submissions will be returned in reverse-chronological
+  order." There is no sunset notice.
+
+  **VERIFIED (2026-10-20):** live, and a missing form is a **`404`**:
+  `{"message": "No form with guid '00000000-0000-0000-0000-000000000000' exists on this
+  portal", "errorType": "NO_FORM", ...}`. That is the status the backfill's skip
+  handles.
+
+  **LIMITATION (VERIFIED 2026-10-20):** a form deleted between `fetch_forms` and its
+  submissions read returns `404 NO_FORM`. The backfill skips it, but the incremental
+  sweep (`fetch_form_submissions`) has no such handling. There the `404` surfaces as an
+  `HTTPError` and fails the capture task. It recovers on restart, because the
+  deleted form is no longer listed.
+
+  **UNOBSERVABLE:** how `limit=51` is enforced, the reverse-chronological order the
+  connector's early stop relies on, and `after` paging. All of them need a form with
+  submissions, and creating a form and submitting it are mutations. The connector
+  relies on the documented order. If the order were wrong, the early stop at the first
+  submission at or before `since` could skip newer ones.

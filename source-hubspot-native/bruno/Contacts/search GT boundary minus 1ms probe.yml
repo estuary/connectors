@@ -1,0 +1,94 @@
+info:
+  name: search GT boundary minus 1ms probe
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/objects/2026-03/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filterGroups": [
+          {
+            "filters": [
+              {
+                "propertyName": "lastmodifieddate",
+                "operator": "GT",
+                "value": "{{pin_contact_lastmodifieddate_minus_1ms}}"
+              }
+            ]
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Set by `Contacts / search lastmodifieddate replacement`. The fallback is
+        // that request's newest contact as of 2026-10-20, for out-of-order runs.
+        if (!bru.getVar('pin_contact_lastmodifieddate')) {
+          bru.setVar('pin_contact_id', '225877317544');
+          bru.setVar('pin_contact_lastmodifieddate', '2026-06-03T01:33:01.284Z');
+        }
+        const pinned = new Date(bru.getVar('pin_contact_lastmodifieddate'));
+        bru.setVar(
+          'pin_contact_lastmodifieddate_minus_1ms',
+          new Date(pinned.getTime() - 1).toISOString(),
+        );
+    - type: after-response
+      code: |-
+        const ids = (res.getBody()?.results || []).map((r) => r.id);
+        console.log('PINNED_CONTACT_PRESENT', ids.includes(bru.getVar('pin_contact_id')));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - GT pinned minus 1 ms returns pinned contact (projection - id and lastmodifieddate)"
+    request:
+      url: "{{base_url}}/crm/objects/2026-03/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 1,
+            "results": [
+              {
+                "id": "225877317544",
+                "properties": {
+                  "lastmodifieddate": "2026-06-03T01:33:01.284Z"
+                }
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts (2026-03)](https://developers.hubspot.com/docs/api-reference/2026-03/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** the control for `Contacts / search GT boundary probe`. The same `GT` filter
+  1 ms before the pinned contact's `lastmodifieddate` must return it if HubSpot
+  compares at millisecond resolution. If it doesn't, the exclusion seen in the
+  boundary probe comes from coarser rounding, not from `GT` being exclusive. Run
+  `Contacts / search lastmodifieddate replacement` first in a fresh session; otherwise
+  the before-request script falls back to the contact pinned on 2026-10-20.
+
+  **VERIFIED (2026-10-20):** `GT 2026-06-03T01:33:01.283Z` returns `total: 1`, the
+  pinned contact `225877317544` (`lastmodifieddate` `2026-06-03T01:33:01.284Z`).
+  HubSpot compares `lastmodifieddate` at millisecond resolution, so the exclusion in
+  `Contacts / search GT boundary probe` is `GT` being exclusive, not rounding.

@@ -1,0 +1,75 @@
+info:
+  name: join-order unknown list
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/lists/999999999/memberships/join-order?limit=250"
+  params:
+    - name: limit
+      value: "250"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "404 - unknown list id"
+    request:
+      url: "{{base_url}}/crm/v3/lists/999999999/memberships/join-order?limit=250"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "List does not exist with ID 999999999.",
+            "correlationId": "01a15b8b-e1cd-7133-828f-27c0286e4380",
+            "context": {
+              "listId": [
+                "999999999"
+              ]
+            },
+            "category": "OBJECT_NOT_FOUND",
+            "subCategory": "ListError.LIST_ID_DOES_NOT_EXIST"
+          }
+
+docs: |-
+  **REFERENCE:** [Fetch List Memberships Ordered by Added to List Date (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/lists/memberships/get-memberships-by-added-date)
+
+  **WHY:** two questions the empty test account otherwise leaves open, asked with a list
+  id that doesn't exist (`999999999`).
+  1. Is the token authorized for list memberships at all? With no lists,
+     `check_contact_list_memberships_access` never reaches the memberships endpoint
+     (`GET /crm/v3/lists/{listId}/memberships?limit=1`, documented on the [by-recordId
+     page](https://developers.hubspot.com/docs/api-reference/legacy/crm/lists/memberships/get-memberships-by-id)
+     with the same scopes as this one), so discovery keeps `contact_list_memberships`
+     without proving access.
+  2. What happens when a list disappears between the search and the memberships fetch?
+     The incremental task fetches memberships for every list concurrently, after one
+     search, so a deletion in between is possible.
+
+  **DOCUMENTED (2026-10-20):** the page lists the scopes `crm.lists.read` and
+  `crm.segments.read`. The connector asks for `crm.lists.read` as a required scope.
+
+  **VERIFIED (2026-10-20):** `404`, `category: "OBJECT_NOT_FOUND"`,
+  `subCategory: "ListError.LIST_ID_DOES_NOT_EXIST"`, "List does not exist with ID
+  999999999." It isn't a 403, so the token is authorized for list memberships.
+
+  **LIMITATION (VERIFIED 2026-10-20):** a missing list returns a 404. The CDK raises
+  `HTTPError` on any 4xx without retrying, and `_request_contact_list_memberships`
+  doesn't catch it. So a list deleted after the search fails the whole memberships task:
+  the worker re-raises, and the `TaskGroup` cancels the other workers. Reading the code,
+  the restarted task should search again, no longer see the list, and recover, so the
+  cost is a failed run rather than lost data.

@@ -1,0 +1,72 @@
+info:
+  name: change-log bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/crm-objects/v1/change-log/tickets?timestamp=999"
+  params:
+    - name: timestamp
+      value: "999"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - endpoint live, empty array (account has no tickets)"
+    request:
+      url: "{{base_url}}/crm-objects/v1/change-log/tickets?timestamp=999"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          []
+
+docs: |-
+  **REFERENCE:** [Get a log of changes for tickets (v1, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/tickets/v1/get-crm-objects-v1-changelog-tickets)
+
+  **WHY:** the only call `fetch_recent_tickets` (`api/tickets.py`) makes for the realtime
+  `tickets` subtask. The connector sends `timestamp = since_ms - 1`; here `since` is the
+  connector's `EPOCH_PLUS_ONE_SECOND`, giving `999`. It answers whether this legacy
+  endpoint is still live, and what it returns.
+
+  **DOCUMENTED (2026-10-20):** the reference page lists **no query parameters**, so
+  `timestamp` is undocumented. HubSpot's docs index for the legacy tickets API
+  (https://developers.hubspot.com/docs/_llms/apis/legacy/crm/objects/tickets.md)
+  describes the endpoint: "Returns 1000 (or fewer) changes, starting with the _least
+  recent_ change. Returned changes are limited to the last 24 hours. Changes prior to
+  that period will not be returned." That contradicts the connector's code comment,
+  which says the endpoint "ends at the 1000 most recently modified tickets".
+
+  **VERIFIED (2026-10-20):** live. `200` with the connector's existing scopes. The body
+  is a bare JSON array, `[]`, with no envelope and no paging fields. The account has
+  no tickets (`Tickets / v1 paged population check`).
+
+  **UNOBSERVABLE:** whether `timestamp` is inclusive, whether it bounds the change
+  `timestamp`, and which 1000 changes come back (oldest or newest). All of them need a
+  ticket changed in the last 24 hours, which means editing test-account data. The
+  connector filters `> since` itself, so inclusive or exclusive is equally safe as long
+  as `timestamp` is a lower bound. Oldest-first, as documented, is mostly safe: while
+  the realtime subtask is caught up, its cursor advances only to the newest change it
+  received, so the next poll continues from there. When it is catching up, the
+  window is capped at `MAX_REALTIME_WINDOW` and the cursor jumps to the cap,
+  skipping any changes past the 1000th. If the code comment is right instead (newest
+  1000), any burst of more than 1000 changes would push the cursor past older ones.
+  In both cases the delayed search subtask recovers them `DELAYED_LAG` (1 hour) late.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** at most 1000 changes per call, no paging, and
+  nothing older than 24 hours. The connector makes one call per poll. A realtime
+  cursor more than 24 hours behind gets nothing for that span, and those changes
+  arrive only through the delayed search subtask.

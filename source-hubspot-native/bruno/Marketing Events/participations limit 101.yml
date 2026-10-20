@@ -1,0 +1,68 @@
+info:
+  name: participations limit 101
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/marketing-events/participations/{{marketing_event_id}}/breakdown?limit=101"
+  params:
+    - name: limit
+      value: "101"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // marketing_event_id normally arrives from `Marketing Events / bare`'s
+        // after-response script. Out of order (or in a fresh session), fall back to
+        // the test account's only event, pinned from that request's saved example.
+        if (!bru.getVar('marketing_event_id')) bru.setVar('marketing_event_id', '559722810694');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - limit 101 rejected"
+    request:
+      url: "{{base_url}}/marketing/v3/marketing-events/participations/559722810694/breakdown?limit=101"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "Limit should be in range from 1 to 100",
+            "correlationId": "01a15b8b-d4e5-78cf-b2cd-48ab7b2a3b99",
+            "category": "VALIDATION_ERROR",
+            "subCategory": "PagingErrors.INVALID_LIMIT"
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve participant breakdown by HubSpot ID (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/participant-state/get-breakdown)
+
+  **WHY:** `+1` probe on the shared `PAGE_SIZE = 100`, against the documented maximum of
+  100. `fetch_marketing_event_participants` (`api/marketing_events.py`) makes this call
+  once per event, with the event's `objectId`, `limit=100`, no `state`, and `after` from
+  `paging.next.after`. The before-request script falls back to the test account's only
+  event (`559722810694`) when `marketing_event_id` isn't set. To chain the id instead,
+  run `Marketing Events / bare` first in a fresh session.
+
+  **VERIFIED (2026-10-20):** `400`, `category: "VALIDATION_ERROR"`,
+  `subCategory: "PagingErrors.INVALID_LIMIT"`, "Limit should be in range from 1 to 100":
+  **rejected**, not clamped. This is the same body as `Marketing Events / limit 101`.
+
+  **LIMITATION (VERIFIED 2026-10-20):** `limit` is capped at 100 and anything above is a
+  hard 400, as documented ("the max number is 100", DOCUMENTED 2026-10-20). The
+  connector uses exactly 100.

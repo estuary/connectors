@@ -1,0 +1,128 @@
+info:
+  name: batch read with missing id
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/batch/read"
+  body:
+    type: json
+    data: |-
+      {
+        "inputs": [
+          {"id": "{{crm_pin_id_1}}"},
+          {"id": "{{crm_pin_id_2}}"},
+          {"id": "{{crm_pin_id_3}}"},
+          {"id": "1"}
+        ],
+        "properties": ["createdate", "lastmodifieddate", "email", "firstname", "lastname"]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Set by `_crm-objects / list bare`; fall back to the contacts it listed on
+        // 2026-10-20 when that request hasn't run in this session.
+        const pins = ['72810357568', '72811506244', '225877317544'];
+        pins.forEach((id, i) => {
+          if (!bru.getVar(`crm_pin_id_${i + 1}`)) bru.setVar(`crm_pin_id_${i + 1}`, id);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "207 - 3 found, id 1 OBJECT_NOT_FOUND (projection - ids, timestamps and errors)"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/batch/read"
+      method: POST
+    response:
+      status: 207
+      statusText: 
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "COMPLETE",
+            "startedAt": "2026-10-20T23:02:47.034Z",
+            "completedAt": "2026-10-20T23:02:47.069Z",
+            "results": [
+              {
+                "id": "72811506244",
+                "properties": {
+                  "lastmodifieddate": "2024-10-28T16:40:20.553Z"
+                },
+                "createdAt": "2024-10-28T16:39:01.326Z",
+                "updatedAt": "2024-10-28T16:40:20.553Z",
+                "archived": false
+              },
+              {
+                "id": "72810357568",
+                "properties": {
+                  "lastmodifieddate": "2024-10-28T16:40:17.996Z"
+                },
+                "createdAt": "2024-10-28T16:39:00.846Z",
+                "updatedAt": "2024-10-28T16:40:17.996Z",
+                "archived": false
+              },
+              {
+                "id": "225877317544",
+                "properties": {
+                  "lastmodifieddate": "2026-06-03T01:33:01.284Z"
+                },
+                "createdAt": "2026-06-02T17:19:07.527Z",
+                "updatedAt": "2026-06-03T01:33:01.284Z",
+                "archived": false
+              }
+            ],
+            "errors": [
+              {
+                "status": "error",
+                "category": "OBJECT_NOT_FOUND",
+                "message": "Could not get some CONTACT objects, they may be deleted or not exist. Check that ids are valid.",
+                "context": {
+                  "ids": [
+                    "1"
+                  ]
+                }
+              }
+            ],
+            "numErrors": 1
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve a batch of contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/batch/get-contacts)
+
+  **WHY:** the incremental subtasks re-read every changed id with
+  `POST /crm/v3/objects/{object}/batch/read` (`_fetch_batch` in
+  `api/object_with_associations.py`), 100 ids at a time (50 with history). The body
+  sets `properties` to every property name and adds `propertiesWithHistory` only when
+  history capture is on. A record can be deleted between the search that found it and
+  this read, so the body adds id `1`, which doesn't exist, to the three ids from
+  `_crm-objects / list bare`. Run that request first in a fresh session; otherwise the
+  before-request script falls back to the ids it listed on 2026-10-20.
+
+  **DOCUMENTED (2026-10-20):** `200` on success, or `207` "multiple statuses" with `errors` and
+  `numErrors`. The reference marks `propertiesWithHistory` as required.
+
+  **VERIFIED (2026-10-20):**
+  - `207` with `status: "COMPLETE"`, the three contacts in `results`, and one
+    `errors` entry: `category: "OBJECT_NOT_FOUND"`, `context.ids: ["1"]`,
+    `numErrors: 1`. That is the error shape `BatchResult.Error` in `models.py`
+    accepts, and the CDK raises only on 4xx and 5xx (`estuary_cdk/http.py`), so a
+    vanished record doesn't fail the batch.
+  - Leaving out `propertiesWithHistory` is accepted, even though the reference marks
+    it required. The connector leaves it out whenever history capture is off.
+  - `results` don't follow input order: `72811506244` came back before `72810357568`.
+    The connector looks results up by id, so the order doesn't matter.
+  - Batch-read records carry no `associations`. The connector fetches those separately
+    through the v4 associations API.

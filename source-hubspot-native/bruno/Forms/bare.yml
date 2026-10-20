@@ -1,0 +1,65 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+    - name: formTypes
+      value: all
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - empty, no paging"
+    request:
+      url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get a list of forms (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/forms/get-forms)
+
+  **WHY:** the only call `fetch_forms` (`api/forms.py`) makes; it is also the binding's
+  discovery access check. It sends `limit=500` and `formTypes=all` (the code comment
+  says HubSpot otherwise defaults to `hubspot`), never `archived`, and follows
+  `paging.next.after`. `forms` is a snapshot binding. This answers whether the scope is
+  granted and what the envelope looks like.
+
+  **DOCUMENTED (2026-10-20):** the page lists `after`, `archived` (boolean), `formTypes`
+  (enum `hubspot`, `captured`, `flow`, `blog_comment`, `all`) and `limit`, none with a
+  description or default, and the scope `forms`. The connector asks for `forms` as an
+  optional scope.
+
+  **VERIFIED (2026-10-20):** `200`, `{"results": []}`, with no `total` and no `paging`.
+  The `forms` scope is granted. The account has no forms of any type, which matches the
+  capture snapshot having no `forms` documents.
+
+  **UNOBSERVABLE:** the per-form shape, and what `formTypes` defaults to. Neither
+  fetched page states the listing default. The
+  [guide](https://developers.hubspot.com/docs/api-reference/legacy/marketing/forms/guide)
+  says only that a form's own type "is set to `hubspot` by default" (DOCUMENTED
+  2026-10-20). The account has no forms, and this collection creates none. The connector
+  sends `formTypes=all` explicitly, so it doesn't depend on the default.
