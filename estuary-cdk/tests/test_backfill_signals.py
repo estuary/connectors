@@ -548,15 +548,49 @@ def _resetting_state() -> ResourceState:
 
 
 @pytest.mark.asyncio
-async def test_scheduled_backfill_that_keeps_its_cursors_doesnt_signal():
-    # Its incremental tasks already passed the records at and after the cutoff, and
-    # nothing would capture those again after a BackfillBegin.
+@pytest.mark.parametrize("shape", ["single", "subtasks"])
+async def test_signaling_scheduled_backfill_rewinds_every_incremental_cursor(shape: str):
+    if shape == "single":
+        state = ResourceState(
+            inc=ResourceState.Incremental(cursor=CUTOFF),
+            last_initialized=datetime.now(tz=UTC) - timedelta(days=3),
+        )
+    else:
+        state = _scheduled_state(realtime=CUTOFF + timedelta(hours=12), lookback=CUTOFF)
+
     messages = await _capture(
         _binding(resource_config=_SCHEDULED),
-        _resource(BackfillCoverage.FULL, _backfill_state(), fetch_page=_pages(["a"])),
-        state=_scheduled_state(only=CUTOFF),
+        _resource(BackfillCoverage.FULL, _backfill_state(), fetch_page=_pages([])),
+        state=state,
     )
-    assert _timeline(messages) == ["a"]
+    assert _timeline(messages) == ["begin", "complete"]
+    # The cutoff is the slowest cursor, and every cursor moves back to just before
+    # it, so the incremental tasks recapture what they captured at or after it.
+    initialized = _initialized(messages)
+    assert initialized["backfill"]["cutoff"] == _json_time(CUTOFF)
+    inc = initialized["inc"]
+    cursors = [inc["cursor"]] if "cursor" in inc else [i["cursor"] for i in inc.values()]
+    assert cursors and set(cursors) == {_json_time(CUTOFF - common.BACKFILL_SIGNAL_CURSOR_REWIND)}
+
+
+@pytest.mark.asyncio
+async def test_scheduled_backfill_that_doesnt_signal_keeps_its_cursors():
+    # Answers like a resource whose scheduled backfills refresh only some fields.
+    def coverage(ctx: BackfillContext[ResourceConfig]) -> BackfillCoverage:
+        return BackfillCoverage.PARTIAL if ctx.is_connector_initiated else BackfillCoverage.FULL
+
+    realtime = CUTOFF + timedelta(hours=12)
+    messages = await _capture(
+        _binding(resource_config=_SCHEDULED),
+        _resource(coverage, _backfill_state(), fetch_page=_pages([])),
+        state=_scheduled_state(realtime=realtime, lookback=CUTOFF),
+    )
+    assert _timeline(messages) == []
+    initialized = _initialized(messages)
+    assert {k: v["cursor"] for k, v in initialized["inc"].items()} == {
+        "realtime": _json_time(realtime),
+        "lookback": _json_time(CUTOFF),
+    }
 
 
 @pytest.mark.asyncio
