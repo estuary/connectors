@@ -365,7 +365,8 @@ func (h *partitionHarness) runLoad(query string, lb python.LoadBinding) []string
 	return lines
 }
 
-// load runs the connector's load for the keys and returns n by id.
+// load runs the connector's load for the keys and returns n by id. It fails
+// the test if the load returns any id more than once.
 func (h *partitionHarness) load(mb partitionBinding, ids []string) map[string]int64 {
 	got := map[string]int64{}
 	for _, line := range h.runLoad(h.loadQuery(mb, ids)) {
@@ -377,6 +378,7 @@ func (h *partitionHarness) load(mb partitionBinding, ids []string) map[string]in
 			N  int64  `json:"n"`
 		}
 		require.NoError(h.t, json.Unmarshal([]byte(doc), &parsed), doc)
+		require.NotContains(h.t, got, parsed.ID, "load returned a key twice")
 		got[parsed.ID] = parsed.N
 	}
 	return got
