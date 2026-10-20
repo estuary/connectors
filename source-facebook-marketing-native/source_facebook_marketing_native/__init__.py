@@ -1,37 +1,19 @@
 from logging import Logger
-from typing import Awaitable, Callable, Generic
-from pydantic import Field
+from typing import Awaitable, Callable
 
 from estuary_cdk.capture import (
     BaseCaptureConnector,
-    Request as BaseRequest,
+    Request,
     Task,
     common,
     request,
     response,
 )
 from estuary_cdk.capture.common import ResourceConfig
-from estuary_cdk.flow import (
-    ConnectorSpec,
-    EndpointConfig as EndpointConfigType,
-    ConnectorState as ConnectorStateType,
-    ResourceConfig as ResourceConfigType,
-)
+from estuary_cdk.flow import ConnectorSpec
 
 from .models import EndpointConfig, OAUTH2_SPEC, ConnectorState
 from .resources import all_resources
-
-
-class Validate(request.Validate):
-    lastCapture: dict | None = None  # type: ignore[assignment]
-
-
-class Request(
-    BaseRequest, Generic[EndpointConfigType, ResourceConfigType, ConnectorStateType]
-):
-    validate_: Validate | None = Field(  # type: ignore[override]
-        default=None, alias="validate"
-    )
 
 
 class Connector(
@@ -60,10 +42,10 @@ class Connector(
         )
         return common.discovered(resources)
 
-    async def validate(  # type: ignore[override]
+    async def validate(
         self,
         log: Logger,
-        validate: Validate,
+        validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
