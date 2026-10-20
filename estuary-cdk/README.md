@@ -112,6 +112,13 @@ Snapshot bindings store a digest of the previous snapshot in their state and com
 
 When a snapshot captures fewer documents than the previous run, the CDK emits minimal documents with `_meta/op: "d"` for the missing keys. This deletion inference mechanism enables standard-updates materializations to maintain a complete view of what exists in the source system.
 
+### Backfill Signals
+The backfill signals are the `BackfillBegin` and `BackfillComplete` messages. A backfill sent with them restates its binding, and destinations delete the rows it didn't capture again. A resource declares its backfills' coverage by setting `Resource.backfill_coverage` to a `BackfillCoverage`, or to a function that answers for each backfill, and the CDK sends a backfill as a restatement only when its coverage allows it. The connector also declares two feature flags with `backfill_signal_flag_defaults`. `emit_backfill_signals` turns the signals on, and `ignore_config_for_backfill_signals` also sends them for backfills the configuration bounds.
+
+The CDK sends the signals and keeps them exactly-once across restarts. It never decides a backfill's coverage, and a wrong answer deletes data. Read `capture/backfill_signals.py` before answering anything but `PARTIAL`. `BackfillCoverage` holds the checklist.
+
+`flowctl preview` counts its task as newly created, so `emit_backfill_signals` defaults on there, and a `BackfillBegin` ends a `--sessions 1` preview before it captures any document. A capture test sets the flags it tests in its config's `advanced.feature_flags`, and `no_emit_backfill_signals` otherwise.
+
 ## Why Another Connector Kit?
 
 Good question! Within the Python ecosystem, there are Singer taps, Meltano's singer-sdk, and Airbyte's CDK.
