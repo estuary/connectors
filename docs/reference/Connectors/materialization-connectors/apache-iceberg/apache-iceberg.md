@@ -777,4 +777,20 @@ If you do not use Glue for your catalog or otherwise do not configure automatic 
 you should conduct [regular maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
 for your materialized tables to ensure optimal query performance.
 
+### Merge-on-read
+
+By default, a merge rewrites every data file that holds an updated or deleted row. This is Iceberg's
+copy-on-write mode. When each merge changes a few rows spread across many large files, merge-on-read
+writes far less, because it records the changed rows in small delete files instead.
+
+To use merge-on-read, set the table properties `write.merge.mode`, `write.update.mode` and
+`write.delete.mode` to `merge-on-read`. You can set them in `additional_table_properties` when the
+table is created, or run `ALTER TABLE ... SET TBLPROPERTIES` on an existing table. Merge-on-read
+needs EMR release emr-7.12.0 or emr-spark-8.0.0 or later. Earlier releases bundle an Iceberg version
+that fails every merge into a merge-on-read table.
+
+Each merge adds delete files, and readers, including the connector's own loads, slow down as they
+accumulate. Compact merge-on-read tables regularly so the deletes are applied to the data files, for
+example with Spark's `rewrite_data_files` procedure and its `delete-file-threshold` option.
+
 [spark-job-properties]: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-spark.html#spark-defaults
