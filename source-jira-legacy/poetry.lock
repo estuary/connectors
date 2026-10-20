@@ -230,58 +230,6 @@ frozenlist = ">=1.1.0"
 typing-extensions = {version = ">=4.2", markers = "python_version < \"3.13\""}
 
 [[package]]
-name = "airbyte-cdk"
-version = "0.52.10"
-description = "A framework for writing Airbyte Connectors."
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "airbyte-cdk-0.52.10.tar.gz", hash = "sha256:0daee950fe0d4453e6ceea2633090fc1d2144224e6f170b3c6cb4c6392811b47"},
-    {file = "airbyte_cdk-0.52.10-py3-none-any.whl", hash = "sha256:366fd7bbbba317223edc1571d22b91c6f5bcff4ba65b3131e42f9b37e29932f4"},
-]
-
-[package.dependencies]
-airbyte-protocol-models = "0.4.2"
-backoff = "*"
-cachetools = "*"
-Deprecated = ">=1.2,<2.0"
-dpath = ">=2.0.1,<2.1.0"
-genson = "1.2.2"
-isodate = ">=0.6.1,<0.7.0"
-Jinja2 = ">=3.1.2,<3.2.0"
-jsonref = ">=0.2,<1.0"
-jsonschema = ">=3.2.0,<3.3.0"
-pendulum = "*"
-pydantic = ">=1.10.8,<2.0.0"
-python-dateutil = "*"
-PyYAML = ">=6.0.1"
-requests = "*"
-requests-cache = "*"
-wcmatch = "8.4"
-
-[package.extras]
-dev = ["avro (>=1.11.2,<1.12.0)", "cohere (==4.21)", "fastavro (>=1.8.0,<1.9.0)", "freezegun", "langchain (==0.0.271)", "markdown", "mypy", "openai[embeddings] (==0.27.9)", "pandas (==2.0.3)", "pdf2image (==1.16.3)", "pdfminer.six (==20221105)", "pyarrow (==12.0.1)", "pytesseract (==0.3.10)", "pytest", "pytest-cov", "pytest-httpserver", "pytest-mock", "requests-mock", "tiktoken (==0.4.0)", "unstructured (==0.10.19)", "unstructured.pytesseract (>=0.3.12)", "unstructured[docx,pptx] (==0.10.19)"]
-file-based = ["avro (>=1.11.2,<1.12.0)", "fastavro (>=1.8.0,<1.9.0)", "markdown", "pdf2image (==1.16.3)", "pdfminer.six (==20221105)", "pyarrow (==12.0.1)", "pytesseract (==0.3.10)", "unstructured (==0.10.19)", "unstructured.pytesseract (>=0.3.12)", "unstructured[docx,pptx] (==0.10.19)"]
-sphinx-docs = ["Sphinx (>=4.2,<5.0)", "sphinx-rtd-theme (>=1.0,<2.0)"]
-vector-db-based = ["cohere (==4.21)", "langchain (==0.0.271)", "openai[embeddings] (==0.27.9)", "tiktoken (==0.4.0)"]
-
-[[package]]
-name = "airbyte-protocol-models"
-version = "0.4.2"
-description = "Declares the Airbyte Protocol."
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "airbyte_protocol_models-0.4.2-py3-none-any.whl", hash = "sha256:d3bbb14d4af9483bd7b08f5eb06f87e7113553bf4baed3998af95be873a0d821"},
-    {file = "airbyte_protocol_models-0.4.2.tar.gz", hash = "sha256:67b149d4812f8fdb88396b161274aa73cf0e16f22e35ce44f2bfc4d47e51915c"},
-]
-
-[package.dependencies]
-pydantic = ">=1.9.2,<2.0.0"
-
-[[package]]
 name = "attrs"
 version = "24.2.0"
 description = "Classes Without Boilerplate"
@@ -311,18 +259,6 @@ groups = ["main"]
 files = [
     {file = "backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8"},
     {file = "backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba"},
-]
-
-[[package]]
-name = "bracex"
-version = "2.5"
-description = "Bash style brace expander."
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "bracex-2.5-py3-none-any.whl", hash = "sha256:d2fcf4b606a82ac325471affe1706dd9bbaa3536c91ef86a31f6b766f3dad1d0"},
-    {file = "bracex-2.5.tar.gz", hash = "sha256:0725da5045e8d37ea9592ab3614d8b561e22c3c5fde3964699be672e072ab611"},
 ]
 
 [[package]]
@@ -599,24 +535,6 @@ files = [
 ]
 
 [[package]]
-name = "deprecated"
-version = "1.2.14"
-description = "Python @deprecated decorator to deprecate old python classes, functions or methods."
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
-groups = ["main"]
-files = [
-    {file = "Deprecated-1.2.14-py2.py3-none-any.whl", hash = "sha256:6fac8b097794a90302bdbb17b9b815e732d3c4720583ff1b198499d78470466c"},
-    {file = "Deprecated-1.2.14.tar.gz", hash = "sha256:e5323eb936458dccc2582dc6f9c322c852a775a27065ff2b0c4970b9d53d01b3"},
-]
-
-[package.dependencies]
-wrapt = ">=1.10,<2"
-
-[package.extras]
-dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "sphinx (<2)", "tox"]
-
-[[package]]
 name = "dpath"
 version = "2.0.8"
 description = "Filesystem-like pathing and searching for dictionaries"
@@ -641,19 +559,26 @@ develop = true
 [package.dependencies]
 aiocsv = "^1.3.2"
 aiodns = "^3.1.1"
-aiohttp = "^3.13.3"
-airbyte-cdk = {version = "<=6.56.0", optional = true}
+aiohttp = "^3.14.3"
+backoff = {version = "*", optional = true}
+dpath = {version = ">=2.0.1,<2.1.0", optional = true}
 google-auth = {version = ">=2.40.3", extras = ["requests"]}
 ijson = "^3.3.0"
-orjson = "^3.9.15"
+jsonref = {version = ">=0.2,<1.0", optional = true}
+jsonschema = {version = ">=3.2.0,<3.3.0", optional = true}
+orjson = "^3.11.6"
 pendulum = "<=2.0.0 | >=3.0.0"
 pycron = "^3.1.2"
 pydantic = ">1.10,<3"
+PyYAML = {version = ">=6.0.1", optional = true}
+requests = {version = "*", optional = true}
+requests-cache = {version = "*", optional = true}
 stream-unzip = "0.0.99"
+typing-extensions = "^4.13"
 xxhash = "^3.4.1"
 
 [package.extras]
-airbyte-shim = ["airbyte-cdk (<=6.56.0)"]
+airbyte-shim = ["PyYAML (>=6.0.1)", "backoff", "dpath (>=2.0.1,<2.1.0)", "jsonref (>=0.2,<1.0)", "jsonschema (>=3.2.0,<3.3.0)", "requests", "requests-cache"]
 
 [package.source]
 type = "directory"
@@ -744,17 +669,6 @@ files = [
     {file = "frozenlist-1.4.1-cp39-cp39-win_amd64.whl", hash = "sha256:e6a20a581f9ce92d389a8c7d7c3dd47c81fd5d6e655c8dddf341e14aa48659d0"},
     {file = "frozenlist-1.4.1-py3-none-any.whl", hash = "sha256:04ced3e6a46b4cfffe20f9ae482818e34eba9b5fb0ce4056e4cc9b6e212d09b7"},
     {file = "frozenlist-1.4.1.tar.gz", hash = "sha256:c037a86e8513059a2613aaba4d817bb90b9d9b6b69aace3ce9c877e8c8ed402b"},
-]
-
-[[package]]
-name = "genson"
-version = "1.2.2"
-description = "GenSON is a powerful, user-friendly JSON Schema generator."
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "genson-1.2.2.tar.gz", hash = "sha256:8caf69aa10af7aee0e1a1351d1d06801f4696e005f06cedef438635384346a16"},
 ]
 
 [[package]]
@@ -915,21 +829,6 @@ files = [
     {file = "iniconfig-2.0.0-py3-none-any.whl", hash = "sha256:b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"},
     {file = "iniconfig-2.0.0.tar.gz", hash = "sha256:2d91e135bf72d31a410b17c16da610a82cb55f6b0477d1a902134b24a455b8b3"},
 ]
-
-[[package]]
-name = "isodate"
-version = "0.6.1"
-description = "An ISO 8601 date/time/duration parser and formatter"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "isodate-0.6.1-py2.py3-none-any.whl", hash = "sha256:0751eece944162659049d35f4f549ed815792b38793f07cf73381c1c87cbed96"},
-    {file = "isodate-0.6.1.tar.gz", hash = "sha256:48c5881de7e8b0a0d648cb024c8062dc84e7b840ed81e864c7614fd3c127bde9"},
-]
-
-[package.dependencies]
-six = "*"
 
 [[package]]
 name = "jinja2"
@@ -2275,14 +2174,14 @@ urllib3 = ">=2"
 
 [[package]]
 name = "typing-extensions"
-version = "4.12.2"
-description = "Backported and Experimental Type Hints for Python 3.8+"
+version = "4.16.0"
+description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "typing_extensions-4.12.2-py3-none-any.whl", hash = "sha256:04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"},
-    {file = "typing_extensions-4.12.2.tar.gz", hash = "sha256:1a7ead55c7e559dd4dee8856e3a88b41225abfe1ce8df57b7c13915fe121ffb8"},
+    {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
+    {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
 ]
 
 [[package]]
@@ -2331,27 +2230,12 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 
 [[package]]
-name = "wcmatch"
-version = "8.4"
-description = "Wildcard/glob file name matcher."
-optional = false
-python-versions = ">=3.7"
-groups = ["main"]
-files = [
-    {file = "wcmatch-8.4-py3-none-any.whl", hash = "sha256:dc7351e5a7f8bbf4c6828d51ad20c1770113f5f3fd3dfe2a03cfde2a63f03f98"},
-    {file = "wcmatch-8.4.tar.gz", hash = "sha256:ba4fc5558f8946bf1ffc7034b05b814d825d694112499c86035e0e4d398b6a67"},
-]
-
-[package.dependencies]
-bracex = ">=2.1.1"
-
-[[package]]
 name = "wrapt"
 version = "1.16.0"
 description = "Module for decorators, wrappers and monkey patching."
 optional = false
 python-versions = ">=3.6"
-groups = ["main", "dev"]
+groups = ["dev"]
 files = [
     {file = "wrapt-1.16.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ffa565331890b90056c01db69c0fe634a776f8019c143a5ae265f9c6bc4bd6d4"},
     {file = "wrapt-1.16.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:e4fdb9275308292e880dcbeb12546df7f3e0f96c6b41197e0cf37d2826359020"},
@@ -2665,4 +2549,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "f30446449ee4125b6a1b9b9563d8bd8966e4b325084180c232e7eca37571258c"
+content-hash = "53c4d8842a3444781659feb0fbaa15d9d1b4ff07be5bb222772e2cf78e9f95f4"
