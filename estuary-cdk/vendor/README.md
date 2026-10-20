@@ -42,7 +42,7 @@ roughly a fifth of the distributed package:
 | `sources/utils/schema_models.py` | Unused, and the gnarliest pydantic-v1 code in the package. |
 | `sources/config.py` (`BaseConfig`) | Unused. |
 | `models/well_known_types.py` | Unused protocol primitives. |
-| `Connector`, `AirbyteSpec`, `NoAuth`, `MultipleTokenAuthenticator`, `AlwaysLogSliceLogger`, `LogAppenderMessageRepositoryDecorator`, `ObservedDict`/`ConfigObserver`, `expand_refs`/`rename_key`, `log_by_prefix` | Individually unreferenced. |
+| `Connector`, `AirbyteSpec`, `MultipleTokenAuthenticator`, `AlwaysLogSliceLogger`, `LogAppenderMessageRepositoryDecorator`, `ObservedDict`/`ConfigObserver`, `expand_refs`/`rename_key`, `log_by_prefix` | Individually unreferenced. |
 | `@deprecated` decorators | Warning-only; dropping them removes the `Deprecated` dependency. |
 
 `airbyte_protocol/models/airbyte_protocol.py` is left byte-identical to upstream. It is
@@ -69,13 +69,14 @@ Version constraints in `estuary-cdk/pyproject.toml` are carried over verbatim fr
 `airbyte-cdk` 0.52.10, so vendoring on its own does not change dependency resolution.
 Relaxing them is deliberately a separate step.
 
-### Known hazard, not yet addressed
+### `distutils`
 
-`sources/utils/transform.py` does `from distutils.util import strtobool`. `distutils` was removed
-from the standard library in Python 3.12, and the connector images are built on `python:3.12-slim`;
-this works today only because `setuptools` installs a `distutils` shim. `source-klaviyo` pins
-`setuptools` explicitly for what appears to be this reason. Replacing `strtobool` with a local
-three-line equivalent is the first candidate for the dependency pass.
+Upstream's `sources/utils/transform.py` does `from distutils.util import strtobool`. `distutils`
+was removed from the standard library in Python 3.12 and the images are built on
+`python:3.12-slim`, so this worked only because `jsonschema` 3.2.0 requires `setuptools`, which
+installs a `distutils` shim. Since `streams/core.py` imports that module, losing the shim would
+have broken every shim connector at import time, not just boolean coercion — and relaxing the
+`jsonschema` ceiling would lose it. `strtobool` is now carried in the module itself.
 
 ## Modifying this tree
 
