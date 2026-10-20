@@ -824,13 +824,41 @@ def open(
 
                 # A requested backfill already cleared this state and begins again.
                 if (
-                    state.is_awaiting_backfill_complete
-                    and binding.stateKey not in backfill_requests
-                    and not _has_pending_backfill(state)
-                ):
-                    # The capture crashed after the backfill finished but before it
-                    # sent the BackfillComplete.
-                    await _send_backfill_complete(task, binding, index, state)
+                    state.is_awaiting_backfill_begin or state.is_awaiting_backfill_complete
+                ) and binding.stateKey not in backfill_requests:
+                    coverage = _resolve_backfill_coverage(
+                        binding, resource, state.is_connector_initiated
+                    )
+                    if coverage not in coverages_that_emit_backfill_signals:
+                        # The flags or the answer no longer allow signals for this
+                        # backfill, and its BackfillComplete would delete rows the user
+                        # now means to keep.
+                        task.log.warning(
+                            "binding no longer sends backfill signals, so its backfill won't send them",
+                            {
+                                "resource": ".".join(binding.resourceConfig.path()),
+                                "coverage": coverage,
+                                "coverages_that_emit_backfill_signals": sorted(
+                                    coverages_that_emit_backfill_signals
+                                ),
+                            },
+                        )
+                        state.is_awaiting_backfill_begin = None
+                        state.is_awaiting_backfill_complete = None
+                        await task.checkpoint(
+                            ConnectorState(
+                                bindingStateV1={
+                                    binding.stateKey: ResourceState(
+                                        is_awaiting_backfill_begin=None,
+                                        is_awaiting_backfill_complete=None,
+                                    )
+                                }
+                            )
+                        )
+                    elif state.is_awaiting_backfill_complete and not _has_pending_backfill(state):
+                        # The capture crashed after the backfill finished but before it
+                        # sent the BackfillComplete.
+                        await _send_backfill_complete(task, binding, index, state)
 
                 if not state.backfill and isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
                     cron_schedule = binding.resourceConfig.schedule
@@ -890,6 +918,10 @@ def open(
 
                 state.last_initialized = NOW
 
+                # A coordinated backfill keeps the earlier state, which may still
+                # owe a BackfillComplete for an earlier backfill.
+                if state.is_awaiting_backfill_complete:
+                    state.is_awaiting_backfill_complete = None
                 if should_emit_backfill_signals:
                     # open_binding sends the BackfillBegin, once it has a fetch_page
                     # to run the backfill.
