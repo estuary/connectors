@@ -3,7 +3,6 @@
 #
 
 import logging
-from distutils.util import strtobool
 from enum import Flag, auto
 from typing import Any, Callable, Dict, Mapping, Optional
 
@@ -14,6 +13,22 @@ json_to_python = {**json_to_python_simple, **{"object": dict, "array": list}}
 python_to_json = {v: k for k, v in json_to_python.items()}
 
 logger = logging.getLogger("airbyte")
+
+
+def strtobool(val: str) -> int:
+    """`distutils.util.strtobool`, which left the standard library in Python 3.12.
+
+    Reimplemented here rather than leaning on the `distutils` shim that `setuptools`
+    installs: the images are built on `python:3.12-slim`, and `streams/core.py` imports
+    this module, so losing the shim would break every shim connector at import time.
+    """
+    val = val.lower()
+    if val in ("y", "yes", "t", "true", "on", "1"):
+        return 1
+    elif val in ("n", "no", "f", "false", "off", "0"):
+        return 0
+    else:
+        raise ValueError(f"invalid truth value {val!r}")
 
 
 class TransformConfig(Flag):
