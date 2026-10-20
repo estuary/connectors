@@ -81,7 +81,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 
 	var sockPath = filepath.Join(tmpDir, "rpc.sock")
 	s.cmd = exec.CommandContext(ctx, argv[0], append(argv[1:], "--uds", sockPath)...)
-	s.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL}
+	s.cmd.SysProcAttr = sidecarSysProcAttr()
 	s.cmd.Cancel = func() error { return s.signal(syscall.SIGTERM) }
 	s.cmd.WaitDelay = sidecarStopTimeout
 
