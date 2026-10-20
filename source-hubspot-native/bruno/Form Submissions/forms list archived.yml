@@ -1,0 +1,64 @@
+info:
+  name: forms list archived
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all&archived=true"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+    - name: formTypes
+      value: all
+      type: query
+    - name: archived
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - no archived forms"
+    request:
+      url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all&archived=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get a list of forms (v3)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/forms/get-forms)
+
+  **WHY:** silent-data-loss audit. The connector lists forms without `archived`. If
+  the default leaves archived forms out, their submissions are never fetched by the
+  `form_submissions` binding.
+
+  **DOCUMENTED (2026-10-20):** `archived` is a boolean query parameter. The page states
+  no default.
+
+  **VERIFIED (2026-10-20):** `200`, `{"results": []}`. The account has no archived
+  forms either.
+
+  **UNOBSERVABLE:** whether the default hides archived forms, and whether HubSpot still
+  exports submissions for an archived form. Both need a form archived in the test
+  account, which is a mutation. The v3 companies and deals list pages document
+  `archived` as defaulting to `false` (`Associations / companies ids`,
+  `Deals / population check`), so the assumption is that this one does too. If
+  so, the connector skips submissions of archived forms. The fix would be a second
+  `archived=true` listing when the connector builds its form IDs.

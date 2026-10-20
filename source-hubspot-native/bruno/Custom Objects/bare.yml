@@ -1,0 +1,65 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/schemas"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - no custom object schemas"
+    request:
+      url: "{{base_url}}/crm/v3/schemas"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all custom object schemas](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/schemas/get-schemas)
+
+  **WHY:** `list_custom_objects` (`api/custom_objects.py`) makes this call at the start
+  of every discovery and every run, outside any error handling. Each non-archived
+  schema's `name` becomes a binding, read through the path component `p_{name}`.
+
+  **DOCUMENTED (2026-10-20):** the reference and the [schemas guide](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/schemas/guide) give the path as
+  `/crm-object-schemas/v3/schemas`, not the `/crm/v3/schemas` the connector calls.
+  `results` has no paging. The required scope is any one of
+  `crm.schemas.custom.read`, `crm.objects.custom.read` or their sensitive variants, and
+  custom objects need an Enterprise subscription.
+
+  **VERIFIED (2026-10-20):** `200` with `{"results": []}`. The undocumented
+  `/crm/v3/schemas` path works, the test token can read schemas, and the test account
+  has no custom objects, so discovery adds no custom bindings.
+
+  **LIMITATION (VERIFIED 2026-10-20):** the connector calls `/crm/v3/schemas`, a path HubSpot
+  doesn't document. The documented path answers the same way
+  (`Custom Objects / documented path`), so switching is a drop-in change.
+
+  **UNOBSERVABLE:**
+  - What a real schema looks like, and whether `p_{name}` still addresses a custom
+    object in the properties, objects and search paths. The docs name the
+    `fullyQualifiedName` (`p{Hub_ID}_{object_name}`) or the `objectTypeId` instead.
+    Checking needs an Enterprise account with a custom object, and creating one would
+    change the test account. If `p_{name}` stopped working, those bindings would fail
+    when opened.
+  - What a token without any custom-object scope gets here. Those scopes are optional in
+    `models.py`. If the answer is a `403`, discovery fails as a whole, because this call
+    has no missing-scope handling. The test token holds a scope that works.

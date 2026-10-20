@@ -1,0 +1,144 @@
+info:
+  name: batch read bare
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v4/associations/companies/contacts/batch/read"
+  body:
+    type: json
+    data: |-
+      {
+        "inputs": {{assoc_inputs}}
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Set by `Associations / companies ids`. The fallback is the one company
+        // that request returned on 2026-10-20, for out-of-order runs.
+        if (!bru.getVar('assoc_company_ids')) {
+          bru.setVar('assoc_company_ids', JSON.stringify(['25177527565']));
+        }
+        const ids = JSON.parse(bru.getVar('assoc_company_ids'));
+        bru.setVar('assoc_inputs', JSON.stringify(ids.map((id) => ({ id }))));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - company with two contacts, two association types each"
+    request:
+      url: "{{base_url}}/crm/v4/associations/companies/contacts/batch/read"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "completedAt": "2026-10-20T23:04:39.996Z",
+            "status": "COMPLETE",
+            "startedAt": "2026-10-20T23:04:39.988Z",
+            "results": [
+              {
+                "from": {
+                  "id": "25177527565"
+                },
+                "to": [
+                  {
+                    "toObjectId": 72810357568,
+                    "associationTypes": [
+                      {
+                        "category": "HUBSPOT_DEFINED",
+                        "typeId": 280,
+                        "label": null,
+                        "fromObjectTypeId": null,
+                        "toObjectTypeId": null
+                      },
+                      {
+                        "category": "HUBSPOT_DEFINED",
+                        "typeId": 2,
+                        "label": "Contact with Primary Company",
+                        "fromObjectTypeId": null,
+                        "toObjectTypeId": null
+                      }
+                    ]
+                  },
+                  {
+                    "toObjectId": 72811506244,
+                    "associationTypes": [
+                      {
+                        "category": "HUBSPOT_DEFINED",
+                        "typeId": 280,
+                        "label": null,
+                        "fromObjectTypeId": null,
+                        "toObjectTypeId": null
+                      },
+                      {
+                        "category": "HUBSPOT_DEFINED",
+                        "typeId": 2,
+                        "label": "Contact with Primary Company",
+                        "fromObjectTypeId": null,
+                        "toObjectTypeId": null
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve associations (v4, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/associations/associate-records/batch/get-associations)
+
+  **WHY:** the call `fetch_association` (`api/object_with_associations.py`) makes for each
+  associated entity of a batch of changed records. Here that is companies → contacts,
+  one of `Company.ASSOCIATED_ENTITIES`. It shows the shape the `Association` model
+  parses, which the connector reduces to a list of `toObjectId`s per record. Run
+  `Associations / companies ids` first in a fresh session; otherwise the
+  before-request script falls back to the company pinned on 2026-10-20.
+
+  **DOCUMENTED (2026-10-20):** the body is `{"inputs": [{"id", "after"?}]}`; "The
+  'paging' field will only be present if there are more pages and absent otherwise";
+  responses are `200`, or `207` with an `errors` array. The
+  [current associations guide](https://developers.hubspot.com/docs/api-reference/latest/crm/associations/associate-records/guide)
+  allows "up to 1,000 `id` values" per batch read. The connector sends at most 100 (50
+  with history). HubSpot's
+  [v4 changelog](https://developers.hubspot.com/changelog/deprecating-support-for-hubspot-v4-apis)
+  says: "If your app or integration currently uses v4 APIs (e.g., /crm/v4/), you
+  should plan to migrate to the latest date-based versioned API before March 30,
+  2027." It adds: "Unsupported versions may continue to function for some period of
+  time, but they are not guaranteed to remain stable or available." and "The current
+  recommended target is API version 2026-09." The guide names that path as
+  `/crm/associations/2026-09/{fromObjectType}/{toObjectType}/batch/read`.
+
+  **VERIFIED (2026-10-20):** `200`, `status: "COMPLETE"`. Company `25177527565` has
+  contacts `72810357568` and `72811506244`. Each `to` entry carries two
+  `associationTypes`: `HUBSPOT_DEFINED` typeId `280` (label `null`) and typeId `2`
+  ("Contact with Primary Company"). Each type also carries `fromObjectTypeId` and
+  `toObjectTypeId` (both `null`). The `Association.Type` model doesn't declare them,
+  but it allows extra fields, and the connector discards types anyway. `from.id` is a
+  string; `toObjectId` is an integer. There is no `paging`.
+
+  **UNOBSERVABLE:** per-record paging of associations. The connector ignores `paging`
+  (a comment in `models.py` says extra pages are deliberately ignored), so a record
+  with more associations than one page holds would lose the rest silently. HubSpot
+  doesn't document the page size, and the busiest record in the test account has 2
+  associations. The assumption is that the page is large enough for real accounts.
+  The fix, if it isn't, is to re-send each paged input with its `after`.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** v4 goes unsupported on March 30, 2027, when
+  it may degrade or disappear. The connector needs to move to
+  `/crm/associations/2026-09/.../batch/read` before then. The date-versioned path is
+  not probed in this collection.

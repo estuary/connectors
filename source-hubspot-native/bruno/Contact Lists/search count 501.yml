@@ -1,0 +1,60 @@
+info:
+  name: search count 501
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/lists/search"
+  body:
+    type: json
+    data: |-
+      {
+        "count": 501,
+        "offset": 0,
+        "sort": "HS_LIST_ID",
+        "additionalProperties": ["hs_lastmodifieddate"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - count 501 accepted (empty account, clamp unobservable)"
+    request:
+      url: "{{base_url}}/crm/v3/lists/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "offset": 0,
+            "hasMore": false,
+            "lists": [],
+            "total": 0
+          }
+
+docs: |-
+  **REFERENCE:** [Search lists (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/lists/search-lists)
+
+  **WHY:** `+1` probe on the connector's `count=500`, the documented maximum ("The max
+  `count` is `500`.", DOCUMENTED 2026-10-20). Otherwise identical to
+  `Contact Lists / search bare`.
+
+  **VERIFIED (2026-10-20):** `200`,
+  `{"offset": 0, "hasMore": false, "lists": [], "total": 0}`. `count=501` is **not
+  rejected**, despite the documented maximum.
+
+  **UNOBSERVABLE:** whether 501 is served in full or clamped to 500. Telling them apart
+  needs more than 500 lists, and the account has none. Either way the connector loses
+  nothing: it pages on `hasMore` and the returned `offset`, never on page length.

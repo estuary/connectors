@@ -1,0 +1,117 @@
+info:
+  name: list bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/objects/contacts?limit=100&properties=createdate,lastmodifieddate,hs_lastmodifieddate,email,firstname,lastname,hs_object_id&associations=companies"
+  params:
+    - name: limit
+      value: "100"
+      type: query
+    - name: properties
+      value: createdate,lastmodifieddate,hs_lastmodifieddate,email,firstname,lastname,hs_object_id
+      type: query
+    - name: associations
+      value: companies
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin the first three contact ids for `_crm-objects / batch read with missing id`.
+        const ids = (res.getBody()?.results || []).map((r) => String(r.id));
+        ids.slice(0, 3).forEach((id, i) => bru.setVar(`crm_pin_id_${i + 1}`, id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - 3 contacts in id order, no paging (projection - first of 3 results)"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts?limit=100&properties=createdate,lastmodifieddate,hs_lastmodifieddate,email,firstname,lastname,hs_object_id&associations=companies"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "id": "72810357568",
+                "properties": {
+                  "createdate": "2024-10-28T16:39:00.846Z",
+                  "email": "emailmaria@hubspot.com",
+                  "firstname": "Maria",
+                  "hs_lastmodifieddate": null,
+                  "hs_object_id": "72810357568",
+                  "lastmodifieddate": "2024-10-28T16:40:17.996Z",
+                  "lastname": "Johnson (Sample Contact)"
+                },
+                "createdAt": "2024-10-28T16:39:00.846Z",
+                "updatedAt": "2024-10-28T16:40:17.996Z",
+                "archived": false,
+                "url": "REDACTED",
+                "associations": {
+                  "companies": {
+                    "results": [
+                      {
+                        "id": "25177527565",
+                        "type": "contact_to_company"
+                      },
+                      {
+                        "id": "25177527565",
+                        "type": "contact_to_company_unlabeled"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/get-contacts)
+
+  **WHY:** the backfill call `fetch_page_with_associations`
+  (`api/object_with_associations.py`) makes for every CRM object binding, standard and
+  custom: `GET /crm/v3/objects/{object}` with `limit=100` (50 with
+  `capturePropertyHistory`), `properties` (every name from `Properties / bare`, one
+  request per ≤5 KiB chunk), `associations` (the entities the v4 probe found readable)
+  and `after`. This folder uses `contacts` for every shared probe because the test
+  account has three contacts and no products, line items or custom objects. The probe
+  asks for seven properties instead of all 403 to keep the URL readable. It answers what
+  a page and a record look like and how paging ends. Its after-response script pins the
+  three ids for `_crm-objects / batch read with missing id`.
+
+  **DOCUMENTED (2026-10-20):** `limit` defaults to 10 and `archived` to `false`. The next page
+  is signalled by `paging.next.after` and `paging.next.link`. The
+  [contacts guide](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/guide)
+  says "You can retrieve up to 100 contacts in one request."
+
+  **VERIFIED (2026-10-20):**
+  - `200` with all three contacts in ascending `id` order and **no `paging` key** on the
+    last page. The connector stops when `paging` is absent, which matches.
+  - Each record has `id` (a string), `properties`, `createdAt`, `updatedAt`, `archived`,
+    `url` and, because `associations=companies` was asked for,
+    `associations.companies.results`.
+  - `updatedAt` equals the `lastmodifieddate` property on every contact, and
+    `hs_lastmodifieddate` comes back `null`. Contacts carry their cursor in
+    `lastmodifieddate`, as `CustomObjectSearchResult` in `models.py` assumes.
+
+  **LIMITATION (VERIFIED 2026-10-20):** inline associations list one entry per association
+  type. Both sample contacts list company `25177527565` twice, as `contact_to_company`
+  and `contact_to_company_unlabeled`. `BaseCRMObject` hoists them without
+  de-duplicating, so backfilled documents carry `companies: [25177527565, 25177527565]`,
+  as the committed capture snapshot shows.

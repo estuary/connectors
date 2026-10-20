@@ -1,0 +1,59 @@
+info:
+  name: forms list
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+    - name: formTypes
+      value: all
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - no forms of any type"
+    request:
+      url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get a list of forms (v3)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/forms/get-forms)
+
+  **WHY:** the call `fetch_forms` (`api/forms.py`) makes, with the same `limit=500` and
+  `formTypes=all`. It is also where the submissions streams get their form IDs
+  (`FormIdCache` and `fetch_form_submissions` in `api/form_submissions.py`), so it is
+  this folder's form-ID source.
+
+  **DOCUMENTED (2026-10-20):** `formTypes` takes `hubspot`, `captured`, `flow`,
+  `blog_comment` or `all`; `archived` is a boolean. The page gives no description or
+  default for either. The connector's comment that "HubSpot defaults to
+  formTypes=hubspot" is not stated there.
+
+  **VERIFIED (2026-10-20):** live. `200` with the connector's existing scopes:
+  `{"results": []}`, with no `paging`. The test account has **no forms of any type**.
+  There is no form ID to pin, so no submissions request against a real form can be
+  authored. `Form Submissions / unknown form probe` exercises the submissions endpoint
+  instead.

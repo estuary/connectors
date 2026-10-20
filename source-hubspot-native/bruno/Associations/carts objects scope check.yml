@@ -1,0 +1,70 @@
+info:
+  name: carts objects scope check
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/objects/carts?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "403 - MISSING_SCOPES, token cannot read carts"
+    request:
+      url: "{{base_url}}/crm/v3/objects/carts?limit=1"
+      method: GET
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "This app hasn't been granted all required scopes to make this call. Read more about required scopes here: https://developers.hubspot.com/scopes.",
+            "correlationId": "01a15b8f-b1b1-7a6d-a635-6a811be4c956",
+            "errors": [
+              {
+                "message": "One or more of the following scopes are required.",
+                "context": {
+                  "requiredGranularScopes": [
+                    "crm.objects.carts.read",
+                    "crm.schemas.carts.read"
+                  ]
+                }
+              }
+            ],
+            "links": {
+              "scopes": "https://developers.hubspot.com/scopes"
+            },
+            "category": "MISSING_SCOPES"
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve carts (v3)](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/carts/get-carts)
+
+  **WHY:** `Engagement.ASSOCIATED_ENTITIES` includes `carts`, but the connector asks for
+  no carts scope (`scopes` and `optional_scopes` in `models.py`). This shows whether
+  the token can read carts at all, which
+  `Associations / scope probe id 0 without carts scope` needs to be interpreted.
+
+  **DOCUMENTED (2026-10-20):** the page has a "Required Scopes" heading but lists none.
+
+  **VERIFIED (2026-10-20):** `403`, `category: "MISSING_SCOPES"`, message "This app
+  hasn't been granted all required scopes to make this call. ...", with
+  `requiredGranularScopes` `crm.objects.carts.read` and `crm.schemas.carts.read`. The
+  token **cannot** read carts. Both the message and the category match the connector's
+  `MISSING_SCOPE_REGEX`.

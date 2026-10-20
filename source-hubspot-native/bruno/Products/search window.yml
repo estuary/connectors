@@ -1,0 +1,67 @@
+info:
+  name: search window
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/products/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "hs_lastmodifieddate",
+            "operator": "BETWEEN",
+            "value": "1970-01-01T00:00:01.000000Z",
+            "highValue": "2026-10-20T00:00:00.000000Z"
+          }
+        ],
+        "sorts": [{"propertyName": "hs_lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - total 0"
+    request:
+      url: "{{base_url}}/crm/v3/objects/products/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 0,
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Search for products](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/products/search/search-products)
+
+  **WHY:** both `products` subtasks find changed ids with this search
+  (`fetch_recent_products` and `fetch_delayed_products` call `fetch_search_objects`).
+  They filter and sort on `hs_lastmodifieddate`, the default property. The body is the
+  connector's, with a window from `EPOCH_PLUS_ONE_SECOND` to the probe date.
+
+  **DOCUMENTED (2026-10-20):** `limit` is at most 200, and the response carries `total`,
+  `results` and `paging`.
+
+  **VERIFIED (2026-10-20):** `200` with `{"total": 0, "results": []}`. The same token can use
+  the search endpoint, and it agrees the account has no products.
+
+  **UNOBSERVABLE:** whether product search results include `hs_lastmodifieddate` by
+  default. With no products, nothing comes back. Companies do include it
+  (`_crm-objects / search companies default properties`).

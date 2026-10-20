@@ -1,0 +1,65 @@
+info:
+  name: list with history limit 51 probe
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/objects/contacts?limit=51&properties=lastmodifieddate&propertiesWithHistory=lastmodifieddate"
+  params:
+    - name: limit
+      value: "51"
+      type: query
+    - name: properties
+      value: lastmodifieddate
+      type: query
+    - name: propertiesWithHistory
+      value: lastmodifieddate
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - limit 51 with history rejected"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts?limit=51&properties=lastmodifieddate&propertiesWithHistory=lastmodifieddate"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "You can only request at most 50 objects in one request for properties with history.",
+            "correlationId": "01a15b8d-db4c-7db2-871b-974bd76825e2",
+            "context": {
+              "limit": [
+                "51"
+              ]
+            },
+            "category": "VALIDATION_ERROR"
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/get-contacts)
+
+  **WHY:** with `capturePropertyHistory` on, the backfill adds `propertiesWithHistory`
+  and drops its page size to 50. One past that shows whether 50 is the real ceiling.
+
+  **DOCUMENTED (2026-10-20):** `propertiesWithHistory` "will reduce the maximum number of
+  contacts that can be read by a single request". The page doesn't give the number.
+
+  **LIMITATION (VERIFIED 2026-10-20):** `limit=51` with `propertiesWithHistory` is
+  **rejected** with `400 VALIDATION_ERROR`, "You can only request at most 50 objects in
+  one request for properties with history." The connector's 50 is exactly the maximum.
+  Batch reads have the same ceiling (`_crm-objects / batch read with history 51 inputs probe`).

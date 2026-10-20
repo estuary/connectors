@@ -1,0 +1,74 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/automation/v3/workflows"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "403 - missing workflows-access-public-api scope"
+    request:
+      url: "{{base_url}}/automation/v3/workflows"
+      method: GET
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "EXTERNAL auth request is missing required 'workflows-access-public-api' scope.",
+            "correlationId": "01a15b89-8964-7e3c-8873-7bc1a34db317"
+          }
+
+docs: |-
+  **REFERENCE:** [Get all workflows (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/automation/workflows/v3/get-workflows)
+
+  **WHY:** the only call the `workflows` binding makes.
+  `_fetch_workflows_updated_between` (`api/workflows.py`) requests every workflow in one
+  response, with no parameters, and filters on `updatedAt` locally. The discovery access
+  check (`fetch_recent_workflows` in `_remove_permission_blocked_resources`), the
+  backfill and both incremental subtasks all send this same request. This answers
+  whether the scope is granted and how a refusal is worded.
+
+  **DOCUMENTED (2026-10-20):** "Returns a list of workflows for the portal (metadata
+  only)." The page lists no query parameters and no paging fields, so a single response
+  holds every workflow. Its example gives `insertedAt` and `updatedAt` as epoch-ms
+  integers (e.g. `1467737836223`). The [scopes
+  page](https://developers.hubspot.com/docs/apps/legacy-apps/authentication/scopes) maps
+  `automation` to "Automation API (Workflows endpoints)". The connector asks for
+  `automation` only as an optional scope.
+
+  **VERIFIED (2026-10-20):** `403` whose body has only `status`, `message` and
+  `correlationId` (no `category`): "EXTERNAL auth request is missing required
+  'workflows-access-public-api' scope." The scope it names is HubSpot's internal one,
+  not `automation`. The wording matches the second alternative of `MISSING_SCOPE_REGEX`
+  ("auth request is missing required '.+' scope"), so discovery drops `workflows`.
+  That's why `test.flow.yaml` has no `workflows` binding.
+
+  **LIMITATION (VERIFIED 2026-10-20):** the test account's OAuth app lacks `automation`,
+  so the `workflows` binding is never discovered and the capture snapshot never covers
+  it.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** no paging and no server-side time filter.
+  Every poll, realtime and delayed alike, downloads all workflows and filters them
+  locally.
+
+  **UNOBSERVABLE:** the response for a token that has the scope, including whether
+  `updatedAt` and `insertedAt` really are epoch-ms integers. The `Workflow` model parses
+  both as `AwareDatetime` and `id` as an int. Granting `automation` means re-authorizing
+  the test account's OAuth app, which this read-only collection doesn't do. Fallback:
+  re-run after re-authorizing.

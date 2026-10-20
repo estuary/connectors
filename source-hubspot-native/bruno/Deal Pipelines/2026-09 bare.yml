@@ -1,0 +1,168 @@
+info:
+  name: 2026-09 bare
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/pipelines/2026-09/deals"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - one default pipeline, 7 stages
+    request:
+      url: "{{base_url}}/crm/pipelines/2026-09/deals"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "label": " Sample Pipeline",
+                "displayOrder": 0,
+                "id": "default",
+                "stages": [
+                  {
+                    "label": "Appointment Scheduled",
+                    "displayOrder": 0,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.2"
+                    },
+                    "id": "appointmentscheduled",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  },
+                  {
+                    "label": "Qualified To Buy",
+                    "displayOrder": 1,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.4"
+                    },
+                    "id": "qualifiedtobuy",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  },
+                  {
+                    "label": "Presentation Scheduled",
+                    "displayOrder": 2,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.6"
+                    },
+                    "id": "presentationscheduled",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  },
+                  {
+                    "label": "Decision Maker Bought-In",
+                    "displayOrder": 3,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.8"
+                    },
+                    "id": "decisionmakerboughtin",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  },
+                  {
+                    "label": "Contract Sent",
+                    "displayOrder": 4,
+                    "metadata": {
+                      "isClosed": "false",
+                      "probability": "0.9"
+                    },
+                    "id": "contractsent",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  },
+                  {
+                    "label": "Closed Won",
+                    "displayOrder": 5,
+                    "metadata": {
+                      "isClosed": "true",
+                      "probability": "1.0"
+                    },
+                    "id": "closedwon",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  },
+                  {
+                    "label": "Closed Lost",
+                    "displayOrder": 6,
+                    "metadata": {
+                      "isClosed": "true",
+                      "probability": "0.0"
+                    },
+                    "id": "closedlost",
+                    "createdAt": "2025-04-03T12:58:52.529Z",
+                    "updatedAt": "2025-04-03T12:59:10.749Z",
+                    "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT",
+                    "archived": false
+                  }
+                ],
+                "createdAt": "1970-01-01T00:00:00Z",
+                "updatedAt": "REDACTED",
+                "archived": false
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all pipelines (2026-09)](https://developers.hubspot.com/docs/api-reference/latest/crm/pipelines/get-pipelines)
+
+  **WHY:** the call `fetch_deal_pipelines` (`api/deal_pipelines.py`) makes after the
+  migration off Pipelines V1. It answers whether the live response matches the
+  2026-09 spec, whether it returns the same pipelines and stages as
+  `Deal Pipelines / v1 bare`, and whether the existing scopes are enough.
+
+  **VERIFIED (2026-10-19):** `200` with the connector's existing OAuth scopes, so no
+  re-authorization is needed. Same wrapper (`{"results": [...]}`, no pagination) and the
+  same pipeline and 7 stages as `Deal Pipelines / v1 bare`, with every value matching
+  after renaming:
+  - `pipelineId` → `id` (still `"default"`); `stageId` → `id` (same values).
+  - `active: true` → `archived: false`, on the pipeline and on every stage. No
+    `archivedAt`, since nothing is archived.
+  - `objectType`, `objectTypeId` and `default` are absent.
+  - Pipeline `createdAt` is `"1970-01-01T00:00:00Z"`, the same value the connector
+    already emitted from V1's `0`.
+  - Stage `createdAt`/`updatedAt` are ISO strings with milliseconds and `Z`
+    (`"2025-04-03T12:58:52.529Z"`), each equal to the V1 epoch-ms value.
+  - `metadata` is unchanged: `isClosed` and `probability`, both strings.
+  - New on every stage: `writePermissions: "CRM_PERMISSIONS_ENFORCEMENT"`.
+  - Stages come back sorted by `displayOrder` (0–6), unlike V1.
+
+  **UNOBSERVABLE:** how several pipelines are ordered relative to each other. The test
+  account has only the default pipeline, and creating another would change the
+  capture snapshot's data. The order decides which `/_meta/row_id` each pipeline gets.
+  That matters little, because every row is re-emitted at cutover. The
+  [guide](https://developers.hubspot.com/docs/api-reference/latest/crm/pipelines/guide)
+  defines `displayOrder` as the order pipelines are displayed in, with ties broken by
+  label (DOCUMENTED 2026-10-16). It doesn't say the API returns results in that order;
+  the stages observed here suggest it does.

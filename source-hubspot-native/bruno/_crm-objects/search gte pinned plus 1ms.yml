@@ -1,0 +1,87 @@
+info:
+  name: search gte pinned plus 1ms
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "lastmodifieddate",
+            "operator": "GTE",
+            "value": "{{crm_search_pin_plus_1ms}}"
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Set by `_crm-objects / search window`; fall back to the contact it pinned on
+        // 2026-10-20 when that request hasn't run in this session.
+        if (!bru.getVar('crm_search_pin_ts')) {
+          bru.setVar('crm_search_pin_id', '72811506244');
+          bru.setVar('crm_search_pin_ts', '2024-10-28T16:40:20.553Z');
+        }
+        // Format like the connector's dt_to_str: microseconds and a Z suffix.
+        const fmt = (ms) => new Date(ms).toISOString().replace(/Z$/, '000Z');
+        const pinMs = Date.parse(bru.getVar('crm_search_pin_ts'));
+        bru.setVar('crm_search_pin_value', fmt(pinMs));
+        bru.setVar('crm_search_pin_plus_1ms', fmt(pinMs + 1));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - pinned contact excluded at plus 1 ms (projection - total, id and cursor)"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 1,
+            "results": [
+              {
+                "id": "225877317544",
+                "properties": {
+                  "lastmodifieddate": "2026-06-03T01:33:01.284Z"
+                },
+                "updatedAt": "2026-06-03T01:33:01.284Z"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** the counterpart to `_crm-objects / search between pinned instant`. A
+  realtime search with no end uses `GTE` from its cursor, and a resumed window starts
+  1 ms after the previous window's end. If HubSpot compared timestamps more coarsely
+  than milliseconds, `GTE` the pinned instant plus 1 ms
+  (`2024-10-28T16:40:20.554000Z`) would still return the pinned contact. Same chaining
+  and fallback as `_crm-objects / search between pinned instant`.
+
+  **VERIFIED (2026-10-20):** `total: 1`, only John (`225877317544`). The pinned contact is
+  excluded, so comparisons are at millisecond resolution. Together with the inclusive
+  `BETWEEN`, adjacent windows `[a, b]` and `[b + 1 ms, …]` neither overlap nor leave a
+  gap.

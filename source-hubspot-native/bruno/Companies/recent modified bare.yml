@@ -1,0 +1,73 @@
+info:
+  name: recent modified bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/companies/v2/companies/recent/modified?count=1"
+  params:
+    - name: count
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - endpoint live, empty (no company modified in the last 30 days)"
+    request:
+      url: "{{base_url}}/companies/v2/companies/recent/modified?count=1"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [],
+            "hasMore": false,
+            "offset": 0,
+            "total": 0
+          }
+
+docs: |-
+  **REFERENCE:** [Get recently modified and created companies (v2, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/companies/v2/get-companies-v2-companies-recent-modified)
+
+  **WHY:** the first call `fetch_recent_companies` (`api/companies.py`) makes on every
+  realtime poll of the `companies` binding (`count=1`; later pages send `count=100`
+  and `offset`). It answers whether this legacy endpoint is still live, and what it
+  returns, before HubSpot's legacy APIs go unsupported.
+
+  **DOCUMENTED (2026-10-20):** the page lists `limit` ("The number of records to
+  return. Defaults to 100, has a maximum value of 250."), `offset`, `properties`,
+  `propertiesWithHistory` and `includeMergeAudits`. It does **not** list `count`, the
+  parameter the connector sends. "This endpoint will only return records modified or
+  created in the last 30 days, or the 10K most recently modified and created
+  records." There is no sunset notice on the page.
+
+  **VERIFIED (2026-10-20):** live. `200` with the connector's existing scopes:
+  `{"results": [], "hasMore": false, "offset": 0, "total": 0}`. That is the expected
+  answer. The account's only company was last modified on 2025-01-18
+  (`Associations / companies ids`), outside the 30-day window.
+
+  **UNOBSERVABLE:** whether HubSpot honours `count`, and the order and paging of
+  results. Both need a company modified in the last 30 days, which means editing
+  test-account data. The assumption is that an unrecognised `count` falls back to the
+  documented default `limit` of 100. Then the first call returns up to 100 companies
+  instead of 1, and later pages are the same size the connector asks for. Either way
+  the connector pages on `hasMore`/`offset` and applies `since` itself, so nothing is
+  lost.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** at most the last 30 days or the 10K most
+  recent changes. The connector stops at 9,900 IDs and leaves anything older to the
+  delayed search subtask, so a realtime cursor that falls further behind than that
+  is caught up only `DELAYED_LAG` (1 hour) late.

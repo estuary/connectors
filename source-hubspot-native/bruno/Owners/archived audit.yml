@@ -1,0 +1,59 @@
+info:
+  name: archived audit
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/owners?limit=500&archived=true"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+    - name: archived
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - no archived owners"
+    request:
+      url: "{{base_url}}/crm/v3/owners?limit=500&archived=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all owners](https://developers.hubspot.com/docs/api-reference/legacy/crm/owners/get-owners)
+
+  **WHY:** silent-data-loss audit. Archived owners are deactivated users. The connector
+  sends no `archived`, so they never reach the `owners` collection, even though older
+  records still carry their ids in owner properties such as `hubspot_owner_id`.
+
+  **DOCUMENTED (2026-10-20):** "You can also retrieve archived owners to view users that were
+  deactivated. To do so, add the `archived` parameter with the value `true`." For those
+  owners "there is still an `id` value, but the `userId` value will be `null`."
+  ([owners guide](https://developers.hubspot.com/docs/api-reference/legacy/crm/owners/guide))
+
+  **VERIFIED (2026-10-20):** `archived=true` returns `200` with an empty `results`. The test
+  account has no deactivated users.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** deactivated users are left out of the `owners`
+  binding, so owner ids on older records may not match any captured owner. Covering
+  them needs a second sweep with `archived=true`.

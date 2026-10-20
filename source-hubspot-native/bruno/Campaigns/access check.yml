@@ -1,0 +1,88 @@
+info:
+  name: access check
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/campaigns?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "403 - missing marketing.campaigns.read scope"
+    request:
+      url: "{{base_url}}/marketing/v3/campaigns?limit=1"
+      method: GET
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "This app hasn't been granted all required scopes to make this call. Read more about required scopes here: https://developers.hubspot.com/scopes.",
+            "correlationId": "01a15b89-82aa-7490-a36c-34efed53fb10",
+            "errors": [
+              {
+                "message": "One or more of the following scopes are required.",
+                "context": {
+                  "requiredGranularScopes": [
+                    "marketing.campaigns.read"
+                  ]
+                }
+              }
+            ],
+            "links": {
+              "scopes": "https://developers.hubspot.com/scopes"
+            },
+            "category": "MISSING_SCOPES"
+          }
+
+docs: |-
+  **REFERENCE:** [Get campaigns (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/campaigns/get-campaigns)
+
+  **WHY:** the exact call `check_campaigns_access` (`api/campaigns.py`) makes at
+  discovery: `limit=1` and nothing else. `_remove_permission_blocked_resources`
+  (`resources.py`) drops the `campaigns` binding when this call fails with a 403 that
+  `is_missing_scope_error` recognizes. This answers whether the test account's OAuth app
+  has the scope, and whether HubSpot's refusal is worded so that discovery drops the
+  binding instead of failing.
+
+  **DOCUMENTED (2026-10-20):** the
+  [guide](https://developers.hubspot.com/docs/api-reference/legacy/marketing/campaigns/guide)
+  names the required scope: `marketing.campaigns.read`, which "provides access to view
+  details about marketing campaigns and their associated assets". The connector asks for
+  it only as an optional OAuth scope (`optional_scopes` in `models.py`).
+
+  **VERIFIED (2026-10-20):** `403`, `category: "MISSING_SCOPES"`, with
+  `errors[0].context.requiredGranularScopes: ["marketing.campaigns.read"]`. The message
+  ("This app hasn't been granted all required scopes to make this call. ...") matches
+  the first alternative of `MISSING_SCOPE_REGEX` (`api/shared.py`), and the body also
+  carries `"category":"MISSING_SCOPES"`. Discovery therefore drops `campaigns` rather
+  than erroring, which is why `test.flow.yaml` has no `campaigns` binding.
+
+  **LIMITATION (VERIFIED 2026-10-20):** the test account's OAuth app lacks
+  `marketing.campaigns.read`, so the `campaigns` binding is never discovered and the
+  capture snapshot never covers it.
+
+  **UNOBSERVABLE:** the response for a token that has the scope. The reference page
+  documents a `results`/`total`/`paging` envelope and `PublicCampaign` items with `id`,
+  `properties`, `createdAt`, `updatedAt` and `businessUnits` (DOCUMENTED 2026-10-20).
+  Granting the scope means re-authorizing the test account's OAuth app, which this
+  read-only collection doesn't do. The connector's `Campaign` model needs only `id` and
+  `updatedAt` and allows extra fields. Fallback: re-run this folder after re-authorizing
+  with the scope.

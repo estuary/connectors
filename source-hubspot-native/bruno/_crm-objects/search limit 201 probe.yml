@@ -1,0 +1,69 @@
+info:
+  name: search limit 201 probe
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "lastmodifieddate",
+            "operator": "BETWEEN",
+            "value": "2024-10-28T16:40:18.000000Z",
+            "highValue": "2026-10-20T00:00:00.000000Z"
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 201
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - limit 201 rejected"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/search"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "limit must be in range [0..200] (actual value: 201)",
+            "correlationId": "01a15b8e-7f1f-787f-854f-9677e9481a72",
+            "context": {
+              "limit": [
+                "201"
+              ]
+            },
+            "category": "VALIDATION_ERROR"
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** one past the connector's `SEARCH_PAGE_LIMIT` of 200, on the same window as
+  `_crm-objects / search window`.
+
+  **DOCUMENTED (2026-10-20):** "The maximum number of supported objects per page is 200."
+  ([search guide](https://developers.hubspot.com/docs/api-reference/legacy/crm/search-the-crm))
+
+  **LIMITATION (VERIFIED 2026-10-20):** `limit: 201` is **rejected** with
+  `400 VALIDATION_ERROR`, "limit must be in range [0..200] (actual value: 201)". The
+  connector's 200 is exactly the maximum.
