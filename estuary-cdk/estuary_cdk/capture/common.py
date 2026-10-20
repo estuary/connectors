@@ -41,6 +41,10 @@ from ..flow import (
 )
 from ..utils import json_merge_patch
 from . import Task, request, response
+from .backfill_signals import (
+    BackfillCoverage,
+    BackfillCoverageFn,
+)
 from .webhook.match import CollectionMatchingSpec, UrlMatch
 # _BaseDocument is a package-internal TypeVar shared across these modules.
 from .document import (
@@ -472,6 +476,13 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     # afterwards. A key the connector emits deletions for is not a fallback.
     is_fallback_key: bool = False
     requires_explicit_acks: bool = False
+    # How much of its source a backfill of this resource covers, which decides whether
+    # the CDK sends backfill signals. See BackfillCoverage for what the answer has to
+    # account for. A function answers each backfill separately. The default of None
+    # opts out and needs no backfill signal flags.
+    backfill_coverage: (
+        BackfillCoverage | BackfillCoverageFn[_BaseResourceConfig] | None
+    ) = None
 
 
 @dataclass(kw_only=True)
@@ -501,6 +512,10 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
         assert not self.is_fallback_key, (
             "A SnapshotResource's key can't be a fallback key because the CDK "
             "emits deletions against /_meta/row_id."
+        )
+        assert self.backfill_coverage is None, (
+            "A SnapshotResource never sends backfill signals since its snapshots "
+            "already delete rows through synthetic tombstones."
         )
 
 
