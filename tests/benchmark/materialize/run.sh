@@ -37,6 +37,8 @@
 #                            #   collection key, so each document lands on
 #                            #   exactly one shard.
 #
+#     [--preview-arg ARG]    # extra argument to the materialization's
+#                            #   `flowctl raw preview-next`, repeatable.
 #     [--tpcds-cache DIR]    # TPC-DS only: generate the fixture into DIR once
 #                            #   before the run and replay it, here and in
 #                            #   later runs of the same workload.
@@ -64,6 +66,7 @@ TABLE_SUFFIX=""
 SHARD_LOG_LEVEL=""
 SHARDS=1
 TPCDS_CACHE=""
+PREVIEW_EXTRA=()
 
 while (($#)); do
   case "$1" in
@@ -79,8 +82,9 @@ while (($#)); do
     --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
     --shards)    SHARDS="$2";    shift 2 ;;
     --tpcds-cache) TPCDS_CACHE="$2"; shift 2 ;;
+    --preview-arg) PREVIEW_EXTRA+=("$2"); shift 2 ;;
     -h|--help)
-      sed -n '2,45p' "$0"; exit 0 ;;
+      sed -n '2,47p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -334,6 +338,7 @@ PREVIEW_ARGS=(
 if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
 fi
+PREVIEW_ARGS+=("${PREVIEW_EXTRA[@]+"${PREVIEW_EXTRA[@]}"}")
 
 # flowctl publishes one `transaction stats` line per round at info, which is
 # what results.py derives the transaction boundaries from. The task keeps its

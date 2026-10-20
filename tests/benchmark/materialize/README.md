@@ -206,6 +206,20 @@ Overlap rules:
 --keep                 don't tear docker-compose down on exit
 --out-dir   DIR        output directory; default: runs/<ts>-<connector>
 --tpcds-cache DIR      TPC-DS only: generate the fixture into DIR once and replay it
+--preview-arg ARG      extra argument to the materialization's preview-next, repeatable
+```
+
+## Measuring the harness
+
+`materialize-null` reads every Load and Store and discards them, with the
+field selection a SQL materialization makes. A run against it measures what
+`flowctl raw preview-next` and the materialize protocol can deliver; a
+connector run at that rate is bound by the harness, not the destination.
+
+```bash
+echo '{}' > /tmp/null.yaml
+./tests/benchmark/materialize/run.sh --connector materialize-null --config /tmp/null.yaml \
+    --scenario tests/benchmark/materialize/scenarios/tpcds-sf1.yaml --tpcds-cache /tmp/tpcds
 ```
 
 ## Output
