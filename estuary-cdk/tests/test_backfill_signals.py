@@ -425,6 +425,38 @@ async def test_owed_begin_is_sent_in_the_next_session():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("owed", [_awaiting_begin, _awaiting], ids=["begin", "complete"])
+async def test_backfill_that_stops_qualifying_drops_its_owed_signals(owed: Callable[[ResourceState], ResourceState]):
+    messages = await _capture(
+        _binding(),
+        _resource(BackfillCoverage.PARTIAL, _backfill_state(), fetch_page=_pages(["a"], ["b"])),
+        state=owed(_backfill_state()),
+    )
+    assert _timeline(messages) == ["a", "b"]
+    assert {"is_awaiting_backfill_begin": None, "is_awaiting_backfill_complete": None} in _binding_checkpoints(messages)
+
+
+@pytest.mark.asyncio
+async def test_resumed_scheduled_backfill_is_judged_as_connector_initiated():
+    seen: list[bool] = []
+
+    def coverage(ctx: BackfillContext[ResourceConfig]) -> BackfillCoverage:
+        seen.append(ctx.is_connector_initiated)
+        return BackfillCoverage.PARTIAL if ctx.is_connector_initiated else BackfillCoverage.FULL
+
+    state = _awaiting(_backfill_state(next_page=1))
+    state.is_connector_initiated = True
+
+    messages = await _capture(
+        _binding(),
+        _resource(coverage, _backfill_state(), fetch_page=_pages(["a"], ["b"])),
+        state=state,
+    )
+    assert seen == [True]
+    assert _timeline(messages) == ["b"]
+
+
+@pytest.mark.asyncio
 async def test_triggered_backfill_begins_again():
     # A Triggers.BACKFILL restarts the binding from its initial state, even
     # while a BackfillComplete is owed.
@@ -571,6 +603,23 @@ async def test_no_scheduled_backfill_starts_while_one_runs():
         state=state,
     )
     assert _timeline(messages) == ["b", "complete"]
+
+
+@pytest.mark.asyncio
+async def test_backfill_that_doesnt_signal_clears_a_stale_owed_complete():
+    # A requested backfill on a scheduled binding coordinates with its earlier
+    # state. That state still owes a BackfillComplete that this unsignaled backfill
+    # must not send.
+    state = _awaiting(_scheduled_state(only=CUTOFF))
+    messages = await _capture(
+        _binding(resource_config=_SCHEDULED),
+        _resource(BackfillCoverage.FULL, _backfill_state(), fetch_page=_pages(["a"])),
+        state=state,
+        backfill_requests=["things"],
+        feature_flags="no_emit_backfill_signals",
+    )
+    assert _timeline(messages) == ["a"]
+    assert _initialized(messages)["is_awaiting_backfill_complete"] is None
 
 
 @pytest.mark.asyncio
