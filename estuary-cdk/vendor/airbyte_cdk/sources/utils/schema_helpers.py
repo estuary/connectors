@@ -7,7 +7,7 @@ import importlib
 import json
 import os
 import pkgutil
-from typing import Any, ClassVar, Dict, Mapping, Tuple
+from typing import Any, ClassVar, Dict, Mapping, Optional, Tuple
 
 import jsonref
 from airbyte_cdk.models import ConnectorSpecification, FailureType
@@ -134,13 +134,13 @@ def check_config_against_spec_or_exit(config: Mapping[str, Any], spec: Connector
 
 class InternalConfig(BaseModel):
     KEYWORDS: ClassVar[set[str]] = {"_limit", "_page_size"}
-    limit: int = Field(None, alias="_limit")
-    page_size: int = Field(None, alias="_page_size")
+    limit: Optional[int] = Field(None, alias="_limit")
+    page_size: Optional[int] = Field(None, alias="_page_size")
 
-    def dict(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         kwargs["by_alias"] = True
         kwargs["exclude_unset"] = True
-        return super().dict(*args, **kwargs)
+        return super().model_dump(*args, **kwargs)
 
     def is_limit_reached(self, records_counter: int) -> bool:
         """
@@ -173,4 +173,4 @@ def split_config(config: Mapping[str, Any]) -> Tuple[dict[str, Any], InternalCon
             internal_config[k] = v
         else:
             main_config[k] = v
-    return main_config, InternalConfig.parse_obj(internal_config)
+    return main_config, InternalConfig.model_validate(internal_config)

@@ -41,15 +41,23 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/cmd/connecto
 FROM ${BASE_IMAGE} AS pybuilder
 
 USER root
+# python3-venv is for the throwaway test venv below; uv builds /opt/venv itself.
 RUN apt-get update -y \
      && apt-get install --no-install-recommends -y \
      python3 \
      python3-venv \
-     python3-poetry \
      && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m venv /opt/venv
-ENV VIRTUAL_ENV=/opt/venv
+COPY --from=ghcr.io/astral-sh/uv:0.13.3 /uv /usr/local/bin/uv
+
+# UV_PYTHON/-PREFERENCE keep uv on the base image's own interpreter rather than
+# downloading one of its own, which is the point of building this stage on
+# ${BASE_IMAGE}: the venv's interpreter must match the runtime stage's.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON=/usr/bin/python3 \
+    UV_PYTHON_PREFERENCE=only-system \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
 # The sidecar depends on estuary-cdk from this repository, so the CDK is copied
 # to where the sidecar's pyproject.toml expects it. Both are installed in
@@ -57,7 +65,9 @@ ENV VIRTUAL_ENV=/opt/venv
 COPY estuary-cdk                   /opt/estuary-cdk
 COPY materialize-snowflake/sidecar /opt/materialize-snowflake/sidecar
 WORKDIR /opt/materialize-snowflake/sidecar
-RUN poetry install --only main
+# `--frozen` makes the sidecar's uv.lock authoritative: the image installs what
+# was resolved and committed, and resolves nothing at build time.
+RUN uv sync --frozen --no-dev
 
 # Type-check and test the sidecar, as the builder stage does the connector. A
 # throwaway venv holds mypy and pytest, keeping the test dependencies out of the

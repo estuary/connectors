@@ -1,8 +1,7 @@
 import asyncio
 import json
 
-import estuary_cdk.pydantic_polyfill  # Must be first.
-import estuary_cdk.requests_session_send_patch  # Must be second.
+import estuary_cdk.requests_session_send_patch  # Must be first.
 from estuary_cdk import flow, shim_airbyte_cdk
 
 from source_google_ads import SourceGoogleAds

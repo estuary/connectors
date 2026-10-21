@@ -4,11 +4,11 @@
 # Only rules that catch real bugs are selected. Formatting, import order,
 # naming and annotation style are deliberately left out for now.
 
-# Every invocation (CI and agent skills) runs `pipx run ruff==0.16.9`; bump
-# them together.
+# Every invocation (CI and agent skills) runs `uvx ruff@0.16.9`; bump them
+# together.
 required-version = "==0.16.9"
 
-# The connector images run Python 3.12.
+# The connector images run Python 3.14, and the workspace floor is 3.12.
 target-version = "py312"
 
 [lint]

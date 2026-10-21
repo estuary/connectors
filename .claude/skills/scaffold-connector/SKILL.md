@@ -23,7 +23,6 @@ Create the standard layout:
 ```
 source-$1/
 ├── pyproject.toml
-├── poetry.lock
 ├── VERSION
 ├── config.yaml                 # plaintext placeholder (Phase 3)
 ├── test.flow.yaml              # Flow catalog for testing
@@ -41,7 +40,9 @@ source-$1/
 
 `api.py` may be a package (`api/` with per-stream modules and a `shared.py`) once a connector has enough streams to warrant it — see `source-mailchimp-native/source_mailchimp_native/api/`. Start with the single module; splitting is `add-stream`'s call, not this skill's.
 
-**`pyproject.toml`** — copy `source-front/pyproject.toml`, changing only `name` (to `source-$1`) and `authors` (read the git user via `git config user.name`/`user.email`). Keep the `estuary-cdk = {path="../estuary-cdk", develop = true}` path dependency and the dev-group deps verbatim.
+**`pyproject.toml`** — copy `source-front/pyproject.toml`, changing only `name` (to `source-$1`) and `authors` (read the git user via `git config user.name`/`user.email`). Keep the `[project.dependencies]` entry for `estuary-cdk` and the `[tool.uv.sources]` table verbatim. Declare no test dependencies: they come from the workspace root's `dev` group.
+
+**Register the member** — add `"source-$1"` to `members` in the repo-root `pyproject.toml`, keeping the list sorted, then run `uv lock` from the repo root. The connector is not resolvable until it is a workspace member, and the root `uv.lock` is the only lock in the tree.
 
 **`VERSION`** — `v1` (new connectors start at v1; existing ones increment).
 
@@ -172,24 +173,24 @@ Adjust the `credentials` shape only if Phase 0 already established a non-bearer 
 
 ## Phase 4 — Environment & Smoke Test
 
-From the connector directory:
+Sync from the repo root -- uv manages one `.venv` at the workspace root and
+ignores a member-local one:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-poetry install
+uv sync --package source-$1 --group dev
 ```
 
-Then run the two **free** checks:
+Then, from the connector directory, run the two **free** checks:
 
 ```bash
-poetry run flowctl raw spec --source test.flow.yaml -o json --emit-raw
-poetry run flowctl raw discover --source test.flow.yaml -o json --emit-raw
+uv run --group dev flowctl raw spec --source test.flow.yaml -o json --emit-raw
+uv run --group dev flowctl raw discover --source test.flow.yaml -o json --emit-raw
 ```
 
 - `spec` must emit the config schema (with the `start_date` + `credentials` fields).
 - `discover` must succeed and emit **zero bindings** (the empty registry). It will not write any schema files yet.
 
-If either fails with `ModuleNotFoundError`, the venv isn't active — `source "$(poetry env info --path)/bin/activate"` and retry (per `regenerate-flow-discovery` Law #1). If `spec` fails on a Pydantic/import error, fix the skeleton before handing off.
+If either fails with `ModuleNotFoundError`, the venv isn't active — `uv run --group dev <cmd>` and retry (per `regenerate-flow-discovery` Law #1). If `spec` fails on a Pydantic/import error, fix the skeleton before handing off.
 
 Do **not** run `pytest` to create snapshots here — there are no streams to snapshot.
 

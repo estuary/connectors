@@ -25,29 +25,23 @@ import (
 // sidecar package (and the snowpipe-streaming SDK) installed, building the
 // venv on first use. The venv is shared across test runs; the sidecar package
 // itself is installed editable so source changes are always picked up. The
-// install goes through poetry so that the venv holds the sidecar's locked
-// dependencies.
+// install goes through uv against the sidecar's own uv.lock, so that the venv
+// holds its locked dependencies. uv creates the venv, and the interpreter with
+// it, so there is no separate python3 lookup to make.
 func testSidecarPython(t *testing.T) string {
 	t.Helper()
-	systemPython, err := exec.LookPath("python3")
+	uv, err := exec.LookPath("uv")
 	if err != nil {
-		t.Skip("python3 not available")
-	}
-	poetry, err := exec.LookPath("poetry")
-	if err != nil {
-		t.Fatal("poetry is required to build the sidecar test venv but was not found on PATH")
+		t.Fatal("uv is required to build the sidecar test venv but was not found on PATH")
 	}
 
 	var venv = filepath.Join(os.TempDir(), "snowpipe-sidecar-test-venv")
 	var python = filepath.Join(venv, "bin", "python")
 	if _, err := os.Stat(python); err != nil {
 		t.Logf("building sidecar test venv at %s", venv)
-		if out, err := exec.Command(systemPython, "-m", "venv", venv).CombinedOutput(); err != nil {
-			t.Fatalf("creating venv: %v: %s", err, out)
-		}
-		var install = exec.Command(poetry, "install", "--only", "main", "--quiet")
+		var install = exec.Command(uv, "sync", "--frozen", "--no-dev")
 		install.Dir = "sidecar"
-		install.Env = append(os.Environ(), "VIRTUAL_ENV="+venv)
+		install.Env = append(os.Environ(), "UV_PROJECT_ENVIRONMENT="+venv)
 		if out, err := install.CombinedOutput(); err != nil {
 			os.RemoveAll(venv)
 			t.Fatalf("installing sidecar package: %v: %s", err, out)

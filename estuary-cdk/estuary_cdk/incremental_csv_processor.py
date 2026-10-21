@@ -5,7 +5,7 @@ import csv
 import sys
 from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, overload
 from dataclasses import dataclass
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from estuary_cdk.capture.common import BaseDocument
 
 
@@ -29,8 +29,7 @@ class BaseCSVRow(BaseDocument):
     # can subclass and override NULL_VALUES as needed.
     NULL_VALUES: ClassVar[set[str]] = {""}
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     @model_validator(mode='before')
     @classmethod

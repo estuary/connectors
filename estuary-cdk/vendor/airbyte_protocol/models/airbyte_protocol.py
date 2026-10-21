@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import AnyUrl, BaseModel, Extra, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Type(Enum):
@@ -21,8 +21,7 @@ class Type(Enum):
 
 
 class AirbyteRecordMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     namespace: Optional[str] = Field(
         None, description='namespace the data is associated with'
@@ -42,8 +41,7 @@ class AirbyteStateType(Enum):
 
 
 class StreamDescriptor(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     name: str
     namespace: Optional[str] = None
@@ -52,8 +50,7 @@ class StreamDescriptor(BaseModel):
 class AirbyteStateBlob(BaseModel):
     pass
 
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
 
 class Level(Enum):
@@ -66,8 +63,7 @@ class Level(Enum):
 
 
 class AirbyteLogMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     level: Level = Field(..., description='log level')
     message: str = Field(..., description='log message')
@@ -90,8 +86,7 @@ class FailureType(Enum):
 
 
 class AirbyteErrorTraceMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     message: str = Field(
         ..., description='A user-friendly message that indicates the cause of the error'
@@ -114,8 +109,7 @@ class EstimateType(Enum):
 
 
 class AirbyteEstimateTraceMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     name: str = Field(..., description='The name of the stream')
     type: EstimateType = Field(
@@ -142,8 +136,7 @@ class AirbyteStreamStatus(Enum):
 
 
 class AirbyteStreamStatusTraceMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     stream_descriptor: StreamDescriptor = Field(
         ..., description='The stream associated with the status'
@@ -154,8 +147,7 @@ class AirbyteStreamStatusTraceMessage(BaseModel):
 
 
 class AirbyteAnalyticsTraceMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     type: str = Field(
         ...,
@@ -172,8 +164,7 @@ class OrchestratorType(Enum):
 
 
 class AirbyteControlConnectorConfigMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     config: Dict[str, Any] = Field(
         ..., description="the config items from this connector's spec to update"
@@ -186,8 +177,7 @@ class Status(Enum):
 
 
 class AirbyteConnectionStatus(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     status: Status
     message: Optional[str] = None
@@ -210,8 +200,7 @@ class AuthFlowType(Enum):
 
 
 class OAuthConfigSpecification(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     oauth_user_input_from_connector_config_specification: Optional[
         Dict[str, Any]
@@ -234,24 +223,21 @@ class OAuthConfigSpecification(BaseModel):
 
 
 class AirbyteStreamState(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     stream_descriptor: StreamDescriptor
     stream_state: Optional[AirbyteStateBlob] = None
 
 
 class AirbyteGlobalState(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     shared_state: Optional[AirbyteStateBlob] = None
     stream_states: List[AirbyteStreamState]
 
 
 class AirbyteTraceMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     type: TraceType = Field(
         ..., description='the type of trace message', title='trace type'
@@ -274,8 +260,7 @@ class AirbyteTraceMessage(BaseModel):
 
 
 class AirbyteControlMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     type: OrchestratorType = Field(
         ..., description='the type of orchestrator message', title='orchestrator type'
@@ -290,15 +275,14 @@ class AirbyteControlMessage(BaseModel):
 
 
 class AirbyteStream(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     name: str = Field(..., description="Stream's name.")
     json_schema: Dict[str, Any] = Field(
         ..., description='Stream schema using Json Schema specs.'
     )
     supported_sync_modes: List[SyncMode] = Field(
-        ..., description='List of sync modes supported by this stream.', min_items=1
+        ..., description='List of sync modes supported by this stream.', min_length=1
     )
     source_defined_cursor: Optional[bool] = Field(
         None,
@@ -319,8 +303,7 @@ class AirbyteStream(BaseModel):
 
 
 class ConfiguredAirbyteStream(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     stream: AirbyteStream
     sync_mode: SyncMode
@@ -349,11 +332,10 @@ class AdvancedAuth(BaseModel):
 
 
 class ConnectorSpecification(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
-    documentationUrl: Optional[AnyUrl] = None
-    changelogUrl: Optional[AnyUrl] = None
+    documentationUrl: Optional[str] = None
+    changelogUrl: Optional[str] = None
     connectionSpecification: Dict[str, Any] = Field(
         ...,
         description='ConnectorDefinition specific blob. Must be a valid JSON string.',
@@ -382,8 +364,7 @@ class ConnectorSpecification(BaseModel):
 
 
 class AirbyteStateMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     type: Optional[AirbyteStateType] = None
     stream: Optional[AirbyteStreamState] = None
@@ -394,22 +375,19 @@ class AirbyteStateMessage(BaseModel):
 
 
 class AirbyteCatalog(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     streams: List[AirbyteStream]
 
 
 class ConfiguredAirbyteCatalog(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     streams: List[ConfiguredAirbyteStream]
 
 
 class AirbyteMessage(BaseModel):
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
     type: Type = Field(..., description='Message type')
     log: Optional[AirbyteLogMessage] = Field(

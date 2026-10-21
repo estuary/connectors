@@ -10,7 +10,7 @@ from typing import Any, BinaryIO, Callable, Generic
 
 import orjson
 import xxhash
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from estuary_cdk.capture.connector_status import ConnectorStatus
 from estuary_cdk.capture.document import AssociatedDocument, BaseDocument
@@ -22,12 +22,11 @@ from ..flow import (
     EndpointConfig,
     ResourceConfig,
 )
-from ..pydantic_polyfill import GenericModel
 from . import request, response
 from .transactor import Transactor
 
 
-class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Request(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     spec: request.Spec | None = None
     discover: request.Discover[EndpointConfig] | None = None
     validate_: request.Validate[EndpointConfig, ResourceConfig] | None = Field(
@@ -38,7 +37,7 @@ class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSta
     acknowledge: request.Acknowledge | None = None
 
 
-class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     spec: ConnectorSpec | None = None
     discovered: response.Discovered[ResourceConfig] | None = None
     validated: response.Validated | None = None

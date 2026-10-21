@@ -1,5 +1,4 @@
-import estuary_cdk.pydantic_polyfill  # Must be first. # noqa
-import estuary_cdk.requests_session_send_patch # Must be second.
+import estuary_cdk.requests_session_send_patch # Must be first.
 
 import asyncio
 from estuary_cdk import shim_airbyte_cdk, flow

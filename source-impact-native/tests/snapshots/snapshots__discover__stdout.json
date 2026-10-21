@@ -34,11 +34,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -121,11 +117,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -208,11 +200,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -289,11 +277,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -370,11 +354,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -451,11 +431,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -532,11 +508,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -613,11 +585,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -694,11 +662,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -775,11 +739,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -849,11 +809,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -923,11 +879,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -997,11 +949,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -1071,11 +1019,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -1145,11 +1089,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1226,11 +1166,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1307,11 +1243,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1388,11 +1320,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1469,11 +1397,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },

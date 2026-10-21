@@ -1,25 +1,22 @@
-[tool.poetry]
+[project]
 name = "source_hubspot"
 version = "0.1.0"
 description = ""
-authors = ["Johnny Graettinger <johnny@estuary.dev>"]
+authors = [
+    { name = "Johnny Graettinger", email = "johnny@estuary.dev" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    # The vendored Airbyte CDK is pydantic v1 code; see estuary-cdk/vendor/README.md.
+    "estuary-cdk[airbyte-shim]",
+    "types-requests>=2.31,<3.0",
+]
 
-[tool.poetry.dependencies]
-estuary-cdk = {path="../estuary-cdk", develop = true, extras = ["airbyte-shim"]}
-# The vendored Airbyte CDK is pydantic v1 code; see estuary-cdk/vendor/README.md.
-pydantic = "==1.10.14"
-python = "^3.11"
-types-requests = "^2.31"
-
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.8.0"
-mypy = "^1.8.0"
-pytest = "^7.4.3"
-pytest-insta = "^0.3.0"
-requests-mock = "^1.11.0"
-pytest-mock = "^3.12.0"
-mock = "^5.1.0"
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

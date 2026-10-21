@@ -1,28 +1,47 @@
-[tool.poetry]
+[project]
 name = "snowpipe_sidecar"
 version = "0.1.0"
 description = "Snowpipe Streaming (high-performance) sidecar for materialize-snowflake"
-authors = ["Jacob Marble <jacob@estuary.dev>"]
-packages = [{include = "snowpipe_sidecar"}]
+authors = [
+    { name = "Jacob Marble", email = "jacob@estuary.dev" },
+]
+# Its own uv project rather than a member of the repo-root workspace: the
+# pybuilder stage pins uv to the base image's `/usr/bin/python3`, so the venv's
+# interpreter matches the runtime stage's, and on `ghcr.io/estuary/base-image:v2`
+# (Debian trixie) that is 3.13. A workspace shares one `requires-python` across
+# every member, and the connectors there are on 3.14.
+requires-python = ">=3.13,<3.15"
+dependencies = [
+    "estuary-cdk",
+    # The SDK is pinned exactly: the append path hands its channels one
+    # msgspec.Raw per row, which is an internal of the SDK rather than
+    # something it documents -- see tests/test_sdk_raw_rows.py. msgspec is the
+    # SDK's own dependency, which pins it exactly in turn, and is listed here
+    # because this package imports it directly to frame those rows.
+    "snowpipe-streaming==1.6.2",
+    "msgspec",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-estuary-cdk = {path="../../estuary-cdk", develop = true}
-# The SDK is pinned exactly: the append path hands its channels one msgspec.Raw
-# per row, which is an internal of the SDK rather than something it documents —
-# see tests/test_sdk_raw_rows.py. msgspec is the SDK's own dependency, which
-# pins it exactly in turn, and is listed here because this package imports it
-# directly to frame those rows.
-snowpipe-streaming = "1.6.2"
-msgspec = "*"
+# The dependency is declared in [project.dependencies] above; this is where uv
+# finds it. A path source rather than `workspace = true`, since this project is
+# outside the workspace.
+[tool.uv.sources]
+estuary-cdk = { path = "../../estuary-cdk", editable = true }
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.4"
-mypy = "^1.8.0"
+# Outside the workspace, so these cannot come from the root's `dev` group.
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1,<10",
+    "mypy>=1.8.0,<2",
+]
 
-[tool.ruff]
-target-version = "py312"
-
+# mypy gates this package's image build, as it did before the uv conversion;
+# the rest of the tree is checked by pyright, report-only. Keeping the gate is
+# a transitional choice to hold this connector's churn down in the conversion,
+# not a decision that the sidecar should type-check differently forever.
+#
+# `python_version` is 3.12 because that is what it was; the project itself runs
+# on 3.13. Leaving them apart only costs the older dialect's checks.
 [tool.mypy]
 python_version = "3.12"
 files = ["snowpipe_sidecar", "tests"]
@@ -33,5 +52,5 @@ module = ["snowflake.ingest.*"]
 ignore_missing_imports = true
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

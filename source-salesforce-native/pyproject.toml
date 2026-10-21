@@ -1,23 +1,23 @@
-[tool.poetry]
+[project]
 name = "source_salesforce_native"
 version = "0.1.0"
 description = ""
-authors = ["Alex Bair <alexb@estuary.dev>"]
+authors = [
+    { name = "Alex Bair", email = "alexb@estuary.dev" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "estuary-cdk",
+    "pydantic>=2,<3",
+    "aiohttp>=3.13.4,<4.0.0",
+    "simple-salesforce>=1.12.6,<2.0.0",
+]
 
-[tool.poetry.dependencies]
-estuary-cdk = {path="../estuary-cdk", develop = true}
-pydantic = "^2"
-python = "^3.11"
-aiohttp = "^3.13.4"
-simple-salesforce = "^1.12.6"
-
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.8.0"
-mypy = "^1.8.0"
-pytest = "^8.3.4"
-pytest-asyncio = "^1.4.0"
-pytest-insta = "^0.3.0"
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

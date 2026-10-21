@@ -174,7 +174,7 @@ class AirbyteEntrypoint(object):
 
     @staticmethod
     def airbyte_message_to_string(airbyte_message: AirbyteMessage) -> Any:
-        return airbyte_message.json(exclude_unset=True)
+        return airbyte_message.model_dump_json(exclude_unset=True)
 
     @classmethod
     def extract_state(cls, args: List[str]) -> Optional[Any]:
