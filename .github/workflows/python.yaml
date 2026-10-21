@@ -142,7 +142,7 @@ jobs:
 
       - name: ${{ matrix.connector.name }} tests
         run: |
-          uv sync --package ${{ matrix.connector.name }} --all-extras --group dev --group lint
+          uv sync --locked --package ${{ matrix.connector.name }} --all-extras --group dev --group lint
           uv run --no-sync pytest ${{ matrix.connector.name }}
 
       # Report-only, like the lint step above. The connectors carry a large
