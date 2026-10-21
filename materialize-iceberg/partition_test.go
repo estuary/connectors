@@ -53,21 +53,38 @@ func TestPartitionedTable(t *testing.T) {
 const partitionBuckets = 8
 
 func runPartitionedTable(t *testing.T, cfg config) {
-	h := newPartitionHarness(t, cfg, "acmeCo/tests/partitioned")
+	ctx := t.Context()
+	h, err := newPartitionHarness(ctx, cfg, "acmeCo/tests/partitioned")
+	require.NoError(t, err)
 	suffix := fmt.Sprintf("_flow_test_%d", time.Now().Unix())
 
 	partitionSpec := func(path []string) string {
-		tbl, err := h.mat.catalog.GetTable(h.ctx, path[0], path[1])
+		tbl, err := h.mat.catalog.GetTable(ctx, path[0], path[1])
 		require.NoError(t, err)
 		spec := tbl.Metadata.PartitionSpec()
 		return spec.String()
 	}
+	query := func(q string) [][]any {
+		rows, err := h.query(ctx, q)
+		require.NoError(t, err, q)
+		return rows
+	}
+	merge := func(mb partitionBinding, rows []partitionRow) {
+		require.NoError(t, h.merge(ctx, mb, rows))
+	}
+	explainLoad := func(mb partitionBinding, ids []string) string {
+		q, lb, err := h.loadQuery(ctx, mb, ids)
+		require.NoError(t, err)
+		lines, err := h.runLoad(ctx, "EXPLAIN "+q, lb)
+		require.NoError(t, err)
+		return strings.Join(lines, "\n")
+	}
 
 	// The control table stays unpartitioned so the plans can be compared.
-	partitioned, partitionedPath := h.createTable("partitioned" + suffix)
-	control, _ := h.createTable("control" + suffix)
+	partitioned, partitionedPath := createPartitionTable(t, h, "partitioned"+suffix)
+	control, _ := createPartitionTable(t, h, "control"+suffix)
 
-	h.exec(fmt.Sprintf("ALTER TABLE %s ADD PARTITION FIELD bucket(%d, `id`)", fqn(partitionedPath), partitionBuckets))
+	require.NoError(t, h.exec(ctx, fmt.Sprintf("ALTER TABLE %s ADD PARTITION FIELD bucket(%d, `id`)", fqn(partitionedPath), partitionBuckets)))
 	require.Contains(t, partitionSpec(partitionedPath), fmt.Sprintf("bucket[%d]", partitionBuckets), "the catalog must accept the spec change")
 
 	// rows are the fifty documents merged into both tables, keyed k00..k49.
@@ -76,12 +93,12 @@ func runPartitionedTable(t *testing.T, cfg config) {
 		rows = append(rows, partitionRow{id: fmt.Sprintf("k%02d", i), n: int64(i)})
 	}
 
-	h.merge(partitioned, rows)
-	h.merge(control, rows)
+	merge(partitioned, rows)
+	merge(control, rows)
 
 	// Every file the merge wrote belongs to the bucket spec, which is spec
 	// 1 after the unpartitioned spec 0 the table was created with.
-	files := h.query(fmt.Sprintf("SELECT spec_id, partition.id_bucket_%d FROM %s.files", partitionBuckets, fqn(partitionedPath)))
+	files := query(fmt.Sprintf("SELECT spec_id, partition.id_bucket_%d FROM %s.files", partitionBuckets, fqn(partitionedPath)))
 	require.NotEmpty(t, files)
 	bucketsSeen := map[string]struct{}{}
 	for _, f := range files {
@@ -93,8 +110,10 @@ func runPartitionedTable(t *testing.T, cfg config) {
 
 	// A load of three keys returns exactly those documents.
 	wantIDs := []string{"k03", "k17", "k42"}
+	loaded, err := h.load(ctx, partitioned, wantIDs)
+	require.NoError(t, err)
 	var gotIDs []string
-	for id := range h.load(partitioned, wantIDs) {
+	for id := range loaded {
 		gotIDs = append(gotIDs, id)
 	}
 	require.ElementsMatch(t, wantIDs, gotIDs)
@@ -104,8 +123,7 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	// prints as dynamicpruningexpression(true), so the assertion requires
 	// the IN form that carries the keys.
 	pruned := regexp.MustCompile(`dynamicpruningexpression\([^)]*\bIN\b`)
-	query, lb := h.loadQuery(partitioned, wantIDs)
-	plan := strings.Join(h.runLoad("EXPLAIN "+query, lb), "\n")
+	plan := explainLoad(partitioned, wantIDs)
 	require.Regexp(t, pruned, plan, "no runtime filter on the partitioned table's load:\n%s", plan)
 	for _, line := range strings.Split(plan, "\n") {
 		if pruned.MatchString(line) {
@@ -113,8 +131,7 @@ func runPartitionedTable(t *testing.T, cfg config) {
 		}
 	}
 
-	controlQuery, controlLB := h.loadQuery(control, wantIDs)
-	controlPlan := strings.Join(h.runLoad("EXPLAIN "+controlQuery, controlLB), "\n")
+	controlPlan := explainLoad(control, wantIDs)
 	require.NotContains(t, controlPlan, "dynamicpruningexpression(", "unexpected runtime filter on the unpartitioned table's load:\n%s", controlPlan)
 
 	// A second merge updates every row, which is the copy-on-write rewrite
@@ -123,8 +140,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	for _, r := range rows {
 		updated = append(updated, partitionRow{id: r.id, n: r.n + 100})
 	}
-	h.merge(partitioned, updated)
-	got := h.query(fmt.Sprintf("SELECT `id`, `n` FROM %s ORDER BY `id`", fqn(partitionedPath)))
+	merge(partitioned, updated)
+	got := query(fmt.Sprintf("SELECT `id`, `n` FROM %s ORDER BY `id`", fqn(partitionedPath)))
 	require.Len(t, got, len(updated))
 	for i, r := range got {
 		require.JSONEq(t, fmt.Sprintf("%q", updated[i].id), string(r[0].(json.RawMessage)))
@@ -133,14 +150,14 @@ func runPartitionedTable(t *testing.T, cfg config) {
 
 	// Adding a column through the connector's apply path commits a new
 	// schema, and the spec it did not ask for survives that commit.
-	tbl, err := h.mat.catalog.GetTable(h.ctx, partitionedPath[0], partitionedPath[1])
+	tbl, err := h.mat.catalog.GetTable(ctx, partitionedPath[0], partitionedPath[1])
 	require.NoError(t, err)
-	_, apply, err := h.mat.UpdateResource(h.ctx, partitionedPath, realBoilerplate.ExistingResource{Meta: tbl.Metadata}, realBoilerplate.BindingUpdate[config, resource, mapped]{
+	_, apply, err := h.mat.UpdateResource(ctx, partitionedPath, realBoilerplate.ExistingResource{Meta: tbl.Metadata}, realBoilerplate.BindingUpdate[config, resource, mapped]{
 		Binding:        partitioned,
 		NewProjections: []realBoilerplate.MappedProjection[mapped]{h.project("extra", "/extra", []string{"string"}, false)},
 	})
 	require.NoError(t, err)
-	require.NoError(t, apply(h.ctx))
+	require.NoError(t, apply(ctx))
 	require.Contains(t, partitionSpec(partitionedPath), fmt.Sprintf("bucket[%d]", partitionBuckets), "the spec must survive a schema update")
 	t.Logf("partition spec after the schema update: %s", partitionSpec(partitionedPath))
 }
@@ -165,6 +182,21 @@ func forEachLocalConfig(t *testing.T, fn func(t *testing.T, name string, cfg con
 	}
 }
 
+// createPartitionTable creates a table through the harness and drops it when
+// the test ends.
+func createPartitionTable(t *testing.T, h *partitionHarness, table string) (partitionBinding, []string) {
+	mb, path, err := h.createTable(t.Context(), table)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		// The test's context is already canceled when cleanups run.
+		ctx := context.Background()
+		_, del, err := h.mat.DeleteResource(ctx, path)
+		require.NoError(t, err)
+		_ = del(ctx)
+	})
+	return mb, path
+}
+
 type partitionBinding = realBoilerplate.MappedBinding[config, resource, mapped]
 
 // partitionRow is a document {"id": id, "n": n}.
@@ -176,27 +208,28 @@ type partitionRow struct {
 // partitionHarness runs the connector's own merge and load queries against
 // tables it creates through the connector, on the local Spark daemon.
 type partitionHarness struct {
-	t   *testing.T
-	ctx context.Context
 	cfg config
 	mat *materialization
 }
 
-func newPartitionHarness(t *testing.T, cfg config, name string) *partitionHarness {
-	ctx := context.Background()
+func newPartitionHarness(ctx context.Context, cfg config, name string) (*partitionHarness, error) {
 	flags := common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
 	matIface, err := NewMaterializer(ctx, name, cfg, flags)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 	mat := matIface.(*materialization)
-	_, ok := mat.compute.(*sparkClient)
-	require.True(t, ok, "this test drives the local spark daemon")
+	if _, ok := mat.compute.(*sparkClient); !ok {
+		return nil, fmt.Errorf("this test drives the local spark daemon, got compute %T", mat.compute)
+	}
 
 	// Setup stages the PySpark scripts and records their locations, which
 	// runJob needs to pick its entry point.
-	_, err = mat.Setup(ctx, nil)
-	require.NoError(t, err)
+	if _, err := mat.Setup(ctx, nil); err != nil {
+		return nil, err
+	}
 
-	return &partitionHarness{t: t, ctx: ctx, cfg: cfg, mat: mat}
+	return &partitionHarness{cfg: cfg, mat: mat}, nil
 }
 
 func (h *partitionHarness) project(field, ptr string, types []string, isKey bool) realBoilerplate.MappedProjection[mapped] {
@@ -210,12 +243,13 @@ func (h *partitionHarness) project(field, ptr string, types []string, isKey bool
 	return realBoilerplate.MappedProjection[mapped]{Projection: p, Mapped: mt}
 }
 
-// createTable creates a table keyed on a string id with an integer n, and
-// drops it when the test ends.
-func (h *partitionHarness) createTable(table string) (partitionBinding, []string) {
+// createTable creates a table keyed on a string id with an integer n.
+func (h *partitionHarness) createTable(ctx context.Context, table string) (partitionBinding, []string, error) {
 	res := resource{Table: table}.WithDefaults(h.cfg)
 	path, _, err := res.Parameters()
-	require.NoError(h.t, err)
+	if err != nil {
+		return partitionBinding{}, nil, err
+	}
 	doc := h.project("flow_document", "", []string{"object"}, false)
 	mb := partitionBinding{
 		MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: path},
@@ -225,41 +259,47 @@ func (h *partitionHarness) createTable(table string) (partitionBinding, []string
 		Document:                    &doc,
 	}
 
-	_, err = h.mat.CreateNamespace(h.ctx, path[0])
-	require.NoError(h.t, err)
-	_, apply, err := h.mat.CreateResource(h.ctx, mb)
-	require.NoError(h.t, err)
-	require.NoError(h.t, apply(h.ctx))
-	h.t.Cleanup(func() {
-		_, del, err := h.mat.DeleteResource(context.Background(), path)
-		require.NoError(h.t, err)
-		_ = del(context.Background())
-	})
-	return mb, path
+	if _, err := h.mat.CreateNamespace(ctx, path[0]); err != nil {
+		return partitionBinding{}, nil, err
+	}
+	_, apply, err := h.mat.CreateResource(ctx, mb)
+	if err != nil {
+		return partitionBinding{}, nil, err
+	}
+	if err := apply(ctx); err != nil {
+		return partitionBinding{}, nil, err
+	}
+	return mb, path, nil
 }
 
 func fqn(path []string) string {
 	return fmt.Sprintf("`estuary`.%s.%s", quoteIdentifier(path[0]), quoteIdentifier(path[1]))
 }
 
-func (h *partitionHarness) exec(query string) {
-	require.NoError(h.t, h.mat.compute.(*sparkClient).postDaemon(h.ctx, "exec", python.ExecInput{Query: query}, &daemonResult{}), query)
-}
-
-func (h *partitionHarness) query(query string) [][]any {
-	_, rows, err := h.mat.compute.(rowQuerier).queryRows(h.ctx, query)
-	require.NoError(h.t, err, query)
-	return rows
-}
-
-func (h *partitionHarness) stage(fields []string, values [][]any) string {
-	key := stagedFileClient{}.NewKey([]string{h.cfg.Compute.BucketPath, "partition-" + uuid.NewString(), "staged"})
-	w := stagedFileClient{}.NewWriter(h.mat.bucket.NewWriter(h.ctx, key), fields)
-	for _, v := range values {
-		require.NoError(h.t, w.Write(v))
+func (h *partitionHarness) exec(ctx context.Context, query string) error {
+	if err := h.mat.compute.(*sparkClient).postDaemon(ctx, "exec", python.ExecInput{Query: query}, &daemonResult{}); err != nil {
+		return fmt.Errorf("%s: %w", query, err)
 	}
-	require.NoError(h.t, w.Close())
-	return h.mat.bucket.URI(key)
+	return nil
+}
+
+func (h *partitionHarness) query(ctx context.Context, query string) ([][]any, error) {
+	_, rows, err := h.mat.compute.(rowQuerier).queryRows(ctx, query)
+	return rows, err
+}
+
+func (h *partitionHarness) stage(ctx context.Context, fields []string, values [][]any) (string, error) {
+	key := stagedFileClient{}.NewKey([]string{h.cfg.Compute.BucketPath, "partition-" + uuid.NewString(), "staged"})
+	w := stagedFileClient{}.NewWriter(h.mat.bucket.NewWriter(ctx, key), fields)
+	for _, v := range values {
+		if err := w.Write(v); err != nil {
+			return "", err
+		}
+	}
+	if err := w.Close(); err != nil {
+		return "", err
+	}
+	return h.mat.bucket.URI(key), nil
 }
 
 func columnsOf(mb partitionBinding) (cols, keys []python.NestedField) {
@@ -284,7 +324,7 @@ func boundsOf(mb partitionBinding, ids []string) []mergeBound {
 // merge runs the connector's merge query for the rows exactly as
 // Acknowledge would, through the merge entry point. Rows must be sorted by
 // id, as the connector sends them.
-func (h *partitionHarness) merge(mb partitionBinding, rows []partitionRow) {
+func (h *partitionHarness) merge(ctx context.Context, mb partitionBinding, rows []partitionRow) error {
 	cols, _ := columnsOf(mb)
 	var values [][]any
 	var ids []string
@@ -293,47 +333,59 @@ func (h *partitionHarness) merge(mb partitionBinding, rows []partitionRow) {
 		ids = append(ids, r.id)
 	}
 	var q strings.Builder
-	require.NoError(h.t, h.mat.templates.mergeQuery.Execute(&q, templateInput{
+	if err := h.mat.templates.mergeQuery.Execute(&q, templateInput{
 		binding: binding{Idx: 0, Mapped: &mb},
 		Bounds:  boundsOf(mb, ids),
-	}))
-	require.NoError(h.t, h.mat.compute.runJob(h.ctx, computeJob{
+	}); err != nil {
+		return err
+	}
+	file, err := h.stage(ctx, []string{"id", "n", "flow_document"}, values)
+	if err != nil {
+		return err
+	}
+	return h.mat.compute.runJob(ctx, computeJob{
 		Input: python.MergeInput{Bindings: []python.MergeBinding{{
 			Binding:          0,
 			Query:            q.String(),
 			Columns:          cols,
-			Files:            []string{h.stage([]string{"id", "n", "flow_document"}, values)},
+			Files:            []string{file},
 			IdempotencyToken: uuid.NewString(),
 		}}},
 		EntryPointURI:    h.mat.pyFiles.merge,
 		PyFilesCommonURI: h.mat.pyFiles.common,
 		Name:             "merge",
 		WorkingPrefix:    path.Join(h.cfg.Compute.BucketPath, uuid.NewString()),
-	}))
+	})
 }
 
 // loadQuery renders the connector's load query for the given keys, with
 // the staged key file the query's temporary view reads.
-func (h *partitionHarness) loadQuery(mb partitionBinding, ids []string) (string, python.LoadBinding) {
+func (h *partitionHarness) loadQuery(ctx context.Context, mb partitionBinding, ids []string) (string, python.LoadBinding, error) {
 	_, keys := columnsOf(mb)
 	var values [][]any
 	for _, id := range ids {
 		values = append(values, []any{id})
 	}
 	var q strings.Builder
-	require.NoError(h.t, h.mat.templates.loadQuery.Execute(&q, templateInput{
+	if err := h.mat.templates.loadQuery.Execute(&q, templateInput{
 		binding: binding{Idx: 0, Mapped: &mb},
 		Bounds:  boundsOf(mb, ids),
-	}))
-	return q.String(), python.LoadBinding{Binding: 0, Keys: keys, Files: []string{h.stage([]string{"id"}, values)}}
+	}); err != nil {
+		return "", python.LoadBinding{}, err
+	}
+	file, err := h.stage(ctx, []string{"id"}, values)
+	if err != nil {
+		return "", python.LoadBinding{}, err
+	}
+	return q.String(), python.LoadBinding{Binding: 0, Keys: keys, Files: []string{file}}, nil
 }
 
 // runLoad runs a query through the load entry point and returns the
 // lines of its output files, so it serves both a real load and an
 // EXPLAIN of one.
-func (h *partitionHarness) runLoad(query string, lb python.LoadBinding) []string {
+func (h *partitionHarness) runLoad(ctx context.Context, query string, lb python.LoadBinding) ([]string, error) {
 	outputPrefix := path.Join(h.cfg.Compute.BucketPath, uuid.NewString())
-	require.NoError(h.t, h.mat.compute.runJob(h.ctx, computeJob{
+	if err := h.mat.compute.runJob(ctx, computeJob{
 		Input: python.LoadInput{
 			Query:          query,
 			Bindings:       []python.LoadBinding{lb},
@@ -343,43 +395,70 @@ func (h *partitionHarness) runLoad(query string, lb python.LoadBinding) []string
 		PyFilesCommonURI: h.mat.pyFiles.common,
 		Name:             "load",
 		WorkingPrefix:    outputPrefix,
-	}))
+	}); err != nil {
+		return nil, err
+	}
 
 	var lines []string
-	for obj := range h.mat.bucket.List(h.ctx, blob.Query{Prefix: outputPrefix}) {
+	for obj := range h.mat.bucket.List(ctx, blob.Query{Prefix: outputPrefix}) {
 		if !strings.HasPrefix(path.Base(obj.Key), "part-") {
 			continue
 		}
-		r, err := h.mat.bucket.NewReader(h.ctx, obj.Key)
-		require.NoError(h.t, err)
+		r, err := h.mat.bucket.NewReader(ctx, obj.Key)
+		if err != nil {
+			return nil, err
+		}
 		gzr, err := gzip.NewReader(r)
-		require.NoError(h.t, err)
+		if err != nil {
+			r.Close()
+			return nil, err
+		}
 		scanner := bufio.NewScanner(gzr)
 		scanner.Buffer(make([]byte, 0, 64*1024), math.MaxInt64)
 		for scanner.Scan() {
 			lines = append(lines, scanner.Text())
 		}
-		require.NoError(h.t, scanner.Err())
-		require.NoError(h.t, r.Close())
+		if err := scanner.Err(); err != nil {
+			r.Close()
+			return nil, err
+		}
+		if err := r.Close(); err != nil {
+			return nil, err
+		}
 	}
-	return lines
+	return lines, nil
 }
 
-// load runs the connector's load for the keys and returns n by id. It fails
-// the test if the load returns any id more than once.
-func (h *partitionHarness) load(mb partitionBinding, ids []string) map[string]int64 {
+// load runs the connector's load for the keys and returns n by id. It
+// returns an error if the load returns any id more than once.
+func (h *partitionHarness) load(ctx context.Context, mb partitionBinding, ids []string) (map[string]int64, error) {
+	q, lb, err := h.loadQuery(ctx, mb, ids)
+	if err != nil {
+		return nil, err
+	}
+	lines, err := h.runLoad(ctx, q, lb)
+	if err != nil {
+		return nil, err
+	}
 	got := map[string]int64{}
-	for _, line := range h.runLoad(h.loadQuery(mb, ids)) {
+	for _, line := range lines {
 		idx, doc, found := strings.Cut(line, "\x00")
-		require.True(h.t, found, "load output line without a binding separator: %q", line)
-		require.Equal(h.t, "0", idx)
+		if !found {
+			return nil, fmt.Errorf("load output line without a binding separator: %q", line)
+		} else if idx != "0" {
+			return nil, fmt.Errorf("load output line for binding %s, want 0: %q", idx, line)
+		}
 		var parsed struct {
 			ID string `json:"id"`
 			N  int64  `json:"n"`
 		}
-		require.NoError(h.t, json.Unmarshal([]byte(doc), &parsed), doc)
-		require.NotContains(h.t, got, parsed.ID, "load returned a key twice")
+		if err := json.Unmarshal([]byte(doc), &parsed); err != nil {
+			return nil, fmt.Errorf("%s: %w", doc, err)
+		}
+		if _, dup := got[parsed.ID]; dup {
+			return nil, fmt.Errorf("load returned key %q twice", parsed.ID)
+		}
 		got[parsed.ID] = parsed.N
 	}
-	return got
+	return got, nil
 }

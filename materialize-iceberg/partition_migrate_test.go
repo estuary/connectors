@@ -33,14 +33,21 @@ func TestPartitionMigration(t *testing.T) {
 const migrateBuckets = 16
 
 func runPartitionMigration(t *testing.T, cfg config, container string) {
-	h := newPartitionHarness(t, cfg, "acmeCo/tests/partition-migrate")
-	mb, tablePath := h.createTable(fmt.Sprintf("migrate_flow_test_%d", time.Now().Unix()))
+	ctx := t.Context()
+	h, err := newPartitionHarness(ctx, cfg, "acmeCo/tests/partition-migrate")
+	require.NoError(t, err)
+	mb, tablePath := createPartitionTable(t, h, fmt.Sprintf("migrate_flow_test_%d", time.Now().Unix()))
 	byID := func(a, b partitionRow) int { return strings.Compare(a.id, b.id) }
+	query := func(q string) [][]any {
+		rows, err := h.query(ctx, q)
+		require.NoError(t, err, q)
+		return rows
+	}
 	count := func(where string) string {
-		return strings.Trim(string(h.query(fmt.Sprintf("SELECT count(*) FROM %s %s", fqn(tablePath), where))[0][0].(json.RawMessage)), `"`)
+		return strings.Trim(string(query(fmt.Sprintf("SELECT count(*) FROM %s %s", fqn(tablePath), where))[0][0].(json.RawMessage)), `"`)
 	}
 	specIDs := func() [][]any {
-		return h.query(fmt.Sprintf("SELECT spec_id, count(*) FROM %s.files GROUP BY spec_id", fqn(tablePath)))
+		return query(fmt.Sprintf("SELECT spec_id, count(*) FROM %s.files GROUP BY spec_id", fqn(tablePath)))
 	}
 
 	// Twelve merges of random keys, so every file's min/max key range spans
@@ -60,7 +67,7 @@ func runPartitionMigration(t *testing.T, cfg config, container string) {
 			batch = append(batch, partitionRow{id: id, n: int64(i)})
 		}
 		slices.SortFunc(batch, byID)
-		h.merge(mb, batch)
+		require.NoError(t, h.merge(ctx, mb, batch))
 	}
 	pick := func(n int) []string {
 		var out []string
@@ -73,8 +80,8 @@ func runPartitionMigration(t *testing.T, cfg config, container string) {
 
 	// Rewrite every file into the new spec. partial-progress commits each file
 	// group as it finishes, so a failure on a large table keeps the work done.
-	h.exec(fmt.Sprintf("ALTER TABLE %s ADD PARTITION FIELD bucket(%d, `id`)", fqn(tablePath), migrateBuckets))
-	h.query(fmt.Sprintf(
+	require.NoError(t, h.exec(ctx, fmt.Sprintf("ALTER TABLE %s ADD PARTITION FIELD bucket(%d, `id`)", fqn(tablePath), migrateBuckets)))
+	query(fmt.Sprintf(
 		"CALL estuary.system.rewrite_data_files(table => '%s.%s', strategy => 'sort', options => map('rewrite-all', 'true', 'partial-progress.enabled', 'true'))",
 		tablePath[0], tablePath[1]))
 	specs := specIDs()
@@ -86,7 +93,8 @@ func runPartitionMigration(t *testing.T, cfg config, container string) {
 	// filter drops the file tasks of the buckets that don't hold them.
 	want := pick(3)
 	since := time.Now()
-	got := h.load(mb, want)
+	got, err := h.load(ctx, mb, want)
+	require.NoError(t, err)
 	require.Len(t, got, len(want))
 	for _, id := range want {
 		require.Equal(t, all[id], got[id], id)
@@ -114,7 +122,7 @@ func runPartitionMigration(t *testing.T, cfg config, container string) {
 		all[id] = 2000
 	}
 	slices.SortFunc(batch, byID)
-	h.merge(mb, batch)
+	require.NoError(t, h.merge(ctx, mb, batch))
 	require.Equal(t, strconv.Itoa(len(all)), count(""))
 	require.Equal(t, "70", count("WHERE n >= 1000"))
 	require.Len(t, specIDs(), 1, "merge wrote files under the old spec")
