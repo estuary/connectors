@@ -44,8 +44,8 @@ var streamV2WaitCommitTimeout = 10 * time.Minute
 const streamV2TokenRefreshMargin = 5 * time.Minute
 
 // streamV2APIError is an error the Snowpipe Streaming REST API reported, either
-// as a non-2xx response or as a channel status other than SUCCESS, in which case
-// Status is zero.
+// as a non-2xx response or as a channel status code with the ERR_ prefix, in which
+// case Status is zero.
 //
 // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api#error-response-structure
 type streamV2APIError struct {
@@ -70,6 +70,18 @@ type streamV2ChannelStatusResult struct {
 	CommittedToken   *string `json:"last_committed_offset_token"`
 	RowsErrorCount   int64   `json:"rows_error_count"`
 	LastErrorMessage string  `json:"last_error_message"`
+}
+
+// checkCode fails a status whose code has the ERR_ prefix. Any other code but
+// SUCCESS is logged and accepted, because Snowflake does not document the codes
+// it reports.
+func (s *streamV2ChannelStatusResult) checkCode(channelName string) error {
+	if strings.HasPrefix(s.StatusCode, "ERR_") {
+		return &streamV2APIError{Code: s.StatusCode, Message: s.LastErrorMessage}
+	} else if s.StatusCode != "SUCCESS" {
+		log.WithFields(log.Fields{"channel": channelName, "code": s.StatusCode, "message": s.LastErrorMessage}).Warn("snowpipe streaming channel reported an unexpected status code")
+	}
+	return nil
 }
 
 // validateRejectedRows fails a channel on which Snowflake has ever rejected a row,
@@ -362,8 +374,8 @@ func (c *streamV2Client) OpenChannel(ctx context.Context, database, schema, tabl
 	if err := c.call(ctx, "PUT", pipePath+"/channels/"+url.PathEscape(channelName), nil, []byte("{}"), nil, &res); err != nil {
 		return nil, err
 	}
-	if res.Status.StatusCode != "SUCCESS" {
-		return nil, &streamV2APIError{Code: res.Status.StatusCode, Message: res.Status.LastErrorMessage}
+	if err := res.Status.checkCode(channelName); err != nil {
+		return nil, err
 	}
 
 	c.mu.Lock()
@@ -440,8 +452,8 @@ func (c *streamV2Client) ChannelStatus(ctx context.Context, channelName string) 
 	var status, ok = res.Statuses[channelName]
 	if !ok || status == nil {
 		return nil, fmt.Errorf("channel %q is unknown to Snowflake", channelName)
-	} else if status.StatusCode != "SUCCESS" {
-		return nil, &streamV2APIError{Code: status.StatusCode, Message: status.LastErrorMessage}
+	} else if err := status.checkCode(channelName); err != nil {
+		return nil, err
 	}
 	return status, nil
 }
