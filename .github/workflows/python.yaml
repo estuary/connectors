@@ -181,6 +181,23 @@ jobs:
             USAGE_RATE=${{ matrix.connector.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
 
+      # The tests run in the workspace venv, which also holds the dev group, so
+      # an import that only a dev dependency satisfies still passes them.
+      # Asking the built image for its spec imports the connector from what
+      # the image actually installed.
+      - name: ${{ matrix.connector.name }} image smoke test
+        run: |
+          cat > "${RUNNER_TEMP}/smoke.flow.yaml" <<EOF
+          captures:
+            acmeCo/smoke-test:
+              endpoint:
+                connector:
+                  image: ghcr.io/estuary/${{ matrix.connector.name }}:local
+                  config: {}
+              bindings: []
+          EOF
+          flowctl raw spec --source "${RUNNER_TEMP}/smoke.flow.yaml" > /dev/null
+
       - name: Deployment
         uses: ./.github/actions/deploy
         with:
