@@ -9,6 +9,16 @@
     "lastModifiedBy",
     "updatedAt"
   ],
+  "acmeCo/alert_subscriptions": [
+    "_meta",
+    "alertTypes",
+    "catalogPrefix",
+    "createdAt",
+    "destination",
+    "detail",
+    "email",
+    "updatedAt"
+  ],
   "acmeCo/alerts": [
     "_meta",
     "alertType",
