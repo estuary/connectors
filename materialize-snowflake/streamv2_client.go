@@ -40,6 +40,10 @@ const streamV2MaxAppendBytes = 4 * 1024 * 1024
 // tests can shorten it.
 var streamV2WaitCommitTimeout = 10 * time.Minute
 
+// streamV2RoleNotGrantedCode is the error code of a token exchange refused
+// because the user does not hold the requested role.
+const streamV2RoleNotGrantedCode = "390186"
+
 // streamV2TokenRefreshMargin is how long before the scoped token expires that a
 // refresh starts.
 const streamV2TokenRefreshMargin = 5 * time.Minute
@@ -245,7 +249,12 @@ func (c *streamV2Client) refreshToken(ctx context.Context, ingestURL *string) (s
 	jwtHeaders.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := c.send(ctx, "POST", c.accountURL+"/oauth/token", []byte(form.Encode()), jwtHeaders)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("exchanging the JWT for a scoped token: %w", err)
+		err = fmt.Errorf("exchanging the JWT for a scoped token: %w", err)
+		var apiErr *streamV2APIError
+		if c.role != "" && errors.As(err, &apiErr) && apiErr.Status == http.StatusUnauthorized && apiErr.Code == streamV2RoleNotGrantedCode {
+			err = fmt.Errorf("role %q is not granted to user %q, or does not exist (unquoted role names are case-insensitive; quoted names must match exactly): %w", c.role, c.user, err)
+		}
+		return "", time.Time{}, err
 	}
 	var token = strings.TrimSpace(string(res))
 
