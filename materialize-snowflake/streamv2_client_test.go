@@ -135,3 +135,28 @@ func TestStreamV2ClientRefreshDoesNotBlockValidCallers(t *testing.T) {
 	close(release)
 	require.Equal(t, "token-2", <-refreshed)
 }
+
+// TestStreamV2PipePath covers object names that Snowflake resolves only when
+// quoted, because the REST API reads each path segment as a SQL identifier.
+func TestStreamV2PipePath(t *testing.T) {
+	for _, tc := range []struct {
+		database, schema, table string
+		want                    string
+	}{
+		{"DB", "SCH", "MY_TABLE", `databases/DB/schemas/SCH/pipes/%22MY_TABLE-STREAMING%22`},
+		{"DB", "SCH", "my-table", `databases/DB/schemas/SCH/pipes/%22my-table-STREAMING%22`},
+		{"DB", "SCH", "order", `databases/DB/schemas/SCH/pipes/%22order-STREAMING%22`},
+		{"DB", "SCH", "Mixed-Case", `databases/DB/schemas/SCH/pipes/%22Mixed-Case-STREAMING%22`},
+		{"DB", "SCH", `a"b`, `databases/DB/schemas/SCH/pipes/%22a%22%22b-STREAMING%22`},
+		{"DB", "SCH", "with space", `databases/DB/schemas/SCH/pipes/%22with%20space-STREAMING%22`},
+		{"DB", "zz-names", "my-table", `databases/DB/schemas/%22zz-names%22/pipes/%22my-table-STREAMING%22`},
+		{"DB", "order", "T", `databases/DB/schemas/%22order%22/pipes/%22T-STREAMING%22`},
+		// A simple database name stays unquoted, so Snowflake folds its case as
+		// it does for the configured connection database.
+		{"estuary_db", "SCH", "T", `databases/estuary_db/schemas/SCH/pipes/%22T-STREAMING%22`},
+		{"my-db", "SCH", "T", `databases/%22my-db%22/schemas/SCH/pipes/%22T-STREAMING%22`},
+	} {
+		require.Equal(t, tc.want, streamV2PipePath(tc.database, tc.schema, tc.table),
+			"%s.%s.%s", tc.database, tc.schema, tc.table)
+	}
+}

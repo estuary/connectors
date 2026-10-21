@@ -1238,6 +1238,8 @@ func TestStreamingQuotedSchema(t *testing.T) {
 	var schema = "quoted-schema-" + testRunNonce
 	var tableName = "QUOTED_SCHEMA_TEST"
 	var fqTable = testDialect.Identifier(schema, tableName)
+	var hyphenTableName = "quoted-schema-test"
+	var fqHyphenTable = testDialect.Identifier(schema, hyphenTableName)
 	var cleanup = func() {
 		db.ExecContext(ctx, fmt.Sprintf("DROP SCHEMA IF EXISTS %s;", testDialect.Identifier(schema)))
 	}
@@ -1245,6 +1247,8 @@ func TestStreamingQuotedSchema(t *testing.T) {
 	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA %s;", testDialect.Identifier(schema)))
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (KEY TEXT, VAL NUMBER);", fqTable))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (KEY TEXT, VAL NUMBER);", fqHyphenTable))
 	require.NoError(t, err)
 	// Registered before the managers' stops below, so the cleanup stack stops
 	// them while the table they hold channels on still exists.
@@ -1256,6 +1260,13 @@ func TestStreamingQuotedSchema(t *testing.T) {
 		Keys:       []sql.Column{{Identifier: `KEY`}},
 		Values:     []sql.Column{{Identifier: `VAL`}},
 		StateKey:   noncedStateKey("quoted.v1"),
+	}
+	var hyphenTarget = sql.Table{
+		TableShape: sql.TableShape{Path: []string{schema, hyphenTableName}, Binding: 1, DeltaUpdates: true},
+		Identifier: fqHyphenTable,
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   noncedStateKey("quoted-hyphen.v1"),
 	}
 
 	t.Run("snowpipe_streaming", func(t *testing.T) {
@@ -1279,14 +1290,18 @@ func TestStreamingQuotedSchema(t *testing.T) {
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 		require.NoError(t, err)
 
-		var loc = testDialect.TableLocator(target.Path)
-		m.addBinding(cfg.Database, loc.TableSchema, testDialect.Identifier(loc.TableName), target, nil)
-		require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", 1}))
+		for _, tgt := range []sql.Table{target, hyphenTarget} {
+			var loc = testDialect.TableLocator(tgt.Path)
+			m.addBinding(cfg.Database, loc.TableSchema, testDialect.Identifier(loc.TableName), tgt, nil)
+			require.NoError(t, testWriteRow(ctx, m, tgt.Binding, []any{"k", 1}))
+		}
 		_, err = m.flush(ctx)
 		require.NoError(t, err)
 
-		var count int
-		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", fqTable)).Scan(&count))
-		require.Equal(t, 1, count)
+		for _, fq := range []string{fqTable, fqHyphenTable} {
+			var count int
+			require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", fq)).Scan(&count))
+			require.Equal(t, 1, count, fq)
+		}
 	})
 }
