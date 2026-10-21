@@ -111,3 +111,35 @@ dev = [
 lint = [
     "pyright==1.1.408",
 ]
+
+# Type checking. Every workspace member is checked, but nothing gates on it:
+# the connectors carry a backlog in the low thousands, so findings are
+# surfaced as annotations and worked down separately. `vendor/` is excluded as
+# vendored Airbyte code that is never edited to satisfy a checker.
+[tool.pyright]
+include = [
+    "estuary-cdk/estuary_cdk",
+    "source-*",
+]
+exclude = ["**/.venv", "**/__pycache__", "estuary-cdk/vendor"]
+# The workspace's own version. estuary-cdk supports 3.11 as well, but a
+# second config for it would be a net loss: a per-member `[tool.pyright]`
+# replaces the root's rules rather than extending them, so all six promotions
+# below would have to be kept in sync by hand -- and pyright picks its config
+# from the invocation directory, not the path argument, so `pyright
+# estuary-cdk/estuary_cdk` from the repo root would read this file anyway. The
+# 3.11 guarantee is carried by estuary-cdk.yaml's supported-Pythons job, which
+# compiles and tests on a real 3.11 interpreter.
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+
+# Rules from strict mode that are worth having on their own. Full strict is
+# dominated by the "Unknown type" family, which is a real annotation project
+# rather than a setting. reportMissingTypeStubs stays off: its hits are
+# pycron, ijson and airbyte_protocol, none of which we can produce stubs for.
+reportUnusedImport = "error"
+reportMissingParameterType = "error"
+reportInvalidTypeVarUse = "error"
+reportDeprecated = "error"
+reportUnnecessaryIsInstance = "error"
+reportPrivateUsage = "error"

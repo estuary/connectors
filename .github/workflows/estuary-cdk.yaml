@@ -40,21 +40,38 @@ jobs:
           version: "0.13.3"
           enable-cache: true
 
-      # Report-only: findings show up as PR annotations without failing the
-      # job. One Python version is enough to report them, and running it once
-      # keeps them from being reported twice. The version must match
+      # Report-only, like the connector workflow: findings are surfaced as
+      # annotations without failing the job. The version must match
       # `required-version` in ruff.toml.
       - name: Lint
-        run: uvx ruff@0.16.9 check --exit-zero --output-format=github estuary-cdk
+        run: |
+          uvx ruff@0.16.9 check --exit-zero --output-format=github estuary-cdk
+          # GitHub renders only the first handful of annotations per step, so
+          # the counts also go to the job summary, where none are dropped.
+          {
+            echo "### ruff: estuary-cdk"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics estuary-cdk
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install dependencies and run tests
         run: |
           # --all-extras: tests/test_airbyte_cdk.py imports the shim, which needs
           # the `airbyte-shim` extra's dependencies for the vendored Airbyte CDK.
-          uv sync --package estuary_cdk --all-extras --group dev
+          uv sync --package estuary_cdk --all-extras --group dev --group lint
           cd estuary-cdk
           uv run --no-sync python -m compileall -q estuary_cdk vendor
           uv run --no-sync pytest
+
+      # Report-only, as above. estuary_cdk alone is checked here; the
+      # connectors are checked by their own workflow, where the matrix keeps
+      # each job's findings to one connector.
+      - name: Type-check
+        run: |
+          uv run --no-sync pyright --outputjson estuary-cdk/estuary_cdk \
+            | python3 .github/scripts/pyright_annotations.py estuary-cdk
 
   # estuary-cdk declares `>=3.11,<4.0` rather than the workspace's 3.14,
   # because it is also consumed outside this repository -- source-netsuite is
