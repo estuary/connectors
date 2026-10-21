@@ -66,7 +66,7 @@ jobs:
         run: |
           # --all-extras: tests/test_airbyte_cdk.py imports the shim, which needs
           # the `airbyte-shim` extra's dependencies for the vendored Airbyte CDK.
-          uv sync --package estuary_cdk --all-extras --group dev --group lint
+          uv sync --locked --package estuary_cdk --all-extras --group dev --group lint
           cd estuary-cdk
           uv run --no-sync python -m compileall -q estuary_cdk vendor
           uv run --no-sync pytest
