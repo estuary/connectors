@@ -10,6 +10,9 @@ on:
       - "estuary-cdk/**"
       - ".github/workflows/estuary-cdk.yaml"
       - "ruff.toml"
+      # The workspace lock, and the root pyproject's pyright config.
+      - "uv.lock"
+      - "pyproject.toml"
 
   pull_request:
     branches: [main]
@@ -17,6 +20,9 @@ on:
       - "estuary-cdk/**"
       - ".github/workflows/estuary-cdk.yaml"
       - "ruff.toml"
+      # The workspace lock, and the root pyproject's pyright config.
+      - "uv.lock"
+      - "pyproject.toml"
 
 concurrency:
   group: estuary-cdk-${{ github.ref }}

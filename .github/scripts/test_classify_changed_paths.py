@@ -70,6 +70,13 @@ class TestLanes(unittest.TestCase):
         self.assertEqual(classify(".dockerignore"), (True, True, ALL))
         self.assertEqual(classify("connector-variant.Dockerfile"), (True, True, ALL))
 
+    def test_workspace_manifests_are_python_all(self):
+        # Every workspace member resolves from the root manifest and lock, so
+        # either one reaches every Python connector -- and only those. The two
+        # Python packages that belong to Go connectors are not members.
+        self.assertEqual(classify("uv.lock"), (True, False, ALL))
+        self.assertEqual(classify("pyproject.toml"), (True, False, ALL))
+
     def test_docs_are_neither(self):
         self.assertEqual(classify("CLAUDE.md"), (False, False, []))
         self.assertEqual(classify("docs/contexts/captures.md"), (False, False, []))
