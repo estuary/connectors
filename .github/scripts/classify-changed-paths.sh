@@ -60,6 +60,12 @@ while IFS= read -r path || [ -n "$path" ]; do
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;
 
+        # The uv workspace resolves every member from these two files, so a
+        # change to either reaches every Python connector. They are named here
+        # because the directory heuristic below only looks at a path's first
+        # segment, and theirs is the file itself.
+        uv.lock | pyproject.toml) lane="python" ;;
+
         # Shared build plumbing that both workflows invoke. Both workflows also
         # build images with the repo root as the Docker context, so the root
         # .dockerignore shapes every image, and the deploy action layers
@@ -98,8 +104,9 @@ while IFS= read -r path || [ -n "$path" ]; do
             python=true
             case "$path" in
                 # The CDK (and the Dockerfiles connectors symlink to), the
-                # workflow and its connector list feed every Python connector.
-                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml)
+                # workflow and its connector list, and the workspace manifest
+                # and lock, feed every Python connector.
+                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml | uv.lock | pyproject.toml)
                     python_all=true ;;
                 *) python_dirs+=("${path%%/*}") ;;
             esac
