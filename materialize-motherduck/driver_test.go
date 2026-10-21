@@ -209,16 +209,18 @@ const (
 	// early leaves the rest to the next.
 	snapshotExpiryCalls  = 10
 	snapshotExpiryBudget = 15 * time.Second
-	// snapshotBacklogLimit is the snapshot count above which the variant fails
-	// before it runs. MotherDuck returns internal errors on ordinary statements
-	// against a DuckLake database with a large enough backlog.
+	// snapshotBacklogLimit is the count of snapshots older than
+	// snapshotRetention above which the variant fails before it runs. MotherDuck
+	// returns internal errors on ordinary statements against a DuckLake database
+	// with a large enough backlog.
 	snapshotBacklogLimit = 20_000
 )
 
-// maintainSnapshots fails the variant if its DuckLake database holds more
-// snapshots than snapshotBacklogLimit, and expires old snapshots once the
-// variant's subtests finish. A DuckLake database keeps every snapshot until one
-// is expired explicitly, so a shared test database grows with every run.
+// maintainSnapshots fails the variant if its DuckLake database holds more than
+// snapshotBacklogLimit snapshots older than snapshotRetention, and expires old
+// snapshots once the variant's subtests finish. A DuckLake database keeps every
+// snapshot until one is expired explicitly, so a shared test database grows with
+// every run.
 func maintainSnapshots(t *testing.T, variant integrationVariant) {
 	t.Helper()
 
@@ -243,17 +245,20 @@ func maintainSnapshots(t *testing.T, variant integrationVariant) {
 		backlog, err := snapshotBacklog(ctx, db, database)
 		require.NoError(t, err)
 		require.LessOrEqualf(t, backlog, snapshotBacklogLimit,
-			"database %q holds %d snapshots, so expiry is not keeping up with test runs", cfg.Database, backlog)
+			"database %q holds %d snapshots older than %s, so expiry is not keeping up with test runs",
+			cfg.Database, backlog, snapshotRetention)
 	})
 }
 
-// snapshotBacklog returns the number of snapshots held by the DuckLake database
-// named by the SQL literal database.
+// snapshotBacklog returns the number of snapshots older than snapshotRetention
+// in the DuckLake database named by the SQL literal database. These are the
+// snapshots expireSnapshots may remove.
 func snapshotBacklog(ctx context.Context, db *stdsql.DB, database string) (int, error) {
 	var count int
-	err := db.QueryRowContext(ctx,
-		fmt.Sprintf("SELECT count(*) FROM ducklake_snapshots(%s)", database),
-	).Scan(&count)
+	err := db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT count(*) FROM ducklake_snapshots(%s) WHERE snapshot_time < now() - INTERVAL %s",
+		database, snapshotRetention,
+	)).Scan(&count)
 	return count, err
 }
 
