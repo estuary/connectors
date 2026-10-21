@@ -121,9 +121,19 @@ type streamV2OpenChannel struct {
 }
 
 // streamV2PipePath is the path of a table's default pipe under /v2/streaming/.
+// database, schema and table are unquoted names. Snowflake reads each path
+// segment as a SQL identifier, so a segment is quoted under the same rule as SQL.
 func streamV2PipePath(database, schema, table string) string {
 	return fmt.Sprintf("databases/%s/schemas/%s/pipes/%s",
-		url.PathEscape(database), url.PathEscape(schema), url.PathEscape(table+streamV2DefaultPipeSuffix))
+		streamV2PathIdentifier(database), streamV2PathIdentifier(schema), streamV2PathIdentifier(table+streamV2DefaultPipeSuffix))
+}
+
+// streamV2PathIdentifier is name as a path-escaped SQL identifier.
+func streamV2PathIdentifier(name string) string {
+	if !isSimpleIdentifier(name) {
+		name = `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+	}
+	return url.PathEscape(name)
 }
 
 func newStreamV2Client(cfg *config, accountURL, account string) (*streamV2Client, error) {

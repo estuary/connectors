@@ -338,7 +338,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 	// The schema is shared with CI, so the table carries a name no other run can
 	// derive. Both write paths store the same two columns into it.
-	var tableName = fmt.Sprintf("STREAMV2_SWITCH_flow_test_%d", time.Now().Unix())
+	var tableName = fmt.Sprintf("STREAMV2_SWITCH_FLOW_TEST_%d", time.Now().Unix())
 	var cleanup = func() {
 		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tableName))
 	}
