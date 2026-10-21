@@ -7,6 +7,7 @@ use std::borrow::Cow;
 #[serde(tag = "type")]
 pub enum Store {
     S3(S3Config),
+    Gcs(GcsConfig),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -25,6 +26,19 @@ pub struct Credentials {
     pub aws_access_key_id: String,
     #[serde(rename = "awsSecretAccessKey")]
     pub aws_secret_access_key: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GcsConfig {
+    pub bucket: String,
+    pub prefix: String,
+    pub credentials: GcsCredentials,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct GcsCredentials {
+    #[serde(rename = "serviceAccountJson")]
+    pub service_account_json: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -102,6 +116,43 @@ impl JsonSchema for EndpointConfig {
                                     "description": "Endpoint URL of an S3-compatible store to use in place of AWS S3. Only needed for testing against a local S3-compatible store.",
                                     "type": "string",
                                     "advanced": true
+                                }
+                            }
+                        },
+                        {
+                            "title": "Google Cloud Storage",
+                            "description": "Store data in Google Cloud Storage.",
+                            "type": "object",
+                            "required": ["type", "bucket", "prefix", "credentials"],
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "const": "Gcs",
+                                    "default": "Gcs"
+                                },
+                                "bucket": {
+                                    "title": "Bucket",
+                                    "description": "Name of the GCS bucket to write data files to.",
+                                    "type": "string"
+                                },
+                                "prefix": {
+                                    "title": "Prefix",
+                                    "description": "Key prefix under the bucket to write data files under.",
+                                    "type": "string"
+                                },
+                                "credentials": {
+                                    "title": "GCS Credentials",
+                                    "description": "Google Cloud credentials used to write to the bucket.",
+                                    "type": "object",
+                                    "required": ["serviceAccountJson"],
+                                    "properties": {
+                                        "serviceAccountJson": {
+                                            "title": "Service Account JSON",
+                                            "description": "Contents of a Google Cloud service account key file, in JSON format.",
+                                            "type": "string",
+                                            "secret": true
+                                        }
+                                    }
                                 }
                             }
                         }

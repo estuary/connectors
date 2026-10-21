@@ -18,6 +18,7 @@ use object_store::ObjectStore;
 use object_store::ObjectStoreExt;
 use object_store::PutPayload;
 use object_store::aws::AmazonS3Builder;
+use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::path::Path as ObjectPath;
 use parquet::arrow::ArrowWriter;
 use parquet::arrow::PARQUET_FIELD_ID_META_KEY;
@@ -68,12 +69,13 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         .expect("must have a materialization spec");
 
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
-    let (object_store, prefix, bucket) = build_object_store(&config.store)?;
+    let (object_store, prefix, bucket, scheme) = build_object_store(&config.store)?;
 
     let catalog = Arc::new(Catalog {
-        object_store: object_store.clone(),
-        prefix: prefix.clone(),
-        bucket: bucket.clone(),
+        object_store,
+        prefix,
+        bucket,
+        scheme,
     });
     // Torn down (aborted) when this function returns, since the server is
     // only meaningful for the lifetime of this materialization's commits.
@@ -264,9 +266,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
             Some(request::Kind::StartCommit(_)) => {
                 tracing::warn!("StartCommit");
                 for binding in bindings.iter_mut() {
-                    binding
-                        .write_and_upload(&object_store, &prefix, &bucket)
-                        .await?;
+                    binding.write_and_upload(&catalog).await?;
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
@@ -280,7 +280,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
             Some(request::Kind::Acknowledge(_)) => {
                 tracing::warn!("Acknowledge");
                 for binding in bindings.iter_mut() {
-                    binding.acknowledge(&object_store, &prefix, &bucket).await?;
+                    binding.acknowledge(&catalog).await?;
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
@@ -312,26 +312,41 @@ fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::Connector
 
 pub(crate) fn build_object_store(
     store: &StoreConfig,
-) -> Result<(Arc<dyn ObjectStore>, String, String)> {
-    let StoreConfig::S3(s3) = store;
+) -> Result<(Arc<dyn ObjectStore>, String, String, &'static str)> {
+    match store {
+        StoreConfig::S3(s3) => {
+            let mut builder = AmazonS3Builder::new()
+                .with_bucket_name(&s3.bucket)
+                .with_region(&s3.region)
+                .with_access_key_id(&s3.credentials.aws_access_key_id)
+                .with_secret_access_key(&s3.credentials.aws_secret_access_key)
+                // rustfs and MinIO require path-style addressing.
+                .with_virtual_hosted_style_request(false);
 
-    let mut builder = AmazonS3Builder::new()
-        .with_bucket_name(&s3.bucket)
-        .with_region(&s3.region)
-        .with_access_key_id(&s3.credentials.aws_access_key_id)
-        .with_secret_access_key(&s3.credentials.aws_secret_access_key)
-        // rustfs and MinIO require path-style addressing.
-        .with_virtual_hosted_style_request(false);
+            if let Some(endpoint) = &s3.endpoint {
+                builder = builder.with_endpoint(endpoint).with_allow_http(true);
+            }
 
-    if let Some(endpoint) = &s3.endpoint {
-        builder = builder.with_endpoint(endpoint).with_allow_http(true);
+            Ok((
+                Arc::new(builder.build()?),
+                s3.prefix.clone(),
+                s3.bucket.clone(),
+                "s3",
+            ))
+        }
+        StoreConfig::Gcs(gcs) => {
+            let builder = GoogleCloudStorageBuilder::new()
+                .with_bucket_name(&gcs.bucket)
+                .with_service_account_key(&gcs.credentials.service_account_json);
+
+            Ok((
+                Arc::new(builder.build()?),
+                gcs.prefix.clone(),
+                gcs.bucket.clone(),
+                "gs",
+            ))
+        }
     }
-
-    Ok((
-        Arc::new(builder.build()?),
-        s3.prefix.clone(),
-        s3.bucket.clone(),
-    ))
 }
 
 struct BindingState {
@@ -367,12 +382,7 @@ struct BindingState {
 }
 
 impl BindingState {
-    async fn write_and_upload(
-        &mut self,
-        object_store: &Arc<dyn ObjectStore>,
-        prefix: &str,
-        bucket: &str,
-    ) -> Result<()> {
+    async fn write_and_upload(&mut self, catalog: &Catalog) -> Result<()> {
         if self.rows == 0 && self.pending_deletes.is_empty() {
             return Ok(());
         }
@@ -425,13 +435,16 @@ impl BindingState {
             let rows = self.rows;
             let path = ObjectPath::from(format!(
                 "{}/{}/data/{}.parquet",
-                prefix,
+                catalog.prefix,
                 self.table,
                 Uuid::new_v4()
             ));
 
             let started = Instant::now();
-            object_store.put(&path, PutPayload::from(buf)).await?;
+            catalog
+                .object_store
+                .put(&path, PutPayload::from(buf))
+                .await?;
 
             tracing::info!(
                 table = %self.table,
@@ -449,14 +462,12 @@ impl BindingState {
                 .collect();
 
             let pending_manifest = manifest::write_manifest(
-                object_store,
-                prefix,
-                bucket,
+                catalog,
                 &self.table,
                 &self.table_schema.to_string(),
                 snapshot_id,
                 DataFileInfo {
-                    file_path: format!("s3://{bucket}/{path}"),
+                    file_path: catalog.uri(&path.to_string()),
                     record_count: rows as i64,
                     file_size_in_bytes: bytes as i64,
                     split_offsets,
@@ -472,9 +483,7 @@ impl BindingState {
 
         for (file_path, positions) in self.pending_deletes.drain() {
             let pending_manifest = write_position_delete_file(
-                object_store,
-                prefix,
-                bucket,
+                catalog,
                 &self.table,
                 &self.table_schema.to_string(),
                 snapshot_id,
@@ -488,12 +497,7 @@ impl BindingState {
         Ok(())
     }
 
-    async fn acknowledge(
-        &mut self,
-        object_store: &Arc<dyn ObjectStore>,
-        prefix: &str,
-        bucket: &str,
-    ) -> Result<()> {
+    async fn acknowledge(&mut self, catalog: &Catalog) -> Result<()> {
         if self.checkpoint.pending_manifests.is_empty() {
             return Ok(());
         }
@@ -504,13 +508,13 @@ impl BindingState {
             .unwrap_or(self.checkpoint.sequence_number + 1);
 
         let prior_entries = match &self.checkpoint.manifest_list {
-            Some(path) => manifest_list::read_manifest_list(object_store, path).await?,
+            Some(path) => manifest_list::read_manifest_list(&catalog.object_store, path).await?,
             None => Vec::new(),
         };
 
         let manifest_list_path = manifest_list::write_manifest_list(
-            object_store,
-            prefix,
+            &catalog.object_store,
+            &catalog.prefix,
             &self.table,
             snapshot_id,
             snapshot_id,
@@ -539,7 +543,7 @@ impl BindingState {
             snapshot_id,
             self.checkpoint.snapshot_id,
             snapshot_id,
-            format!("s3://{bucket}/{manifest_list_path}"),
+            catalog.uri(&manifest_list_path),
             added_files_count,
             added_rows_count,
             added_files_size,
@@ -634,11 +638,8 @@ fn position_delete_schema() -> Arc<Schema> {
 /// Writes a positional-delete Parquet file masking `positions` within
 /// `referenced_data_file`, and its manifest entry — one delete file per
 /// referenced data file_path.
-#[allow(clippy::too_many_arguments)]
 async fn write_position_delete_file(
-    object_store: &Arc<dyn ObjectStore>,
-    prefix: &str,
-    bucket: &str,
+    catalog: &Catalog,
     table: &str,
     table_schema_json: &str,
     snapshot_id: i64,
@@ -672,11 +673,15 @@ async fn write_position_delete_file(
     let file_size_in_bytes = buf.len() as i64;
     let record_count = positions.len() as i64;
     let path = ObjectPath::from(format!(
-        "{prefix}/{table}/data/{}-deletes.parquet",
+        "{}/{table}/data/{}-deletes.parquet",
+        catalog.prefix,
         Uuid::new_v4()
     ));
 
-    object_store.put(&path, PutPayload::from(buf)).await?;
+    catalog
+        .object_store
+        .put(&path, PutPayload::from(buf))
+        .await?;
 
     tracing::info!(
         table = %table,
@@ -687,14 +692,12 @@ async fn write_position_delete_file(
     );
 
     manifest::write_delete_manifest(
-        object_store,
-        prefix,
-        bucket,
+        catalog,
         table,
         table_schema_json,
         snapshot_id,
         DeleteFileInfo {
-            file_path: format!("s3://{bucket}/{path}"),
+            file_path: catalog.uri(&path.to_string()),
             record_count,
             file_size_in_bytes,
             referenced_data_file: referenced_data_file.to_string(),

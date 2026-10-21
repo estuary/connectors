@@ -73,6 +73,50 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
             ],
             "title": "S3",
             "type": "object"
+          },
+          {
+            "description": "Store data in Google Cloud Storage.",
+            "properties": {
+              "bucket": {
+                "description": "Name of the GCS bucket to write data files to.",
+                "title": "Bucket",
+                "type": "string"
+              },
+              "credentials": {
+                "description": "Google Cloud credentials used to write to the bucket.",
+                "properties": {
+                  "serviceAccountJson": {
+                    "description": "Contents of a Google Cloud service account key file, in JSON format.",
+                    "secret": true,
+                    "title": "Service Account JSON",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "serviceAccountJson"
+                ],
+                "title": "GCS Credentials",
+                "type": "object"
+              },
+              "prefix": {
+                "description": "Key prefix under the bucket to write data files under.",
+                "title": "Prefix",
+                "type": "string"
+              },
+              "type": {
+                "const": "Gcs",
+                "default": "Gcs",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "bucket",
+              "prefix",
+              "credentials"
+            ],
+            "title": "Google Cloud Storage",
+            "type": "object"
           }
         ],
         "title": "Object Store",

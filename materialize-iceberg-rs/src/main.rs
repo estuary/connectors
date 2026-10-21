@@ -2,25 +2,9 @@ use anyhow::Context;
 use materialize_iceberg_rs::Input;
 use materialize_iceberg_rs::Output;
 use materialize_iceberg_rs::run_connector;
+use std::time::Duration;
 
-fn main() -> anyhow::Result<()> {
-    let runtime = start_runtime()?;
-
-    let result = runtime.block_on(run_connector(Input::new(), Output::new()));
-
-    if let Err(err) = result.as_ref() {
-        tracing::error!(error = %err, "operation failed");
-    } else {
-        tracing::debug!("connector run successful");
-    }
-
-    runtime.shutdown_background();
-
-    tracing::info!(success = %result.is_ok(), "connector exiting");
-    result
-}
-
-fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+fn setup_logging() {
     // The level string "debug" results in enabling debug logging for all the crates
     // in the dependency tree, which produces a ridiculous amount of output.
     // So map the debug level to a filter that will still use info level for other crates.
@@ -44,11 +28,25 @@ fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
         .with_thread_names(false)
         .with_target(false)
         .init();
+}
 
-    // These bits about the runtime and shutdown were cargo-culted over from connector-init
+fn run() -> anyhow::Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .context("building tokio runtime")?;
-    Ok(runtime)
+
+    let result = runtime.block_on(run_connector(Input::new(), Output::new()));
+
+    runtime.shutdown_timeout(Duration::from_secs(60));
+    result
+}
+
+fn main() {
+    setup_logging();
+
+    if let Err(err) = run() {
+        tracing::error!(error = %err, "connector exiting");
+        std::process::exit(1);
+    }
 }

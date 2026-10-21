@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
+use super::catalog::Catalog;
 use super::schema::manifest_entry_schema;
 use super::state::PendingManifest;
 
@@ -108,9 +109,7 @@ pub struct ManifestEntryInfo {
 /// JSON recorded in the manifest's Avro file metadata, as required by the
 /// spec.
 pub async fn write_manifest(
-    object_store: &Arc<dyn ObjectStore>,
-    prefix: &str,
-    bucket: &str,
+    catalog: &Catalog,
     table: &str,
     table_schema_json: &str,
     snapshot_id: i64,
@@ -148,16 +147,7 @@ pub async fn write_manifest(
         },
     };
 
-    let (path, length) = upload_manifest(
-        object_store,
-        prefix,
-        bucket,
-        table,
-        table_schema_json,
-        "data",
-        entry,
-    )
-    .await?;
+    let (path, length) = upload_manifest(catalog, table, table_schema_json, "data", entry).await?;
 
     Ok(PendingManifest {
         path,
@@ -172,9 +162,7 @@ pub async fn write_manifest(
 /// Writes an Avro `manifest` file for a single newly-written positional-
 /// delete file, and uploads it to object storage.
 pub async fn write_delete_manifest(
-    object_store: &Arc<dyn ObjectStore>,
-    prefix: &str,
-    bucket: &str,
+    catalog: &Catalog,
     table: &str,
     table_schema_json: &str,
     snapshot_id: i64,
@@ -199,16 +187,8 @@ pub async fn write_delete_manifest(
         },
     };
 
-    let (path, length) = upload_manifest(
-        object_store,
-        prefix,
-        bucket,
-        table,
-        table_schema_json,
-        "deletes",
-        entry,
-    )
-    .await?;
+    let (path, length) =
+        upload_manifest(catalog, table, table_schema_json, "deletes", entry).await?;
 
     Ok(PendingManifest {
         path,
@@ -221,9 +201,7 @@ pub async fn write_delete_manifest(
 }
 
 async fn upload_manifest(
-    object_store: &Arc<dyn ObjectStore>,
-    prefix: &str,
-    bucket: &str,
+    catalog: &Catalog,
     table: &str,
     table_schema_json: &str,
     content: &str,
@@ -242,16 +220,18 @@ async fn upload_manifest(
 
     let length = bytes.len() as i64;
     let path = ObjectPath::from(format!(
-        "{prefix}/{table}/metadata/{}-m0.avro",
+        "{}/{table}/metadata/{}-m0.avro",
+        catalog.prefix,
         Uuid::new_v4()
     ));
 
-    object_store
+    catalog
+        .object_store
         .put(&path, PutPayload::from(bytes))
         .await
         .context("uploading manifest file")?;
 
-    Ok((format!("s3://{bucket}/{path}"), length))
+    Ok((catalog.uri(&path.to_string()), length))
 }
 
 /// Downloads and decodes a manifest file, returning its entries.

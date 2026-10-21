@@ -207,7 +207,7 @@ async fn scan_batch(
     // connector, i.e. they inherit the manifest-list row's).
     let mut data_files = Vec::new();
     for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
-        let manifest_path = strip_bucket_prefix(&catalog.bucket, &manifest_file.manifest_path)?;
+        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
         for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
             let lower = decode_bounds(&entry.lower_bounds, key_field_ids, key_types);
             let upper = decode_bounds(&entry.upper_bounds, key_field_ids, key_types);
@@ -227,7 +227,7 @@ async fn scan_batch(
     // delete files reference one of them.
     let mut deleted: HashMap<String, Vec<i64>> = HashMap::new();
     for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DELETES) {
-        let manifest_path = strip_bucket_prefix(&catalog.bucket, &manifest_file.manifest_path)?;
+        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
         for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
             let Some(referenced) = &entry.referenced_data_file else {
                 continue;
@@ -389,7 +389,7 @@ impl DataFileIter {
         deleted: Vec<i64>,
         sequence_number: i64,
     ) -> Result<DataFileIter> {
-        let relative_path = strip_bucket_prefix(&catalog.bucket, file_path)?;
+        let relative_path = catalog.strip_uri_prefix(file_path)?;
         let reader = ParquetObjectReader::new(
             catalog.object_store.clone(),
             ObjectPath::from(relative_path.to_string()),
@@ -623,7 +623,7 @@ async fn heap_merge(
 }
 
 async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec<i64>> {
-    let relative_path = strip_bucket_prefix(&catalog.bucket, file_path)?;
+    let relative_path = catalog.strip_uri_prefix(file_path)?;
     let reader = ParquetObjectReader::new(
         catalog.object_store.clone(),
         ObjectPath::from(relative_path.to_string()),
@@ -667,12 +667,6 @@ fn augment_doc(doc_text: &str, file_index: usize, position: i64) -> Result<Vec<u
     meta_object.insert("positional_delete".to_string(), serde_json::json!(position));
 
     serde_json::to_vec(&doc).context("re-serializing augmented flow_document")
-}
-
-fn strip_bucket_prefix<'a>(bucket: &str, path: &'a str) -> Result<&'a str> {
-    let prefix = format!("s3://{bucket}/");
-    path.strip_prefix(prefix.as_str())
-        .with_context(|| format!("path {path} does not start with {prefix}"))
 }
 
 #[cfg(test)]

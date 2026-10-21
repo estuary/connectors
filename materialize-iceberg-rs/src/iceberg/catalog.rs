@@ -71,6 +71,11 @@ pub struct Catalog {
     pub object_store: Arc<dyn ObjectStore>,
     pub prefix: String,
     pub bucket: String,
+    /// URI scheme identifying the object store backing `object_store`, e.g.
+    /// `"s3"` or `"gs"` — used to build and parse the absolute
+    /// `scheme://bucket/path` URIs Iceberg metadata records for data,
+    /// manifest, and manifest-list files.
+    pub scheme: &'static str,
 }
 
 /// The head state of an already-committed Iceberg table, as recovered from
@@ -82,6 +87,20 @@ pub struct CurrentSnapshot {
 }
 
 impl Catalog {
+    /// Builds the absolute `scheme://bucket/path` URI for an object-store-
+    /// relative `path`, as recorded in Iceberg metadata.
+    pub fn uri(&self, path: &str) -> String {
+        format!("{}://{}/{}", self.scheme, self.bucket, path)
+    }
+
+    /// Strips this catalog's `scheme://bucket/` prefix from a previously
+    /// recorded absolute URI, recovering the object-store-relative path.
+    pub fn strip_uri_prefix<'a>(&self, uri: &'a str) -> Result<&'a str> {
+        let prefix = format!("{}://{}/", self.scheme, self.bucket);
+        uri.strip_prefix(prefix.as_str())
+            .with_context(|| format!("path {uri} does not start with {prefix}"))
+    }
+
     fn version_hint_path(&self, table: &str) -> ObjectPath {
         ObjectPath::from(format!(
             "{}/{}/metadata/version-hint.text",
@@ -183,17 +202,7 @@ impl Catalog {
             .find(|snapshot| snapshot.snapshot_id == snapshot_id)
             .with_context(|| format!("table metadata is missing current snapshot {snapshot_id}"))?;
 
-        let s3_prefix = format!("s3://{}/", self.bucket);
-        let manifest_list = snapshot
-            .manifest_list
-            .strip_prefix(&s3_prefix)
-            .with_context(|| {
-                format!(
-                    "manifest-list path {} does not start with {s3_prefix}",
-                    snapshot.manifest_list
-                )
-            })?
-            .to_string();
+        let manifest_list = self.strip_uri_prefix(&snapshot.manifest_list)?.to_string();
 
         Ok(Some(CurrentSnapshot {
             snapshot_id: snapshot.snapshot_id,
@@ -233,7 +242,7 @@ impl Catalog {
                 let schema =
                     schema.context("creating a new table requires an add-schema update")?;
                 TableMetadata::new(
-                    format!("s3://{}/{}/{}", self.bucket, self.prefix, table),
+                    self.uri(&format!("{}/{}", self.prefix, table)),
                     schema,
                     last_column_id,
                 )
@@ -244,7 +253,7 @@ impl Catalog {
 
         let next_version = version + 1;
         let metadata_path = self.new_metadata_path(table, next_version);
-        let metadata_file = format!("s3://{}/{}", self.bucket, metadata_path);
+        let metadata_file = self.uri(&metadata_path.to_string());
         metadata.add_snapshot(snapshot);
         metadata.metadata_log.push(MetadataLogEntry {
             timestamp_ms: metadata.last_updated_ms,
