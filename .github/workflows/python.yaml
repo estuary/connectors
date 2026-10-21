@@ -95,6 +95,11 @@ jobs:
       matrix:
         connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
 
+    # Without this, uv picks the runner's system Python. Test on the Python
+    # the images ship, and keep it in step with estuary-cdk/*.Dockerfile.
+    env:
+      UV_PYTHON: "3.14"
+
     steps:
       - uses: actions/checkout@v4
 
