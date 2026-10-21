@@ -10,8 +10,8 @@ your integration is tied to a very specific use case and you want to apply
 custom business logic to the connector as you ingest data.
 
 :::tip
-Custom connectors are available as a **beta** feature for users with [private
-or BYOC deployments](/private-byoc).
+Custom connectors are currently supported for **captures**. Custom derivations
+and materializations are coming soon.
 :::
 
 ## Estuary's Connector Development Kit
@@ -54,13 +54,11 @@ Each resource strategy is implemented slightly differently. You can use or view
 the [`classify-stream-types` skill](https://github.com/estuary/connectors/blob/main/.claude/skills/classify-stream-types/SKILL.md)
 for implementation examples.
 
-## Limitations
+## Custom Connector Specification
 
-Custom connectors are currently in beta, and therefore have some limitations.
+Tasks based on custom connectors must be defined in your [catalog](/concepts/catalogs)
+like any other task. Make sure you are familiar with [capture](/concepts/captures)
+specification files and managing your catalog via [flowctl](/concepts/flowctl).
 
-* **Public registries only.** Custom connectors must be deployed as public images as there is no support for authenticated pulls.
-* **Captures only.** Estuary's CDK does not yet support custom materializations and derivations.
-* **No auto-discovery.** A custom capture cannot use `autoDiscover`. It is skipped rather than reported as failing, so schema changes need a manual republish.
-* **No dashboard editing.** Custom connectors must be managed through `flowctl`. The **Edit** button on a custom capture will run into an error as the dashboard builds its config form from a connector registry entry that a custom image does not have.
-* **Dashboard stats and usage reporting** are off by default on managed private deployments.
-* **Config encryption is a manual step.** [See instructions](./create-capture.md#4-generate-the-spec-and-encrypt-the-config) when creating a capture.
+See the guide on [creating a custom capture](./create-capture.md) for an
+example specification.
