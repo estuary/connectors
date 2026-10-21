@@ -93,7 +93,7 @@ appends the buffer to the channel at 10,000 rows or at 3.5 MiB, whichever limit
 it reaches first. The API caps one append at 4 MiB after compression. One append
 per channel is pending at a time. A slow channel therefore applies back pressure
 to the buffer instead of opening more requests.
-All channels together hold 256 MiB of rows at most, counting each batch until its
+All channels together hold 128 MiB of rows at most, counting each batch until its
 append returns. A row that would pass that ceiling first appends every batch, then
 waits for appends to return.
 

@@ -24,7 +24,7 @@ import (
 )
 
 // streamV2MaxHeldBytes caps the memory that batches and in-flight appends hold.
-var streamV2MaxHeldBytes = 256 * 1024 * 1024
+var streamV2MaxHeldBytes = 128 * 1024 * 1024
 
 // streamV2ChannelCheckpointItem represents one channel of a binding, and the
 // offset of the last document routed to it as of the checkpoint.
