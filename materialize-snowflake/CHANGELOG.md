@@ -7,6 +7,9 @@
   API directly from the connector. The Python sidecar holding Snowflake's SDK,
   and its memory, are gone. Appends travel as zstd-compressed NDJSON of up to
   3.5 MiB each.
+- On the `snowpipe_streaming_v2` write path, a document that compresses to
+  more than 4 MiB now fails the task, because Snowflake refuses any
+  compressed append request over 4 MiB. The SDK wrote such documents.
 
 ## 2026-10-15
 

@@ -183,3 +183,8 @@ own. Either half of that convergence can be interrupted and repeats safely.
   Restore that path for one transaction, or backfill the binding.
 - An API error that retries do not clear fails the transaction. The runtime
   restarts the connector, and recovery replays through the offset token.
+- A document whose zstd-compressed JSON row exceeds 4 MiB cannot be written,
+  because Snowflake refuses any compressed append request over 4 MiB. The
+  failure names the table and the compressed size, and it repeats on every
+  restart. Incompressible content such as base64-encoded files reaches the limit
+  at about 4 MiB of document.

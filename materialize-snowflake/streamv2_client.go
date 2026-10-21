@@ -32,7 +32,8 @@ const (
 	streamV2MaxAttempts        = 6
 )
 
-// streamV2MaxAppendBytes is the API's limit on the compressed body of one append.
+// streamV2MaxAppendBytes is Snowflake's limit on the compressed body of one append
+// request. Snowflake refuses a larger body outright, whatever its encoding.
 const streamV2MaxAppendBytes = 4 * 1024 * 1024
 
 // streamV2WaitCommitTimeout bounds one wait for a commit. It is a var so that
@@ -424,7 +425,9 @@ func (c *streamV2Client) AppendRows(ctx context.Context, channelName, startToken
 	}
 	var compressed = c.zstd.EncodeAll(rows, make([]byte, 0, len(rows)/4))
 	if len(compressed) > streamV2MaxAppendBytes {
-		return fmt.Errorf("an append of %d bytes compresses to %d, over the API's limit of %d bytes, so a document this large cannot be written by snowpipe_streaming_v2", len(rows), len(compressed), streamV2MaxAppendBytes)
+		return fmt.Errorf(
+			"an append of %d document(s) totalling %d bytes compresses to %d bytes, which exceeds Snowflake's limit of %d bytes (4 MiB) per compressed Snowpipe Streaming request, so the snowpipe_streaming_v2 write path cannot write it and the task will fail the same way on every restart",
+			bytes.Count(rows, []byte{'\n'}), len(rows), len(compressed), streamV2MaxAppendBytes)
 	}
 	if err := c.call(ctx, "POST", "data/"+ch.pipePath+"/channels/"+url.PathEscape(channelName)+"/rows", query, compressed, headers, &res); err != nil {
 		return err
