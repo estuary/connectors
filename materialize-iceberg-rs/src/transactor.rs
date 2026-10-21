@@ -212,12 +212,15 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                         .push(position);
 
                     if store.delete {
+                        binding.transaction_counts.deletes += 1;
                         continue;
                     }
 
+                    binding.transaction_counts.updates += 1;
                     serde_json::to_string(&doc)
                         .context("re-serializing document after stripping _meta")?
                 } else {
+                    binding.transaction_counts.inserts += 1;
                     raw_doc_text.to_string()
                 };
 
@@ -267,6 +270,15 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 tracing::warn!("StartCommit");
                 for binding in bindings.iter_mut() {
                     binding.write_and_upload(&catalog).await?;
+
+                    tracing::warn!(
+                        table = %binding.table,
+                        inserts = binding.transaction_counts.inserts,
+                        updates = binding.transaction_counts.updates,
+                        deletes = binding.transaction_counts.deletes,
+                        "transaction summary"
+                    );
+                    binding.transaction_counts = TransactionCounts::default();
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
@@ -378,7 +390,17 @@ struct BindingState {
     /// `_meta.positional_delete` on the existing document, carried forward
     /// from `Load` through the runtime's document reduction).
     pending_deletes: HashMap<String, Vec<i64>>,
+    /// Counts of inserts/updates/deletes `Store` has applied this
+    /// transaction, logged and reset at `StartCommit`.
+    transaction_counts: TransactionCounts,
     checkpoint: BindingCheckpoint,
+}
+
+#[derive(Default)]
+struct TransactionCounts {
+    inserts: u64,
+    updates: u64,
+    deletes: u64,
 }
 
 impl BindingState {
@@ -796,6 +818,7 @@ fn binding_state(
         pending_loads: Vec::new(),
         load_file_paths: Vec::new(),
         pending_deletes: HashMap::new(),
+        transaction_counts: TransactionCounts::default(),
         checkpoint,
     })
 }
