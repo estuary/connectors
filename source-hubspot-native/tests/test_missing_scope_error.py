@@ -25,8 +25,9 @@ log = getLogger("test_missing_scope_error")
 
 def _http_error(body: dict[str, Any] | str, status: int = 403) -> HTTPError:
     """An HTTPError shaped the way HTTPMixin builds one for a 4xx: the response
-    body is embedded in `message`, which is all the predicate gets to inspect."""
-    rendered = body if isinstance(body, str) else json.dumps(body, indent=2)
+    body is embedded in `message`, which is all the predicate gets to inspect.
+    HubSpot sends compact JSON, so render it that way."""
+    rendered = body if isinstance(body, str) else json.dumps(body, separators=(",", ":"))
     return HTTPError(
         f"Encountered HTTP error status {status} which cannot be retried.\n"
         "URL: https://api.hubapi.com/crm/v3/properties/leads\n"
@@ -84,6 +85,21 @@ PRIVATE_APP_MISSING_SCOPES_REFUSAL = {
         # pattern isn't anchored.
         "EXTERNAL auth request is missing required 'workflows-access-public-api' scope.",
         "This oauth-token (some token details) does not have proper permissions!",
+        # Reading /crm/v3/objects/tickets with an OAuth token whose install
+        # didn't grant the optional tickets scope.
+        {
+            "status": "error",
+            "message": (
+                "The scope needed for this API call isn't available for public use. "
+                "If you have questions, contact support or post in our developer forum."
+            ),
+            "correlationId": "00000000-0000-0000-0000-000000000000",
+            "links": {
+                "support": "https://help.hubspot.com/",
+                "forum": "https://community.hubspot.com/t5/APIs-Integrations/bd-p/integrations",
+            },
+            "category": "MISSING_SCOPES",
+        },
     ],
     ids=[
         "oauth_view_schema",
@@ -91,6 +107,7 @@ PRIVATE_APP_MISSING_SCOPES_REFUSAL = {
         "app_not_granted_scopes",
         "external_auth_request",
         "oauth_token_improper_permissions",
+        "scope_not_available_for_public_use",
     ],
 )
 def test_recognizes_every_observed_refusal(body: dict[str, Any] | str):

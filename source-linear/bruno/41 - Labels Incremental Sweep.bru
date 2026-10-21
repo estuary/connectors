@@ -1,0 +1,138 @@
+meta {
+  name: 41 - Labels Incremental Sweep
+  type: graphql
+  seq: 41
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query LabelsIncrementalSweep {
+    narrowed: issueLabels(
+      first: 250
+      includeArchived: true
+      orderBy: updatedAt
+      filter: {updatedAt: {gt: "2026-07-30T21:35:03.808Z"}}
+    ) {
+      nodes { id name updatedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+    wideOpen: issueLabels(
+      first: 250
+      includeArchived: true
+      orderBy: updatedAt
+      filter: {updatedAt: {gt: "2020-01-01T00:00:00Z"}}
+    ) {
+      nodes { id name updatedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/filtering
+
+  The exact incremental query the connector will issue for Labels. Note it uses
+  `orderBy: updatedAt` (descending) rather than `sort`, because `issueLabels` rejects the
+  `sort` argument — see `42 - Labels Sort Rejected`.
+
+  **Limitation / observed finding** (confirmed 2026-07-30): `IssueLabelFilter.updatedAt`
+  IS honored, and this is the one cluster stream besides Issues where narrowing was
+  actually demonstrated on live data.
+
+  - `narrowed` (`gt: 2026-07-30T21:35:03.808Z`, the exact shared bulk-seed timestamp)
+    -> **0 rows**
+  - `wideOpen` (`gt: 2020-01-01T00:00:00Z`)
+    -> **3 rows** (Bug, Feature, Improvement), `hasNextPage: false`
+
+  3 -> 0 on a 1 ms-exclusive boundary, mirroring `07 - Cursor Filter Boundary` on Issues.
+  The `gt` comparator is strictly exclusive here too.
+
+  The `narrowed` alias also re-demonstrates the tie hazard on this stream specifically: all
+  3 labels share one `updatedAt`, so a cursor checkpointed at that value excludes the
+  entire population. Because Labels sweeps DESCENDING and can only checkpoint at
+  end-of-sweep, a partially-completed sweep must NOT advance the cursor at all.
+}
+
+example {
+  name: 200 — updatedAt filter narrows 3 -> 0 at exact boundary
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query LabelsIncrementalSweep {
+        narrowed: issueLabels(
+          first: 250
+          includeArchived: true
+          orderBy: updatedAt
+          filter: {updatedAt: {gt: "2026-07-30T21:35:03.808Z"}}
+        ) {
+          nodes { id name updatedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+        wideOpen: issueLabels(
+          first: 250
+          includeArchived: true
+          orderBy: updatedAt
+          filter: {updatedAt: {gt: "2020-01-01T00:00:00Z"}}
+        ) {
+          nodes { id name updatedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 1250
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2480
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2997750
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "narrowed": {
+              "count": 0,
+              "rows": []
+            },
+            "wideOpen": {
+              "count": 3,
+              "rows": [
+                {
+                  "id": "Bug",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "Feature",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "Improvement",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}

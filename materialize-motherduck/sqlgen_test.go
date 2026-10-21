@@ -1,20 +1,20 @@
 package connector
 
 import (
-	"maps"
 	"testing"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createDuckDialect(featureFlagDefaults, false)
+var testDialect = createDuckDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}), false)
 var testTemplates = renderTemplates(testDialect)
 
 func flagsWithoutNativeBinary() map[string]bool {
-	out := maps.Clone(featureFlagDefaults)
+	out := common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
 	out["native_binary_column_type"] = false
 	return out
 }

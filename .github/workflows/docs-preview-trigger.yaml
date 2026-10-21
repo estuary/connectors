@@ -13,10 +13,10 @@ name: "Trigger connector docs preview"
 # touches no published docs: this workflow does not run, nothing dispatches,
 # and branch protection waits for a status that will never arrive. The
 # auto-skip that rescues path-filtered Actions jobs does not apply. Since
-# ci.yaml and python.yaml both `paths-ignore: docs/**`, the code and docs
-# halves are disjoint by design and every code PR would hang. The same gap
-# applies to fork PRs, to PREVIEW_APP_ID being unset, and to the receiver's
-# status step being gated on a minted token.
+# ci.yaml `paths-ignore: docs/**`, the code and docs halves are disjoint by
+# design and every code PR would hang. The same gap applies to fork PRs, to
+# PREVIEW_APP_ID being unset, and to the receiver's status step being gated on
+# a minted token.
 #
 # The protection that gap would have bought is already in place from a
 # different direction: docs-build-check.yaml (#5090) runs the same docs build

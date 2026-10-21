@@ -1,0 +1,92 @@
+info:
+  name: updated_at sort
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/ticket_metrics?sort=updated_at&page[size]=100"
+  params:
+    - name: "sort"
+      value: "updated_at"
+      type: query
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - sort ignored: cursor stays -created_at,id (projection)"
+    request:
+      url: "{{base_url}}/ticket_metrics?sort=updated_at&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "19"
+      body:
+        type: json
+        data: |-
+          {
+            "ticket_metrics": [
+              {
+                "ticket_id": 49,
+                "created_at": "2026-10-07T15:55:19Z",
+                "updated_at": "2026-10-07T15:55:19Z"
+              },
+              {
+                "ticket_id": 47,
+                "created_at": "2026-09-23T22:12:32Z",
+                "updated_at": "2026-09-23T22:12:32Z"
+              },
+              {
+                "ticket_id": 46,
+                "created_at": "2026-08-20T21:36:34Z",
+                "updated_at": "2026-08-20T21:36:34Z"
+              },
+              {
+                "ticket_id": 45,
+                "created_at": "2026-07-14T22:31:06Z",
+                "updated_at": "2026-07-14T22:31:06Z"
+              },
+              {
+                "ticket_id": 44,
+                "created_at": "2026-06-12T22:40:10Z",
+                "updated_at": "2026-06-12T22:40:10Z"
+              }
+            ],
+            "ticket_metrics_total": 43,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiLWNyZWF0ZWRfYXQsaWQiLCJ2IjoiWkpERG8yWUFBQUFBYVJRVmpkWTVHZ0FBIn0=",
+              "before_cursor": "eyJvIjoiLWNyZWF0ZWRfYXQsaWQiLCJ2IjoiWkdkcnhtb0FBQUFBYVJTU3NIZHJNUUFBIn0="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Ticket Metrics](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metrics/#list-ticket-metrics)
+
+  **WHY:** Whether `/ticket_metrics` accepts `sort=updated_at` with a keyset cursor, so
+  changed metric sets can be swept with A8.
+
+  **LIMITATION (VERIFIED 2026-10-07):** `sort=updated_at` is silently ignored. The cursor
+  decodes to `{"o":"-created_at,id",...}` (newest-created first), so metric-set changes
+  can't be swept with A8.

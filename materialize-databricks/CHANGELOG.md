@@ -1,5 +1,50 @@
 # Changelog
 
+## 2026-10-13
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to each transaction's key range, exact for `TIMESTAMP` keys and
+  by date for `STRING` keys.
+
+## 2026-10-12
+### Fixed
+- A materialization that restarts partway through a commit no longer fails on
+  every restart after it when a table's staging data was already cleaned up.
+
+## 2026-10-07
+### Changed
+- A transaction's tables are committed concurrently, up to five at a time,
+  instead of one after another.
+
+## 2026-10-01
+### Changed
+- Updates to existing rows are copied into a Delta staging table once a
+  table's rows are staged, and the commit's MERGE reads that table instead of
+  the staged JSON files. In transactions with several tables, this loading
+  overlaps with staging the remaining tables.
+
+## 2026-09-29
+### Fixed
+- Each table's staged files are finished and uploaded as soon as the
+  transaction's rows move on to the next table, instead of every table's file
+  staying open until commit. Wide transactions no longer hold a compressor per
+  table, and uploads overlap with writing the remaining tables.
+
+## 2026-09-28
+### Fixed
+- Materializations using `OAuth2 M2M` credentials no longer fail every
+  transaction with `pat auth: token is required`. Since 2026-09-23 the staging
+  directory was created with a client that always used PAT authentication,
+  regardless of the configured `auth_type`.
+
+## 2026-09-23
+### Changed
+- Each transaction's staged files are uploaded into a directory of their own,
+  and the load and MERGE queries read that directory as one relation with the
+  files' schema given explicitly, instead of one schema-inferred scan per
+  file. COPY INTO no longer infers column types either. Files staged by an
+  earlier version and still pending in the checkpoint commit as before.
+
 ## 2026-09-17
 ### Fixed
 - Fixed escaping of identifiers containing backslash character.

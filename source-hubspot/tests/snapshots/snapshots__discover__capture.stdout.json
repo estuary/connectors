@@ -2021,6 +2021,18 @@
                 "string"
               ]
             },
+            "hs_bing_ad_clicked": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_bing_click_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_buying_role": {
               "type": [
                 "null",
@@ -2083,6 +2095,18 @@
               ]
             },
             "hs_chat_assistant_summary": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_chatgpt_ad_clicked": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_chatgpt_click_id": {
               "type": [
                 "null",
                 "string"
@@ -3323,12 +3347,6 @@
                 "string"
               ]
             },
-            "hubspotscore": {
-              "type": [
-                "null",
-                "number"
-              ]
-            },
             "industry": {
               "type": [
                 "null",
@@ -4279,6 +4297,12 @@
                 "boolean"
               ]
             },
+            "hs_has_last_meeting_followups": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_closed": {
               "type": [
                 "null",
@@ -4315,6 +4339,12 @@
                 "number"
               ]
             },
+            "hs_last_call_id_with_followups": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_last_conversation_with_followups_object_coordinates": {
               "type": [
                 "null",
@@ -4332,6 +4362,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_last_meeting_id_with_followups": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_last_partner_shared_message_date": {
@@ -4674,6 +4710,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_price_book_reassignment_status": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_primary_associated_company": {
@@ -5300,6 +5342,12 @@
                 "boolean"
               ]
             },
+            "hs_has_last_meeting_followups": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_closed": {
               "type": [
                 "null",
@@ -5336,6 +5384,12 @@
                 "number"
               ]
             },
+            "hs_last_call_id_with_followups": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_last_conversation_with_followups_object_coordinates": {
               "type": [
                 "null",
@@ -5353,6 +5407,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_last_meeting_id_with_followups": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_last_partner_shared_message_date": {
@@ -5695,6 +5755,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_price_book_reassignment_status": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_primary_associated_company": {
@@ -7658,6 +7724,12 @@
                 "boolean"
               ]
             },
+            "hs_voice_agent_customer_engagement_status": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_voice_agent_escalated_to_live_agent": {
               "type": [
                 "null",
@@ -8307,6 +8379,12 @@
                 "boolean"
               ]
             },
+            "hs_in_reply_to_engagement_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_incoming_email_is_out_of_office": {
               "type": [
                 "null",
@@ -8468,6 +8546,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_skip_ticket_auto_association": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_template_id": {
@@ -8865,6 +8949,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_has_internal_meeting_notes": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_has_meeting_transcript": {
@@ -11849,12 +11939,6 @@
                 "string"
               ]
             },
-            "hs_ramp_key": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_ramp_phase_key": {
               "type": [
                 "null",
@@ -12380,6 +12464,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_inventory_quantity": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_lastmodifieddate": {
@@ -12987,6 +13077,18 @@
                 "string"
               ]
             },
+            "hs_bing_ad_clicked": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_bing_click_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_buying_role": {
               "type": [
                 "null",
@@ -13049,6 +13151,18 @@
               ]
             },
             "hs_chat_assistant_summary": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_chatgpt_ad_clicked": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_chatgpt_click_id": {
               "type": [
                 "null",
                 "string"
@@ -14289,12 +14403,6 @@
                 "string"
               ]
             },
-            "hubspotscore": {
-              "type": [
-                "null",
-                "number"
-              ]
-            },
             "industry": {
               "type": [
                 "null",
@@ -15008,6 +15116,12 @@
                 "string"
               ]
             },
+            "hs_customer_agent_matched_segment": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_customer_agent_status_updated_time": {
               "format": "date-time",
               "type": [
@@ -15551,6 +15665,12 @@
                 "string"
               ]
             },
+            "hs_summarized_ticket_owner_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_thread_ids_to_restore": {
               "type": [
                 "null",
@@ -15567,6 +15687,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_ticket_owner_type": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_ticket_priority": {

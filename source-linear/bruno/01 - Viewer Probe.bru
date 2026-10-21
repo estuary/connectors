@@ -1,0 +1,98 @@
+meta {
+  name: 01 - Viewer Probe
+  type: graphql
+  seq: 1
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query ViewerProbe {
+    viewer {
+      id
+      name
+      email
+    }
+    organization {
+      id
+      name
+      urlKey
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/rate-limiting
+
+  Cheapest authenticated query. Serves two purposes: confirms the bare
+  `Authorization: <key>` header wiring works (same shape as
+  `source_linear/resources.py::_token_source`), and reads this account's ACTUAL
+  rate-limit ceilings off the response headers rather than trusting the docs table.
+
+  This is also the reference point for "what does a near-zero-complexity query cost",
+  which anchors the per-stream complexity measurements.
+}
+
+example {
+  name: 200 — auth OK + live rate-limit ceilings (2500 req/hr)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query ViewerProbe {
+        viewer {
+          id
+          name
+          email
+        }
+        organization {
+          id
+          name
+          urlKey
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 3
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2499
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999997
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "viewer": {
+              "id": "8ef0e033-440f-4809-b0ff-6a68821fc413",
+              "name": "Jonathan Wihl",
+              "email": "jonathan@estuary.dev"
+            },
+            "organization": {
+              "id": "14d2f26b-c26d-45e5-ada9-96636caa48be",
+              "name": "Estuary",
+              "urlKey": "estuary-test"
+            }
+          }
+        }
+      '''
+    }
+  }
+}

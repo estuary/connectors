@@ -43,9 +43,12 @@ MISSING_SCOPE_REGEX = (
     # "This oauth-token (...) does not have proper permissions!" and "You do not
     # have permissions to view_schema object type ... (requires one of [leads-read])"
     r"do(es)? not have (proper )?permissions|"
+    # "The scope needed for this API call isn't available for public use."
+    r"The scope needed for this API call isn't available for public use|"
     # '"category": "MISSING_SCOPES"', the one part of a refusal HubSpot is
-    # unlikely to reword -- but only some responses carry it.
-    r'"category": "MISSING_SCOPES"'
+    # unlikely to reword -- but only some responses carry it. HubSpot sends
+    # compact JSON, so the whitespace is optional.
+    r'"category":\s*"MISSING_SCOPES"'
 )
 
 

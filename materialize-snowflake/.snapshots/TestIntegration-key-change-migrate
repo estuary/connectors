@@ -1,0 +1,51 @@
+Task: acmeCo/tests/materialize-snowflake
+
+Base:
+Resource: key_change_test
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS key_change_test (\n\tid INTEGER NOT NULL,\n\tflow_published_at TIMESTAMP_LTZ NOT NULL,\n\ttenant TEXT NOT NULL,\n\tvalue TEXT,\n\tflow_document VARIANT NOT NULL,\n\n\tPRIMARY KEY (id)\n)\nDEFAULT_DDL_COLLATION = '';\n\nCOMMENT ON TABLE key_change_test IS 'Generated for materialization acmeCo/tests/materialize-snowflake of collection key/change';\nCOMMENT ON COLUMN key_change_test.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN key_change_test.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN key_change_test.tenant IS 'auto-generated projection of JSON at: /tenant with inferred types: [string]';\nCOMMENT ON COLUMN key_change_test.value IS 'auto-generated projection of JSON at: /value with inferred types: [string]';\nCOMMENT ON COLUMN key_change_test.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n"]
+["applied.actionDescription", ""]
+
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"ID","Nullable":false,"Type":"FIXED"}
+{"Name":"TENANT","Nullable":false,"Type":"TEXT"}
+{"Name":"VALUE","Nullable":true,"Type":"TEXT"}
+
+Table Data:
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:00-08:00","ID":1,"TENANT":"a","VALUE":"one"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:01-08:00","ID":2,"TENANT":"a","VALUE":"two"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:02-08:00","ID":3,"TENANT":"b","VALUE":"three"}
+
+Group-by changed with backfill:
+Resource: key_change_test
+
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"ID","Nullable":false,"Type":"FIXED"}
+{"Name":"TENANT","Nullable":false,"Type":"TEXT"}
+{"Name":"VALUE","Nullable":true,"Type":"TEXT"}
+
+Table Data:
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:00-08:00","ID":1,"TENANT":"a","VALUE":"one"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:01-08:00","ID":2,"TENANT":"a","VALUE":"two"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:02-08:00","ID":3,"TENANT":"b","VALUE":"three"}
+
+Materialized under the new group-by:
+Resource: key_change_test
+["applied.actionDescription", ""]
+["applied.actionDescription", ""]
+
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"ID","Nullable":false,"Type":"FIXED"}
+{"Name":"TENANT","Nullable":false,"Type":"TEXT"}
+{"Name":"VALUE","Nullable":true,"Type":"TEXT"}
+
+Table Data:
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one-updated"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:00-08:00","ID":1,"TENANT":"a","VALUE":"one-updated"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:01-08:00","ID":2,"TENANT":"a","VALUE":"two"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"c","value":"two-moved"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:01-08:00","ID":2,"TENANT":"c","VALUE":"two-moved"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:02-08:00","ID":3,"TENANT":"b","VALUE":"three"}
+{"FLOW_DOCUMENT":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":4,"tenant":"b","value":"four"},"FLOW_PUBLISHED_AT":"1969-12-31T16:00:02-08:00","ID":4,"TENANT":"b","VALUE":"four"}
+
+

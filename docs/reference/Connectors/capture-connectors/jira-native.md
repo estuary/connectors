@@ -4,7 +4,7 @@ description: Capture Jira data into Estuary collections, including issues, proje
 
 # Jira
 
-This connector captures data from Jira's [Platform](https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/), [Service Management](https://developer.atlassian.com/cloud/jira/service-desk/rest/intro/), and [Software](https://developer.atlassian.com/cloud/jira/software/rest/intro/) REST APIs into Estuary collections.
+This connector captures data from Jira's [Platform](https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/), [Service Management](https://developer.atlassian.com/cloud/jira/service-desk/rest/intro/), [Software](https://developer.atlassian.com/cloud/jira/software/rest/intro/), and [Teams](https://developer.atlassian.com/platform/teams/rest/v1/) REST APIs into Estuary collections.
 
 ## Supported data resources
 
@@ -55,6 +55,7 @@ The following data resources are supported through the Jira APIs:
 * [Sprint issues](https://developer.atlassian.com/cloud/jira/software/rest/api-group-sprint/#api-rest-agile-1-0-sprint-sprintid-issue-get)
 * [Statuses](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-status/#api-rest-api-3-statuses-search-get)
 * [System avatars](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-avatars/#api-rest-api-3-avatar-type-system-get)
+* [Teams](https://developer.atlassian.com/platform/teams/rest/v1/api-group-teams-public-api/#api-public-teams-v1-org-orgid-teams-get)
 * [Users](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-users/#api-rest-api-3-users-search-get)
 * [Workflow schemes](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-workflow-schemes/#api-rest-api-3-workflowscheme-get)
 * [Workflow status categories](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-workflow-status-categories/#api-rest-api-3-statuscategory-get)
@@ -68,6 +69,7 @@ By default, each resource is mapped to an Estuary collection through a separate 
 - API Token: You can create an API token following [these steps from Jira](https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/)
 - Domain
 - Email
+- Organization ID, if you want to capture the `teams` resource. Find it after `/o/` in the address bar at [admin.atlassian.com](https://admin.atlassian.com).
 
 ## Configuration
 
@@ -81,6 +83,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | Property | Title | Description | Type | Required/Default |
 |---|---|---|---|---|
 | **`/domain`** | Domain | The Domain for your Jira account, e.g. estuary.atlassian.net, estuary.jira.com, jira.your-domain.com | string | Required |
+| `/organization_id` | Organization ID | The id of your Atlassian organization, found after /o/ in the address bar at https://admin.atlassian.com. Only required to capture the teams stream; leave blank otherwise. | string |  |
 | `/start_date` | Start Date | UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present. | string |  |
 | **`/credentials/username`** | Email | The user email for your Jira account. | string | Required |
 | **`/credentials/password`** | API Token | The value of the API token generated. | string | Required |

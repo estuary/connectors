@@ -3,6 +3,7 @@ PostHog API client functions.
 """
 
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import wraps
 from logging import Logger
@@ -28,12 +29,27 @@ from .models import (
     ProjectEntity,
     ProjectIdValidationContext,
     RestResponseMeta,
+    Session,
 )
 
 P = ParamSpec("P")
 
 HOGQL_PAGE_SIZE = 50_000
 BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
+
+# How far a session's ingestion (`max_inserted_at`) may trail its last event
+# (`$end_timestamp`) and still be captured. The query bounds `$end_timestamp`
+# by it so PostHog's backend can skip old data, which the computed cursor can't
+# do. Sessions whose events arrive later than this are not captured. PostHog's
+# own SESSIONS_LOOKBACK_DAYS is 3 days, with the note "While testing, 3 days
+# catched almost all sessions"; we allow 5 to cover more of the tail.
+SESSIONS_ALLOWED_LATENESS = timedelta(days=5)
+
+# One unit of the cursor's resolution; `Session.cursor_expression` fixes it at
+# a second.
+SESSIONS_CURSOR_TICK = timedelta(seconds=1)
+SESSIONS_REALTIME_LAG = timedelta(minutes=5)
+SESSIONS_LOOKBACK_LAG = timedelta(hours=1)
 
 
 # Cache for project IDs per organization (avoids re-fetching on retry).
@@ -348,6 +364,277 @@ def backfill_timeout(timeout_period: timedelta):
         return wrapper
 
     return decorator
+
+
+@dataclass(frozen=True, slots=True)
+class _SessionsQuery:
+    """The SELECT shape for one project's sessions table, probed once per sweep.
+
+    `column_names` positionally matches `selected`; the row zip relies on it.
+    """
+
+    cursor: str
+    selected: list[str]
+    column_names: list[str]
+
+
+async def _build_sessions_query(
+    base_url: str,
+    project_id: int,
+    http: HTTPSession,
+    log: Logger,
+) -> _SessionsQuery:
+    discovered = await _get_hogql_columns(Session, base_url, project_id, http, log)
+    # `$`-prefixed names are aliased bare so documents read like the rest of the
+    # connector. `team_id` is left alone: HogQL rejects it as an alias.
+    return _SessionsQuery(
+        cursor=Session.cursor_expression(discovered),
+        selected=[
+            f"{column} AS {column.removeprefix('$')}"
+            if column.startswith("$")
+            else column
+            for column in discovered
+        ]
+        + list(Session.extra_columns.values()),
+        column_names=[column.removeprefix("$") for column in discovered]
+        + list(Session.extra_columns),
+    )
+
+
+def _hogql_string(value: str) -> str:
+    """Quote `value` as a HogQL string literal."""
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"'{escaped}'"
+
+
+async def _query_sessions(
+    query: _SessionsQuery,
+    start: datetime,
+    after_id: str | None,
+    end: datetime,
+    base_url: str,
+    project_id: int,
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[Session, None]:
+    """Yield one page of sessions from [start, end), ordered by (cursor, id)."""
+    url = Session.get_api_endpoint_url(base_url, project_id)
+    ctx = ProjectIdValidationContext(project_id=project_id)
+    cursor = query.cursor
+    scan_column = Session.scan_column
+    tiebreak = Session.tiebreak_column
+
+    def literal(when: datetime) -> str:
+        serialized = when.astimezone(UTC).replace(tzinfo=None).isoformat()
+        return f"toDateTime64('{serialized}', 6, 'UTC')"
+
+    if after_id is None:
+        lower_bound = f"{cursor} >= {literal(start)}"
+    else:
+        lower_bound = (
+            f"({cursor} > {literal(start)} OR "
+            + f"({cursor} = {literal(start)} "
+            + f"AND {tiebreak} > {_hogql_string(after_id)}))"
+        )
+
+    payload = {
+        "query": {
+            "kind": "HogQLQuery",
+            "query": f"SELECT {', '.join(query.selected)} "
+            + f"FROM {Session.table_name} "
+            + f"WHERE {lower_bound} "
+            + f"AND {cursor} < {literal(end)} "
+            # Present so PostHog's backend can skip old data: the cursor is
+            # computed from two columns, so it cannot be used to narrow the
+            # scan, but this stored column can. The upper bound is implied by
+            # the cursor and costs nothing. The lower bound is not free — it
+            # drops a session whose events arrive more than
+            # SESSIONS_ALLOWED_LATENESS after the session ended.
+            + f"AND {scan_column} >= {literal(start - SESSIONS_ALLOWED_LATENESS)} "
+            + f"AND {scan_column} < {literal(end)} "
+            + f"ORDER BY {cursor} ASC, {tiebreak} ASC "
+            + f"LIMIT {HOGQL_PAGE_SIZE}",
+        },
+    }
+
+    _, body = await http.request_stream(log, url, method="POST", json=payload)
+    processor = IncrementalJsonProcessor(body(), "results.item", HogQLRow)
+
+    async for row in processor:
+        yield Session.model_validate(
+            dict(zip(query.column_names, row.root, strict=True)),
+            context=ctx,
+        )
+
+
+async def _fetch_sessions_between(
+    http: HTTPSession,
+    base_url: str,
+    project_id: int,
+    log: Logger,
+    start: datetime,
+    end: datetime,
+) -> AsyncGenerator[Session, None]:
+    """Page through sessions in [start, end), yielding every row the API returns."""
+    query = await _build_sessions_query(base_url, project_id, http, log)
+    reached = start
+    after_id: str | None = None
+
+    while True:
+        batch_count = 0
+
+        async for item in _query_sessions(
+            query,
+            reached,
+            after_id,
+            end,
+            base_url,
+            project_id,
+            http,
+            log,
+        ):
+            batch_count += 1
+            # Both halves of the page key come from the same row — the last one
+            # the server sent — so the next page opens exactly where this ended.
+            reached = item.get_cursor()
+            after_id = item.id
+            yield item
+
+        if batch_count < HOGQL_PAGE_SIZE:
+            break
+
+
+async def fetch_sessions(
+    http: HTTPSession,
+    base_url: str,
+    project_id: int,
+    lag: timedelta,
+    should_evict_emitted_changes: bool,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[Session | LogCursor, None]:
+    """Emit sessions whose ingestion time landed since the last poll.
+
+                cursor        horizon - 1s   horizon = now - lag
+    ───────────────┼───────────────┼──────────────┼─────▶ time (1s ticks)
+                   │               │              │
+    cursor_expr ───[═══════════════╪══════════════)
+    scan_column ═══╪═══════════════╪══════════════)
+    emitted ───────(═══════════════]              │
+                   │               │              └─ excluded; rows this
+                   │               │                 recent may not be
+                   │               │                 queryable yet
+                   │               └─ last second collected
+                   └─ swept but not emitted: rows on this instant were emitted
+                      by the poll that checkpointed here
+
+    `lag` is how far this subtask trails the present: SESSIONS_REALTIME_LAG for
+    the realtime subtask, SESSIONS_LOOKBACK_LAG for the one that re-walks the
+    same span later to pick up rows that were not yet queryable. Only the
+    trailing subtask sets `should_evict_emitted_changes`.
+    """
+    assert isinstance(cursor, datetime)
+
+    horizon = datetime.now(tz=UTC).replace(microsecond=0) - lag
+    if horizon <= cursor:
+        return
+
+    # Namespaced per project so one project's pruning cannot evict another's
+    # entries; the subtasks of a single project share a cursor timeline.
+    cache_name = f"sessions/{project_id}"
+    last_cursor = cursor
+    doc_count = 0
+
+    async for item in _fetch_sessions_between(
+        http, base_url, project_id, log, cursor, horizon
+    ):
+        item_cursor = item.get_cursor()
+
+        if item_cursor <= cursor:
+            continue
+
+        last_cursor = max(last_cursor, item_cursor)
+
+        # The two subtasks re-walk the same span an hour apart, so most of what
+        # the lookback subtask reads the realtime one has already emitted.
+        if cache.should_yield(cache_name, item.id, item_cursor):
+            doc_count += 1
+            yield item
+
+    if should_evict_emitted_changes:
+        # Everything at or before this poll's start has now been walked by the
+        # trailing subtask too, so it can no longer suppress anything. Only the
+        # trailing subtask may evict: the realtime one runs ahead of entries the
+        # lookback one still needs.
+        cache.cleanup(cache_name, cursor)
+
+    log.info(f"Fetched {doc_count} session changes from project {project_id}")
+
+    if last_cursor > cursor:
+        yield last_cursor
+
+
+@backfill_timeout(BACKFILL_TIMEOUT_PERIOD)
+async def backfill_sessions(
+    http: HTTPSession,
+    base_url: str,
+    start_date: datetime,
+    project_id: int,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[Session | PageCursor, None]:
+    """Walk sessions from the configured start date up to the incremental cutoff.
+
+             start_date      cutoff - 1s    cutoff = incremental hand-off
+    ───────────────┼───────────────┼──────────────┼─────▶ time (1s ticks)
+                   │               │              │
+    cursor_expr ───[═══════════════╪══════════════)
+    scan_column ═══╪═══════════════╪══════════════)
+    emitted ───────[═══════════════]              │
+                   │               │              └─ belongs to the next stage:
+                   │               │                 incremental is seeded one
+                   │               │                 tick back so it opens here
+                   │               └─ last second collected
+                   └─ emitted on the first pass; on a resume this instant was
+                      already emitted before the checkpoint was written
+
+    Resumes from the reached instant rather than an offset, so a row that is
+    deleted mid-walk renumbers nothing.
+    """
+    assert isinstance(page, str | None)
+    assert isinstance(cutoff, datetime)
+
+    resuming = page is not None
+    start = datetime.fromisoformat(page) if resuming else start_date
+
+    if start >= cutoff:
+        return
+
+    cache_name = f"sessions/{project_id}"
+    last_cursor = start
+    doc_count = 0
+
+    async for item in _fetch_sessions_between(
+        http, base_url, project_id, log, start, cutoff
+    ):
+        item_cursor = item.get_cursor()
+
+        if resuming and item_cursor <= start:
+            continue
+
+        last_cursor = max(last_cursor, item_cursor)
+
+        # The lookback subtask opens an hour before this cutoff, so the tail of
+        # the backfill's range is walked by both.
+        if cache.should_yield(cache_name, item.id, item_cursor):
+            doc_count += 1
+            yield item
+
+    log.info(f"Backfilled {doc_count} sessions from project {project_id}")
+
+    if last_cursor > start:
+        yield last_cursor.isoformat()
 
 
 @backfill_timeout(BACKFILL_TIMEOUT_PERIOD)

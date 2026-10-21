@@ -1,5 +1,51 @@
 # materialize-bigquery
 
+## 2026-10-13
+
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to the date range of each transaction's keys.
+
+## 2026-10-12
+
+### Added
+- When a collection is backfilled, rows the backfill did not re-send are deleted
+  from standard-updates tables once it completes, so documents removed from the
+  source no longer linger in the destination. Delta-updates tables keep every
+  row. A table that excludes the `flow_published_at` field is left unchanged,
+  and a warning on the task page explains why.
+  Disable it with the `no_truncate_after_backfill` feature flag. It is also
+  disabled while `retain_existing_data_on_backfill` is enabled.
+
+## 2026-10-09
+
+### Fixed
+- Validating or applying a materialization no longer fails when another task
+  or shard drops a table in the dataset while the connector is listing it.
+
+## 2026-09-22
+
+### Fixed
+- Publishing a materialization now fails with a clear error when the endpoint
+  `dataset` exists in a location other than the configured `region`. Since
+  2026-09-14, load results are written to the endpoint dataset even when every
+  binding overrides its dataset, so such a configuration made every
+  transaction fail with `Dataset ... was not found in location ...`.
+
+## 2026-09-17
+
+### Added
+- New optional `partition_by` field on each table's resource configuration sets
+  the table's
+  [partitioning](https://cloud.google.com/bigquery/docs/partitioned-tables), for
+  example `DATE(created_at)`, `TIMESTAMP_TRUNC(updated_at, MONTH)`,
+  `_PARTITIONDATE` or `RANGE_BUCKET(id, GENERATE_ARRAY(0, 1000, 10))`. The
+  expression is verified against BigQuery when the materialization is published,
+  and is applied every time the connector creates the table, so partitioning now
+  survives backfills that drop and re-create it. Because BigQuery only accepts
+  partitioning at table creation, changing `partition_by` on an existing table
+  requires backfilling the binding, which drops and re-creates the table.
+
 ## 2026-09-14
 
 ### Fixed

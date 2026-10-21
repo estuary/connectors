@@ -1,0 +1,51 @@
+meta {
+  name: A1 - Create Project
+  type: graphql
+  seq: 1
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  mutation SeedProject($teamId: String!) {
+    projectCreate(input: {
+      name: "estuary-connector-verification"
+      description: "Temporary record created to verify source-linear's Projects stream. Safe to delete."
+      teamIds: [$teamId]
+    }) {
+      success
+      project { id name createdAt updatedAt archivedAt status { id } health }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "teamId": "ae4e7ae3-6e8b-4528-a1eb-4d77ce563971"
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  **Only the user runs this. Never the assistant.** This is a state-mutating call.
+
+  Creates one throwaway project so the Projects stream can be observed with real data. The
+  `teamId` is pinned to the Estuary workspace's only team (`EST`), read from the live
+  `teams` query.
+
+  Closes: the Projects stream currently has NO observed response body at all
+  (`20 - Projects Bare` and `21 - Projects Incremental Sweep` both return zero rows). Its
+  selection set is validated against the schema but never against a real payload — in
+  particular `status { id }` and the `health` enum have never been seen populated.
+
+  **Re-run after:** `20 - Projects Bare`, then `21 - Projects Incremental Sweep` with
+  `filter.updatedAt.gt` set just below the new project's `createdAt` to confirm the filter
+  narrows on this stream too.
+
+  Cleanup: archive or delete the project from the Linear UI once verification is done.
+}

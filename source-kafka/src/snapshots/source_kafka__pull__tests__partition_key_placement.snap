@@ -1,0 +1,23 @@
+---
+source: src/pull.rs
+expression: out
+---
+partition  0: a80f3ea2
+partition  1: e35d43f3
+partition  2: 59f286e7
+partition  3: 0d8b38dc
+partition  4: 3bc5a4fc
+partition  5: 2e755e7a
+partition  6: 86fa639d
+partition  7: a8592e6b
+partition  8: 5acb899a
+partition  9: e65ac427
+partition 10: 10a3478b
+partition 11: 24526967
+partition 12: 9c98cafe
+partition 13: 24a7265a
+partition 14: 0602776d
+partition 15: 4960f5f2
+2 shards: [10, 6]
+4 shards: [7, 3, 4, 2]
+8 shards: [3, 4, 3, 0, 2, 2, 0, 2]

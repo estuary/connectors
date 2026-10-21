@@ -1,0 +1,608 @@
+info:
+  name: start_time alone
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?start_time={{tickets_start_time}}&page[size]=100"
+  params:
+    - name: "start_time"
+      value: "{{tickets_start_time}}"
+      type: query
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - start_time=0, 42 of 47 tickets (projection)"
+    request:
+      url: "{{base_url}}/tickets?start_time=0&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "45"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99999; resets=45"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 1,
+                "updated_at": "2026-05-08T14:08:44Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 3,
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open"
+              },
+              {
+                "id": 4,
+                "updated_at": "2024-07-26T15:43:00Z",
+                "status": "open"
+              },
+              {
+                "id": 5,
+                "updated_at": "2024-07-26T15:43:03Z",
+                "status": "open"
+              },
+              {
+                "id": 6,
+                "updated_at": "2024-07-26T15:43:07Z",
+                "status": "open"
+              },
+              {
+                "id": 7,
+                "updated_at": "2024-07-26T15:44:56Z",
+                "status": "open"
+              },
+              {
+                "id": 8,
+                "updated_at": "2024-07-26T15:44:46Z",
+                "status": "open"
+              },
+              {
+                "id": 9,
+                "updated_at": "2024-10-11T21:48:56Z",
+                "status": "open"
+              },
+              {
+                "id": 10,
+                "updated_at": "2024-07-26T15:44:32Z",
+                "status": "open"
+              },
+              {
+                "id": 11,
+                "updated_at": "2024-07-26T15:43:24Z",
+                "status": "open"
+              },
+              {
+                "id": 12,
+                "updated_at": "2024-07-26T15:45:00Z",
+                "status": "open"
+              },
+              {
+                "id": 13,
+                "updated_at": "2024-07-26T15:44:39Z",
+                "status": "open"
+              },
+              {
+                "id": 14,
+                "updated_at": "2024-07-26T15:42:06Z",
+                "status": "open"
+              },
+              {
+                "id": 15,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 16,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 17,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 18,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 19,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 20,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 21,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 22,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 23,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 24,
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open"
+              },
+              {
+                "id": 25,
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open"
+              },
+              {
+                "id": 31,
+                "updated_at": "2024-11-19T16:57:12Z",
+                "status": "open"
+              },
+              {
+                "id": 32,
+                "updated_at": "2024-11-19T16:58:08Z",
+                "status": "open"
+              },
+              {
+                "id": 33,
+                "updated_at": "2025-01-27T19:31:47Z",
+                "status": "open"
+              },
+              {
+                "id": 34,
+                "updated_at": "2025-03-17T19:35:27Z",
+                "status": "open"
+              },
+              {
+                "id": 35,
+                "updated_at": "2025-05-01T01:27:42Z",
+                "status": "open"
+              },
+              {
+                "id": 36,
+                "updated_at": "2025-05-19T17:23:30Z",
+                "status": "open"
+              },
+              {
+                "id": 37,
+                "updated_at": "2026-01-16T01:28:25Z",
+                "status": "open"
+              },
+              {
+                "id": 38,
+                "updated_at": "2026-02-19T15:49:35Z",
+                "status": "open"
+              },
+              {
+                "id": 39,
+                "updated_at": "2026-03-04T12:55:46Z",
+                "status": "open"
+              },
+              {
+                "id": 40,
+                "updated_at": "2026-03-05T13:37:54Z",
+                "status": "open"
+              },
+              {
+                "id": 41,
+                "updated_at": "2026-03-18T22:55:54Z",
+                "status": "open"
+              },
+              {
+                "id": 42,
+                "updated_at": "2026-04-30T14:53:34Z",
+                "status": "open"
+              },
+              {
+                "id": 43,
+                "updated_at": "2026-05-06T21:55:52Z",
+                "status": "open"
+              },
+              {
+                "id": 44,
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open"
+              },
+              {
+                "id": 45,
+                "updated_at": "2026-07-14T22:31:08Z",
+                "status": "open"
+              },
+              {
+                "id": 46,
+                "updated_at": "2026-08-20T21:36:36Z",
+                "status": "open"
+              },
+              {
+                "id": 47,
+                "updated_at": "2026-09-23T22:12:34Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUzhBQUFBQUFBQUEifQ==",
+              "before_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUUVBQUFBQUFBQUEifQ=="
+            }
+          }
+  - name: "200 - start_time=1778249324 ignored (projection)"
+    request:
+      url: "{{base_url}}/tickets?start_time=1778249324&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "697"
+        - name: "ratelimit-remaining"
+          value: "697"
+        - name: "ratelimit-reset"
+          value: "41"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99997; resets=41"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 1,
+                "updated_at": "2026-05-08T14:08:44Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 3,
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open"
+              },
+              {
+                "id": 4,
+                "updated_at": "2024-07-26T15:43:00Z",
+                "status": "open"
+              },
+              {
+                "id": 5,
+                "updated_at": "2024-07-26T15:43:03Z",
+                "status": "open"
+              },
+              {
+                "id": 6,
+                "updated_at": "2024-07-26T15:43:07Z",
+                "status": "open"
+              },
+              {
+                "id": 7,
+                "updated_at": "2024-07-26T15:44:56Z",
+                "status": "open"
+              },
+              {
+                "id": 8,
+                "updated_at": "2024-07-26T15:44:46Z",
+                "status": "open"
+              },
+              {
+                "id": 9,
+                "updated_at": "2024-10-11T21:48:56Z",
+                "status": "open"
+              },
+              {
+                "id": 10,
+                "updated_at": "2024-07-26T15:44:32Z",
+                "status": "open"
+              }
+            ],
+            "tickets_total": 42,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUzhBQUFBQUFBQUEifQ==",
+              "before_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUUVBQUFBQUFBQUEifQ=="
+            }
+          }
+  - name: "200 - after A5/A6 delete seeding, deleted ticket 48 absent (projection)"
+    request:
+      url: "{{base_url}}/tickets?start_time=0&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "686"
+        - name: "ratelimit-remaining"
+          value: "686"
+        - name: "ratelimit-reset"
+          value: "32"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99999; resets=32"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 1,
+                "updated_at": "2026-05-08T14:08:44Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 3,
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open"
+              },
+              {
+                "id": 4,
+                "updated_at": "2024-07-26T15:43:00Z",
+                "status": "open"
+              },
+              {
+                "id": 5,
+                "updated_at": "2024-07-26T15:43:03Z",
+                "status": "open"
+              },
+              {
+                "id": 6,
+                "updated_at": "2024-07-26T15:43:07Z",
+                "status": "open"
+              },
+              {
+                "id": 7,
+                "updated_at": "2024-07-26T15:44:56Z",
+                "status": "open"
+              },
+              {
+                "id": 8,
+                "updated_at": "2024-07-26T15:44:46Z",
+                "status": "open"
+              },
+              {
+                "id": 9,
+                "updated_at": "2024-10-11T21:48:56Z",
+                "status": "open"
+              },
+              {
+                "id": 10,
+                "updated_at": "2024-07-26T15:44:32Z",
+                "status": "open"
+              },
+              {
+                "id": 11,
+                "updated_at": "2024-07-26T15:43:24Z",
+                "status": "open"
+              },
+              {
+                "id": 12,
+                "updated_at": "2024-07-26T15:45:00Z",
+                "status": "open"
+              },
+              {
+                "id": 13,
+                "updated_at": "2024-07-26T15:44:39Z",
+                "status": "open"
+              },
+              {
+                "id": 14,
+                "updated_at": "2024-07-26T15:42:06Z",
+                "status": "open"
+              },
+              {
+                "id": 15,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 16,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 17,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 18,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 19,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 20,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 21,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 22,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 23,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 24,
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open"
+              },
+              {
+                "id": 25,
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open"
+              },
+              {
+                "id": 31,
+                "updated_at": "2024-11-19T16:57:12Z",
+                "status": "open"
+              },
+              {
+                "id": 32,
+                "updated_at": "2024-11-19T16:58:08Z",
+                "status": "open"
+              },
+              {
+                "id": 33,
+                "updated_at": "2025-01-27T19:31:47Z",
+                "status": "open"
+              },
+              {
+                "id": 34,
+                "updated_at": "2025-03-17T19:35:27Z",
+                "status": "open"
+              },
+              {
+                "id": 35,
+                "updated_at": "2025-05-01T01:27:42Z",
+                "status": "open"
+              },
+              {
+                "id": 36,
+                "updated_at": "2025-05-19T17:23:30Z",
+                "status": "open"
+              },
+              {
+                "id": 37,
+                "updated_at": "2026-01-16T01:28:25Z",
+                "status": "open"
+              },
+              {
+                "id": 38,
+                "updated_at": "2026-02-19T15:49:35Z",
+                "status": "open"
+              },
+              {
+                "id": 39,
+                "updated_at": "2026-03-04T12:55:46Z",
+                "status": "open"
+              },
+              {
+                "id": 40,
+                "updated_at": "2026-03-05T13:37:54Z",
+                "status": "open"
+              },
+              {
+                "id": 41,
+                "updated_at": "2026-03-18T22:55:54Z",
+                "status": "open"
+              },
+              {
+                "id": 42,
+                "updated_at": "2026-04-30T14:53:34Z",
+                "status": "open"
+              },
+              {
+                "id": 43,
+                "updated_at": "2026-05-06T21:55:52Z",
+                "status": "open"
+              },
+              {
+                "id": 44,
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open"
+              },
+              {
+                "id": 45,
+                "updated_at": "2026-07-14T22:31:08Z",
+                "status": "open"
+              },
+              {
+                "id": 46,
+                "updated_at": "2026-08-20T21:36:36Z",
+                "status": "open"
+              },
+              {
+                "id": 47,
+                "updated_at": "2026-09-23T22:12:34Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUzhBQUFBQUFBQUEifQ==",
+              "before_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhUUVBQUFBQUFBQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** V1 control. Shows what `start_time` does without `sort` (default order is
+  documented as `id`), so `start_time with updated_at sort` can be compared against it.
+
+  **VERIFIED (2026-10-07):** returns 42 tickets with or without `start_time`. Default order is
+  ticket id. The 5 tickets missing from the 47 the incremental export returns (ids
+  26-30, closed August 2024) are archived. A ticket deleted by
+  `Seeding / A6 - Delete ticket` (id 48) is also excluded.

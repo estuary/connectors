@@ -1,3 +1,11 @@
+---
+title: Jira (Deprecated)
+description: Deprecated Jira capture connector. Use Estuary's native Jira connector instead to sync issues, projects, boards, and sprints.
+---
+
+<head>
+  <meta name="robots" content="noindex, follow" />
+</head>
 
 # Jira (Deprecated)
 

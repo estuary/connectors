@@ -151,6 +151,8 @@ type templates struct {
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
 	copyIntoDirect          *template.Template
+	createStagingTable      *template.Template
+	copyIntoStaging         *template.Template
 	mergeInto               *template.Template
 }
 
@@ -188,19 +190,7 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{ if $.Table.Document -}}
 SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
-	JOIN (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Keys }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
+	JOIN ({{ template "loadSource" $ }}) AS r
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
 	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
@@ -222,23 +212,77 @@ to_json(struct(
 {{- end}}
 )) as flow_document
 FROM {{ $.Table.Identifier }}
-JOIN (
-	{{- range $fi, $file := $.Files }}
-	{{ if $fi }} UNION ALL {{ end -}}
-	(
-		SELECT
-		{{ range $ind, $key := $.Table.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ template "cast" $key -}}
-		{{- end }}
-		FROM json.`+"`{{ $file }}`"+`
-	)
-	{{- end }}
-) AS r
+JOIN ({{ template "loadSource" $ }}) AS r
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
+-- The staged files of a transaction: one relation per staging directory, and
+-- one scan per file for files staged at the root by earlier versions.
+-- TODO: remove the per-file scans in about January 2027, with the root-level
+-- file path in renderCommitQueries.
+
+{{ define "loadSource" }}
+{{- range $di, $dir := $.Directories }}
+		{{ if $di }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM read_files({{ Literal $dir }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+{{- end }}
+{{- range $fi, $file := $.Files }}
+		{{ if or $fi $.Directories }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM json.`+"`{{ $file }}`"+`
+		)
+{{- end }}
+{{ end }}
+
+{{ define "storeSource" }}
+{{- range $ti, $tbl := $.Tables }}
+		{{ if $ti }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			c{{ $ind }} AS {{ $key.Identifier }}
+			{{- end }}, _flow_delete
+			FROM {{ $tbl }}
+		)
+{{- end }}
+{{- range $di, $dir := $.Directories }}
+		{{ if or $di $.Tables }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}, _flow_delete::BOOLEAN
+			FROM read_files({{ Literal $dir }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+{{- end }}
+{{- range $fi, $file := $.Files }}
+		{{ if or $fi $.Directories $.Tables }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}, _flow_delete::BOOLEAN
+			FROM json.`+"`{{ $file }}`"+`
+		)
 {{- end }}
 {{ end }}
 
@@ -249,6 +293,15 @@ JOIN (
 {{ $DDL := First (Split $.DDL " ") }}
 {{- if eq $DDL "BINARY" -}}
 	unbase64({{ $.Identifier }})::BINARY as {{ $.Identifier }}
+{{- else -}}
+	{{ $.Identifier }}::{{- $DDL -}}
+{{- end -}}
+{{- end }}
+
+{{ define "castValue" -}}
+{{ $DDL := First (Split $.DDL " ") }}
+{{- if eq $DDL "BINARY" -}}
+	unbase64({{ $.Identifier }})::BINARY
 {{- else -}}
 	{{ $.Identifier }}::{{- $DDL -}}
 {{- end -}}
@@ -280,27 +333,41 @@ JOIN (
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
+  {{- if $.Files }}
   FILES = ('{{ Join $.Files "','" }}')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
+  {{- end }}
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
+  ;
+{{ end }}
+
+{{ define "createStagingTable" }}
+CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
+  {{- range $ind, $col := $.Target.Columns }}
+  {{- if $ind }},{{ end }}
+  c{{ $ind }} {{$col.NullableDDL}}
+  {{- end }},
+  _flow_delete BOOLEAN
+);
+{{ end }}
+
+{{ define "copyIntoStaging" }}
+	COPY INTO {{ $.Identifier }} FROM (
+    SELECT
+		{{ range $ind, $key := $.Target.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "castValue" $key }} AS c{{ $ind }}
+		{{- end }}, _flow_delete::BOOLEAN AS _flow_delete
+  FROM {{ Literal $.Directory }}
+	)
+  FILEFORMAT = JSON
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
   ;
 {{ end }}
 
 {{ define "mergeInto" }}
 	MERGE INTO {{ $.Table.Identifier }} AS l
-	USING (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}, _flow_delete::BOOLEAN
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
+	USING ({{ template "storeSource" $ }}) AS r
   ON {{ range $ind, $bound := $.Bounds }}
     {{ if $ind -}} AND {{ end -}}
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
@@ -338,20 +405,46 @@ JOIN (
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		copyIntoDirect:          tplAll.Lookup("copyIntoDirect"),
+		createStagingTable:      tplAll.Lookup("createStagingTable"),
+		copyIntoStaging:         tplAll.Lookup("copyIntoStaging"),
 		mergeInto:               tplAll.Lookup("mergeInto"),
 	}
 }
 
 type tableWithFiles struct {
+	// Files are relative to StagingPath for COPY INTO, which reads the whole
+	// of StagingPath when there are none, and full paths otherwise.
 	Files       []string
 	StagingPath string
 	Table       *sql.Table
 	Bounds      []sql.MergeBound
+	// Directories are each read as one relation with Schema, a DDL string.
+	Directories []string
+	Schema      string
+	// Tables are the staging tables a MERGE reads.
+	Tables []string
+}
+
+// stagingCopy renders the creation of a staging table and the copy of a
+// directory of staged files into it.
+type stagingCopy struct {
+	Target     *sql.Table
+	Identifier string
+	Directory  string
 }
 
 func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds})
+}
+
+// RenderTableWithStaged renders a load or merge over staging directories and root-level files.
+func RenderTableWithStaged(table sql.Table, dirs, rootFiles []string, schema string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Directories: dirs, Files: rootFiles, Schema: schema, Bounds: bounds})
+}
+
+func renderTemplate(tpl *template.Template, data any) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds}); err != nil {
+	if err := tpl.Execute(&w, data); err != nil {
 		return "", err
 	}
 	return w.String(), nil

@@ -146,6 +146,21 @@ func SetCurrentSchemaUpdate(id int) TableUpdate {
 	}
 }
 
+type upgradeFormatVersionUpdateReq struct {
+	baseUpdate
+	FormatVersion int `json:"format-version"`
+}
+
+func (upgradeFormatVersionUpdateReq) isTableUpdate() {}
+
+// UpgradeFormatVersionUpdate raises the table's Iceberg format version.
+func UpgradeFormatVersionUpdate(version int) TableUpdate {
+	return &upgradeFormatVersionUpdateReq{
+		baseUpdate:    baseUpdate{Action: "upgrade-format-version"},
+		FormatVersion: version,
+	}
+}
+
 type catalogOpts struct {
 	useClientCredential bool
 	oauth2ServerUri     string

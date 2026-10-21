@@ -1,0 +1,178 @@
+meta {
+  name: 14 - Issues Include Archived
+  type: graphql
+  seq: 14
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IssuesIncludeArchived {
+    liveOnly: issues(first: 250, orderBy: updatedAt) {
+      nodes { id archivedAt updatedAt }
+      pageInfo { hasNextPage }
+    }
+    withArchived: issues(first: 250, includeArchived: true, orderBy: updatedAt) {
+      nodes { id archivedAt updatedAt }
+      pageInfo { hasNextPage }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  The silent-data-loss probe for this stream. Linear's default hides a whole partition:
+  "Archived resources are hidden by default from the paginated responses. They can be
+  included by passing optional `includeArchived: true` as a query parameter for
+  pagination."
+
+  Archival is how deletion is normally expressed in Linear's UI, so a connector that omits
+  `includeArchived` does not merely miss archived rows — it makes archival INVISIBLE. A
+  record that gets archived simply stops appearing in incremental sweeps, and the
+  downstream collection keeps serving a stale live-looking copy forever, with no tombstone
+  and no signal that anything happened. That is silent data loss in the exact sense the
+  verification rules are about.
+
+  `03 - Introspect Entity Types` confirmed `archivedAt: DateTime` (nullable) is exposed on
+  all four cluster types, so with `includeArchived: true` the archived partition is
+  self-identifying downstream: `archivedAt != null` IS the tombstone. No separate deletion
+  mechanism is needed.
+
+  Recommendation, therefore: set `includeArchived: true` on ALL FOUR cluster streams,
+  unconditionally, and always select `archivedAt`.
+
+  **Limitation / observed finding — RESOLVED, and it is a VERIFIED NEGATIVE.**
+
+  Two runs, before and after `Seeding/D2 - Archive Issue`:
+
+  - **2026-07-30 (pre-seed, the saved example below):** zero archived records existed, so
+    `liveOnly` and `withArchived` both returned the same 4 rows, all `archivedAt: null`.
+    Proved only that the argument is accepted.
+  - **2026-08-04 (post-seed, EST-2 archived):** `withArchived` -> 4 rows, `liveOnly` -> 3.
+    `includeArchived: true` genuinely works, and the default genuinely hides the partition.
+
+  **But the load-bearing assumption FAILED. Archiving does NOT bump `updatedAt`:**
+
+  | EST-2 | before | after `issueArchive` |
+  |---|---|---|
+  | `updatedAt` | `2026-07-30T21:35:03.808Z` | **unchanged** |
+  | `archivedAt` | `null` | `2026-08-04T18:13:09.393Z` |
+  | visible by default | yes | no |
+
+  So an `updatedAt`-cursored incremental sweep will **never** re-emit an archived record,
+  and `includeArchived: true` buys incremental sync **nothing on its own** — the row is
+  merely eligible to appear, and nothing ever asks for it again. Had the connector shipped
+  on the original assumption, deleted records would sit in destination tables looking live,
+  indefinitely.
+
+  Ordinary field mutations DO bump `updatedAt` (verified via `Seeding/D1` on EST-1:
+  `…03.808Z` -> `2026-08-04T18:12:51.985Z`). It is specifically archival that does not.
+
+  `includeArchived: true` is still REQUIRED on every request in this cluster — without it
+  archived rows cannot be retrieved by any means. It is simply not SUFFICIENT.
+
+  What replaces the original design:
+  - **Issues** — a second, independently-cursored pass on `filter.archivedAt.gt`. See
+    `15 - Issues Archival Sweep`.
+  - **Projects / Initiatives / Labels** — no `archivedAt` filter exists on their filter
+    types, so archival is not incrementally detectable at all. See
+    `08 - Archival Capability Matrix`.
+}
+
+example {
+  name: 200 — withArchived=4 / liveOnly=3; updatedAt NOT bumped by archive
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IssuesIncludeArchived {
+        liveOnly: issues(first: 250, orderBy: updatedAt) {
+          nodes { id archivedAt updatedAt }
+          pageInfo { hasNextPage }
+        }
+        withArchived: issues(first: 250, includeArchived: true, orderBy: updatedAt) {
+          nodes { id archivedAt updatedAt }
+          pageInfo { hasNextPage }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 7
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2487
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999989
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "liveOnly": {
+              "count": 3,
+              "rows": [
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z",
+                  "archivedAt": null
+                },
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null
+                }
+              ]
+            },
+            "withArchived": {
+              "count": 4,
+              "rows": [
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z",
+                  "archivedAt": null
+                },
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null
+                },
+                {
+                  "id": "431c9f95-fe23-44cb-9391-f4880c51bede",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": "2026-08-04T18:13:09.393Z"
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}

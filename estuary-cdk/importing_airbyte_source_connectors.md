@@ -39,8 +39,8 @@ exception of snapshot outputs), but this sequence of commits is recommended for 
    compatibility.
 4. Removal of unnecessary files from the imported source code. The final state of the connector
    folder should include only what is needed for the connector to run under the Estuary CDK.
-5. Addition of the imported connector to the [python CI
-   workflow](https://github.com/estuary/connectors/blob/main/.github/workflows/python.yaml) and
+5. Addition of the imported connector to the [Python connector
+   list](https://github.com/estuary/connectors/blob/main/.github/python-connectors.yaml) and
    verification that the tests pass when run in CI.
 
 Each pull request should include the following if at all possible. If these items are not included,

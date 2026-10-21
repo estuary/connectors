@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-12
+
+### Fixed
+- `satisfaction_ratings`, `audit_logs`, `ticket_skips`, `ticket_metric_events`, `ticket_activities`, `organizations`, `calls`, and `call_legs` now wait to poll Zendesk until at least 1 minute of new data is available.
+
+## 2026-10-08
+
+### Changed
+- `ticket_metric_events` now trails roughly 30 minutes behind the present. Previously, events recorded more than 5 minutes late could be missed.
+
+## 2026-10-01
+
+### Changed
+- `ticket_audits`, `ticket_comments`, and `side_conversations` now fetch up to 5 tickets' records at a time instead of one at a time, so these streams catch up faster after many tickets are updated at once.
+
 ## 2026-09-10
 
 ### Changed

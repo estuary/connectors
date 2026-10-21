@@ -37,7 +37,9 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		uri, err := url.Parse(cfg.Address)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address for network tunnel: %w", err)
+			// A *url.Error repeats its input, which may contain a password, so unwrap it
+			// to get the actual error.
+			return nil, fmt.Errorf("parsing address for network tunnel: %w", errors.Unwrap(err))
 		}
 
 		var sshConfig = &networkTunnel.SshConfig{
@@ -72,7 +74,7 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 		var mongoErr mongoDriver.Error
 
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address))
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", redactedAddress(cfg.Address)))
 		} else if errors.As(err, &mongoErr) {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
@@ -90,6 +92,17 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	}
 
 	return client, nil
+}
+
+// redactedAddress masks any password in the address for use in messages. The
+// address shouldn't contain credentials, but users sometimes paste a full
+// connection string.
+func redactedAddress(address string) string {
+	uri, err := url.Parse(address)
+	if err != nil {
+		return "<unparseable address>"
+	}
+	return uri.Redacted()
 }
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
@@ -121,6 +134,9 @@ func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bi
 type materialization struct {
 	cfg    config
 	client *mongo.Client
+	// truncateAfterBackfill permits deleting the documents published before
+	// a completed backfill.
+	truncateAfterBackfill bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
@@ -132,8 +148,9 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	}
 
 	return &materialization{
-		cfg:    cfg,
-		client: client,
+		cfg:                   cfg,
+		client:                client,
+		truncateAfterBackfill: featureFlags["truncate_after_backfill"],
 	}, nil
 }
 
@@ -275,10 +292,11 @@ func (d *materialization) NewTransactor(
 	}
 
 	return &transactor{
-		cfg:      &d.cfg,
-		client:   d.client,
-		bindings: bindings,
-		be:       be,
+		cfg:                   &d.cfg,
+		client:                d.client,
+		bindings:              bindings,
+		be:                    be,
+		truncateAfterBackfill: d.truncateAfterBackfill,
 	}, nil
 }
 

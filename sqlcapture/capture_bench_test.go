@@ -89,14 +89,7 @@ func newBenchmarkCapture(b *testing.B, numBindings int, mode string) *Capture {
 		Output:   newMockPullOutput(),
 		Database: db,
 	}
-	capture.dirtyStreams = make(map[boilerplate.StateKey]struct{})
-	for stateKey, state := range streams {
-		capture.updateBackfillSet(stateKey, state.Mode)
-	}
-	capture.replStream = &mockReplicationStream{}
-	capture.lastDiscovery = discovery
-	capture.rediscoverAfter = time.Now().Add(time.Hour)
-	capture.periodicChecksAfter = time.Now().Add(time.Hour)
+	startMockCapture(capture, discovery)
 	return capture
 }
 

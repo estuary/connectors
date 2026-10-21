@@ -1,0 +1,59 @@
+info:
+  name: page size 101
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?page[size]=101"
+  params:
+    - name: "page[size]"
+      value: "101"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - page[size] 101 rejected"
+    request:
+      url: "{{base_url}}/tickets?page[size]=101"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "696"
+        - name: "ratelimit-remaining"
+          value: "696"
+        - name: "ratelimit-reset"
+          value: "57"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99997; resets=57"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "page[size] cannot be greater than 100"
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** V10. The documented max page size is 100. Records whether 101 is
+  rejected or silently clamped.
+
+  **LIMITATION (VERIFIED 2026-10-07):** rejected, not clamped: `400 InvalidPaginationParameter`,
+  "page[size] cannot be greater than 100". The connector must cap page size at 100.

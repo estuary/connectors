@@ -1,0 +1,107 @@
+info:
+  name: bare startsWith
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query AlertConfigs($prefix: String!) {
+        alertConfigs(filter: { catalogPrefixOrName: { startsWith: $prefix } }, first: 100) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node { id catalogPrefixOrName config detail createdAt updatedAt lastModifiedBy } }
+        }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix_nested}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alert_configs.rs
+
+  **WHY:** The query the connector runs per scope prefix. A `startsWith` filter
+  is always passed so the resolver never hits its >20-authorized-prefixes error.
+  Confirms node shape and ascending `catalogPrefixOrName` order / cursor.
+  `effective` is deliberately not selected (derived merge of ancestor layers —
+  recomputable, and it would make every row change whenever a parent changes).
+
+  **VERIFIED (2026-10-07):** One row under `Artificial-Industries/` (id `15373da214d8a400`, `config` is a sparse JSON object, `lastModifiedBy` is a UUID). Under `Jonathan_Wihl/` it is empty: `edges: []`, `endCursor: null`. Cursor is `catalogPrefixOrName`.
+
+examples:
+  - name: 200 - one config under Artificial-Industries
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alertConfigs": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Artificial-Industries/"
+                },
+                "edges": [
+                  {
+                    "cursor": "Artificial-Industries/",
+                    "node": {
+                      "id": "15373da214d8a400",
+                      "catalogPrefixOrName": "Artificial-Industries/",
+                      "config": {
+                        "shardFailed": {
+                          "enabled": true,
+                          "condition": {
+                            "per": "8h"
+                          }
+                        }
+                      },
+                      "detail": null,
+                      "createdAt": "2026-06-23T19:16:38.568397+00:00",
+                      "updatedAt": "2026-06-23T19:31:06.218994+00:00",
+                      "lastModifiedBy": "3df2ea2c-3c66-4db0-8410-a405e6ed06ae"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+  - name: 200 - empty under Jonathan_Wihl (prefix var was test_prefix)
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alertConfigs": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": null
+                },
+                "edges": []
+              }
+            }
+          }

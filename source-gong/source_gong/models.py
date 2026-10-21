@@ -68,7 +68,7 @@ class EndpointConfig(BaseModel):
         ge=1,
         le=30,
         title="Calls Lookback Window (Days)",
-        description="Number of days to look back when fetching calls to capture post-call enrichment. Applied once per day.",
+        description="Number of days to look back when fetching `calls`, `extensive_calls`, and `call_transcripts` to capture post-call enrichment. Applied once per day.",
         json_schema_extra={"nonsensitive": True},
     )
 
@@ -145,19 +145,24 @@ class GongResponseEnvelope[T: GongResource](BaseModel, extra="allow"):
         return self.records.cursor if self.records else None
 
 
-class IncrementalGongResource(GongResource):
-    CURSOR_FIELD: ClassVar[str]
+class FilteredGongResource(GongResource):
+    """Gong resource listed through a date-filtered query."""
+
+    ABSTRACT: ClassVar[bool] = False
+    REQUIRED_CLASSVARS: ClassVar[tuple[str, ...]] = (
+        "URL_PATH",
+        "ITEMS_KEY",
+        "FROM_PARAM",
+        "TO_PARAM",
+    )
     ID_FIELD: ClassVar[str] = "id"
     METHOD: ClassVar[HttpMethod] = HttpMethod.GET
     DATE_FORMAT: ClassVar[DateFormat] = DateFormat.ISO
     FROM_PARAM: ClassVar[str]
     TO_PARAM: ClassVar[str]
     FILTER_WRAPPER: ClassVar[bool] = False
-
-    # Synthetic field populated by the `extract_cursor` before-validator from
-    # the resource's CURSOR_FIELD. Excluded from serialized output (exclude=True)
-    # so it does not appear in captured documents.
-    cursor_value: int = Field(exclude=True)
+    # Merged into POST bodies alongside the filter.
+    BODY_EXTRA: ClassVar[dict[str, object]] = {}
 
     @classmethod
     def get_key_json_path(cls) -> str:
@@ -165,11 +170,27 @@ class IncrementalGongResource(GongResource):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        for attr in ("CURSOR_FIELD", "URL_PATH", "ITEMS_KEY", "FROM_PARAM", "TO_PARAM"):
+        # Intermediate bases set ABSTRACT in their own body to skip the check.
+        if cls.__dict__.get("ABSTRACT"):
+            return
+        for attr in cls.REQUIRED_CLASSVARS:
             if not hasattr(cls, attr) or getattr(cls, attr) == "":
                 raise TypeError(
                     f"Class {cls.__name__} must define class attribute '{attr}'"
                 )
+
+
+class IncrementalGongResource(FilteredGongResource):
+    """Filtered resource whose documents carry their own cursor timestamp."""
+
+    ABSTRACT = True
+    REQUIRED_CLASSVARS = FilteredGongResource.REQUIRED_CLASSVARS + ("CURSOR_FIELD",)
+    CURSOR_FIELD: ClassVar[str]
+
+    # Synthetic field populated by the `extract_cursor` before-validator from
+    # the resource's CURSOR_FIELD. Excluded from serialized output (exclude=True)
+    # so it does not appear in captured documents.
+    cursor_value: int = Field(exclude=True)
 
     @model_validator(mode="before")
     @classmethod
@@ -204,6 +225,86 @@ class Call(IncrementalGongResource):
     TO_PARAM = "toDateTime"
 
     id: int
+
+
+# Gong omits fields the account can't access, so the full set is safe to
+# request. `media` stays off because its `audioUrl` is re-signed on every
+# request. Mirrors the body in bruno/Calls/extensive.yml.
+EXTENSIVE_CONTENT_SELECTOR: dict[str, object] = {
+    "context": "Extended",
+    "contextTiming": ["Now", "TimeOfCall"],
+    "exposedFields": {
+        "parties": True,
+        "content": {
+            "structure": True,
+            "topics": True,
+            "trackers": True,
+            "trackerOccurrences": True,
+            "pointsOfInterest": True,
+            "brief": True,
+            "outline": True,
+            "highlights": True,
+            "callOutcome": True,
+            "keyPoints": True,
+        },
+        "interaction": {
+            "speakers": True,
+            "video": True,
+            "personInteractionStats": True,
+            "questions": True,
+        },
+        "collaboration": {"publicComments": True},
+        "media": False,
+    },
+}
+
+
+class ExtensiveCallMetaData(BaseModel, extra="allow"):
+    """The Call document, nested under `metaData` in extensive responses."""
+
+    id: int
+
+
+class ExtensiveCall(FilteredGongResource):
+    """
+    Gong Call resource with parties, content, and interaction data.
+
+    Windowed by call date with the same lookback window as Call.
+    """
+
+    NAME = "extensive_calls"
+    KEY = ["/metaData/id"]
+    ID_FIELD = "metaData/id"
+    URL_PATH = "/v2/calls/extensive"
+    METHOD = HttpMethod.POST
+    ITEMS_KEY = "calls"
+    FROM_PARAM = "fromDateTime"
+    TO_PARAM = "toDateTime"
+    FILTER_WRAPPER = True
+    BODY_EXTRA = {"contentSelector": EXTENSIVE_CONTENT_SELECTOR}
+
+    metaData: ExtensiveCallMetaData
+
+
+class CallTranscript(FilteredGongResource):
+    """
+    Gong Call Transcript resource.
+
+    Transcripts carry no timestamp, so the checkpoint is the window end.
+    `callId` is an int to match Call.id.
+    """
+
+    NAME = "call_transcripts"
+    KEY = ["/callId"]
+    ID_FIELD = "callId"
+    URL_PATH = "/v2/calls/transcript"
+    METHOD = HttpMethod.POST
+    ITEMS_KEY = "callTranscripts"
+    FROM_PARAM = "fromDateTime"
+    TO_PARAM = "toDateTime"
+    FILTER_WRAPPER = True
+
+    callId: int
 
 
 class User(IncrementalGongResource):

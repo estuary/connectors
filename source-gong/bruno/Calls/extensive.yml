@@ -15,7 +15,36 @@ http:
       {
         "filter": {
           "fromDateTime": "2026-08-01T00:00:00Z",
-          "toDateTime": "2026-09-01T00:00:00Z"
+          "toDateTime": "2026-10-01T00:00:00Z"
+        },
+        "contentSelector": {
+          "context": "Extended",
+          "contextTiming": ["Now", "TimeOfCall"],
+          "exposedFields": {
+            "parties": true,
+            "content": {
+              "structure": true,
+              "topics": true,
+              "trackers": true,
+              "trackerOccurrences": true,
+              "pointsOfInterest": true,
+              "brief": true,
+              "outline": true,
+              "highlights": true,
+              "callOutcome": true,
+              "keyPoints": true
+            },
+            "interaction": {
+              "speakers": true,
+              "video": true,
+              "personInteractionStats": true,
+              "questions": true
+            },
+            "collaboration": {
+              "publicComments": true
+            },
+            "media": false
+          }
         }
       }
   auth: inherit
@@ -29,8 +58,8 @@ settings:
 docs: |-
   **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/extensive
 
-  **WHY:** not an endpoint the connector uses — kept because it is the second
-  place to ask whether a call exists that `bare` declines to list.
+  **WHY:** the endpoint backing the `extensive_calls` stream. This body matches
+  `EXTENSIVE_CONTENT_SELECTOR` in `source_gong/models.py`.
 
   **VERIFIED (2026-08-31):** it declines the same calls `bare` does. A call
   created but never successfully given media is invisible here too, with the
@@ -38,3 +67,26 @@ docs: |-
   processed — but the id is still recoverable by re-posting its
   `clientUniqueId`, which returns it in the duplicate error (see
   `Seeding / A1`).
+
+  **VERIFIED (2026-09-16) — the id and start time sit under `metaData`.** A
+  call item is `{metaData, context, parties, content, interaction,
+  collaboration, media}`, hence `KEY = ["/metaData/id"]`. `metaData` holds the
+  same twenty fields and values as the `/v2/calls` document.
+
+  **VERIFIED (2026-09-16) — `started` carries a numeric offset**
+  (`"2026-08-28T08:00:00-07:00"`). Still RFC3339; parse it before comparing,
+  since offset and `Z` timestamps don't sort as strings.
+
+  **VERIFIED (2026-09-16) — unavailable `exposedFields` are omitted
+  silently.** Requesting all of them returns `200`, with
+  `content.{structure,trackerOccurrences,pointsOfInterest,highlights}` and
+  `interaction.video` absent. The full set is safe to request.
+
+  **VERIFIED (2026-09-16) — sandbox coverage:** `parties`,
+  `content.{brief,outline,keyPoints,topics,callOutcome,trackers}` and
+  `interaction.{speakers,interactionStats,questions}` are populated.
+  `collaboration` (`{}`) and `context` (`[]`, no CRM) are empty, so their
+  populated shape is **UNOBSERVABLE** here.
+
+  **LIMITATION — `media` is off.** Its `audioUrl` is re-signed on every
+  request; see `media url churn`.

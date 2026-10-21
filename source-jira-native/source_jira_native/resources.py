@@ -40,6 +40,7 @@ from .models import (
     StandardPermissions,
     Statuses,
     SystemAvatars,
+    Teams,
     FULL_REFRESH_STREAMS,
     ISSUE_CHILD_STREAMS,
     PERMISSION_BLOCKED_STREAMS,
@@ -67,6 +68,7 @@ from .api import (
     snapshot_sprint_issues,
     snapshot_statuses,
     snapshot_system_avatars,
+    snapshot_teams,
     url_base,
     ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON,
 )
@@ -214,6 +216,14 @@ def _get_partial_snapshot_fn(
             config.domain,
             stream,
         )
+    elif issubclass(stream, Teams):
+        snapshot_fn = functools.partial(
+            snapshot_teams,
+            http,
+            config.domain,
+            config.organization_id,
+            stream,
+        )
     elif issubclass(stream, FilterSharing):
         snapshot_fn = functools.partial(
             snapshot_filter_sharing,
@@ -315,6 +325,11 @@ def full_refresh_resources(
     resources: list[common.Resource] = []
 
     for stream in FULL_REFRESH_STREAMS:
+        # Teams can't be fetched without an organization id, so the stream is
+        # only offered once one is configured.
+        if issubclass(stream, Teams) and not config.organization_id:
+            continue
+
         resources.append(
             common.SnapshotResource(
                 name=stream.name,

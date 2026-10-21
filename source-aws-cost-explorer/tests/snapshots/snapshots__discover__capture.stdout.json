@@ -1,0 +1,362 @@
+[
+  {
+    "recommendedName": "daily_costs",
+    "resourceConfig": {
+      "name": "daily_costs"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CostMetric": {
+          "properties": {
+            "amount": {
+              "title": "Amount",
+              "type": "string"
+            },
+            "unit": {
+              "title": "Unit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "unit"
+          ],
+          "title": "CostMetric",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "period_end": {
+          "title": "Period End",
+          "type": "string"
+        },
+        "estimated": {
+          "title": "Estimated",
+          "type": "boolean"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CostMetric"
+          },
+          "title": "Metrics",
+          "type": "object"
+        }
+      },
+      "required": [
+        "date",
+        "period_end",
+        "estimated",
+        "metrics"
+      ],
+      "title": "DailyCost",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/date"
+    ]
+  },
+  {
+    "recommendedName": "daily_costs_by_service",
+    "resourceConfig": {
+      "name": "daily_costs_by_service"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CostMetric": {
+          "properties": {
+            "amount": {
+              "title": "Amount",
+              "type": "string"
+            },
+            "unit": {
+              "title": "Unit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "unit"
+          ],
+          "title": "CostMetric",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "period_end": {
+          "title": "Period End",
+          "type": "string"
+        },
+        "estimated": {
+          "title": "Estimated",
+          "type": "boolean"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CostMetric"
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "service": {
+          "title": "Service",
+          "type": "string"
+        }
+      },
+      "required": [
+        "date",
+        "period_end",
+        "estimated",
+        "metrics",
+        "service"
+      ],
+      "title": "ServiceCost",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/date",
+      "/service"
+    ]
+  },
+  {
+    "recommendedName": "daily_costs_by_linked_account",
+    "resourceConfig": {
+      "name": "daily_costs_by_linked_account"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CostMetric": {
+          "properties": {
+            "amount": {
+              "title": "Amount",
+              "type": "string"
+            },
+            "unit": {
+              "title": "Unit",
+              "type": "string"
+            }
+          },
+          "required": [
+            "amount",
+            "unit"
+          ],
+          "title": "CostMetric",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "period_end": {
+          "title": "Period End",
+          "type": "string"
+        },
+        "estimated": {
+          "title": "Estimated",
+          "type": "boolean"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CostMetric"
+          },
+          "title": "Metrics",
+          "type": "object"
+        },
+        "linked_account_id": {
+          "title": "Linked Account Id",
+          "type": "string"
+        },
+        "linked_account_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linked Account Name"
+        }
+      },
+      "required": [
+        "date",
+        "period_end",
+        "estimated",
+        "metrics",
+        "linked_account_id"
+      ],
+      "title": "AccountCost",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/date",
+      "/linked_account_id"
+    ]
+  }
+]

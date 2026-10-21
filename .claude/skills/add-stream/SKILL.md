@@ -96,8 +96,9 @@ After the implementation compiles and before regenerating flow discovery, run ov
    - Fix every error in code this session wrote.
    - **Read the warnings individually too — never dismiss the warning list wholesale.** Actionable classes hide there at warning severity: `reportDeprecated` (e.g. `typing.AsyncGenerator` → `collections.abc`) and `reportPrivateImportUsage` (importing a symbol from a module that re-imports but doesn't re-export it — follow the "Import from X instead" hint). Fix these in session-written code; only generics-inference noise from CDK internals may be left.
    - House-pattern errors (e.g. `request_class`/`spec`/`credentials_title` override complaints inherited from the scaffold/reference idioms) may be pre-existing noise: **verify parity by running the same check on a sibling connector** before ignoring them, and say so out loud.
-2. **Organize imports**: `ruff check --select I --fix source_<pkg>/ tests/`.
-3. **Format**: `black source_<pkg>/ tests/`.
+2. **Organize imports**: `pipx run ruff==0.16.9 check --select I --fix source_<pkg>/ tests/`. Always use the pinned version: the repo's `ruff.toml` rejects any other.
+3. **Lint**: `pipx run ruff==0.16.9 check source_<pkg>/ tests/`. Fix findings in code this session wrote; report pre-existing ones to the user without fixing them.
+4. **Format**: `black source_<pkg>/ tests/`.
 
 Re-run the test suite if any of these changed code. If a tool isn't on PATH, find it (editor tooling dirs count) or ask — don't skip the step silently.
 

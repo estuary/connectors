@@ -69,8 +69,9 @@ from .api import (
     snapshot_offset_paginated_resources,
     snapshot_cursor_paginated_resources,
     url_base,
-    _dt_to_s,
+    dt_to_s,
     INCREMENTAL_LAG,
+    TICKET_METRIC_EVENTS_LAG,
     TIME_PARAMETER_DELAY,
 )
 
@@ -254,7 +255,7 @@ def ticket_metrics(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     return common.Resource(
         name="ticket_metrics",
@@ -557,6 +558,7 @@ def incremental_cursor_paginated_resources(
         filter_param: FilterParam,
         cursor_field: str,
         response_model: type[IncrementalCursorPaginatedResponse],
+        lag: timedelta,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -576,6 +578,7 @@ def incremental_cursor_paginated_resources(
                 filter_param,
                 cursor_field,
                 response_model,
+                lag,
             ),
             fetch_page=functools.partial(
                 backfill_incremental_cursor_paginated_resources,
@@ -589,25 +592,29 @@ def incremental_cursor_paginated_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
+    resources: list[common.Resource] = []
 
-    resources = [
+    for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES:
+        lag = TICKET_METRIC_EVENTS_LAG if name == "ticket_metric_events" else INCREMENTAL_LAG
+
+        cutoff = datetime.now(tz=UTC) - max(lag, TIME_PARAMETER_DELAY)
+
+        resources.append(
             common.Resource(
-            name=name,
-            key=["/id"],
-            model=ZendeskResource,
-            open=functools.partial(open, path, filter_param, cursor_field, response_model),
-            initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
-            ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
-            schema_inference=True,
+                name=name,
+                key=["/id"],
+                model=ZendeskResource,
+                open=functools.partial(open, path, filter_param, cursor_field, response_model, lag),
+                initial_state=ResourceState(
+                    inc=ResourceState.Incremental(cursor=cutoff),
+                    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+                ),
+                initial_config=ResourceConfig(
+                    name=name, interval=timedelta(minutes=5)
+                ),
+                schema_inference=True,
+            )
         )
-        for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES
-    ]
 
     return resources
 
@@ -769,7 +776,7 @@ def incremental_cursor_export_resources(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     resources = [
             common.Resource(
@@ -830,7 +837,7 @@ def ticket_child_resources(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     resources = [
             common.Resource(
@@ -885,7 +892,7 @@ def side_conversations(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as a Unix timestamp.
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     return common.Resource(
         name="side_conversations",

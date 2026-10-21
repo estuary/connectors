@@ -28,8 +28,8 @@ ARG CONNECTOR_TYPE
 ARG DOCS_URL
 ARG ENCRYPTION_URL="https://config-encryption.estuary.dev/v1/encrypt-config"
 # The USAGE_RATE arg is required, because GH actions doesn't seem to have a way to conditionally
-# pass it only for the connectors that should have a 0 rate. Comes from `usage_rate` in the
-# `python.yaml` workflow matrix.
+# pass it only for the connectors that should have a 0 rate. Comes from `usage_rate` in
+# `.github/python-connectors.yaml`.
 ARG USAGE_RATE
 
 RUN apt-get update && \

@@ -1,5 +1,30 @@
 # materialize-redshift
 
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as an
+  `enable_case_sensitive_identifier` query error. This also applies when the
+  materialization is saved, so messages such as "incorrect username or
+  password" are shown again.
+
+## 2026-09-29
+
+### Added
+- When a collection is backfilled, rows the backfill did not re-send are deleted
+  from standard-updates tables once it completes, so documents removed from the
+  source no longer linger in the destination. Delta-updates tables keep every
+  row. A table that excludes the `flow_published_at` field is left unchanged,
+  and a warning on the task page explains why.
+  Disable it with the `no_truncate_after_backfill` feature flag. It is also
+  disabled while `retain_existing_data_on_backfill` is enabled.
+
+## 2026-09-23
+
+### Fixed
+- An SQL LIKE pattern was not quoted correctly which could cause issues if the
+  bucket path contained special characters.
+
 ## 2026-09-11
 
 ### Fixed

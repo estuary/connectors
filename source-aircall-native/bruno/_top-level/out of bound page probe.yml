@@ -1,0 +1,50 @@
+info:
+  name: out of bound page probe
+  type: http
+  seq: 4
+http:
+  method: GET
+  url: '{{base_url}}/{{resource}}?per_page=50&page=201'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  - name: page
+    value: '201'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#pagination
+    **WHY:** docs scope the 10,000-item cap to Calls and Contacts only; the brief says all list endpoints. page=201 x 50 starts at item 10,001 — does a reference endpoint 400 (cap applies to it) or return an empty page (no cap / plain past-the-end)?
+
+    **LIMITATION (VERIFIED 2026-09-28) (tags):** `per_page=50&page=201` → **400** `{"message":"BAD_REQUEST","errors":"Your query is limited to 10k results and pagination is out of bound, please use timestamps or other filters."}` even though `total` is 9. The cap is an **offset check (page×per_page > 10,000) enforced on reference lists too**, not only Calls/Contacts as the docs say.
+    Consequence: a plain page walk can read at most 10,000 items (page 200 at per_page 50). Stopping on `next_page_link: null` never reaches page 201 on accounts below the cap. On accounts above it, the walk would 400, so the connector must fail loudly there (never truncate silently).
+  type: text/markdown
+examples:
+- name: tags - 400 offset past 10k (total=9)
+  request:
+    url: '{{base_url}}/{{resource}}?per_page=50&page=201'
+    method: GET
+  response:
+    status: 400
+    statusText: Bad Request
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "error": "Bad Request",
+          "data": null,
+          "message": "BAD_REQUEST",
+          "errors": "Your query is limited to 10k results and pagination is out of bound, please use timestamps or other filters.",
+          "troubleshoot": "BAD_REQUEST",
+          "success": false
+        }

@@ -1,0 +1,545 @@
+[
+  [
+    "acmeCo/alert_configs",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogPrefixOrName": "Artificial-Industries/",
+      "config": {
+        "shardFailed": {
+          "condition": {
+            "per": "8h"
+          },
+          "enabled": true
+        }
+      },
+      "createdAt": "2026-06-23T19:16:38.568397+00:00",
+      "detail": null,
+      "id": "15373da214d8a400",
+      "lastModifiedBy": "redacted",
+      "updatedAt": "redacted"
+    }
+  ],
+  [
+    "acmeCo/alert_subscriptions",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "alertTypes": [
+        "free_trial",
+        "free_trial_ending",
+        "free_trial_stalled",
+        "missing_payment_method",
+        "data_movement_stalled"
+      ],
+      "catalogPrefix": "Artificial-Industries/",
+      "createdAt": "2026-03-20T14:23:05.971199+00:00",
+      "destination": "redacted",
+      "detail": null,
+      "email": "redacted",
+      "updatedAt": "redacted"
+    }
+  ],
+  [
+    "acmeCo/alerts",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "alertType": "missing_payment_method",
+      "arguments": {
+        "plan_state": "paid",
+        "recipients": "redacted",
+        "tenant": "Jonathan_Wihl/",
+        "trial_end": "2023-11-02",
+        "trial_start": "2023-10-02"
+      },
+      "catalogName": "Jonathan_Wihl/alerts/missing_payment_method",
+      "firedAt": "2024-02-13T21:58:23.429321Z",
+      "resolvedArguments": "redacted",
+      "resolvedAt": "redacted"
+    }
+  ],
+  [
+    "acmeCo/catalog_stats_daily",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogName": "Artificial-Industries/",
+      "grain": "DAILY",
+      "statsSummary": {
+        "errors": 0,
+        "failures": 0,
+        "lastPublishedAt": "2026-09-01T23:59:59.995460Z",
+        "readByMe": {
+          "bytesTotal": 0,
+          "docsTotal": 0
+        },
+        "readFromMe": {
+          "bytesTotal": 1255627317,
+          "docsTotal": 1927498
+        },
+        "txnCount": 1556150,
+        "usageSeconds": 86400,
+        "warnings": 0,
+        "writtenByMe": {
+          "bytesTotal": 1255629274,
+          "docsTotal": 1927501
+        },
+        "writtenToMe": {
+          "bytesTotal": 1255629274,
+          "docsTotal": 1927501
+        }
+      },
+      "taskStats": null,
+      "timestamp": "2026-09-01T00:00:00Z"
+    }
+  ],
+  [
+    "acmeCo/catalog_stats_hourly",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogName": "Artificial-Industries/",
+      "grain": "HOURLY",
+      "statsSummary": {
+        "errors": 0,
+        "failures": 0,
+        "lastPublishedAt": "2026-09-01T00:58:59.997843Z",
+        "readByMe": {
+          "bytesTotal": 0,
+          "docsTotal": 0
+        },
+        "readFromMe": {
+          "bytesTotal": 52513761,
+          "docsTotal": 80615
+        },
+        "txnCount": 62510,
+        "usageSeconds": 3600,
+        "warnings": 0,
+        "writtenByMe": {
+          "bytesTotal": 52513761,
+          "docsTotal": 80615
+        },
+        "writtenToMe": {
+          "bytesTotal": 52513761,
+          "docsTotal": 80615
+        }
+      },
+      "taskStats": null,
+      "timestamp": "2026-09-01T00:00:00Z"
+    }
+  ],
+  [
+    "acmeCo/catalog_stats_monthly",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogName": "Artificial-Industries/",
+      "grain": "MONTHLY",
+      "statsSummary": {
+        "errors": 0,
+        "failures": 0,
+        "lastPublishedAt": "2026-09-30T23:59:53.926976Z",
+        "readByMe": {
+          "bytesTotal": 0,
+          "docsTotal": 0
+        },
+        "readFromMe": {
+          "bytesTotal": 37457156903,
+          "docsTotal": 57505436
+        },
+        "txnCount": 48686554,
+        "usageSeconds": 2590020,
+        "warnings": 484,
+        "writtenByMe": {
+          "bytesTotal": 37457156903,
+          "docsTotal": 57505436
+        },
+        "writtenToMe": {
+          "bytesTotal": 37457156903,
+          "docsTotal": 57505436
+        }
+      },
+      "taskStats": null,
+      "timestamp": "2026-09-01T00:00:00Z"
+    }
+  ],
+  [
+    "acmeCo/connectors",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2022-04-28T03:28:13.617220+00:00",
+      "defaultImageTag": ":v2",
+      "detail": "A flood of real-time greetings",
+      "externalUrl": "https://github.com/estuary/connectors/tree/main/source-hello-world",
+      "id": "05f363e5a8800400",
+      "imageName": "ghcr.io/estuary/source-hello-world",
+      "logoUrl": "https://storage.googleapis.com/estuary-marketing-strapi-uploads/uploads//366c26_Group_4_300x300_ed4ef061f5/366c26_Group_4_300x300_ed4ef061f5.png",
+      "protocol": "capture",
+      "recommended": false,
+      "title": "Hello World"
+    }
+  ],
+  [
+    "acmeCo/data_planes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-29dmej81ghjohrht",
+      "azureApplicationClientId": "82b7d516-09d8-44be-ae20-80568daef6d3",
+      "azureApplicationName": "data-plane-aws-ap-southeast-2-c1.dp.estuary-data.com",
+      "cidrBlocks": [
+        "2406:da1c:463:cd00::/56",
+        "15.134.198.216/32",
+        "3.24.170.247/32"
+      ],
+      "closed": false,
+      "cloudProvider": "AWS",
+      "fqdn": "aws-ap-southeast-2-c1.dp.estuary-data.com",
+      "gcpServiceAccountEmail": "data-plane-r2ht42anamce4e4u@helpful-kingdom-273219.iam.gserviceaccount.com",
+      "id": "13300087b9760400",
+      "isPublic": true,
+      "name": "ops/dp/public/aws-ap-southeast-2-c1",
+      "reactorAddress": "https://reactor.aws-ap-southeast-2-c1.dp.estuary-data.com",
+      "region": "ap-southeast-2",
+      "tag": "c1"
+    }
+  ],
+  [
+    "acmeCo/invoices",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "dateEnd": "2024-12-31",
+      "dateStart": "2024-12-01",
+      "extra": {
+        "billed_month": "2024-12-01T00:00:00+00:00",
+        "billed_prefix": "Artificial-Industries/",
+        "daily_usage": [
+          {
+            "data_gb": 0.041330197,
+            "data_subtotal": 50,
+            "task_hours": 2.45,
+            "task_subtotal": 42,
+            "ts": "2024-12-13T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-14T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-15T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.001431576,
+            "data_subtotal": 0,
+            "task_hours": 3.95,
+            "task_subtotal": 56,
+            "ts": "2024-12-16T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 18.6,
+            "task_subtotal": 252,
+            "ts": "2024-12-17T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-18T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-19T00:00:00+00:00"
+          },
+          {
+            "data_gb": 4.93e-07,
+            "data_subtotal": 0,
+            "task_hours": 0.7,
+            "task_subtotal": 14,
+            "ts": "2024-12-20T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-21T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-22T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.003566023,
+            "data_subtotal": 0,
+            "task_hours": 7.15,
+            "task_subtotal": 98,
+            "ts": "2024-12-23T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-24T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-25T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-26T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-27T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-28T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-29T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-30T00:00:00+00:00"
+          },
+          {
+            "data_gb": 0.0,
+            "data_subtotal": 0,
+            "task_hours": 0.0,
+            "task_subtotal": 0,
+            "ts": "2024-12-31T00:00:00+00:00"
+          }
+        ],
+        "free_tier_credit": 512,
+        "line_items": [
+          {
+            "count": 1,
+            "description": "Data processing (at $0.50/GB)",
+            "rate": 50,
+            "subtotal": 50
+          },
+          {
+            "count": 33,
+            "description": "Task usage (first 4464 hours at $0.14/hour)",
+            "rate": 14,
+            "subtotal": 462
+          },
+          {
+            "count": 0,
+            "description": "Task usage (at $0.07/hour)",
+            "rate": 7,
+            "subtotal": 0
+          },
+          {
+            "count": 1,
+            "description": "Free tier credit",
+            "rate": -512,
+            "subtotal": -512
+          }
+        ],
+        "processed_data_gb": 0.046328289,
+        "recurring_fee": 0,
+        "subtotal": 0,
+        "task_usage_hours": 32.85,
+        "trial_credit": 0,
+        "trial_start": null
+      },
+      "invoiceType": "FINAL",
+      "lineItems": [
+        {
+          "count": 1,
+          "description": "Data processing (at $0.50/GB)",
+          "rate": 50,
+          "subtotal": 50
+        },
+        {
+          "count": 33,
+          "description": "Task usage (first 4464 hours at $0.14/hour)",
+          "rate": 14,
+          "subtotal": 462
+        },
+        {
+          "count": 0,
+          "description": "Task usage (at $0.07/hour)",
+          "rate": 7,
+          "subtotal": 0
+        },
+        {
+          "count": 1,
+          "description": "Free tier credit",
+          "rate": -512,
+          "subtotal": -512
+        }
+      ],
+      "subtotal": 0,
+      "tenant": "Artificial-Industries/"
+    }
+  ],
+  [
+    "acmeCo/live_specs",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogName": "Artificial-Industries/asana-ref/events",
+      "catalogType": "collection",
+      "createdAt": "2025-07-15T15:36:50.641498Z",
+      "dataPlaneId": "11900caf66f59800",
+      "isDisabled": "redacted",
+      "lastBuildId": "redacted",
+      "lastPubId": "redacted",
+      "liveSpecId": "11c3a67122a8d400",
+      "readsFrom": null,
+      "sourceCapture": null,
+      "updatedAt": "redacted",
+      "writesTo": null
+    }
+  ],
+  [
+    "acmeCo/publication_history",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogName": "Artificial-Industries/overview/sample_mflix/comments",
+      "catalogType": "collection",
+      "detail": "- reset collection to new generation 1647ce02f98002c8\n- applied inferred schema placeholder (inferred schema is stale)",
+      "publicationId": "1647ce02f98002c8",
+      "publishedAt": "2026-10-07T15:45:32.365957Z",
+      "userEmail": "redacted",
+      "userFullName": "redacted",
+      "userId": "redacted"
+    }
+  ],
+  [
+    "acmeCo/storage_mappings",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogPrefix": "Artificial-Industries/",
+      "dataPlanes": [
+        {
+          "name": "ops/dp/public/gcp-us-central1-c2"
+        },
+        {
+          "name": "ops/dp/public/aws-eu-west-1-c1"
+        }
+      ],
+      "detail": "updated by user 3df2ea2c-3c66-4db0-8410-a405e6ed06ae via applied directive 12a3dade74892400",
+      "fragmentStores": [
+        {
+          "accountTenantId": null,
+          "bucket": "estuary-marketing-demos",
+          "containerName": null,
+          "endpoint": null,
+          "prefix": "artificial-industries/collection-data/",
+          "provider": "GCS",
+          "region": null,
+          "storageAccountName": null
+        },
+        {
+          "accountTenantId": null,
+          "bucket": "estuary-trial",
+          "containerName": null,
+          "endpoint": null,
+          "prefix": "collection-data/",
+          "provider": "GCS",
+          "region": null,
+          "storageAccountName": null
+        },
+        {
+          "accountTenantId": null,
+          "bucket": "estuary-marketing-demos",
+          "containerName": null,
+          "endpoint": null,
+          "prefix": "artificial-industries/collection-data/collection-data/",
+          "provider": "GCS",
+          "region": null,
+          "storageAccountName": null
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/task_status",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalogName": "Artificial-Industries/asana-ref/events",
+      "connector": "redacted",
+      "controller": "redacted",
+      "summary": "redacted",
+      "type": "redacted"
+    }
+  ]
+]

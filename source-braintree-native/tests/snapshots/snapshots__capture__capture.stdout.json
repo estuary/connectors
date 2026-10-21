@@ -137,7 +137,6 @@
           "card_types": [
             "AMERICAN_EXPRESS",
             "DISCOVER",
-            "JCB",
             "MASTERCARD",
             "VISA"
           ],
@@ -162,7 +161,7 @@
       "add_ons": [],
       "additional_processor_response": null,
       "amount": "11.00",
-      "amount_requested": null,
+      "amount_requested": "11.00",
       "ani_first_name_response_code": "U",
       "ani_last_name_response_code": "U",
       "authorization_adjustments": [],

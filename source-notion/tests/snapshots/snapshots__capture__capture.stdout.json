@@ -56,6 +56,7 @@
         "object": "user"
       },
       "created_time": "2024-03-21T13:42:00.000Z",
+      "database_type": null,
       "description": [],
       "icon": null,
       "id": "20e1921f-a184-4b40-bfb1-513ad5bb90af",

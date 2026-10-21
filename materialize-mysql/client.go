@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,7 +40,7 @@ func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, _ str
 	}
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := stdsql.Open("mysql", cfg.ToURI())
@@ -95,8 +96,50 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
+// datetimeFieldMeta is attached to the ExistingField.Meta of a DATETIME
+// column to carry its fractional-seconds precision.
+type datetimeFieldMeta struct {
+	precision int
+}
+
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, "def", resourcePaths)
+	if err := sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, "def", resourcePaths); err != nil {
+		return err
+	} else if len(resourcePaths) == 0 {
+		return nil
+	}
+
+	schemas := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		loc := c.ep.Dialect.TableLocator(p)
+		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+	}
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		SELECT table_name, column_name, datetime_precision
+		FROM information_schema.columns
+		WHERE table_catalog = 'def' AND table_schema IN (%s) AND data_type = 'datetime'`,
+		strings.Join(schemas, ",")))
+	if err != nil {
+		return fmt.Errorf("querying datetime precisions: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tn, cn string
+		var precision int
+		if err := rows.Scan(&tn, &cn, &precision); err != nil {
+			return err
+		}
+		if res := is.GetResource([]string{tn}); res != nil {
+			if field := res.GetField(cn); field != nil {
+				field.Meta = datetimeFieldMeta{precision: precision}
+			}
+		}
+	}
+	return rows.Err()
 }
 
 var migrationSteps = []sql.ColumnMigrationStep{

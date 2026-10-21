@@ -5,9 +5,12 @@ import (
 	"embed"
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -364,6 +367,83 @@ func TestRunApplyDrainsPendingState(t *testing.T) {
 	}
 }
 
+// TestRunApplyDrainsOnFieldSelectionChange verifies that Apply drains pending
+// state when a binding's field selection changes but its resource needs no
+// action, because every selected column already exists.
+func TestRunApplyDrainsOnFieldSelectionChange(t *testing.T) {
+	ctx := context.Background()
+
+	pendingState := json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
+	clearingPatch := &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
+
+	for _, tt := range []struct {
+		name        string
+		lastSpec    func(*pf.MaterializationSpec)
+		wantAckKeys []string
+		wantState   *pf.ConnectorState
+	}{
+		{
+			name: "re-selecting an existing column drains pending state",
+			lastSpec: func(s *pf.MaterializationSpec) {
+				s.Bindings[0].FieldSelection.Values = slices.DeleteFunc(s.Bindings[0].FieldSelection.Values, func(f string) bool {
+					return f == "optionalVal2"
+				})
+			},
+			wantAckKeys: []string{"key_value"},
+			wantState:   clearingPatch,
+		},
+		{
+			name: "reordering the selected values drains pending state",
+			lastSpec: func(s *pf.MaterializationSpec) {
+				vals := s.Bindings[0].FieldSelection.Values
+				require.Greater(t, len(vals), 1)
+				vals[0], vals[1] = vals[1], vals[0]
+			},
+			wantAckKeys: []string{"key_value"},
+			wantState:   clearingPatch,
+		},
+		{
+			name:        "an unchanged selection without actions does not drain",
+			lastSpec:    func(*pf.MaterializationSpec) {},
+			wantAckKeys: nil,
+			wantState:   nil,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			newSpec := loadMaterializerSpec(t, "base.flow.proto")
+			lastSpec := loadMaterializerSpec(t, "base.flow.proto")
+			tt.lastSpec(lastSpec)
+
+			req := &pm.Request_Apply{
+				Materialization:     newSpec,
+				Version:             "thisone",
+				LastMaterialization: lastSpec,
+				LastVersion:         "oldone",
+				StateJson:           pendingState,
+			}
+
+			// Every column of the new selection already exists, so the
+			// binding's update is empty and yields no action.
+			is := testInfoSchemaFromSpec(t, newSpec, func(in string) string { return in })
+			rec := &drainRecorder{ackPatch: clearingPatch, noopUpdates: true}
+
+			applied, err := RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
+			require.NoError(t, err)
+
+			require.Equal(t, tt.wantAckKeys, rec.ackKeys)
+			require.Equal(t, tt.wantState, applied.State)
+			require.Equal(t, 0, rec.executedActions)
+
+			if tt.wantState != nil {
+				require.Contains(t, applied.ActionDescription, "committed previously staged transaction for state keys: key_value")
+				require.Same(t, lastSpec, rec.openedSpec)
+			} else {
+				require.Nil(t, rec.openedSpec)
+			}
+		})
+	}
+}
+
 type testCalls struct {
 	createResource   [][]string
 	updateResource   [][]string
@@ -376,6 +456,48 @@ var _ Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testM
 type testMaterializer struct {
 	calls *testCalls
 	is    *InfoSchema
+}
+
+// TestRunApplyResolvesFlagsFromCreatedAt verifies that Apply resolves a
+// date-gated feature flag from the creation date stamped onto the task's spec,
+// with no dependence on connector state or on whether the task is being applied
+// for the first time.
+func TestRunApplyResolvesFlagsFromCreatedAt(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name      string
+		createdAt string
+		want      bool
+	}{
+		{"created before the flag's cutoff", "2020-01-01", false},
+		{"created after the flag's cutoff", "2030-01-01", true},
+		{"brand new task, creation not yet committed", "", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := loadMaterializerSpec(t, "base.flow.proto")
+			spec.CreatedAt = tt.createdAt
+			is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+
+			var gotFlags map[string]bool
+			capturingFn := func(
+				ctx context.Context,
+				materializationName string,
+				endpointConfig testEndpointConfiger,
+				featureFlags map[string]bool,
+			) (Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper], error) {
+				gotFlags = featureFlags
+				return &testMaterializer{calls: &testCalls{}, is: is}, nil
+			}
+
+			_, err := RunApply(ctx, &pm.Request_Apply{
+				Materialization:     spec,
+				LastMaterialization: spec,
+			}, capturingFn)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, gotFlags["test_gated"])
+		})
+	}
 }
 
 func makeTestMaterializerFn(got *testCalls, is *InfoSchema) NewMaterializerFn[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] {
@@ -469,7 +591,7 @@ func (c testEndpointConfiger) DefaultNamespace() string {
 	return ""
 }
 
-func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
+func (c testEndpointConfiger) FeatureFlags() (string, map[string]common.FlagDefault) {
 	featureFlags := ""
 	if advanced, ok := c.Config["advanced"].(map[string]any); ok {
 		if ff, ok := advanced["feature_flags"].(string); ok {
@@ -477,8 +599,9 @@ func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
 		}
 	}
 
-	return featureFlags, map[string]bool{
-		"retain_existing_data_on_backfill": false,
+	return featureFlags, map[string]common.FlagDefault{
+		"retain_existing_data_on_backfill": common.FlagDisabled,
+		"test_gated":                       common.FlagEnabledForTasksCreatedAfter("2026-06-10"),
 	}
 }
 
@@ -549,7 +672,7 @@ func (m *testMaterializer) Close(ctx context.Context) {}
 type testTransactor struct{}
 
 func (t *testTransactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
-	panic("unimplemented")
+	return nil, nil
 }
 
 func (t *testTransactor) UnmarshalState(state json.RawMessage) error {
@@ -562,6 +685,10 @@ func (t *testTransactor) Load(it *m.LoadIterator, loaded func(binding int, doc j
 
 func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	panic("unimplemented")
+}
+
+func (t *testTransactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
 }
 
 func (t *testTransactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
@@ -583,6 +710,7 @@ type drainRecorder struct {
 	ackKeys         []string
 	ackPatch        *pf.ConnectorState // returned by Acknowledge
 	destroyed       bool
+	noopUpdates     bool // UpdateResource yields no action, as for an update with nothing to do
 }
 
 type drainTestMaterializer struct {
@@ -620,6 +748,9 @@ func (d *drainTestMaterializer) DeleteResource(ctx context.Context, path []strin
 }
 
 func (d *drainTestMaterializer) UpdateResource(ctx context.Context, path []string, existing ExistingResource, update BindingUpdate[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
+	if d.rec.noopUpdates {
+		return "", nil, nil
+	}
 	return "", d.countingAction(), nil
 }
 
@@ -640,6 +771,10 @@ type drainTestTransactor struct {
 
 func (t *drainTestTransactor) UnmarshalState(state json.RawMessage) error {
 	t.rec.unmarshaled = state
+	return nil
+}
+
+func (t *drainTestTransactor) Flush(context.Context, map[int]time.Time) error {
 	return nil
 }
 

@@ -103,6 +103,7 @@ lookback_window
 lookback_window_size
 lookback_window_minutes
 calls_lookback_window
+catalog_stats_lookback_hours
 insights_lookback_window
 conversion_window_days
 attribution_window
@@ -131,6 +132,7 @@ node_id
 page_size
 search_page_size
 max_batch_size
+max_concurrent_bulk_ops
 incremental_limit
 backfill_limit
 fileSizeLimit
@@ -159,6 +161,7 @@ ascendingKeys
 
 # --- connection behaviour (non-identifying) ---
 sslmode
+skipHostKeyVerification
 dictionary_mode
 api_version
 
@@ -172,3 +175,4 @@ skip_state
 fail_after
 exit_after
 rediscovery_interval
+scale

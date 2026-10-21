@@ -255,18 +255,31 @@ func discoverTables(ctx context.Context, db *bigquery.Client, dataset string) ([
 }
 
 type discoveredColumn struct {
-	Schema      string              // The schema in which the table resides
-	Table       string              // The name of the table with this column
-	Name        string              // The name of the column
-	Index       int                 // The ordinal position of the column within a row
+	Schema      string               // The schema in which the table resides
+	Table       string               // The name of the table with this column
+	Name        string               // The name of the column
+	Index       int                  // The ordinal position of the column within a row
 	DataType    datatypes.ColumnType // The datatype of the column
-	Description *string             // The description of the column, if present and known
+	Description *string              // The description of the column, if present and known
 }
 
 const queryDiscoverColumns = `
-SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type
+SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type,
+       is_hidden, is_system_defined
   FROM %[1]s.INFORMATION_SCHEMA.COLUMNS
   ORDER BY table_schema, table_name, ordinal_position;`
+
+// columnRow is one row of INFORMATION_SCHEMA.COLUMNS, loaded by column name.
+type columnRow struct {
+	TableSchema     string              `bigquery:"table_schema"`
+	TableName       string              `bigquery:"table_name"`
+	ColumnName      string              `bigquery:"column_name"`
+	OrdinalPosition bigquery.NullInt64  `bigquery:"ordinal_position"`
+	IsNullable      string              `bigquery:"is_nullable"`
+	DataType        string              `bigquery:"data_type"`
+	IsHidden        bigquery.NullString `bigquery:"is_hidden"`
+	IsSystemDefined bigquery.NullString `bigquery:"is_system_defined"`
+}
 
 func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredColumn, error) {
 	var rows, err = db.Query(fmt.Sprintf(queryDiscoverColumns, bqclient.QuoteIdentifier(dataset))).Read(ctx)
@@ -276,19 +289,32 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 
 	var columns []*discoveredColumn
 	for {
-		var row []bigquery.Value
+		var row columnRow
 		if err := rows.Next(&row); err == iterator.Done {
 			break
 		} else if err != nil {
-			return nil, fmt.Errorf("error discovering primary keys: %w", err)
+			return nil, fmt.Errorf("error discovering columns: %w", err)
 		}
 
-		var tableSchema = row[0].(string)
-		var tableName = row[1].(string)
-		var columnName = row[2].(string)
-		var ordinalPosition = int(row[3].(int64))
-		var isNullable = row[4].(string) == "YES"
-		var fullType = row[5].(string)
+		// Pseudo-columns like `_PARTITIONTIME` have no ordinal position, and `SELECT *`
+		// never returns them, so we skip them and leave them out of the schema. BigQuery marks
+		// pseudo-columns as both hidden and system-defined.
+		if !row.OrdinalPosition.Valid {
+			// If the column is not both hidden and system-defined, then it isn't a documented
+			// pseudo-column and we've encountered something unexpected that we'll need to investigate.
+			if row.IsHidden.StringVal != "YES" || row.IsSystemDefined.StringVal != "YES" {
+				return nil, fmt.Errorf("column %s.%s.%s has no ordinal position but is not flagged as a pseudo-column (is_hidden=%q, is_system_defined=%q)", row.TableSchema, row.TableName, row.ColumnName, row.IsHidden.StringVal, row.IsSystemDefined.StringVal)
+			}
+			log.WithFields(log.Fields{
+				"schema": row.TableSchema,
+				"table":  row.TableName,
+				"column": row.ColumnName,
+			}).Debug("skipping pseudo-column")
+			continue
+		}
+
+		var isNullable = row.IsNullable == "YES"
+		var fullType = row.DataType
 
 		// For parameterized types like STRING(50) we want to chop off the parameters
 		// and concern ourselves solely with the base type name for now. Likewise for
@@ -344,10 +370,10 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 		dataType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, fullType)
 
 		var column = &discoveredColumn{
-			Schema:   tableSchema,
-			Table:    tableName,
-			Name:     columnName,
-			Index:    ordinalPosition,
+			Schema:   row.TableSchema,
+			Table:    row.TableName,
+			Name:     row.ColumnName,
+			Index:    int(row.OrdinalPosition.Int64),
 			DataType: &dataType,
 		}
 		columns = append(columns, column)

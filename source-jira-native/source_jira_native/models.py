@@ -52,17 +52,23 @@ class EndpointConfig(BaseModel):
         pattern=DOMAIN_REGEX,
         json_schema_extra={"order": 0}
     )
+    organization_id: str = Field(
+        description="The id of your Atlassian organization, found after /o/ in the address bar at https://admin.atlassian.com. Only required to capture the teams stream; leave blank otherwise.",
+        title="Organization ID",
+        default="",
+        json_schema_extra={"order": 1}
+    )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
         default_factory=default_start_date,
         ge=EPOCH,
-        json_schema_extra={"order": 1}
+        json_schema_extra={"order": 2}
     )
     credentials: ApiToken = Field(
         discriminator="credentials_title",
         title="Authentication",
-        json_schema_extra={"order": 2}
+        json_schema_extra={"order": 3}
     )
 
     class Advanced(BaseModel):
@@ -77,7 +83,7 @@ class EndpointConfig(BaseModel):
         default_factory=Advanced, #type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
-        json_schema_extra={"advanced": True, "order": 3},
+        json_schema_extra={"advanced": True, "order": 4},
     )
 
 
@@ -187,6 +193,8 @@ class JiraAPI(StrEnum):
     SERVICE_MANAGEMENT = auto()
     # Software API docs - https://developer.atlassian.com/cloud/jira/software/rest/intro/
     SOFTWARE = auto()
+    # Teams API docs - https://developer.atlassian.com/platform/teams/rest/v1/
+    TEAMS = auto()
 
 
 class Stream():
@@ -604,6 +612,23 @@ class RequestTypes(ServiceManagementFullRefreshPaginatedStream):
     }
 
 
+# Teams API streams
+class Teams(FullRefreshStream):
+    name: ClassVar[str] = "teams"
+    path: ClassVar[str] = "teams"
+    api: ClassVar[JiraAPI] = JiraAPI.TEAMS
+
+
+class TeamsResponse(BaseModel, extra="allow"):
+    # cursor is null once there are no further pages of results.
+    cursor: str | None = None
+    entities: list[APIRecord]
+
+
+class TenantInfoResponse(BaseModel, extra="allow"):
+    cloudId: str
+
+
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ApplicationRoles,
     Boards,
@@ -645,6 +670,7 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     Sprints,
     Statuses,
     SystemAvatars,
+    Teams,
     Users,
     WorkflowSchemes,
     WorkflowStatusCategories,

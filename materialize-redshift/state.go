@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,8 +21,8 @@ import (
 const checkpointTokensColumn = "checkpoint_tokens"
 
 // stateItem is one binding's staged-but-not-yet-applied work. Every
-// field is written even when empty, so an entry's merge patch replaces the
-// previous entry outright.
+// field except TruncateBefore is written even when empty, so an entry's merge
+// patch replaces the previous entry outright.
 type stateItem struct {
 	// ID is the transaction's token in the checkpoints table once applied.
 	ID          string   `json:"id"`
@@ -33,6 +34,13 @@ type stateItem struct {
 	// rows it staged, for reporting the commit's row stats from Acknowledge.
 	Round int   `json:"round"`
 	Rows  int64 `json:"rows"`
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. Target rows published before it are deleted after the
+	// transaction's stores are applied. It is omitted when unset so that
+	// connector versions without it can parse the entry. A stale boundary
+	// that survives a merge patch deletes nothing, because every row stored
+	// since was published after it.
+	TruncateBefore *time.Time `json:"truncateBefore,omitempty"`
 }
 
 // objects is every S3 object the transaction staged.

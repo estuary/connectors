@@ -1,0 +1,10 @@
+{"commit": true}
+["tests/truncate",{"id":1,"_meta":{}}]
+["tests/truncate",{"id":2,"_meta":{}}]
+["tests/truncate",{"id":3,"_meta":{}}]
+{"commit": true}
+{"backfillBegin": "tests/truncate"}
+["tests/truncate",{"id":1,"_meta":{}}]
+{"commit": true}
+{"backfillComplete": "tests/truncate"}
+{"commit": true}

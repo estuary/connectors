@@ -44,7 +44,7 @@ To meet these requirements, do the following:
 Grant `SELECT` on all tables or restrict it to the tables to be captured. `SELECT`
 permissions must be at the table level, not the column level. Automatic discovery also
 requires `information_schema` access. To keep specific columns, such as sensitive fields,
-out of the capture, use [redaction](/features/redaction.md) rather than column-level grants.
+out of the capture, use [redaction](/features/redaction) rather than column-level grants.
 
 ```sql
 CREATE USER IF NOT EXISTS flow_capture IDENTIFIED BY 'secret';
@@ -132,6 +132,10 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). | string | `"required"` |
+| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA). | string |  |
+| `/advanced/ssl_client_cert` | SSL Client Certificate | Optional PEM-encoded client certificate to present to the server for mutual TLS. | string |  |
+| `/advanced/ssl_client_key` | SSL Client Key | PEM-encoded private key for the SSL Client Certificate. | string |  |
 
 ##### Authentication
 
@@ -184,6 +188,21 @@ captures:
 Your capture definition will likely be more complex, with additional bindings for each table in the source database.
 
 [Learn more about capture definitions.](/concepts/captures.md)
+
+## TLS and certificate verification
+
+By default the connector uses `required`: it requires a TLS-encrypted connection but doesn't verify the server's certificate, so it doesn't protect against an attacker impersonating your database server. To verify the server, set the `sslmode` advanced option to one of:
+
+- `verify_identity` checks that the server's certificate is valid for the configured server hostname. When `ssl_server_ca` is empty, the connector trusts public certificate authorities, which include the ones Azure Database for MySQL uses, and the CAs of Amazon RDS and Aurora and Google Cloud SQL's shared CA. When `ssl_server_ca` is set, the connector trusts only that CA.
+- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate doesn't name the address you connect to.
+
+A self-managed server's auto-generated or self-signed certificate usually comes from a private CA and names no host, so `verify_identity` rejects it. Paste the CA that issued it into `ssl_server_ca` and use `verify_ca`.
+
+MariaDB 11.4 and later generate a certificate in memory at startup when none is configured. It names no host and changes on every server restart, so it can't be pinned with `ssl_server_ca`: either configure a persistent certificate on the server with its `ssl_cert` and `ssl_key` settings and pin the CA that issued it, or use `required`.
+
+If the server's certificate can't be verified, the connection fails with an error explaining why.
+
+`preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS. If your server doesn't accept TLS connections, the default `required` can't connect: enable TLS on the server, or set `sslmode` to `preferred` or `disabled`. IAM authentication presents a bearer token as the password, which must never be sent unencrypted, so `disabled` and `preferred` are both rejected in that case.
 
 ## Troubleshooting Capture Errors
 

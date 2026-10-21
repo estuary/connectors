@@ -2,7 +2,8 @@ import json
 import subprocess
 
 # Contact details of real sandbox users; the snapshot is committed to a public
-# repository, so they are replaced with a marker rather than recorded.
+# repository, so they are replaced with a marker rather than recorded. Matched
+# at any depth, as in the after-response script in bruno/opencollection.yml.
 FIELDS_TO_REDACT = [
     "emailAddress",
     "emailAliases",
@@ -11,6 +12,18 @@ FIELDS_TO_REDACT = [
     "meetingConsentPageUrl",
     "trustedEmailAddress",
 ]
+
+
+def redact(node):
+    if isinstance(node, list):
+        for item in node:
+            redact(item)
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            if key in FIELDS_TO_REDACT:
+                node[key] = "redacted"
+            else:
+                redact(value)
 
 
 def test_capture(request, snapshot):
@@ -42,9 +55,7 @@ def test_capture(request, snapshot):
     for stream in sorted(by_stream):
         docs = sorted(by_stream[stream], key=lambda d: json.dumps(d, sort_keys=True))
         doc = docs[0]
-        for field in FIELDS_TO_REDACT:
-            if field in doc:
-                doc[field] = "redacted"
+        redact(doc)
         unique_stream_lines.append([stream, doc])
 
     assert snapshot("stdout.json") == unique_stream_lines

@@ -1,8 +1,16 @@
 collections:
+  acmeCo/call_transcripts:
+    schema: call_transcripts.schema.yaml
+    key:
+    - /callId
   acmeCo/calls:
     schema: calls.schema.yaml
     key:
     - /id
+  acmeCo/extensive_calls:
+    schema: extensive_calls.schema.yaml
+    key:
+    - /metaData/id
   acmeCo/scorecard_definitions:
     schema: scorecard_definitions.schema.yaml
     key:

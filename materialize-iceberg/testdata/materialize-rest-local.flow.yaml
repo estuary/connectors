@@ -22,3 +22,24 @@ materializations:
       source: tests/data-types
       fields:
         recommended: true
+
+  acmeCo/tests/materialize-iceberg/rest-local-spark4:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: .local/config.rest-local-spark4.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    # tests/not-simple is omitted: Polaris rejects table creation when the key
+    # is a unicode character, and the key cannot be excluded via field
+    # selection. Same exclusion applies to the cloud REST configs.
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: true

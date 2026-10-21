@@ -1,0 +1,78 @@
+# ================================
+# Collection "acmeCo/test/test/backfillmarkers_rulefailsmidbackfill_589937": 5 Documents
+# ================================
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 5,
+    "source": {
+      "resource": "test_backfillmarkers_rulefailsmidbackfill_589937",
+      "schema": "test",
+      "table": "backfillmarkers_rulefailsmidbackfill_589937"
+    }
+  },
+  "data": "Value for row 5",
+  "id": 5
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 6,
+    "source": {
+      "resource": "test_backfillmarkers_rulefailsmidbackfill_589937",
+      "schema": "test",
+      "table": "backfillmarkers_rulefailsmidbackfill_589937"
+    }
+  },
+  "data": "Value for row 6",
+  "id": 6
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 7,
+    "source": {
+      "resource": "test_backfillmarkers_rulefailsmidbackfill_589937",
+      "schema": "test",
+      "table": "backfillmarkers_rulefailsmidbackfill_589937"
+    }
+  },
+  "data": "Value for row 7",
+  "id": 7
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 8,
+    "source": {
+      "resource": "test_backfillmarkers_rulefailsmidbackfill_589937",
+      "schema": "test",
+      "table": "backfillmarkers_rulefailsmidbackfill_589937"
+    }
+  },
+  "data": "Value for row 8",
+  "id": 8
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 9,
+    "source": {
+      "resource": "test_backfillmarkers_rulefailsmidbackfill_589937",
+      "schema": "test",
+      "table": "backfillmarkers_rulefailsmidbackfill_589937"
+    }
+  },
+  "data": "Value for row 9",
+  "id": 9
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_backfillmarkers_rulefailsmidbackfill_589937":{"CursorNames":["id"],"CursorValues":[9],"DocumentCount":10,"LastPolled":"<TIMESTAMP>"}}}
+

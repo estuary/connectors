@@ -2,14 +2,14 @@ import json
 import subprocess
 
 
-def test_capture(request, snapshot):
+def _capture(request, flow_file):
     result = subprocess.run(
         [
             "flowctl",
             "raw",
             "preview-next",
             "--source",
-            request.fspath.dirname + "/../test.flow.yaml",
+            request.fspath.dirname + "/../" + flow_file,
             "--sessions",
             "1",
             "--delay",
@@ -30,7 +30,17 @@ def test_capture(request, snapshot):
             unique_stream_lines.append(line)
             seen.add(stream)
 
-    assert snapshot("capture.stdout.json") == unique_stream_lines
+    return unique_stream_lines
+
+
+def test_capture(request, snapshot):
+    assert snapshot("capture.stdout.json") == _capture(request, "test.flow.yaml")
+
+
+# Intercom makes breaking changes between API versions, so the capture also runs
+# against a config with advanced.api_version set to 2.16.
+def test_capture_v2_16(request, snapshot):
+    assert snapshot("capture.stdout.json") == _capture(request, "test.v2_16.flow.yaml")
 
 
 def test_discover(request, snapshot):

@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from typing import Generic, Any
 
@@ -23,6 +25,7 @@ class Spec(BaseModel):
 class Discover(GenericModel, Generic[EndpointConfig]):
     connectorType: ConnectorType
     config: EndpointConfig
+    createdAt: date | None = None
 
 
 class ValidateBinding(GenericModel, Generic[ResourceConfig]):
@@ -43,6 +46,7 @@ class ValidateLastCaptureEndpointConfig(BaseModel):
 
 class ValidateLastCapture(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
     config: ValidateLastCaptureEndpointConfig
+    createdAt: date | None = None
 
 
 class Validate(ValidateBase, Generic[EndpointConfig, ResourceConfig]):

@@ -42,6 +42,10 @@ def data_type_for_field(field: NestedField) -> DataType:
         # Binary data is base64 encoded as strings in CSV files. Queries must
         # handle the unbase64'ing.
         return StringType()
+    elif field.type == "variant":
+        # Variant data is staged as JSON text, exactly like a string column, and
+        # parsed into a variant by with_variant_columns before it is queried.
+        return StringType()
     elif field.type == "boolean":
         return BooleanType()
     elif field.type == "long":
@@ -69,13 +73,44 @@ def fields_to_struct(fields: list[NestedField]) -> StructType:
     return StructType([StructField(f.name, data_type_for_field(f)) for f in fields])
 
 
+def _quote(ident: str) -> str:
+    return "`" + ident.replace("`", "``") + "`"
+
+
+def with_variant_columns(df, cols: list[NestedField]):
+    """Parse the staged JSON text of each variant column of a DataFrame read
+    with read_csv_opts into a variant, keeping column order. Values keep their
+    JSON types. A DataFrame without variant columns is returned unchanged, so
+    this is a no-op on Spark 3.5."""
+    if not any(c.type == "variant" for c in cols):
+        return df
+
+    from pyspark.sql import functions as F
+
+    return df.select(
+        *[
+            F.expr(f"parse_json({_quote(c.name)})").alias(c.name)
+            if c.type == "variant"
+            else F.col(_quote(c.name))
+            for c in cols
+        ]
+    )
+
+
+CSV_NULL_VALUE = "\x00flow_null\x00"
+
+
 def read_csv_opts(files: list[str], cols: list[NestedField]):
     return {
         "path": files,
         "schema": fields_to_struct(cols),
         "quote": "`",
         "escape": "`",
-        "emptyValue": '""',
+        # The staged CSV writes a null as nothing between the separators and an
+        # empty string as an empty quoted field. Spark treats both as null when
+        # nullValue is the default "", so nulls are given a representation that
+        # no staged string is expected to equal.
+        "nullValue": CSV_NULL_VALUE,
         "header": False,
         "inferSchema": False,
         "enforceSchema": False,
@@ -173,6 +208,10 @@ def _build_session(c: dict) -> SparkSession:
         .config("spark.sql.catalog.estuary.type", "rest")
         .config("spark.sql.catalog.estuary.uri", c["catalog_url"])
         .config("spark.sql.catalog.estuary.warehouse", c["warehouse"])
+        # Also passed as a spark-submit conf by the EMR runner. Iceberg 1.10's
+        # vectorized Parquet reader cannot open a data file holding a variant
+        # column unless that column is projected, so it stays off everywhere.
+        .config("spark.sql.iceberg.vectorization.enabled", "false")
     )
 
     if c.get("spark_master_url"):

@@ -75,4 +75,7 @@ func TestIntegration(t *testing.T) {
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, sanitizers)
 	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), "testdata/key-change.flow.yaml", makeResourceFn, sanitizers)
+	})
 }

@@ -86,7 +86,7 @@ type opener func(ctx context.Context, taskName string, endpointConfig, resourceC
 // enumerate.
 var connectors = map[string]opener{
 	"materialize-azure-fabric-warehouse": fromSQLDriver(azurefabric.NewDriver),
-	"materialize-bigquery":               fromSQLDriver(bigquery.NewDriver),
+	"materialize-bigquery":               fromMaterializer(bigquery.NewMaterializer),
 	"materialize-bigtable":               fromMaterializer(bigtable.NewMaterializer),
 	"materialize-clickhouse":             fromMaterializer(clickhouse.NewMaterializer),
 	"materialize-databricks":             fromSQLDriver(databricks.NewDriver),

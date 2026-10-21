@@ -129,7 +129,9 @@ func (m TypeMigrations[T]) CanMigrate(from string, to T) bool {
 	return false
 }
 
-func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
+// MapProjection lifts a pf.Projection into a Projection with its FlatType
+// resolved.
+func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
 	mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
 	typesWithoutNull := getTypesWithoutNull(p.Inference.Types)
 

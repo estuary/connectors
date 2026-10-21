@@ -67,6 +67,7 @@ Report the sweep result either way. "Checked all six streams, only `campaigns` w
 
 - The reproduction from Phase 1 now shows the correct behavior.
 - The full suite passes, matching the Phase 0 baseline plus the fix.
+- **Lint:** once the suite passes, run `pipx run ruff==0.16.9 check source-$1/` from the repo root (output to a file and read it). Fix findings in code this session wrote; report pre-existing ones to the user without fixing them.
 - If the fix changed discovered schemas or bindings, dispatch the `regenerate-flow-discovery` agent, then confirm `git diff --stat` is scoped to the change (`REVIEW-SNAPSHOT-SCOPE` — a broad uniform delta is a CDK schema sweep and belongs in its own commit).
 
 ## Phase 6 — Land

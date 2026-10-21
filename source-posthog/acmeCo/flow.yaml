@@ -30,3 +30,8 @@ collections:
     schema: Projects.schema.yaml
     key:
     - /_meta/row_id
+  acmeCo/Sessions:
+    schema: Sessions.schema.yaml
+    key:
+    - /_meta/project_id
+    - /session_id

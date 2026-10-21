@@ -212,3 +212,39 @@ Different seeds produce different fixtures.
 ```bash
 python3 -m unittest tests.benchmark.materialize.test_generate -v
 ```
+
+## Comparing two connector configurations
+
+To A/B a connector-side change that is gated on a feature flag, run the same
+scenario twice against separate tables, once per flag value. The flag goes into
+a copy of the encrypted config with `sops set`, which needs no decryption:
+
+```bash
+cp materialize-databricks/testdata/config.local.yaml /tmp/config.flag.yaml
+sops set /tmp/config.flag.yaml '["advanced"]["feature_flags"]' '"some_flag"'
+
+for arm in base:materialize-databricks/testdata/config.local.yaml flag:/tmp/config.flag.yaml; do
+  ./tests/benchmark/materialize/run.sh \
+      --connector materialize-databricks \
+      --scenario  tests/benchmark/materialize/scenarios/uuid-uniform-3tx.yaml \
+      --config    "${arm#*:}" \
+      --table-suffix "_${arm%%:*}" \
+      --shard-log-level info \
+      --out-dir   "tests/benchmark/materialize/runs/$(date +%Y%m%d-%H%M%S)-databricks-${arm%%:*}"
+done
+```
+
+Run the arms serially on one machine so they share the feeder and network.
+`results.py` measures whole transactions, which include the fixture feeder and
+the connector's uploads; the warehouse-side work a staging or query change
+moves is read from the connector's own phase logs instead, which is why the
+runs above raise the shard log level:
+
+```bash
+python3 tests/benchmark/materialize/phases.py runs/*-databricks-base/preview.log runs/*-databricks-flag/preview.log
+```
+
+This prints, per round, the load-query time and the commit (COPY INTO / MERGE)
+time. For the Databricks arms, also pull the query profiles of the MERGE and
+load queries from the SQL warehouse's query history (filter on the
+`materialization_name` query tag) to compare Photon coverage and bytes read.

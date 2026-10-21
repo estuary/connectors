@@ -33,7 +33,7 @@ from .models import (
     TIterableResource,
     SMALLEST_EXPORT_DATE_WINDOW_SIZE,
 )
-from .shared import BASE_URL, EPOCH, dt_to_ms, dt_to_str, ms_to_dt, str_to_dt
+from .shared import BASE_URL, EPOCH, dt_to_ms, dt_to_str, ms_to_dt, now, str_to_dt
 
 
 MAX_CAMPAIGNS_PAGE_SIZE = 1_000
@@ -44,6 +44,9 @@ MAX_CAMPAIGNS_PER_METRICS_REQUEST = 80
 # Fetch metrics for campaigns in a final state within the past 15 days
 # so we capture any late arriving attributions.
 CAMPAIGN_METRICS_LOOKBACK_WINDOW = timedelta(days=15)
+# To combat distributed clock-related discrepancies between the connector's clock
+# and Iterable's clock.
+CAMPAIGNS_HORIZON_MARGIN = timedelta(minutes=1)
 LIST_USERS_RATE_LIMIT_INTERVAL = 60 / 5 # 12 seconds
 GENERIC_API_ERROR_RESPONSE = "An error occurred. Please try again later."
 
@@ -303,18 +306,22 @@ async def fetch_campaigns(
 ) -> AsyncGenerator[Campaigns | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    last_checkpointed_ts = dt_to_ms(log_cursor)
-    most_recent_ts = last_checkpointed_ts
+    horizon = now() - CAMPAIGNS_HORIZON_MARGIN
+    if horizon <= log_cursor:
+        return
 
-    async for campaign in _paginate_through_campaigns(http, log, sort_param="-updatedAt"):
-        if campaign.updatedAt <= last_checkpointed_ts:
-            break
+    cursor_ms = dt_to_ms(log_cursor)
+    horizon_ms = dt_to_ms(horizon)
+    newest_ms = cursor_ms
 
-        most_recent_ts = max(most_recent_ts, campaign.updatedAt)
-        yield campaign
+    async for campaign in _paginate_through_campaigns(http, log, sort_param="id"):
+        timestamps = [ts for ts in campaign.change_timestamps if cursor_ms < ts <= horizon_ms]
+        if timestamps:
+            newest_ms = max(newest_ms, *timestamps)
+            yield campaign
 
-    if most_recent_ts > last_checkpointed_ts:
-        yield ms_to_dt(most_recent_ts)
+    if newest_ms > cursor_ms:
+        yield ms_to_dt(newest_ms)
 
 
 async def backfill_campaigns(

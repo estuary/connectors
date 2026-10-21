@@ -1,0 +1,140 @@
+meta {
+  name: 15 - Issues Archival Sweep
+  type: graphql
+  seq: 15
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IssuesArchivalSweep {
+    archived: issues(
+      first: 250
+      includeArchived: true
+      filter: {archivedAt: {gt: "2026-08-01T00:00:00.000Z"}}
+    ) {
+      nodes { id identifier updatedAt archivedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+    withoutIncludeArchived: issues(
+      first: 250
+      filter: {archivedAt: {gt: "2026-08-01T00:00:00.000Z"}}
+    ) {
+      nodes { id identifier archivedAt }
+      pageInfo { hasNextPage }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/filtering
+
+  The second, independent sweep the Issues stream needs in order to observe archival at
+  all. Runs on its OWN cursor (`archivedAt`), separate from the `updatedAt` cursor that
+  drives `11 - Issues Ascending Sweep`.
+
+  Necessary because archiving does not touch `updatedAt` — see
+  `08 - Archival Capability Matrix` for the verified negative and the full reasoning.
+
+  **Limitation / observed finding** (confirmed 2026-08-04, after `Seeding/D2` archived
+  EST-2):
+
+  - `archived` -> **1 row**: `EST-2`, `archivedAt: 2026-08-04T18:13:09.393Z`, and
+    `updatedAt` still at the original bulk-seed value `2026-07-30T21:35:03.808Z`. That
+    single row is the whole argument for this request existing: it is invisible to an
+    `updatedAt` sweep, and visible here.
+  - `withoutIncludeArchived` -> **0 rows**. **`includeArchived: true` remains mandatory**
+    even when filtering on `archivedAt` — the filter alone does not opt archived rows back
+    into the response. Omitting it yields a silently empty archival pass, which would look
+    exactly like "nothing was archived".
+
+  Two design constraints this pass inherits:
+
+  1. **End-of-sweep checkpointing only.** `IssueSortInput` has no `archivedAt` member, so
+     this pass cannot sort by its own cursor. Without an ascending sort there is no
+     guarantee that rows arrive in `archivedAt` order, so a per-page checkpoint could
+     advance past unread rows. Checkpoint once, at `max(archivedAt)` observed, after
+     `hasNextPage` goes false.
+  2. **`gt` is safe here, unlike the `updatedAt` cursor.** `archivedAt` is set once, at
+     archival, and is not subsequently churned by unrelated edits, so the tie-group hazard
+     that forces `gte` on `updatedAt` (see `07 - Cursor Filter Boundary`) is far weaker.
+     `gte` is still the more conservative choice and costs only a re-emit; the plan uses
+     `gte` uniformly for consistency.
+
+  Note the archived document still carries its stale `updatedAt`. Downstream, `archivedAt
+  != null` is the tombstone — do not infer archival from `updatedAt` movement.
+}
+
+
+example {
+  name: 200 — archivedAt filter finds EST-2; includeArchived still mandatory
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IssuesArchivalSweep {
+        archived: issues(
+          first: 250
+          includeArchived: true
+          filter: {archivedAt: {gt: "2026-08-01T00:00:00.000Z"}}
+        ) {
+          nodes { id identifier updatedAt archivedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+        withoutIncludeArchived: issues(
+          first: 250
+          filter: {archivedAt: {gt: "2026-08-01T00:00:00.000Z"}}
+        ) {
+          nodes { id identifier archivedAt }
+          pageInfo { hasNextPage }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 7
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2486
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999993
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "archived": {
+              "count": 1,
+              "rows": [
+                {
+                  "id": "EST-2",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": "2026-08-04T18:13:09.393Z"
+                }
+              ]
+            },
+            "withoutIncludeArchived": {
+              "count": 0,
+              "rows": []
+            }
+          }
+        }
+      '''
+    }
+  }
+}

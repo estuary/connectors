@@ -1,0 +1,78 @@
+info:
+  name: pagination walk
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query LiveSpecsWalk($prefix: Prefix!, $after: String) {\n  liveSpecs(by: { prefix: $prefix }, first: 2, after: $after) {\n    pageInfo { hasNextPage endCursor }\n    edges { cursor node { catalogName } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}",
+          "after": "{{ls_first_name}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — after first name returns names #2-#3"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Jonathan_Wihl/motherduck/materialize-motherduck"
+                },
+                "edges": [
+                  {
+                    "cursor": "Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion"
+                    }
+                  },
+                  {
+                    "cursor": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [liveSpecs resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs)
+
+  **WHY:** Proves `after` is exclusive (`catalog_name > after`) and ordering is
+  ascending by catalog name: with `after` = the first name from
+  `Live Specs / bare`, the first edge here must be the bare list's second name.
+  The connector checkpoints nothing mid-walk for snapshots, but
+  `publication_history` backfill resumes by catalog name, so this exclusivity is
+  load-bearing.
+
+  Run `Live Specs / bare` first (it sets `ls_first_name`).
+
+  **VERIFIED (2026-10-07):** `after: "Jonathan_Wihl/gen_ai_demo_1/blocks"` (the bare list's first name) returned `gpt-notion` then `motherduck/materialize-motherduck`, which are the bare list's #2 and #3. `after` is exclusive and the cursor is the plain catalog name, so it is derived and stable.

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,10 @@ type emrClient struct {
 	bucket              blob.Bucket
 	ssmClient           *ssm.Client
 	tokenURL            string
+	// variantColumns requires the application to run Spark 4, which is
+	// checked as a prerequisite so the problem surfaces at publish rather
+	// than as a failed background job.
+	variantColumns bool
 
 	// Set after StartJobRun fails with an access-denied error while passing
 	// Tags. Subsequent runs in this process will skip tagging to avoid
@@ -52,6 +57,12 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 		errs.Err(fmt.Errorf("failed to list job runs for application %q: %w", e.cfg.ApplicationId, err))
 	}
 
+	if e.variantColumns {
+		if err := checkVariantReleaseLabel(ctx, e.c, e.cfg.ApplicationId); err != nil {
+			errs.Err(err)
+		}
+	}
+
 	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		testParameter := e.cfg.SystemsManagerPrefix + "test"
 		if err := ssmPutParameterWithRetry(ctx, e.ssmClient, testParameter, "test"); err != nil {
@@ -64,6 +75,59 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 			errs.Err(fmt.Errorf("failed to get secure string parameter %s: %w", testParameter, err))
 		}
 	}
+}
+
+// minVariantEMRMajor is the first EMR Serverless major release running Spark 4,
+// which is needed to write variant columns. Its release labels are of the form
+// "emr-spark-8.0.0"; earlier releases are "emr-7.9.0".
+const minVariantEMRMajor = 8
+
+type applicationGetter interface {
+	GetApplication(ctx context.Context, params *emr.GetApplicationInput, optFns ...func(*emr.Options)) (*emr.GetApplicationOutput, error)
+}
+
+// checkVariantReleaseLabel fails when the application's EMR release is too old
+// to write variant columns. A missing `emr-serverless:GetApplication`
+// permission is logged and tolerated, as with `TagResource`, since a
+// read-only permission gap should not block the task.
+func checkVariantReleaseLabel(ctx context.Context, c applicationGetter, applicationID string) error {
+	out, err := c.GetApplication(ctx, &emr.GetApplicationInput{ApplicationId: aws.String(applicationID)})
+	if err != nil {
+		if isAccessDeniedErr(err) {
+			log.WithError(err).Warn("could not check the EMR release of the application for variant column support; grant 'emr-serverless:GetApplication' to the execution role to enable this check. Variant columns need release emr-spark-8.0.0 or later.")
+			return nil
+		}
+		return fmt.Errorf("getting EMR application %q: %w", applicationID, err)
+	}
+
+	label := aws.ToString(out.Application.ReleaseLabel)
+	major, ok := emrReleaseMajor(label)
+	if !ok {
+		log.WithField("releaseLabel", label).Warn("could not parse the EMR release label to check for variant column support, which needs release emr-spark-8.0.0 or later")
+		return nil
+	}
+	if major < minVariantEMRMajor {
+		return fmt.Errorf("EMR application %q runs release %q, but variant columns need Spark 4 (release emr-spark-8.0.0 or later): upgrade the application, or %s", applicationID, label, variantRemedy)
+	}
+
+	return nil
+}
+
+// emrReleaseMajor extracts the major version from an EMR release label such
+// as "emr-7.9.0", "emr-spark-8.0.0", or "emr-7.0.0-preview": the first
+// dash-separated segment that starts with a digit.
+func emrReleaseMajor(label string) (int, bool) {
+	rest, ok := strings.CutPrefix(label, "emr-")
+	if !ok {
+		return 0, false
+	}
+	for _, segment := range strings.Split(rest, "-") {
+		majorStr, _, _ := strings.Cut(segment, ".")
+		if major, err := strconv.Atoi(majorStr); err == nil {
+			return major, true
+		}
+	}
+	return 0, false
 }
 
 func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {

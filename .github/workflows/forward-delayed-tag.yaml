@@ -54,9 +54,9 @@ jobs:
         run: cd .github/scripts && python3 -m unittest test_delayed_tag -v
 
       - name: Resolve connector to image + version
-        # Validates the selected connector against the ci.yaml / python.yaml
-        # matrices and expands variants. Reads the version from the connector's
-        # VERSION file (Go) or the python.yaml matrix (Python).
+        # Validates the selected connector against the ci.yaml matrix and
+        # python-connectors.yaml, and expands variants. Reads the version from the connector's
+        # VERSION file (Go) or python-connectors.yaml (Python).
         # Writes: /tmp/forward_plan.tsv  (image, version)
         run: |
           python3 .github/scripts/delayed_tag.py forward \

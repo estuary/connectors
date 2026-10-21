@@ -38,10 +38,16 @@ func (c *capture) backfillChangeStreamCollections(
 	coordinator *streamBackfillCoordinator,
 	changeStreamBindings []bindingInfo,
 	backfillFor time.Duration,
-) error {
+) (retErr error) {
 	ts := time.Now()
 	log.WithField("backfillFor", backfillFor.String()).Info("backfilling collections")
-	defer func() { log.WithField("took", time.Since(ts).String()).Info("finished backfill round") }()
+	defer func() {
+		ll := log.WithField("took", time.Since(ts).String())
+		if retErr != nil {
+			ll = ll.WithError(retErr)
+		}
+		ll.Info("finished backfill round")
+	}()
 
 	shuffledBindings := make([]bindingInfo, len(changeStreamBindings))
 	copy(shuffledBindings, changeStreamBindings)
@@ -267,9 +273,11 @@ func (c *capture) doBackfill(
 	binding bindingInfo,
 	backfillDone chan struct{},
 	stopBackfill <-chan struct{},
-) error {
+) (retErr error) {
 	c.mu.Lock()
 	backfillState := c.state.Resources[binding.stateKey].Backfill
+	c.backfillAttempt++
+	attempt := c.backfillAttempt
 	c.mu.Unlock()
 
 	lastCursorValue := backfillState.LastCursorValue
@@ -279,18 +287,30 @@ func (c *capture) doBackfill(
 		lastCursorValue = nil
 		initialDocsCaptured = 0
 	}
-	additionalDocsCaptured := 0
 
 	collection := c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
 
+	var resumeAfter any
+	if lastCursorValue != nil {
+		resumeAfter = lastCursorValue.String()
+	}
 	logEntry := log.WithFields(log.Fields{
-		"database":   binding.resource.Database,
-		"collection": binding.resource.Collection,
+		"database":              binding.resource.Database,
+		"collection":            binding.resource.Collection,
+		"mode":                  binding.resource.getMode(),
+		"attempt":               attempt,
+		"resumeAfter":           resumeAfter,
+		"initialBackfilledDocs": initialDocsCaptured,
 	})
+	logEntry.Info("starting backfill for collection")
+	progress := startBackfillProgress(logEntry, stopBackfill, backfillLoggerInterval)
+	outcome := "stopped"
+	defer func() { progress.finish(outcome, retErr) }()
 
 	var err error
 	var estimatedTotalDocs int64
 	if !binding.isTimeseries {
+		progress.setOperation("estimating collection size")
 		// Not using the more precise `CountDocuments()` here since that
 		// requires a full collection scan. Getting an estimate from the
 		// collection's metadata is very fast and should be close enough for
@@ -310,6 +330,7 @@ func (c *capture) doBackfill(
 	// Check if the collection is sharded. For sharded collections, we must use explicit sort
 	// to ensure consistent ordering across rounds, as natural order is non-deterministic
 	// when results are merged from multiple shards.
+	progress.setOperation("checking sharding")
 	isSharded, err := c.isShardedCollection(ctx, binding.resource.Database, binding.resource.Collection)
 	if err != nil {
 		return fmt.Errorf("checking if collection is sharded: %w", err)
@@ -338,35 +359,52 @@ func (c *capture) doBackfill(
 		return err
 	}
 
+	query := bson.D{{Key: "find", Value: binding.resource.Collection}, {Key: "filter", Value: filter}, {Key: "sort", Value: opts.Sort}}
+	if opts.Hint != nil {
+		query = append(query, bson.E{Key: "hint", Value: opts.Hint})
+	}
+	if rc := collection.Database().ReadConcern(); rc != nil && rc.GetLevel() != "" {
+		query = append(query, bson.E{Key: "readConcern", Value: bson.D{{Key: "level", Value: rc.GetLevel()}}})
+	}
+	queryJSON, err := bson.MarshalExtJSON(query, true, false)
+	if err != nil {
+		logEntry.WithError(err).Warn("could not serialize backfill query for logging")
+	}
+	progress.setOperation("explaining query")
+	c.explainBackfill(ctx, binding, query, lastCursorValue != nil, logEntry)
+	progress.setOperation("find")
+	logEntry.WithField("query", string(queryJSON)).Info("querying backfill documents")
+	findStarted := time.Now()
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		return fmt.Errorf("collection.Find: %w", err)
 	}
-	defer cursor.Close(ctx)
-
-	logEntry.WithField("resumeAfter", lastCursorValue).Info("starting backfill for collection")
+	progress.received(cursor.RemainingBatchLength(), cursor.ID())
+	logEntry.WithFields(log.Fields{
+		"elapsed":        time.Since(findStarted).String(),
+		"cursorID":       cursor.ID(),
+		"firstBatchDocs": cursor.RemainingBatchLength(),
+	}).Info("opened backfill cursor")
+	defer func() {
+		if retErr != nil {
+			progress.entry().WithError(retErr).Warn("backfill failed")
+		}
+		progress.setOperation("closing cursor")
+		if err := cursor.Close(ctx); err != nil {
+			logEntry.WithError(err).Warn("failed to close backfill cursor")
+		}
+	}()
 
 	for {
+		progress.setOperation("waiting for change streams")
 		select {
 		case <-stopBackfill:
-			if additionalDocsCaptured != 0 {
-				newTotal := initialDocsCaptured + additionalDocsCaptured
-
-				ll := logEntry.WithFields(log.Fields{
-					"docsCapturedThisRound": additionalDocsCaptured,
-					"totalDocsCaptured":     newTotal,
-				})
-				if !binding.isTimeseries {
-					complete := fmt.Sprintf("%.0f", float64(newTotal)/float64(estimatedTotalDocs)*100)
-					ll = ll.WithField("percentComplete", complete)
-				}
-				ll.Info("progressed backfill for collection")
-			}
+			outcome = "time budget expired"
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-coordinator.streamsCaughtUp():
-			docCount, err := c.pullCursor(ctx, cursor, binding)
+			docCount, err := c.pullCursor(ctx, cursor, binding, progress)
 			if err != nil {
 				return fmt.Errorf("pullCursor: %w", err)
 			}
@@ -375,11 +413,9 @@ func (c *capture) doBackfill(
 				if backfillDone != nil {
 					close(backfillDone)
 				}
-				logEntry.WithField("totalDocsCaptured", initialDocsCaptured+additionalDocsCaptured).Info("completed backfill for collection")
+				outcome = "completed"
 				return nil
 			}
-
-			additionalDocsCaptured += docCount
 		}
 	}
 }
@@ -393,6 +429,7 @@ func (c *capture) pullCursor(
 	ctx context.Context,
 	cursor *mongo.Cursor,
 	binding bindingInfo,
+	progress *backfillProgress,
 ) (int, error) {
 	var sk = binding.stateKey
 	// LookupErr expects individual field components, unlike collection.Find filters
@@ -419,6 +456,7 @@ func (c *capture) pullCursor(
 	c.mu.Unlock()
 
 	emitDocs := func() error {
+		progress.setOperation("transcoding documents")
 		// Transcode all raw documents through the transcoder
 		responses, err := c.transcoder.TranscodeRawDocuments(rawDocBatch)
 		if err != nil {
@@ -445,11 +483,15 @@ func (c *capture) pullCursor(
 		}
 		c.mu.Unlock()
 
+		progress.setOperation("emitting documents and checkpoint")
 		if cpJson, err := json.Marshal(checkpoint); err != nil {
 			return fmt.Errorf("serializing checkpoint: %w", err)
 		} else if err := c.output.DocumentsAndCheckpoint(cpJson, true, binding.index, docBatch...); err != nil {
 			return fmt.Errorf("outputting documents and checkpoint: %w", err)
 		}
+
+		progress.emitted(len(docBatch), lastCursor)
+		progress.setOperation("processing batch")
 
 		docsRead += len(docBatch)
 		// Reset for the next batch.
@@ -460,7 +502,18 @@ func (c *capture) pullCursor(
 	}
 
 	done := true
+	gettingMore := cursor.RemainingBatchLength() == 0 && cursor.ID() != 0
+	if gettingMore {
+		progress.setOperation("getMore")
+	} else {
+		progress.setOperation("processing batch")
+	}
 	for cursor.Next(ctx) {
+		if gettingMore {
+			progress.received(cursor.RemainingBatchLength()+1, cursor.ID())
+			progress.setOperation("processing batch")
+			gettingMore = false
+		}
 		var err error
 		if lastCursor, err = cursor.Current.LookupErr(cursorField...); err != nil {
 			return 0, fmt.Errorf("looking up cursor field '%s': %w", strings.Join(cursorField, "."), err)
@@ -492,6 +545,10 @@ func (c *capture) pullCursor(
 		return 0, fmt.Errorf("backfill cursor error: %w", err)
 	}
 
+	if gettingMore {
+		progress.received(0, cursor.ID())
+	}
+
 	if len(rawDocBatch) > 0 {
 		if err := emitDocs(); err != nil {
 			return 0, fmt.Errorf("emitting final backfill batch: %w", err)
@@ -499,6 +556,7 @@ func (c *capture) pullCursor(
 	}
 
 	if done {
+		progress.setOperation("emitting completion checkpoint")
 		c.mu.Lock()
 		state := c.state.Resources[sk]
 		state.Backfill.Done = makePtr(true)

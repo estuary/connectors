@@ -15,6 +15,7 @@ on:
       - ".claude/**"
       - ".github/workflows/python.yaml"
       - ".github/workflows/estuary-cdk.yaml"
+      - ".github/workflows/python-auto-rerun.yaml"
 
   pull_request:
     branches: [main]
@@ -110,6 +111,11 @@ jobs:
 
   build_connectors:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      pull-requests: read
     # Without this a wedged job runs to GitHub's six-hour default. The slowest
     # connector observed is ~25m.
     timeout-minutes: 60
@@ -152,6 +158,7 @@ jobs:
           - source-sqlserver-ct
           - source-sqs
           - source-test
+          - source-tpc-ds
           - source-azure-blob-storage
           - materialize-azure-blob-parquet
           - materialize-azure-fabric-warehouse
@@ -211,18 +218,28 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
+      # column types or keys drift from the spec.
+      - name: Verify generated table definitions for ${{ matrix.connector }}
+        if: matrix.connector == 'source-tpc-ds'
+        run: |
+          go generate ./source-tpc-ds/...
+          git diff --exit-code -- source-tpc-ds
+
       - name: Restore Flow binaries
         uses: ./.github/actions/restore-flow-binaries
 
       - name: Authenticate with GCloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          project_id: estuary-theatre
+          workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
+          service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          project_id: estuary-theatre
 
       - name: Login to GitHub package docker registry
         uses: docker/login-action@v4
@@ -271,6 +288,12 @@ jobs:
         run: |
           bash source-mongodb/docker-compose-init.sh
 
+      # The snowflake tests build a venv for the Snowpipe Streaming sidecar
+      # with poetry, so the venv holds the sidecar's locked dependencies.
+      - name: Install poetry for the sidecar test venv
+        if: matrix.connector == 'materialize-snowflake'
+        run: pipx install poetry
+
       # Run the tests of every in-repo helper package which this connector
       # transitively depends on. This list is computed on the fly so that we
       # don't have to keep an explicit list up-to-date. Likewise instead of
@@ -308,7 +331,6 @@ jobs:
         run: |
           ${{ matrix.connector }}/run_tests.sh
         env:
-          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
           # The estuary/flow repository contains a few large files in Git LFS. This can
           # present an issue with Go module checksums when using a commit-tagged version,
           # because a commit-tagged version will be fetched from VCS using `git archive`
@@ -452,7 +474,11 @@ jobs:
           cd ${{ matrix.connector }}
           # Rust connectors have no Go packages to drive; run.sh skips them the same way.
           if [ -f Cargo.toml ]; then echo "Rust connector; no runtime v1 pass"; exit 0; fi
-          go test -v ./... -timeout 20m
+          TIMEOUT=20m
+          if [ "${{ matrix.connector }}" = "materialize-snowflake" ]; then
+            TIMEOUT=30m
+          fi
+          go test -v ./... -timeout $TIMEOUT
 
       # On a snapshot mismatch the harness writes this run's value beside the
       # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed

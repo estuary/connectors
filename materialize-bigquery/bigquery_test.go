@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -13,11 +14,13 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
 
@@ -43,7 +46,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		started := time.Now()
-		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
 
 		// Every load results table created by this run must be deleted after
@@ -58,31 +61,100 @@ func TestIntegration(t *testing.T) {
 
 			prefix := loadResultsTablePrefix + translateFlowIdentifier(taskName)
 			cutoff := started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
-			var leaked []string
-			it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
-			for {
-				tbl, err := it.Next()
-				if err == iterator.Done {
-					break
+			listLeaked := func() []string {
+				var leaked []string
+				it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
+				for {
+					tbl, err := it.Next()
+					if err == iterator.Done {
+						break
+					}
+					require.NoError(t, err)
+					if !strings.HasPrefix(tbl.TableID, prefix) {
+						continue
+					}
+					md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
+					var gErr *googleapi.Error
+					if errors.As(err, &gErr) && gErr.Code == 404 {
+						continue // Deleted after the listing returned it.
+					}
+					require.NoError(t, err)
+					if md.CreationTime.Before(cutoff) {
+						t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
+						continue
+					}
+					leaked = append(leaked, tbl.TableID)
 				}
-				require.NoError(t, err)
-				if !strings.HasPrefix(tbl.TableID, prefix) {
-					continue
-				}
-				md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
-				require.NoError(t, err)
-				if md.CreationTime.Before(cutoff) {
-					t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
-					continue
-				}
-				leaked = append(leaked, tbl.TableID)
+				return leaked
+			}
+			// A table listing can lag a delete by several seconds, so a
+			// table is only leaked if it is still listed after the lag has
+			// had time to clear.
+			leaked := listLeaked()
+			for deadline := time.Now().Add(time.Minute); len(leaked) > 0 && time.Now().Before(deadline); {
+				time.Sleep(5 * time.Second)
+				leaked = listLeaked()
 			}
 			require.Empty(t, leaked, "leaked load results tables")
 		})
 	})
 
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
+			var bq = bqTestClient(t, cfg, tables...)
+
+			flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+			require.NoError(t, err)
+			materializer, err := NewMaterializer(ctx, taskName, cfg, flags)
+			require.NoError(t, err)
+			defer materializer.Close(ctx)
+			require.NoError(t, materializer.CleanupTestTask(ctx, taskName))
+
+			// Two shards, so that the primary truncates after applying a peer's
+			// staged stores.
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", taskName,
+				"--source", "testdata/truncate.flow.yaml",
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "2",
+				"--timeout", "10m",
+				"--network", "flow-test",
+				"--log-json",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var query = bq.Query(fmt.Sprintf("SELECT id FROM `%s.%s.%s` ORDER BY id;", cfg.ProjectID, cfg.Dataset, table))
+				query.Location = cfg.Region
+				it, err := query.Read(ctx)
+				require.NoError(t, err)
+				var ids []int64
+				for {
+					var row []bigquery.Value
+					if err := it.Next(&row); err == iterator.Done {
+						break
+					}
+					require.NoError(t, err)
+					ids = append(ids, row[0].(int64))
+				}
+				require.Equal(t, want, ids, table)
+			}
+		})
+	})
+
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -105,7 +177,7 @@ func TestIntegration(t *testing.T) {
 				fileKey := path.Join(cfg.effectiveBucketPath(), fmt.Sprintf("applydrain-%s.json", uuid.NewString()))
 				require.NoError(t, bucket.Upload(ctx, fileKey, strings.NewReader("")))
 
-				query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "JSON '{}'")
+				query := sql.DrainSeedInsertQuery(t, NewDriver().sqlDriver, cfg, appliedSpec, "JSON '{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
 						"Query":         query,
@@ -122,12 +194,12 @@ func TestIntegration(t *testing.T) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 
-			sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
+			sql.RunApplyDrainTest(t, NewDriver().sqlDriver, cfg, res, seedPending, verifyDrained)
 		})
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
 	// Toggling objects_and_arrays_as_json migrates the object column and the
@@ -135,7 +207,7 @@ func TestIntegration(t *testing.T) {
 	// root document JSON<->text migration end-to-end, the scenario that requires
 	// the root document to be migratable (rather than needing a backfill).
 	t.Run("flow_document-migration", func(t *testing.T) {
-		sql.RunFeatureFlagMigrationTest(t, NewDriver(), "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
+		sql.RunFeatureFlagMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate-doc.flow.yaml", makeResourceFn, []sql.FeatureFlagMigrationPhase{
 			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // materialize as JSON
 			{FeatureFlags: "no_objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"}, // migrate JSON -> STRING
 			{FeatureFlags: "objects_and_arrays_as_json", Fixture: "testdata/fixture.doc-migrate.json"},    // migrate STRING -> JSON

@@ -1,0 +1,53 @@
+info:
+  name: page 200 in-cap past end
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/contacts?per_page=50&page=200"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - page 200 (offset 10000) -> empty page (projection)"
+    request:
+      url: "{{base_url}}/contacts?per_page=50&page=200"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "contacts": [],
+            "meta": {
+              "count": 0,
+              "total": 3,
+              "current_page": 200,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": "https://api.aircall.io/v1/contacts?order=asc&order_by=created_at&per_page=50&page=199"
+            }
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-contacts
+
+    **WHY:** Separate the out-of-bound 400 from "past the data".
+
+    **VERIFIED (2026-09-28):** `page=200&per_page=50` (offset exactly 10,000) is 200 with
+    an empty page even though `total: 3`. With `Contacts / page past end` this
+    proves the 400 is triggered by `page * per_page > 10000` (positional), not by
+    paging past `total`. Pages 1..200 at `per_page=50` are always legal.
+  type: text/markdown

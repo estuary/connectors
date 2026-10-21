@@ -38,3 +38,7 @@ captures:
         name: Persons
         interval: PT5M
       target: acmeCo/Persons
+    - resource:
+        name: Sessions
+        interval: PT5M
+      target: acmeCo/Sessions

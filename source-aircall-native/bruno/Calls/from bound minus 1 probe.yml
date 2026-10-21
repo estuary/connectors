@@ -1,0 +1,85 @@
+info:
+  name: from bound minus 1 probe
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/calls?from={{pin_minus_1}}&to={{pin_to}}&order=asc&per_page=50"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Pinned by `Calls / window asc`'s after-response script. Fail loudly
+        // rather than sending a malformed window.
+        const x = Number(bru.getVar('pin_started_at'));
+        if (!x) throw new Error('pin_started_at not set — run "Calls / window asc" first in this session');
+        bru.setVar('pin_to', String(x + 3599));
+        bru.setVar('pin_from', String(x - 3599));
+        bru.setVar('pin_minus_1', String(x - 1));
+        console.log('PIN', bru.getVar('pin_call_id'), x);
+    - type: after-response
+      code: |-
+        const calls = res.getBody()?.calls || [];
+        const id = Number(bru.getVar('pin_call_id'));
+        console.log('PINNED_CALL_PRESENT', calls.some(c => c.id === id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - from=X-1 includes pinned call (projection)
+    request:
+      url: "{{base_url}}/calls?from=1790603086&to=1790606686&order=asc&per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "calls": [
+              {
+                "id": 4186784158,
+                "started_at": 1790603087,
+                "status": "done"
+              },
+              {
+                "id": 4186787210,
+                "started_at": 1790603116,
+                "status": "done"
+              }
+            ],
+            "meta": {
+              "count": 2,
+              "total": 2,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            }
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-calls
+
+    **WHY:** companion to `Calls / from bound probe` — `from` set one second
+    *before* the pinned call's `started_at`. Present here but absent at
+    `from = started_at` pins the lower bound as exclusive (`started_at > from`),
+    provided `Calls / to bound minus 1 probe` shows the filter is on
+    `started_at` itself. Requires `Calls / window asc` first in this session.
+
+    **VERIFIED (2026-09-28, all 3 seeded calls):** with `from = started_at - 1` the
+    pinned call is **present**. With `Calls / from bound probe`: lower bound
+    is `started_at > from`.
+  type: text/markdown

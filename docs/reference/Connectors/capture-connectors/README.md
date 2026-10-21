@@ -16,7 +16,7 @@ The SQL CDC group of database connectors share some common features, from
 real-time CDC ingestion to [extra backfill options](/reference/backfilling-data/#resource-configuration-backfill-modes)
 and other [advanced features](/guides/customize-dataflows/#sql-captures).
 
-- [AlloyDB](./alloydb.md)
+- [AlloyDB](./PostgreSQL/alloydb.md)
 - [Amazon RDS SQL Server](./SQLServer/amazon-rds-sqlserver.md)
 - [Azure SQL Server](./SQLServer/)
 - [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
@@ -105,6 +105,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### CRMs, sales, and support
 
 - [Ada](./ada.md)
+- [Aircall](./aircall-native.md)
 - [Front](./front.md)
 - [Gainsight NXT](./gainsight-nxt.md)
 - [Genesys](./genesys.md)
@@ -133,6 +134,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### Finance, hiring, and operations
 
 - [Ashby](./ashby.md)
+- [AWS Cost Explorer](./aws-cost-explorer.md)
 - [Greenhouse](./greenhouse-native.md)
 - [Microsoft Dynamics 365 Finance and Operations](./dynamics-365-finance-and-operations.md)
 - [Sage Intacct](./sage-intacct.md)
@@ -146,6 +148,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [GitHub](./github.md)
 - [Incident.io](./incident-io.md)
 - [Jira](./jira-native.md)
+- [Linear](./linear.md)
 - [Monday](./monday.md)
 - [Navan](./navan.md)
 - [Sentry](./sentry.md)
@@ -153,6 +156,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### Other applications
 
 - [Apple App Store](./apple-app-store.md)
+- [Estuary](./estuary.md)
 - [Google Play](./google-play.md)
 - [Iterate](./iterate.md)
 - [Pendo](./pendo.md)
@@ -169,7 +173,6 @@ within the limitations set by the connector itself.
 
 Typically, we enable SaaS connectors from third parties to allow more diverse data flows.
 
-- [Aircall](./aircall.md)
 - [Amazon Ads](./amazon-ads.md)
 - [Amplitude](./amplitude.md)
 - [Bing Ads](./bing-ads.md)
@@ -179,7 +182,6 @@ Typically, we enable SaaS connectors from third parties to allow more diverse da
 - [Freshdesk](./freshdesk.md)
 - [GitLab](./gitlab.md)
 - [Google Analytics 4](./google-analytics-4.md)
-- [Google Universal Analytics](./google-analytics.md)
 - [Google Search Console](./google-search-console.md)
 - [Harvest](./harvest.md)
 - [Instagram](./instagram.md)

@@ -47,11 +47,37 @@ func parseTemplates() templates {
 			}
 			return strings.Join(quotedParts, ".")
 		},
-		"IsBinary":          func(m mapped) bool { return m.type_.Equals(iceberg.BinaryType{}) },
+		"IsBinary": func(m mapped) bool { return m.type_.Equals(iceberg.BinaryType{}) },
+		// DocumentAsJSON is the document column of alias as JSON text: a
+		// variant document is rendered through TO_JSON so that loaded
+		// documents and the delete sentinel comparison see the same text a
+		// string column holds.
+		"DocumentAsJSON": func(alias string, m mapped) string {
+			ident := alias + "." + quoteIdentifier(m.Name)
+			if m.isVariant() {
+				return fmt.Sprintf("TO_JSON(%s)", ident)
+			}
+			return ident
+		},
 		"MigrateColumnName": func(f string) string { return f + migrateFieldSuffix },
 		"CastSQL": func(m migrateColumn) string {
 			ident := quoteIdentifier(m.Name)
+			if m.TargetType.Equals(iceberg.VariantType{}) {
+				if m.FromType == "string" {
+					// A string column that held an object, array, or the
+					// root document holds JSON text; one that held a plain
+					// string, or a multi-type field's string values, holds
+					// bare text that becomes a variant string.
+					return fmt.Sprintf("COALESCE(TRY_PARSE_JSON(%s), CAST(%s AS VARIANT))", ident, ident)
+				}
+				// Other primitives cast to the variant type of the same
+				// kind: a timestamptz becomes a variant timestamp, a binary
+				// a variant binary, and so on.
+				return fmt.Sprintf("CAST(%s AS VARIANT)", ident)
+			}
 			switch m.FromType {
+			case "variant":
+				return fmt.Sprintf("TO_JSON(%s)", ident)
 			case "binary":
 				return fmt.Sprintf("BASE64(%s)", ident)
 			case "timestamptz":
@@ -75,7 +101,7 @@ func parseTemplates() templates {
 {{- end }}
 
 {{ define "loadQuery" -}}
-SELECT {{ $.Idx }}, l.{{ QuoteIdentifier $.Mapped.Document.Mapped.Name }}
+SELECT {{ $.Idx }}, {{ DocumentAsJSON "l" $.Mapped.Document.Mapped }}
 FROM {{ TableFQN $.Mapped.ResourcePath }} AS l
 JOIN load_view_{{ $.Idx }} AS r
 {{- range $ind, $bound := $.Bounds }}
@@ -93,12 +119,12 @@ ON {{ range $ind, $bound := $.Bounds }}
 	l.{{ QuoteIdentifier $bound.Mapped.Name }} = {{ template "maybe_unbase64_rhs" $bound }}
 	{{- if $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Mapped.Name }} >= {{ $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Mapped.Name }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
-WHEN MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Mapped.Name }} = '"delete"' THEN DELETE
+WHEN MATCHED AND {{ DocumentAsJSON "r" $.Mapped.Document.Mapped }} = '"delete"' THEN DELETE
 WHEN MATCHED THEN UPDATE SET {{ range $ind, $proj := $.Mapped.SelectedProjections }}
 	{{- if $ind }}, {{ end -}}
 	l.{{ QuoteIdentifier $proj.Mapped.Name }} = {{ template "maybe_unbase64_rhs" $proj }}
 {{- end }}
-WHEN NOT MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Mapped.Name }} != '"delete"' THEN INSERT (
+WHEN NOT MATCHED AND {{ DocumentAsJSON "r" $.Mapped.Document.Mapped }} != '"delete"' THEN INSERT (
 {{- range $ind, $proj := $.Mapped.SelectedProjections }}
 	{{- if $ind }}, {{ end -}}
 	{{ QuoteIdentifier $proj.Mapped.Name -}}

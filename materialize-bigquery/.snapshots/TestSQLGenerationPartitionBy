@@ -1,0 +1,112 @@
+--- Begin standard date partition ---
+CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
+		key1 INTEGER NOT NULL,
+		key2 BOOLEAN NOT NULL,
+		key_binary BYTES NOT NULL,
+		`array` JSON,
+		binary BYTES,
+		boolean BOOLEAN,
+		field_with_projection STRING,
+		flow_published_at TIMESTAMP NOT NULL,
+		integer INTEGER,
+		integerGt128Bit BIGNUMERIC(38,0),
+		integerGt256Bit BIGNUMERIC(38,0),
+		integerGt64Bit BIGNUMERIC(38,0),
+		integerWithUserDDL DECIMAL(20),
+		multiple JSON,
+		nonAscii_____ STRING,
+		number FLOAT64,
+		numberCastToString STRING,
+		object JSON,
+		string STRING,
+		stringInteger BIGNUMERIC(38,0),
+		stringInteger18Chars BIGNUMERIC(38,0),
+		stringInteger38Chars BIGNUMERIC(38,0),
+		stringInteger39Chars STRING,
+		stringInteger66Chars STRING,
+		stringInteger77Chars STRING,
+		stringNumber FLOAT64,
+		flow_document JSON NOT NULL
+)
+PARTITION BY DATE(flow_published_at)
+CLUSTER BY key1, key2, key_binary;
+--- End standard date partition ---
+
+--- Begin delta month partition ---
+CREATE TABLE IF NOT EXISTS projectID.dataset.delta_updates (
+		theKey STRING NOT NULL,
+		aValue INTEGER,
+		flow_published_at TIMESTAMP NOT NULL
+)
+PARTITION BY TIMESTAMP_TRUNC(flow_published_at, MONTH)
+CLUSTER BY theKey;
+--- End delta month partition ---
+
+--- Begin ingestion time ---
+CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
+		key1 INTEGER NOT NULL,
+		key2 BOOLEAN NOT NULL,
+		key_binary BYTES NOT NULL,
+		`array` JSON,
+		binary BYTES,
+		boolean BOOLEAN,
+		field_with_projection STRING,
+		flow_published_at TIMESTAMP NOT NULL,
+		integer INTEGER,
+		integerGt128Bit BIGNUMERIC(38,0),
+		integerGt256Bit BIGNUMERIC(38,0),
+		integerGt64Bit BIGNUMERIC(38,0),
+		integerWithUserDDL DECIMAL(20),
+		multiple JSON,
+		nonAscii_____ STRING,
+		number FLOAT64,
+		numberCastToString STRING,
+		object JSON,
+		string STRING,
+		stringInteger BIGNUMERIC(38,0),
+		stringInteger18Chars BIGNUMERIC(38,0),
+		stringInteger38Chars BIGNUMERIC(38,0),
+		stringInteger39Chars STRING,
+		stringInteger66Chars STRING,
+		stringInteger77Chars STRING,
+		stringNumber FLOAT64,
+		flow_document JSON NOT NULL
+)
+PARTITION BY _PARTITIONDATE
+CLUSTER BY key1, key2, key_binary;
+--- End ingestion time ---
+
+--- Begin whitespace only renders no clause ---
+CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
+		key1 INTEGER NOT NULL,
+		key2 BOOLEAN NOT NULL,
+		key_binary BYTES NOT NULL,
+		`array` JSON,
+		binary BYTES,
+		boolean BOOLEAN,
+		field_with_projection STRING,
+		flow_published_at TIMESTAMP NOT NULL,
+		integer INTEGER,
+		integerGt128Bit BIGNUMERIC(38,0),
+		integerGt256Bit BIGNUMERIC(38,0),
+		integerGt64Bit BIGNUMERIC(38,0),
+		integerWithUserDDL DECIMAL(20),
+		multiple JSON,
+		nonAscii_____ STRING,
+		number FLOAT64,
+		numberCastToString STRING,
+		object JSON,
+		string STRING,
+		stringInteger BIGNUMERIC(38,0),
+		stringInteger18Chars BIGNUMERIC(38,0),
+		stringInteger38Chars BIGNUMERIC(38,0),
+		stringInteger39Chars STRING,
+		stringInteger66Chars STRING,
+		stringInteger77Chars STRING,
+		stringNumber FLOAT64,
+		flow_document JSON NOT NULL
+)
+CLUSTER BY key1, key2, key_binary;
+--- End whitespace only renders no clause ---
+
+

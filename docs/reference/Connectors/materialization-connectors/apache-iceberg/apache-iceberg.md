@@ -405,7 +405,7 @@ available
 Note the following specific details when creating the application to use with
 this connector:
 - Select **Spark** for the **Type**.
-- Use **emr-7.7.0** for the **Release Version**, and **x86_64** for the
+- Use **emr-spark-8.1.0** for the **Release Version**, and **x86_64** for the
   **Architecture**
 - For **Application setup options**, select **Use custom settings**. These options
   can generally be configured as desired, with the specific notes below:
@@ -747,13 +747,13 @@ about how to configure this [here](/reference/materialization-sync-schedule).
 ## Iceberg Column Types
 
 Estuary collection fields are written to Iceberg table columns based on the data type of the field.
-Iceberg [V2 primitive type](https://iceberg.apache.org/spec/#primitive-types) columns are created
+Iceberg [data type](https://iceberg.apache.org/spec/#schemas-and-data-types) columns are created
 for these Estuary collection fields:
 
 | Collection Field Data Type                  | Iceberg Column Type                          |
 |---------------------------------------------|----------------------------------------------|
-| **array**                                   | **string**                                   |
-| **object**                                  | **string**                                   |
+| **array**                                   | **variant** (array)                          |
+| **object**                                  | **variant** (object)                         |
 | **boolean**                                 | **boolean**                                  |
 | **integer**                                 | **long**                                     |
 | **number**                                  | **double**                                   |
@@ -766,8 +766,7 @@ for these Estuary collection fields:
 
 Estuary collection fields with `{type: string, format: time}` and `{type: string, format: uuid}` are
 materialized as **string** columns rather than **time** and **uuid** columns for compatibility with
-Apache Spark. **[Nested types](https://iceberg.apache.org/spec/#nested-types)** are not currently
-supported.
+Apache Spark.
 
 ## Table Maintenance
 
@@ -777,5 +776,21 @@ to enable automatic maintenance on your tables, including data file compaction, 
 If you do not use Glue for your catalog or otherwise do not configure automatic optimization through the connector,
 you should conduct [regular maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
 for your materialized tables to ensure optimal query performance.
+
+### Merge-on-read
+
+By default, a merge rewrites every data file that holds an updated or deleted row. This is Iceberg's
+copy-on-write mode. When each merge changes a few rows spread across many large files, merge-on-read
+writes far less, because it records the changed rows in small delete files instead.
+
+To use merge-on-read, set the table properties `write.merge.mode`, `write.update.mode` and
+`write.delete.mode` to `merge-on-read`. You can set them in `additional_table_properties` when the
+table is created, or run `ALTER TABLE ... SET TBLPROPERTIES` on an existing table. Merge-on-read
+needs EMR release emr-7.12.0 or emr-spark-8.0.0 or later. Earlier releases bundle an Iceberg version
+that fails every merge into a merge-on-read table.
+
+Each merge adds delete files, and readers, including the connector's own loads, slow down as they
+accumulate. Compact merge-on-read tables regularly so the deletes are applied to the data files, for
+example with Spark's `rewrite_data_files` procedure and its `delete-file-threshold` option.
 
 [spark-job-properties]: https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/jobs-spark.html#spark-defaults

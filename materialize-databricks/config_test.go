@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
@@ -74,6 +75,20 @@ func TestDatabricksConfig(t *testing.T) {
 	var noClientSecret = validOAuthConfig
 	noClientSecret.Credentials.ClientSecret = ""
 	require.Error(t, noClientSecret.Validate(), "expected validation error for missing client_secret")
+
+	patWs := validConfig.workspaceConfig()
+	require.Equal(t, "db-something.cloud.databricks.com:400//sql/1.0/warehouses/someid", patWs.Host)
+	require.Equal(t, "secret", patWs.Token)
+	require.Empty(t, patWs.ClientID)
+	require.Empty(t, patWs.ClientSecret)
+	require.IsType(t, dbConfig.PatCredentials{}, patWs.Credentials)
+
+	oauthWs := validOAuthConfig.workspaceConfig()
+	require.Equal(t, "db-something.cloud.databricks.com:400//sql/1.0/warehouses/someid", oauthWs.Host)
+	require.Equal(t, "my-client-id", oauthWs.ClientID)
+	require.Equal(t, "my-client-secret", oauthWs.ClientSecret)
+	require.Empty(t, oauthWs.Token)
+	require.Nil(t, oauthWs.Credentials)
 }
 
 func TestSpecification(t *testing.T) {
