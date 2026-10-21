@@ -203,3 +203,19 @@ func TestStreamV2ClientChannelStatusCodes(t *testing.T) {
 		})
 	}
 }
+
+// TestStreamV2Scope covers the OAuth scope of the token exchange. Snowflake
+// resolves the role in it with SQL identifier rules, so the role must reach the
+// scope exactly as configured, neither case-folded nor unquoted.
+func TestStreamV2Scope(t *testing.T) {
+	for _, tc := range []struct {
+		role, want string
+	}{
+		{"", "ingest.example.com"},
+		{"estuary_role", "session:role:estuary_role ingest.example.com"},
+		{"ESTUARY_ROLE", "session:role:ESTUARY_ROLE ingest.example.com"},
+		{`"Quoted_Role"`, `session:role:"Quoted_Role" ingest.example.com`},
+	} {
+		require.Equal(t, tc.want, streamV2Scope(tc.role, "https://ingest.example.com"), "role %q", tc.role)
+	}
+}
