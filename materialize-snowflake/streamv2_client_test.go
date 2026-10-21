@@ -253,3 +253,15 @@ func TestStreamV2ClientNamesARefusedRole(t *testing.T) {
 		}
 	}
 }
+
+// TestStreamV2ClientRejectsWhitespaceInRole covers a role containing whitespace,
+// which the space-separated OAuth scope cannot carry intact.
+func TestStreamV2ClientRejectsWhitespaceInRole(t *testing.T) {
+	for _, role := range []string{"my role", `"my role"`, "my\trole", " ESTUARY_ROLE"} {
+		var cfg = &config{Role: role, Credentials: &snowflake_auth.CredentialConfig{
+			AuthType: snowflake_auth.JWT, User: "U", PrivateKey: fakeTestKey(),
+		}}
+		_, err := newStreamV2Client(cfg, "https://example.com", "ACCT")
+		require.ErrorContains(t, err, fmt.Sprintf("role %q contains whitespace", role))
+	}
+}
