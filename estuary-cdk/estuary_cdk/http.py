@@ -679,7 +679,9 @@ class HTTPMixin(Mixin, HTTPSession):
                 else:
                     resp.raise_for_status()
 
-                    async def body_generator() -> AsyncGenerator[bytes, None]:
+                    async def body_generator(
+                        resp: aiohttp.ClientResponse = resp,
+                    ) -> AsyncGenerator[bytes, None]:
                         try:
                             async for chunk in resp.content.iter_any():
                                 yield chunk
