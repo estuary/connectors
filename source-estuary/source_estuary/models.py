@@ -72,13 +72,14 @@ ConnectorState = GenericConnectorState[ResourceState]
 class CapabilityBit(StrEnum):
     """Capability bits that newer resolvers check, as `prefixes` reports them.
 
-    Resolvers that still check a legacy capability (read, admin) are gated on
-    `userCapability` instead, since the bits making up those bundles change.
+    Resolvers that still check the legacy read capability need no bit:
+    `prefixes(minCapability: read)` only returns prefixes that hold it.
     """
 
     CatalogRead = "CatalogRead"
     ViewBilling = "ViewBilling"
     QueryServiceAccounts = "QueryServiceAccounts"
+    ManageAlerts = "ManageAlerts"
 
 
 class GraphQLErrorEntry(BaseModel, extra="allow"):
@@ -117,8 +118,6 @@ class Connection(EdgeList):
 
 class AuthorizedPrefix(BaseModel, extra="allow"):
     prefix: str
-    # The legacy capability: read, write or admin.
-    userCapability: str
     capabilities: list[str]
 
 
@@ -169,8 +168,6 @@ class EstuarySnapshot(BaseDocument, extra="allow"):
     pager: ClassVar[Pager]
     scope: ClassVar[Scope]
     required: ClassVar[frozenset[CapabilityBit]] = frozenset()
-    # Whether the resolver requires the legacy admin capability.
-    admin_only: ClassVar[bool] = False
     interval: ClassVar[timedelta] = timedelta(minutes=5)
 
     def identity(self) -> tuple[Any, ...]:
@@ -235,7 +232,7 @@ query AlertSubscriptions($scope: Prefix!) {
     connection_path: ClassVar[tuple[str, ...]] = ("alertSubscriptions",)
     pager: ClassVar[Pager] = Pager.LIST
     scope: ClassVar[Scope] = Scope.PREFIX
-    admin_only: ClassVar[bool] = True
+    required: ClassVar[frozenset[CapabilityBit]] = frozenset({CapabilityBit.ManageAlerts})
 
     catalogPrefix: str
     destination: str

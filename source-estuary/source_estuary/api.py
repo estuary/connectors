@@ -72,7 +72,7 @@ async def graphql_request(
 AUTHORIZED_PREFIXES_QUERY = """
 query AuthorizedPrefixes {
   prefixes(by: { minCapability: read }) {
-    edges { node { prefix userCapability capabilities } }
+    edges { node { prefix capabilities } }
   }
 }
 """
@@ -98,11 +98,10 @@ async def resolve_scopes(
     prefixes: list[str],
     stream: str,
     required: frozenset[CapabilityBit],
-    admin_only: bool = False,
 ) -> list[str]:
     """Return the disjoint prefixes to query: the configured `prefixes` (or every
     authorized prefix when none are configured) where the API key holds every
-    `required` capability bit, and the legacy admin capability if `admin_only`.
+    `required` capability.
 
     A configured prefix the key can't read in full raises, rather than being
     skipped or narrowed: either would tombstone snapshot rows and let
@@ -111,10 +110,7 @@ async def resolve_scopes(
     extra capabilities, is skipped for that stream.
     """
     authorized = await fetch_authorized_prefixes(log, http)
-    holders = [
-        a.prefix for a in authorized
-        if required <= set(a.capabilities) and (not admin_only or a.userCapability == "admin")
-    ]
+    holders = [a.prefix for a in authorized if required <= set(a.capabilities)]
 
     if not prefixes:
         return _prune_nested(set(holders))
@@ -198,7 +194,7 @@ async def snapshot_stream(
 ) -> AsyncGenerator[EstuarySnapshot, None]:
     scopes: list[str] = []
     if cls.scope != Scope.GLOBAL:
-        scopes = await resolve_scopes(log, http, prefixes, cls.name, cls.required, cls.admin_only)
+        scopes = await resolve_scopes(log, http, prefixes, cls.name, cls.required)
         if not scopes:
             log.info(f"{cls.name}: the API key lacks the required capabilities on every configured prefix")
             return
