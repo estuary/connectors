@@ -272,7 +272,7 @@ class CaptureShim(BaseCaptureConnector):
                     name=stream.name,
                     key=key,
                     model=common.Resource.FixedSchema(stream.json_schema),
-                    open=lambda binding, index, state, task: None,  # No-op.
+                    open=lambda binding, index, state, task, resolved: None,  # No-op.
                     initial_state=ResourceState(rowId=0),
                     initial_config=resource_config,
                     schema_inference=self.schema_inference,
