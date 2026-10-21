@@ -238,13 +238,9 @@ func (c *streamV2Client) refreshToken(ctx context.Context, ingestURL *string) (s
 		*ingestURL = scheme + "://" + strings.TrimSpace(string(host))
 	}
 
-	var scope = strings.TrimPrefix(strings.TrimPrefix(*ingestURL, "https://"), "http://")
-	if c.role != "" {
-		scope = "session:role:" + c.role + " " + scope
-	}
 	var form = url.Values{
 		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
-		"scope":      {scope},
+		"scope":      {streamV2Scope(c.role, *ingestURL)},
 	}
 	jwtHeaders.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := c.send(ctx, "POST", c.accountURL+"/oauth/token", []byte(form.Encode()), jwtHeaders)
@@ -262,6 +258,17 @@ func (c *streamV2Client) refreshToken(ctx context.Context, ingestURL *string) (s
 		expiry = claims.ExpiresAt.Time
 	}
 	return token, expiry, nil
+}
+
+// streamV2Scope is the OAuth scope of a token for the ingest host, assuming role
+// when one is set. Snowflake resolves the role with SQL identifier rules, so it
+// is passed exactly as configured.
+func streamV2Scope(role, ingestURL string) string {
+	var scope = strings.TrimPrefix(strings.TrimPrefix(ingestURL, "https://"), "http://")
+	if role != "" {
+		scope = "session:role:" + role + " " + scope
+	}
+	return scope
 }
 
 // call sends one authenticated request to the ingest host and decodes its JSON
