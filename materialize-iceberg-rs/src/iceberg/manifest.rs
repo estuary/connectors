@@ -93,6 +93,7 @@ pub struct DeleteFileInfo {
 }
 
 /// A decoded manifest entry, as returned by [`read_manifest`].
+#[derive(Debug)]
 pub struct ManifestEntryInfo {
     pub content: i32,
     pub file_path: String,

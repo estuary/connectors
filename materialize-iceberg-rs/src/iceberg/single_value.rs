@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use anyhow::Context;
 use anyhow::Result;
 use arrow::array::Array;
@@ -23,6 +25,21 @@ pub enum Bound {
 }
 
 impl Bound {
+    /// Orders two bounds of the same variant. `f64` uses `total_cmp` since
+    /// key/bound columns are never `NaN` in practice but `f64` has no `Ord`.
+    /// Comparing across different variants is meaningless and shouldn't
+    /// occur (see the enum's doc comment); it returns `Equal` rather than
+    /// panicking.
+    pub fn compare(&self, other: &Bound) -> Ordering {
+        match (self, other) {
+            (Bound::Int64(a), Bound::Int64(b)) => a.cmp(b),
+            (Bound::Float64(a), Bound::Float64(b)) => a.total_cmp(b),
+            (Bound::Boolean(a), Bound::Boolean(b)) => a.cmp(b),
+            (Bound::Utf8(a), Bound::Utf8(b)) => a.cmp(b),
+            _ => Ordering::Equal,
+        }
+    }
+
     /// Encodes per the Iceberg spec's single-value binary serialization
     /// (<https://iceberg.apache.org/spec/#appendix-d-single-value-serialization>),
     /// for the column types this connector supports.
@@ -99,6 +116,19 @@ impl Bound {
             ),
         })
     }
+}
+
+/// Orders two key tuples column by column (lexicographic), the same way a
+/// multi-column key sorts in `Store`'s arrival order and in a data file's
+/// rows.
+pub fn compare_keys(a: &[Bound], b: &[Bound]) -> Ordering {
+    for (x, y) in a.iter().zip(b) {
+        match x.compare(y) {
+            Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    Ordering::Equal
 }
 
 /// Tracks a running [lower, upper] bound for one column as rows are

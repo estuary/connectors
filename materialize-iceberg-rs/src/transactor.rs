@@ -53,7 +53,9 @@ use crate::iceberg::manifest::DeleteFileInfo;
 use crate::iceberg::manifest::{self};
 use crate::iceberg::manifest_list;
 use crate::iceberg::scan;
+use crate::iceberg::single_value::Bound;
 use crate::iceberg::single_value::BoundTracker;
+use crate::iceberg::single_value::compare_keys;
 use crate::iceberg::snapshot::Snapshot;
 use crate::iceberg::snapshot::build_snapshot;
 use crate::iceberg::state::BindingCheckpoint;
@@ -217,12 +219,35 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     raw_doc_text.to_string()
                 };
 
-                let elements: Vec<Element> = tuple::unpack(&store.key_packed)?;
+                let key_elements: Vec<Element> = tuple::unpack(&store.key_packed)?;
+
+                // scan::load's merge-scan streams a data file's rows in
+                // ascending key order on the assumption that they were
+                // written in that order — Flow guarantees Store calls
+                // arrive sorted by (binding, key), so this should never
+                // trip.
+                let key: Vec<Bound> = key_elements
+                    .iter()
+                    .zip(&binding.key_types)
+                    .map(|(element, data_type)| {
+                        Bound::from_element(data_type, element)
+                            .context("key element does not match its column's type")
+                    })
+                    .collect::<Result<_>>()?;
+                if let Some(last_key) = &binding.last_key {
+                    anyhow::ensure!(
+                        compare_keys(last_key, &key) != std::cmp::Ordering::Greater,
+                        "Store keys must arrive in ascending order per binding; \
+                         got {key:?} after {last_key:?}",
+                    );
+                }
+                binding.last_key = Some(key);
+
                 for ((builder, tracker), element) in binding
                     .key_builders
                     .iter_mut()
                     .zip(binding.key_bound_trackers.iter_mut())
-                    .zip(elements.iter())
+                    .zip(key_elements.iter())
                 {
                     builder.append(element)?;
                     tracker.update(element);
@@ -315,8 +340,13 @@ struct BindingState {
     schema: Arc<Schema>,
     table_schema: serde_json::Value,
     last_column_id: i32,
+    key_types: Vec<DataType>,
     key_builders: Vec<ColumnBuilder>,
     key_bound_trackers: Vec<BoundTracker>,
+    /// The last key appended this data file, for asserting Store calls keep
+    /// arriving in ascending order. Reset whenever `write_and_upload`
+    /// flushes the accumulated rows into a new data file.
+    last_key: Option<Vec<Bound>>,
     value_builders: Vec<ColumnBuilder>,
     doc_builder: StringBuilder,
     rows: usize,
@@ -372,6 +402,7 @@ impl BindingState {
             for tracker in &mut self.key_bound_trackers {
                 tracker.reset();
             }
+            self.last_key = None;
 
             let mut columns: Vec<ArrayRef> = self
                 .key_builders
@@ -686,6 +717,7 @@ fn binding_state(
         .expect("binding must have collection spec");
 
     let mut fields = Vec::new();
+    let mut key_types = Vec::new();
     let mut key_builders = Vec::new();
     let mut key_bound_trackers = Vec::new();
     let mut value_builders = Vec::new();
@@ -701,6 +733,7 @@ fn binding_state(
         ));
         key_builders.push(ColumnBuilder::new(&data_type));
         key_bound_trackers.push(BoundTracker::new(&data_type));
+        key_types.push(data_type.clone());
         iceberg_fields.push(json!({
             "id": field_id,
             "name": key_field,
@@ -750,8 +783,10 @@ fn binding_state(
         schema: Arc::new(Schema::new(fields)),
         table_schema,
         last_column_id,
+        key_types,
         key_builders,
         key_bound_trackers,
+        last_key: None,
         value_builders,
         doc_builder: StringBuilder::new(),
         rows: 0,
