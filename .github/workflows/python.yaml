@@ -127,12 +127,33 @@ jobs:
       # job. It runs before the tests so it still reports when they fail. The
       # version must match `required-version` in ruff.toml.
       - name: ${{ matrix.connector.name }} lint
-        run: uvx ruff@0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
+        run: |
+          uvx ruff@0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
+          # GitHub renders only the first handful of annotations per step, and
+          # caps them per run as well, so with a matrix this wide the counts
+          # also go to the job summary, where none are dropped.
+          {
+            echo "### ruff: ${{ matrix.connector.name }}"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics ${{ matrix.connector.name }}
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: ${{ matrix.connector.name }} tests
         run: |
-          uv sync --package ${{ matrix.connector.name }} --all-extras --group dev
+          uv sync --package ${{ matrix.connector.name }} --all-extras --group dev --group lint
           uv run --no-sync pytest ${{ matrix.connector.name }}
+
+      # Report-only, like the lint step above. The connectors carry a large
+      # pre-existing backlog, so this surfaces findings as annotations and a
+      # per-rule tally in the job summary rather than gating on them. It runs
+      # after the tests because it needs the synced environment, and the
+      # changed-connector matrix keeps each job's findings to one connector.
+      - name: ${{ matrix.connector.name }} type-check
+        run: |
+          uv run --no-sync pyright --outputjson ${{ matrix.connector.name }} \
+            | python3 .github/scripts/pyright_annotations.py ${{ matrix.connector.name }}
 
       - name: Find Dockerfile for ${{ matrix.connector.name }}
         id: dockerfile
