@@ -12,10 +12,10 @@ import (
 )
 
 // streamV2Batch accumulates encoded rows into the payload of one Snowpipe
-// Streaming append call. The payload is kept a JSON array at every step, so a
-// batch is shipped by closing it rather than by re-reading its rows.
+// Streaming append call: NDJSON, one row per line.
 type streamV2Batch struct {
-	enc         *streamV2RowEncoder
+	// scratch holds one encoded row, and each row reuses it.
+	scratch     []byte
 	payload     []byte
 	rows        int
 	firstOffset int64
@@ -27,42 +27,12 @@ type streamV2Batch struct {
 // streamV2MinBatchCapacity is the size a payload starts with.
 const streamV2MinBatchCapacity = 8 * 1024
 
-func newStreamV2Batch(enc *streamV2RowEncoder) streamV2Batch {
-	return streamV2Batch{enc: enc}
-}
-
-// addRow encodes one document into the payload and reports how many bytes the
-// payload grew by.
-func (b *streamV2Batch) addRow(offset int64, converted []any) (int, error) {
-	var before = len(b.payload)
-	if b.rows == 0 {
-		b.start()
-		b.firstOffset = offset
-	} else {
-		b.payload = append(b.payload, ',')
-	}
-
-	var payload, err = b.enc.appendRow(b.payload, converted)
-	if err != nil {
-		if b.rows == 0 {
-			b.payload = nil
-		} else {
-			b.payload = b.payload[:before]
-		}
-		return 0, err
-	}
-
-	b.payload = payload
-	b.rows++
-	return len(b.payload) - before, nil
-}
-
 // start opens the payload of a new batch. The size is a little over the batch
 // before it, so a full batch does not grow and copy a dozen times on its way to
-// 8 MiB. The payload is always a new allocation, because the batch before it
+// the cap. The payload is always a new allocation, because the batch before it
 // gave its bytes away.
 func (b *streamV2Batch) start() {
-	b.payload = append(make([]byte, 0, max(b.hint+b.hint/8, streamV2MinBatchCapacity)), '[')
+	b.payload = make([]byte, 0, max(b.hint+b.hint/8, streamV2MinBatchCapacity))
 }
 
 func (b *streamV2Batch) empty() bool {
@@ -73,21 +43,18 @@ func (b *streamV2Batch) size() int {
 	return len(b.payload)
 }
 
-// finish closes the payload and gives up ownership of it. It reports the payload,
-// the number of rows it holds, and the buffered bytes it releases.
-func (b *streamV2Batch) finish() (payload []byte, rows, released int) {
-	released = len(b.payload)
-	payload = append(b.payload, ']')
-	rows = b.rows
+// finish gives up ownership of the payload and returns it.
+func (b *streamV2Batch) finish() []byte {
+	var payload = b.payload
 
 	b.hint = len(payload)
 	b.payload, b.rows, b.firstOffset = nil, 0, 0
-	return payload, rows, released
+	return payload
 }
 
-// streamV2RowEncoder encodes rows of column values as a JSON objects keyed by
-// column name. It holds the column names already serialized, because they are
-// the same for every row it encodes.
+// streamV2RowEncoder encodes rows of column values as newline-terminated JSON
+// objects keyed by column name. It holds the column names already serialized,
+// because they are the same for every row it encodes.
 type streamV2RowEncoder struct {
 	columns []columnName
 }
@@ -110,7 +77,7 @@ func newStreamV2RowEncoder(names []string) *streamV2RowEncoder {
 	return e
 }
 
-func (e *streamV2RowEncoder) appendRow(buf []byte, converted []any) ([]byte, error) {
+func (e *streamV2RowEncoder) encodeRow(buf []byte, converted []any) ([]byte, error) {
 	var start = len(buf)
 	buf = append(buf, '{')
 
@@ -132,7 +99,7 @@ func (e *streamV2RowEncoder) appendRow(buf []byte, converted []any) ([]byte, err
 		}
 	}
 
-	return append(buf, '}'), nil
+	return append(buf, '}', '\n'), nil
 }
 
 func (e *streamV2RowEncoder) appendValue(buf []byte, value any) ([]byte, error) {
