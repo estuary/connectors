@@ -160,3 +160,46 @@ func TestStreamV2PipePath(t *testing.T) {
 			"%s.%s.%s", tc.database, tc.schema, tc.table)
 	}
 }
+
+// TestStreamV2ClientChannelStatusCodes covers the channel_status_code that open
+// and bulk status report. Only a code with the ERR_ prefix fails the call.
+func TestStreamV2ClientChannelStatusCodes(t *testing.T) {
+	for _, tc := range []struct {
+		code    string
+		wantErr bool
+	}{
+		{"SUCCESS", false},
+		{"ACTIVE", false},
+		{"ERR_CHANNEL_HAS_INVALID_ROW_SEQUENCER", true},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			var status = fmt.Sprintf(`{"channel_status_code":%q,"last_committed_offset_token":"1","last_error_message":"msg"}`, tc.code)
+			var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == "PUT" {
+					fmt.Fprintf(w, `{"next_continuation_token":"c1","channel_status":%s}`, status)
+				} else {
+					fmt.Fprintf(w, `{"channel_statuses":{"CH":%s}}`, status)
+				}
+			})
+			var ctx = context.Background()
+
+			opened, err := c.OpenChannel(ctx, "DB", "SCH", "T", "CH")
+			if tc.wantErr {
+				require.ErrorContains(t, err, tc.code)
+				// Register the channel so bulk status can be exercised too.
+				c.channels["CH"] = &streamV2OpenChannel{pipePath: streamV2PipePath("DB", "SCH", "T")}
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.code, opened.StatusCode)
+			}
+
+			got, err := c.ChannelStatus(ctx, "CH")
+			if tc.wantErr {
+				require.ErrorContains(t, err, tc.code)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, "1", *got.CommittedToken)
+			}
+		})
+	}
+}
