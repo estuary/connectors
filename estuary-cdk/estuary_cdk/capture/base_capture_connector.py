@@ -259,6 +259,7 @@ class BaseCaptureConnector(
             # We don't do this within the TaskGroup because we don't
             # want to block on it.
             periodic_stop_task = asyncio.create_task(periodic_stop())
+            enforce_shutdown_task: asyncio.Task[None] | None = None
 
             try:
                 async with asyncio.TaskGroup() as tg:
@@ -302,7 +303,8 @@ class BaseCaptureConnector(
             # Cancel the background tasks if capture exited gracefully
             # before the shutdown timeout.
             _ = periodic_stop_task.cancel()
-            _ = enforce_shutdown_task.cancel()
+            if enforce_shutdown_task is not None:
+                _ = enforce_shutdown_task.cancel()
 
             # When capture() completes, the connector exits.
             if stopping.first_error:
