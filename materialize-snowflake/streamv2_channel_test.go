@@ -128,7 +128,8 @@ func TestStreamV2NoAppendAfterAFailedAppend(t *testing.T) {
 }
 
 // TestStreamV2RejectsAnOversizedAppend covers a document too large for one append
-// even after compression: the failure names the table and the API's limit.
+// even after compression. The failure names the table, the document's compressed
+// size and Snowflake's limit, and says that a restart cannot get past it.
 func TestStreamV2RejectsAnOversizedAppend(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
@@ -152,5 +153,7 @@ func TestStreamV2RejectsAnOversizedAppend(t *testing.T) {
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", string(val)}))
 	_, err := m.flush(ctx)
 	require.ErrorContains(t, err, "TBL")
-	require.ErrorContains(t, err, "over the API's limit")
+	require.Regexp(t, `an append of 1 document\(s\) totalling \d+ bytes compresses to \d+ bytes`, err.Error())
+	require.ErrorContains(t, err, "Snowflake's limit of 4194304 bytes (4 MiB) per compressed Snowpipe Streaming request")
+	require.ErrorContains(t, err, "the task will fail the same way on every restart")
 }
