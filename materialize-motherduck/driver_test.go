@@ -4,6 +4,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -239,13 +240,21 @@ func maintainSnapshots(t *testing.T, variant integrationVariant) {
 			}
 		})
 
-		var count int
-		require.NoError(t, db.QueryRowContext(ctx,
-			fmt.Sprintf("SELECT count(*) FROM ducklake_snapshots(%s)", database),
-		).Scan(&count))
-		require.LessOrEqualf(t, count, snapshotBacklogLimit,
-			"database %q holds %d snapshots, so expiry is not keeping up with test runs", cfg.Database, count)
+		backlog, err := snapshotBacklog(ctx, db, database)
+		require.NoError(t, err)
+		require.LessOrEqualf(t, backlog, snapshotBacklogLimit,
+			"database %q holds %d snapshots, so expiry is not keeping up with test runs", cfg.Database, backlog)
 	})
+}
+
+// snapshotBacklog returns the number of snapshots held by the DuckLake database
+// named by the SQL literal database.
+func snapshotBacklog(ctx context.Context, db *stdsql.DB, database string) (int, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		fmt.Sprintf("SELECT count(*) FROM ducklake_snapshots(%s)", database),
+	).Scan(&count)
+	return count, err
 }
 
 // expireSnapshots expires snapshots older than snapshotRetention from the
@@ -291,6 +300,34 @@ func expireSnapshots(ctx context.Context, db *stdsql.DB, database string) (int, 
 	}
 
 	return total, nil
+}
+
+func TestSnapshotBacklog(t *testing.T) {
+	var ctx = context.Background()
+	var dir = t.TempDir()
+
+	db, err := stdsql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer db.Close()
+
+	for _, stmt := range []string{
+		fmt.Sprintf("ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s')",
+			filepath.Join(dir, "lake.ducklake"), filepath.Join(dir, "data")),
+		"CREATE TABLE lake.t (id INTEGER)",
+		"INSERT INTO lake.t VALUES (1)",
+		"INSERT INTO lake.t VALUES (2)",
+		"INSERT INTO lake.t VALUES (3)",
+		fmt.Sprintf(`UPDATE __ducklake_metadata_lake.ducklake_snapshot
+			SET snapshot_time = now() - INTERVAL %s - INTERVAL 1 MINUTE
+			WHERE snapshot_id < 3`, snapshotRetention),
+	} {
+		_, err := db.ExecContext(ctx, stmt)
+		require.NoError(t, err)
+	}
+
+	backlog, err := snapshotBacklog(ctx, db, "'lake'")
+	require.NoError(t, err)
+	require.Equal(t, 3, backlog)
 }
 
 func runFenceSuite(t *testing.T, variant integrationVariant) {
