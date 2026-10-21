@@ -133,7 +133,7 @@ class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
     effectively start over from the beginning.
     """
 
-    bindingStateV1: dict[str, ResourceState] = {}
+    bindingStateV1: dict[str, ResourceState | None] = {}
 
 
 class Document(common.BaseDocument, extra="allow"):
@@ -385,17 +385,25 @@ class CaptureShim(BaseCaptureConnector):
             # checkpoints.
             connector_state.__setattr__("bindingStateV1", {})
 
+        def _state_for(binding: CaptureBinding[ResourceConfig], resource) -> ResourceState:
+            # Entries are nullable: common.open() writes None to request a
+            # backfill, so a present-but-None entry restarts from initial_state.
+            state = connector_state.bindingStateV1.setdefault(
+                binding.stateKey, resource.initial_state
+            )
+            if state is None:
+                state = resource.initial_state
+                connector_state.bindingStateV1[binding.stateKey] = state
+            return state
+
         # Index of Airbyte (namespace, stream) => ResourceState.
-        # Use `setdefault()` to initialize ResourceState if it's not already part of `connector_state`.
         index: dict[tuple[str | None, str], tuple[int, ResourceState]] = {
             (
                 binding.resourceConfig.namespace,
                 binding.resourceConfig.stream,
             ): (
                 index,
-                connector_state.bindingStateV1.setdefault(
-                    binding.stateKey, resource.initial_state
-                ),
+                _state_for(binding, resource),
             )
             for index, (binding, resource) in enumerate(resolved)
         }
