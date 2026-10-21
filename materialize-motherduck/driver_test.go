@@ -200,7 +200,7 @@ const (
 	// snapshotRetention is how old a DuckLake snapshot must be before it is
 	// expired, as a DuckDB interval. Every test run finishes well within it, so
 	// expiry never touches a snapshot a concurrent run still reads.
-	snapshotRetention = "1 DAY"
+	snapshotRetention = "1 HOUR"
 	// snapshotExpiryBatch is the most snapshots one expiry call removes, because
 	// MotherDuck fails calls that remove a few hundred at once.
 	snapshotExpiryBatch = 100
