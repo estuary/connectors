@@ -19,8 +19,10 @@ def test_capture(request, snapshot):
             "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
-            "--sessions",
-            "1",
+            # Run for a fixed window rather than one transaction: a single
+            # transaction can close before the slower streams emit.
+            "--timeout",
+            "60s",
             "--delay",
             "10s",
         ],
