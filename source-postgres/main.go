@@ -180,6 +180,10 @@ type advancedConfig struct {
 }
 
 var featureFlagDefaults = map[string]bool{
+	// Raise the per-field truncation threshold from 8 MiB to 32 MiB for captures
+	// with a single large column per row. The 64 MiB document limit still applies.
+	"extended_field_truncation_threshold": false,
+
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": true,
