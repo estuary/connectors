@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -154,6 +155,11 @@ func streamV2PathIdentifier(name string) string {
 }
 
 func newStreamV2Client(cfg *config, accountURL, account string) (*streamV2Client, error) {
+	// The OAuth scope is space-separated, so a role containing whitespace would
+	// split into separate scope entries.
+	if strings.ContainsFunc(cfg.Role, unicode.IsSpace) {
+		return nil, fmt.Errorf("role %q contains whitespace, which the space-separated Snowpipe Streaming token scope cannot carry", cfg.Role)
+	}
 	key, err := cfg.Credentials.ParsePrivateKey()
 	if err != nil {
 		return nil, err
