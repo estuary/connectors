@@ -20,6 +20,7 @@ from typing_extensions import override
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
+from .._background import spawn
 from ..cron import next_fire
 from ..logger import OBSERVABLE_FIELD
 from ..flow import (
@@ -771,7 +772,7 @@ def open(
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
             # re-initialization schedules.
-            asyncio.create_task(
+            _ = spawn(
                 scheduled_stop(task, soonest_future_scheduled_initialization)
             )
 
@@ -1280,7 +1281,7 @@ async def _binding_backfill_task(
             task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
             task.stopping.event.set()
         elif future_scheduled_initialization:
-            asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))
+            _ = spawn(scheduled_stop(task, future_scheduled_initialization))
 
 
 async def _binding_incremental_task(

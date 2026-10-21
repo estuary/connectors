@@ -1,4 +1,6 @@
 import asyncio
+
+from .._background import spawn
 from collections import defaultdict
 import typing
 
@@ -32,7 +34,7 @@ class ConnectorStatus:
         # Periodically log connector statuses.
         # We don't do this within a TaskGroup because we don't
         # want to block on it.
-        asyncio.create_task(periodic_log())
+        _ = spawn(periodic_log())
 
         self.log = log
         self.binding_count = 0
