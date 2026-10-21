@@ -1979,12 +1979,14 @@ source = { editable = "source-facebook-marketing-native" }
 dependencies = [
     { name = "estuary-cdk" },
     { name = "pydantic" },
+    { name = "python-dateutil" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "estuary-cdk", editable = "estuary-cdk" },
     { name = "pydantic", specifier = ">=2,<3" },
+    { name = "python-dateutil", specifier = ">=2.9,<3" },
 ]
 
 [[package]]
