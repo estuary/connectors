@@ -219,3 +219,37 @@ func TestStreamV2Scope(t *testing.T) {
 		require.Equal(t, tc.want, streamV2Scope(tc.role, "https://ingest.example.com"), "role %q", tc.role)
 	}
 }
+
+// TestStreamV2ClientNamesARefusedRole covers a token exchange refused because
+// the user does not hold the configured role. The response mirrors the shape
+// Snowflake returns.
+func TestStreamV2ClientNamesARefusedRole(t *testing.T) {
+	for _, tc := range []struct {
+		role    string
+		wantErr string
+	}{
+		{"estuary_role", `role "estuary_role" is not granted to user "U", or does not exist (unquoted role names are case-insensitive; quoted names must match exactly)`},
+		{"", "HTTP 401, 390186"},
+	} {
+		var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {})
+		var mux = http.NewServeMux()
+		var ts = httptest.NewServer(mux)
+		t.Cleanup(ts.Close)
+		mux.HandleFunc("GET /v2/streaming/hostname", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, ts.Listener.Addr().String()) })
+		mux.HandleFunc("POST /oauth/token", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"data":null,"code":"390186","message":"Role 'X' specified in the connect string is not granted to this user, or is not permitted for the credentials being used.","success":false,"headers":null}`)
+		})
+		c.accountURL = ts.URL
+		c.role = tc.role
+
+		_, _, err := c.bearer(context.Background())
+		require.ErrorContains(t, err, tc.wantErr, "role %q", tc.role)
+		var apiErr *streamV2APIError
+		require.ErrorAs(t, err, &apiErr)
+		if tc.role == "" {
+			require.NotContains(t, err.Error(), "is not granted to user")
+		}
+	}
+}
