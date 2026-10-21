@@ -37,7 +37,6 @@ from ..flow import (
     RotatingOAuth2Credentials,
     ValidationError,
 )
-from ..pydantic_polyfill import GenericModel
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .webhook.match import CollectionMatchingSpec, UrlMatch
@@ -290,7 +289,7 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 
 
-class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
+class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
     bindingStateV1: dict[str, _BaseResourceState | None] = {}

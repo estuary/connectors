@@ -157,26 +157,34 @@
       }
     },
     "resourceConfigSchema": {
-      "title": "ResourceConfig",
+      "additionalProperties": false,
       "description": "ResourceConfig encodes a configured resource stream",
-      "type": "object",
       "properties": {
         "_meta": {
-          "title": "Meta",
-          "type": "object"
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
         },
         "stream": {
-          "title": "Stream",
           "description": "Name of this stream",
+          "title": "Stream",
           "type": "string"
         },
         "syncMode": {
-          "title": "Sync Mode",
           "description": "Sync this resource incrementally, or fully refresh it every run",
           "enum": [
             "full_refresh",
             "incremental"
           ],
+          "title": "Sync Mode",
           "type": "string"
         },
         "namespace": {
@@ -196,7 +204,8 @@
         "stream",
         "syncMode"
       ],
-      "additionalProperties": false
+      "title": "ResourceConfig",
+      "type": "object"
     },
     "documentationUrl": "https://go.estuary.dev/kC5MzU",
     "resourcePathPointers": [

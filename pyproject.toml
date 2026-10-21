@@ -1,0 +1,113 @@
+# Virtual workspace root: not a package itself, just the set of members that
+# share one resolution and one uv.lock. Members are listed explicitly because
+# a `source-*` glob would also match the Go connectors, which have no
+# pyproject.toml.
+#
+# `requires-python` intersects across members, so the narrowest member sets the
+# floor for every member's resolution. Every member here declares `>=3.14`
+# except estuary-cdk, which is wider because it is also published to consumers
+# outside this repo; source-google-ads' `<3.15` supplies the only ceiling. The
+# lock therefore resolves for `==3.14.*`.
+#
+# The two Python packages that belong to Go connectors are deliberately not
+# members. materialize-snowflake/sidecar must run on the base image's 3.13 and
+# is its own uv project with its own lock; materialize-iceberg/python is
+# `go:embed`-ed and submitted to Spark images carrying 3.10 and 3.8, and keeps
+# the poetry.lock it has always had.
+[tool.uv.workspace]
+members = [
+    "estuary-cdk",
+    "source-ada",
+    "source-aircall-native",
+    "source-airtable",
+    "source-airtable-native",
+    "source-apple-app-store",
+    "source-appsflyer",
+    "source-asana",
+    "source-ashby",
+    "source-aws-cost-explorer",
+    "source-braintree-native",
+    "source-brevo",
+    "source-calendly",
+    "source-chargebee-native",
+    "source-commercetools",
+    "source-criteo",
+    "source-datadog",
+    "source-dynamics-365-finance-and-operations",
+    "source-estuary",
+    "source-facebook-marketing-native",
+    "source-front",
+    "source-gainsight-nxt",
+    "source-genesys",
+    "source-gladly",
+    "source-gong",
+    "source-google-ads",
+    "source-google-analytics-data-api-native",
+    "source-google-play",
+    "source-google-sheets-native",
+    "source-greenhouse-native",
+    "source-hubspot",
+    "source-hubspot-native",
+    "source-impact-native",
+    "source-incident-io",
+    "source-intercom-native",
+    "source-iterable",
+    "source-iterable-native",
+    "source-iterate",
+    "source-jira-legacy",
+    "source-jira-native",
+    "source-klaviyo",
+    "source-klaviyo-native",
+    "source-linear",
+    "source-linkedin-ads-v2",
+    "source-linkedin-pages",
+    "source-looker",
+    "source-mailchimp-native",
+    "source-mixpanel-native",
+    "source-monday",
+    "source-navan",
+    "source-notion",
+    "source-outreach",
+    "source-pendo",
+    "source-posthog",
+    "source-qualtrics",
+    "source-quickbooks",
+    "source-recharge",
+    "source-ringcentral",
+    "source-sage-intacct",
+    "source-salesforce-native",
+    "source-sentry",
+    "source-shopify-native",
+    "source-smartsheet",
+    "source-stripe-native",
+    "source-twilio",
+    "source-zendesk-support",
+    "source-zendesk-support-native",
+    "source-zoho",
+    "source-zuora",
+]
+
+# Test and tooling dependencies live here, once, rather than in 69 member
+# copies that drift apart. A workspace resolves to one version of each package
+# anyway, so a per-member declaration could only ever disagree with its
+# siblings, never actually get a different version.
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1,<10",
+    "pytest-asyncio>=1.4,<2",
+    "pytest-insta>=0.4.1,<0.5",
+    "pytest-mock>=3.15.1,<4",
+    "requests-mock>=1.11.0,<2",
+    "mock>=5.1.0,<6",
+    "freezegun>=1.4.0,<2",
+    "jsonschema>=4,<5",
+    "debugpy>=1.8.0,<2",
+    "boto3-stubs[ce]>=1.40,<2",
+    "types-python-dateutil>=2.9.0.20251008,<3",
+]
+# pyright needs to import the workspace's dependencies, so it runs from the
+# environment rather than via `uvx`. ruff does not, and stays a `uvx` call
+# pinned by ruff.toml's `required-version`.
+lint = [
+    "pyright==1.1.408",
+]

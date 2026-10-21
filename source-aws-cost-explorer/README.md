@@ -31,8 +31,8 @@ Flow decrypts the endpoint configuration and strips the `_sops` suffix. No crede
 ## Tests
 
 ```shell
-poetry install
-poetry run pytest
+uv sync --group dev
+uv run --group dev pytest
 ```
 
 Tests cover spec/discovery, explicit credentials, API error handling, pagination, decimal precision, grouping, UTC dates, and preservation of expired history. Discovery is static and the committed test suite makes no Cost Explorer calls. A real capture incurs AWS API charges.

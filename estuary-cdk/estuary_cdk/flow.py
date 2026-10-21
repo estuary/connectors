@@ -6,8 +6,6 @@ from typing import Any, ClassVar, Generic, Literal, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
 
-from .pydantic_polyfill import GenericModel
-
 # The type of this invoked connector.
 ConnectorType = Literal[
     "IMAGE",  # We're running with the context of a container image.
@@ -41,7 +39,7 @@ class CollectionSpec(BaseModel):
     readSchema: dict[str, Any] | None = None
 
 
-class CaptureBinding(GenericModel, Generic[ResourceConfig]):
+class CaptureBinding(BaseModel, Generic[ResourceConfig]):
     collection: CollectionSpec
     resourceConfig: ResourceConfig
     resourcePath: list[str]
@@ -49,7 +47,7 @@ class CaptureBinding(GenericModel, Generic[ResourceConfig]):
     backfill: NonNegativeInt = 0
 
 
-class CaptureSpec(GenericModel, Generic[EndpointConfig, ResourceConfig]):
+class CaptureSpec(BaseModel, Generic[EndpointConfig, ResourceConfig]):
     name: str
     connectorType: ConnectorType
     config: EndpointConfig
@@ -108,7 +106,7 @@ class ConnectorSpec(BaseModel):
     protocol: int = 0
 
 
-class ConnectorStateUpdate(GenericModel, Generic[ConnectorState]):
+class ConnectorStateUpdate(BaseModel, Generic[ConnectorState]):
     updated: ConnectorState
     mergePatch: bool
 

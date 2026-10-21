@@ -13,10 +13,7 @@ from aiohttp.web_urldispatcher import DynamicResource
 from pydantic import BaseModel
 from pydantic.fields import Field
 
-from estuary_cdk.pydantic_polyfill import VERSION as _PYDANTIC_VERSION
-
 _BODY_KEY_REGEX = r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$"
-_REGEX_FIELD_KWARG = "pattern" if _PYDANTIC_VERSION == "v2" else "regex"
 
 # ------------------------------------------------------------------------------
 # Match types: concrete match rules used for routing incoming webhooks
@@ -215,7 +212,7 @@ class HeaderMatch(_KeyValueMatch, frozen=True):
 
 class BodyMatch(_KeyValueMatch, frozen=True):
     type: Literal["body"] = "body"
-    key: str = Field(**{_REGEX_FIELD_KWARG: _BODY_KEY_REGEX})
+    key: str = Field(pattern=_BODY_KEY_REGEX)
 
     @override
     async def matches(

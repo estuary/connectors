@@ -10,10 +10,10 @@ Keep that page as the source of truth; this file covers development only.
 ## Development
 
 ```bash
-poetry install
-poetry run pytest                  # snapshot tests
-poetry run pytest --insta=update   # refresh snapshots
-poetry run mypy source_linear/
+uv sync --group dev
+uv run --group dev pytest                  # snapshot tests
+uv run --group dev pytest --insta=update   # refresh snapshots
+uv run --group lint pyright source_linear/
 ```
 
 `config.yaml` is sops-encrypted with the repo's GCP KMS key and holds a working key for the

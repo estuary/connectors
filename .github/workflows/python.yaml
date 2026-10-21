@@ -115,27 +115,24 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Python
-        uses: actions/setup-python@v5
+      # uv provisions the interpreter itself, so there is no separate
+      # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+          version: "0.13.3"
+          enable-cache: true
 
       # Report-only: findings show up as PR annotations without failing the
       # job. It runs before the tests so it still reports when they fail. The
       # version must match `required-version` in ruff.toml.
       - name: ${{ matrix.connector.name }} lint
-        run: pipx run ruff==0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
+        run: uvx ruff@0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
 
       - name: ${{ matrix.connector.name }} tests
         run: |
-          cd ${{ matrix.connector.name }}
-          poetry install
-          source $(poetry env info --path)/bin/activate
-          cd ..
-          pytest ${{ matrix.connector.name }}
+          uv sync --package ${{ matrix.connector.name }} --all-extras --group dev
+          uv run --no-sync pytest ${{ matrix.connector.name }}
 
       - name: Find Dockerfile for ${{ matrix.connector.name }}
         id: dockerfile

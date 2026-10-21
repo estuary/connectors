@@ -60,7 +60,7 @@ class AirbyteLogFormatter(logging.Formatter):
             message = super().format(record)
             message = filter_secrets(message)
             log_message = AirbyteMessage(type="LOG", log=AirbyteLogMessage(level=airbyte_level, message=message))
-            return log_message.json(exclude_unset=True)
+            return log_message.model_dump_json(exclude_unset=True)
 
     @staticmethod
     def extract_extra_args_from_record(record: logging.LogRecord):
@@ -77,7 +77,7 @@ class AirbyteLogger:
     def log(self, level, message):
         log_record = AirbyteLogMessage(level=level, message=message)
         log_message = AirbyteMessage(type="LOG", log=log_record)
-        print(log_message.json(exclude_unset=True))
+        print(log_message.model_dump_json(exclude_unset=True))
 
     def fatal(self, message):
         self.log("FATAL", message)

@@ -33,9 +33,6 @@ source-*/source-*
 .pytest_cache
 .venv/
 __pycache__
-# Currently-active pyproject, which is overwritten by ./python/activate.sh
-/poetry.lock
-/pyproject.toml
 
 # Python Distribution / packaging
 .Python
@@ -62,3 +59,14 @@ source-kafka/tests/test.generated.flow.yaml
 
 # Written by the materialization test harness when a snapshot mismatches.
 .snapshots/*.actual
+
+# The repo-root uv.lock covers every workspace member, so a lock in a member
+# directory is a stray from running uv there and would never be read. The two
+# locks that are real -- the root's and materialize-snowflake/sidecar's, which
+# is its own uv project -- are both outside this one-level pattern.
+/*/uv.lock
+
+# requests-cache backing files that a few connector test suites write into
+# the working directory.
+REQUEST_CACHE_PATH/
+file::memory:*

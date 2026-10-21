@@ -132,4 +132,4 @@ In addition to configuring the endpoint config, for imported connectors you will
 ## Debugging
 You can test the OAuth flow using `flowctl raw oauth`. Make sure that you have a local stack set up and running, as the intent is to emulate the production behavior as closely as possible. 
 
-> **Note**: Make sure your terminal is set up to run the connector in question. If your `flow.yaml` is configured to use local commands, you should be inside the proper poetry shell for example.
+> **Note**: Make sure your terminal is set up to run the connector in question. If your `flow.yaml` is configured to use local commands, run the connector through `uv run --package <connector> ...` so its environment is in place, for example.

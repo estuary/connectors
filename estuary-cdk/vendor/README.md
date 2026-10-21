@@ -14,7 +14,7 @@ and the connectors built on it are not bound to the ancient dependency pins that
 Both are MIT licensed, Copyright (c) 2020 Airbyte. The license text is in `LICENSE.txt`.
 
 `airbyte-protocol-models` was previously a transitive dependency of `airbyte-cdk`; it is folded
-in here because it is the source of the `pydantic<2` constraint, and because `airbyte_cdk.models`
+in here because it was the source of the `pydantic<2` constraint, and because `airbyte_cdk.models`
 is a thin re-export of it.
 
 ## Why vendored
@@ -45,9 +45,11 @@ roughly a fifth of the distributed package:
 | `Connector`, `AirbyteSpec`, `MultipleTokenAuthenticator`, `AlwaysLogSliceLogger`, `LogAppenderMessageRepositoryDecorator`, `ObservedDict`/`ConfigObserver`, `expand_refs`/`rename_key`, `log_by_prefix` | Individually unreferenced. |
 | `@deprecated` decorators | Warning-only; dropping them removes the `Deprecated` dependency. |
 
-`airbyte_protocol/models/airbyte_protocol.py` is left byte-identical to upstream. It is
-datamodel-codegen output, and keeping it pristine makes regenerating it for pydantic v2
-a mechanical step later.
+`airbyte_protocol/models/airbyte_protocol.py` was kept byte-identical to upstream through the
+vendoring, so that the fork could be shown equivalent before anything moved. The pydantic v2
+migration edited it, and it no longer matches upstream. It needed no regenerating: its v1
+surface was `class Config: extra = Extra.allow`, repeated on twenty-two models, one
+`min_items` (now `min_length`), and two `AnyUrl` fields (see below).
 
 ## Dependencies
 
@@ -60,23 +62,53 @@ The eight it drops are `airbyte-protocol-models` (vendored here), `cachetools`, 
 own dependency `bracex`.
 
 Six of those leave every connector lock file outright. `cachetools` and `python-dateutil`
-remain wherever `google-auth` or `pendulum` still require them. `Jinja2` leaves eleven of the
-fourteen; the three that keep it (`source-jira-legacy`, `source-linkedin-ads-v2`,
-`source-zendesk-support`) declare it directly as a CVE floor, and nothing in their graphs
-needs it any more, so those pins are now vestigial.
+remain wherever `google-auth` or `pendulum` still require them. `Jinja2` is gone from all
+fourteen: the three that declared it directly as a CVE floor (`source-jira-legacy`,
+`source-linkedin-ads-v2`, `source-zendesk-support`) had nothing left in their graphs that
+needed it, so those pins went with it.
 
-Version constraints in `estuary-cdk/pyproject.toml` are carried over verbatim from
-`airbyte-cdk` 0.52.10, so vendoring on its own does not change dependency resolution.
-Relaxing them is deliberately a separate step.
+### Constraints
+
+The versions in `estuary-cdk/pyproject.toml` are the fork's own. Vendoring landed with
+upstream's pins carried over verbatim; relaxing them was the point of the exercise:
+
+| | `airbyte-cdk` 0.52.10 | now | what had to change |
+| --- | --- | --- | --- |
+| `dpath` | `>=2.0.1,<2.1.0` | `^2.1` | 2.1 moved `dpath.util.*` to the package top level. The two call sites now use `dpath.get`/`dpath.new`; `dpath.options` is untouched. |
+| `jsonref` | `>=0.2,<1.0` | `^1.1` | Nothing. `JsonRef.replace_refs` keeps its signature in 1.x, and still returns the proxy type `resolve_ref_links` tests for. |
+| `jsonschema` | `>=3.2.0,<3.3.0` | `^4` | Nothing. `validate`, `validators.create` and `Draft7Validator.VALIDATORS`/`META_SCHEMA` are unchanged. |
+| `pydantic` | `>=1.10.8,<2.0.0` | `^2` | Twenty-two `class Config` blocks in `airbyte_protocol.py`, and fifteen call sites in `airbyte_cdk` (`parse_obj`, `.dict()`, `.json()`). See below. |
+
+The major bounds are deliberate: the fork is never re-synced upstream, so a breaking major
+has to be absorbed by editing `vendor/` by hand.
+
+The `jsonschema` bump also drops `setuptools` (see below) and `pyrsistent` from every lock,
+in exchange for `referencing` and `rpds-py`.
+
+One deprecated API remains: `sources/utils/transform.py` reaches for
+`validator_instance.resolver`, which jsonschema 4.18 deprecated in favour of `referencing`.
+It warns but works, and it is what the `<5` ceiling is actually holding back.
+
+### `pydantic` v2
+
+`ConnectorSpecification.documentationUrl` and `.changelogUrl` were `AnyUrl`, which is a `str`
+subclass under v1 but a parsing, normalising type under v2 — it appends a trailing slash to a
+bare host, so `https://docsurl.com` would become `https://docsurl.com/`. Both fields are only
+ever passed through to Flow's `ConnectorSpec.documentationUrl`, which is a plain `str`, so they
+are `Optional[str]` here and a connector's `spec.json` reaches the UI as written.
+
+`InternalConfig.limit` and `.page_size` were annotated `int` with a `None` default, which v1
+quietly accepted. They are `Optional[int]` now. Nothing in the subset calls that class's
+serializer, so its `dict()` override was renamed rather than reworked.
 
 ### `distutils`
 
 Upstream's `sources/utils/transform.py` does `from distutils.util import strtobool`. `distutils`
 was removed from the standard library in Python 3.12 and the images are built on
-`python:3.12-slim`, so this worked only because `jsonschema` 3.2.0 requires `setuptools`, which
+`python:3.14-slim`, so this worked only because `jsonschema` 3.2.0 requires `setuptools`, which
 installs a `distutils` shim. Since `streams/core.py` imports that module, losing the shim would
 have broken every shim connector at import time, not just boolean coercion — and relaxing the
-`jsonschema` ceiling would lose it. `strtobool` is now carried in the module itself.
+`jsonschema` ceiling would have lost it. `strtobool` is now carried in the module itself.
 
 ## Modifying this tree
 

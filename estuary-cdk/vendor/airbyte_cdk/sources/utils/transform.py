@@ -19,7 +19,7 @@ def strtobool(val: str) -> int:
     """`distutils.util.strtobool`, which left the standard library in Python 3.12.
 
     Reimplemented here rather than leaning on the `distutils` shim that `setuptools`
-    installs: the images are built on `python:3.12-slim`, and `streams/core.py` imports
+    installs: the images are built on `python:3.14-slim`, and `streams/core.py` imports
     this module, so losing the shim would break every shim connector at import time.
     """
     val = val.lower()

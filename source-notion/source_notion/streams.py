@@ -3,7 +3,7 @@
 #
 
 from abc import ABC
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, TypeVar
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional
 
 import pendulum
 import pydantic
@@ -144,14 +144,13 @@ class NotionStream(HttpStream, ABC):
         yield from data
 
 
-T = TypeVar("T")
-
-
 class StateValueWrapper(pydantic.BaseModel):
-
-    stream: T
+    # `stream` holds the stream object itself, which is not a pydantic type.
+    # Under pydantic v1 the field was annotated with a bare TypeVar, which
+    # accepted anything; `Any` says the same thing and v2 accepts it.
+    stream: Any
     state_value: str
-    max_cursor_time = ""
+    max_cursor_time: str = ""
 
     def __repr__(self):
         """Overrides print view"""
@@ -162,9 +161,15 @@ class StateValueWrapper(pydantic.BaseModel):
         """Return max cursor time after stream sync is finished."""
         return self.max_cursor_time if self.stream.is_finished else self.state_value
 
-    def dict(self, **kwargs):
-        """Overrides default logic to return current value only."""
-        return {pydantic.utils.ROOT_KEY: self.value}
+    @pydantic.model_serializer
+    def serialize(self) -> str:
+        """Serialize as the cursor value alone.
+
+        Under pydantic v1 this was a `dict()` returning `{__root__: value}`,
+        which the enclosing model unwrapped to the bare value. A model
+        serializer is the v2 spelling of the same thing.
+        """
+        return self.value
 
 
 class IncrementalNotionStream(NotionStream, ABC):

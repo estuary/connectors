@@ -8,7 +8,7 @@ from typing import Any, List, Mapping, MutableMapping, Optional, Tuple, Union
 from airbyte_cdk.models import AirbyteMessage, AirbyteStateBlob, AirbyteStateMessage, AirbyteStateType, AirbyteStreamState, StreamDescriptor
 from airbyte_cdk.models import Type as MessageType
 from airbyte_cdk.sources.streams import Stream
-from pydantic import Extra
+from pydantic import ConfigDict
 
 
 class HashableStreamDescriptor(StreamDescriptor):
@@ -17,9 +17,7 @@ class HashableStreamDescriptor(StreamDescriptor):
     freezes its fields so that it be used as a hash key. This is only marked public because we use it outside for unit tests.
     """
 
-    class Config:
-        extra = Extra.allow
-        frozen = True
+    model_config = ConfigDict(extra='allow', frozen=True)
 
 
 class ConnectorStateManager:
@@ -54,7 +52,7 @@ class ConnectorStateManager:
         """
         stream_state = self.per_stream_states.get(HashableStreamDescriptor(name=stream_name, namespace=namespace))
         if stream_state:
-            return stream_state.dict()  # type: ignore # mypy thinks dict() returns any, but it returns a dict
+            return stream_state.model_dump()  # type: ignore # mypy thinks model_dump() returns any, but it returns a dict
         return {}
 
     def update_state_for_stream(self, stream_name: str, namespace: Optional[str], value: Mapping[str, Any]) -> None:
@@ -65,7 +63,7 @@ class ConnectorStateManager:
         :param value: A stream state mapping that is being updated for a stream
         """
         stream_descriptor = HashableStreamDescriptor(name=stream_name, namespace=namespace)
-        self.per_stream_states[stream_descriptor] = AirbyteStateBlob.parse_obj(value)
+        self.per_stream_states[stream_descriptor] = AirbyteStateBlob.model_validate(value)
 
     def create_state_message(self, stream_name: str, namespace: Optional[str], send_per_stream_state: bool) -> AirbyteMessage:
         """
@@ -161,7 +159,7 @@ class ConnectorStateManager:
         for stream_name, state_value in state.items():
             namespace = stream_to_instance_map[stream_name].namespace if stream_name in stream_to_instance_map else None
             stream_descriptor = HashableStreamDescriptor(name=stream_name, namespace=namespace)
-            streams[stream_descriptor] = AirbyteStateBlob.parse_obj(state_value or {})
+            streams[stream_descriptor] = AirbyteStateBlob.model_validate(state_value or {})
         return streams
 
     def _get_legacy_state(self) -> Mapping[str, Any]:
@@ -169,7 +167,7 @@ class ConnectorStateManager:
         Using the current per-stream state, creates a mapping of all the stream states for the connector being synced
         :return: A deep copy of the mapping of stream name to stream state value
         """
-        return {descriptor.name: state.dict() if state else {} for descriptor, state in self.per_stream_states.items()}
+        return {descriptor.name: state.model_dump() if state else {} for descriptor, state in self.per_stream_states.items()}
 
     @staticmethod
     def _is_legacy_dict_state(state: Union[List[AirbyteStateMessage], MutableMapping[str, Any]]) -> bool:
