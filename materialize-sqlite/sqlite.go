@@ -350,11 +350,7 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 		}
 		if b.store.truncateSQL == "" {
 			var _, reason = b.target.PublishedAtColumn()
-			log.WithFields(log.Fields{
-				"eventType": "connectorStatus",
-				"table":     b.target.Identifier,
-				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
 			continue
 		}
 		t.truncations[binding] = boundary
