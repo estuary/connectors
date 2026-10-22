@@ -254,9 +254,9 @@ jobs:
 
       - name: Install dependencies and run tests
         run: |
-          # --all-extras: tests/test_airbyte_cdk.py imports the shim, which needs
-          # the `airbyte-shim` extra's dependencies for the vendored Airbyte CDK.
-          uv sync --locked --package estuary_cdk --all-extras --group dev --group lint
+          # tests/test_airbyte_cdk.py imports the shim, which the `airbyte-shim`
+          # group supplies; see estuary-cdk/pyproject.toml.
+          uv sync --locked --package estuary_cdk --group airbyte-shim --group dev --group lint
           cd estuary-cdk
           uv run --no-sync python -m compileall -q estuary_cdk vendor
           uv run --no-sync pytest
@@ -305,7 +305,8 @@ jobs:
           # install can take a different patch than uv.lock pins. That is
           # inherent in testing outside the lock, and better than a second copy
           # of the list.
-          uv pip install -e "estuary-cdk[airbyte-shim]" --group pyproject.toml:dev
+          uv pip install -e estuary-cdk \
+            --group estuary-cdk/pyproject.toml:airbyte-shim --group pyproject.toml:dev
           cd estuary-cdk
           "$VIRTUAL_ENV/bin/python" -m compileall -q estuary_cdk vendor
           "$VIRTUAL_ENV/bin/python" -m pytest

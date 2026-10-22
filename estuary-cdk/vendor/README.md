@@ -113,6 +113,10 @@ have broken every shim connector at import time, not just boolean coercion — a
 ## Modifying this tree
 
 This is a fork, not a mirror: edit it in place. It is not re-synced from upstream, and no new
-Airbyte CDK surface should be added to it — the connectors listed in `estuary-cdk/pyproject.toml`'s
-`airbyte-shim` extra are its only consumers, and the long-term direction is to replace each of them
-with a native `estuary_cdk` connector.
+Airbyte CDK surface should be added to it. The direction is to replace every consumer with a
+native `estuary_cdk` connector and delete this tree. What is left, which
+`grep -l estuary-cdk-airbyte-shim source-*/pyproject.toml` answers directly:
+
+source-airtable, source-asana, source-google-ads, source-hubspot, source-iterable,
+source-jira-legacy, source-klaviyo, source-linkedin-ads-v2, source-linkedin-pages,
+source-mixpanel-native, source-notion, source-recharge, source-twilio, source-zendesk-support
