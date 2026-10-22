@@ -2,12 +2,13 @@
 #
 # Work out which connector CI lanes a set of changed paths affects.
 #
-# Reads changed paths on stdin, one per line, and writes three lines to stdout:
+# Reads changed paths on stdin, one per line, and writes four lines to stdout:
 #
 #   python=true|false        a path in the Python lane changed; it can be true
 #                            while python_connectors is [], for a Python
 #                            directory missing from the connector list
 #   go_rust=true|false       the Go & Rust connector workflow must run
+#   cdk=true|false           estuary-cdk's own tests and checks must run
 #   python_connectors=...    the Python connectors to build: `all` when a path
 #                            shared by every one of them changed, otherwise a
 #                            compact JSON list of connector directories
@@ -19,6 +20,7 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 
 python=false
 go_rust=false
+cdk=false
 
 # Set when a changed path feeds every Python connector. Otherwise only the
 # connector directories collected in $python_dirs are affected.
@@ -53,9 +55,9 @@ while IFS= read -r path || [ -n "$path" ]; do
         .github/workflows/ci.yaml) lane="go_rust" ;;
         .github/workflows/estuary-cdk.yaml) lane="none" ;;
         .github/workflows/python-auto-rerun.yaml) lane="none" ;;
-        # The shared ruff config only feeds report-only lint steps, so it
-        # builds nothing. estuary-cdk.yaml lints the CDK when it changes.
-        ruff.toml) lane="none" ;;
+        # The shared ruff config builds no connector, since connector lint only
+        # reports, but estuary-cdk's lint gates on it.
+        ruff.toml) lane="none"; cdk=true ;;
 
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;
@@ -123,8 +125,16 @@ while IFS= read -r path || [ -n "$path" ]; do
     echo "  ${lane}: ${path}" >&2
 done <<< "$input"
 
+# A change that rebuilds every Python connector also runs estuary-cdk's checks.
+# That covers the CDK itself, the workspace manifest and lock, and python.yaml,
+# and the few other paths it sweeps in cost little next to the full rebuild.
+if [ "$python_all" = true ]; then
+    cdk=true
+fi
+
 echo "python=${python}"
 echo "go_rust=${go_rust}"
+echo "cdk=${cdk}"
 if [ "$python_all" = true ]; then
     echo "python_connectors=all"
 else

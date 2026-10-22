@@ -37,6 +37,7 @@ jobs:
     outputs:
       run: ${{ steps.matrix.outputs.run }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      cdk: ${{ steps.classify.outputs.cdk }}
     steps:
       - uses: actions/checkout@v4
 

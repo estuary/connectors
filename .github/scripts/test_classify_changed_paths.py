@@ -34,6 +34,18 @@ def classify(*paths: str, terminate: bool = True) -> tuple[bool, bool, str | lis
     )
 
 
+def cdk(*paths: str) -> bool:
+    """Run the classifier, returning whether estuary-cdk's checks must run."""
+    stdin = "\n".join(paths) + "\n"
+    proc = subprocess.run(
+        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True
+    )
+    verdict = dict(
+        line.split("=", 1) for line in proc.stdout.strip().splitlines() if "=" in line
+    )
+    return verdict["cdk"] == "true"
+
+
 class TestLanes(unittest.TestCase):
     def test_python_connector_is_python_only(self):
         self.assertEqual(
@@ -197,6 +209,38 @@ class TestPythonConnectors(unittest.TestCase):
 
     def test_connector_docs_build_none(self):
         self.assertEqual(classify("source-sentry/CHANGELOG.md")[2], [])
+
+
+class TestCdk(unittest.TestCase):
+    def test_cdk_runs_its_checks(self):
+        self.assertTrue(cdk("estuary-cdk/estuary_cdk/http.py"))
+
+    def test_workspace_manifests_run_cdk_checks(self):
+        # The CDK resolves from the same root manifest and lock.
+        self.assertTrue(cdk("uv.lock"))
+        self.assertTrue(cdk("pyproject.toml"))
+
+    def test_ruff_config_runs_cdk_checks(self):
+        # It builds no connector, but estuary-cdk's lint gates on it.
+        self.assertTrue(cdk("ruff.toml"))
+
+    def test_python_workflow_runs_cdk_checks(self):
+        self.assertTrue(cdk(".github/workflows/python.yaml"))
+
+    def test_shared_plumbing_runs_cdk_checks(self):
+        self.assertTrue(cdk(".github/actions/classify-changes/action.yaml"))
+
+    def test_one_connector_skips_cdk_checks(self):
+        self.assertFalse(cdk("source-sentry/source_sentry/api.py"))
+
+    def test_go_connector_skips_cdk_checks(self):
+        self.assertFalse(cdk("source-postgres/main.go"))
+
+    def test_docs_skip_cdk_checks(self):
+        self.assertFalse(cdk("docs/contexts/captures.md"))
+
+    def test_empty_input_skips_cdk_checks(self):
+        self.assertFalse(cdk())
 
 
 class TestRobustness(unittest.TestCase):
