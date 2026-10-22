@@ -20,6 +20,8 @@ You dispatch nothing. A cluster that deserves more parallel sessions becomes a `
 
 ## The review gate (`GATE-PLAN-REVIEW`)
 
+Every turn ends per `CONDUCT-END-TURN-WITH-ASK` ([`session-conduct.md`](../shared/session-conduct.md)).
+
 - **Human-in-the-loop**: before finalizing, render the full draft plan and verification evidence in your reply (stream table, classification, design, cursor and pagination contracts, live findings, risks, open decisions), then ask via `AskUserQuestion` so the row shows "Needs input". The user approves what they can read inline, never a file path. Incorporate their feedback, then finalize.
 - **Autonomous**: no `AskUserQuestion` at all; a blocked session would wait forever. Grade the draft yourself against `.claude/shared/rules-index.md`, every `FETCH-*` and `DOC-*` row checkable from the plan; fix what fails; add `## Decisions made without review` to each plan, one line per `GATE-*` you resolved (what, why, the alternative rejected). The orchestrator's reviewer reads that section, so state judgment calls plainly.
 
