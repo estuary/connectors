@@ -19,6 +19,9 @@ outputs:
       The Python connectors to build: `all`, or a JSON list of connector
       directories.
     value: ${{ steps.classify.outputs.python_connectors }}
+  cdk:
+    description: Whether estuary-cdk's own tests and checks need to run.
+    value: ${{ steps.classify.outputs.cdk }}
 
 runs:
   using: "composite"
@@ -35,7 +38,7 @@ runs:
         # Every failure path below runs both lanes.
         fallback() {
           echo "$1; running both lanes to be safe"
-          printf 'python=true\ngo_rust=true\npython_connectors=all\n' >> "$GITHUB_OUTPUT"
+          printf 'python=true\ngo_rust=true\npython_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
           exit 0
         }
 
@@ -44,7 +47,7 @@ runs:
         case "${{ github.event_name }}" in
           schedule | workflow_dispatch)
             echo "${{ github.event_name }} run; running both lanes"
-            printf 'python=true\ngo_rust=true\npython_connectors=all\n' >> "$GITHUB_OUTPUT"
+            printf 'python=true\ngo_rust=true\npython_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
             exit 0
             ;;
         esac
@@ -100,6 +103,7 @@ runs:
         CONNECTORS=$(sed -n 's/^python_connectors=//p' <<< "$VERDICT")
         if ! grep -Eq '^python=(true|false)$' <<< "$VERDICT" ||
            ! grep -Eq '^go_rust=(true|false)$' <<< "$VERDICT" ||
+           ! grep -Eq '^cdk=(true|false)$' <<< "$VERDICT" ||
            ! { [ "$CONNECTORS" = all ] || jq -e 'type == "array"' <<< "$CONNECTORS" > /dev/null 2>&1; }; then
           fallback "classifier gave '${VERDICT}'"
         fi
