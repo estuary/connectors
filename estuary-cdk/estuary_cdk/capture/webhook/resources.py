@@ -31,7 +31,7 @@ class WebhookDocument(BaseDocument):
         pathParams: dict[str, str] | None = None
         queryParams: dict[str, str] | None = None
 
-    meta_: Meta = Field(
+    meta_: Meta = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
         default_factory=lambda: WebhookDocument.Meta(op="u", headers={}, reqPath=""),
         alias="_meta",
         description="Document metadata",
@@ -117,7 +117,7 @@ class WebhookCaptureSpec(BaseModel, Generic[_WebhookDocument]):
     ) -> list[WebhookResource[_WebhookDocument, WebhookResourceConfig]]:
         if self.discriminator == CATCH_ALL_DISCRIMINATOR:
             return [
-                WebhookResource(
+                WebhookResource[_WebhookDocument, WebhookResourceConfig](
                     name=self.name,
                     key=self.key,
                     model=self.document_model,
@@ -131,7 +131,7 @@ class WebhookCaptureSpec(BaseModel, Generic[_WebhookDocument]):
             ]
 
         return [
-            WebhookResource(
+            WebhookResource[_WebhookDocument, WebhookResourceConfig](
                 name=f"{self.name}_{rule.display_name}",
                 model=self.document_model,
                 open=open_webhook_binding,  # pyright: ignore[reportArgumentType]

@@ -154,7 +154,7 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     return normalize(root)
 
 
-def orjson_default(obj):
+def orjson_default(obj: Any) -> Any:
     # Pydantic automatically serializes Decimals as strings, but orjson doesn't
     # know about that. In order to handle this, we must provide this as
     # the default= kwarg to orjson.dumps
@@ -300,8 +300,14 @@ class _BaseTask:
         self._buffer.seek(0)
         self._hasher.reset()
 
+    # ConnectorState parameterises the pydantic generic below, so it is
+    # load-bearing at runtime even though it appears once here: substituting
+    # its bound drops the state's fields from the serialised checkpoint
+    # (tests/test_snapshot_subtasks.py covers it).
     async def _emit_checkpoint(
-        self, state: ConnectorState, merge_patch: bool = True
+        self,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+        merge_patch: bool = True,
     ) -> asyncio.Future[None] | None:
         checkpoint = Response[Any, Any, ConnectorState](
             checkpoint=response.Checkpoint(
@@ -352,7 +358,11 @@ class Task(_BaseTask):
         """Discard any captured documents, resetting to an empty state."""
         self._reset()
 
-    async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
+    async def checkpoint(
+        self,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+        merge_patch: bool = True,
+    ):
         """Emit previously-queued, captured documents followed by a checkpoint.
 
         When this Task's `requires_ack` is True, the call blocks on Flow's
@@ -463,7 +473,7 @@ class MultipleWritersTask(_BaseTask):
     async def emit(
         self,
         items: Iterable[AssociatedDocument],
-        state: ConnectorState,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
     ) -> None:
         """Capture each item against its binding and write one checkpoint.
 

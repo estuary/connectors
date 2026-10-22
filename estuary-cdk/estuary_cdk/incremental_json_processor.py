@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Callable, Generic, List, Optional, TypeVar
 
 import ijson

@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
-from typing import TypeVar, Callable, AsyncGenerator, Generic
+from typing import Any, TypeVar, Callable, AsyncGenerator, Generic
 import abc
+from types import FrameType
 import asyncio
 import signal
 import sys
@@ -33,8 +34,11 @@ async def stdin_jsonl(cls: type[Request]) -> AsyncGenerator[Request, None]:
 # they're entered prior to handling any requests, and exited after all requests have
 # been fully processed.
 class Mixin(abc.ABC):
-    async def _mixin_enter(self, log: Logger): ...
-    async def _mixin_exit(self, log: Logger): ...
+    # Parameters are positional-only so overrides may name them freely, and the
+    # return is Any because serve() discards it while implementations commonly
+    # return self.
+    async def _mixin_enter(self, log: Logger, /) -> Any: ...
+    async def _mixin_exit(self, log: Logger, /) -> Any: ...
 
 
 @dataclass
@@ -58,9 +62,11 @@ class BaseConnector(Generic[Request], abc.ABC):
     #
     # Python classes are type-erased, so it's not possible to determine the
     # concrete class at runtime using only type annotations.
-    @classmethod
-    @abc.abstractclassmethod
-    def request_class(cls) -> type[Request]:
+    # It is an instance method, not a classmethod, because connectors
+    # idiomatically override it as `def request_class(self)`; serve() calls it
+    # through the instance, so either form works at runtime.
+    @abc.abstractmethod
+    def request_class(self) -> type[Request]:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -89,7 +95,7 @@ class BaseConnector(Generic[Request], abc.ABC):
         this_task = asyncio.current_task(loop)
         original_sigquit = signal.getsignal(signal.SIGQUIT)
 
-        def dump_all_tasks(signum, frame):
+        def dump_all_tasks(signum: int, frame: FrameType | None):
             task_infos = get_running_tasks_info(exclude_tasks={this_task} if this_task else None)
 
             for info in task_infos:

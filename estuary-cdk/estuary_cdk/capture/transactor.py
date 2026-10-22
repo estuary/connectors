@@ -1,6 +1,6 @@
 import asyncio
 from collections import deque
-from typing import BinaryIO
+from typing import IO, BinaryIO
 
 from ._emit import emit_from_buffer
 
@@ -26,7 +26,7 @@ class Transactor:
 
     async def commit(
         self,
-        buffer: BinaryIO,
+        buffer: IO[bytes],
         wait_for_ack: bool = False,
     ) -> asyncio.Future[None] | None:
         """Emit `buffer` (already containing captured + checkpoint bytes) to

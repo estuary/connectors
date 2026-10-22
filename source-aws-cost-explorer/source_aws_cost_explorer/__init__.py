@@ -25,11 +25,9 @@ from .resources import all_resources, validate_credentials, validate_intervals
 class Connector(
     BaseCaptureConnector[EndpointConfig, CostResourceConfig, ConnectorState],
 ):
-    @classmethod
     @override
-    # CDK uses deprecated abstractclassmethod; same diagnostic in source-front.
-    def request_class(  # pyright: ignore[reportIncompatibleVariableOverride]
-        cls,
+    def request_class(
+        self,
     ) -> type[Request[EndpointConfig, CostResourceConfig, ConnectorState]]:
         return Request[EndpointConfig, CostResourceConfig, ConnectorState]
 

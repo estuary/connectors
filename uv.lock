@@ -583,7 +583,7 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.11.6,<4.0.0" },
     { name = "pendulum", marker = "extra == 'airbyte-shim'", specifier = ">=3,<4" },
     { name = "pycron", specifier = ">=3.1.2,<4.0.0" },
-    { name = "pydantic", specifier = ">=2,<3" },
+    { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pyyaml", marker = "extra == 'airbyte-shim'", specifier = ">=6.0.1" },
     { name = "requests", marker = "extra == 'airbyte-shim'" },
     { name = "requests-cache", marker = "extra == 'airbyte-shim'" },

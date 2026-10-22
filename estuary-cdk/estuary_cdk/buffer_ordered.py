@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Awaitable, Generic, TypeVar
+from typing import AsyncGenerator, Awaitable, Generic, TypeVar
 
 T = TypeVar("T")
 
