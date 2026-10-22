@@ -484,8 +484,7 @@ func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats)
 
 // Warn sets the connector status to a condition that needs the user's
 // attention, such as rows a backfill did not delete. Warnings are kept in the
-// status, replacing progress, until the connector stops. Repeated warnings with
-// the same key, such as a table name, are reported once. Active regardless of
+// status, replacing progress, until the connector stops. Active regardless of
 // extended logging.
 func (l *BindingEvents) Warn(key, msg string) {
 	if l != nil && l.status != nil {
