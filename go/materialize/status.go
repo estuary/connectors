@@ -47,62 +47,77 @@ type statusKey struct {
 	round int
 }
 
-// statusCounts counts the documents of a stage and the collections they are
-// from.
+// statusCounts counts the documents of a stage and the distinct collections
+// they are from.
 type statusCounts struct {
 	docs        int
-	seen        []bool
+	seen        []bool // Indexed by collection.
 	collections int
 }
 
-type statusCompletion struct {
+func (c *statusCounts) reset(numCollections int) {
+	*c = statusCounts{seen: make([]bool, numCollections)}
+}
+
+func (c *statusCounts) add(collection int) {
+	c.docs++
+	if collection >= 0 && !c.seen[collection] {
+		c.seen[collection] = true
+		c.collections++
+	}
+}
+
+type statusCommit struct {
 	at   time.Time
 	docs int
 }
 
 // statusTracker keeps the connector status current with the transaction stage
-// the materialization is in. Two stages can be in progress at once: the commit
-// of a round overlaps the reading of the next one, and the commit is reported
-// while it runs. Warnings from BindingEvents.Warn replace progress statuses
-// for the rest of the session.
+// the materialization is in, and reports warnings from BindingEvents.Warn in
+// place of progress for the rest of the session.
+//
+// It is safe for concurrent use. RunTransactions' load and acknowledge
+// goroutines report events, the transactor reports warnings, and a ticker
+// goroutine decides what to report. One mutex guards all state, and is held
+// while a status is logged, so statuses are logged in the order they're
+// decided and a progress status never follows a warning.
 type statusTracker struct {
+	mu   sync.Mutex
 	now  func() time.Time
 	emit func(lvl log.Level, msg string)
-	// Serializes emits, so a progress status rendered before a warning is
-	// never emitted after it.
-	emitMu sync.Mutex
 
-	mu sync.Mutex
-	// Only one shard reports progress, since all shards' statuses overwrite
-	// the same one.
-	progress     bool
-	collectionOf []int
-	nCollections int
+	// Fixed at Open. Only one shard reports progress, since every shard's
+	// status overwrites the same one; other shards report only warnings.
+	reportsProgress   bool
+	bindingCollection []int // Collection index of each binding.
+	numCollections    int
 
-	round        int
-	recovery     bool
-	stagingDone  bool
-	backlog      bool
-	load         statusKey
-	commit       statusKey
-	loads        statusCounts
-	stores       statusCounts
-	committing   statusCounts
-	waitingSince time.Time
-	syncAt       time.Time
-	syncEvery    time.Duration
-	completions  []statusCompletion
+	// Transaction progress. A round's commit overlaps the reading of the next
+	// round, so two stages can be in progress at once, and the commit stage
+	// is reported while it runs.
+	round          int
+	inRecovery     bool
+	commitStage    statusKey // Starting, recovery, committing or sync wait.
+	readStage      statusKey // Waiting for data, reading, loading or staging.
+	loadCounts     statusCounts
+	storeCounts    statusCounts
+	commitCounts   statusCounts
+	storesComplete bool // All of the staging round's Store requests are read.
+	backlog        bool
+	waitingSince   time.Time
+	syncAt         time.Time
+	syncEvery      time.Duration
+	recentCommits  []statusCommit // Within statusRollupWindow.
 
-	shown      statusKey
-	shownSince time.Time
-	emitted    statusKey
-	lastMsg    string
-	lastEmit   time.Time
+	// The stage that would be reported now, and what was last reported.
+	current      statusKey
+	currentSince time.Time
+	reported     statusKey
+	reportedMsg  string
+	reportedAt   time.Time
 
 	warningKeys map[string]struct{}
 	warnings    []string
-
-	stop func(func())
 }
 
 func newStatusTracker(open *pm.Request_Open) *statusTracker {
@@ -111,9 +126,12 @@ func newStatusTracker(open *pm.Request_Open) *statusTracker {
 		emit: func(lvl log.Level, msg string) {
 			log.WithField("eventType", "connectorStatus").Log(lvl, msg)
 		},
-		progress:    open.Range == nil || (open.Range.KeyBegin == 0 && open.Range.RClockBegin == 0),
-		recovery:    true,
-		warningKeys: make(map[string]struct{}),
+		reportsProgress: open.Range == nil || (open.Range.KeyBegin == 0 && open.Range.RClockBegin == 0),
+		inRecovery:      true,
+		commitStage:     statusKey{stage: stageStarting},
+		readStage:       statusKey{stage: stageIdle},
+		reported:        statusKey{stage: stageIdle, round: -1},
+		warningKeys:     make(map[string]struct{}),
 	}
 	if open.Materialization != nil {
 		index := make(map[string]int)
@@ -122,15 +140,11 @@ func newStatusTracker(open *pm.Request_Open) *statusTracker {
 			if _, ok := index[name]; !ok {
 				index[name] = len(index)
 			}
-			t.collectionOf = append(t.collectionOf, index[name])
+			t.bindingCollection = append(t.bindingCollection, index[name])
 		}
-		t.nCollections = len(index)
+		t.numCollections = len(index)
 	}
-	t.commit = statusKey{stage: stageStarting}
-	t.load = statusKey{stage: stageIdle}
-	t.shown = t.commit
-	t.shownSince = t.now()
-	t.emitted = statusKey{stage: stageIdle, round: -1}
+	t.current, t.currentSince = t.commitStage, t.now()
 	return t
 }
 
@@ -142,21 +156,6 @@ func (t *statusTracker) start() (stop func()) {
 	return func() { stopRepeat(func() {}) }
 }
 
-func (c *statusCounts) reset(n int) {
-	*c = statusCounts{seen: make([]bool, n)}
-}
-
-func (t *statusTracker) count(c *statusCounts, binding int) {
-	c.docs++
-	if binding < 0 || binding >= len(t.collectionOf) {
-		return
-	}
-	if col := t.collectionOf[binding]; !c.seen[col] {
-		c.seen[col] = true
-		c.collections++
-	}
-}
-
 // event updates the stages for a transactions event. `binding` is the binding
 // of a Load or Store request.
 func (t *statusTracker) event(ev transactionsEvent, binding int) {
@@ -165,50 +164,50 @@ func (t *statusTracker) event(ev transactionsEvent, binding int) {
 
 	switch ev {
 	case readLoad:
-		if t.load.stage != stageReading {
-			t.load = statusKey{stageReading, t.round}
-			t.loads.reset(t.nCollections)
+		if t.readStage.stage != stageReading {
+			t.readStage = statusKey{stageReading, t.round}
+			t.loadCounts.reset(t.numCollections)
 		}
-		t.count(&t.loads, binding)
+		t.loadCounts.add(t.collectionOf(binding))
 	case readFlush:
-		if t.load.stage == stageReading {
-			t.load = statusKey{stageLoading, t.round}
+		if t.readStage.stage == stageReading {
+			t.readStage = statusKey{stageLoading, t.round}
 		} else {
-			t.load = statusKey{stageStaging, t.round}
-			t.stores.reset(t.nCollections)
+			t.readStage = statusKey{stageStaging, t.round}
+			t.storeCounts.reset(t.numCollections)
 		}
 	case sentFlushed:
-		if t.load.stage != stageStaging {
-			t.load = statusKey{stageStaging, t.round}
-			t.stores.reset(t.nCollections)
+		if t.readStage.stage != stageStaging {
+			t.readStage = statusKey{stageStaging, t.round}
+			t.storeCounts.reset(t.numCollections)
 		}
 	case readStore:
-		t.count(&t.stores, binding)
+		t.storeCounts.add(t.collectionOf(binding))
 	case readStartCommit:
-		t.stagingDone = true
+		t.storesComplete = true
 	case sentStartedCommit:
-		t.committing = t.stores
-		t.commit = statusKey{stageCommitting, t.round}
-		t.load = statusKey{stageIdle, t.round + 1}
-		t.stagingDone = false
+		t.commitCounts = t.storeCounts
+		t.commitStage = statusKey{stageCommitting, t.round}
+		t.readStage = statusKey{stageIdle, t.round + 1}
+		t.storesComplete = false
 		t.round++
 	case readAcknowledge:
-		if t.recovery {
-			t.commit = statusKey{stage: stageRecovery}
+		if t.inRecovery {
+			t.commitStage = statusKey{stage: stageRecovery}
 		}
 	case sentAcknowledged:
-		// Completions are trimmed only while progress is reported.
-		if !t.recovery && t.progress && len(t.warnings) == 0 {
-			t.completions = append(t.completions, statusCompletion{at: t.now(), docs: t.committing.docs})
+		// Commits are trimmed only while progress is reported.
+		if !t.inRecovery && t.reportsProgress && len(t.warnings) == 0 {
+			t.recentCommits = append(t.recentCommits, statusCommit{at: t.now(), docs: t.commitCounts.docs})
 		}
-		t.recovery = false
-		t.commit = statusKey{stage: stageIdle}
-		if t.load.stage == stageIdle {
-			t.load = statusKey{stageWaitingForData, t.round}
+		t.inRecovery = false
+		t.commitStage = statusKey{stage: stageIdle}
+		if t.readStage.stage == stageIdle {
+			t.readStage = statusKey{stageWaitingForData, t.round}
 			t.waitingSince = t.now()
 		}
 	}
-	t.updateShown()
+	t.updateCurrent()
 }
 
 // syncWait reports the wait for the next scheduled sync. `every` is zero when
@@ -216,9 +215,9 @@ func (t *statusTracker) event(ev transactionsEvent, binding int) {
 func (t *statusTracker) syncWait(at time.Time, every time.Duration) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.commit = statusKey{stageSyncWait, t.round - 1}
+	t.commitStage = statusKey{stageSyncWait, t.round - 1}
 	t.syncAt, t.syncEvery = at, every
-	t.updateShown()
+	t.updateCurrent()
 }
 
 // setBacklog sets whether recent transactions were large enough to skip the
@@ -229,99 +228,96 @@ func (t *statusTracker) setBacklog(backlog bool) {
 	t.mu.Unlock()
 }
 
-func (t *statusTracker) updateShown() {
-	shown := t.commit
-	if shown.stage == stageIdle {
-		shown = t.load
-	}
-	if shown != t.shown {
-		t.shown = shown
-		t.shownSince = t.now()
-	}
-}
-
 // warn adds a warning to the status, which then reports every warning instead
 // of progress. Warnings are deduplicated by key.
 func (t *statusTracker) warn(key, msg string) {
-	t.emitMu.Lock()
-	defer t.emitMu.Unlock()
-
 	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if _, ok := t.warningKeys[key]; ok {
-		t.mu.Unlock()
 		return
 	}
 	t.warningKeys[key] = struct{}{}
 	t.warnings = append(t.warnings, msg)
-	t.completions = nil
-	msg = strings.Join(t.warnings, " ")
-	t.lastMsg, t.lastEmit = msg, t.now()
-	t.mu.Unlock()
-
-	t.emit(log.WarnLevel, msg)
+	t.recentCommits = nil
+	t.reportedMsg, t.reportedAt = strings.Join(t.warnings, " "), t.now()
+	t.emit(log.WarnLevel, t.reportedMsg)
 }
 
 func (t *statusTracker) tick() {
-	t.emitMu.Lock()
-	defer t.emitMu.Unlock()
-
 	t.mu.Lock()
-	msg := t.next(t.now())
-	t.mu.Unlock()
+	defer t.mu.Unlock()
 
-	if msg != "" {
+	if msg := t.next(t.now()); msg != "" {
 		t.emit(log.InfoLevel, msg)
+	}
+}
+
+func (t *statusTracker) collectionOf(binding int) int {
+	if binding < 0 || binding >= len(t.bindingCollection) {
+		return -1
+	}
+	return t.bindingCollection[binding]
+}
+
+func (t *statusTracker) updateCurrent() {
+	current := t.commitStage
+	if current.stage == stageIdle {
+		current = t.readStage
+	}
+	if current != t.current {
+		t.current, t.currentSince = current, t.now()
 	}
 }
 
 // next is the status to report now, or "" if the reported one is current.
 func (t *statusTracker) next(now time.Time) string {
-	if len(t.warnings) > 0 || !t.progress {
+	if len(t.warnings) > 0 || !t.reportsProgress {
 		return ""
 	}
 
-	for len(t.completions) > 0 && now.Sub(t.completions[0].at) > statusRollupWindow {
-		t.completions = t.completions[1:]
+	for len(t.recentCommits) > 0 && now.Sub(t.recentCommits[0].at) > statusRollupWindow {
+		t.recentCommits = t.recentCommits[1:]
 	}
 
 	var key statusKey
 	var msg string
-	switch immediate := t.shown.stage == stageStarting || t.shown.stage == stageRecovery || t.shown.stage == stageSyncWait; {
-	case immediate || now.Sub(t.shownSince) >= statusMinActivePeriod:
-		if t.shown == t.emitted && now.Sub(t.lastEmit) < statusRefresh {
+	switch immediate := t.current.stage == stageStarting || t.current.stage == stageRecovery || t.current.stage == stageSyncWait; {
+	case immediate || now.Sub(t.currentSince) >= statusMinActivePeriod:
+		if t.current == t.reported && now.Sub(t.reportedAt) < statusRefresh {
 			return ""
 		}
-		key, msg = t.shown, t.render(now)
-	case now.Sub(t.lastEmit) >= statusRollupWindow && len(t.completions) > 0:
+		key, msg = t.current, t.render(now)
+	case now.Sub(t.reportedAt) >= statusRollupWindow && len(t.recentCommits) > 0:
 		var docs int
-		for _, c := range t.completions {
+		for _, c := range t.recentCommits {
 			docs += c.docs
 		}
 		key = statusKey{stage: stageRollup}
 		msg = fmt.Sprintf("Streaming changes (%s, %s in the last %d minutes)",
-			plural(docs, "document"), plural(len(t.completions), "transaction"), int(statusRollupWindow/time.Minute))
+			plural(docs, "document"), plural(len(t.recentCommits), "transaction"), int(statusRollupWindow/time.Minute))
 	default:
 		return ""
 	}
 
-	if msg == t.lastMsg {
+	if msg == t.reportedMsg {
 		return ""
 	}
-	t.emitted, t.lastMsg, t.lastEmit = key, msg, now
+	t.reported, t.reportedMsg, t.reportedAt = key, msg, now
 	return msg
 }
 
 func (t *statusTracker) render(now time.Time) string {
 	var msg string
-	switch r := t.shown.round; t.shown.stage {
+	switch r := t.current.round; t.current.stage {
 	case stageStarting:
 		return "Starting up: connecting to the destination"
 	case stageRecovery:
 		msg = "Recovery commit: finishing the transaction that was in progress when the task last stopped"
 	case stageWaitingForData:
-		return "Waiting, no new collection data since " + formatTime(t.waitingSince, now)
+		return "Waiting, no new collection data since " + formatTime(t.waitingSince)
 	case stageSyncWait:
-		msg = "Waiting, next scheduled sync at " + formatTime(t.syncAt, now)
+		msg = "Waiting, next scheduled sync at " + formatTime(t.syncAt)
 		if t.syncEvery > 0 {
 			msg += " (every " + formatDuration(t.syncEvery) + ")"
 		}
@@ -329,29 +325,29 @@ func (t *statusTracker) render(now time.Time) string {
 	case stageReading:
 		msg = fmt.Sprintf("Reading new data (round %d)", r)
 	case stageLoading:
-		msg = fmt.Sprintf("Loading existing rows (%s, round %d)", t.describe(t.loads, ""), r)
+		msg = fmt.Sprintf("Loading existing rows (%s, round %d)", describe(t.loadCounts, ""), r)
 	case stageStaging:
 		var soFar = " so far"
-		if t.stagingDone {
+		if t.storesComplete {
 			soFar = ""
 		}
-		msg = fmt.Sprintf("Staging changes at destination (%s, round %d)", t.describe(t.stores, soFar), r)
+		msg = fmt.Sprintf("Staging changes at destination (%s, round %d)", describe(t.storeCounts, soFar), r)
 	case stageCommitting:
-		msg = fmt.Sprintf("Committing changes (%s, round %d)", t.describe(t.committing, ""), r)
+		msg = fmt.Sprintf("Committing changes (%s, round %d)", describe(t.commitCounts, ""), r)
 	default:
 		return ""
 	}
 
-	if t.backlog && t.shown.stage != stageRecovery {
+	if t.backlog && t.current.stage != stageRecovery {
 		msg = "Backlog catchup: " + msg
 	}
-	if d := now.Sub(t.shownSince); d >= statusRefresh {
+	if d := now.Sub(t.currentSince); d >= statusRefresh {
 		msg += ", running for " + formatDuration(d.Truncate(time.Minute))
 	}
 	return msg
 }
 
-func (t *statusTracker) describe(c statusCounts, soFar string) string {
+func describe(c statusCounts, soFar string) string {
 	return fmt.Sprintf("%s%s from %s", plural(c.docs, "document"), soFar, plural(c.collections, "collection"))
 }
 
@@ -398,11 +394,8 @@ func formatDuration(d time.Duration) string {
 	return out
 }
 
-// formatTime formats ts in UTC, with its date when that isn't the date of now.
-func formatTime(ts, now time.Time) string {
-	ts, now = ts.UTC(), now.UTC()
-	if ts.YearDay() == now.YearDay() && ts.Year() == now.Year() {
-		return ts.Format("15:04:05 UTC")
-	}
-	return ts.Format("2006-01-02 15:04:05 UTC")
+// formatTime formats ts in UTC with its date, so a status that stays current
+// for days still reads unambiguously.
+func formatTime(ts time.Time) string {
+	return ts.UTC().Format("2006-01-02 15:04:05 UTC")
 }

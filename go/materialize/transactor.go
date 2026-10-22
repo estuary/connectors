@@ -200,9 +200,9 @@ func RunTransactions(
 	be := NewBindingEvents()
 	health := newHealthTracker(open)
 	be.health = health
-	status := newStatusTracker(open)
-	be.status = status
-	defer status.start()()
+	be.status = newStatusTracker(open)
+	stopStatus := be.status.start()
+	defer stopStatus()
 
 	openStart := time.Now()
 	log.Info("requesting materialization Open")
@@ -221,7 +221,7 @@ func RunTransactions(
 	}
 
 	// Wrap `stream` with additional logging and auxiliary capabilities.
-	stream, err = newTransactionsStream(ctx, stream, lvl, *options, be, status)
+	stream, err = newTransactionsStream(ctx, stream, lvl, *options, be)
 	if err != nil {
 		return fmt.Errorf("creating transactions stream: %w", err)
 	}
