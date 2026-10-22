@@ -568,7 +568,6 @@ async fn heap_merge(
     let mut batch_ptr = 0;
 
     while let Some(Reverse(first)) = heap.pop() {
-        tracing::warn!(?first, "heap pop");
         let mut group = vec![first];
         while let Some(Reverse(top)) = heap.peek() {
             if compare_keys(&top.key, &group[0].key) == Ordering::Equal {
