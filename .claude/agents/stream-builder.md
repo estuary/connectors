@@ -67,7 +67,7 @@ Detailed enough that `add-stream` Phases 4–5.5 execute it without re-research.
 - **Cursors**: backfill and incremental cursor, each with field, type (unix-int / RFC3339 / opaque token), source object, filter parameter, and the Phase 5 evidence that the filter is honored. Opaque tokens carry their stability evidence per `bruno-probe-endpoint`.
 - **Pagination**: mechanism, max page size, completion signal.
 - **Document model**: keys, cursor fields, and every field the logic depends on (required, never defensive `getattr`).
-- **Registration**: stream-enumeration list(s) and special lists (split-child, scheduled-backfill).
+- **Registration**: stream-enumeration list(s), special lists (split-child, scheduled-backfill), and any capability-gated streams (`add-stream` Phase 5) with the probe that decides access.
 - **Edge cases and risks** from verification: default filters that hide data, empty partitions, rate-limit hazards.
 
 ## Phase 7 — Review, finalize, hand off
