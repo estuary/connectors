@@ -373,6 +373,7 @@ func (l *extendedLogger) finishedWaitingForDocsLogFn(round int) func() {
 type BindingEvents struct {
 	enabled              bool
 	health               *healthTracker
+	status               *statusTracker
 	log                  func(log.Fields, string)
 	wg                   sync.WaitGroup
 	stopLogger           chan struct{}
@@ -479,6 +480,19 @@ func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats)
 	if l != nil && l.health != nil {
 		l.health.report(round, path, stats)
 	}
+}
+
+// Warn sets the connector status to a condition that needs the user's
+// attention, such as rows a backfill did not delete. Warnings are kept in the
+// status, replacing progress, until the connector stops. Repeated warnings with
+// the same key, such as a table name, are reported once. Active regardless of
+// extended logging.
+func (l *BindingEvents) Warn(key, msg string) {
+	if l != nil && l.status != nil {
+		l.status.warn(key, msg)
+		return
+	}
+	log.Warn(msg)
 }
 
 func repeatAsync(repeat func(), every time.Duration) (stop func(onStop func())) {

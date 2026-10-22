@@ -418,8 +418,8 @@ Two rules apply to every truncating connector:
   boundary first, so that a live row never rounds below it.
 
 A binding that excludes `flow_published_at` cannot be truncated. The connector
-skips it and logs a WARN with `eventType: connectorStatus`, which surfaces the
-reason on the task page. Rows deleted by truncation are reported on the
+skips it and reports the reason with `BindingEvents.Warn`, which surfaces it on
+the task page (see [Connector status](#connector-status)). Rows deleted by truncation are reported on the
 transaction health line as `truncated` (see [Transaction health](#transaction-health)).
 
 ## Request.Store + Request.StartCommit + Request.Acknowledge
@@ -709,6 +709,39 @@ Note that many reductions require only last-write-wins delivery, and that for
 these use cases, delta updates do the "right thing" by trivially replacing
 each document with its most recent version.
 This matches the behavior of Kafka Connect, for example.
+
+# Connector status
+
+Every Go materialization built on `m.RunTransactions` keeps its connector
+status (an INFO or WARN log with `eventType: connectorStatus`, shown on the
+task page) current with the step it is in, in plain language:
+
+| Status | While |
+|---|---|
+| Starting up: connecting to the destination | Open |
+| Recovery commit: finishing the transaction that was in progress when the task last stopped | The first Acknowledge |
+| Waiting, no new collection data since T | Acknowledged until the next Load or Flush |
+| Reading new data (round X) | Load requests until Flush |
+| Loading existing rows (M documents from N collections, round X) | Flush until Flushed |
+| Staging changes at destination (M documents from N collections, round X) | Store requests until StartedCommit |
+| Committing changes (M documents from N collections, round X) | StartedCommit until Acknowledged |
+| Waiting, next scheduled sync at T (every F) | The sync schedule's acknowledgement delay |
+
+A commit runs alongside the next round's Load requests, and is reported while
+it runs. Stage statuses are prefixed with "Backlog catchup:" while recent
+transactions are large enough to skip the sync delay.
+
+Each status is also a log line, so a stage is reported only once it has lasted
+a minute, and then once a minute with its counts and elapsed time ("running for
+5m"). The starting, recovery and sync-wait statuses are reported right away. A
+task whose stages are all shorter than a minute instead reports a rollup every
+five minutes: "Streaming changes (M documents, N transactions in the last 5
+minutes)". Only the shard whose range starts at zero reports progress, since
+all shards write the same status.
+
+A connector reports a condition that needs the user's attention with
+`BindingEvents.Warn(key, msg)`. Warnings replace progress until the connector
+stops, and the status lists every distinct key's message.
 
 # Transaction health
 

@@ -280,3 +280,26 @@ func TestParseActiveDays(t *testing.T) {
 		require.Equal(t, tc.want, got)
 	}
 }
+
+func TestIntervalAt(t *testing.T) {
+	at := func(ts string) time.Time {
+		parsed, err := time.Parse(time.RFC3339, ts)
+		require.NoError(t, err)
+		return parsed
+	}
+
+	fixed, err := NewFixedSchedule("30m", nil)
+	require.NoError(t, err)
+	require.Equal(t, 30*time.Minute, IntervalAt(fixed, at("2024-02-15T01:00:00Z")))
+	require.Equal(t, time.Hour, IntervalAt(NewPeriodicSchedule(time.Hour), at("2024-02-15T01:00:00Z")))
+
+	alternating, err := NewAlternatingSchedule("4h", "5m", "8:00", "17:00", "M-F", "UTC", nil)
+	require.NoError(t, err)
+	require.Equal(t, 5*time.Minute, IntervalAt(alternating, at("2024-02-15T09:00:00Z"))) // Thursday
+	require.Equal(t, 4*time.Hour, IntervalAt(alternating, at("2024-02-15T18:00:00Z")))   // after hours
+	require.Equal(t, 4*time.Hour, IntervalAt(alternating, at("2024-02-17T09:00:00Z")))   // Saturday
+
+	daily, err := Parse("daily at 12:00Z")
+	require.NoError(t, err)
+	require.Zero(t, IntervalAt(daily, at("2024-02-15T09:00:00Z")))
+}

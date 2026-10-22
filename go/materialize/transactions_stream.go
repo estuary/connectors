@@ -85,6 +85,7 @@ type transactionsStream struct {
 	ctx     context.Context
 	stream  Stream
 	handler func(transactionsEvent)
+	status  *statusTracker
 
 	// Variables used for handling acknowledgement delays when configured.
 	ackSchedule   schedule.Schedule
@@ -103,8 +104,9 @@ func newTransactionsStream(
 	lvl log.Level,
 	options MaterializeOptions,
 	be *BindingEvents,
+	status *statusTracker,
 ) (*transactionsStream, error) {
-	s := &transactionsStream{stream: stream, ctx: ctx, dbtJobTriggerCh: make(chan struct{})}
+	s := &transactionsStream{stream: stream, ctx: ctx, status: status, dbtJobTriggerCh: make(chan struct{})}
 
 	var loggingHandler func(transactionsEvent)
 	if options.ExtendedLogging {
@@ -215,6 +217,7 @@ func (l *transactionsStream) storedHistoryHandler(delegate func(transactionsEven
 					l.storedHistory = l.storedHistory[1:]
 				}
 				count = 0
+				l.status.setBacklog(slices.ContainsFunc(l.storedHistory, isBackfillSize))
 			}
 		}
 		delegate(event)
@@ -225,9 +228,9 @@ func (l *transactionsStream) Send(m *pm.Response) error {
 	if m.Loaded != nil {
 		l.handler(sentLoaded)
 	} else if m.Flushed != nil {
-		l.handler(sentFlushed)
+		l.event(sentFlushed, -1)
 	} else if m.StartedCommit != nil {
-		l.handler(sentStartedCommit)
+		l.event(sentStartedCommit, -1)
 	} else if m.Acknowledged != nil {
 		// Schedule a dbt job trigger
 		l.dbtJobTriggerCh <- struct{}{}
@@ -235,7 +238,7 @@ func (l *transactionsStream) Send(m *pm.Response) error {
 		if err := l.maybeDelayAcknowledgement(); err != nil {
 			return err
 		}
-		l.handler(sentAcknowledged)
+		l.event(sentAcknowledged, -1)
 	}
 
 	return l.stream.Send(m)
@@ -247,19 +250,26 @@ func (l *transactionsStream) RecvMsg(m *pm.Request) error {
 	}
 
 	if m.Load != nil {
-		l.handler(readLoad)
+		l.event(readLoad, int(m.Load.Binding))
 	} else if m.Flush != nil {
-		l.handler(readFlush)
+		l.event(readFlush, -1)
 	} else if m.Store != nil {
-		l.handler(readStore)
+		l.event(readStore, int(m.Store.Binding))
 	} else if m.StartCommit != nil {
-		l.handler(readStartCommit)
+		l.event(readStartCommit, -1)
 	} else if m.Acknowledge != nil {
-		l.handler(readAcknowledge)
+		l.event(readAcknowledge, -1)
 	}
 
 	return nil
 }
+
+func (l *transactionsStream) event(ev transactionsEvent, binding int) {
+	l.handler(ev)
+	l.status.event(ev, binding)
+}
+
+func isBackfillSize(stored int) bool { return stored >= storeBackfillThreshold }
 
 func (l *transactionsStream) triggerDBTJob() error {
 	if l.dbtJobTriggerConfig != nil {
@@ -287,9 +297,7 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 		// completed and none of the transactions were large enough to suggest
 		// we are still in the midst of a backfill, the acknowledgement delay
 		// may be applicable.
-		delayBasedOnStoredHistory := len(l.storedHistory) >= storedHistorySize && !slices.ContainsFunc(l.storedHistory, func(n int) bool {
-			return n >= storeBackfillThreshold
-		})
+		delayBasedOnStoredHistory := len(l.storedHistory) >= storedHistorySize && !slices.ContainsFunc(l.storedHistory, isBackfillSize)
 
 		if !delayBasedOnStoredHistory {
 			ll.Info("not delaying commit acknowledgement based on stored history")
@@ -297,6 +305,7 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 			ll.Info("not delaying commit acknowledgement since current time is after next scheduled acknowledgement")
 		} else {
 			l.handler(startedAckDelay)
+			l.status.syncWait(nextAckAt, schedule.IntervalAt(l.ackSchedule, l.lastAckTime))
 			ll.WithField("delay", d.String()).Info("delaying before acknowledging commit")
 
 			select {

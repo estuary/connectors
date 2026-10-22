@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is doing, such as loading, staging or committing data, or waiting for its next scheduled sync.
+
 ## 2026-10-13
 ### Changed
 - Load and merge queries on tables with a date-time key column now restrict
