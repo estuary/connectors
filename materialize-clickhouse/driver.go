@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -25,6 +27,7 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 )
 
 // connectorVersion is the connector's release tag, embedded so the client
@@ -118,8 +121,12 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"truncate_after_backfill": common.FlagEnabled,
+}
+
 func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
-	return c.Advanced.FeatureFlags, nil
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 func (c config) resolvedAddress() string {
@@ -162,8 +169,12 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 		Compression: &clickhouse.Compression{
 			Method: clickhouse.CompressionLZ4,
 		},
+		MaxOpenConns: maxOpenConns,
 	}
 }
+
+// maxOpenConns is the size of each connection pool the connector opens.
+const maxOpenConns = 10
 
 // tableConfig defines per-binding resource configuration.
 type tableConfig struct {
@@ -290,6 +301,13 @@ type transactor struct {
 	ensured           chan struct{}
 	state             connectorState
 	runtimeCheckpoint m.RuntimeCheckpoint
+
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion once this transaction's staged rows are moved.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -329,6 +347,11 @@ type stateItem struct {
 	// from the stage table entirely) from rows that were never staged (present,
 	// but short) -- a distinction a single total cannot make.
 	MovePartitions []stagedPartition
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. The commit deletes the target's rows published before it,
+	// after the partition moves. It is omitted when unset, so that the entry
+	// stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 }
 
 type connectorState map[string]*stateItem
@@ -362,6 +385,8 @@ func newTransactor(
 		ensured:           make(chan struct{}),
 		state:             make(connectorState, len(bindings)),
 		runtimeCheckpoint: fence.Checkpoint,
+
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	var err error
@@ -502,6 +527,13 @@ type binding struct {
 		movePartitionSQL string
 		dropTableSQL     string
 	}
+	// truncate deletes the target rows published before a boundary, after
+	// counting them, because a lightweight DELETE reports no affected rows.
+	// Both are empty when the binding has no usable flow_published_at column.
+	truncate struct {
+		countSQL  string
+		deleteSQL string
+	}
 }
 
 func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
@@ -550,6 +582,14 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	}
 	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropStoreTable); err != nil {
 		return fmt.Errorf("rendering dropStoreTable template: %w", err)
+	}
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		// The boundary is bound as a string, because the driver formats a
+		// time.Time parameter without its fractional seconds.
+		var where = fmt.Sprintf("WHERE %s < toDateTime64(?, 6, 'UTC')", col.Identifier)
+		b.truncate.countSQL = fmt.Sprintf("SELECT count() FROM %s %s SETTINGS select_sequential_consistency = 1;", target.Identifier, where)
+		b.truncate.deleteSQL = fmt.Sprintf("DELETE FROM %s %s;", target.Identifier, where)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -651,8 +691,17 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// reported: should the truncate at the start of the next round
 			// fail too, that round's key-count check trips with no indication
 			// of why the table was not empty.
-			if truncErr := t.load.conn.Exec(ctx, b.load.truncateSQL); truncErr != nil && err == nil {
-				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, truncErr)
+			//
+			// When the load itself failed, its error is the one worth
+			// reporting, so the truncate is a single best-effort attempt.
+			if err != nil {
+				_ = t.load.conn.Exec(ctx, b.load.truncateSQL)
+				continue
+			}
+			if err = transientRetryPolicy.retry(ctx, "truncating load table after load", isTransientErr, func() error {
+				return t.load.conn.Exec(ctx, b.load.truncateSQL)
+			}); err != nil {
+				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, err)
 			}
 		}
 	}()
@@ -661,8 +710,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if _, found := activeBindings[it.Binding]; !found {
 			b := t.bindings[it.Binding]
 			// The load table exists (ensured at session start); truncate
-			// clears any keys left over from a previous round.
-			if err = t.load.conn.Exec(ctx, b.load.truncateSQL); err != nil {
+			// clears any keys left over from a previous round. TRUNCATE is
+			// idempotent, so a transient connection drop is simply retried.
+			if err = transientRetryPolicy.retry(ctx, "truncating load stage table", isTransientErr, func() error {
+				return t.load.conn.Exec(ctx, b.load.truncateSQL)
+			}); err != nil {
 				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 			}
 			activeBindings[it.Binding] = 0
@@ -846,6 +898,18 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		return nil, err
 	}
 
+	// A truncation travels in the binding's state item so that it survives
+	// a restart, and so that a binding which stored nothing still has one.
+	for binding, boundary := range t.truncations {
+		stateKey := t.bindings[binding].target.StateKey
+		if _, found := t.state[stateKey]; !found {
+			t.state[stateKey] = &stateItem{Round: it.Round}
+			storedKeys = append(storedKeys, stateKey)
+		}
+		t.state[stateKey].TruncateBefore = &boundary
+	}
+	t.truncations = nil
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// Returning a pre-resolved error here makes the runtime fail without
 		// sending StartedCommit, so this checkpoint never becomes durable and the
@@ -872,6 +936,33 @@ func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
 	return nil, false
 }
 
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncate.deleteSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	shouldProcess := m.StateKeyFilter(stateKeys)
 	var drained []string
@@ -882,60 +973,25 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// ensure every binding's persistent temp tables. This always runs
 		// before the first Store (the runtime serializes Acknowledge ahead
 		// of the next transaction's store phase).
+		//
+		// Each binding has its own stage and target tables, so bindings are
+		// prepared concurrently: preparing one is several DDL round trips,
+		// and a serial pass over hundreds of bindings took tens of minutes
+		// on a slow service.
+		var drainedMu sync.Mutex
+		var group, groupCtx = errgroup.WithContext(ctx)
+		group.SetLimit(sessionStartConcurrency)
 		for _, b := range t.bindings {
-			if si, pending := t.state[b.target.StateKey]; pending {
-				if !shouldProcess(b.target.StateKey) {
-					// This binding's pending work was not requested, so its
-					// staged rows must stay put. ensureTempTables would
-					// discard them, so it is skipped as well; a session
-					// always processes every state key, so this only happens
-					// in the Apply RPC's narrowed drain, where no Store
-					// follows.
-					continue
-				}
-				drained = append(drained, b.target.StateKey)
-				// A store table whose partition key differs from the target's
-				// predates a partition-changing backfill: the backfill dropped
-				// and re-created the target, so the staged rows belong to a
-				// table generation that no longer exists and the backfill will
-				// re-send them. MOVE PARTITION into the new target can never
-				// succeed (code 36), so skip the move and let ensureTempTables
-				// re-create the store table.
-				if drifted, err := t.storePartitionKeyDrifted(ctx, b); err != nil {
-					return nil, fmt.Errorf("comparing store and target partition keys of %s: %w", b.target.Identifier, err)
-				} else if drifted {
-					log.WithField("target", b.target.Identifier).Warn(
-						"store table partition key differs from target; staged rows predate a partition-changing backfill and are discarded")
-					if err := t.ensureTempTables(ctx, b); err != nil {
-						return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
-					}
-					continue
-				}
-				// A committed-but-unacknowledged transaction has rows staged
-				// in this binding's store table. Move them; never truncate or
-				// re-create a stage table holding pending rows.
-				if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
-					if !isUnknownTableErr(err) {
-						return nil, fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
-					}
-					// The store table was dropped out-of-band, so there are no
-					// staged rows left to recover. Fall through to re-create
-					// the temp tables rather than crash-looping on the missing
-					// table; ReplacingMergeTree lets later transactions refresh
-					// the lost rows.
-					log.WithField("target", b.target.Identifier).Warn(
-						"store table missing during recovery; nothing to recover, re-creating temp tables")
-				}
-				// A successful recovery move leaves the store table empty, so
-				// falling through to ensureTempTables is safe and reconciles
-				// any target-schema drift that occurred while the commit was
-				// pending. Skipping it would fail the next MOVE PARTITION with
-				// code 122 ("Tables have different structure") -- a permanent
-				// recovery crash-loop (issue #4817).
-			}
-			if err := t.ensureTempTables(ctx, b); err != nil {
-				return nil, fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
-			}
+			group.Go(func() error {
+				return t.prepareBinding(groupCtx, b, shouldProcess, func(stateKey string) {
+					drainedMu.Lock()
+					defer drainedMu.Unlock()
+					drained = append(drained, stateKey)
+				})
+			})
+		}
+		if err := group.Wait(); err != nil {
+			return nil, err
 		}
 		close(t.ensured)
 	case <-t.ensured: // ensured channel is closed
@@ -986,6 +1042,70 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 }
 
+// sessionStartConcurrency bounds how many bindings are prepared at once when
+// a session starts. It stays under maxOpenConns so that no worker queues on
+// the pool.
+const sessionStartConcurrency = 8
+
+// prepareBinding recovers a binding's pending commit, when one is requested,
+// and ensures its persistent temp tables. drained is called with the
+// binding's state key once its pending commit is recovered.
+func (t *transactor) prepareBinding(ctx context.Context, b *binding, shouldProcess func(string) bool, drained func(string)) error {
+	if si, pending := t.state[b.target.StateKey]; pending {
+		if !shouldProcess(b.target.StateKey) {
+			// This binding's pending work was not requested, so its staged
+			// rows must stay put. ensureTempTables would discard them, so it
+			// is skipped as well; a session always processes every state
+			// key, so this only happens in the Apply RPC's narrowed drain,
+			// where no Store follows.
+			return nil
+		}
+		drained(b.target.StateKey)
+		// A store table whose partition key differs from the target's
+		// predates a partition-changing backfill: the backfill dropped and
+		// re-created the target, so the staged rows belong to a table
+		// generation that no longer exists and the backfill will re-send
+		// them. MOVE PARTITION into the new target can never succeed (code
+		// 36), so skip the move and let ensureTempTables re-create the store
+		// table.
+		if drifted, err := t.storePartitionKeyDrifted(ctx, b); err != nil {
+			return fmt.Errorf("comparing store and target partition keys of %s: %w", b.target.Identifier, err)
+		} else if drifted {
+			log.WithField("target", b.target.Identifier).Warn(
+				"store table partition key differs from target; staged rows predate a partition-changing backfill and are discarded")
+			if err := t.ensureTempTables(ctx, b); err != nil {
+				return fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+			}
+			return nil
+		}
+		// A committed-but-unacknowledged transaction has rows staged in this
+		// binding's store table. Move them; never truncate or re-create a
+		// stage table holding pending rows.
+		if err := t.moveStorePartitionsToTarget(ctx, b, si, true); err != nil {
+			if !isUnknownTableErr(err) {
+				return fmt.Errorf("recovering stage to target %s: %w", b.target.Identifier, err)
+			}
+			// The store table was dropped out-of-band, so there are no staged
+			// rows left to recover. Fall through to re-create the temp tables
+			// rather than crash-looping on the missing table;
+			// ReplacingMergeTree lets later transactions refresh the lost
+			// rows.
+			log.WithField("target", b.target.Identifier).Warn(
+				"store table missing during recovery; nothing to recover, re-creating temp tables")
+		}
+		// A successful recovery move leaves the store table empty, so falling
+		// through to ensureTempTables is safe and reconciles any
+		// target-schema drift that occurred while the commit was pending.
+		// Skipping it would fail the next MOVE PARTITION with code 122
+		// ("Tables have different structure") -- a permanent recovery
+		// crash-loop (issue #4817).
+	}
+	if err := t.ensureTempTables(ctx, b); err != nil {
+		return fmt.Errorf("ensuring temp tables of %s: %w", b.target.Identifier, err)
+	}
+	return nil
+}
+
 // isUnknownTableErr reports whether err (anywhere in its chain) is a ClickHouse
 // "unknown table" exception (code 60), raised when a query references a table
 // that does not exist.
@@ -998,24 +1118,34 @@ func isUnknownTableErr(err error) bool {
 // counts under select_sequential_consistency, which makes the result
 // authoritative for the connection that will service the partition moves.
 func (t *transactor) queryStoreParts(ctx context.Context, b *binding) (parts []stagedPartition, totalRows int64, err error) {
-	rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
-	if err != nil {
-		return nil, 0, fmt.Errorf("querying store table partitions: %w", err)
-	}
-	defer rows.Close()
+	// The read has no side effects, so a transient connection drop restarts
+	// it from scratch.
+	err = transientRetryPolicy.retry(ctx, "querying store table partitions", isTransientErr, func() error {
+		parts, totalRows = nil, 0
 
-	for rows.Next() {
-		var part stagedPartition
-		var partitionRows uint64
-		if err = rows.Scan(&part.ID, &partitionRows); err != nil {
-			return nil, 0, fmt.Errorf("scanning store table partition: %w", err)
+		rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
+		if err != nil {
+			return fmt.Errorf("querying store table partitions: %w", err)
 		}
-		part.Rows = int64(partitionRows)
-		parts = append(parts, part)
-		totalRows += part.Rows
-	}
-	if err = rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("iterating store table partitions: %w", err)
+		defer rows.Close()
+
+		for rows.Next() {
+			var part stagedPartition
+			var partitionRows uint64
+			if err = rows.Scan(&part.ID, &partitionRows); err != nil {
+				return fmt.Errorf("scanning store table partition: %w", err)
+			}
+			part.Rows = int64(partitionRows)
+			parts = append(parts, part)
+			totalRows += part.Rows
+		}
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("iterating store table partitions: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
 	}
 	return parts, totalRows, nil
 }
@@ -1148,9 +1278,59 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 	if si.StoredRows > 0 {
 		stats = stats.WithStaged(si.StoredRows)
 	}
+
+	// The truncation follows the moves, so that it keeps the rows they just
+	// carried in, which were published after the boundary.
+	if si.TruncateBefore != nil {
+		if truncated, err := t.truncateTarget(ctx, b, *si.TruncateBefore); err != nil {
+			return err
+		} else if truncated != nil {
+			stats = stats.WithTruncated(*truncated)
+		}
+	}
 	t.be.ReportRowStats(si.Round, b.target.Path, stats)
 
 	return nil
+}
+
+// truncateTarget deletes the binding's target rows published before boundary
+// and returns how many there were, or nil when the binding no longer has a
+// usable flow_published_at column.
+func (t *transactor) truncateTarget(ctx context.Context, b *binding, boundary time.Time) (*int64, error) {
+	if b.truncate.deleteSQL == "" {
+		var _, reason = b.target.PublishedAtColumn()
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": boundary,
+			"reason":   reason.Error(),
+		}).Warn("skipping staged truncation because the binding no longer supports it")
+		return nil, nil
+	}
+
+	// The boundary is floored to microseconds to match DateTime64(6), so
+	// that a live row never rounds below it.
+	var before = boundary.UTC().Truncate(time.Microsecond).Format("2006-01-02 15:04:05.000000")
+
+	// Counting then deleting is idempotent, so a transient connection drop
+	// restarts the pair: rows deleted by a first attempt are absent from the
+	// second count.
+	var count uint64
+	if err := transientRetryPolicy.retry(ctx, "truncating target table", isTransientErr, func() error {
+		if err := t.store.conn.QueryRow(ctx, b.truncate.countSQL, before).Scan(&count); err != nil {
+			return fmt.Errorf("counting rows to truncate: %w", err)
+		}
+		return t.store.conn.Exec(ctx, b.truncate.deleteSQL, before)
+	}); err != nil {
+		return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+	}
+
+	var truncated = int64(count)
+	log.WithFields(log.Fields{
+		"table":    b.target.Identifier,
+		"boundary": boundary,
+		"deleted":  truncated,
+	}).Info("truncated rows published before the backfill")
+	return &truncated, nil
 }
 
 // reconcileStagedPartitions returns the partition IDs to move, or an error when
@@ -1251,27 +1431,13 @@ func (t *transactor) reconcileStagedPartitions(
 // table holds no staged rows of a pending commit; on the recovery path this
 // is guaranteed by moveStorePartitionsToTarget's post-move emptiness check.
 func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
+	// Every step is idempotent (CREATE IF NOT EXISTS, a read, DROP IF EXISTS,
+	// TRUNCATE), so a transient connection drop restarts the sequence from
+	// the top without changing its outcome.
 	ensure := func(createSQL, truncateSQL, dropSQL string, tableName string) error {
-		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
-			return fmt.Errorf("creating temp table: %w", err)
-		}
-		matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
-		if err != nil {
-			return err
-		}
-		if !matches {
-			if err := t.store.conn.Exec(ctx, dropSQL); err != nil {
-				return fmt.Errorf("dropping schema-drifted temp table: %w", err)
-			}
-			if err := t.store.conn.Exec(ctx, createSQL); err != nil {
-				return fmt.Errorf("re-creating temp table: %w", err)
-			}
-			return nil
-		}
-		if err := t.store.conn.Exec(ctx, truncateSQL); err != nil {
-			return fmt.Errorf("truncating temp table: %w", err)
-		}
-		return nil
+		return transientRetryPolicy.retry(ctx, "ensuring temp table", isTransientErr, func() error {
+			return t.ensureTempTable(ctx, b, createSQL, truncateSQL, dropSQL, tableName)
+		})
 	}
 
 	if err := ensure(b.store.createTableSQL, b.store.truncateSQL, b.store.dropTableSQL, storeTableName(b.target, t._range.KeyBegin)); err != nil {
@@ -1288,6 +1454,30 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 	return nil
 }
 
+// ensureTempTable is one pass of ensureTempTables for a single temp table.
+func (t *transactor) ensureTempTable(ctx context.Context, b *binding, createSQL, truncateSQL, dropSQL string, tableName string) error {
+	if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+		return fmt.Errorf("creating temp table: %w", err)
+	}
+	matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
+	if err != nil {
+		return err
+	}
+	if !matches {
+		if err := t.store.conn.Exec(ctx, dropSQL); err != nil {
+			return fmt.Errorf("dropping schema-drifted temp table: %w", err)
+		}
+		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+			return fmt.Errorf("re-creating temp table: %w", err)
+		}
+		return nil
+	}
+	if err := t.store.conn.Exec(ctx, truncateSQL); err != nil {
+		return fmt.Errorf("truncating temp table: %w", err)
+	}
+	return nil
+}
+
 // storePartitionKeyDrifted reports whether the binding's store table and
 // target table both exist but have different partition keys. If either table
 // is missing it reports false, leaving that condition to the caller's
@@ -1297,23 +1487,26 @@ func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (
 	var storeTable = storeTableName(b.target, t._range.KeyBegin)
 	var targetTable = b.target.Path[0]
 
-	rows, err := t.store.conn.Query(ctx,
-		"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
-		storeTable, targetTable)
-	if err != nil {
-		return false, fmt.Errorf("querying partition keys: %w", err)
-	}
-	defer rows.Close()
-
-	var keys = make(map[string]string)
-	for rows.Next() {
-		var name, pk string
-		if err := rows.Scan(&name, &pk); err != nil {
-			return false, fmt.Errorf("scanning partition key: %w", err)
+	var keys map[string]string
+	if err := transientRetryPolicy.retry(ctx, "querying partition keys", isTransientErr, func() error {
+		rows, err := t.store.conn.Query(ctx,
+			"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
+			storeTable, targetTable)
+		if err != nil {
+			return fmt.Errorf("querying partition keys: %w", err)
 		}
-		keys[name] = pk
-	}
-	if err := rows.Err(); err != nil {
+		defer rows.Close()
+
+		keys = make(map[string]string)
+		for rows.Next() {
+			var name, pk string
+			if err := rows.Scan(&name, &pk); err != nil {
+				return fmt.Errorf("scanning partition key: %w", err)
+			}
+			keys[name] = pk
+		}
+		return rows.Err()
+	}); err != nil {
 		return false, err
 	}
 

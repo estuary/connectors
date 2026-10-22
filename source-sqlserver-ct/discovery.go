@@ -455,29 +455,26 @@ func getColumns(ctx context.Context, conn *sql.DB, requested []sqlcapture.TableI
 	return columns, nil
 }
 
-// Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
-// overkill but shouldn't hurt, and helps to make absolutely sure that we're
-// matching up the constraint type with the column names/positions correctly.
+// INFORMATION_SCHEMA.KEY_COLUMN_USAGE provides the same data, but we read the
+// sys catalog views directly because many captures querying that view on the
+// same server contend with each other.
 func queryDiscoverPrimaryKeys(predicate string) string {
 	return fmt.Sprintf(`
-SELECT KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.COLUMN_NAME, KCU.ORDINAL_POSITION
-  FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
-  JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS TCS
-    ON  TCS.CONSTRAINT_CATALOG = KCU.CONSTRAINT_CATALOG
-    AND TCS.CONSTRAINT_SCHEMA = KCU.CONSTRAINT_SCHEMA
-    AND TCS.CONSTRAINT_NAME = KCU.CONSTRAINT_NAME
-    AND TCS.TABLE_CATALOG = KCU.TABLE_CATALOG
-    AND TCS.TABLE_SCHEMA = KCU.TABLE_SCHEMA
-    AND TCS.TABLE_NAME = KCU.TABLE_NAME
-  WHERE TCS.CONSTRAINT_TYPE = 'PRIMARY KEY' AND %s
-  ORDER BY KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.ORDINAL_POSITION;`, predicate)
+SELECT sch.name, tbl.name, col.name, ic.key_ordinal
+  FROM sys.key_constraints kc
+  JOIN sys.tables tbl ON tbl.object_id = kc.parent_object_id
+  JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
+  JOIN sys.index_columns ic ON ic.object_id = kc.parent_object_id AND ic.index_id = kc.unique_index_id
+  JOIN sys.columns col ON col.object_id = ic.object_id AND col.column_id = ic.column_id
+  WHERE kc.type = 'PK' AND %s
+  ORDER BY sch.name, tbl.name, ic.key_ordinal;`, predicate)
 }
 
 func getPrimaryKeys(ctx context.Context, conn *sql.DB, requested []sqlcapture.TableID) (map[sqlcapture.StreamID][]string, error) {
 	if len(requested) == 0 {
 		return make(map[sqlcapture.StreamID][]string), nil
 	}
-	var predicate, args = tableIDsPredicate("KCU.TABLE_SCHEMA", "KCU.TABLE_NAME", requested, 1)
+	var predicate, args = tableIDsPredicate("sch.name", "tbl.name", requested, 1)
 	var rows, err = conn.QueryContext(ctx, queryDiscoverPrimaryKeys(predicate), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)

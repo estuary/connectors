@@ -1,20 +1,21 @@
-[tool.poetry]
+[project]
 name = "source_impact_native"
 version = "0.1.0"
 description = ""
-authors = ["Luis Salomao <luish1980@hotmail.com>"]
+authors = [
+    { name = "Luis Salomao", email = "luish1980@hotmail.com" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "estuary-cdk",
+    "pydantic>=2,<3",
+]
 
-[tool.poetry.dependencies]
-estuary-cdk = {path="../estuary-cdk", develop = true}
-pydantic = "==2.7.2"
-python = "^3.12"
-
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.8.0"
-mypy = "^1.8.0"
-pytest = "^7.4.3"
-pytest-insta = "^0.3.0"
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

@@ -1,0 +1,51 @@
+Task: acmeCo/tests/materialize-motherduck/ducklake
+
+Base:
+Resource: ci_testing_ducklake.main.key_change_test
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS ci_testing_ducklake.main.key_change_test (\n\tid BIGINT NOT NULL,\n\tflow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,\n\ttenant VARCHAR NOT NULL,\n\t\"value\" VARCHAR,\n\tflow_document JSON NOT NULL\n);\n"]
+["applied.actionDescription", ""]
+
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"id","Nullable":false,"Type":"BIGINT"}
+{"Name":"tenant","Nullable":false,"Type":"VARCHAR"}
+{"Name":"value","Nullable":true,"Type":"VARCHAR"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Group-by changed with backfill:
+Resource: ci_testing_ducklake.main.key_change_test
+
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"id","Nullable":false,"Type":"BIGINT"}
+{"Name":"tenant","Nullable":false,"Type":"VARCHAR"}
+{"Name":"value","Nullable":true,"Type":"VARCHAR"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Materialized under the new group-by:
+Resource: ci_testing_ducklake.main.key_change_test
+["applied.actionDescription", ""]
+["applied.actionDescription", ""]
+
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"id","Nullable":false,"Type":"BIGINT"}
+{"Name":"tenant","Nullable":false,"Type":"VARCHAR"}
+{"Name":"value","Nullable":true,"Type":"VARCHAR"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one-updated"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one-updated"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"a","value":"two"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"c","value":"two-moved"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"c","value":"two-moved"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":3,"tenant":"b","value":"three"},"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":4,"tenant":"b","value":"four"},"flow_published_at":"1970-01-01T00:00:02Z","id":4,"tenant":"b","value":"four"}
+
+

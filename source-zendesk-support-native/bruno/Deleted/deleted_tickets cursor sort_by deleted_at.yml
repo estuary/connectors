@@ -1,0 +1,88 @@
+info:
+  name: deleted_tickets cursor sort_by deleted_at
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/deleted_tickets?sort_by=deleted_at&sort_order=asc&page[size]=100"
+  params:
+    - name: "sort_by"
+      value: "deleted_at"
+      type: query
+    - name: "sort_order"
+      value: "asc"
+      type: query
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - sort_by ignored: nice_id order 48, A, B (projection)"
+    request:
+      url: "{{base_url}}/deleted_tickets?sort_by=deleted_at&sort_order=asc&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "691"
+        - name: "ratelimit-remaining"
+          value: "691"
+        - name: "ratelimit-reset"
+          value: "18"
+        - name: "zendesk-ratelimit-deleted-tickets-index"
+          value: "total=10; remaining=5; resets=18"
+      body:
+        type: json
+        data: |-
+          {
+            "deleted_tickets": [
+              {
+                "id": 48,
+                "subject": "Bruno probe deleted ticket",
+                "deleted_at": "2026-10-07T15:52:09Z"
+              },
+              {
+                "id": 50,
+                "subject": "Bruno probe deletion order A",
+                "deleted_at": "2026-10-07T19:57:24Z"
+              },
+              {
+                "id": 51,
+                "subject": "Bruno probe deletion order B",
+                "deleted_at": "2026-10-07T19:57:21Z"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhVE1BQUFBQUFBQUEifQ==",
+              "before_cursor": "eyJvIjoibmljZV9pZCIsInYiOiJhVEFBQUFBQUFBQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Deleted Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-deleted-tickets)
+
+  **WHY:** Whether the documented `sort_by=deleted_at` works with cursor pagination.
+  The returned cursor's decoded order fields show which order Zendesk applied. An
+  incremental read of deletions needs ascending `deleted_at` with resumable cursors.
+
+  **LIMITATION (VERIFIED 2026-10-07):** `sort_by=deleted_at` is silently ignored under cursor
+  pagination. Results come back in `nice_id` order (48, A, B) and the cursor decodes
+  to `{"o":"nice_id",...}`. Use `sort=updated_at` instead (see
+  `Keyset Cursors / deleted_tickets crafted seek`).

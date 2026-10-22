@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.25-trixie AS builder
+FROM --platform=linux/amd64 golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
@@ -19,10 +19,70 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-snowflake   ./materialize-snowflake
 COPY materialize-sql         ./materialize-sql
 
+# The supervisor tests drive a stdlib-only python fake sidecar, so python3 is a
+# real dependency of this stage rather than one inherited incidentally from the
+# base image. Without it those tests skip instead of failing, so the build would
+# stay green while silently covering less.
+RUN apt-get update -y \
+     && apt-get install --no-install-recommends -y \
+     python3 \
+     && rm -rf /var/lib/apt/lists/*
+
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...
 RUN go test  -tags nozstd -short -v ./materialize-snowflake/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-snowflake/cmd/connector
+
+# Python Sidecar Stage
+################################################################################
+# The Snowpipe Streaming sidecar venv is built on the same base image as the
+# runtime stage so its interpreter and site-packages exactly match the python3
+# installed there.
+FROM ${BASE_IMAGE} AS pybuilder
+
+USER root
+# python3-venv is for the throwaway test venv below; uv builds /opt/venv itself.
+RUN apt-get update -y \
+     && apt-get install --no-install-recommends -y \
+     python3 \
+     python3-venv \
+     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:0.13.3 /uv /usr/local/bin/uv
+
+# UV_PYTHON/-PREFERENCE keep uv on the base image's own interpreter rather than
+# downloading one of its own, which is the point of building this stage on
+# ${BASE_IMAGE}: the venv's interpreter must match the runtime stage's.
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_PYTHON=/usr/bin/python3 \
+    UV_PYTHON_PREFERENCE=only-system \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+# The sidecar depends on estuary-cdk from this repository, so the CDK is copied
+# to where the sidecar's pyproject.toml expects it. Both are installed in
+# development mode, so the runtime stage carries both source trees too.
+COPY estuary-cdk                   /opt/estuary-cdk
+COPY materialize-snowflake/sidecar /opt/materialize-snowflake/sidecar
+WORKDIR /opt/materialize-snowflake/sidecar
+# `--frozen` makes the sidecar's uv.lock authoritative: the image installs what
+# was resolved and committed, and resolves nothing at build time.
+RUN uv sync --frozen --no-dev
+
+# Type-check and test the sidecar, as the builder stage does the connector. A
+# throwaway venv holds mypy and pytest, keeping the test dependencies out of the
+# venv the image ships, and reaches the SDK through the shipped venv's
+# site-packages: most of the suite stubs the SDK, but the guard on the append
+# path's use of msgspec.Raw has to run against the installed one.
+# SNOWPIPE_SDK_GUARD makes an SDK it cannot import a failure there rather than a
+# skip, so the guard cannot be passed over silently.
+RUN python3 -m venv /tmp/testvenv \
+     && /tmp/testvenv/bin/pip install --no-cache-dir pytest "mypy>=1.8,<2" \
+     && export SNOWPIPE_SDK_GUARD=required \
+        PYTHONPATH="/opt/materialize-snowflake/sidecar:/opt/estuary-cdk:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
+     && /tmp/testvenv/bin/python -m mypy --cache-dir /tmp/testvenv/mypy-cache \
+     && /tmp/testvenv/bin/python -m pytest -q -p no:cacheprovider tests \
+     && rm -rf /tmp/testvenv
 
 # Runtime Stage
 ################################################################################
@@ -33,7 +93,13 @@ RUN apt-get update -y \
      ca-certificates \
      curl \
      unzip \
+     python3 \
      && rm -rf /var/lib/apt/lists/*
+
+# The Snowpipe Streaming (high-performance) python SDK sidecar.
+COPY --from=pybuilder /opt/venv                   /opt/venv
+COPY --from=pybuilder /opt/estuary-cdk            /opt/estuary-cdk
+COPY --from=pybuilder /opt/materialize-snowflake  /opt/materialize-snowflake
 
 # Avoid running the connector as root.
 USER nonroot:nonroot

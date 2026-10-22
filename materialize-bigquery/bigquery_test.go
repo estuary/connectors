@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"regexp"
@@ -13,11 +14,13 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
 
@@ -58,26 +61,95 @@ func TestIntegration(t *testing.T) {
 
 			prefix := loadResultsTablePrefix + translateFlowIdentifier(taskName)
 			cutoff := started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
-			var leaked []string
-			it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
-			for {
-				tbl, err := it.Next()
-				if err == iterator.Done {
-					break
+			listLeaked := func() []string {
+				var leaked []string
+				it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
+				for {
+					tbl, err := it.Next()
+					if err == iterator.Done {
+						break
+					}
+					require.NoError(t, err)
+					if !strings.HasPrefix(tbl.TableID, prefix) {
+						continue
+					}
+					md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
+					var gErr *googleapi.Error
+					if errors.As(err, &gErr) && gErr.Code == 404 {
+						continue // Deleted after the listing returned it.
+					}
+					require.NoError(t, err)
+					if md.CreationTime.Before(cutoff) {
+						t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
+						continue
+					}
+					leaked = append(leaked, tbl.TableID)
 				}
-				require.NoError(t, err)
-				if !strings.HasPrefix(tbl.TableID, prefix) {
-					continue
-				}
-				md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
-				require.NoError(t, err)
-				if md.CreationTime.Before(cutoff) {
-					t.Logf("ignoring load results table %s from an earlier run", tbl.TableID)
-					continue
-				}
-				leaked = append(leaked, tbl.TableID)
+				return leaked
+			}
+			// A table listing can lag a delete by several seconds, so a
+			// table is only leaked if it is still listed after the lag has
+			// had time to clear.
+			leaked := listLeaked()
+			for deadline := time.Now().Add(time.Minute); len(leaked) > 0 && time.Now().Before(deadline); {
+				time.Sleep(5 * time.Second)
+				leaked = listLeaked()
 			}
 			require.Empty(t, leaked, "leaked load results tables")
+		})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
+			var bq = bqTestClient(t, cfg, tables...)
+
+			flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+			require.NoError(t, err)
+			materializer, err := NewMaterializer(ctx, taskName, cfg, flags)
+			require.NoError(t, err)
+			defer materializer.Close(ctx)
+			require.NoError(t, materializer.CleanupTestTask(ctx, taskName))
+
+			// Two shards, so that the primary truncates after applying a peer's
+			// staged stores.
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", taskName,
+				"--source", "testdata/truncate.flow.yaml",
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "2",
+				"--timeout", "10m",
+				"--network", "flow-test",
+				"--log-json",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var query = bq.Query(fmt.Sprintf("SELECT id FROM `%s.%s.%s` ORDER BY id;", cfg.ProjectID, cfg.Dataset, table))
+				query.Location = cfg.Region
+				it, err := query.Read(ctx)
+				require.NoError(t, err)
+				var ids []int64
+				for {
+					var row []bigquery.Value
+					if err := it.Next(&row); err == iterator.Done {
+						break
+					}
+					require.NoError(t, err)
+					ids = append(ids, row[0].(int64))
+				}
+				require.Equal(t, want, ids, table)
+			}
 		})
 	})
 

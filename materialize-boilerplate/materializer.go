@@ -79,6 +79,10 @@ type MaterializeCfg struct {
 	// result in a resource deletion + re-creation.
 	NoTruncateResources bool
 
+	// KeyChangeInPlace indicates that a backfill with a changed collection key
+	// does not require re-creating the resource.
+	KeyChangeInPlace bool
+
 	// Serialization policy to use for all bindings of this materialization.
 	SerPolicy *pf.SerPolicy
 
@@ -611,10 +615,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				return false
 			})
 
-			// For simplicity, if the collection key has changed the resource
-			// will be re-created, although theoretically some systems could
-			// handle this change without fully dropping & re-creating.
-			if !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
+			// A changed collection key requires re-creating the resource,
+			// unless the endpoint doesn't enforce keys.
+			if !mCfg.KeyChangeInPlace && !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
 				doTruncate = false
 			}
 
@@ -759,10 +762,10 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			return nil, err
 		} else {
 			addResourceAction(desc, action)
-			if (action != nil || update.NewlyDeltaUpdates) && !destructiveBindings[bindingIdx] {
-				// The binding's resource is being updated in-place, so any
-				// transaction previously staged against it must be committed
-				// before the update runs.
+			if (action != nil || update.NewlyDeltaUpdates || selectedFieldsChanged(req, bindingIdx)) && !destructiveBindings[bindingIdx] {
+				// The binding's resource is being updated in-place, or its
+				// selected fields are changing, so any transaction previously
+				// staged against it must be committed before the update runs.
 				drainBindings[bindingIdx] = true
 			}
 		}
@@ -827,6 +830,21 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	allActions = append(allActions, resourceActionDescriptions...)
 
 	return &pm.Response_Applied{ActionDescription: strings.Join(allActions, "\n")}, nil
+}
+
+// selectedFieldsChanged reports whether the field selection of the given
+// binding differs, in content or order, from that of the last-applied binding
+// of the same resource.
+func selectedFieldsChanged(req *pm.Request_Apply, bindingIdx int) bool {
+	var next = req.Materialization.Bindings[bindingIdx]
+	var last = FindLastBinding(next.ResourcePath, req.LastMaterialization)
+	if last == nil {
+		return false
+	}
+
+	return !slices.Equal(last.FieldSelection.Keys, next.FieldSelection.Keys) ||
+		!slices.Equal(last.FieldSelection.Values, next.FieldSelection.Values) ||
+		last.FieldSelection.Document != next.FieldSelection.Document
 }
 
 // pinFeatureFlags records the resolved value of any cutoff-gated flag that the

@@ -1,5 +1,41 @@
 # materialize-motherduck
 
+## 2026-10-13
+
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to the date range of each transaction's keys.
+
+## 2026-10-08
+
+### Changed
+- The integration test suite now runs against a MotherDuck organization owned
+  service account instead of a personal account. Its `ci_testing` and
+  `ci_testing_ducklake` databases are shared read-only with every member of
+  the organization.
+
+## 2026-10-05
+
+### Added
+- When a collection is backfilled, rows the backfill did not re-send are deleted
+  from standard-updates tables once it completes, so documents removed from the
+  source no longer linger in the destination. Delta-updates tables keep every
+  row. A table that excludes the `flow_published_at` field is left unchanged,
+  and a warning on the task page explains why.
+  Disable it with the `no_truncate_after_backfill` feature flag. It is also
+  disabled while `retain_existing_data_on_backfill` is enabled.
+
+## 2026-10-02
+
+### Fixed
+- A DuckLake destination could fail a publication or restart a task with
+  `Failed to commit DuckLake transaction` when another writer committed to the
+  same database at the same moment. Creating, altering, dropping, and
+  truncating tables, creating schemas, and starting a task now retry this
+  conflict, waiting a little longer before each attempt.
+- Retries of a failed data commit now wait before trying again, making them
+  less likely to collide with the same concurrent writer.
+
 ## 2026-08-25
 
 ### Added

@@ -4,15 +4,71 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"text/template"
+	"time"
 
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
+
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		var ctx = context.Background()
+		// The connector's database outlives its process, so each run starts
+		// from a fresh file.
+		for _, path := range []string{databasePath, databasePath + "-journal"} {
+			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				require.NoError(t, err)
+			}
+		}
+
+		testutil.RunFlowctl(t, "raw", "preview-next",
+			"--name", "acmeCo/tests/materialize-sqlite-truncate",
+			"--source", "testdata/truncate.flow.yaml",
+			"--fixture", "testdata/truncate.fixture.json",
+			"--shards", "1",
+			"--timeout", "5m",
+		)
+
+		db, err := stdsql.Open("sqlite3", databasePath)
+		require.NoError(t, err)
+		defer db.Close()
+
+		// The fixture stores ids 1-3, then re-stores only id 1 during a
+		// backfill. Only the table with a flow_published_at column loses the
+		// rows published before the backfill.
+		for table, want := range map[string][]int64{
+			"truncate_standard":        {1},
+			"truncate_no_published_at": {1, 2, 3},
+		} {
+			var rows, err = db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+			require.NoError(t, err)
+			var ids []int64
+			for rows.Next() {
+				var id int64
+				require.NoError(t, rows.Scan(&id))
+				ids = append(ids, id)
+			}
+			require.NoError(t, rows.Err())
+			require.NoError(t, rows.Close())
+			require.Equal(t, want, ids, table)
+		}
+	})
+}
 
 func TestStoreInsertThenUpdate(t *testing.T) {
 	var ctx = context.Background()
@@ -50,6 +106,89 @@ func TestStoreInsertThenUpdate(t *testing.T) {
 	require.JSONEq(t, `{"id":1,"v":2}`, documentJSON(t, byID[1]["flow_document"]))
 	require.Equal(t, "orig2", byID[2]["canary"])
 	require.JSONEq(t, `{"id":2}`, documentJSON(t, byID[2]["flow_document"]))
+}
+
+func TestTruncateBoundaryPrecision(t *testing.T) {
+	var ctx = t.Context()
+	var shape = testTableShape("truncate_precision")
+	shape.Values = append(shape.Values, sql.Projection{Projection: pf.Projection{
+		Field: "flow_published_at",
+		Ptr:   "/_meta/uuid",
+		Inference: pf.Inference{
+			Types:   []string{"string"},
+			Exists:  pf.Inference_MUST,
+			String_: &pf.Inference_String{Format: "date-time", ContentEncoding: "uuid"},
+		},
+	}})
+	table, err := sql.ResolveTable(shape, sqliteDialect)
+	require.NoError(t, err)
+
+	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	_, err = db.ExecContext(ctx, mustRender(t, table, tplCreateTargetTable))
+	require.NoError(t, err)
+
+	var d = &transactor{}
+	d.load.conn, err = db.Conn(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { d.load.conn.Close() })
+	_, err = d.load.conn.ExecContext(ctx, attachSQL)
+	require.NoError(t, err)
+	require.NoError(t, d.addBinding(ctx, table))
+	var truncateSQL = d.bindings[0].store.truncateSQL
+	require.NotEmpty(t, truncateSQL)
+
+	// Rows published one nanosecond on either side of the boundary, and at
+	// it, in the fixed-width form the runtime writes.
+	var boundary = time.Date(2026, 9, 29, 12, 0, 0, 500, time.UTC)
+	var insertSQL = mustRender(t, table, tplStoreInsert)
+	for id, publishedAt := range map[int64]string{
+		1: "2026-09-29T12:00:00.000000499Z",
+		2: "2026-09-29T12:00:00.000000500Z",
+		3: "2026-09-29T12:00:00.000000501Z",
+	} {
+		_, err = db.ExecContext(ctx, insertSQL, id, "canary", publishedAt, "{}")
+		require.NoError(t, err)
+	}
+
+	res, err := db.ExecContext(ctx, truncateSQL, boundary.Format(publishedAtLayout))
+	require.NoError(t, err)
+	n, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), n)
+
+	var byID = readTableByID(t, ctx, db, table.Identifier)
+	require.Len(t, byID, 2)
+	require.Contains(t, byID, int64(2))
+	require.Contains(t, byID, int64(3))
+}
+
+func TestStoreUpdateWithoutValues(t *testing.T) {
+	var ctx = context.Background()
+
+	var shape = testTableShape("key_only")
+	shape.Values = nil
+	table, db := setupTestTableShape(t, shape)
+
+	insertSQL := mustRender(t, table, tplStoreInsert)
+	updateSQL := mustRender(t, table, tplStoreUpdate)
+
+	params, err := table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{}, json.RawMessage(`{"id":1}`))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, insertSQL, params...)
+	require.NoError(t, err)
+
+	params, err = table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{}, json.RawMessage(`{"id":1,"v":2}`))
+	require.NoError(t, err)
+	res, err := db.ExecContext(ctx, updateSQL, params...)
+	require.NoError(t, err)
+	affected, err := res.RowsAffected()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), affected)
+
+	byID := readTableByID(t, ctx, db, table.Identifier)
+	require.JSONEq(t, `{"id":1,"v":2}`, documentJSON(t, byID[1]["flow_document"]))
 }
 
 func TestLoad(t *testing.T) {
@@ -117,6 +256,48 @@ func TestLoad(t *testing.T) {
 	require.JSONEq(t, `{"id":2,"v":2}`, got[2])
 }
 
+func TestCreateLoadTableAfterRestart(t *testing.T) {
+	var ctx = context.Background()
+
+	table, err := sql.ResolveTable(testTableShape("test_results"), sqliteDialect)
+	require.NoError(t, err)
+	var path = filepath.Join(t.TempDir(), "test.db")
+	var createSQL = mustRender(t, table, tplCreateLoadTable)
+
+	// Each iteration is one connector run against the same database file.
+	for range 2 {
+		conn := openLoadConn(t, ctx, path)
+		_, err := conn.ExecContext(ctx, createSQL)
+		require.NoError(t, err)
+		require.NoError(t, conn.Close())
+	}
+
+	// The destination file holds no staging tables.
+	db, err := stdsql.Open("sqlite3", path)
+	require.NoError(t, err)
+	defer db.Close()
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT count(*) FROM sqlite_master WHERE name LIKE 'flow_temp_table_%'`).Scan(&count))
+	require.Zero(t, count)
+}
+
+// openLoadConn opens a connection to the database at path with the load
+// database attached.
+func openLoadConn(t *testing.T, ctx context.Context, path string) *stdsql.Conn {
+	t.Helper()
+
+	db, err := stdsql.Open("sqlite3", path)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, attachSQL)
+	require.NoError(t, err)
+	return conn
+}
+
 func testTableShape(name string) sql.TableShape {
 	return sql.TableShape{
 		Path:    sql.TablePath{name},
@@ -137,16 +318,27 @@ func testTableShape(name string) sql.TableShape {
 }
 
 // setupTestTable resolves the test table shape through the real sqliteDialect,
-// opens an isolated on-disk database, and creates the target table.
+// opens an isolated on-disk database with the load database attached, and
+// creates the target table.
 func setupTestTable(t *testing.T) (sql.Table, *stdsql.DB) {
 	t.Helper()
+	return setupTestTableShape(t, testTableShape("test_results"))
+}
 
-	table, err := sql.ResolveTable(testTableShape("test_results"), sqliteDialect)
+func setupTestTableShape(t *testing.T, shape sql.TableShape) (sql.Table, *stdsql.DB) {
+	t.Helper()
+
+	table, err := sql.ResolveTable(shape, sqliteDialect)
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
+
+	// The load database is attached per connection, so pin the pool to one.
+	db.SetMaxOpenConns(1)
+	_, err = db.ExecContext(context.Background(), attachSQL)
+	require.NoError(t, err)
 
 	_, err = db.ExecContext(context.Background(), mustRender(t, table, tplCreateTargetTable))
 	require.NoError(t, err)

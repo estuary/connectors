@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -153,6 +154,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 			defer db.Close()
 
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
+
 			caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
 			if err != nil {
 				return nil, err
@@ -170,6 +180,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{

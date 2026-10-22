@@ -1,0 +1,30 @@
+info:
+  name: C4 - Update Contact Alpha
+  type: http
+  seq: 23
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts/{{seed_contact_a_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "information": "estuary connector test seed (updated)"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** Run at least a few seconds after C3. Bumps Alpha `updated_at` past Charlie `created_at` (Aircall updates via POST /v1/contacts/:id, per the dinistavares/aircall Go client api.go:261; if it returns 404/405, switch the verb to PUT). Needs `seed_contact_a_id` from C1 in the same session.
+
+    Outcome: ran 2026-09-28 by the user; POST succeeded (the docs list PUT; both verbs route). Alpha updated_at → 1790603985; finding VERIFIED in `Contacts / order_by updated_at desc`.
+  type: text/markdown

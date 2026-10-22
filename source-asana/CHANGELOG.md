@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-19
+
+### Fixed
+- Captures of large workspaces no longer fail with `Your pagination token has expired` while
+  reading `stories` and similar child streams.
+- Captures that authenticate with OAuth no longer fail with `The bearer token has expired` after
+  running for more than an hour.
+
 ## 2026-07-29
 
 ### Fixed

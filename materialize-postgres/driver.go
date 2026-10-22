@@ -57,6 +57,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"native_binary_column_type":        common.FlagEnabled,
 	"enum":                             common.FlagEnabled,
 	"jsonb":                            common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -374,6 +375,12 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func newTransactor(
@@ -392,7 +399,12 @@ func newTransactor(
 	// Create templates using the dialect from the endpoint (which already has feature flags)
 	templates := renderTemplates(ep.Dialect)
 
-	var d = &transactor{cfg: cfg, templates: templates, be: be}
+	var d = &transactor{
+		cfg:                   cfg,
+		templates:             templates,
+		be:                    be,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+	}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -440,6 +452,7 @@ type binding struct {
 	storeInsertSQL    string
 	deleteQuerySQL    string
 	loadQuerySQL      string
+	truncateSQL       string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -473,6 +486,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		}
 	}
 
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
+	}
+
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
@@ -500,6 +517,34 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }
@@ -637,6 +682,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	batchBytes := 0
 
 	var round = it.Round
+	var truncations = d.truncations
 	var rowsAffected = make([]int64, len(d.bindings))
 	var stored = make([]bool, len(d.bindings))
 	countRows := func(rows []int64) {
@@ -725,10 +771,32 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("results.Close(): %w", err))
 		}
 
-		for i, b := range d.bindings {
-			if stored[i] {
-				d.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(rowsAffected[i]))
+		// Truncations run after the stores, because a store of an existing row
+		// is an UPDATE that would match nothing if its row were already
+		// deleted.
+		var truncated = make(map[int]int64, len(truncations))
+		for binding, boundary := range truncations {
+			var b = d.bindings[binding]
+			if tag, err := txn.Exec(ctx, b.truncateSQL, boundary); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+			} else {
+				truncated[binding] = tag.RowsAffected()
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"deleted":  tag.RowsAffected(),
+				}).Info("truncated rows published before the backfill")
 			}
+		}
+
+		for i, b := range d.bindings {
+			var stats = m.TotalRowStats(rowsAffected[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if !stored[i] {
+				continue
+			}
+			d.be.ReportRowStats(round, b.target.Path, stats)
 		}
 
 		commitCtx, cancel := ctxWithQueryTimeout(ctx)

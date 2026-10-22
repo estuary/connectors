@@ -1,0 +1,40 @@
+info:
+  name: E2 - Delete user after 5 seconds
+  type: http
+  seq: 16
+
+http:
+  method: DELETE
+  url: "{{base_url}}/users/{{seed_user_e_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_user_e_id normally arrives from `Seeding / E1 - Create user to delete later`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('seed_user_e_id') && !bru.getEnvVar('seed_user_e_id')) {
+          throw new Error('seed_user_e_id not set: run `Seeding / E1 - Create user to delete later` first in this session, or bru.setVar it');
+        }
+        // Separate creation and deletion so the two timestamps are distinguishable.
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete User](https://developer.zendesk.com/api-reference/ticketing/users/users/#delete-user)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** Whether a deleted user's `updated_at` is its deletion time. E1 creates a
+  user; E2 waits 5 seconds and then deletes it, so creation and deletion times are
+  distinguishable. The `users` deletion subtask filters `/deleted_users` on
+  `updated_at`, because that endpoint only sorts by id. Afterwards re-run
+  `Deleted / deleted_users`.
+
+  **Outcome:** Ran 2026-10-07 (`updated_at` 20:04:15); VERIFIED in `Deleted / deleted_users`.

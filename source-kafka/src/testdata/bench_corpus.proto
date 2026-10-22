@@ -1,0 +1,107 @@
+// Payload shapes for benches/protobuf_path.rs. Each message stands in for a
+// kind of production topic: a tiny record, a service event, a wide flat row,
+// a text-heavy document, and a repeated-heavy batch. None of these is a real
+// customer schema. To measure a specific capture, add its schema as a shape
+// locally and do not commit it: this repository is public.
+syntax = "proto3";
+
+package bench;
+
+import "google/protobuf/timestamp.proto";
+
+message Tiny {
+  int64 id = 1;
+  string kind = 2;
+  int32 n = 3;
+  bool ok = 4;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OK = 1;
+  STATUS_ERROR = 2;
+  STATUS_TIMEOUT = 3;
+}
+
+message Usage {
+  int32 reads = 1;
+  int32 writes = 2;
+  float cost = 3;
+}
+
+message Event {
+  string request_id = 1;
+  string service = 2;
+  string region = 3;
+  int64 user_id = 4;
+  Status status = 5;
+  google.protobuf.Timestamp ts = 6;
+  double latency_ms = 7;
+  int32 bytes_in = 8;
+  int32 bytes_out = 9;
+  bool cached = 10;
+  map<string, string> labels = 11;
+  Usage usage = 12;
+  repeated string tags = 13;
+}
+
+message Wide {
+  int32 f01 = 1;
+  int64 f02 = 2;
+  string f03 = 3;
+  double f04 = 4;
+  bool f05 = 5;
+  uint32 f06 = 6;
+  float f07 = 7;
+  sint32 f08 = 8;
+  int32 f09 = 9;
+  int64 f10 = 10;
+  string f11 = 11;
+  double f12 = 12;
+  bool f13 = 13;
+  uint32 f14 = 14;
+  float f15 = 15;
+  sint32 f16 = 16;
+  int32 f17 = 17;
+  int64 f18 = 18;
+  string f19 = 19;
+  double f20 = 20;
+  bool f21 = 21;
+  uint32 f22 = 22;
+  float f23 = 23;
+  sint32 f24 = 24;
+  int32 f25 = 25;
+  int64 f26 = 26;
+  string f27 = 27;
+  double f28 = 28;
+  bool f29 = 29;
+  uint32 f30 = 30;
+  float f31 = 31;
+  sint32 f32 = 32;
+  int32 f33 = 33;
+  int64 f34 = 34;
+  string f35 = 35;
+  double f36 = 36;
+  bool f37 = 37;
+  uint32 f38 = 38;
+  float f39 = 39;
+  sint32 f40 = 40;
+}
+
+message Text {
+  string title = 1;
+  string body = 2;
+  string footer = 3;
+  int64 id = 4;
+}
+
+message Nested {
+  repeated Usage items = 1;
+  repeated double samples = 2;
+  string name = 3;
+}
+
+message Key {
+  string request_id = 1;
+  int32 shard = 2;
+}

@@ -1,5 +1,18 @@
 # source-sqlserver
 
+## 2026-10-21
+
+### Changed
+- Backfill progress in the connector status now counts tables which finished
+  backfilling since the capture last restarted, and includes an approximate
+  time remaining.
+
+## 2026-10-02
+
+### Fixed
+- Primary key discovery now reads the `sys` catalog views directly instead of
+  `INFORMATION_SCHEMA.KEY_COLUMN_USAGE`. This may reduce database locking in some setups.
+
 ## 2026-08-28
 
 ### Added

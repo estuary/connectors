@@ -34,11 +34,12 @@ const (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db         *stdsql.DB
-	dbNoSchema *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
-	xdb        *sqlx.DB   // used to easily read the results of SHOW queries
-	cfg        config
-	ep         *sql.Endpoint[config]
+	db                  *stdsql.DB
+	dbNoSchema          *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
+	xdb                 *sqlx.DB   // used to easily read the results of SHOW queries
+	cfg                 config
+	ep                  *sql.Endpoint[config]
+	materializationName string
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -63,11 +64,12 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}
 
 	return &client{
-		db:         db,
-		dbNoSchema: dbNoSchema,
-		xdb:        sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
-		cfg:        ep.Config,
-		ep:         ep,
+		db:                  db,
+		dbNoSchema:          dbNoSchema,
+		xdb:                 sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
+		cfg:                 ep.Config,
+		ep:                  ep,
+		materializationName: materializationName,
 	}, nil
 }
 
@@ -272,6 +274,30 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.dbNoSchema, c.ep.Dialect, schemaName)
 }
 
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
+	var sfError *sf.SnowflakeError
+	if errors.As(err, &sfError) {
+		switch sfError.Number {
+		case 390100:
+			err = fmt.Errorf("incorrect username or password")
+		case 390144:
+			err = fmt.Errorf("JWT token is invalid")
+		case 390201:
+			// This means "doesn't exist or not authorized", and we don't have a great way to
+			// distinguish between that for the database, schema, or warehouse. The snowflake
+			// error message in these cases is fairly decent fortunately.
+		case 390189:
+			err = fmt.Errorf("role %q does not exist", cfg.Role)
+		}
+
+		if strings.Contains(sfError.Message, "MFA with TOTP is required.") {
+			err = fmt.Errorf("username/password authentication is not supported for your account - try a different authentication method")
+		}
+	}
+	return err
+}
+
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
@@ -288,27 +314,7 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	}
 
 	if err := db.PingContext(ctx); err != nil {
-		var sfError *sf.SnowflakeError
-		if errors.As(err, &sfError) {
-			switch sfError.Number {
-			case 390100:
-				err = fmt.Errorf("incorrect username or password")
-			case 390144:
-				err = fmt.Errorf("JWT token is invalid")
-			case 390201:
-				// This means "doesn't exist or not authorized", and we don't have a great way to
-				// distinguish between that for the database, schema, or warehouse. The snowflake
-				// error message in these cases is fairly decent fortunately.
-			case 390189:
-				err = fmt.Errorf("role %q does not exist", cfg.Role)
-			}
-
-			if strings.Contains(sfError.Message, "MFA with TOTP is required.") {
-				err = fmt.Errorf("username/password authentication is not supported for your account - try a different authentication method")
-			}
-		}
-
-		errs.Err(err)
+		errs.Err(connectError(err, cfg))
 	} else {
 		// Check for an active warehouse for the connection. If there is no default warehouse for
 		// the user and the configuration did not set a warehouse, this may be `null`, and the user

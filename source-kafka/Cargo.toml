@@ -43,6 +43,10 @@ prost-reflect = { version = "0.16", features = ["serde"] }
 prost-types = "0.14"
 
 
+[[bench]]
+name = "protobuf_path"
+harness = false
+
 [dev-dependencies]
 insta = { version = "1", features = ["json", "serde"] }
 # Compiles the differential test corpus .proto at test time. At runtime the

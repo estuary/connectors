@@ -17,11 +17,10 @@
     "skipHostKeyVerification": {
       "type": "boolean",
       "title": "Skip Host Key Verification",
-      "description": "Connect without verifying the SFTP server's host key.",
+      "description": "Connect without verifying the SFTP server's host key. This leaves the capture open to man-in-the-middle attacks.",
       "default": false,
       "order": 2,
-      "nonsensitive": true,
-      "x-hidden-field": true
+      "nonsensitive": true
     },
     "credentials": {
       "type": "object",

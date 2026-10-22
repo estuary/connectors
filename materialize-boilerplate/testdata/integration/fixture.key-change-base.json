@@ -1,0 +1,4 @@
+["key/change",{"id":1,"tenant":"a","value":"one"}]
+["key/change",{"id":2,"tenant":"a","value":"two"}]
+["key/change",{"id":3,"tenant":"b","value":"three"}]
+{"commit":true}

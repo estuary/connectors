@@ -1,0 +1,170 @@
+[
+  [
+    "acmeCo/contacts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "company_name": "Test your sound",
+      "created_at": 1790590869,
+      "direct_link": "https://api.aircall.io/v1/contacts/518690461",
+      "emails": [],
+      "first_name": "Echo",
+      "id": 518690461,
+      "information": "Call this number to test your sound!",
+      "is_shared": true,
+      "last_name": "Test",
+      "phone_numbers": [
+        {
+          "id": 2168224894,
+          "label": "Main",
+          "value": "+16314402060"
+        }
+      ],
+      "updated_at": 1790590869
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "availability_status": "redacted",
+      "available": "redacted",
+      "created_at": "2026-09-28T10:21:09.000Z",
+      "default_number_id": 1389850,
+      "direct_link": "https://api.aircall.io/v2/users/2078847",
+      "email": "jonathan@estuary.dev",
+      "extension": "001",
+      "id": 2078847,
+      "language": "en-US",
+      "name": "Jonathan Wihl",
+      "state": "always_opened",
+      "substatus": "redacted",
+      "time_zone": "Etc/UTC",
+      "wrap_up_time": 0
+    }
+  ],
+  [
+    "acmeCo/user_availability",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "availability": "redacted",
+      "id": 2078847
+    }
+  ],
+  [
+    "acmeCo/teams",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-09-28T14:07:43.000Z",
+      "direct_link": "https://api.aircall.io/v1/teams/262615",
+      "id": 262615,
+      "name": "Estuary Bruno Seed Team",
+      "users": [
+        {
+          "availability_status": "redacted",
+          "created_at": "2026-09-28T10:21:09.000Z",
+          "default_number_id": 1389850,
+          "direct_link": "https://api.aircall.io/v1/users/2078847",
+          "email": "jonathan@estuary.dev",
+          "id": 2078847,
+          "language": "en-US",
+          "name": "Jonathan Wihl",
+          "time_zone": "Etc/UTC",
+          "wrap_up_time": 0
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/numbers",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "availability_status": "redacted",
+      "country": "US",
+      "created_at": "2026-09-28T10:21:51.000Z",
+      "digits": "+1 984-314-0278",
+      "direct_link": "https://api.aircall.io/v1/numbers/1389850",
+      "id": 1389850,
+      "is_ivr": false,
+      "live_recording_activated": true,
+      "messages": {
+        "after_hours": null,
+        "callback_later": "https://media-web.aircall.io/tts/languages/en/voices/Joanna/a04a676e475a50791cccbea7faa349dab88c4f05.mp3",
+        "closed": "https://media-web.aircall.io/tracks/tts/languages/en/voices/Joanna/e5bc465c2b0595ade98a98500aa6851cb557a663.mp3",
+        "ivr": null,
+        "ringing_tone": null,
+        "unanswered_call": "https://media-web.aircall.io/tracks/tts/languages/en/voices/Joanna/74ce97ac9772be646ccf5583b92be7248930af18.mp3",
+        "voicemail": null,
+        "waiting": "https://media-web.aircall.io/tracks/library/bensound-retrosoul-normalized.mp3",
+        "welcome": null
+      },
+      "name": "Jonathan Wihl Number - 1790590903483",
+      "open": "redacted",
+      "priority": 0,
+      "time_zone": "America/Chicago"
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "color": "#29C8FF",
+      "description": "queue_callback",
+      "id": 3037353,
+      "name": "Callback Request"
+    }
+  ],
+  [
+    "acmeCo/webhooks",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "created_at": "2026-09-28T14:07:54.001Z",
+      "direct_link": "https://api.aircall.io/v1/webhooks/7c97a580-72dc-47f0-b593-a82faadc27c2",
+      "events": [
+        "number.created"
+      ],
+      "id": 44215352,
+      "url": "https://example.com/estuary-bruno-seed",
+      "webhook_id": "7c97a580-72dc-47f0-b593-a82faadc27c2"
+    }
+  ],
+  [
+    "acmeCo/company",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "name": "Estuary",
+      "numbers_count": "redacted",
+      "users_count": "redacted"
+    }
+  ]
+]

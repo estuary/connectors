@@ -1,0 +1,100 @@
+info:
+  name: backward page 1
+  type: graphql
+  seq: 2
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Alerts($prefix: String!) {
+        alerts(by: { prefix: $prefix }, last: 3) {
+          pageInfo { hasPreviousPage hasNextPage startCursor endCursor }
+          edges { cursor node { catalogName alertType firedAt resolvedAt } }
+        }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix}}"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const ec = res.getBody()?.data?.alerts?.pageInfo?.endCursor;
+        if (ec) bru.setVar('alerts_before', ec);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alerts.rs
+
+  **WHY:** The connector pages alerts backward. This proves which cursor
+  continues the walk (edges are newest-first, so the *oldest* edge on the page
+  is `endCursor`, not `startCursor` as Relay convention would suggest) and that
+  `hasPreviousPage` is the "more" flag. Captures `endCursor` into the runtime var
+  `alerts_before` for `Alerts / backward page 2`.
+
+  **VERIFIED (2026-10-07):** `last: 3` returns the 3 newest, `hasPreviousPage: true`, `hasNextPage: false`. **`endCursor` is the oldest edge** (edges are newest-first), so continue with `before: endCursor`, not `startCursor`.
+
+examples:
+  - name: 200 - last 3, hasPreviousPage true
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alerts": {
+                "pageInfo": {
+                  "hasPreviousPage": true,
+                  "hasNextPage": false,
+                  "startCursor": "2026-06-02T13:14:14.852195+00:00;shard_failed;Jonathan_Wihl/wikipedia/user-fact-table",
+                  "endCursor": "2026-06-02T12:48:43.441117+00:00;shard_failed;Jonathan_Wihl/gpt-notion"
+                },
+                "edges": [
+                  {
+                    "cursor": "2026-06-02T13:14:14.852195+00:00;shard_failed;Jonathan_Wihl/wikipedia/user-fact-table",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/wikipedia/user-fact-table",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T13:14:14.852195+00:00",
+                      "resolvedAt": "2026-06-02T16:40:00.266912+00:00"
+                    }
+                  },
+                  {
+                    "cursor": "2026-06-02T13:00:34.735123+00:00;shard_failed;Jonathan_Wihl/notion-input",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T13:00:34.735123+00:00",
+                      "resolvedAt": "2026-06-02T16:50:03.681473+00:00"
+                    }
+                  },
+                  {
+                    "cursor": "2026-06-02T12:48:43.441117+00:00;shard_failed;Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T12:48:43.441117+00:00",
+                      "resolvedAt": "2026-06-02T16:50:01.258105+00:00"
+                    }
+                  }
+                ]
+              }
+            }
+          }

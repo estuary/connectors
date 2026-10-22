@@ -1,31 +1,25 @@
-[tool.poetry]
+[project]
 name = "source-zendesk-support"
 version = "0.1.0"
 description = ""
-authors = ["Alex Bair <alexb@estuary.dev>"]
+authors = [
+    { name = "Alex Bair", email = "alexb@estuary.dev" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "estuary-cdk[airbyte-shim]",
+    "pytz>=2026.5,<2027.0",
+    "requests-futures>=1.0.1,<2.0.0",
+    "urllib3>=2.7.0,<3.0.0",
+    "requests>=2.33.0,<3.0.0",
+    "aiohttp>=3.14.4,<4.0.0",
+]
 
-[tool.poetry.dependencies]
-airbyte-cdk = "^0.52"
-estuary-cdk = {path="../estuary-cdk", develop = true, extras = ["airbyte-shim"]}
-python = "^3.11"
-pydantic = "< 1.10.15"
-pytz = "^2024.1"
-requests-futures = "^1.0.1"
-urllib3 = "^2.7.0"
-pycares = "^4.9.0"
-requests = "^2.33.0"
-Jinja2 = "^3.1.5"
-aiohttp = "^3.14.3"
-
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.8.0"
-mypy = "^1.8.0"
-pytest = "^7.4.3"
-pytest-insta = "^0.3.0"
-requests-mock = "^1.11.0"
-pytest-mock = "^3.12.0"
-freezegun = "^1.4.0"
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

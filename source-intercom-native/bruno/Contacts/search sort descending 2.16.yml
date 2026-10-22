@@ -1,0 +1,70 @@
+info:
+  name: search sort descending 2.16
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts/search"
+  headers:
+    - name: Intercom-Version
+      value: "2.16"
+  body:
+    type: json
+    data: |-
+      {
+        "query": { "field": "updated_at", "operator": ">", "value": 0 },
+        "pagination": { "per_page": 1 },
+        "sort": { "field": "updated_at", "order": "descending" }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - accepted (projection: id, updated_at)
+    request:
+      url: "{{base_url}}/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "list",
+            "data": [
+              {
+                "id": "67570a878b6e26fe4ce6a894",
+                "updated_at": 1772633377
+              }
+            ],
+            "total_count": 3,
+            "pages": {
+              "type": "pages",
+              "next": {
+                "page": 2,
+                "starting_after": "WzE3NzI2MzMzNzcwMDAsIjY3NTcwYTg3OGI2ZTI2ZmU0Y2U2YTg5NCIsMl0="
+              },
+              "page": 1,
+              "per_page": 1,
+              "total_pages": 3
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Search contacts (2.16)](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/contacts/searchcontacts)
+
+  Read-only search, but sent as POST. Run only with the user's consent.
+
+  **WHY:** The fix candidate on 2.16: `descending` should be accepted.
+
+  **VERIFIED (2026-10-02):** 200; `descending` is accepted on 2.16.

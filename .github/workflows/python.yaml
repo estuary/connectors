@@ -10,6 +10,15 @@ on:
   pull_request:
     branches: [main]
 
+  # Push runs only build the connectors a change touches, so a deploy that
+  # failed, or a queued run a newer push replaced, stays missed until the
+  # connector changes again. The nightly run builds and deploys every Python
+  # connector, fixing those within a day and picking up base image updates.
+  # A manual run does the same; it only moves `dev` and version tags on main.
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Don't cancel in progress builds of main, since that can result in connector
@@ -74,6 +83,10 @@ jobs:
 
   py_connector:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     needs: [classify_changes, fetch_flow]
     if: needs.classify_changes.outputs.run == 'true'
     name: ${{ matrix.connector.name }}
@@ -81,6 +94,11 @@ jobs:
       fail-fast: false
       matrix:
         connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
+
+    # Without this, uv picks the runner's system Python. Test on the Python
+    # the images ship, and keep it in step with estuary-cdk/*.Dockerfile.
+    env:
+      UV_PYTHON: "3.14"
 
     steps:
       - uses: actions/checkout@v4
@@ -101,24 +119,46 @@ jobs:
         uses: ./.github/actions/setup
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          gcp_service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-      - name: Install Python
-        uses: actions/setup-python@v5
+      # uv provisions the interpreter itself, so there is no separate
+      # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          version: "0.13.3"
+          enable-cache: true
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      # Report-only: findings show up as PR annotations without failing the
+      # job. It runs before the tests so it still reports when they fail. The
+      # version must match `required-version` in ruff.toml.
+      - name: ${{ matrix.connector.name }} lint
+        run: |
+          uvx ruff@0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
+          # GitHub renders only the first handful of annotations per step, and
+          # caps them per run as well, so with a matrix this wide the counts
+          # also go to the job summary, where none are dropped.
+          {
+            echo "### ruff: ${{ matrix.connector.name }}"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics ${{ matrix.connector.name }}
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: ${{ matrix.connector.name }} tests
         run: |
-          cd ${{ matrix.connector.name }}
-          poetry install
-          source $(poetry env info --path)/bin/activate
-          cd ..
-          pytest ${{ matrix.connector.name }}
+          uv sync --locked --package ${{ matrix.connector.name }} --all-extras --group dev --group lint
+          uv run --no-sync pytest ${{ matrix.connector.name }}
+
+      # Report-only, like the lint step above. The connectors carry a large
+      # pre-existing backlog, so this surfaces findings as annotations and a
+      # per-rule tally in the job summary rather than gating on them. It runs
+      # after the tests because it needs the synced environment, and the
+      # changed-connector matrix keeps each job's findings to one connector.
+      - name: ${{ matrix.connector.name }} type-check
+        run: |
+          uv run --no-sync pyright --outputjson ${{ matrix.connector.name }} \
+            | python3 .github/scripts/pyright_annotations.py ${{ matrix.connector.name }}
 
       - name: Find Dockerfile for ${{ matrix.connector.name }}
         id: dockerfile
@@ -140,6 +180,23 @@ jobs:
             CONNECTOR_TYPE=${{ matrix.connector.type }}
             USAGE_RATE=${{ matrix.connector.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+
+      # The tests run in the workspace venv, which also holds the dev group, so
+      # an import that only a dev dependency satisfies still passes them.
+      # Asking the built image for its spec imports the connector from what
+      # the image actually installed.
+      - name: ${{ matrix.connector.name }} image smoke test
+        run: |
+          cat > "${RUNNER_TEMP}/smoke.flow.yaml" <<EOF
+          captures:
+            acmeCo/smoke-test:
+              endpoint:
+                connector:
+                  image: ghcr.io/estuary/${{ matrix.connector.name }}:local
+                  config: {}
+              bindings: []
+          EOF
+          flowctl raw spec --source "${RUNNER_TEMP}/smoke.flow.yaml" > /dev/null
 
       - name: Deployment
         uses: ./.github/actions/deploy

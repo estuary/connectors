@@ -1,0 +1,70 @@
+info:
+  name: deleted_users crafted seek
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/deleted_users?sort={{seek_sort}}&page[size]=100&page[after]={{crafted_cursor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Build a keyset cursor from plain values instead of one Zendesk returned:
+        // base64(JSON {"o": <order>, "v": base64(type byte + int64 LE, ...)}), with
+        // type 'd' = epoch-seconds updated_at and 'i' = id. Not a credential, so a
+        // runtime var is fine.
+        const T = BigInt(bru.getEnvVar('seek_updated_at'));
+        const id = BigInt(bru.getEnvVar('seek_id'));
+        const order = bru.getEnvVar('seek_order');
+        const buf = Buffer.alloc(18);
+        buf.write('d', 0); buf.writeBigInt64LE(T, 1);
+        buf.write('i', 9); buf.writeBigInt64LE(id, 10);
+        const cursor = Buffer.from(JSON.stringify({ o: order, v: buf.toString('base64') })).toString('base64');
+        bru.setVar('crafted_cursor', cursor);
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - sort=updated_at rejected"
+    request:
+      url: "{{base_url}}/deleted_users?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaS1ZxeG1vQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "60"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "sort is not valid"
+          }
+
+docs: |-
+  **REFERENCE:** [List Deleted Users](https://developer.zendesk.com/api-reference/ticketing/users/users/#list-deleted-users)
+
+  **WHY:** Whether `/deleted_users` supports `sort=updated_at` with keyset cursors the
+  client can build, so user deletions can be read with the A8 sweep.
+
+  **VERIFIED (2026-10-07):** not supported: `/deleted_users` rejects `sort=updated_at` (see
+  `Deleted / deleted_users sort values`).

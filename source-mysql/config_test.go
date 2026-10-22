@@ -353,34 +353,45 @@ func TestEffectivePassword(t *testing.T) {
 }
 
 func TestDefaultSSLMode(t *testing.T) {
-	// Pinned per auth type so that adding another IAM method cannot silently reopen
-	// the plaintext fallback. The unknown-type case pins the fail-closed default.
-	for _, tc := range []struct {
-		authType AuthType
-		expect   string
-	}{
-		{UserPassword, mysqltls.ModePreferred},
-		{AWSIAM, mysqltls.ModeRequired},
-		{GCPIAM, mysqltls.ModeRequired},
-		{AzureIAM, mysqltls.ModeRequired},
-		{AuthType("Bogus"), mysqltls.ModeRequired},
-	} {
-		t.Run(string(tc.authType), func(t *testing.T) {
-			var cfg = Config{Credentials: &CredentialsConfig{AuthType: tc.authType}}
-			require.Equal(t, tc.expect, cfg.sslSettings().Mode)
-			require.Equal(t, tc.expect == mysqltls.ModePreferred, cfg.sslSettings().AllowsPlaintextFallback())
+	// Pinned per auth type so that no authentication scheme can silently weaken
+	// the default.
+	for _, authType := range []AuthType{UserPassword, AWSIAM, GCPIAM, AzureIAM, AuthType("Bogus")} {
+		t.Run(string(authType), func(t *testing.T) {
+			var cfg = Config{Credentials: &CredentialsConfig{AuthType: authType}}
+			require.Equal(t, mysqltls.ModeRequired, cfg.sslSettings().EffectiveMode())
+			require.False(t, cfg.sslSettings().AllowsPlaintextFallback())
 		})
 	}
 
-	t.Run("LegacyPasswordIsPreferred", func(t *testing.T) {
+	t.Run("LegacyPasswordIsRequired", func(t *testing.T) {
 		var cfg = Config{Password: "secret"}
-		require.Equal(t, mysqltls.ModePreferred, cfg.sslSettings().Mode)
+		require.Equal(t, mysqltls.ModeRequired, cfg.sslSettings().EffectiveMode())
 	})
 	t.Run("ExplicitModeWins", func(t *testing.T) {
 		var cfg = Config{Credentials: &CredentialsConfig{AuthType: AWSIAM}}
 		cfg.Advanced.SSLMode = mysqltls.ModeVerifyIdentity
-		require.Equal(t, mysqltls.ModeVerifyIdentity, cfg.sslSettings().Mode)
+		require.Equal(t, mysqltls.ModeVerifyIdentity, cfg.sslSettings().EffectiveMode())
 	})
+}
+
+// testCAPEM returns a throwaway self-signed CA certificate in PEM form, for
+// cases that need 'ssl_server_ca' to contain something that actually parses.
+func testCAPEM(t *testing.T) string {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	var tmpl = &x509.Certificate{
+		SerialNumber:          big.NewInt(1),
+		Subject:               pkix.Name{CommonName: "test-ca"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		KeyUsage:              x509.KeyUsageCertSign,
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }
 
 func TestSSLModeValidation(t *testing.T) {
@@ -410,7 +421,7 @@ func TestSSLModeValidation(t *testing.T) {
 		for _, mode := range []string{"", mysqltls.ModeDisabled, mysqltls.ModePreferred, mysqltls.ModeRequired} {
 			var name = mode
 			if name == "" {
-				name = "Unset"
+				name = "Unset" // Defaults to 'required'.
 			}
 			t.Run(name, func(t *testing.T) {
 				var cfg = base()
@@ -493,24 +504,4 @@ func TestSSLModeValidation(t *testing.T) {
 		require.Equal(t, "db.example.com", cfg.serverHost())
 		require.Equal(t, "db.example.com", (&Config{Address: "db.example.com"}).serverHost())
 	})
-}
-
-// testCAPEM returns a throwaway self-signed CA certificate in PEM form, for
-// cases that need 'ssl_server_ca' to contain something that actually parses.
-func testCAPEM(t *testing.T) string {
-	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-	var tmpl = &x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: "test-ca"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign,
-		IsCA:                  true,
-		BasicConstraintsValid: true,
-	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	require.NoError(t, err)
-	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }

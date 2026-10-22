@@ -1,0 +1,62 @@
+info:
+  name: Calls
+  type: folder
+  seq: 10
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Calls-folder helpers. Window bounds are computed here (unix seconds,
+        // relative to "now") so the requests never depend on the shared
+        // environments/Aircall.yml, which several sessions edit concurrently.
+        // Runtime vars only — non-secret.
+        const now = Math.floor(Date.now() / 1000);
+        const DAY = 86400;
+        bru.setVar('calls_now', String(now));
+        // A recent window, [now-30d, now-1s]: wide enough to include freshly
+        // placed test calls (the last whole elapsed second is the upper bound).
+        bru.setVar('calls_window_from', String(now - 30 * DAY));
+        bru.setVar('calls_window_to', String(now - 1));
+        // Entirely older than the documented six-month retention.
+        bru.setVar('calls_old_from', String(now - 365 * DAY));
+        bru.setVar('calls_old_to', String(now - 190 * DAY));
+    - type: after-response
+      code: |-
+        // 1) Surface the account's rate-limit headers on every Calls probe so the
+        //    budget can be recorded from live evidence.
+        const h = res.getHeaders() || {};
+        const pick = (k) => h[k] ?? h[k.toLowerCase()];
+        console.log('RATE', JSON.stringify({
+          limit: pick('X-AircallApi-Limit'),
+          remaining: pick('X-AircallApi-Remaining'),
+          reset: pick('X-AircallApi-Reset'),
+          status: res.getStatus(),
+        }));
+        // 2) Redact the signed, expiring media URLs (recording/voicemail: 1h;
+        //    *_short_url: 3h). They are bearer-style links to call audio and churn
+        //    on every read. Only non-null values are replaced, so presence stays
+        //    visible. Keep in sync with the calls stream's snapshot redactions
+        //    (plan: tests/test_snapshots.py REDACTED_FIELDS).
+        // Top-level Call fields only — nested objects (e.g. number.messages.voicemail,
+        // a static greeting URL) are left alone.
+        const MEDIA = ['recording', 'voicemail', 'recording_short_url', 'voicemail_short_url'];
+        function redactCall(c) {
+          if (!c || typeof c !== 'object') return c;
+          const o = { ...c };
+          for (const k of MEDIA) if (o[k] != null) o[k] = 'REDACTED';
+          return o;
+        }
+        function redact(b) {
+          if (Array.isArray(b.calls)) return { ...b, calls: b.calls.map(redactCall) };
+          if (b.call) return { ...b, call: redactCall(b.call) };
+          return b;
+        }
+        const body = res.getBody();
+        if (body && typeof body === 'object') {
+          res.setBody(redact(body));
+          if (body.meta) console.log('META', JSON.stringify(body.meta));
+          if (Array.isArray(body.calls)) {
+            console.log('CALLS', JSON.stringify(body.calls.map(c => [c.id, c.started_at, c.status])));
+          }
+        }

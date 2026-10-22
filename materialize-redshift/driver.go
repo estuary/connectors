@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -20,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -63,6 +65,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"s3_use_dualstack_endpoints":       common.FlagDisabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -268,6 +271,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 			defer db.Close()
 
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
+
 			var caseSensitiveIdentifier string
 			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
 				return nil, fmt.Errorf("querying enable_case_sensitive_identifier: %w", err)
@@ -297,6 +309,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       prepareNewTransactor(templates, caseSensitiveIdentifierEnabled),
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -329,6 +342,12 @@ type transactor struct {
 	committedTokens map[string]bool
 	// The whole state: staged transactions not yet applied, from every shard.
 	state connectorState
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging by Store.
+	truncations map[int]time.Time
 	// Set only for a task crossing over from the old format, whose row still
 	// holds the runtime checkpoint and whose state has nothing staged.
 	runtimeCheckpoint m.RuntimeCheckpoint
@@ -388,8 +407,9 @@ func prepareNewTransactor(
 				keyBegin:        fence.KeyBegin,
 				keyEnd:          fence.KeyEnd,
 			},
-			committedTokens: make(map[string]bool),
-			state:           make(connectorState),
+			committedTokens:       make(map[string]bool),
+			state:                 make(connectorState),
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 		}
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
@@ -457,6 +477,7 @@ type binding struct {
 	mergeIntoSQL              string
 	deleteQuerySQL            string
 	loadQuerySQL              string
+	truncateSQL               string
 
 	// The transaction being staged, if any.
 	staged *stateItem
@@ -501,6 +522,10 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
 		}
+	}
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
 	}
 
 	// The load/store/delete tables template are re-evaluated every transaction
@@ -860,6 +885,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
+	for binding, boundary := range d.truncations {
+		var b = d.bindings[binding]
+		if b.staged == nil {
+			b.staged = &stateItem{ID: uuid.NewString(), Round: it.Round}
+		}
+		b.staged.TruncateBefore = &boundary
+	}
+	d.truncations = nil
+
 	return func(ctx context.Context, checkpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		if checkpoint != nil {
 			raw, err := checkpoint.Marshal()
@@ -891,6 +925,38 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 	}, nil
+}
+
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged work.
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	d.truncations = make(map[int]time.Time, len(completes))
+	if !d.primary {
+		return nil
+	}
+	for binding, boundary := range completes {
+		var b = d.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			continue
+		}
+		d.truncations[binding] = boundary
+	}
+	return nil
 }
 
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
@@ -972,6 +1038,9 @@ type commitGroup struct {
 	// first merged entry's; a multi-shard commit is unchecked anyway.
 	round    int
 	hasRound bool
+	// truncated is the number of rows the group's truncation deleted, once
+	// it has run.
+	truncated *int64
 }
 
 // commit runs the staged transactions of pending as one Redshift
@@ -999,6 +1068,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			g.merged.DeleteFiles = append(g.merged.DeleteFiles, e.DeleteFiles...)
 			g.merged.MustMerge = g.merged.MustMerge || e.MustMerge
 			g.merged.Rows += e.Rows
+			if e.TruncateBefore != nil && (g.merged.TruncateBefore == nil || e.TruncateBefore.After(*g.merged.TruncateBefore)) {
+				g.merged.TruncateBefore = e.TruncateBefore
+			}
 			if rk == d.rangeKey || !g.hasRound {
 				g.round, g.hasRound = e.Round, true
 			}
@@ -1009,7 +1081,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			}
 			tokensMap.add(b.target.StateKey, rk, e.ID)
 		}
-		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 {
+		if len(g.merged.StoreFiles) > 0 || len(g.merged.DeleteFiles) > 0 || g.merged.TruncateBefore != nil {
 			groups = append(groups, g)
 		}
 	}
@@ -1098,6 +1170,9 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		stats := m.TotalRowStats(affected[g])
 		if g.merged.Rows > 0 {
 			stats = stats.WithStaged(g.merged.Rows)
+		}
+		if g.truncated != nil {
+			stats = stats.WithTruncated(*g.truncated)
 		}
 		d.be.ReportRowStats(g.round, g.binding.target.Path, stats)
 	}
@@ -1194,6 +1269,29 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			} else {
 				affected[g] += n
 			}
+		}
+
+		// The truncation runs after the stores, so that it keeps the rows
+		// they just wrote, which were published after the boundary.
+		if g.merged.TruncateBefore == nil {
+			// Pass.
+		} else if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *g.merged.TruncateBefore,
+				"reason":   reason.Error(),
+			}).Warn("skipping staged truncation because the binding no longer supports it")
+		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+		} else {
+			var n = tag.RowsAffected()
+			g.truncated = &n
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *g.merged.TruncateBefore,
+				"deleted":  n,
+			}).Info("truncated rows published before the backfill")
 		}
 
 		d.be.FinishedResourceCommit(b.target.Path)

@@ -3,7 +3,7 @@
 #
 
 from abc import ABC
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, TypeVar
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional
 
 import pendulum
 import pydantic
@@ -13,7 +13,9 @@ from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources import Source
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http import HttpStream, HttpSubStream
-from airbyte_cdk.sources.streams.http.availability_strategy import HttpAvailabilityStrategy
+from airbyte_cdk.sources.streams.http.availability_strategy import (
+    HttpAvailabilityStrategy,
+)
 from airbyte_cdk.sources.streams.http.exceptions import UserDefinedBackoffException
 from requests import HTTPError
 
@@ -28,7 +30,9 @@ class NotionAvailabilityStrategy(HttpAvailabilityStrategy):
     Inherit from HttpAvailabilityStrategy with slight modification to 403 error message.
     """
 
-    def reasons_for_unavailable_status_codes(self, stream: Stream, logger: Logger, source: Source, error: HTTPError) -> Dict[int, str]:
+    def reasons_for_unavailable_status_codes(
+        self, stream: Stream, logger: Logger, source: Source, error: HTTPError
+    ) -> Dict[int, str]:
 
         reasons_for_codes: Dict[int, str] = {
             requests.codes.FORBIDDEN: "This is likely due to insufficient permissions for your Notion integration. "
@@ -38,7 +42,6 @@ class NotionAvailabilityStrategy(HttpAvailabilityStrategy):
 
 
 class NotionStream(HttpStream, ABC):
-
     url_base = "https://api.notion.com/v1/"
 
     primary_key = "id"
@@ -53,7 +56,12 @@ class NotionStream(HttpStream, ABC):
 
         # If start_date is not found in config, set it to 2 years ago and update value in config for use in next stream
         if not self.start_date:
-            self.start_date = pendulum.now().subtract(years=2).in_timezone("UTC").format("YYYY-MM-DDTHH:mm:ss.SSS[Z]")
+            self.start_date = (
+                pendulum.now()
+                .subtract(years=2)
+                .in_timezone("UTC")
+                .format("YYYY-MM-DDTHH:mm:ss.SSS[Z]")
+            )
             config["start_date"] = self.start_date
 
     @property
@@ -105,13 +113,17 @@ class NotionStream(HttpStream, ABC):
         # In the case of a 504 Gateway Timeout error, we can lower the page_size when retrying to reduce the load on the server.
         if response.status_code == 504:
             self.page_size = self.throttle_request_page_size(self.page_size)
-            self.logger.info(f"Encountered a server timeout. Reducing request page size to {self.page_size} and retrying.")
+            self.logger.info(
+                f"Encountered a server timeout. Reducing request page size to {self.page_size} and retrying."
+            )
 
         # If page_size has been reduced after encountering a 504 Gateway Timeout error,
         # we increase it back to the default of 100 once a success response is achieved, for the following API calls.
         if response.status_code == 200 and self.page_size != 100:
             self.page_size = 100
-            self.logger.info(f"Successfully reconnected after a server timeout. Increasing request page size to {self.page_size}.")
+            self.logger.info(
+                f"Successfully reconnected after a server timeout. Increasing request page size to {self.page_size}."
+            )
 
         return response.status_code == 400 or super().should_retry(response)
 
@@ -138,20 +150,21 @@ class NotionStream(HttpStream, ABC):
         if next_cursor:
             return {"next_cursor": next_cursor}
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         # sometimes notion api returns response without results object
         data = response.json().get("results", [])
         yield from data
 
 
-T = TypeVar("T")
-
-
 class StateValueWrapper(pydantic.BaseModel):
-
-    stream: T
+    # `stream` holds the stream object itself, which is not a pydantic type.
+    # Under pydantic v1 the field was annotated with a bare TypeVar, which
+    # accepted anything; `Any` says the same thing and v2 accepts it.
+    stream: Any
     state_value: str
-    max_cursor_time = ""
+    max_cursor_time: str = ""
 
     def __repr__(self):
         """Overrides print view"""
@@ -162,13 +175,18 @@ class StateValueWrapper(pydantic.BaseModel):
         """Return max cursor time after stream sync is finished."""
         return self.max_cursor_time if self.stream.is_finished else self.state_value
 
-    def dict(self, **kwargs):
-        """Overrides default logic to return current value only."""
-        return {pydantic.utils.ROOT_KEY: self.value}
+    @pydantic.model_serializer
+    def serialize(self) -> str:
+        """Serialize as the cursor value alone.
+
+        Under pydantic v1 this was a `dict()` returning `{__root__: value}`,
+        which the enclosing model unwrapped to the bare value. A model
+        serializer is the v2 spelling of the same thing.
+        """
+        return self.value
 
 
 class IncrementalNotionStream(NotionStream, ABC):
-
     cursor_field = "last_edited_time"
 
     http_method = "POST"
@@ -185,7 +203,9 @@ class IncrementalNotionStream(NotionStream, ABC):
     def path(self, **kwargs) -> str:
         return "search"
 
-    def request_body_json(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> Optional[Mapping]:
+    def request_body_json(
+        self, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> Optional[Mapping]:
         if not self.obj_type:
             return
 
@@ -201,26 +221,36 @@ class IncrementalNotionStream(NotionStream, ABC):
 
         return body
 
-    def read_records(self, sync_mode: SyncMode, stream_state: Mapping[str, Any] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+    def read_records(
+        self, sync_mode: SyncMode, stream_state: Mapping[str, Any] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
         if sync_mode == SyncMode.full_refresh:
             stream_state = None
         try:
-            yield from super().read_records(sync_mode, stream_state=stream_state, **kwargs)
+            yield from super().read_records(
+                sync_mode, stream_state=stream_state, **kwargs
+            )
         except UserDefinedBackoffException as e:
             message = self.check_invalid_start_cursor(e.response)
             if message:
-                self.logger.error(f"Skipping stream {self.name}, error message: {message}")
+                self.logger.error(
+                    f"Skipping stream {self.name}, error message: {message}"
+                )
                 return
             raise e
 
-    def parse_response(self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs
+    ) -> Iterable[Mapping]:
         records = super().parse_response(response, stream_state=stream_state, **kwargs)
         for record in records:
             record_lmd = record.get(self.cursor_field, "")
             state_lmd = stream_state.get(self.cursor_field, "")
             if isinstance(state_lmd, StateValueWrapper):
                 state_lmd = state_lmd.value
-            if (not stream_state or record_lmd >= state_lmd) and record_lmd >= self.start_date:
+            if (
+                not stream_state or record_lmd >= state_lmd
+            ) and record_lmd >= self.start_date:
                 yield from transform_properties(record)
 
     def get_updated_state(
@@ -246,7 +276,9 @@ class Users(NotionStream):
     def path(self, **kwargs) -> str:
         return "users"
 
-    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = {"page_size": self.page_size}
         if next_page_token:
             params["start_cursor"] = next_page_token["next_cursor"]
@@ -262,7 +294,9 @@ class Users(NotionStream):
                 del record["bot"]["owner"][owner_type]
         return record
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, **kwargs
+    ) -> Iterable[Mapping]:
         # sometimes notion api returns response without results object
         data = response.json().get("results", [])
         for record in data:
@@ -304,7 +338,9 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
     def path(self, **kwargs) -> str:
         return f"blocks/{self.block_id_stack[-1]}/children"
 
-    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
+    def request_params(
+        self, next_page_token: Mapping[str, Any] = None, **kwargs
+    ) -> MutableMapping[str, Any]:
         params = {"page_size": self.page_size}
         if next_page_token:
             params["start_cursor"] = next_page_token["next_cursor"]
@@ -316,16 +352,19 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
         cursor_field: List[str] = None,
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Optional[Mapping[str, Any]]]:
-        # gather parent stream records in full
-        slices = list(super().stream_slices(SyncMode.full_refresh, cursor_field, stream_state))
+        page_ids = [
+            page["parent"]["id"]
+            for page in super().stream_slices(
+                SyncMode.full_refresh, cursor_field, stream_state
+            )
+        ]
 
         self.is_finished = False
-        for page in slices:
-            page_id = page["parent"]["id"]
+        for idx, page_id in enumerate(page_ids):
             self.block_id_stack.append(page_id)
 
             # stream sync is finished when it is on the last slice
-            self.is_finished = page_id == slices[-1]["parent"]["id"]
+            self.is_finished = idx == len(page_ids) - 1
 
             yield {"page_id": page_id}
 
@@ -338,12 +377,18 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
                 mention = r.get("mention")
                 if mention:
                     type_info = mention[mention["type"]]
-                    record[transform_object_field]["rich_text"][rich_text.index(r)]["mention"]["info"] = type_info
-                    del record[transform_object_field]["rich_text"][rich_text.index(r)]["mention"][mention["type"]]
+                    record[transform_object_field]["rich_text"][rich_text.index(r)][
+                        "mention"
+                    ]["info"] = type_info
+                    del record[transform_object_field]["rich_text"][rich_text.index(r)][
+                        "mention"
+                    ][mention["type"]]
 
         return record
 
-    def parse_response(self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs) -> Iterable[Mapping]:
+    def parse_response(
+        self, response: requests.Response, stream_state: Mapping[str, Any], **kwargs
+    ) -> Iterable[Mapping]:
         # pages and databases blocks are already fetched in their streams, so no
         # need to do it again
         # fetching of `ai_block` type is unsupported by API
@@ -381,7 +426,10 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
         if response.status_code == 400:
             error_code = response.json().get("code")
             error_msg = response.json().get("message")
-            if "validation_error" in error_code and "ai_block is not supported" in error_msg:
+            if (
+                "validation_error" in error_code
+                and "ai_block is not supported" in error_msg
+            ):
                 setattr(self, "raise_on_http_errors", False)
                 self.logger.error(
                     f"Stream {self.name}: `ai_block` type is not supported, skipping. See https://developers.notion.com/reference/block for available block type."
@@ -407,7 +455,10 @@ class Comments(HttpSubStream, IncrementalNotionStream):
         return "comments"
 
     def request_params(
-        self, next_page_token: Mapping[str, Any] = None, stream_slice: Mapping[str, Any] = None, **kwargs
+        self,
+        next_page_token: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
+        **kwargs,
     ) -> MutableMapping[str, Any]:
         block_id = stream_slice.get("block_id")
         params = {"block_id": block_id, "page_size": self.page_size}
@@ -418,7 +469,11 @@ class Comments(HttpSubStream, IncrementalNotionStream):
         return params
 
     def parse_response(
-        self, response: requests.Response, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, **kwargs
+        self,
+        response: requests.Response,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
+        **kwargs,
     ) -> Iterable[Mapping]:
 
         # Get the parent's "last edited time" to compare against state
@@ -444,10 +499,15 @@ class Comments(HttpSubStream, IncrementalNotionStream):
     ) -> Iterable[Optional[Mapping[str, Any]]]:
 
         # Gather parent stream records in full
-        parent_records = self.parent.read_records(sync_mode=SyncMode.full_refresh, cursor_field=self.parent.cursor_field)
+        parent_records = self.parent.read_records(
+            sync_mode=SyncMode.full_refresh, cursor_field=self.parent.cursor_field
+        )
 
         # The parent stream is the Pages stream, but we have to pass its id to the request_params as "block_id"
         # because pages are also blocks in the Notion API.
         # We also grab the last_edited_time from the parent record to use as the cursor field.
         for record in parent_records:
-            yield {"block_id": record["id"], "page_last_edited_time": record["last_edited_time"]}
+            yield {
+                "block_id": record["id"],
+                "page_last_edited_time": record["last_edited_time"],
+            }

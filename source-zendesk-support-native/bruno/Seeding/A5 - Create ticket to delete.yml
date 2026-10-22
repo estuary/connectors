@@ -1,0 +1,47 @@
+info:
+  name: A5 - Create ticket to delete
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/tickets"
+  body:
+    type: json
+    data: |-
+      {
+        "ticket": {
+          "subject": "Bruno probe deleted ticket",
+          "comment": {
+            "body": "Created to verify deleted-ticket representation."
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Seeding / A6 - Delete ticket` consumes this id as {{seed_ticket_id}}.
+        // Runtime var only (a resource id, not a credential).
+        if (res.status >= 200 && res.status < 300 && res.body?.ticket?.id) {
+          bru.setVar('seed_ticket_id', res.body.ticket?.id);
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** A5. Creates a ticket that `Seeding / A6 - Delete ticket` deletes, so the
+  incremental ticket export (`status: "deleted"`), `/tickets`, and `/deleted_tickets`
+  can be compared. The test account has no deleted tickets today.
+
+  **Outcome:** Ran 2026-10-07 (ticket 48); VERIFIED in `Incremental / tickets cursor`, `Tickets / start_time alone`, `Deleted / deleted_tickets`.

@@ -9,39 +9,109 @@ on:
     paths:
       - "estuary-cdk/**"
       - ".github/workflows/estuary-cdk.yaml"
+      - "ruff.toml"
+      # The workspace lock, and the root pyproject's pyright config.
+      - "uv.lock"
+      - "pyproject.toml"
 
   pull_request:
     branches: [main]
     paths:
       - "estuary-cdk/**"
       - ".github/workflows/estuary-cdk.yaml"
+      - "ruff.toml"
+      # The workspace lock, and the root pyproject's pyright config.
+      - "uv.lock"
+      - "pyproject.toml"
 
 concurrency:
   group: estuary-cdk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # `requires-python` intersects across workspace members, and every connector
+  # declares `>=3.14`, so the workspace lock resolves for 3.14 and refuses any
+  # other interpreter. This job is therefore not a matrix. The CDK's other
+  # supported releases are covered by test-estuary-cdk-supported-pythons below.
   test-estuary-cdk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # uv provisions the interpreter itself, so there is no separate
+      # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      # Report-only, like the connector workflow: findings are surfaced as
+      # annotations without failing the job. The version must match
+      # `required-version` in ruff.toml.
+      - name: Lint
+        run: |
+          uvx ruff@0.16.9 check --exit-zero --output-format=github estuary-cdk
+          # GitHub renders only the first handful of annotations per step, so
+          # the counts also go to the job summary, where none are dropped.
+          {
+            echo "### ruff: estuary-cdk"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics estuary-cdk
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install dependencies and run tests
+        run: |
+          # --all-extras: tests/test_airbyte_cdk.py imports the shim, which needs
+          # the `airbyte-shim` extra's dependencies for the vendored Airbyte CDK.
+          uv sync --locked --package estuary_cdk --all-extras --group dev --group lint
+          cd estuary-cdk
+          uv run --no-sync python -m compileall -q estuary_cdk vendor
+          uv run --no-sync pytest
+
+      # Report-only, as above. estuary_cdk alone is checked here; the
+      # connectors are checked by their own workflow, where the matrix keeps
+      # each job's findings to one connector.
+      - name: Type-check
+        run: |
+          uv run --no-sync pyright --outputjson estuary-cdk/estuary_cdk \
+            | python3 .github/scripts/pyright_annotations.py estuary-cdk
+
+  # estuary-cdk declares `>=3.11,<4.0` rather than the workspace's 3.14,
+  # because it is also consumed outside this repository -- source-netsuite is
+  # its own repo, pins the CDK, and runs on 3.11. What that floor promises has
+  # to be tested, and it cannot be tested inside the workspace, whose lock
+  # admits 3.14 alone. So this job installs the CDK into a venv of its own.
+  test-estuary-cdk-supported-pythons:
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+          version: "0.13.3"
+          enable-cache: true
 
       - name: Install dependencies and run tests
+        env:
+          VIRTUAL_ENV: /tmp/cdk-venv
         run: |
+          uv venv --python ${{ matrix.python-version }} "$VIRTUAL_ENV"
+          # `--group pyproject.toml:dev` reads the root workspace's own dev
+          # group, so this job declares no test dependencies of its own and
+          # cannot drift from the versions every other job uses. The
+          # declaration is shared; the resolution is not, since an unlocked
+          # install can take a different patch than uv.lock pins. That is
+          # inherent in testing outside the lock, and better than a second copy
+          # of the list.
+          uv pip install -e "estuary-cdk[airbyte-shim]" --group pyproject.toml:dev
           cd estuary-cdk
-          poetry install
-          source $(poetry env info --path)/bin/activate
-          python -m compileall -q estuary_cdk
-          pytest
+          "$VIRTUAL_ENV/bin/python" -m compileall -q estuary_cdk vendor
+          "$VIRTUAL_ENV/bin/python" -m pytest

@@ -4,7 +4,7 @@ import json
 import os
 import sys
 from collections.abc import Awaitable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, BinaryIO, Callable, Generic
 
 from pydantic import BaseModel
@@ -12,9 +12,9 @@ from pydantic import BaseModel
 from estuary_cdk.capture.connector_status import ConnectorStatus
 
 from .. import BaseConnector, Stopped
+from ..feature_flags import FeatureFlagsConfig
 from ..flow import (
     ConnectorSpec,
-    ConnectorStateUpdate,
     EndpointConfig,
     ResourceConfig,
     RotatingOAuth2Credentials,
@@ -49,6 +49,17 @@ class TerminateTaskGroup(Exception):
 async def force_terminate_task_group():
     """Used to force termination of a task group."""
     raise TerminateTaskGroup()
+
+
+def _resolve_feature_flags(
+    config: object, created_at: date | None
+) -> dict[str, bool] | None:
+    """Resolve the feature flags of a connector whose `advanced` config is a
+    FeatureFlagsConfig. Other connectors are left alone."""
+    advanced = getattr(config, "advanced", None)
+    if not isinstance(advanced, FeatureFlagsConfig):
+        return None
+    return advanced.resolve_feature_flags(created_at)
 
 
 class BaseCaptureConnector(
@@ -129,12 +140,20 @@ class BaseCaptureConnector(
             await self._emit(Response(spec=response))
 
         elif discover := request.discover:
+            _resolve_feature_flags(discover.config, discover.createdAt)
             await self._emit(Response(discovered=await self.discover(log, discover)))
 
         elif validate := request.validate_:
+            # A task that has never been published has no last capture, and so
+            # no creation date yet.
+            last_capture = validate.lastCapture
+            _resolve_feature_flags(
+                validate.config, last_capture.createdAt if last_capture else None
+            )
             await self._emit(Response(validated=await self.validate(log, validate)))
 
         elif apply := request.apply:
+            _resolve_feature_flags(apply.capture.config, apply.capture.createdAt)
             await self._emit(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
@@ -144,6 +163,14 @@ class BaseCaptureConnector(
                 open.capture.config = updated_config
                 encrypted_config = await self._encrypt_config(log, updated_config)
                 log.event.config_update(message, encrypted_config)
+
+            # Resolved after update_config, which may replace the config.
+            flags = _resolve_feature_flags(open.capture.config, open.capture.createdAt)
+            if flags is not None:
+                log.info(
+                    "resolved feature flags",
+                    {"flags": flags, "created_at": open.capture.createdAt},
+                )
 
             opened, capture = await self.open(log, open)
             await self._emit(Response(opened=opened))
@@ -232,6 +259,7 @@ class BaseCaptureConnector(
             # We don't do this within the TaskGroup because we don't
             # want to block on it.
             periodic_stop_task = asyncio.create_task(periodic_stop())
+            enforce_shutdown_task: asyncio.Task[None] | None = None
 
             try:
                 async with asyncio.TaskGroup() as tg:
@@ -275,7 +303,8 @@ class BaseCaptureConnector(
             # Cancel the background tasks if capture exited gracefully
             # before the shutdown timeout.
             _ = periodic_stop_task.cancel()
-            _ = enforce_shutdown_task.cancel()
+            if enforce_shutdown_task is not None:
+                _ = enforce_shutdown_task.cancel()
 
             # When capture() completes, the connector exits.
             if stopping.first_error:
@@ -296,15 +325,6 @@ class BaseCaptureConnector(
     ):
         data = response.model_dump_json(by_alias=True, exclude_unset=True).encode()
         await emit_bytes(data + b"\n", self.output)
-
-    async def _checkpoint(self, state: GeneralConnectorState, merge_patch: bool = True):
-        r = Response[Any, Any, GeneralConnectorState](
-            checkpoint=response.Checkpoint(
-                state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
-            )
-        )
-
-        await self._emit(r)
 
     async def _encrypt_config(
         self,

@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-10-12
+
+### Added
+- When a collection is backfilled, rows the backfill did not re-send are deleted
+  from standard-updates tables once it completes, so documents removed from the
+  source no longer linger in the destination. Delta-updates tables keep every
+  row. The deletion runs once the transaction's staged rows are moved into the
+  target table, and a pending deletion survives a restart.
+  Disable it with the `no_truncate_after_backfill` feature flag. It is also
+  disabled while `retain_existing_data_on_backfill` is enabled.
+
+## 2026-10-06
+
+### Fixed
+- A dropped ClickHouse connection while the connector prepared its stage
+  tables at session start, read a stage table's partitions, or cleared the
+  load table between rounds failed the shard instead of being retried. Those
+  statements now use the same retry policy as loads and stores. Server errors
+  caused by a lost Keeper session (`KEEPER_EXCEPTION`, code 999) are retried
+  as well.
+
+### Changed
+- Session start prepares bindings concurrently (up to 8 at a time) instead of
+  one after another. A task with hundreds of bindings on a slow service spent
+  tens of minutes in this step before data moved again.
+
 ## 2026-09-04
 
 ### Changed

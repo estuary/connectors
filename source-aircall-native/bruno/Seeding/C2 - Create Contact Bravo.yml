@@ -1,0 +1,41 @@
+info:
+  name: C2 - Create Contact Bravo
+  type: http
+  seq: 21
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts"
+  body:
+    type: json
+    data: |-
+      {
+        "first_name": "Estuary",
+        "last_name": "Seed Bravo",
+        "information": "estuary connector test seed",
+        "phone_numbers": [{"label": "Work", "value": "+12025550102"}]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() < 300 && res.getBody()?.contact?.id) {
+          bru.setVar('seed_contact_b_id', String(res.getBody().contact.id));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** Second seed (created after Alpha). C6 deletes it to show deletions are invisible to the list endpoint. Captures `seed_contact_b_id`.
+
+    Outcome: ran 2026-09-28 by the user; deleted again by C6.
+  type: text/markdown

@@ -1,0 +1,291 @@
+info:
+  name: window asc
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/calls?from={{calls_window_from}}&to={{calls_window_to}}&order=asc&per_page=50"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin a call from this window for the boundary probes. Choose one whose
+        // started_at is not shared with a neighbour so membership is unambiguous.
+        const calls = res.getBody()?.calls || [];
+        const counts = {};
+        for (const c of calls) counts[c.started_at] = (counts[c.started_at] || 0) + 1;
+        // `--env-var calls_pin_index=N` overrides the choice, to repeat the boundary
+        // probes against every call in the window.
+        const forced = bru.getEnvVar('calls_pin_index');
+        const pick = forced != null && forced !== '' ? calls[Number(forced)]
+          : calls.slice(Math.floor(calls.length / 2)).find(c => counts[c.started_at] === 1)
+            || calls.find(c => counts[c.started_at] === 1);
+        if (pick) {
+          bru.setVar('pin_call_id', String(pick.id));
+          bru.setVar('pin_started_at', String(pick.started_at));
+          console.log('PIN', pick.id, pick.started_at, 'answered', pick.answered_at, 'ended', pick.ended_at);
+        }
+        // Out-of-window check (client-side, for the report only).
+        const lo = Number(bru.getVar('calls_window_from')), hi = Number(bru.getVar('calls_window_to'));
+        console.log('OUT_OF_WINDOW', JSON.stringify(calls.filter(c => c.started_at < lo || c.started_at > hi).map(c => [c.id, c.started_at])));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - ~20 min later, after K2 - finalization rewrote started_at, duration, cost (projection)
+    request:
+      url: "{{base_url}}/calls?from=1788012318&to=1790604317&order=asc&per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "calls": [
+              {
+                "id": 4186780376,
+                "started_at": 1790603050,
+                "answered_at": 1790603053,
+                "ended_at": 1790603071,
+                "duration": 21,
+                "cost": "3.0",
+                "pricing_type": "in_bundle",
+                "archived": false,
+                "comments": []
+              },
+              {
+                "id": 4186784158,
+                "started_at": 1790603088,
+                "answered_at": 1790603090,
+                "ended_at": 1790603097,
+                "duration": 9,
+                "cost": "3.0",
+                "pricing_type": "in_bundle",
+                "archived": false,
+                "comments": [
+                  {
+                    "id": 150407637,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604053
+                  },
+                  {
+                    "id": 150408132,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604167
+                  },
+                  {
+                    "id": 150408635,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604273
+                  },
+                  {
+                    "id": 150408652,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604278
+                  }
+                ]
+              },
+              {
+                "id": 4186787210,
+                "started_at": 1790603116,
+                "answered_at": 1790603121,
+                "ended_at": 1790603136,
+                "duration": 20,
+                "cost": "3.0",
+                "pricing_type": "in_bundle",
+                "archived": false,
+                "comments": []
+              }
+            ],
+            "meta": {
+              "count": 3,
+              "total": 3,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            }
+          }
+  - name: 200 - after K4 - archived call still listed, no timestamp moved (projection)
+    request:
+      url: "{{base_url}}/calls?from=1788012401&to=1790604400&order=asc&per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "calls": [
+              {
+                "id": 4186780376,
+                "started_at": 1790603050,
+                "answered_at": 1790603053,
+                "ended_at": 1790603071,
+                "duration": 21,
+                "cost": "3.0",
+                "pricing_type": "in_bundle",
+                "archived": false,
+                "comments": []
+              },
+              {
+                "id": 4186784158,
+                "started_at": 1790603088,
+                "answered_at": 1790603090,
+                "ended_at": 1790603097,
+                "duration": 9,
+                "cost": "3.0",
+                "pricing_type": "in_bundle",
+                "archived": true,
+                "comments": [
+                  {
+                    "id": 150407637,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604053
+                  },
+                  {
+                    "id": 150408132,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604167
+                  },
+                  {
+                    "id": 150408635,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604273
+                  },
+                  {
+                    "id": 150408652,
+                    "content": "estuary connector test comment (safe to ignore)",
+                    "posted_by": null,
+                    "posted_at": 1790604278
+                  }
+                ]
+              },
+              {
+                "id": 4186787210,
+                "started_at": 1790603116,
+                "answered_at": 1790603121,
+                "ended_at": 1790603136,
+                "duration": 20,
+                "cost": "3.0",
+                "pricing_type": "in_bundle",
+                "archived": false,
+                "comments": []
+              }
+            ],
+            "meta": {
+              "count": 3,
+              "total": 3,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            }
+          }
+  - name: 200 - window [now-30d, now-1s] returns all 3 in asc started_at (projection)
+    request:
+      url: "{{base_url}}/calls?from=1788011251&to=1790603250&order=asc&per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "calls": [
+              {
+                "id": 4186780376,
+                "started_at": 1790603050,
+                "status": "done"
+              },
+              {
+                "id": 4186784158,
+                "started_at": 1790603087,
+                "status": "done"
+              },
+              {
+                "id": 4186787210,
+                "started_at": 1790603116,
+                "status": "done"
+              }
+            ],
+            "meta": {
+              "count": 3,
+              "total": 3,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            }
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-calls
+
+    **WHY:** the connector's fetch shape: `from`/`to` unix seconds + `order=asc`
+    over a recent window `[now-30d, now-1s]` (computed in `Calls/folder.yml`).
+    Proves (a) the filter narrows (`meta.total` < `Calls / bare`'s), (b) which
+    timestamp it filters on — every returned `started_at` should fall inside
+    the window, and (c) whether `asc` sorts by `started_at`. Its after-response
+    script pins `pin_call_id` / `pin_started_at` for `Calls / from bound probe`
+    and `Calls / to bound probe` — run this first in a fresh session.
+
+
+    **VERIFIED (2026-09-28):** the `from`/`to` window returns all 3 seeded calls,
+    ascending by `started_at` (`…050 → …087 → …116`), nothing outside the
+    window (`OUT_OF_WINDOW []`). An earlier run with `to = now-300s` returned 0
+    because the calls were under 5 minutes old — that is the filter working,
+    not a gap. Narrowing is proven by the bound probes below.
+
+    **LIMITATION (VERIFIED 2026-09-28): calls are rewritten after they end —
+    including the filtered field.** Between a read ~1.5 min after the calls
+    ended (unchanged) and one ~20 min after, Aircall finalized all 3 calls:
+    `cost` `"0.0"` → `"3.0"`, `pricing_type` `null` → `"in_bundle"`,
+    `duration` recomputed to `ended_at - started_at` (22 → 21, 10 → 9), and
+    call 4186784158's **`started_at` moved 1790603087 → 1790603088**. So
+    `started_at` is not immutable in the first minutes of a call's life. A
+    window read before finalization can see a call at a pre-final second; the
+    connector's lookback subtask re-reads every window after `now - LAG`,
+    once calls are final, so it alone tiles the final `started_at` timeline
+    (plan §3). Observed shift: +1s, one sample. **UNOBSERVABLE:** whether
+    shifts can be larger or backwards, or finalization slower than ~20 min
+    under load. The fallback is the lookback lag's large margin (hours vs
+    minutes).
+
+    **VERIFIED (2026-09-28): mutations surface on re-read with no update
+    marker.** After `Seeding / K2 - Comment a Call` the call carries
+    `comments[]` (`posted_at` is a **unix int**, not the documented String;
+    `posted_by: null` for API-posted comments), and after
+    `Seeding / K4 - Archive a Call` it carries `archived: true`. Neither
+    changes any timestamp on the call, and the Call has no `updated_at`, so
+    there is no update cursor. **Archived calls stay listed** (`meta.total`
+    still 3) — the list endpoint's defaults hide no partition.
+  type: text/markdown

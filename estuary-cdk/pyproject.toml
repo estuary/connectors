@@ -1,43 +1,65 @@
-[tool.poetry]
+[project]
 name = "estuary_cdk"
 version = "0.2.0"
 description = "Estuary Connector Development Kit"
-authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
+authors = [
+    { name = "Joseph Shearer", email = "joseph@estuary.dev" },
+    { name = "Johnny Graettinger", email = "johnny@estuary.dev" },
+]
+# The CDK is consumed outside this workspace -- source-netsuite lives in its
+# own repository, pins estuary-cdk, and runs on 3.11 -- so this floor is what
+# those consumers see, not what the workspace resolves to. Tested on 3.11,
+# 3.12, 3.13 and 3.14; see .github/workflows/estuary-cdk.yaml. The ceiling is
+# deliberately a major: too low a floor silently drops a consumer, but too low
+# a ceiling blocks one outright, with no opt-out, the day that release ships.
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "aiocsv>=1.3.2,<2.0.0",
+    "aiodns>=4.0.4,<5.0.0",
+    "aiohttp>=3.14.3,<4.0.0",
+    "orjson>=3.11.6,<4.0.0",
+    "pydantic>=2,<3",
+    "xxhash>=4.0.2,<5.0.0",
+    "ijson>=3.3.0,<4.0.0",
+    "pycron>=3.1.2,<4.0.0",
+    "stream-unzip==0.0.101",
+    "typing-extensions>=4.13,<5.0",
+    "google-auth[requests]>=2.40.3",
+]
+
+[project.urls]
 homepage = "https://github.com/estuary/connectors/tree/main/estuary-cdk"
 
-[tool.poetry.dependencies]
-python = "^3.11"
+# Leaf dependencies of the vendored Airbyte CDK subset under `vendor/`.
+# See vendor/README.md. pydantic is already required above.
+#
+# These are the fork's own constraints, no longer `airbyte-cdk` 0.52.10's: the major
+# bounds are there because the fork is never re-synced upstream, so a breaking major
+# has to be absorbed by editing `vendor/` by hand.
+[project.optional-dependencies]
+airbyte-shim = [
+    "backoff",
+    "dpath>=2.1,<3.0",
+    "jsonref>=1.1,<2.0",
+    "jsonschema>=4,<5",
+    "pendulum>=3,<4",
+    "PyYAML>=6.0.1",
+    "requests",
+    "requests-cache",
+]
+# The wheel ships the vendored Airbyte fork alongside estuary_cdk, as three
+# top-level packages from two roots. `ignore-vcs` is required: the repo
+# .gitignore carries `vendor` for `go mod vendor` output, with an
+# `!estuary-cdk/vendor` negation, and hatchling reads that file relative to
+# THIS directory, where the negation's path no longer matches -- so the
+# vendored tree would be silently excluded from the wheel and from the
+# editable install's search path.
+[tool.hatch.build]
+ignore-vcs = true
 
-aiocsv = "^1.3.2"
-aiodns = "^3.1.1"
-aiohttp = "^3.13.4"
-orjson = "^3.11.6"
-pydantic = ">1.10,<3"
-xxhash = "^3.4.1"
-ijson = "^3.3.0"
-pycron = "^3.1.2"
-stream-unzip = "0.0.99"
-typing-extensions = "^4.13"
-
-google-auth = {version = ">=2.40.3", extras = ["requests"]}
-pendulum = "<=2.0.0 | >=3.0.0"
-
-airbyte-cdk = {version = "<=6.56.0", optional = true}
-
-[tool.poetry.extras]
-airbyte-shim = ["airbyte-cdk"]
-
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.8.0"
-mypy = "^1.8.0"
-pytest = "^7.4.3"
-pytest-insta = "^0.3.0"
-pytest-asyncio = "0.23.8"
-airbyte-cdk = "<=6.56.0"
-
-[tool.ruff]
-target-version = "py311"
+[tool.hatch.build.targets.wheel]
+packages = ["estuary_cdk", "vendor/airbyte_cdk", "vendor/airbyte_protocol"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

@@ -65,6 +65,11 @@ async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
 
     tasks = [asyncio.create_task(_drain(aiter)) for aiter in iterators]
 
+    async def _reap() -> None:
+        """Discard queued items so blocked producers can finish unwinding."""
+        while True:
+            await queue.get()
+
     def _cancel_all_tasks() -> None:
         nonlocal cancelling
         cancelling = True
@@ -86,7 +91,17 @@ async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
 
     finally:
         _cancel_all_tasks()
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # A `_drain` task cancelled while blocked on a full queue still runs its
+        # own `finally`, which awaits `queue.put(_DONE)`. By now nothing is
+        # consuming the queue, so that put would never complete and the gather
+        # below would wait forever. Keep draining until the tasks have exited.
+        reaper = asyncio.create_task(_reap())
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            reaper.cancel()
+            await asyncio.gather(reaper, return_exceptions=True)
 
         for iterator in iterators:
             if hasattr(iterator, "aclose"):

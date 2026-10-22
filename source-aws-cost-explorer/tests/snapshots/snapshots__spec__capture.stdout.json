@@ -1,0 +1,118 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AWSAccessKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "AWS Access Key",
+              "default": "AWS Access Key",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_key_id": {
+              "description": "The ID of an AWS access key with the ce:GetCostAndUsage permission.",
+              "minLength": 1,
+              "order": 1,
+              "secret": true,
+              "title": "Access Key ID",
+              "type": "string"
+            },
+            "secret_access_key": {
+              "description": "The secret for your AWS access key.",
+              "minLength": 1,
+              "order": 2,
+              "secret": true,
+              "title": "Secret Access Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_key_id",
+            "secret_access_key"
+          ],
+          "title": "AWSAccessKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "start_date": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The UTC date you want to capture costs from. If you leave this empty, each refresh rereads the last 30 days. AWS only keeps the current month and the 13 months before it; costs older than that keep their last captured values.",
+          "title": "Start Date"
+        },
+        "credentials": {
+          "description": "The AWS credentials the connector uses to read Cost Explorer.",
+          "discriminator": {
+            "mapping": {
+              "AWS Access Key": "#/$defs/AWSAccessKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AWSAccessKey"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "P1D",
+          "description": "Interval between updates for this resource. Must be at least one day.",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "CostResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-aws-cost-explorer",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

@@ -83,30 +83,26 @@ class ResourceConfig(common.BaseResourceConfig, extra="forbid"):
 
     @classmethod
     def model_json_schema(cls: "ResourceConfig") -> dict:
-        from estuary_cdk.pydantic_polyfill import VERSION
-
         sch = super().model_json_schema()
 
-        if VERSION == "v2":
-            # TODO(whb): Pydantic V2 represents the schema of unions using
-            # `anyOf`, which is different than Pydantic V1 (see
-            # https://github.com/pydantic/pydantic/issues/656). While
-            # technically correct, this causes problems when rending the JSON
-            # form in the UI, so this patches the schema to work around it for
-            # imports that use Pydantic V2.
-            sch["properties"]["namespace"] = {
-                "title": "Namespace",
-                "description": "Enclosing schema namespace of this resource",
+        # TODO(whb): Pydantic represents an optional field's schema as an
+        # `anyOf` over the type and `null` (see
+        # https://github.com/pydantic/pydantic/issues/656). While technically
+        # correct, this causes problems when rendering the JSON form in the UI,
+        # so these two are flattened back to the bare type.
+        sch["properties"]["namespace"] = {
+            "title": "Namespace",
+            "description": "Enclosing schema namespace of this resource",
+            "type": "string"
+        }
+
+        sch["properties"]["cursorField"] = {
+            "title": "Cursor Field",
+            "type": "array",
+            "items": {
                 "type": "string"
             }
-
-            sch["properties"]["cursorField"] = {
-                "title": "Cursor Field",
-                "type": "array",
-                "items": {
-                    "type": "string"
-                }
-            }
+        }
 
         return sch
 
@@ -133,7 +129,7 @@ class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
     effectively start over from the beginning.
     """
 
-    bindingStateV1: dict[str, ResourceState] = {}
+    bindingStateV1: dict[str, ResourceState | None] = {}
 
 
 class Document(common.BaseDocument, extra="allow"):
@@ -272,7 +268,7 @@ class CaptureShim(BaseCaptureConnector):
                     name=stream.name,
                     key=key,
                     model=common.Resource.FixedSchema(stream.json_schema),
-                    open=lambda binding, index, state, task: None,  # No-op.
+                    open=lambda binding, index, state, task, resolved: None,  # No-op.
                     initial_state=ResourceState(rowId=0),
                     initial_config=resource_config,
                     schema_inference=self.schema_inference,
@@ -385,17 +381,25 @@ class CaptureShim(BaseCaptureConnector):
             # checkpoints.
             connector_state.__setattr__("bindingStateV1", {})
 
+        def _state_for(binding: CaptureBinding[ResourceConfig], resource) -> ResourceState:
+            # Entries are nullable: common.open() writes None to request a
+            # backfill, so a present-but-None entry restarts from initial_state.
+            state = connector_state.bindingStateV1.setdefault(
+                binding.stateKey, resource.initial_state
+            )
+            if state is None:
+                state = resource.initial_state
+                connector_state.bindingStateV1[binding.stateKey] = state
+            return state
+
         # Index of Airbyte (namespace, stream) => ResourceState.
-        # Use `setdefault()` to initialize ResourceState if it's not already part of `connector_state`.
         index: dict[tuple[str | None, str], tuple[int, ResourceState]] = {
             (
                 binding.resourceConfig.namespace,
                 binding.resourceConfig.stream,
             ): (
                 index,
-                connector_state.bindingStateV1.setdefault(
-                    binding.stateKey, resource.initial_state
-                ),
+                _state_for(binding, resource),
             )
             for index, (binding, resource) in enumerate(resolved)
         }

@@ -148,6 +148,18 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	testutil.RunMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
+// RunKeyChangeMigrationTest verifies that a KeyChangeInPlace endpoint keeps
+// its table and data through a group-by changing backfill.
+func RunKeyChangeMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+	actionDescSanitizers []func(string) string,
+) {
+	testutil.RunKeyChangeMigrationTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
+}
+
 // FeatureFlagMigrationPhase is one apply of a RunFeatureFlagMigrationTest.
 type FeatureFlagMigrationPhase = testutil.FeatureFlagMigrationPhase
 
@@ -628,8 +640,15 @@ func compareValues(a, b any) int {
 		}
 	}
 
-	sa := fmt.Sprintf("%v", a)
-	sb := fmt.Sprintf("%v", b)
+	// A json.RawMessage is compared by its byte slice formatting, which is how
+	// fmt printed it before Go 1.27 made it a fmt.Stringer. This keeps the row
+	// order of existing snapshots.
+	fmtValue := func(v any) string {
+		if raw, ok := v.(json.RawMessage); ok {
+			return fmt.Sprintf("%v", []byte(raw))
+		}
+		return fmt.Sprintf("%v", v)
+	}
 
-	return cmp.Compare(sa, sb)
+	return cmp.Compare(fmtValue(a), fmtValue(b))
 }

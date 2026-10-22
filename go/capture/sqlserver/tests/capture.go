@@ -12,6 +12,7 @@ func TestCapture(t *testing.T, setup testSetupFunc) {
 	t.Run("ColumnNameQuoting", func(t *testing.T) { testColumnNameQuoting(t, setup) })
 	t.Run("TextCollation", func(t *testing.T) { testTextCollation(t, setup) })
 	t.Run("DiscoveryIrrelevantConstraints", func(t *testing.T) { testDiscoveryIrrelevantConstraints(t, setup) })
+	t.Run("DiscoveryKeyOrder", func(t *testing.T) { testDiscoveryKeyOrder(t, setup) })
 	t.Run("UUIDCaptureOrder", func(t *testing.T) { testUUIDCaptureOrder(t, setup) })
 	t.Run("ManyTables", func(t *testing.T) { testManyTables(t, setup) })
 	t.Run("DeletedTextColumn", func(t *testing.T) { testDeletedTextColumn(t, setup) })
@@ -48,6 +49,16 @@ func testDiscoveryIrrelevantConstraints(t *testing.T, setup testSetupFunc) {
 	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)`)
+	tc.DiscoverFull("Discover Tables")
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+// TestDiscoveryKeyOrder verifies that discovered primary keys follow the key's
+// declared column order rather than the table's column order.
+func testDiscoveryKeyOrder(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
+	var db, tc = setup(t)
+	db.CreateTable(t, `<NAME>`, `(a INTEGER, b INTEGER, c VARCHAR(8), data TEXT, PRIMARY KEY (c, a, b))`)
 	tc.DiscoverFull("Discover Tables")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }

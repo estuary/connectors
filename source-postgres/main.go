@@ -180,6 +180,10 @@ type advancedConfig struct {
 }
 
 var featureFlagDefaults = map[string]bool{
+	// Raise the per-field truncation threshold from 8 MiB to 32 MiB for captures
+	// with a single large column per row. The 64 MiB document limit still applies.
+	"extended_field_truncation_threshold": false,
+
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": true,
@@ -490,6 +494,13 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return nil
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err == nil {
+		// The pool connects lazily, so without a ping a connection failure
+		// surfaces from whichever query happens to run first.
+		if err = pool.Ping(ctx); err != nil {
+			pool.Close()
+		}
+	}
 	if err != nil {
 		var pgErr *pgconn.PgError
 

@@ -1,0 +1,55 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/users/availabilities?per_page=50'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#retrieve-list-of-users-availability
+    **WHY:** the `user_availability` stream. Airbyte never paginated it; confirm it carries `meta` and honors page/per_page, and its item shape (`id`, `availability`).
+
+    **VERIFIED (2026-09-28):** envelope `{users:[{id, availability}], meta:{…full v1 meta…}}`. The endpoint is paginated like every other v1 list; Airbyte's missing paginator would silently stop at the default 20.
+    **DOCUMENTED (2026-09-28):** the 2026-09-30 sunset notice names only the v1 *List all Users* family; `/v1/users/availabilities` isn't listed, and the API reference has no v2 equivalent. Assume it survives, and re-check after the sunset.
+  type: text/markdown
+examples:
+- name: 200 - populated list (1 user)
+  request:
+    url: '{{base_url}}/users/availabilities?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "users": [
+            {
+              "availability": "offline",
+              "id": 2078847
+            }
+          ],
+          "meta": {
+            "count": 1,
+            "total": 1,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -66,6 +67,58 @@ func TestIntegration(t *testing.T) {
 		// only that its lines carry the declared fidelity.
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
 			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityTotal})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		var ctx = context.Background()
+		var cfg = mustGetCfg(t)
+		var taskName = "acmeCo/tests/materialize-redshift-truncate"
+		var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
+
+		conn, err := pgx.Connect(ctx, cfg.toURI())
+		require.NoError(t, err)
+		defer conn.Close(ctx)
+
+		var identifiers = make(map[string]string)
+		for _, table := range tables {
+			path, _, err := tableConfig{Table: table}.WithDefaults(cfg).Parameters()
+			require.NoError(t, err)
+			identifiers[table] = pgx.Identifier(path).Sanitize()
+			_, err = conn.Exec(ctx, "DROP TABLE IF EXISTS "+identifiers[table]+";")
+			require.NoError(t, err)
+		}
+		materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, testFlags(t, cfg))
+		require.NoError(t, err)
+		defer materializer.Close(ctx)
+		require.NoError(t, materializer.CleanupTestTask(ctx, taskName))
+
+		// Two shards, so that the primary truncates after applying a peer's
+		// staged stores.
+		testutil.RunFlowctl(t, "raw", "preview-next",
+			"--name", taskName,
+			"--source", "testdata/truncate.flow.yaml",
+			"--fixture", "testdata/truncate.fixture.json",
+			"--shards", "2",
+			"--timeout", "10m",
+		)
+
+		// The fixture stores ids 1-3, then re-stores only id 1 during a
+		// backfill. Only the standard table with a flow_published_at column
+		// loses the rows published before the backfill.
+		for table, want := range map[string][]int64{
+			"truncate_standard":        {1},
+			"truncate_delta":           {1, 1, 2, 3},
+			"truncate_no_published_at": {1, 2, 3},
+		} {
+			var rows, err = conn.Query(ctx, "SELECT id FROM "+identifiers[table]+" ORDER BY id;")
+			require.NoError(t, err)
+			ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+			require.NoError(t, err)
+			require.Equal(t, want, ids, table)
+		}
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -131,6 +184,9 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), "testdata/key-change.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("idempotency", func(t *testing.T) {
@@ -397,6 +453,19 @@ func TestPrereqs(t *testing.T) {
 			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+// NewEndpoint runs before the prerequisite checks, so a login failure must be
+// reported as a connection failure rather than as the first query it runs.
+func TestNewEndpointConnectError(t *testing.T) {
+	cfg := mustGetCfg(t)
+	cfg.User = "wrong" + cfg.User
+
+	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	require.ErrorContains(t, err, "unable to connect to database: incorrect username or password")
+
+	var userErr *cerrors.UserError
+	require.ErrorAs(t, err, &userErr)
 }
 
 // testFlags resolves feature flags for a test that has no runtime spec to take a

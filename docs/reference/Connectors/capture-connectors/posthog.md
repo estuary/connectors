@@ -22,6 +22,7 @@ The connector captures the following PostHog resources:
 
 - Feature Flags
 - Events
+- Sessions
 
 :::info
 The connector automatically discovers and captures data from all projects within the specified organization. You do not need to configure individual projects.
@@ -38,7 +39,7 @@ The connector automatically discovers and captures data from all projects within
   | `cohort:read`       | Cohorts         |
   | `feature_flag:read` | Feature Flags   |
   | `annotation:read`   | Annotations     |
-  | `query:read`        | Events, Persons |
+  | `query:read`        | Events, Persons, Sessions |
 
   A wildcard scope grants access to all resources.
 
@@ -95,6 +96,10 @@ captures:
           name: Persons
           interval: PT5M
         target: ${PREFIX}/Persons
+      - resource:
+          name: Sessions
+          interval: PT5M
+        target: ${PREFIX}/Sessions
       - resource:
           name: FeatureFlags
           interval: PT5M

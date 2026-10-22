@@ -1,0 +1,51 @@
+collections:
+  tests/truncate:
+    schema:
+      properties:
+        id: {type: integer}
+        _meta: {type: object}
+      required: [id, _meta]
+      type: object
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-mysql-truncate/mysql:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.mysql.yaml
+    bindings: &bindings
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_delta
+        delta_updates: true
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-mysql-truncate/mariadb:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.mariadb.yaml
+    bindings: *bindings
+
+  acmeCo/tests/materialize-mysql-truncate/singlestore:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.singlestore.yaml
+    bindings: *bindings

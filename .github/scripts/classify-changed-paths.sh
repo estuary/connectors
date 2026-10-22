@@ -47,13 +47,24 @@ while IFS= read -r path || [ -n "$path" ]; do
 
         # Each workflow is triggered by edits to itself so a change to one
         # verifies itself rather than waiting on an unrelated connector edit.
-        # estuary-cdk.yaml drives its own separate workflow.
+        # estuary-cdk.yaml drives its own separate workflow, and
+        # python-auto-rerun.yaml only re-runs python.yaml's failed jobs.
         .github/workflows/python.yaml) lane="python" ;;
         .github/workflows/ci.yaml) lane="go_rust" ;;
         .github/workflows/estuary-cdk.yaml) lane="none" ;;
+        .github/workflows/python-auto-rerun.yaml) lane="none" ;;
+        # The shared ruff config only feeds report-only lint steps, so it
+        # builds nothing. estuary-cdk.yaml lints the CDK when it changes.
+        ruff.toml) lane="none" ;;
 
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;
+
+        # The uv workspace resolves every member from these two files, so a
+        # change to either reaches every Python connector. They are named here
+        # because the directory heuristic below only looks at a path's first
+        # segment, and theirs is the file itself.
+        uv.lock | pyproject.toml) lane="python" ;;
 
         # Shared build plumbing that both workflows invoke. Both workflows also
         # build images with the repo root as the Docker context, so the root
@@ -93,8 +104,9 @@ while IFS= read -r path || [ -n "$path" ]; do
             python=true
             case "$path" in
                 # The CDK (and the Dockerfiles connectors symlink to), the
-                # workflow and its connector list feed every Python connector.
-                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml)
+                # workflow and its connector list, and the workspace manifest
+                # and lock, feed every Python connector.
+                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml | uv.lock | pyproject.toml)
                     python_all=true ;;
                 *) python_dirs+=("${path%%/*}") ;;
             esac

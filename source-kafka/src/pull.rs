@@ -2,7 +2,7 @@ use crate::{
     configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
     document::MergeSerializer,
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
-    write_capture_response,
+    write_captured,
 };
 use anyhow::{anyhow, Context, Result};
 use apache_avro::{types::Value as AvroValue, Schema as AvroSchema};
@@ -13,12 +13,8 @@ use hex::decode;
 use highway::{HighwayHash, HighwayHasher, Key};
 use lazy_static::lazy_static;
 use proto_flow::{
-    capture::{
-        request::Open,
-        response::{self, Checkpoint},
-        Response,
-    },
-    flow::{capture_spec::Binding, ConnectorState, RangeSpec},
+    capture::request::Open,
+    flow::{capture_spec::Binding, RangeSpec},
 };
 use prost_reflect::DynamicMessage;
 use rdkafka::{
@@ -30,7 +26,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map};
 use std::collections::{hash_map::Entry, HashMap};
-use std::io::{BufWriter, Stdout};
+use std::io::{BufWriter, Stdout, Write};
 use time::{format_description, OffsetDateTime};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -40,6 +36,9 @@ struct CaptureState {
 }
 
 impl CaptureState {
+    /// The checkpoint `write_checkpoint` writes, as a struct. Used by the tests
+    /// as the oracle for the raw bytes.
+    #[cfg(test)]
     fn state_slice(state_key: &str, partition: i32, offset: i64) -> Self {
         let mut partitions = HashMap::new();
         partitions.insert(partition, offset);
@@ -235,35 +234,38 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
             .get(msg.topic())
             .with_context(|| format!("got a message for unknown topic {}", msg.topic()))?;
 
-        let message = response::Captured {
-            binding: binding_info.binding_index,
-            doc_json: doc_bytes.into(),
-        };
-
-        let checkpoint =
-            CaptureState::state_slice(&binding_info.state_key, msg.partition(), msg.offset());
-
-        write_capture_response(
-            Response {
-                captured: Some(message),
-                ..Default::default()
-            },
-            &mut stdout,
-        )?;
-
-        write_capture_response(
-            Response {
-                checkpoint: Some(Checkpoint {
-                    state: Some(ConnectorState {
-                        updated_json: serde_json::to_string(&checkpoint)?.into(),
-                        merge_patch: true,
-                    }),
-                }),
-                ..Default::default()
-            },
+        write_captured(binding_info.binding_index, &doc_bytes, &mut stdout)?;
+        write_checkpoint(
+            &binding_info.state_key,
+            msg.partition(),
+            msg.offset(),
             &mut stdout,
         )?;
     }
+}
+
+/// Write the merge-patch `Checkpoint` response that records `offset` for one
+/// partition, as raw bytes. Byte-identical to serializing a `CaptureState`
+/// slice through `Response`, which built two maps and serialized the state
+/// twice per message. Flushes, pushing the buffered documents to the runtime.
+pub fn write_checkpoint<W: Write>(
+    state_key: &str,
+    partition: i32,
+    offset: i64,
+    out: &mut W,
+) -> Result<()> {
+    use serde_json::ser::{CompactFormatter, Formatter};
+
+    out.write_all(b"{\"checkpoint\":{\"state\":{\"updated\":{\"bindingStateV1\":{")?;
+    serde_json::to_writer(&mut *out, state_key).context("writing checkpoint state key")?;
+    // Map keys are strings in JSON, so the partition number is quoted.
+    out.write_all(b":{\"partitions\":{\"")?;
+    CompactFormatter.write_i32(out, partition)?;
+    out.write_all(b"\":")?;
+    CompactFormatter.write_i64(out, offset)?;
+    out.write_all(b"}}}},\"mergePatch\":true}}}\n")
+        .context("writing checkpoint response")?;
+    out.flush().context("flushing output")
 }
 
 fn unix_millis_to_rfc3339(millis: i64) -> Result<String> {
@@ -357,12 +359,16 @@ fn responsible_for_partition(range: &Option<RangeSpec>, topic: &str, partition: 
         Some(r) => r,
     };
 
+    let hash = partition_key(topic, partition);
+
+    hash >= range.key_begin && hash <= range.key_end
+}
+
+fn partition_key(topic: &str, partition: i32) -> u32 {
     let mut hasher = HighwayHasher::new(bytes_to_key(&HIGHWAY_HASH_KEY));
     hasher.append(topic.as_bytes());
     hasher.append(&partition.to_le_bytes());
-    let hash = (hasher.finalize64() >> 32) as u32;
-
-    hash >= range.key_begin && hash <= range.key_end
+    (hasher.finalize64() >> 32) as u32
 }
 
 async fn parse_datum(
@@ -653,6 +659,12 @@ mod tests {
     use std::{collections::HashMap, i64};
 
     use super::*;
+    use crate::write_capture_response;
+    use proto_flow::capture::{
+        response::{self, Checkpoint},
+        Response,
+    };
+    use proto_flow::flow::ConnectorState;
     use apache_avro::{
         types::{Record, Value as AvroValue},
         Days, Decimal, Duration, Millis, Months,
@@ -862,5 +874,166 @@ mod tests {
         )
         .unwrap();
         assert_eq!(out.flushes, 1, "a checkpoint must flush");
+    }
+
+    fn checkpoint_via_response(state_key: &str, partition: i32, offset: i64) -> Vec<u8> {
+        let state = CaptureState::state_slice(state_key, partition, offset);
+        let mut out = Vec::new();
+        write_capture_response(
+            Response {
+                checkpoint: Some(Checkpoint {
+                    state: Some(ConnectorState {
+                        updated_json: serde_json::to_string(&state).unwrap().into(),
+                        merge_patch: true,
+                    }),
+                }),
+                ..Default::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        out
+    }
+
+    fn checkpoint_via_raw(state_key: &str, partition: i32, offset: i64) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_checkpoint(state_key, partition, offset, &mut out).unwrap();
+        out
+    }
+
+    const STATE_KEYS: &[&str] = &[
+        "topic",
+        "",
+        "näme/with \"quotes\" and \\ and a\u{0}control\ttab",
+        "☃ 🦀",
+    ];
+
+    #[test]
+    fn checkpoint_matches_response_serialization() {
+        for state_key in STATE_KEYS {
+            for partition in [0, 11, i32::MAX, -1] {
+                for offset in [0i64, 1_234_567_890, i64::MAX, -1] {
+                    assert_eq!(
+                        String::from_utf8_lossy(&checkpoint_via_raw(state_key, partition, offset)),
+                        String::from_utf8_lossy(&checkpoint_via_response(
+                            state_key, partition, offset
+                        )),
+                        "{state_key:?} {partition} {offset}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The runtime's own decoder must read back exactly what was written.
+    #[test]
+    fn checkpoint_round_trips_through_the_response_decoder() {
+        for state_key in STATE_KEYS {
+            let line = checkpoint_via_raw(state_key, 7, 99);
+            let response: Response = serde_json::from_slice(&line).unwrap();
+            let state = response.checkpoint.unwrap().state.unwrap();
+            assert!(state.merge_patch);
+            let parsed: CaptureState = serde_json::from_slice(&state.updated_json).unwrap();
+            assert_eq!(parsed.resources.len(), 1);
+            assert_eq!(
+                parsed.resources[*state_key].partitions,
+                HashMap::from([(7, 99)])
+            );
+        }
+    }
+
+    #[test]
+    fn checkpoint_flushes() {
+        let mut out = FlushCountingWriter::default();
+        write_checkpoint("t", 0, 0, &mut out).unwrap();
+        assert_eq!(out.flushes, 1, "a checkpoint must flush");
+    }
+
+    fn full_range() -> RangeSpec {
+        RangeSpec {
+            key_begin: 0,
+            key_end: u32::MAX,
+            r_clock_begin: 0,
+            r_clock_end: u32::MAX,
+        }
+    }
+
+    // Flow splits a shard's key range at this midpoint (`map_shard_to_split`
+    // in Flow's activate crate). The tests must match it to model real splits.
+    fn split(range: &RangeSpec) -> (RangeSpec, RangeSpec) {
+        let pivot = (range.key_begin as u64 + range.key_end as u64).div_ceil(2) as u32;
+        (
+            RangeSpec {
+                key_end: pivot - 1,
+                ..*range
+            },
+            RangeSpec {
+                key_begin: pivot,
+                ..*range
+            },
+        )
+    }
+
+    fn equal_shards(count: usize) -> Vec<RangeSpec> {
+        let mut shards = vec![full_range()];
+        while shards.len() < count {
+            shards = shards
+                .iter()
+                .flat_map(|range| {
+                    let (lhs, rhs) = split(range);
+                    [lhs, rhs]
+                })
+                .collect();
+        }
+        shards
+    }
+
+    fn partitions_per_shard(topic: &str, partitions: i32, shards: &[RangeSpec]) -> Vec<usize> {
+        shards
+            .iter()
+            .map(|range| {
+                (0..partitions)
+                    .filter(|p| responsible_for_partition(&Some(*range), topic, *p))
+                    .count()
+            })
+            .collect()
+    }
+
+    // Changing a partition's key moves it to a different shard once a capture
+    // has been split, so the keys must never change by accident.
+    #[test]
+    fn partition_key_placement() {
+        let mut out = String::new();
+        for partition in 0..16 {
+            out.push_str(&format!(
+                "partition {partition:>2}: {:08x}\n",
+                partition_key("orders", partition)
+            ));
+        }
+        for count in [2, 4, 8] {
+            out.push_str(&format!(
+                "{count} shards: {:?}\n",
+                partitions_per_shard("orders", 16, &equal_shards(count))
+            ));
+        }
+        insta::assert_snapshot!(out);
+    }
+
+    // A key on the edge of a shard's range must belong to that shard. An
+    // exclusive bound would leave the partition with no owner, or give it two.
+    #[test]
+    fn key_range_bounds_are_inclusive() {
+        let key = partition_key("orders", 0);
+        let owns = |key_begin, key_end| {
+            let range = RangeSpec {
+                key_begin,
+                key_end,
+                ..full_range()
+            };
+            responsible_for_partition(&Some(range), "orders", 0)
+        };
+        assert!(owns(key, key));
+        assert!(!owns(0, key - 1));
+        assert!(!owns(key + 1, u32::MAX));
     }
 }

@@ -12,6 +12,7 @@ from pydantic import TypeAdapter
 from ..models import (
     Names,
     OldRecentTicket,
+    PageResult,
     Ticket,
     TimestampedId,
     TimestampedObject,
@@ -25,6 +26,20 @@ from .shared import (
     ms_to_dt,
     HUB,
 )
+
+
+async def check_tickets_access(
+    http: HTTPSession, log: Logger
+) -> AsyncGenerator[Ticket, None]:
+    """Lightweight wrapper for permission checking the tickets endpoint."""
+    url = f"{HUB}/crm/v3/objects/{Names.tickets}"
+
+    response = PageResult[Ticket].model_validate_json(
+        await http.request(log, url, params={"limit": 1})
+    )
+
+    for ticket in response.results:
+        yield ticket
 
 
 def fetch_recent_tickets(

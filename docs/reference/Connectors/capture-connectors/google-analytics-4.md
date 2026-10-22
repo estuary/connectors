@@ -9,8 +9,6 @@ This connector captures data from Google Analytics 4 properties into Estuary col
 
 :::info
 This connector supports Google Analytics 4, not Universal Analytics.
-
-Universal Analytics is supported by a [separate connector](./google-analytics.md).
 :::
 
 This connector is based on an open-source connector from a third party, with modifications for performance in the Estuary system.

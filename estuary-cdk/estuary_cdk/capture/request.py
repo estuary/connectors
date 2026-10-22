@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from typing import Generic, Any
 
@@ -10,7 +12,6 @@ from ..flow import (
     RangeSpec,
     ResourceConfig,
 )
-from ..pydantic_polyfill import GenericModel
 
 
 class Spec(BaseModel):
@@ -20,18 +21,19 @@ class Spec(BaseModel):
     connectorType: ConnectorType = "IMAGE"
 
 
-class Discover(GenericModel, Generic[EndpointConfig]):
+class Discover(BaseModel, Generic[EndpointConfig]):
     connectorType: ConnectorType
     config: EndpointConfig
+    createdAt: date | None = None
 
 
-class ValidateBinding(GenericModel, Generic[ResourceConfig]):
+class ValidateBinding(BaseModel, Generic[ResourceConfig]):
     collection: CollectionSpec
     resourceConfig: ResourceConfig
     backfill: NonNegativeInt = 0
 
 
-class ValidateBase(GenericModel, Generic[ResourceConfig]):
+class ValidateBase(BaseModel, Generic[ResourceConfig]):
     name: str
     connectorType: ConnectorType
     bindings: list[ValidateBinding[ResourceConfig]] = []
@@ -43,6 +45,7 @@ class ValidateLastCaptureEndpointConfig(BaseModel):
 
 class ValidateLastCapture(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
     config: ValidateLastCaptureEndpointConfig
+    createdAt: date | None = None
 
 
 class Validate(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
@@ -50,12 +53,12 @@ class Validate(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
     lastCapture: ValidateLastCapture[EndpointConfig, ResourceConfig] | None = None
 
 
-class Apply(GenericModel, Generic[EndpointConfig, ResourceConfig]):
+class Apply(BaseModel, Generic[EndpointConfig, ResourceConfig]):
     capture: CaptureSpec[EndpointConfig, ResourceConfig]
     version: str
 
 
-class Open(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Open(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     capture: CaptureSpec[EndpointConfig, ResourceConfig]
     version: str
     range: RangeSpec

@@ -3,11 +3,9 @@ package connector
 import (
 	"context"
 	stdsql "database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"path"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,8 +21,6 @@ import (
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
-
-	duckdb "github.com/duckdb/duckdb-go/v2"
 )
 
 func NewDriver() *sql.Driver[config, tableConfig] {
@@ -53,6 +49,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -79,6 +76,13 @@ type transactor struct {
 	bindings   []*binding
 	be         *m.BindingEvents
 	templates  *templates
+
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 var _ m.Transactor = (*transactor)(nil)
@@ -125,6 +129,8 @@ func newTransactor(
 		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, false, false),
 		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, true, false),
 		templates:  renderTemplates(ep.Dialect),
+
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	for idx, target := range bindings {
@@ -137,6 +143,11 @@ func newTransactor(
 		}
 		if cfg.Advanced.NoFlowDocument {
 			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		}
+		if col, err := target.PublishedAtColumn(); err != nil {
+			b.truncateReason = err
+		} else {
+			b.truncateReason = addTruncation(b, col, is)
 		}
 		t.bindings = append(t.bindings, b)
 	}
@@ -154,9 +165,62 @@ type binding struct {
 	updates          int64
 	loadMergeBounds  *sql.MergeBoundsBuilder
 	storeMergeBounds *sql.MergeBoundsBuilder
+
+	// truncateSQL deletes the rows published before a boundary. It is empty
+	// when truncateReason states why the table cannot be truncated.
+	truncateSQL    string
+	truncateReason error
+}
+
+// addTruncation prepares b to delete the rows whose col is earlier than a
+// boundary. It returns why b cannot be truncated, as a clause suited for an
+// operator.
+func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) error {
+	var res = is.GetResource(b.target.Path)
+	if res == nil {
+		return fmt.Errorf("table %s was not found in the database", b.target.Identifier)
+	}
+	var existing = res.GetField(col.Field)
+	if existing == nil {
+		return fmt.Errorf("column %s was not found in the table", col.Identifier)
+	} else if !strings.EqualFold(existing.Type, "timestamp with time zone") {
+		return fmt.Errorf("column %s is not a TIMESTAMP WITH TIME ZONE", col.Identifier)
+	}
+
+	// Stored values reach col by a cast of their RFC3339 string to TIMESTAMP
+	// WITH TIME ZONE, so the boundary takes the same cast.
+	b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < CAST(? AS TIMESTAMP WITH TIME ZONE);", b.target.Identifier, col.Identifier)
+	return nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			log.WithFields(log.Fields{
+				"eventType": "connectorStatus",
+				"table":     b.target.Identifier,
+				"boundary":  boundary,
+			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason)
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }
@@ -345,6 +409,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	round := it.Round
+	var truncations = d.truncations
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
@@ -357,19 +422,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		if err := d.commit(ctx, fenceUpdate.String(), round); err != nil {
+		if err := d.commit(ctx, fenceUpdate.String(), round, truncations); err != nil {
 			return nil, m.FinishedOperation(err)
 		}
 
 		return nil, nil
 	}, nil
-}
-
-var retryableDuckdbErrors = []duckdb.ErrorType{
-	// These both seem to be intermittent errors originating from the internals
-	// of MotherDuck / duckdb that resolve with a retry.
-	duckdb.ErrorTypeConnection,
-	duckdb.ErrorTypeTransaction,
 }
 
 type bindingCommit struct {
@@ -380,14 +438,28 @@ type bindingCommit struct {
 	// row drops in the read_json → INSERT pipeline.
 	expectedInserts int
 	updates         int64
+	// truncateSQL, when set, follows the queries and deletes the rows
+	// published before truncateBefore.
+	truncateSQL    string
+	truncateBefore string
 }
 
-func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int) error {
+func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, truncations map[int]time.Time) error {
 	defer d.storeFiles.CleanupCurrentTransaction(ctx)
 
 	var commits []bindingCommit
 	for idx, b := range d.bindings {
+		var commit = bindingCommit{path: b.target.Path}
+		if boundary, ok := truncations[idx]; ok {
+			// The boundary is floored to microsecond precision to match
+			// DuckDB type TIMESTAMP WITH TIME ZONE.
+			commit.truncateSQL = b.truncateSQL
+			commit.truncateBefore = boundary.Truncate(time.Microsecond).UTC().Format(time.RFC3339Nano)
+		}
 		if !d.storeFiles.Started(idx) {
+			if commit.truncateSQL != "" {
+				commits = append(commits, commit)
+			}
 			continue
 		}
 
@@ -413,12 +485,10 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int) 
 		if err := d.templates.storeQuery.Execute(&storeQuery, params); err != nil {
 			return err
 		}
-		commits = append(commits, bindingCommit{
-			path:            b.target.Path,
-			queries:         append(queries, storeQuery.String()),
-			expectedInserts: b.expectedInserts,
-			updates:         b.updates,
-		})
+		commit.queries = append(queries, storeQuery.String())
+		commit.expectedInserts = b.expectedInserts
+		commit.updates = b.updates
+		commits = append(commits, commit)
 
 		// Reset for next round.
 		b.mustMerge = false
@@ -426,18 +496,10 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int) 
 		b.updates = 0
 	}
 
-	for attempt := 1; ; attempt++ {
-		if err := d.commitBindings(ctx, commits, fenceUpdate, round); err != nil {
-			var duckdbErr *duckdb.Error
-			if attempt <= 3 && errors.As(err, &duckdbErr) && slices.Contains(retryableDuckdbErrors, duckdbErr.Type) {
-				log.WithError(err).WithField("attempt", attempt).Warn("retrying commit due to retryable duckdb error")
-				continue
-			}
-
-			return err
-		}
-
-		break
+	if err := withRetries(ctx, "store commit", func() error {
+		return d.commitBindings(ctx, commits, fenceUpdate, round)
+	}); err != nil {
+		return err
 	}
 
 	if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
@@ -466,6 +528,7 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	// Target rows affected per binding, reported only once the transaction
 	// commits so that a retried attempt is not counted twice.
 	affected := make([]int64, len(bindings))
+	truncated := make([]int64, len(bindings))
 	for idx, b := range bindings {
 		d.be.StartedResourceCommit(b.path)
 		for i, query := range b.queries {
@@ -492,6 +555,16 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 				return fmt.Errorf("expected %d rows inserted for %s, got %d", b.expectedInserts, b.path, rows)
 			}
 		}
+
+		// The truncation follows the binding's stores, so it removes only the
+		// rows they did not rewrite.
+		if b.truncateSQL != "" {
+			if res, err := txn.ExecContext(txnCtx, b.truncateSQL, b.truncateBefore); err != nil {
+				return fmt.Errorf("truncating %s after backfill: %w", b.path, err)
+			} else if truncated[idx], err = res.RowsAffected(); err != nil {
+				return fmt.Errorf("truncating %s after backfill (rows affected): %w", b.path, err)
+			}
+		}
 		d.be.FinishedResourceCommit(b.path)
 	}
 
@@ -508,7 +581,16 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	for idx, b := range bindings {
 		// An update is a DELETE of the old row plus an INSERT of the new one,
 		// so it counts twice; subtract it once so the total counts documents.
-		d.be.ReportRowStats(round, b.path, m.TotalRowStats(affected[idx]-b.updates))
+		var stats = m.TotalRowStats(affected[idx] - b.updates)
+		if b.truncateSQL != "" {
+			stats = stats.WithTruncated(truncated[idx])
+			log.WithFields(log.Fields{
+				"table":   b.path,
+				"before":  b.truncateBefore,
+				"deleted": truncated[idx],
+			}).Info("truncated rows published before the backfill")
+		}
+		d.be.ReportRowStats(round, b.path, stats)
 	}
 
 	return nil

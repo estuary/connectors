@@ -1,0 +1,64 @@
+info:
+  name: search sort desc 2.16
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts/search"
+  headers:
+    - name: Intercom-Version
+      value: "2.16"
+  body:
+    type: json
+    data: |-
+      {
+        "query": { "field": "updated_at", "operator": ">", "value": 0 },
+        "pagination": { "per_page": 1 },
+        "sort": { "field": "updated_at", "order": "desc" }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 400 - invalid_sort_order
+    request:
+      url: "{{base_url}}/contacts/search"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "error.list",
+            "request_id": "000lr8ajoo9irbf28610",
+            "errors": [
+              {
+                "code": "invalid_sort_order",
+                "message": "Invalid sort order 'desc'. Must be one of: ascending, descending"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search contacts (2.16)](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/contacts/searchcontacts)
+
+  Read-only search, but sent as POST. Run only with the user's consent.
+
+  **WHY:** Sibling audit for the `contacts` stream: the connector sends
+  `sort.order: "desc"` (`api.py:_generate_contacts_search_body`). The 2.16 docs
+  say values other than `ascending`/`descending` return 400 `invalid_sort_order`.
+
+  **LIMITATION (VERIFIED 2026-10-02):** 400 `invalid_sort_order`: "Invalid sort order
+  'desc'. Must be one of: ascending, descending". The `contacts` stream fails on
+  2.16 as written.

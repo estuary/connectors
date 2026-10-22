@@ -20,6 +20,7 @@ from typing_extensions import override
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
+from .._background import spawn
 from ..cron import next_fire
 from ..logger import OBSERVABLE_FIELD
 from ..flow import (
@@ -36,7 +37,6 @@ from ..flow import (
     RotatingOAuth2Credentials,
     ValidationError,
 )
-from ..pydantic_polyfill import GenericModel
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .webhook.match import CollectionMatchingSpec, UrlMatch
@@ -289,14 +289,11 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 
 
-class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
+class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
     bindingStateV1: dict[str, _BaseResourceState | None] = {}
     backfillRequests: dict[str, bool | None] = {}
-    # A refresh token that's more recent than the one in the connector's spec. It's used when
-    # a connector requires periodically rotating refresh tokens, otherwise it's None.
-    refresh_token: str | None = None
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
@@ -463,6 +460,10 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+    # A fallback key is one the connector chose for lack of a natural identifier.
+    # The control plane uses it to create the collection, and the user may change it
+    # afterwards. A key the connector emits deletions for is not a fallback.
+    is_fallback_key: bool = False
     requires_explicit_acks: bool = False
 
 
@@ -487,6 +488,10 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
         assert "/_meta/row_id" in self.key, (
             f"A SnapshotResource must be keyed on /_meta/row_id, which is how "
             f"the CDK addresses the document a deletion removes. Got: {self.key}"
+        )
+        assert not self.is_fallback_key, (
+            "A SnapshotResource's key can't be a fallback key because the CDK "
+            "emits deletions against /_meta/row_id."
         )
 
 
@@ -546,6 +551,7 @@ def discovered(
             response.DiscoveredBinding(
                 documentSchema=schema,
                 key=resource.key,
+                isFallbackKey=resource.is_fallback_key,
                 recommendedName=resource.name,
                 resourceConfig=resource.initial_config,
                 disable=resource.disable,
@@ -765,7 +771,7 @@ def open(
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
             # re-initialization schedules.
-            asyncio.create_task(
+            _ = spawn(
                 scheduled_stop(task, soonest_future_scheduled_initialization)
             )
 
@@ -1274,7 +1280,7 @@ async def _binding_backfill_task(
             task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
             task.stopping.event.set()
         elif future_scheduled_initialization:
-            asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))
+            _ = spawn(scheduled_stop(task, future_scheduled_initialization))
 
 
 async def _binding_incremental_task(

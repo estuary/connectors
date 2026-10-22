@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-30
+
+### Fixed
+- Retry ValidationException errors in an EMR job that can occur due to
+  concurrent writers doing maintenance on the table.
+
 ## 2026-09-23
 
 ### Fixed

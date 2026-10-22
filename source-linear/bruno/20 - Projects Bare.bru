@@ -1,0 +1,248 @@
+meta {
+  name: 20 - Projects Bare
+  type: graphql
+  seq: 20
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query ProjectsBare {
+    projects(first: 2, includeArchived: true, sort: [{updatedAt: {order: Ascending}}]) {
+      nodes {
+        id
+        createdAt
+        updatedAt
+        archivedAt
+        name
+        description
+        slugId
+        icon
+        color
+        health
+        priority
+        priorityLabel
+        sortOrder
+        prioritySortOrder
+        startDate
+        targetDate
+        startedAt
+        completedAt
+        canceledAt
+        autoArchivedAt
+        healthUpdatedAt
+        trashed
+        progress
+        scope
+        url
+        slackChannelId
+        content
+        status { id }
+        creator { id }
+        lead { id }
+        leadTeam { id }
+        lastAppliedTemplate { id }
+        convertedFromIssue { id }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  The canonical Projects selection set — verbatim what the connector will send. Same
+  construction rules as `10 - Issues Bare`: all cheap scalars, relations as `{ id }` only,
+  and no nested connections (`issues`, `members`, `teams`, `projectUpdates`,
+  `projectMilestones`, `documents`, `comments`, `history` are all deliberately omitted).
+
+  Static cost under the documented formula (27 scalars, 6 relation objects): per node =
+  1 + 27 x 0.1 + 6 x 1.1 = ~10.3 points; at `first: 250` that is ~2,575 points — roughly
+  4x headroom under the 10,000-point cap, the roomiest of the four streams.
+
+  Two scalars to keep an eye on: `content` (long-form project brief) and `progressHistory`
+  / `currentProgress` (JSON blobs). `content` is included because it is genuine project
+  data; the progress-history JSON scalars are OMITTED — they are large, high-churn
+  derived aggregates, and they would bloat every document for little analytical value.
+
+  `projects` accepts the `sort` argument (verified by introspection), so this stream uses
+  the ascending `updatedAt` sweep and may checkpoint per page.
+
+  **Limitation / observed finding — `identifier` is ENTITLEMENT-GATED and has been REMOVED
+  from this selection set.** With the stream empty (2026-07-30) the field resolved without
+  complaint. Once `Seeding/A1`/`A2` created a real record (2026-08-04), requesting it
+  returned:
+
+      HTTP 200
+      "errors": [{ "extensions": { "code": "INPUT_ERROR" },
+                   "message": "Feature 'Project IDs' is not enabled",
+                   "path": ["projects","nodes",0,"identifier"] }]
+
+  **and `data` was still populated** — the row came back intact, with the errors array
+  alongside it. This is the third and nastiest variant of the "HTTP 200 does not mean
+  success" rule in this collection: not a total failure (`06`, `data: null`) and not a
+  clean rejection (`42`, HTTP 400), but a PARTIAL SUCCESS carrying both real data and a
+  real error.
+
+  Two lessons carried into the plan:
+
+  1. **Entitlement-gated fields are a portability hazard unique to GraphQL selection sets.**
+     REST returns whatever the plan allows; GraphQL returns only what you ask for, so asking
+     for a field the workspace is not entitled to poisons every response — on every page,
+     forever. `identifier` is a paid add-on ('Project IDs') and is not worth that: `id`, `slugId`
+     and `url` already identify the record. Removed.
+  2. **The connector's error handling must distinguish partial success from total failure.**
+     Treating any non-empty `errors` array as fatal would break the sync outright on every
+     workspace lacking this feature; ignoring `errors` would hide genuine failures. Branch
+     on whether `data` is present.
+
+  Only discoverable with data in the stream — the empty-endpoint run gave a false all-clear.
+
+  **Limitation / observed finding — POPULATED as of 2026-08-04.** `Seeding/A1` created one
+  project, so this stream now has a real observed response body (see the saved example):
+  `status` resolves as an OBJECT `{id, name, type}`, `health` is null in practice, and
+  `identifier` was stripped for the entitlement reason above. Field nullability, the
+  `status` shape and cursor behavior are all now confirmed against live data rather than
+  inferred from introspection.
+
+  <!-- Historical, pre-seed (2026-07-30): -->
+  **Superseded — this endpoint WAS empty.** The Estuary workspace contained
+  ZERO projects, with or without `includeArchived: true` (confirmed 2026-07-30). The query
+  is accepted and every field above resolves without error, which proves the selection set
+  is VALID against the live schema — but no response body has ever been observed for this
+  stream. Field nullability in practice, the real shape of `status`/`health`, and cursor
+  behavior are all unobserved.
+
+  Closing this gap requires `Seeding/A1 - Create Project`, which the user must run. Until
+  then this stream's response shape rests on introspection alone.
+}
+
+example {
+  name: 200 — populated Project (identifier removed: entitlement-gated)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query ProjectsBare {
+        projects(first: 2, includeArchived: true, sort: [{updatedAt: {order: Ascending}}]) {
+          nodes {
+            id
+            createdAt
+            updatedAt
+            archivedAt
+            name
+            description
+            slugId
+            icon
+            color
+            health
+            priority
+            priorityLabel
+            sortOrder
+            prioritySortOrder
+            startDate
+            targetDate
+            startedAt
+            completedAt
+            canceledAt
+            autoArchivedAt
+            healthUpdatedAt
+            trashed
+            progress
+            scope
+            url
+            slackChannelId
+            content
+            status { id }
+            creator { id }
+            lead { id }
+            leadTeam { id }
+            lastAppliedTemplate { id }
+            convertedFromIssue { id }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 18
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2485
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999975
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "projects": {
+              "nodes": [
+                {
+                  "id": "1904e338-af08-4cbb-aacd-033e8845e3c0",
+                  "createdAt": "2026-08-04T18:35:04.021Z",
+                  "updatedAt": "2026-08-04T18:35:04.021Z",
+                  "archivedAt": null,
+                  "name": "estuary-connector-verification",
+                  "description": "Temporary record created to verify source-linear Projects stream. Safe to delete.",
+                  "slugId": "6beb53347968",
+                  "icon": null,
+                  "color": "#5e6ad2",
+                  "health": null,
+                  "priority": 0,
+                  "priorityLabel": "No priority",
+                  "sortOrder": -31,
+                  "prioritySortOrder": -31,
+                  "startDate": null,
+                  "targetDate": null,
+                  "startedAt": null,
+                  "completedAt": null,
+                  "canceledAt": null,
+                  "autoArchivedAt": null,
+                  "healthUpdatedAt": null,
+                  "trashed": null,
+                  "progress": 0,
+                  "scope": 0,
+                  "url": "https://linear.app/estuary-test/project/estuary-connector-verification-6beb53347968",
+                  "slackChannelId": null,
+                  "content": null,
+                  "status": {
+                    "id": "5c520723-dcc9-42d2-8127-5d759c43e256"
+                  },
+                  "creator": {
+                    "id": "8ef0e033-440f-4809-b0ff-6a68821fc413"
+                  },
+                  "lead": null,
+                  "leadTeam": null,
+                  "lastAppliedTemplate": null,
+                  "convertedFromIssue": null
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "eyJrZXkiOiIxOTA0ZTMzOC1hZjA4LTRjYmItYWFjZC0wMzNlODg0NWUzYzAiLCJncm91cHMiOlsiIiwiIl19"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

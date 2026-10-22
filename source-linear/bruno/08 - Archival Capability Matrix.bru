@@ -1,0 +1,133 @@
+meta {
+  name: 08 - Archival Capability Matrix
+  type: graphql
+  seq: 8
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query ArchivalCapabilityMatrix {
+    IssueFilter: __type(name: "IssueFilter") { inputFields { name } }
+    ProjectFilter: __type(name: "ProjectFilter") { inputFields { name } }
+    InitiativeFilter: __type(name: "InitiativeFilter") { inputFields { name } }
+    IssueLabelFilter: __type(name: "IssueLabelFilter") { inputFields { name } }
+    IssueSortInput: __type(name: "IssueSortInput") { inputFields { name } }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/filtering
+
+  **This request exists because `14 - Issues Include Archived` came back a VERIFIED
+  NEGATIVE: archiving a record does NOT bump its `updatedAt`.** (Confirmed 2026-08-04 by
+  `Seeding/D2` — EST-2's `updatedAt` stayed at `2026-07-30T21:35:03.808Z` while
+  `archivedAt` became `2026-08-04T18:13:09.393Z`.) An `updatedAt`-cursored sweep can
+  therefore never re-emit an archived row, and `includeArchived: true` buys incremental
+  sync nothing on its own. The only remaining incremental route to archival is a filter on
+  `archivedAt` itself — so this probe asks which filter types actually offer one.
+
+  **Limitation / observed finding** (confirmed 2026-08-04): the capability is NOT uniform
+  across the cluster. This asymmetry is the cluster's real fault line — deletion-capture
+  capability, not ordering.
+
+  | filter type | `archivedAt` filterable? |
+  |---|---|
+  | `IssueFilter` | **YES** |
+  | `ProjectFilter` | **NO** |
+  | `InitiativeFilter` | **NO** |
+  | `IssueLabelFilter` | **NO** |
+
+  Passing it anyway to the three that lack it fails loudly, e.g.
+  `Field "archivedAt" is not defined by type "ProjectFilter"`.
+
+  **`IssueSortInput` also has NO `archivedAt` member** (verified here; the members are
+  priority, estimate, title, label, labelGroup, slaStatus, createdAt, updatedAt,
+  completedAt, dueDate, accumulatedStateUpdatedAt, cycle, milestone, assignee, delegate,
+  project, team, manual, workflowState, customer, customerRevenue, customerCount,
+  customerImportantCount, rootIssue, linkCount, release). So Issues' archival pass can
+  FILTER on `archivedAt` but cannot SORT by it — which forces that pass onto end-of-sweep
+  checkpointing, the same policy Labels needs for its `updatedAt` sweep. See
+  `15 - Issues Archival Sweep`.
+
+  Consequence: Issues can capture archival incrementally; Projects, Initiatives and Labels
+  cannot, by any available filter.
+
+  **Resolution (reviewed decision, 2026-08-13):** accepted as an explicit connector
+  limitation. Projects / Initiatives / Labels stay incremental+backfill, and the connector's
+  user-facing docs must state that archival and deletion of those three are NOT captured —
+  an archived record remains in the destination indefinitely with `archivedAt: null`,
+  indistinguishable from a live one, until a full backfill reconciles it.
+
+  Snapshot reclassification (which would infer deletions natively) and a scheduled full
+  refresh were both considered and declined in favor of keeping the `updatedAt` cursor and
+  the low steady-state request cost. Snapshotting remains the cheap upgrade path if the
+  limitation bites: the shared connection walk already produces what a `fetch_snapshot`
+  needs, so it is a resource-registration change rather than new fetch logic. Labels and
+  Initiatives are the natural first candidates.
+}
+
+
+example {
+  name: 200 — archivedAt filterable on IssueFilter ONLY
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query ArchivalCapabilityMatrix {
+        IssueFilter: __type(name: "IssueFilter") { inputFields { name } }
+        ProjectFilter: __type(name: "ProjectFilter") { inputFields { name } }
+        InitiativeFilter: __type(name: "InitiativeFilter") { inputFields { name } }
+        IssueLabelFilter: __type(name: "IssueLabelFilter") { inputFields { name } }
+        IssueSortInput: __type(name: "IssueSortInput") { inputFields { name } }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 11
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2492
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999989
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "IssueFilter": {
+              "has_archivedAt": true
+            },
+            "ProjectFilter": {
+              "has_archivedAt": false
+            },
+            "InitiativeFilter": {
+              "has_archivedAt": false
+            },
+            "IssueLabelFilter": {
+              "has_archivedAt": false
+            },
+            "IssueSortInput": {
+              "has_archivedAt": false
+            }
+          }
+        }
+      '''
+    }
+  }
+}

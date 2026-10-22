@@ -70,6 +70,13 @@ class TestLanes(unittest.TestCase):
         self.assertEqual(classify(".dockerignore"), (True, True, ALL))
         self.assertEqual(classify("connector-variant.Dockerfile"), (True, True, ALL))
 
+    def test_workspace_manifests_are_python_all(self):
+        # Every workspace member resolves from the root manifest and lock, so
+        # either one reaches every Python connector -- and only those. The two
+        # Python packages that belong to Go connectors are not members.
+        self.assertEqual(classify("uv.lock"), (True, False, ALL))
+        self.assertEqual(classify("pyproject.toml"), (True, False, ALL))
+
     def test_docs_are_neither(self):
         self.assertEqual(classify("CLAUDE.md"), (False, False, []))
         self.assertEqual(classify("docs/contexts/captures.md"), (False, False, []))
@@ -93,6 +100,16 @@ class TestLanes(unittest.TestCase):
         self.assertEqual(
             classify(".github/workflows/estuary-cdk.yaml"), (False, False, [])
         )
+
+    def test_python_auto_rerun_workflow_triggers_neither_connector_lane(self):
+        self.assertEqual(
+            classify(".github/workflows/python-auto-rerun.yaml"), (False, False, [])
+        )
+
+    def test_ruff_config_triggers_neither_connector_lane(self):
+        # Lint only reports, so the shared ruff config builds nothing. Without
+        # this rule it would fall through to the Go & Rust lane like go.mod.
+        self.assertEqual(classify("ruff.toml"), (False, False, []))
 
     def test_nested_pyproject_does_not_make_a_go_connector_python(self):
         # materialize-iceberg/python/pyproject.toml exists. Classing its parent as

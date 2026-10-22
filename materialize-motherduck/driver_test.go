@@ -2,9 +2,12 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -32,6 +35,7 @@ type integrationVariant struct {
 	materializeSpec string
 	applySpec       string
 	migrateSpec     string
+	keyChangeSpec   string
 	fenceSpec       string
 }
 
@@ -44,6 +48,7 @@ var (
 		materializeSpec: "testdata/materialize.flow.yaml",
 		applySpec:       "testdata/apply.flow.yaml",
 		migrateSpec:     "testdata/migrate.flow.yaml",
+		keyChangeSpec:   "testdata/key-change.flow.yaml",
 		fenceSpec:       "testdata/fence.flow.yaml",
 	}
 
@@ -54,6 +59,7 @@ var (
 		materializeSpec: "testdata/materialize.ducklake.flow.yaml",
 		applySpec:       "testdata/apply.ducklake.flow.yaml",
 		migrateSpec:     "testdata/migrate.ducklake.flow.yaml",
+		keyChangeSpec:   "testdata/key-change.ducklake.flow.yaml",
 	}
 )
 
@@ -82,6 +88,64 @@ func TestIntegration(t *testing.T) {
 	t.Run("fence", func(t *testing.T) {
 		runFenceSuite(t, motherduckVariant)
 	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			t.Run(taskName, func(t *testing.T) {
+				var ctx = context.Background()
+				db, err := cfg.db(ctx)
+				require.NoError(t, err)
+				defer db.Close()
+
+				for _, table := range []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"} {
+					_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s.%s;", cfg.Schema, table))
+					require.NoError(t, err)
+				}
+				var checkpoints int
+				require.NoError(t, db.QueryRowContext(ctx,
+					"SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = ? AND table_schema = ? AND table_name = 'flow_checkpoints_v1'",
+					cfg.Database, cfg.Schema,
+				).Scan(&checkpoints))
+				if checkpoints > 0 {
+					_, err = db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s.flow_checkpoints_v1 WHERE materialization = ?;", cfg.Schema), taskName)
+					require.NoError(t, err)
+				}
+
+				testutil.RunFlowctl(t, "raw", "preview-next",
+					"--name", taskName,
+					"--source", "testdata/truncate.flow.yaml",
+					"--fixture", "testdata/truncate.fixture.json",
+					"--shards", "1",
+					"--timeout", "5m",
+					"--network", "flow-test",
+				)
+
+				// The fixture stores ids 1-3, then re-stores only id 1 during a
+				// backfill. Only the standard table with a flow_published_at
+				// column loses the rows published before the backfill.
+				for table, want := range map[string][]int64{
+					"truncate_standard":        {1},
+					"truncate_delta":           {1, 1, 2, 3},
+					"truncate_no_published_at": {1, 2, 3},
+				} {
+					var rows, err = db.QueryContext(ctx, fmt.Sprintf("SELECT id FROM %s.%s ORDER BY id;", cfg.Schema, table))
+					require.NoError(t, err)
+					var ids []int64
+					for rows.Next() {
+						var id int64
+						require.NoError(t, rows.Scan(&id))
+						ids = append(ids, id)
+					}
+					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
+					require.Equal(t, want, ids, table)
+				}
+			})
+		})
+	})
 }
 
 func makeTestResource(table string, delta bool) tableConfig {
@@ -93,6 +157,9 @@ func makeTestResource(table string, delta bool) tableConfig {
 
 func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 	requireDatabaseFormat(t, variant)
+	if variant.duckLake {
+		maintainSnapshots(t, variant)
+	}
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), variant.materializeSpec, makeTestResource, nil,
@@ -105,6 +172,9 @@ func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), variant.migrateSpec, makeTestResource, nil)
+	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), variant.keyChangeSpec, makeTestResource, nil)
 	})
 }
 
@@ -124,6 +194,145 @@ func requireDatabaseFormat(t *testing.T, variant integrationVariant) {
 			"database %q of task %q does not have the format the %q variant covers",
 			cfg.Database, taskName, variant.name)
 	})
+}
+
+const (
+	// snapshotRetention is how old a DuckLake snapshot must be before it is
+	// expired, as a DuckDB interval. Every test run finishes well within it, so
+	// expiry never touches a snapshot a concurrent run still reads.
+	snapshotRetention = "1 HOUR"
+	// snapshotExpiryBatch is the most snapshots one expiry call removes, because
+	// MotherDuck fails calls that remove a few hundred at once.
+	snapshotExpiryBatch = 100
+	// snapshotExpiryCalls and snapshotExpiryBudget bound the work one run spends
+	// on expiry. Each run removes a share of the backlog, so a run that stops
+	// early leaves the rest to the next.
+	snapshotExpiryCalls  = 10
+	snapshotExpiryBudget = 15 * time.Second
+	// snapshotBacklogLimit is the count of snapshots older than
+	// snapshotRetention above which the variant fails before it runs. MotherDuck
+	// returns internal errors on ordinary statements against a DuckLake database
+	// with a large enough backlog.
+	snapshotBacklogLimit = 20_000
+)
+
+// maintainSnapshots fails the variant if its DuckLake database holds more than
+// snapshotBacklogLimit snapshots older than snapshotRetention, and expires old
+// snapshots once the variant's subtests finish. A DuckLake database keeps every
+// snapshot until one is expired explicitly, so a shared test database grows with
+// every run.
+func maintainSnapshots(t *testing.T, variant integrationVariant) {
+	t.Helper()
+
+	testutil.RunTestAllTasks(t, variant.materializeSpec, func(t *testing.T, _ []byte, _ string, cfg config) {
+		var ctx = context.Background()
+		var database = createDuckDialect(nil, true).Literal(cfg.Database)
+
+		db, err := cfg.bareOpen()
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			defer db.Close()
+
+			expired, err := expireSnapshots(ctx, db, database)
+			if err != nil {
+				t.Logf("expired %d snapshots of %s before stopping: %s", expired, cfg.Database, err)
+			} else {
+				t.Logf("expired %d snapshots of %s", expired, cfg.Database)
+			}
+		})
+
+		backlog, err := snapshotBacklog(ctx, db, database)
+		require.NoError(t, err)
+		require.LessOrEqualf(t, backlog, snapshotBacklogLimit,
+			"database %q holds %d snapshots older than %s, so expiry is not keeping up with test runs",
+			cfg.Database, backlog, snapshotRetention)
+	})
+}
+
+// snapshotBacklog returns the number of snapshots older than snapshotRetention
+// in the DuckLake database named by the SQL literal database. These are the
+// snapshots expireSnapshots may remove.
+func snapshotBacklog(ctx context.Context, db *stdsql.DB, database string) (int, error) {
+	var count int
+	err := db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT count(*) FROM ducklake_snapshots(%s) WHERE snapshot_time < now() - INTERVAL %s",
+		database, snapshotRetention,
+	)).Scan(&count)
+	return count, err
+}
+
+// expireSnapshots expires snapshots older than snapshotRetention from the
+// DuckLake database named by the SQL literal database. It makes at most
+// snapshotExpiryCalls calls of up to snapshotExpiryBatch snapshots each within
+// snapshotExpiryBudget, and returns the number of snapshots expired along with
+// whatever stopped it early.
+func expireSnapshots(ctx context.Context, db *stdsql.DB, database string) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, snapshotExpiryBudget)
+	defer cancel()
+
+	// The cutoff is held in a session variable, so every statement must run on
+	// the same connection.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+
+	// ducklake_expire_snapshots accepts no subquery as an argument, so the cutoff
+	// is computed first.
+	var setCutoff = fmt.Sprintf(`SET VARIABLE snapshot_expiry_cutoff = least(
+		now() - INTERVAL %s,
+		(SELECT snapshot_time FROM ducklake_snapshots(%s) ORDER BY snapshot_time LIMIT 1 OFFSET %d))`,
+		snapshotRetention, database, snapshotExpiryBatch)
+	var expire = fmt.Sprintf(
+		"SELECT count(*) FROM ducklake_expire_snapshots(%s, older_than => getvariable('snapshot_expiry_cutoff'))",
+		database)
+
+	var total int
+	for range snapshotExpiryCalls {
+		if _, err := conn.ExecContext(ctx, setCutoff); err != nil {
+			return total, fmt.Errorf("computing expiry cutoff: %w", err)
+		}
+
+		var expired int
+		if err := conn.QueryRowContext(ctx, expire).Scan(&expired); err != nil {
+			return total, fmt.Errorf("expiring snapshots: %w", err)
+		} else if expired == 0 {
+			break
+		}
+		total += expired
+	}
+
+	return total, nil
+}
+
+func TestSnapshotBacklog(t *testing.T) {
+	var ctx = context.Background()
+	var dir = t.TempDir()
+
+	db, err := stdsql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer db.Close()
+
+	for _, stmt := range []string{
+		fmt.Sprintf("ATTACH 'ducklake:%s' AS lake (DATA_PATH '%s')",
+			filepath.Join(dir, "lake.ducklake"), filepath.Join(dir, "data")),
+		"CREATE TABLE lake.t (id INTEGER)",
+		"INSERT INTO lake.t VALUES (1)",
+		"INSERT INTO lake.t VALUES (2)",
+		"INSERT INTO lake.t VALUES (3)",
+		fmt.Sprintf(`UPDATE __ducklake_metadata_lake.ducklake_snapshot
+			SET snapshot_time = now() - INTERVAL %s - INTERVAL 1 MINUTE
+			WHERE snapshot_id < 3`, snapshotRetention),
+	} {
+		_, err := db.ExecContext(ctx, stmt)
+		require.NoError(t, err)
+	}
+
+	backlog, err := snapshotBacklog(ctx, db, "'lake'")
+	require.NoError(t, err)
+	require.Equal(t, 3, backlog)
 }
 
 func runFenceSuite(t *testing.T, variant integrationVariant) {

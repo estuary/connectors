@@ -101,6 +101,7 @@ type stagedFile struct {
 
 	// The remote root directory for uploading files
 	root   string
+	prefix string
 	txnDir string
 	files  files.FilesInterface
 
@@ -124,7 +125,9 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(cfg config, root string, fields []string, filesAPI files.FilesInterface) *stagedFile {
+// newStagedFile stages under root in transaction directories named
+// "<prefix>_<UUIDv7>", so the startup sweep can tell their owner and age.
+func newStagedFile(cfg config, root, prefix string, fields []string, filesAPI files.FilesInterface) *stagedFile {
 	uuid := uuid.NewString()
 	var tempdir = os.TempDir()
 
@@ -132,6 +135,7 @@ func newStagedFile(cfg config, root string, fields []string, filesAPI files.File
 		fields: fields,
 		dir:    filepath.Join(tempdir, uuid),
 		root:   root,
+		prefix: prefix,
 		files:  filesAPI,
 		cfg:    cfg,
 	}
@@ -157,7 +161,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	}
 
 	// Reset values used per-transaction.
-	f.txnDir = uuid.NewString()
+	f.txnDir = f.prefix + "_" + uuid.Must(uuid.NewV7()).String()
 	if err := f.files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: f.remoteDir()}); err != nil {
 		return fmt.Errorf("creating staging directory %q: %w", f.remoteDir(), err)
 	}
