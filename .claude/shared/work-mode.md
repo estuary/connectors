@@ -49,7 +49,7 @@ Outcomes only; the owner named in each row holds the reasoning.
 | `GATE-STREAM-DESIGN` — `add-stream` Phase 3 | Confirm endpoint, grain, classification. | Proceed; ledger. Already settled when a reviewed plan supplies the design. |
 | `GATE-INCREMENTAL-ONLY` — `classify-stream-types` | Confirm. | Never. |
 | `GATE-STRATEGY-UNCLEAR` — `classify-stream-types` | Ask. | Decide on size and cursor; ledger as open. |
-| `GATE-OPAQUE-CURSOR` — `bruno-probe-endpoint`, token stability undocumented | Surface as a blocker. | Reject the opaque cursor; derived cursor or snapshot. |
+| `GATE-OPAQUE-CURSOR` — `bruno-probe-endpoint`, token stability undocumented | Surface as a blocker, with the durability probes' results. | Accept the token when durability probes 2–4 pass; otherwise reject it for a derived cursor or snapshot. |
 | `GATE-PARTITION-COVERAGE` — `bruno-probe-endpoint`, a default filter hides a partition | Decide together. | Sentinel sweep if offered, else sequential sweeps. |
 | `GATE-PLAN-REVIEW` — `stream-builder` draft plan | Human review, inline. | Self-review; orchestrator's reviewer before integration. |
 | `GATE-SEEDING` — `bruno-probe-endpoint` Phase 6 | Per the seeding answer. | `assistant` → run; otherwise PENDING. |
