@@ -149,9 +149,9 @@ def print_results(data: dict) -> None:
     mb_s = data.get("mb_per_sec")
     docs_s = data.get("docs_per_sec")
     throughput_color = GREEN if (mb_s and mb_s > 10) else YELLOW if (mb_s and mb_s > 1) else RED
+    mb_s_str = f"{mb_s:.1f} MB/s" if mb_s is not None else "N/A"
     print(
-        f"  {BOLD}Throughput{RESET}   {throughput_color}{BOLD}"
-        f"{mb_s:.1f} MB/s{RESET}"
+        f"  {BOLD}Throughput{RESET}   {throughput_color}{BOLD}{mb_s_str}{RESET}"
         f"     {BOLD}Docs/sec{RESET}    {_human_count(int(docs_s)) if docs_s else 'N/A'}"
     )
     tpcds = data.get("tpcds")
