@@ -139,6 +139,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     let file_paths = scan::load(
                         &catalog,
                         &binding.table,
+                        &binding.collection,
                         &binding.schema,
                         binding.key_builders.len(),
                         &requested_keys,
@@ -362,6 +363,7 @@ const DATA_FILE_FLUSH_BYTES: usize = 256 * 1024 * 1024;
 
 struct BindingState {
     table: String,
+    collection: String,
     state_key: String,
     schema: Arc<Schema>,
     table_schema: serde_json::Value,
@@ -832,6 +834,7 @@ fn binding_state(
 
     Ok(BindingState {
         table: binding.resource_path[0].clone(),
+        collection: collection.name.clone(),
         state_key: binding.state_key.clone(),
         schema: Arc::new(Schema::new(fields)),
         table_schema,

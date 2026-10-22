@@ -9,6 +9,7 @@ use std::cmp::Reverse;
 use std::collections::BTreeSet;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::time::Instant;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -73,6 +74,28 @@ impl FilePathTable {
     }
 }
 
+/// Counts for the `load`-scan summary log: how many manifest entries/row
+/// groups pruning ruled out versus how many were actually read, across
+/// every batch of one `load` call.
+#[derive(Default)]
+struct ScanStats {
+    manifest_entries_considered: usize,
+    manifest_entries_pruned: usize,
+    row_groups_considered: usize,
+    row_groups_pruned: usize,
+    data_files_opened: usize,
+}
+
+impl ScanStats {
+    fn merge(&mut self, other: ScanStats) {
+        self.manifest_entries_considered += other.manifest_entries_considered;
+        self.manifest_entries_pruned += other.manifest_entries_pruned;
+        self.row_groups_considered += other.row_groups_considered;
+        self.row_groups_pruned += other.row_groups_pruned;
+        self.data_files_opened += other.data_files_opened;
+    }
+}
+
 /// Scans `table`'s current snapshot for rows matching any of
 /// `requested_keys` (each a decoded key tuple, in the same column order as
 /// `schema`'s first `num_keys` fields). Always re-reads the manifest-list
@@ -100,12 +123,22 @@ impl FilePathTable {
 pub async fn load(
     catalog: &Catalog,
     table: &str,
+    collection: &str,
     schema: &Schema,
     num_keys: usize,
     requested_keys: &[Vec<Element<'_>>],
     mut emit: impl FnMut(LoadedDoc) -> Result<()>,
 ) -> Result<Vec<String>> {
+    let started = Instant::now();
+
     let Some(current) = catalog.current_snapshot(table).await? else {
+        tracing::info!(
+            table,
+            collection,
+            requested = requested_keys.len(),
+            elapsed_ms = started.elapsed().as_millis(),
+            "load scan: table has no snapshot yet"
+        );
         return Ok(Vec::new());
     };
 
@@ -120,6 +153,12 @@ pub async fn load(
     let doc_index = schema.fields().len() - 1;
 
     let mut file_paths = FilePathTable::default();
+    let mut stats = ScanStats::default();
+    let mut matched = 0usize;
+    let mut counting_emit = |doc: LoadedDoc| -> Result<()> {
+        matched += 1;
+        emit(doc)
+    };
 
     let indices: Vec<usize> = (0..requested_keys.len()).collect();
     for batch_indices in indices.chunks(DEFAULT_LOAD_BATCH_SIZE) {
@@ -132,7 +171,7 @@ pub async fn load(
             .collect::<Result<_>>()?;
         batch.sort_by(|(_, a), (_, b)| compare_keys(a, b));
 
-        scan_batch(
+        let batch_stats = scan_batch(
             catalog,
             &manifests,
             &key_field_ids,
@@ -140,10 +179,27 @@ pub async fn load(
             doc_index,
             &batch,
             &mut file_paths,
-            &mut emit,
+            &mut counting_emit,
         )
         .await?;
+        stats.merge(batch_stats);
     }
+
+    tracing::info!(
+        table,
+        collection,
+        requested = requested_keys.len(),
+        matched,
+        distinct_files_read = file_paths.paths.len(),
+        data_files_opened = stats.data_files_opened,
+        manifest_entries_considered = stats.manifest_entries_considered,
+        manifest_entries_pruned = stats.manifest_entries_pruned,
+        row_groups_considered = stats.row_groups_considered,
+        row_groups_pruned = stats.row_groups_pruned,
+        files_read = ?file_paths.paths,
+        elapsed_ms = started.elapsed().as_millis(),
+        "load scan complete"
+    );
 
     Ok(file_paths.paths)
 }
@@ -170,9 +226,9 @@ async fn scan_batch(
     batch: &[(usize, Vec<Bound>)],
     file_paths: &mut FilePathTable,
     emit: &mut impl FnMut(LoadedDoc) -> Result<()>,
-) -> Result<()> {
+) -> Result<ScanStats> {
     let Some((_, first_key)) = batch.first() else {
-        return Ok(());
+        return Ok(ScanStats::default());
     };
 
     // Per-column [lower, upper] across the whole batch — independent per
@@ -196,20 +252,23 @@ async fn scan_batch(
     // paired with their manifest's sequence number (manifest entries always
     // have status ADDED with no sequence number of their own in this
     // connector, i.e. they inherit the manifest-list row's).
+    let mut stats = ScanStats::default();
     let mut data_files = Vec::new();
     for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
         let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
         for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
+            stats.manifest_entries_considered += 1;
             let lower = decode_bounds(&entry.lower_bounds, key_field_ids, key_types);
             let upper = decode_bounds(&entry.upper_bounds, key_field_ids, key_types);
             if !ranges_overlap(key_field_ids, &batch_lower, &batch_upper, &lower, &upper) {
+                stats.manifest_entries_pruned += 1;
                 continue;
             }
             data_files.push((entry, manifest_file.sequence_number));
         }
     }
     if data_files.is_empty() {
-        return Ok(());
+        return Ok(stats);
     }
 
     tracing::warn!(?data_files, "reading data files");
@@ -250,10 +309,15 @@ async fn scan_batch(
             *sequence_number,
         )
         .await?;
+        stats.data_files_opened += 1;
+        stats.row_groups_considered += iter.row_group_sizes.len();
+        stats.row_groups_pruned += iter.row_group_sizes.len() - iter.surviving_groups.len();
         file_iters.push(iter);
     }
 
-    heap_merge(file_iters, batch, file_paths, emit).await
+    heap_merge(file_iters, batch, file_paths, emit).await?;
+
+    Ok(stats)
 }
 
 fn decode_bounds(
@@ -641,8 +705,8 @@ async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec
     Ok(positions)
 }
 
-/// `file_index` is an index into the `load()` call's [`LoadResult::file_paths`]
-/// table, not the file path itself — `Store` resolves it back via that table.
+/// `file_index` is an index into the file-path table `load()` returns, not
+/// the file path itself — `Store` resolves it back via that table.
 fn augment_doc(doc_text: &str, file_index: usize, position: i64) -> Result<Vec<u8>> {
     let mut doc: serde_json::Value =
         serde_json::from_str(doc_text).context("flow_document is not valid JSON")?;
