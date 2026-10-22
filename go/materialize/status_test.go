@@ -97,7 +97,7 @@ func TestStatusSlowStages(t *testing.T) {
 	h.recover(2 * time.Second)
 	h.expect("info: Recovery commit: finishing the transaction that was in progress when the task last stopped")
 
-	// Waiting for data is reported once, after it has lasted statusDwell.
+	// Waiting for data is reported once, after it has lasted statusMinActivePeriod.
 	h.advance(5 * time.Minute)
 	h.expect("info: Waiting, no new collection data since 11:00:02 UTC")
 
@@ -140,7 +140,7 @@ func TestStatusFastTask(t *testing.T) {
 	h.recover(time.Second)
 	h.got = nil
 
-	// Stages shorter than statusDwell are never reported. A rollup is, once
+	// Stages shorter than statusMinActivePeriod are never reported. A rollup is, once
 	// statusRollupWindow has passed since the last status.
 	// The rollup is due on the tick before the 75th round is acknowledged.
 	for range 75 {
@@ -148,7 +148,7 @@ func TestStatusFastTask(t *testing.T) {
 	}
 	h.expect("info: Streaming changes (222 documents, 74 transactions in the last 5 minutes)")
 
-	// A long stage after short ones is reported after statusDwell, not held
+	// A long stage after short ones is reported after statusMinActivePeriod, not held
 	// back until the next rollup.
 	h.round(time.Second)
 	h.loads(2)
