@@ -807,13 +807,13 @@ def _assert_tombstone_covers_key(tombstone: BaseDocument, key: list[str]) -> Non
         if key_pointer == "/_meta/row_id":
             continue
         node: Any = dump
-        for field in key_pointer.strip("/").split("/"):
-            assert isinstance(node, dict) and field in node, (
+        for field_name in key_pointer.strip("/").split("/"):
+            assert isinstance(node, dict) and field_name in node, (
                 f"A snapshot tombstone must have every collection key field "
                 f"other than /_meta/row_id pre-set, but {key_pointer} is unset. "
                 f"Key: {key}, tombstone: {dump}"
             )
-            node = node[field]
+            node = node[field_name]
 
 
 def _tombstone_discriminator_values(
@@ -831,8 +831,8 @@ def _tombstone_discriminator_values(
         if key_pointer == "/_meta/row_id":
             continue
         node: Any = dump
-        for field in key_pointer.strip("/").split("/"):
-            node = node[field]
+        for field_name in key_pointer.strip("/").split("/"):
+            node = node[field_name]
         values.append(node)
     return tuple(values)
 

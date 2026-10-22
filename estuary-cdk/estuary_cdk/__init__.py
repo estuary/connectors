@@ -33,7 +33,7 @@ async def stdin_jsonl(cls: type[Request]) -> AsyncGenerator[Request, None]:
 # Mixins may implement a protocol like Python's Asynchronous Context Manager pattern:
 # they're entered prior to handling any requests, and exited after all requests have
 # been fully processed.
-class Mixin(abc.ABC):
+class Mixin:
     # Parameters are positional-only so overrides may name them freely, and the
     # return is Any because serve() discards it while implementations commonly
     # return self.

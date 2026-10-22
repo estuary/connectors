@@ -60,7 +60,7 @@ async def buffer_ordered(
             current.set_result(None)
             for _ in range(concurrency):
                 await work.put(None)
-        except Exception as e:
+        except Exception:
             # Signal the output loop to stop.
             current.set_result(None)
             raise
@@ -74,7 +74,7 @@ async def buffer_ordered(
 
             try:
                 this_work.result.put_nowait(await this_work.aw)
-            except Exception as e:
+            except Exception:
                 # Signal the output loop to stop.
                 this_work.result.put_nowait(None)
                 raise
@@ -109,7 +109,7 @@ async def buffer_ordered(
         # Raise the first error from the producer or any of the workers.
         for e in eg.exceptions:
             raise e
-    except Exception as e:
+    except Exception:
         raise
     finally:
         # Await any queued awaitables, discarding further errors.
@@ -118,5 +118,5 @@ async def buffer_ordered(
             if remaining_work is not None:
                 try:
                     await remaining_work.aw
-                except Exception as e:
+                except Exception:
                     pass

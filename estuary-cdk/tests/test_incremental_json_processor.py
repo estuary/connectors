@@ -365,5 +365,5 @@ async def test_malformed_ndjson_fails():
     )
 
     with pytest.raises(IncompleteJSONError):
-        async for record in processor:
+        async for _ in processor:
             pass  # We expect the error before any records are yielded due to ijson's buffering
