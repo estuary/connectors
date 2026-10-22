@@ -1396,16 +1396,16 @@ def build_custom_ads_insights_model(
     )
 
     # Set ClassVars for the model - set level first so level_specific_fields() works
-    setattr(model, "level", config.level)
-    setattr(model, "primary_keys", primary_keys)
-    setattr(model, "name", "custom" + config.name)
-    setattr(model, "breakdowns", breakdowns)
-    setattr(model, "action_breakdowns", action_breakdowns)
+    model.level = config.level
+    model.primary_keys = primary_keys
+    model.name = "custom" + config.name
+    model.breakdowns = breakdowns
+    model.action_breakdowns = action_breakdowns
 
     # Combine user fields with level-specific required fields
     level_fields = model.level_specific_fields()
     final_fields = list(dict.fromkeys(fields + level_fields))
 
-    setattr(model, "fields", final_fields)
+    model.fields = final_fields
 
     return model

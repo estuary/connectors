@@ -47,7 +47,7 @@ class AsanaStream(HttpStream, ABC):
             self.logger.error(
                 f"Skipping stream {self.name}. {ASANA_ERRORS_MAPPING.get(response.status_code)}. Full error message: {response.text}"
             )
-            setattr(self, "raise_on_http_errors", False)
+            self.raise_on_http_errors = False
             return False
         return super().should_retry(response)
 

@@ -128,7 +128,7 @@ async def fetch_ticket_child_resources(
             if isinstance(result, TimestampedResource):
                 tickets.append(AbbreviatedTicket(
                     id=result.id, 
-                    status=getattr(result, "status"),
+                    status=result.status,
                     updated_at=result.updated_at
                 ))
             elif isinstance(result, str):
@@ -172,7 +172,7 @@ async def backfill_ticket_child_resources(
             if isinstance(result, TimestampedResource):
                 tickets.append(AbbreviatedTicket(
                     id=result.id, 
-                    status=getattr(result, "status"),
+                    status=result.status,
                     updated_at=result.updated_at
                 ))
             elif isinstance(result, str):
@@ -253,7 +253,7 @@ async def fetch_side_conversations(
             if isinstance(result, TimestampedResource):
                 tickets.append(AbbreviatedTicket(
                     id=result.id,
-                    status=getattr(result, "status"),
+                    status=result.status,
                     updated_at=result.updated_at,
                 ))
             elif isinstance(result, str):
@@ -297,7 +297,7 @@ async def backfill_side_conversations(
             if isinstance(result, TimestampedResource):
                 tickets.append(AbbreviatedTicket(
                     id=result.id,
-                    status=getattr(result, "status"),
+                    status=result.status,
                     updated_at=result.updated_at,
                 ))
             elif isinstance(result, str):
@@ -348,7 +348,7 @@ async def fetch_ticket_metrics(
         if isinstance(result, str):
             yield (result,)
         else:
-            metrics = getattr(result, "metric_set")
+            metrics = result.metric_set
             # Deleted tickets have no metrics, so we have to check that the metric set exists before yielding it.
             if metrics is not None:
                 yield ZendeskResource.model_validate(metrics)
@@ -377,7 +377,7 @@ async def backfill_ticket_metrics(
         if isinstance(result, str):
             yield result
         elif result.updated_at < cutoff:
-            metrics = getattr(result, "metric_set")
+            metrics = result.metric_set
             # Deleted tickets have no metrics, so we have to check that the metric set exists before yielding it.
             if metrics is not None:
                 yield ZendeskResource.model_validate(metrics)

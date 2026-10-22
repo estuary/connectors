@@ -80,7 +80,7 @@ def test_streams(requests_mock, config):
 def test_check_credential_title_exception(config):
     config["credentials"].pop("credentials_title")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="No supported .credentials_title. specified"):
         SourceHubspot().check_connection(logger, config=config)
 
 

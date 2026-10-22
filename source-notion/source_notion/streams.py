@@ -415,7 +415,7 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
 
     def should_retry(self, response: requests.Response) -> bool:
         if response.status_code == 404:
-            setattr(self, "raise_on_http_errors", False)
+            self.raise_on_http_errors = False
             self.logger.error(
                 f"Stream {self.name}: {response.json().get('message')}. 404 HTTP response returns if the block specified by id doesn't"
                 " exist, or if the integration doesn't have access to the block."
@@ -430,7 +430,7 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
                 "validation_error" in error_code
                 and "ai_block is not supported" in error_msg
             ):
-                setattr(self, "raise_on_http_errors", False)
+                self.raise_on_http_errors = False
                 self.logger.error(
                     f"Stream {self.name}: `ai_block` type is not supported, skipping. See https://developers.notion.com/reference/block for available block type."
                 )
