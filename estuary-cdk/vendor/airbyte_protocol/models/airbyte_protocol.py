@@ -24,7 +24,7 @@ class AirbyteRecordMessage(BaseModel):
     model_config = ConfigDict(extra='allow')
 
     namespace: Optional[str] = Field(
-        None, description='namespace the data is associated with'
+        default=None, description='namespace the data is associated with'
     )
     stream: str = Field(..., description='stream the data is associated with')
     data: Dict[str, Any] = Field(..., description='record data')
@@ -68,7 +68,7 @@ class AirbyteLogMessage(BaseModel):
     level: Level = Field(..., description='log level')
     message: str = Field(..., description='log message')
     stack_trace: Optional[str] = Field(
-        None,
+        default=None,
         description='an optional stack trace if the log message corresponds to an exception',
     )
 
@@ -92,14 +92,14 @@ class AirbyteErrorTraceMessage(BaseModel):
         ..., description='A user-friendly message that indicates the cause of the error'
     )
     internal_message: Optional[str] = Field(
-        None, description='The internal error that caused the failure'
+        default=None, description='The internal error that caused the failure'
     )
     stack_trace: Optional[str] = Field(
-        None, description='The full stack trace of the error'
+        default=None, description='The full stack trace of the error'
     )
-    failure_type: Optional[FailureType] = Field(None, description='The type of error')
+    failure_type: Optional[FailureType] = Field(default=None, description='The type of error')
     stream_descriptor: Optional[StreamDescriptor] = Field(
-        None, description='The stream associated with the error, if known (optional)'
+        default=None, description='The stream associated with the error, if known (optional)'
     )
 
 
@@ -117,13 +117,13 @@ class AirbyteEstimateTraceMessage(BaseModel):
         description='Estimates are either per-stream (STREAM) or for the entire sync (SYNC). STREAM is preferred, and requires the source to count how many records are about to be emitted per-stream (e.g. there will be 100 rows from this table emitted). For the rare source which cannot tell which stream a record belongs to before reading (e.g. CDC databases), SYNC estimates can be emitted. Sources should not emit both STREAM and SOURCE estimates within a sync.\n',
         title='estimate type',
     )
-    namespace: Optional[str] = Field(None, description='The namespace of the stream')
+    namespace: Optional[str] = Field(default=None, description='The namespace of the stream')
     row_estimate: Optional[int] = Field(
-        None,
+        default=None,
         description='The estimated number of rows to be emitted by this sync for this stream',
     )
     byte_estimate: Optional[int] = Field(
-        None,
+        default=None,
         description='The estimated number of bytes to be emitted by this sync for this stream',
     )
 
@@ -154,7 +154,7 @@ class AirbyteAnalyticsTraceMessage(BaseModel):
         description='The event type - should be a static string. Keep in mind that all strings are shared across all connectors.',
     )
     value: Optional[str] = Field(
-        None,
+        default=None,
         description='The value of the event - can be an arbitrary string. In case the value is numeric, it should be converted to a string. Casting for analytics purposes can happen in the warehouse.',
     )
 
@@ -205,19 +205,19 @@ class OAuthConfigSpecification(BaseModel):
     oauth_user_input_from_connector_config_specification: Optional[
         Dict[str, Any]
     ] = Field(
-        None,
+        default=None,
         description="OAuth specific blob. This is a Json Schema used to validate Json configurations used as input to OAuth.\nMust be a valid non-nested JSON that refers to properties from ConnectorSpecification.connectionSpecification\nusing special annotation 'path_in_connector_config'.\nThese are input values the user is entering through the UI to authenticate to the connector, that might also shared\nas inputs for syncing data via the connector.\n\nExamples:\n\nif no connector values is shared during oauth flow, oauth_user_input_from_connector_config_specification=[]\nif connector values such as 'app_id' inside the top level are used to generate the API url for the oauth flow,\n  oauth_user_input_from_connector_config_specification={\n    app_id: {\n      type: string\n      path_in_connector_config: ['app_id']\n    }\n  }\nif connector values such as 'info.app_id' nested inside another object are used to generate the API url for the oauth flow,\n  oauth_user_input_from_connector_config_specification={\n    app_id: {\n      type: string\n      path_in_connector_config: ['info', 'app_id']\n    }\n  }",
     )
     complete_oauth_output_specification: Optional[Dict[str, Any]] = Field(
-        None,
+        default=None,
         description="OAuth specific blob. This is a Json Schema used to validate Json configurations produced by the OAuth flows as they are\nreturned by the distant OAuth APIs.\nMust be a valid JSON describing the fields to merge back to `ConnectorSpecification.connectionSpecification`.\nFor each field, a special annotation `path_in_connector_config` can be specified to determine where to merge it,\n\nExamples:\n\n    complete_oauth_output_specification={\n      refresh_token: {\n        type: string,\n        path_in_connector_config: ['credentials', 'refresh_token']\n      }\n    }",
     )
     complete_oauth_server_input_specification: Optional[Dict[str, Any]] = Field(
-        None,
+        default=None,
         description='OAuth specific blob. This is a Json Schema used to validate Json configurations persisted as Airbyte Server configurations.\nMust be a valid non-nested JSON describing additional fields configured by the Airbyte Instance or Workspace Admins to be used by the\nserver when completing an OAuth flow (typically exchanging an auth code for refresh token).\n\nExamples:\n\n    complete_oauth_server_input_specification={\n      client_id: {\n        type: string\n      },\n      client_secret: {\n        type: string\n      }\n    }',
     )
     complete_oauth_server_output_specification: Optional[Dict[str, Any]] = Field(
-        None,
+        default=None,
         description="OAuth specific blob. This is a Json Schema used to validate Json configurations persisted as Airbyte Server configurations that\nalso need to be merged back into the connector configuration at runtime.\nThis is a subset configuration of `complete_oauth_server_input_specification` that filters fields out to retain only the ones that\nare necessary for the connector to function with OAuth. (some fields could be used during oauth flows but not needed afterwards, therefore\nthey would be listed in the `complete_oauth_server_input_specification` but not `complete_oauth_server_output_specification`)\nMust be a valid non-nested JSON describing additional fields configured by the Airbyte Instance or Workspace Admins to be used by the\nconnector when using OAuth flow APIs.\nThese fields are to be merged back to `ConnectorSpecification.connectionSpecification`.\nFor each field, a special annotation `path_in_connector_config` can be specified to determine where to merge it,\n\nExamples:\n\n      complete_oauth_server_output_specification={\n        client_id: {\n          type: string,\n          path_in_connector_config: ['credentials', 'client_id']\n        },\n        client_secret: {\n          type: string,\n          path_in_connector_config: ['credentials', 'client_secret']\n        }\n      }",
     )
 
@@ -246,14 +246,14 @@ class AirbyteTraceMessage(BaseModel):
         ..., description='the time in ms that the message was emitted'
     )
     error: Optional[AirbyteErrorTraceMessage] = Field(
-        None, description='error trace message: the error object'
+        default=None, description='error trace message: the error object'
     )
     estimate: Optional[AirbyteEstimateTraceMessage] = Field(
-        None,
+        default=None,
         description='Estimate trace message: a guess at how much data will be produced in this sync',
     )
     stream_status: Optional[AirbyteStreamStatusTraceMessage] = Field(
-        None,
+        default=None,
         description='Stream status trace message:  the current status of a stream within a source',
     )
     analytics: Optional[AirbyteAnalyticsTraceMessage] = None
@@ -269,7 +269,7 @@ class AirbyteControlMessage(BaseModel):
         ..., description='the time in ms that the message was emitted'
     )
     connectorConfig: Optional[AirbyteControlConnectorConfigMessage] = Field(
-        None,
+        default=None,
         description='connector config orchestrator message: the updated config for the platform to store for this connector',
     )
 
@@ -285,19 +285,19 @@ class AirbyteStream(BaseModel):
         ..., description='List of sync modes supported by this stream.', min_length=1
     )
     source_defined_cursor: Optional[bool] = Field(
-        None,
+        default=None,
         description='If the source defines the cursor field, then any other cursor field inputs will be ignored. If it does not, either the user_provided one is used, or the default one is used as a backup.',
     )
     default_cursor_field: Optional[List[str]] = Field(
-        None,
+        default=None,
         description='Path to the field that will be used to determine if a record is new or modified since the last sync. If not provided by the source, the end user will have to specify the comparable themselves.',
     )
     source_defined_primary_key: Optional[List[List[str]]] = Field(
-        None,
+        default=None,
         description='If the source defines the primary key, paths to the fields that will be used as a primary key. If not provided by the source, the end user will have to specify the primary key themselves.',
     )
     namespace: Optional[str] = Field(
-        None,
+        default=None,
         description='Optional Source-defined namespace. Currently only used by JDBC destinations to determine what schema to write to. Airbyte streams from the same sources should have the same namespace.',
     )
 
@@ -308,12 +308,12 @@ class ConfiguredAirbyteStream(BaseModel):
     stream: AirbyteStream
     sync_mode: SyncMode
     cursor_field: Optional[List[str]] = Field(
-        None,
+        default=None,
         description='Path to the field that will be used to determine if a record is new or modified since the last sync. This field is REQUIRED if `sync_mode` is `incremental`. Otherwise it is ignored.',
     )
     destination_sync_mode: DestinationSyncMode
     primary_key: Optional[List[List[str]]] = Field(
-        None,
+        default=None,
         description='Paths to the fields that will be used as primary key. This field is REQUIRED if `destination_sync_mode` is `*_dedup`. Otherwise it is ignored.',
     )
 
@@ -321,11 +321,11 @@ class ConfiguredAirbyteStream(BaseModel):
 class AdvancedAuth(BaseModel):
     auth_flow_type: Optional[AuthFlowType] = None
     predicate_key: Optional[List[str]] = Field(
-        None,
+        default=None,
         description='Json Path to a field in the connectorSpecification that should exist for the advanced auth to be applicable.',
     )
     predicate_value: Optional[str] = Field(
-        None,
+        default=None,
         description='Value of the predicate_key fields for the advanced auth to be applicable.',
     )
     oauth_config_specification: Optional[OAuthConfigSpecification] = None
@@ -341,24 +341,24 @@ class ConnectorSpecification(BaseModel):
         description='ConnectorDefinition specific blob. Must be a valid JSON string.',
     )
     supportsIncremental: Optional[bool] = Field(
-        None,
+        default=None,
         description='(deprecated) If the connector supports incremental mode or not.',
     )
     supportsNormalization: Optional[bool] = Field(
-        False, description='If the connector supports normalization or not.'
+        default=False, description='If the connector supports normalization or not.'
     )
     supportsDBT: Optional[bool] = Field(
-        False, description='If the connector supports DBT or not.'
+        default=False, description='If the connector supports DBT or not.'
     )
     supported_destination_sync_modes: Optional[List[DestinationSyncMode]] = Field(
-        None, description='List of destination sync modes supported by the connector'
+        default=None, description='List of destination sync modes supported by the connector'
     )
     advanced_auth: Optional[AdvancedAuth] = Field(
-        None,
+        default=None,
         description="Additional and optional specification object to describe what an 'advanced' Auth flow would need to function.\n  - A connector should be able to fully function with the configuration as described by the ConnectorSpecification in a 'basic' mode.\n  - The 'advanced' mode provides easier UX for the user with UI improvements and automations. However, this requires further setup on the\n  server side by instance or workspace admins beforehand. The trade-off is that the user does not have to provide as many technical\n  inputs anymore and the auth process is faster and easier to complete.",
     )
     protocol_version: Optional[str] = Field(
-        None,
+        default=None,
         description='the Airbyte Protocol version supported by the connector. Protocol versioning uses SemVer. ',
     )
 
@@ -368,9 +368,9 @@ class AirbyteStateMessage(BaseModel):
 
     type: Optional[AirbyteStateType] = None
     stream: Optional[AirbyteStreamState] = None
-    global_: Optional[AirbyteGlobalState] = Field(None, alias='global')
+    global_: Optional[AirbyteGlobalState] = Field(default=None, alias='global')
     data: Optional[Dict[str, Any]] = Field(
-        None, description='(Deprecated) the state data'
+        default=None, description='(Deprecated) the state data'
     )
 
 
@@ -391,27 +391,27 @@ class AirbyteMessage(BaseModel):
 
     type: Type = Field(..., description='Message type')
     log: Optional[AirbyteLogMessage] = Field(
-        None,
+        default=None,
         description='log message: any kind of logging you want the platform to know about.',
     )
     spec: Optional[ConnectorSpecification] = None
     connectionStatus: Optional[AirbyteConnectionStatus] = None
     catalog: Optional[AirbyteCatalog] = Field(
-        None, description='catalog message: the catalog'
+        default=None, description='catalog message: the catalog'
     )
     record: Optional[AirbyteRecordMessage] = Field(
-        None, description='record message: the record'
+        default=None, description='record message: the record'
     )
     state: Optional[AirbyteStateMessage] = Field(
-        None,
+        default=None,
         description='schema message: the state. Must be the last message produced. The platform uses this information',
     )
     trace: Optional[AirbyteTraceMessage] = Field(
-        None,
+        default=None,
         description='trace message: a message to communicate information about the status and performance of a connector',
     )
     control: Optional[AirbyteControlMessage] = Field(
-        None,
+        default=None,
         description='connector config message: a message to communicate an updated configuration from a connector that should be persisted',
     )
 

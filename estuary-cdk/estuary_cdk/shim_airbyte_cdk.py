@@ -1,8 +1,12 @@
 from dataclasses import dataclass
-import io
 from logging import Logger
 import sys
 from pydantic import Field
+from pydantic.json_schema import (
+    DEFAULT_REF_TEMPLATE,
+    GenerateJsonSchema,
+    JsonSchemaMode,
+)
 from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal
 import asyncio
 import logging
@@ -22,30 +26,21 @@ from . import ValidationError
 
 from airbyte_cdk.sources.source import Source as AirbyteSource
 
-try:
-    # For older Airbyte CDK versions, models are imported from airbyte_protocol.models.
-    from airbyte_protocol.models import (
-        SyncMode as AirbyteSyncMode,
-        ConfiguredAirbyteCatalog,
-        ConfiguredAirbyteStream,
-        AirbyteStateMessage,
-        AirbyteStateType,
-        AirbyteStream,
-        Status as AirbyteStatus,
-        Level as AirbyteLevel,
-    )
-except ImportError:
-    # For newer Airbyte CDK versions, models are imported from airbyte_cdk.models.airbyte_protocol.
-    from airbyte_cdk.models.airbyte_protocol import (
-        SyncMode as AirbyteSyncMode,
-        ConfiguredAirbyteCatalog,
-        ConfiguredAirbyteStream,
-        AirbyteStateMessage,
-        AirbyteStateType,
-        AirbyteStream,
-        Status as AirbyteStatus,
-        Level as AirbyteLevel,
-    )
+# The vendored fork is airbyte-cdk 0.52.10 and is never re-synced (see
+# vendor/README.md), so these always come from airbyte_protocol.models. The
+# fallback to airbyte_cdk.models.airbyte_protocol that used to guard this
+# import was for floating upstream versions, which no longer applies.
+from airbyte_protocol.models import (
+    SyncMode as AirbyteSyncMode,
+    DestinationSyncMode as AirbyteDestinationSyncMode,
+    ConfiguredAirbyteCatalog,
+    ConfiguredAirbyteStream,
+    AirbyteStateMessage,
+    AirbyteStateType,
+    AirbyteStream,
+    Status as AirbyteStatus,
+    Level as AirbyteLevel,
+)
 
 
 # `logger` has name "flow", and we thread it through the Airbyte APIs,
@@ -82,8 +77,18 @@ class ResourceConfig(common.BaseResourceConfig, extra="forbid"):
     )
 
     @classmethod
-    def model_json_schema(cls: "ResourceConfig") -> dict:
-        sch = super().model_json_schema()
+    def model_json_schema(
+        cls,
+        by_alias: bool = True,
+        ref_template: str = DEFAULT_REF_TEMPLATE,
+        schema_generator: type[GenerateJsonSchema] = GenerateJsonSchema,
+        mode: JsonSchemaMode = "validation",
+        *,
+        union_format: Literal["any_of", "primitive_type_array"] = "any_of",
+    ) -> dict[str, Any]:
+        sch = super().model_json_schema(
+            by_alias, ref_template, schema_generator, mode, union_format=union_format
+        )
 
         # TODO(whb): Pydantic represents an optional field's schema as an
         # `anyOf` over the type and `null` (see
@@ -96,7 +101,11 @@ class ResourceConfig(common.BaseResourceConfig, extra="forbid"):
             "type": "string"
         }
 
-        sch["properties"]["cursorField"] = {
+        # cursor_field is aliased, so which key the generated schema used
+        # depends on by_alias. namespace above is unaliased and needs no such
+        # care.
+        cursor_key = "cursorField" if by_alias else "cursor_field"
+        sch["properties"][cursor_key] = {
             "title": "Cursor Field",
             "type": "array",
             "items": {
@@ -147,13 +156,15 @@ def transform_airbyte_key(key: str | List[str] | List[List[str]]) -> List[str]:
         # key = "piz/za"
         # key_fields: ["piz~1za"]
         key_fields = [escape_field(key)]
-    elif isinstance(key, list):
+    # The catalog comes from a third-party connector, so these guards are
+    # against real input rather than the declared type.
+    elif isinstance(key, list):  # pyright: ignore[reportUnnecessaryIsInstance]
         for component in key:
             if isinstance(component, str):
                 # key = ["piz/za", "par~ty"]
                 # key_fields: ["piz~1za", "pa~0rty"]
                 key_fields.append(escape_field(component))
-            elif isinstance(component, list):
+            elif isinstance(component, list):  # pyright: ignore[reportUnnecessaryIsInstance]
                 # key = [["pizza", "che/ese"], "potato"]
                 # Implies a document like {"potato": 12, "pizza": {"che/ese": 5}}
                 # key_fields: ["pizza/che~1ese", "potato"]
@@ -166,7 +177,7 @@ def transform_airbyte_key(key: str | List[str] | List[List[str]]) -> List[str]:
     return key_fields
 
 
-def set_additional_properties_false(schema: dict) -> dict:
+def set_additional_properties_false(schema: Any) -> Any:
     """
     Recursively set additionalProperties to false for all objects in a JSON schema.
     """
@@ -352,11 +363,11 @@ class CaptureShim(BaseCaptureConnector):
                         json_schema=binding.collection.writeSchema,
                         name=binding.resourceConfig.stream,
                         namespace=binding.resourceConfig.namespace,
-                        supported_sync_modes=[binding.resourceConfig.sync_mode],
+                        supported_sync_modes=[AirbyteSyncMode(binding.resourceConfig.sync_mode)],
                     ),
                     cursor_field=binding.resourceConfig.cursor_field,
-                    destination_sync_mode="append",
-                    sync_mode=binding.resourceConfig.sync_mode,
+                    destination_sync_mode=AirbyteDestinationSyncMode.append,
+                    sync_mode=AirbyteSyncMode(binding.resourceConfig.sync_mode),
                 )
             )
             if self.should_emit_sourced_schemas:
@@ -375,13 +386,16 @@ class CaptureShim(BaseCaptureConnector):
 
         airbyte_catalog = ConfiguredAirbyteCatalog(streams=airbyte_streams)
 
-        if "bindingStateV1" not in connector_state.__fields_set__:
+        if "bindingStateV1" not in connector_state.model_fields_set:
             # Initialize the top-level state object so that it is properly serialized if this is an
             # "empty" state, which occurs for a brand new task that has never emitted any
             # checkpoints.
             connector_state.__setattr__("bindingStateV1", {})
 
-        def _state_for(binding: CaptureBinding[ResourceConfig], resource) -> ResourceState:
+        def _state_for(
+            binding: CaptureBinding[ResourceConfig],
+            resource: common.Resource[Any, Any, Any],
+        ) -> ResourceState:
             # Entries are nullable: common.open() writes None to request a
             # backfill, so a present-but-None entry restarts from initial_state.
             state = connector_state.bindingStateV1.setdefault(
@@ -429,7 +443,7 @@ class CaptureShim(BaseCaptureConnector):
             if record := message.record:
                 entry = index.get((record.namespace, record.stream), None)
                 if entry is None:
-                    task.log.warn(
+                    task.log.warning(
                         f"Document read in unrecognized stream {record.stream} (namespace: {record.namespace})"
                     )
                     continue
@@ -459,12 +473,12 @@ class CaptureShim(BaseCaptureConnector):
                     None,
                 )
                 if entry is None:
-                    task.log.warn(
+                    task.log.warning(
                         f"Received state message for unrecognized stream {state_msg.stream.stream_descriptor.name} (namespace: {state_msg.stream.stream_descriptor.namespace})"
                     )
                     continue
 
-                entry[1].state = state_msg.dict()
+                entry[1].state = state_msg.model_dump()
 
                 await task.checkpoint(connector_state, merge_patch=False)
 

@@ -1,10 +1,11 @@
 import asyncio
-from typing import AsyncIterator, TypeVar
+from collections.abc import AsyncGenerator
+from typing import AsyncIterator, TypeVar, cast
 
 T = TypeVar("T")
 
 
-async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
+async def merge(*iterators: AsyncGenerator[T, None]) -> AsyncIterator[T]:
     """
     Merge multiple async iterators into a single stream in completion order.
 
@@ -87,7 +88,8 @@ async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
             if item is _DONE:
                 active_count -= 1
             else:
-                yield item
+                # Neither the _DONE sentinel nor an exception, so an item of T.
+                yield cast(T, item)
 
     finally:
         _cancel_all_tasks()
@@ -104,8 +106,7 @@ async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
             await asyncio.gather(reaper, return_exceptions=True)
 
         for iterator in iterators:
-            if hasattr(iterator, "aclose"):
-                try:
-                    await iterator.aclose()
-                except Exception:
-                    pass
+            try:
+                await iterator.aclose()
+            except Exception:
+                pass

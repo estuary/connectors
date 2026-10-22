@@ -23,24 +23,31 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 from .._background import spawn
 from ..cron import next_fire
 from ..logger import OBSERVABLE_FIELD
+# `from x import Y as Y` marks Y as an explicit re-export: this package ships
+# py.typed, and connectors import these names from this module.
 from ..flow import (
-    AccessToken,
-    AuthorizationCodeFlowOAuth2Credentials,
-    BaseOAuth2Credentials,
-    BasicAuth,
+    AccessToken as AccessToken,
+    AuthorizationCodeFlowOAuth2Credentials as AuthorizationCodeFlowOAuth2Credentials,
+    BaseOAuth2Credentials as BaseOAuth2Credentials,
+    BasicAuth as BasicAuth,
     CaptureBinding,
-    ClientCredentialsOAuth2Credentials,
-    LongLivedClientCredentialsOAuth2Credentials,
-    OAuth2Spec,
-    OAuth2TokenFlowSpec,
-    ResourceOwnerPasswordOAuth2Credentials,
-    RotatingOAuth2Credentials,
+    ClientCredentialsOAuth2Credentials as ClientCredentialsOAuth2Credentials,
+    LongLivedClientCredentialsOAuth2Credentials as LongLivedClientCredentialsOAuth2Credentials,
+    OAuth2Spec as OAuth2Spec,
+    OAuth2TokenFlowSpec as OAuth2TokenFlowSpec,
+    ResourceOwnerPasswordOAuth2Credentials as ResourceOwnerPasswordOAuth2Credentials,
+    RotatingOAuth2Credentials as RotatingOAuth2Credentials,
     ValidationError,
 )
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .webhook.match import CollectionMatchingSpec, UrlMatch
-from .document import _BaseDocument, AssociatedDocument, BaseDocument
+# _BaseDocument is a package-internal TypeVar shared across these modules.
+from .document import (
+    _BaseDocument,  # pyright: ignore[reportPrivateUsage]
+    AssociatedDocument as AssociatedDocument,
+    BaseDocument as BaseDocument,
+)
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -448,8 +455,8 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
             Task,
             list[
                 tuple[
-                    CaptureBinding[_ResourceConfig],
-                    "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
+                    CaptureBinding[_BaseResourceConfig],
+                    "Resource[_BaseDocument, _BaseResourceConfig, _BaseResourceState]",
                 ]
             ],
         ],
@@ -481,7 +488,9 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
 
     key: list[str] = field(default_factory=lambda: ["/_meta/row_id"])
     initial_state: ResourceState = field(default_factory=ResourceState)
-    model: type[BaseDocument] | Resource.FixedSchema = BaseDocument
+    # A mutable attribute is invariant, so narrowing the generic to a
+    # concrete default can never match the base exactly.
+    model: type[BaseDocument] | Resource.FixedSchema = BaseDocument  # pyright: ignore[reportIncompatibleVariableOverride]
     schema_inference: bool = True
 
     def __post_init__(self):
@@ -570,7 +579,7 @@ _ResolvableBinding = TypeVar(
 def resolve_bindings(
     bindings: list[_ResolvableBinding],
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
-    resource_term="Resource",
+    resource_term: str = "Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
 
     resolved: list[
@@ -585,13 +594,9 @@ def resolve_bindings(
         if isinstance(resource.initial_config, WebhookResourceConfig)
     ]
     errors.extend(
-        filter(
-            bool,
-            (
-                rule.list_compatibility_errors(other)
-                for rule, other in combinations(webhook_match_rules, 2)
-            ),
-        )
+        error
+        for rule, other in combinations(webhook_match_rules, 2)
+        if (error := rule.list_compatibility_errors(other))
     )
 
     for binding in bindings:
@@ -757,6 +762,9 @@ def open(
                     )
                 )
 
+            # Every branch above either found a state or built one from
+            # initial_state.
+            assert state is not None
             result = resource.open(
                 binding,
                 index,
@@ -832,7 +840,7 @@ def _tombstone_discriminator_values(
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
-    resource_state: _ResourceState,
+    resource_state: ResourceState,
     task: Task,
     fetch_changes: FetchChangesFn[_BaseDocument]
     | dict[str, FetchChangesFn[_BaseDocument]]

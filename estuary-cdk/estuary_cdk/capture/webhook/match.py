@@ -59,7 +59,7 @@ class UrlMatch(MatchRule, frozen=True):
 
         return re.sub("[^a-zA-Z0-9]+", "_", self.value).strip("_")
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any):
         super().__init__(**data)
 
         if self.value != "*":
@@ -298,7 +298,7 @@ class UrlDiscriminator(Discriminator, frozen=True):
     type: Literal["url"] = "url"
     known_values: set[str] = set()
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any):
         super().__init__(**data)
 
         for v in self.known_values:

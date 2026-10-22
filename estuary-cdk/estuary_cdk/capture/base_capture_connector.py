@@ -27,7 +27,8 @@ from ..logger import FlowLogger
 from ..utils import format_error_message, get_running_tasks_info, sort_dict
 from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
-from .common import _ConnectorState
+# Package-internal TypeVar, shared across this package's modules.
+from .common import _ConnectorState  # pyright: ignore[reportPrivateUsage]
 from .transactor import Transactor
 
 # Default encryption service URL, can be overridden via ENCRYPTION_URL environment variable

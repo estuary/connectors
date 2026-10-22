@@ -18,7 +18,10 @@ dependencies = [
     "aiodns>=4.0.4,<5.0.0",
     "aiohttp>=3.14.3,<4.0.0",
     "orjson>=3.11.6,<4.0.0",
-    "pydantic>=2,<3",
+    # 2.12 is the floor because shim_airbyte_cdk's model_json_schema
+    # override forwards `union_format`, which super() only accepts from
+    # 2.12 on. Lowering this makes the shim raise TypeError on spec.
+    "pydantic>=2.12,<3",
     "xxhash>=4.0.2,<5.0.0",
     "ijson>=3.3.0,<4.0.0",
     "pycron>=3.1.2,<4.0.0",

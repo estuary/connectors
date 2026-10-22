@@ -134,8 +134,8 @@ def check_config_against_spec_or_exit(config: Mapping[str, Any], spec: Connector
 
 class InternalConfig(BaseModel):
     KEYWORDS: ClassVar[set[str]] = {"_limit", "_page_size"}
-    limit: Optional[int] = Field(None, alias="_limit")
-    page_size: Optional[int] = Field(None, alias="_page_size")
+    limit: Optional[int] = Field(default=None, alias="_limit")
+    page_size: Optional[int] = Field(default=None, alias="_page_size")
 
     def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         kwargs["by_alias"] = True
