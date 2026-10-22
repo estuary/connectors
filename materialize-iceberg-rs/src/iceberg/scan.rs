@@ -41,7 +41,7 @@ use super::single_value::compare_keys;
 /// of `Load` calls — each batch's matches are emitted via `load`'s `emit`
 /// callback as soon as that batch resolves, instead of accumulating across
 /// the whole call.
-const DEFAULT_LOAD_BATCH_SIZE: usize = 1000;
+const DEFAULT_LOAD_BATCH_SIZE: usize = 100000;
 
 /// One matched document from [`load`]: the index into the `requested_keys`
 /// slice it answers, and the augmented `flow_document` JSON bytes (with
