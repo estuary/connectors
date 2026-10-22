@@ -15,8 +15,8 @@ const (
 	// A stage is reported once it has been the current stage this long, so a
 	// fast task doesn't report every stage of every transaction.
 	statusMinActivePeriod = time.Minute
-	// A reported stage is reported again this often, with its updated counts
-	// and elapsed time.
+	// A stage is reported again with its updated counts and elapsed time
+	// this often
 	statusRefresh = time.Minute
 	// A task whose stages are all shorter than statusMinActivePeriod reports a
 	// rollup of the transactions it completed over this window instead.
