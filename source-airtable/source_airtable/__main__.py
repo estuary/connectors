@@ -1,5 +1,3 @@
-import estuary_cdk.requests_session_send_patch # Must be first.
-
 import asyncio
 from estuary_cdk import shim_airbyte_cdk, flow
 from source_airtable import SourceAirtable
