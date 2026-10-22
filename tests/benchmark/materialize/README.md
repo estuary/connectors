@@ -104,6 +104,28 @@ transaction holds more than 65,536 documents
 (`assertion failed: entries.len() <= 1 << 16`) and then hangs. TPC-DS
 transactions always do, so use a flowctl built from Flow master.
 
+## Baselines
+
+`runs/baselines/<connector>/<scenario>.json` holds each connector's reference
+result. The TPC-DS ones (`tpcds-sf1.json`) come from `baselines.sh`, which runs
+every tabular materialization serially on one machine and one cached fixture:
+
+```bash
+FLOW_COMMIT=<flow master commit> \
+  ./tests/benchmark/materialize/baselines.sh --tpcds-cache /mnt/localssd/tpcds-cache
+```
+
+It starts from each connector's test config, without the feature flags that
+disable the runtime's load optimization, and records the machine type, the
+flowctl build and both commits under `environment` in each file. Compare a
+connector change against its baseline on the same machine type and flowctl
+build; anything else measures the environment. The current baselines ran on a
+c3-standard-22-lssd with flowctl from Flow master `a15bc3fcb0f`.
+
+`materialize-null` on the same machine and flowctl (172K docs/s at scale 1)
+is the ceiling those numbers sit under. Delta-update connectors, which never
+Load, run close to it.
+
 ## Synthetic scenarios
 
 ```yaml
