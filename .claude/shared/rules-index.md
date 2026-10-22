@@ -44,14 +44,15 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `FETCH-MODEL-OWNS-CONTRACT` | diff | Paths, items keys, cursor params are ClassVars; cursor via `get_cursor()` |
 | `FETCH-PARAM-DICT-NAMING` | diff | `params` at the call site; `request_params` when it crosses a boundary |
 | `FETCH-COMPLETE-TICKS` | diff | Cap the window at the last fully-elapsed tick; early-return if `horizon <= cursor` |
+| `FETCH-LAG-BEYOND-INTERVAL` | diff | A cursor that can trail `now` by more than `interval` returns without a checkpoint while the window is shorter than `interval` |
 | `FETCH-SERVER-SIDE-BOUNDARIES` | runtime | Boundaries in the request, not client-side filters; probe inclusivity first |
 | `FETCH-SEAM-PRECISION` | diff | Gapless at cutoff and cursor; backfill start is not load-bearing |
 | `FETCH-BACKFILL-ALONGSIDE` | diff | Implement `fetch_page` alongside `fetch_changes` |
 | `FETCH-CURSOR-MUST-BE-UPDATED` | diff | `created_at` is not a usable incremental cursor |
 | `FETCH-LOGCURSOR-AFTER-DOCS` | diff | A LogCursor must be yielded after documents are emitted |
-| `FETCH-VALUE-WATERMARK-RESUME` | diff | Resume by value watermark, not positional offset — **data-loss-class** |
+| `FETCH-VALUE-WATERMARK-RESUME` | diff | Resume by value watermark, not positional offset; an unsortable timestamp filter backfills by id — **data-loss-class** |
 | `FETCH-CHECKPOINT-STABLE-STATE` | diff | A `PageCursor` must mean the same thing after a resume gap — **data-loss-class** |
-| `FETCH-DICT-CURSOR-WORKLIST` | diff | A backfill whose resume state is a work list carries it in a dict `PageCursor` built via `make_cursor_dict` |
+| `FETCH-FANOUT-RESUME` | diff | A fan-out backfill resumes from `(parent_id, child_page_token)` over sorted parents; a dict work list only when parents can't be re-listed or ordered |
 | `FETCH-PAGE-SIZE-RESEARCH` | runtime | Max page size and enforcement mode, per endpoint |
 | `DOC-FLAG-ONLY-UNVERIFIED` | diff | No "(verified live)" stamps; annotate only what could *not* be verified |
 | `DOC-CONTRACT-NOT-MECHANISM` | diff | Docstrings state guarantees, not the current implementation's steps |
