@@ -31,7 +31,7 @@ func newStatusHarness(t *testing.T, rng *pf.RangeSpec) *statusHarness {
 	h := &statusHarness{t: t, now: time.Date(2026, 10, 22, 11, 0, 0, 0, time.UTC)}
 	h.st = newStatusTracker(open)
 	h.st.now = func() time.Time { return h.now }
-	h.st.shownSince = h.now
+	h.st.currentSince = h.now
 	h.st.emit = func(lvl log.Level, msg string) { h.got = append(h.got, lvl.String()+": "+msg) }
 	h.st.tick()
 	return h
@@ -99,7 +99,7 @@ func TestStatusSlowStages(t *testing.T) {
 
 	// Waiting for data is reported once, after it has lasted statusMinActivePeriod.
 	h.advance(5 * time.Minute)
-	h.expect("info: Waiting, no new collection data since 11:00:02 UTC")
+	h.expect("info: Waiting, no new collection data since 2026-10-22 11:00:02 UTC")
 
 	h.loads(0, 1, 2)
 	h.advance(30 * time.Second)
@@ -176,7 +176,7 @@ func TestStatusSyncSchedule(t *testing.T) {
 	h.advance(statusTick)
 	h.loads(1)
 	h.advance(10 * time.Minute)
-	h.expect("info: Waiting, next scheduled sync at 11:30:00 UTC (every 30m)")
+	h.expect("info: Waiting, next scheduled sync at 2026-10-22 11:30:00 UTC (every 30m)")
 
 	h.st.syncWait(time.Date(2026, 10, 23, 1, 0, 0, 0, time.UTC), 0)
 	h.advance(statusTick)
@@ -200,7 +200,7 @@ func TestStatusWarnings(t *testing.T) {
 	h.round(2 * time.Minute)
 	h.advance(10 * time.Minute)
 	h.expect()
-	require.Empty(t, h.st.completions)
+	require.Empty(t, h.st.recentCommits)
 }
 
 func TestStatusOtherShards(t *testing.T) {
@@ -209,7 +209,7 @@ func TestStatusOtherShards(t *testing.T) {
 	h.round(2 * time.Minute)
 	h.advance(10 * time.Minute)
 	h.expect()
-	require.Empty(t, h.st.completions)
+	require.Empty(t, h.st.recentCommits)
 
 	h.st.warn("alpha", "Rows of table alpha were not deleted because A.")
 	h.expect("warning: Rows of table alpha were not deleted because A.")
