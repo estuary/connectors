@@ -58,7 +58,7 @@ Verified limits live in `<connector>/bruno/opencollection.yml`'s `docs:` block u
 Which case you're in is a property of the connector, not a blanket exemption — read its discovery path before assuming either way:
 
 - **Static (the common case):** the resource list is fixed in code. Zero provider calls. Discover is free, full stop.
-- **Dynamic:** discovery asks the provider what resources exist. `source-salesforce-native`'s `all_resources` fetches the instance URL and the queryable-object list; `source-zuora`'s fetches its object names. For these, discover is just another API-hitting command.
+- **Dynamic:** discovery asks the provider what resources exist. `source-salesforce-native`'s `all_resources` fetches the instance URL and the queryable-object list; `source-zuora`'s fetches its object names. A capability-gated stream (`add-stream` Phase 5) makes discovery dynamic too. For these, discover is just another API-hitting command.
 
 ---
 
@@ -67,3 +67,5 @@ Which case you're in is a property of the connector, not a blanket exemption —
 `disable: true` on a binding in `test.flow.yaml` skips that stream during preview and capture. When the budget is tight, or you only care about one stream's behavior, disable unrelated bindings before running tests.
 
 **Restore them before committing.** A committed `disable: true` on an unrelated binding is a finding — it silently narrows what the test suite covers.
+
+A stream left out of the capture snapshot for good goes in `OMITTED_STREAMS` in `test_capture` (`tests/test_snapshots.py`), with its reason as a comment.
