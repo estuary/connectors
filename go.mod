@@ -96,7 +96,7 @@ require (
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	resty.dev/v3 v3.0.0-beta.2
-	vitess.io/vitess v0.23.3
+	vitess.io/vitess v0.23.7
 )
 
 require (
