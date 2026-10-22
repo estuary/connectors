@@ -66,7 +66,7 @@ A **PENDING** plan is expected in a docs-only run: integrate it and carry its fi
 
 The plan replaces `add-stream`'s Phases 0–3 (the baseline suite has nothing to baseline yet, and `GATE-STREAM-DESIGN` was settled at `GATE-PLAN-REVIEW`), and this skill owns its Phases 6–7. One plan at a time:
 
-- Merge the plan's `bruno/` copy into `source-$1/bruno/`, so the coder sees its requests.
+- Merge the plan's `bruno/` copy into `source-$1/bruno/`, so the coder sees its requests. Diff its collection-level scripts against the merged root's, and check that every field the plan reads a value from survives the merged redaction.
 - Dispatch a `coder` session for the plan (command and brief in [`dispatch.md`](dispatch.md) § Coders). It runs `add-stream` Phases 4, 5 and 5.5 in your checkout and writes a hand-off file.
 - When it finishes, review its diff against the plan, and dispatch `pr-review-toolkit:code-reviewer` over the diff, telling it to read `.claude/shared/rules-index.md` first. Send what needs fixing to the coder (`SendMessage`) and re-review until both are clean.
 - Webhook-classified streams bypass `add-stream`; wire them per `create-webhook-connector` Phase 3.
