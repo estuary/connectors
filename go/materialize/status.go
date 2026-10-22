@@ -197,7 +197,8 @@ func (t *statusTracker) event(ev transactionsEvent, binding int) {
 			t.commit = statusKey{stage: stageRecovery}
 		}
 	case sentAcknowledged:
-		if !t.recovery {
+		// Completions are trimmed only while progress is reported.
+		if !t.recovery && t.progress && len(t.warnings) == 0 {
 			t.completions = append(t.completions, statusCompletion{at: t.now(), docs: t.committing.docs})
 		}
 		t.recovery = false
@@ -252,6 +253,7 @@ func (t *statusTracker) warn(key, msg string) {
 	}
 	t.warningKeys[key] = struct{}{}
 	t.warnings = append(t.warnings, msg)
+	t.completions = nil
 	msg = strings.Join(t.warnings, " ")
 	t.lastMsg, t.lastEmit = msg, t.now()
 	t.mu.Unlock()
