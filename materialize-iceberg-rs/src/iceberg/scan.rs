@@ -36,31 +36,22 @@ use super::single_value::Bound;
 use super::single_value::compare_keys;
 
 /// Requested keys are processed this many at a time, bounding memory to one
-/// batch's worth of open files/row-group buffers rather than an entire
-/// (potentially arbitrarily long) transaction's worth of `Load` calls.
+/// batch's worth of open files/row-group buffers and matched documents
+/// rather than an entire (potentially arbitrarily long) transaction's worth
+/// of `Load` calls — each batch's matches are emitted via `load`'s `emit`
+/// callback as soon as that batch resolves, instead of accumulating across
+/// the whole call.
 const DEFAULT_LOAD_BATCH_SIZE: usize = 1000;
 
 /// One matched document from [`load`]: the index into the `requested_keys`
 /// slice it answers, and the augmented `flow_document` JSON bytes (with
 /// `_meta.file_path`/`_meta.positional_delete` injected — `file_path` is an
-/// index into the accompanying [`LoadResult::file_paths`] table, not the
-/// path itself; see that field's doc comment for why).
+/// index into the file-path table `load` returns, not the path itself; see
+/// that return value's doc comment for why).
 #[derive(Debug)]
 pub struct LoadedDoc {
     pub request_index: usize,
     pub doc_json: Vec<u8>,
-}
-
-/// The result of one [`load`] call.
-pub struct LoadResult {
-    pub docs: Vec<LoadedDoc>,
-    /// Distinct data file paths referenced by `docs`' injected
-    /// `_meta.file_path` indices, in assignment order. Deduplicated so the
-    /// table's size is bounded by the number of distinct files touched by
-    /// this call, not the number of matched rows — row count for an
-    /// arbitrarily long transaction isn't bounded, but the files backing a
-    /// table in practice are far fewer than its rows.
-    pub file_paths: Vec<String>,
 }
 
 /// Assigns small integer indices to file paths, deduplicating repeats.
@@ -97,27 +88,29 @@ impl FilePathTable {
 /// ascending pass over the table rather than one pass per key. When the
 /// same key is live in more than one data file at once, the file with the
 /// highest sequence number wins.
+///
+/// Matched documents are passed to `emit` as soon as their batch resolves,
+/// rather than being accumulated and returned all at once — otherwise a
+/// transaction with many `Load` calls would hold every matched document in
+/// memory until the very last batch finished scanning. Returns the table of
+/// distinct data file paths referenced by emitted documents' injected
+/// `_meta.file_path` indices, in assignment order; deduplicated so its size
+/// is bounded by the number of distinct files touched by this call, not the
+/// number of matched rows.
 pub async fn load(
     catalog: &Catalog,
     table: &str,
     schema: &Schema,
     num_keys: usize,
     requested_keys: &[Vec<Element<'_>>],
-) -> Result<LoadResult> {
-    tracing::warn!(table, ?schema, num_keys, ?requested_keys, "scan::load");
-
+    mut emit: impl FnMut(LoadedDoc) -> Result<()>,
+) -> Result<Vec<String>> {
     let Some(current) = catalog.current_snapshot(table).await? else {
-        return Ok(LoadResult {
-            docs: Vec::new(),
-            file_paths: Vec::new(),
-        });
+        return Ok(Vec::new());
     };
 
     let manifests =
         manifest_list::read_manifest_list(&catalog.object_store, &current.manifest_list).await?;
-
-    let manifest_paths: Vec<String> = manifests.iter().map(|m| m.manifest_path.clone()).collect();
-    tracing::warn!(manifest_paths = %serde_json::to_string(&manifest_paths)?, "found manifest paths");
 
     let key_field_ids: Vec<i32> = (1..=num_keys as i32).collect();
     let key_types: Vec<DataType> = schema.fields()[..num_keys]
@@ -127,7 +120,6 @@ pub async fn load(
     let doc_index = schema.fields().len() - 1;
 
     let mut file_paths = FilePathTable::default();
-    let mut found = Vec::new();
 
     let indices: Vec<usize> = (0..requested_keys.len()).collect();
     for batch_indices in indices.chunks(DEFAULT_LOAD_BATCH_SIZE) {
@@ -140,7 +132,7 @@ pub async fn load(
             .collect::<Result<_>>()?;
         batch.sort_by(|(_, a), (_, b)| compare_keys(a, b));
 
-        let matches = scan_batch(
+        scan_batch(
             catalog,
             &manifests,
             &key_field_ids,
@@ -148,15 +140,12 @@ pub async fn load(
             doc_index,
             &batch,
             &mut file_paths,
+            &mut emit,
         )
         .await?;
-        found.extend(matches);
     }
 
-    Ok(LoadResult {
-        docs: found,
-        file_paths: file_paths.paths,
-    })
+    Ok(file_paths.paths)
 }
 
 fn decode_key(key: &[Element<'_>], key_types: &[DataType]) -> Result<Vec<Bound>> {
@@ -171,6 +160,7 @@ fn decode_key(key: &[Element<'_>], key_types: &[DataType]) -> Result<Vec<Bound>>
 
 /// Answers one sorted batch by merging the table's surviving data files in
 /// key order.
+#[allow(clippy::too_many_arguments)]
 async fn scan_batch(
     catalog: &Catalog,
     manifests: &[ManifestFile],
@@ -179,9 +169,10 @@ async fn scan_batch(
     doc_index: usize,
     batch: &[(usize, Vec<Bound>)],
     file_paths: &mut FilePathTable,
-) -> Result<Vec<LoadedDoc>> {
+    emit: &mut impl FnMut(LoadedDoc) -> Result<()>,
+) -> Result<()> {
     let Some((_, first_key)) = batch.first() else {
-        return Ok(Vec::new());
+        return Ok(());
     };
 
     // Per-column [lower, upper] across the whole batch — independent per
@@ -218,7 +209,7 @@ async fn scan_batch(
         }
     }
     if data_files.is_empty() {
-        return Ok(Vec::new());
+        return Ok(());
     }
 
     tracing::warn!(?data_files, "reading data files");
@@ -262,7 +253,7 @@ async fn scan_batch(
         file_iters.push(iter);
     }
 
-    heap_merge(file_iters, batch, file_paths).await
+    heap_merge(file_iters, batch, file_paths, emit).await
 }
 
 fn decode_bounds(
@@ -550,7 +541,8 @@ async fn heap_merge(
     mut file_iters: Vec<DataFileIter>,
     batch: &[(usize, Vec<Bound>)],
     file_paths: &mut FilePathTable,
-) -> Result<Vec<LoadedDoc>> {
+    emit: &mut impl FnMut(LoadedDoc) -> Result<()>,
+) -> Result<()> {
     let mut heap: BinaryHeap<Reverse<HeapItem>> = BinaryHeap::new();
     for (file_index, iter) in file_iters.iter_mut().enumerate() {
         if let Some((key, position, doc_text)) = iter.next().await? {
@@ -564,7 +556,6 @@ async fn heap_merge(
         }
     }
 
-    let mut found = Vec::new();
     let mut batch_ptr = 0;
 
     while let Some(Reverse(first)) = heap.pop() {
@@ -609,16 +600,16 @@ async fn heap_merge(
                 && compare_keys(&batch[batch_ptr].1, &winner_key) == Ordering::Equal
             {
                 let doc_json = augment_doc(&winner.doc_text, file_index, winner.position)?;
-                found.push(LoadedDoc {
+                emit(LoadedDoc {
                     request_index: batch[batch_ptr].0,
                     doc_json,
-                });
+                })?;
                 batch_ptr += 1;
             }
         }
     }
 
-    Ok(found)
+    Ok(())
 }
 
 async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec<i64>> {

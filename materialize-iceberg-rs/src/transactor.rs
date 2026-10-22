@@ -136,26 +136,25 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                         .map(|key_packed| tuple::unpack(key_packed))
                         .collect::<Result<_, _>>()?;
 
-                    let result = scan::load(
+                    let file_paths = scan::load(
                         &catalog,
                         &binding.table,
                         &binding.schema,
                         binding.key_builders.len(),
                         &requested_keys,
+                        |loaded| {
+                            output.send(Response {
+                                kind: Some(response::Kind::Loaded(response::Loaded {
+                                    binding: index as u32,
+                                    doc_json: loaded.doc_json.into(),
+                                })),
+                                ..Default::default()
+                            })
+                        },
                     )
                     .await?;
 
-                    binding.load_file_paths = result.file_paths;
-
-                    for loaded in result.docs {
-                        output.send(Response {
-                            kind: Some(response::Kind::Loaded(response::Loaded {
-                                binding: index as u32,
-                                doc_json: loaded.doc_json.into(),
-                            })),
-                            ..Default::default()
-                        })?;
-                    }
+                    binding.load_file_paths = file_paths;
                 }
 
                 output.send(Response {
