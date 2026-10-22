@@ -41,7 +41,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 
 | Rule | Check | Statement |
 | ---- | ----- | --------- |
-| `FETCH-MODEL-OWNS-CONTRACT` | diff | Paths, items keys, cursor params are ClassVars; cursor via `get_cursor()` |
+| `FETCH-MODEL-OWNS-CONTRACT` | diff | Paths, items keys, cursor params are ClassVars; generic fetch code reads a document's cursor via `get_cursor()` |
 | `FETCH-PARAM-DICT-NAMING` | diff | `params` at the call site; `request_params` when it crosses a boundary |
 | `FETCH-COMPLETE-TICKS` | diff | Cap the window at the last fully-elapsed tick; early-return if `horizon <= cursor` |
 | `FETCH-LAG-BEYOND-INTERVAL` | diff | A cursor that can trail `now` by more than `interval` returns without a checkpoint while the window is shorter than `interval` |
