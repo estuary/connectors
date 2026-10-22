@@ -9,7 +9,7 @@ authors = [
 # The CDK is consumed outside this workspace -- source-netsuite lives in its
 # own repository, pins estuary-cdk, and runs on 3.11 -- so this floor is what
 # those consumers see, not what the workspace resolves to. Tested on 3.11,
-# 3.12, 3.13 and 3.14; see .github/workflows/estuary-cdk.yaml. The ceiling is
+# 3.12, 3.13 and 3.14; see .github/workflows/python.yaml. The ceiling is
 # deliberately a major: too low a floor silently drops a consumer, but too low
 # a ceiling blocks one outright, with no opt-out, the day that release ships.
 requires-python = ">=3.11,<4.0"

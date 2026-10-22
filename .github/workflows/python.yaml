@@ -209,12 +209,114 @@ jobs:
           tag_version: ${{ matrix.connector.version }}
           variants: ${{ matrix.connector.variants }}
 
-  # One status check covering every job above, whichever connectors ran, so
-  # it can be made a required check. It must run with `always()`: GitHub
-  # counts a skipped job as passing a required check.
+  # estuary-cdk's own tests and checks. They live in this workflow, gated on
+  # the classifier rather than on a `paths` filter, so the required gate below
+  # covers them: a path-filtered workflow never reports on the PRs it skips,
+  # so it could not be a required check.
+  #
+  # `requires-python` intersects across workspace members, and every connector
+  # declares `>=3.14`, so the workspace lock resolves for 3.14 and refuses any
+  # other interpreter. This job is therefore not a matrix. The CDK's other
+  # supported releases are covered by estuary_cdk_supported_pythons below.
+  estuary_cdk:
+    name: estuary-cdk
+    needs: classify_changes
+    if: needs.classify_changes.outputs.cdk == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # uv provisions the interpreter itself, so there is no separate
+      # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      # Blocking: estuary-cdk is clean. The connector jobs above stay
+      # report-only, since they still carry findings. The version must match
+      # `required-version` in ruff.toml.
+      - name: Lint
+        run: |
+          # The summary is written first: the gating check below exits non-zero
+          # on a finding, and with `bash -e` nothing after it would run.
+          {
+            echo "### ruff: estuary-cdk"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics estuary-cdk
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          uvx ruff@0.16.9 check --output-format=github estuary-cdk
+
+      - name: Install dependencies and run tests
+        run: |
+          # --all-extras: tests/test_airbyte_cdk.py imports the shim, which needs
+          # the `airbyte-shim` extra's dependencies for the vendored Airbyte CDK.
+          uv sync --locked --package estuary_cdk --all-extras --group dev --group lint
+          cd estuary-cdk
+          uv run --no-sync python -m compileall -q estuary_cdk vendor
+          uv run --no-sync pytest
+
+      # Blocking, unlike the connector jobs' report-only step: estuary_cdk is
+      # at zero findings and stays there. The connectors are still reported
+      # rather than gated -- see [tool.pyright] in the root pyproject, which
+      # has them in scope for both.
+      - name: Type-check
+        run: uv run --no-sync pyright estuary-cdk/estuary_cdk
+
+  # estuary-cdk declares `>=3.11,<4.0` rather than the workspace's 3.14,
+  # because it is also consumed outside this repository -- source-netsuite is
+  # its own repo, pins the CDK, and runs on 3.11. What that floor promises has
+  # to be tested, and it cannot be tested inside the workspace, whose lock
+  # admits 3.14 alone. So this job installs the CDK into a venv of its own.
+  estuary_cdk_supported_pythons:
+    name: estuary-cdk on Python ${{ matrix.python-version }}
+    needs: classify_changes
+    if: needs.classify_changes.outputs.cdk == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      - name: Install dependencies and run tests
+        env:
+          VIRTUAL_ENV: /tmp/cdk-venv
+        run: |
+          uv venv --python ${{ matrix.python-version }} "$VIRTUAL_ENV"
+          # `--group pyproject.toml:dev` reads the root workspace's own dev
+          # group, so this job declares no test dependencies of its own and
+          # cannot drift from the versions every other job uses. The
+          # declaration is shared; the resolution is not, since an unlocked
+          # install can take a different patch than uv.lock pins. That is
+          # inherent in testing outside the lock, and better than a second copy
+          # of the list.
+          uv pip install -e "estuary-cdk[airbyte-shim]" --group pyproject.toml:dev
+          cd estuary-cdk
+          "$VIRTUAL_ENV/bin/python" -m compileall -q estuary_cdk vendor
+          "$VIRTUAL_ENV/bin/python" -m pytest
+
+  # One status check covering every job above, whichever connectors ran and
+  # whether or not estuary-cdk's checks did, so it can be made a required
+  # check. It must run with `always()`: GitHub counts a skipped job as passing
+  # a required check.
   python_gate:
     name: Python connectors gate # the required check's name; keep it fixed
-    needs: [classify_changes, fetch_flow, py_connector]
+    needs: [classify_changes, fetch_flow, py_connector, estuary_cdk, estuary_cdk_supported_pythons]
     if: always()
     runs-on: ubuntu-24.04
     steps:
@@ -222,6 +324,9 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
           RUN: ${{ needs.classify_changes.outputs.run }}
           PY: ${{ needs.py_connector.result }}
+          CDK: ${{ needs.classify_changes.outputs.cdk }}
+          CDK_TESTS: ${{ needs.estuary_cdk.result }}
+          CDK_PYTHONS: ${{ needs.estuary_cdk_supported_pythons.result }}
         run: |
           for r in $RESULTS; do
             case "$r" in success|skipped) ;; *) echo "::error::a job ended $r"; exit 1 ;; esac
@@ -230,4 +335,8 @@ jobs:
           # This reads the same `run` output the build jobs gate on.
           if [ "$RUN" = true ] && [ "$PY" != success ]; then
             echo "::error::connectors were due to build but py_connector ended $PY"; exit 1
+          fi
+          # Likewise for estuary-cdk, against the `cdk` output its jobs gate on.
+          if [ "$CDK" = true ] && { [ "$CDK_TESTS" != success ] || [ "$CDK_PYTHONS" != success ]; }; then
+            echo "::error::estuary-cdk was due to be checked but its jobs ended $CDK_TESTS and $CDK_PYTHONS"; exit 1
           fi
