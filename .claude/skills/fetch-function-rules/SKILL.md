@@ -23,6 +23,10 @@ Rules for `fetch_*` (incremental) and `backfill_*` (backfill) functions in estua
 
 **Name request-param dicts by distance from the request.** Plain `params` only where the dict is handed directly to the HTTP call; `request_params` / `extra_request_params` when it crosses a signature, struct, or partial. No anonymous tuples in wiring maps — use a small frozen dataclass.
 
+### `FETCH-NAMED-ERROR-CODES` · checkable-from-diff
+
+**A provider error code the connector branches on is a module-level constant named for its meaning** (`RESOURCE_NOT_FOUND = "E0000007"`), with a comment citing the provider's error-code docs.
+
 ---
 
 ## Window semantics (updated-style cursors)
