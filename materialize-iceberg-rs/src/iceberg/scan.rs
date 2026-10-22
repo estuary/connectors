@@ -32,7 +32,6 @@ use super::manifest;
 use super::manifest::CONTENT_DATA;
 use super::manifest::CONTENT_DELETES;
 use super::manifest_list;
-use super::manifest_list::ManifestFile;
 use super::single_value::Bound;
 use super::single_value::compare_keys;
 
@@ -145,6 +144,25 @@ pub async fn load(
     let manifests =
         manifest_list::read_manifest_list(&catalog.object_store, &current.manifest_list).await?;
 
+    // Decoded once per `load` call, not once per batch: every batch of this
+    // call answers against the same snapshot, so re-fetching and re-decoding
+    // a manifest file from object storage for each of the (potentially
+    // thousands of) batches below would multiply its IO by the batch count
+    // for no benefit — batches only need to re-run the (cheap, in-memory)
+    // bounds pruning against these.
+    let mut data_entries = Vec::new();
+    for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
+        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
+        for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
+            data_entries.push((entry, manifest_file.sequence_number));
+        }
+    }
+    let mut delete_entries = Vec::new();
+    for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DELETES) {
+        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
+        delete_entries.extend(manifest::read_manifest(&catalog.object_store, manifest_path).await?);
+    }
+
     let key_field_ids: Vec<i32> = (1..=num_keys as i32).collect();
     let key_types: Vec<DataType> = schema.fields()[..num_keys]
         .iter()
@@ -173,7 +191,8 @@ pub async fn load(
 
         let batch_stats = scan_batch(
             catalog,
-            &manifests,
+            &data_entries,
+            &delete_entries,
             &key_field_ids,
             &key_types,
             doc_index,
@@ -219,7 +238,8 @@ fn decode_key(key: &[Element<'_>], key_types: &[DataType]) -> Result<Vec<Bound>>
 #[allow(clippy::too_many_arguments)]
 async fn scan_batch(
     catalog: &Catalog,
-    manifests: &[ManifestFile],
+    data_entries: &[(manifest::ManifestEntryInfo, i64)],
+    delete_entries: &[manifest::ManifestEntryInfo],
     key_field_ids: &[i32],
     key_types: &[DataType],
     doc_index: usize,
@@ -254,18 +274,15 @@ async fn scan_batch(
     // connector, i.e. they inherit the manifest-list row's).
     let mut stats = ScanStats::default();
     let mut data_files = Vec::new();
-    for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
-        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
-        for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
-            stats.manifest_entries_considered += 1;
-            let lower = decode_bounds(&entry.lower_bounds, key_field_ids, key_types);
-            let upper = decode_bounds(&entry.upper_bounds, key_field_ids, key_types);
-            if !ranges_overlap(key_field_ids, &batch_lower, &batch_upper, &lower, &upper) {
-                stats.manifest_entries_pruned += 1;
-                continue;
-            }
-            data_files.push((entry, manifest_file.sequence_number));
+    for (entry, sequence_number) in data_entries {
+        stats.manifest_entries_considered += 1;
+        let lower = decode_bounds(&entry.lower_bounds, key_field_ids, key_types);
+        let upper = decode_bounds(&entry.upper_bounds, key_field_ids, key_types);
+        if !ranges_overlap(key_field_ids, &batch_lower, &batch_upper, &lower, &upper) {
+            stats.manifest_entries_pruned += 1;
+            continue;
         }
+        data_files.push((entry, *sequence_number));
     }
     if data_files.is_empty() {
         return Ok(stats);
@@ -276,21 +293,18 @@ async fn scan_batch(
     // Positions masked in each surviving data file, read from whichever
     // delete files reference one of them.
     let mut deleted: HashMap<String, Vec<i64>> = HashMap::new();
-    for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DELETES) {
-        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
-        for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
-            let Some(referenced) = &entry.referenced_data_file else {
-                continue;
-            };
-            if !data_files.iter().any(|(d, _)| &d.file_path == referenced) {
-                continue;
-            }
-            let positions = read_delete_positions(catalog, &entry.file_path).await?;
-            deleted
-                .entry(referenced.clone())
-                .or_default()
-                .extend(positions);
+    for entry in delete_entries {
+        let Some(referenced) = &entry.referenced_data_file else {
+            continue;
+        };
+        if !data_files.iter().any(|(d, _)| &d.file_path == referenced) {
+            continue;
         }
+        let positions = read_delete_positions(catalog, &entry.file_path).await?;
+        deleted
+            .entry(referenced.clone())
+            .or_default()
+            .extend(positions);
     }
 
     tracing::warn!(?deleted);
