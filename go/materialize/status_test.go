@@ -200,6 +200,7 @@ func TestStatusWarnings(t *testing.T) {
 	h.round(2 * time.Minute)
 	h.advance(10 * time.Minute)
 	h.expect()
+	require.Empty(t, h.st.completions)
 }
 
 func TestStatusOtherShards(t *testing.T) {
@@ -208,6 +209,7 @@ func TestStatusOtherShards(t *testing.T) {
 	h.round(2 * time.Minute)
 	h.advance(10 * time.Minute)
 	h.expect()
+	require.Empty(t, h.st.completions)
 
 	h.st.warn("alpha", "Rows of table alpha were not deleted because A.")
 	h.expect("warning: Rows of table alpha were not deleted because A.")
