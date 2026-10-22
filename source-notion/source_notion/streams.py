@@ -352,18 +352,19 @@ class Blocks(HttpSubStream, IncrementalNotionStream):
         cursor_field: List[str] = None,
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Optional[Mapping[str, Any]]]:
-        # gather parent stream records in full
-        slices = list(
-            super().stream_slices(SyncMode.full_refresh, cursor_field, stream_state)
-        )
+        page_ids = [
+            page["parent"]["id"]
+            for page in super().stream_slices(
+                SyncMode.full_refresh, cursor_field, stream_state
+            )
+        ]
 
         self.is_finished = False
-        for page in slices:
-            page_id = page["parent"]["id"]
+        for idx, page_id in enumerate(page_ids):
             self.block_id_stack.append(page_id)
 
             # stream sync is finished when it is on the last slice
-            self.is_finished = page_id == slices[-1]["parent"]["id"]
+            self.is_finished = idx == len(page_ids) - 1
 
             yield {"page_id": page_id}
 
