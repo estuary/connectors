@@ -70,58 +70,16 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 class CapabilityBit(StrEnum):
+    """Capability bits that newer resolvers check, as `prefixes` reports them.
+
+    Resolvers that still check the legacy read capability need no bit:
+    `prefixes(minCapability: read)` only returns prefixes that hold it.
+    """
+
     CatalogRead = "CatalogRead"
-    JournalRead = "JournalRead"
-    JournalAppend = "JournalAppend"
-    SpecEdit = "SpecEdit"
-    CreateGrant = "CreateGrant"
-    DeleteGrant = "DeleteGrant"
-    CreateInviteLink = "CreateInviteLink"
-    ViewDataPlanePrivateNetworking = "ViewDataPlanePrivateNetworking"
-    ModifyDataPlanePrivateNetworking = "ModifyDataPlanePrivateNetworking"
     ViewBilling = "ViewBilling"
-    EditBilling = "EditBilling"
     QueryServiceAccounts = "QueryServiceAccounts"
-    CreateServiceAccount = "CreateServiceAccount"
-    CreateApiKey = "CreateApiKey"
-    RevokeApiKey = "RevokeApiKey"
-    ViewSecret = "ViewSecret"
-    EditSecret = "EditSecret"
-    DecryptSecret = "DecryptSecret"
-    Delegate = "Delegate"
-    Assume = "Assume"
-    CreateSandbox = "CreateSandbox"
-
-
-# Resolvers that still check the legacy `Read` / `Admin` capability require
-# every bit of the matching bundle. Mirrors `CapabilityBundle` in flow's
-# crates/models/src/authz.rs.
-READ_BUNDLE = frozenset({
-    CapabilityBit.CatalogRead,
-    CapabilityBit.JournalRead,
-    CapabilityBit.ViewDataPlanePrivateNetworking,
-})
-ADMIN_BUNDLE = frozenset({
-    CapabilityBit.CatalogRead,
-    CapabilityBit.JournalRead,
-    CapabilityBit.JournalAppend,
-    CapabilityBit.SpecEdit,
-    CapabilityBit.Delegate,
-    CapabilityBit.ViewSecret,
-    CapabilityBit.EditSecret,
-    CapabilityBit.DecryptSecret,
-    CapabilityBit.CreateGrant,
-    CapabilityBit.DeleteGrant,
-    CapabilityBit.CreateInviteLink,
-    CapabilityBit.QueryServiceAccounts,
-    CapabilityBit.CreateServiceAccount,
-    CapabilityBit.CreateApiKey,
-    CapabilityBit.RevokeApiKey,
-    CapabilityBit.ViewBilling,
-    CapabilityBit.EditBilling,
-    CapabilityBit.ViewDataPlanePrivateNetworking,
-    CapabilityBit.ModifyDataPlanePrivateNetworking,
-})
+    ManageAlerts = "ManageAlerts"
 
 
 class GraphQLErrorEntry(BaseModel, extra="allow"):
@@ -232,7 +190,6 @@ query Alerts($scope: String!, $last: Int!, $before: String) {
     connection_path: ClassVar[tuple[str, ...]] = ("alerts",)
     pager: ClassVar[Pager] = Pager.BACKWARD
     scope: ClassVar[Scope] = Scope.PREFIX
-    required: ClassVar[frozenset[CapabilityBit]] = READ_BUNDLE
 
     alertType: str
     catalogName: str
@@ -255,7 +212,6 @@ query AlertConfigs($scope: String!, $first: Int!, $after: String) {
     connection_path: ClassVar[tuple[str, ...]] = ("alertConfigs",)
     pager: ClassVar[Pager] = Pager.FORWARD
     scope: ClassVar[Scope] = Scope.PREFIX
-    required: ClassVar[frozenset[CapabilityBit]] = READ_BUNDLE
 
     id: str
     catalogPrefixOrName: str
@@ -276,7 +232,7 @@ query AlertSubscriptions($scope: Prefix!) {
     connection_path: ClassVar[tuple[str, ...]] = ("alertSubscriptions",)
     pager: ClassVar[Pager] = Pager.LIST
     scope: ClassVar[Scope] = Scope.PREFIX
-    required: ClassVar[frozenset[CapabilityBit]] = ADMIN_BUNDLE
+    required: ClassVar[frozenset[CapabilityBit]] = frozenset({CapabilityBit.ManageAlerts})
 
     catalogPrefix: str
     destination: str

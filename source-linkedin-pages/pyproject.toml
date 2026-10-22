@@ -6,8 +6,9 @@ authors = ["Pedro <pedro@z33dd.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-estuary-cdk = { path = "../estuary-cdk", develop = true }
-airbyte-cdk = "^0.52"
+estuary-cdk = {path="../estuary-cdk", develop = true, extras = ["airbyte-shim"]}
+# The vendored Airbyte CDK is pydantic v1 code; see estuary-cdk/vendor/README.md.
+pydantic = "==1.10.14"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"

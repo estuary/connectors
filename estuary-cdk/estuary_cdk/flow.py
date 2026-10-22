@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum, auto
 from typing import Any, ClassVar, Generic, Literal, Self, TypeVar
 
@@ -55,6 +55,7 @@ class CaptureSpec(GenericModel, Generic[EndpointConfig, ResourceConfig]):
     config: EndpointConfig
     intervalSeconds: NonNegativeInt
     bindings: list[CaptureBinding[ResourceConfig]] = []
+    createdAt: date | None = None
 
 
 class RangeSpec(BaseModel):

@@ -51,7 +51,9 @@ jobs:
       - name: Install dependencies and run tests
         run: |
           cd estuary-cdk
-          poetry install
+          # --all-extras: tests/test_airbyte_cdk.py imports the shim, which needs
+          # the `airbyte-shim` extra's dependencies for the vendored Airbyte CDK.
+          poetry install --all-extras
           source $(poetry env info --path)/bin/activate
-          python -m compileall -q estuary_cdk
+          python -m compileall -q estuary_cdk vendor
           pytest

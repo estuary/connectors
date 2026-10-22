@@ -50,6 +50,9 @@ The CDK's `common` module implements common strategies for capturing data, inclu
 
 ### Third-Party Connector Support
 - **CaptureShim** (`shim_airbyte_cdk.py`) — Wraps Airbyte CDK connectors to run within the Estuary framework
+- **`vendor/`** — The forked Airbyte CDK the shim runs against, pruned to the surface the
+  remaining shim connectors use. Enabled via the `airbyte-shim` extra. See
+  [vendor/README.md](vendor/README.md) before changing anything under it.
 
 ## Runtime Behavior
 

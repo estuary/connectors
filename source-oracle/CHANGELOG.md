@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-21
+
+### Changed
+- Backfill progress in the connector status now counts tables which finished
+  backfilling since the capture last restarted.
+
 ## 2026-09-29
 
 ### Changed
