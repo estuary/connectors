@@ -183,7 +183,7 @@ uv sync --package source-$1 --group dev
 Then, from the connector directory, run the two **free** checks:
 
 ```bash
-uv run --group dev flowctl raw spec --source test.flow.yaml -o json --emit-raw
+uv run --group dev flowctl raw spec --source test.flow.yaml -o json
 uv run --group dev flowctl raw discover --source test.flow.yaml -o json --emit-raw
 ```
 
