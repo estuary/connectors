@@ -398,7 +398,11 @@ class AccessScopes(BaseModel, extra="allow"):
             class AccessScope(BaseModel, extra="forbid"):
                 handle: str
 
+            class App(BaseModel, extra="forbid"):
+                publicCategory: str
+
             accessScopes: list[AccessScope]
+            app: App
 
         currentAppInstallation: AppInstallation
 
@@ -411,6 +415,9 @@ class AccessScopes(BaseModel, extra="allow"):
             currentAppInstallation {
                 accessScopes {
                     handle
+                }
+                app {
+                    publicCategory
                 }
             }
         }

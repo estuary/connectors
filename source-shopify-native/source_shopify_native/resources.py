@@ -21,6 +21,7 @@ from estuary_cdk.flow import (
     ValidationError,
 )
 from estuary_cdk.http import HTTPError, HTTPMixin, RateLimiter, TokenSource
+from estuary_cdk.logger import OBSERVABLE_FIELD
 from pydantic import AwareDatetime
 
 import source_shopify_native.graphql as gql
@@ -201,7 +202,9 @@ async def _create_store_context(
     if should_cancel_ongoing_job:
         await bulk_job_manager.cancel_current()
 
-    granted_scopes = await _get_granted_scopes(store_http, client.url, log)
+    granted_scopes = await _get_granted_scopes(
+        store_http, client.url, log, store_config.store
+    )
 
     # Both AccessToken and ShopifyClientCredentials are custom app tokens
     # subject to plan restrictions on PII access.
@@ -436,7 +439,9 @@ def _plan_is_plus_or_advanced(plan: ShopDetails.Data.Shop.Plan) -> bool:
     )
 
 
-async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str]:
+async def _get_granted_scopes(
+    http: HTTPMixin, url: str, log: Logger, store: str
+) -> set[str]:
     """Query the currentAppInstallation to determine which scopes are granted."""
     response = AccessScopes.model_validate_json(
         await http.request(
@@ -445,6 +450,16 @@ async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str
     )
     scopes = response.get_scope_handles()
     log.info(f"Access token has scopes: {scopes}")
+    # Observable so we can find captures authenticating with a public app's
+    # token, which will stop working once Shopify makes those expire hourly.
+    log.info(
+        "Shopify app public category",
+        extra={
+            OBSERVABLE_FIELD: True,
+            "store": store,
+            "public_category": response.data.currentAppInstallation.app.publicCategory,
+        },
+    )
     return scopes
 
 
