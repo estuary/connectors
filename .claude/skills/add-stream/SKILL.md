@@ -77,6 +77,8 @@ If the stream is a child entity requiring a parent ID to list, use the `child-en
 
 Add the new stream wherever the connector enumerates streams. That's often a top-level list, a discovery function, or both — grep the connector for how other streams declare themselves and match the form.
 
+A stream the token may be unable to access is **capability-gated**: `all_resources` probes access and registers the stream only when the probe passes, logging why when it doesn't.
+
 Check whether any per-connector "special lists" apply (split-child, regional, scheduled-backfill, exempt-from-X). The way to know: grep for sibling streams that share traits with the new one, and see which lists they appear in.
 
 ## Phase 5.5 — Static checks & formatting
