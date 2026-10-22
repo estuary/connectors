@@ -61,7 +61,7 @@ func (c *statusCounts) reset(numCollections int) {
 
 func (c *statusCounts) add(collection int) {
 	c.docs++
-	if collection >= 0 && !c.seen[collection] {
+	if !c.seen[collection] {
 		c.seen[collection] = true
 		c.collections++
 	}
@@ -253,9 +253,11 @@ func (t *statusTracker) tick() {
 	}
 }
 
+// collectionOf is the collection index of a binding. The runtime only sends
+// bindings of the materialization, so any other is a bug.
 func (t *statusTracker) collectionOf(binding int) int {
 	if binding < 0 || binding >= len(t.bindingCollection) {
-		return -1
+		panic(fmt.Sprintf("request for binding %d, but the materialization has %d bindings", binding, len(t.bindingCollection)))
 	}
 	return t.bindingCollection[binding]
 }

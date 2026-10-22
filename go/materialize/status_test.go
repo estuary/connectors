@@ -215,6 +215,12 @@ func TestStatusOtherShards(t *testing.T) {
 	h.expect("warning: Rows of table alpha were not deleted because A.")
 }
 
+func TestStatusUnknownBinding(t *testing.T) {
+	h := newStatusHarness(t, nil)
+	require.PanicsWithValue(t, "request for binding 3, but the materialization has 3 bindings", func() { h.st.event(readStore, 3) })
+	require.Panics(t, func() { h.st.event(readLoad, -1) })
+}
+
 func TestStatusFormatting(t *testing.T) {
 	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 120000: "120,000", 999999: "999,999", 1000000: "1M", 1_234_567: "1.2M", 25_000_000: "25M", 3_400_000_000: "3.4B"} {
 		require.Equal(t, want, formatCount(n), n)
