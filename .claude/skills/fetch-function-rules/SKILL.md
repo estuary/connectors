@@ -17,7 +17,7 @@ Rules for `fetch_*` (incremental) and `backfill_*` (backfill) functions in estua
 
 ### `FETCH-MODEL-OWNS-CONTRACT` · checkable-from-diff
 
-**The model owns its endpoint contract.** Path templates, items keys, and cursor-filter parameter names (`SINCE_PARAM` / `BEFORE_PARAM`-style) are ClassVars on the document model; the cursor value comes from an abstract `get_cursor()` method on the model base — never a `cursor_of` callable threaded through signatures.
+**The model owns its endpoint contract.** Path templates, items keys, and cursor-filter parameter names (`SINCE_PARAM` / `BEFORE_PARAM`-style) are ClassVars on the document model. Give the model base an abstract `get_cursor()` exactly when generic fetch code reads a cursor value off its documents; that code calls it in place of a `cursor_of` callable threaded through signatures.
 
 ### `FETCH-PARAM-DICT-NAMING` · checkable-from-diff
 
