@@ -46,14 +46,13 @@ jobs:
           version: "0.13.3"
           enable-cache: true
 
-      # Report-only, like the connector workflow: findings are surfaced as
-      # annotations without failing the job. The version must match
+      # Blocking: estuary-cdk is clean. The connector workflow stays
+      # report-only, since they still carry findings. The version must match
       # `required-version` in ruff.toml.
       - name: Lint
         run: |
-          uvx ruff@0.16.9 check --exit-zero --output-format=github estuary-cdk
-          # GitHub renders only the first handful of annotations per step, so
-          # the counts also go to the job summary, where none are dropped.
+          # The summary is written first: the gating check below exits non-zero
+          # on a finding, and with `bash -e` nothing after it would run.
           {
             echo "### ruff: estuary-cdk"
             echo
@@ -61,6 +60,7 @@ jobs:
             uvx ruff@0.16.9 check --exit-zero --statistics estuary-cdk
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          uvx ruff@0.16.9 check --output-format=github estuary-cdk
 
       - name: Install dependencies and run tests
         run: |
@@ -71,13 +71,12 @@ jobs:
           uv run --no-sync python -m compileall -q estuary_cdk vendor
           uv run --no-sync pytest
 
-      # Report-only, as above. estuary_cdk alone is checked here; the
-      # connectors are checked by their own workflow, where the matrix keeps
-      # each job's findings to one connector.
+      # Blocking, unlike the connector workflow's report-only step:
+      # estuary_cdk is at zero findings and stays there. The connectors are
+      # still reported rather than gated -- see [tool.pyright] in the root
+      # pyproject, which has them in scope for both.
       - name: Type-check
-        run: |
-          uv run --no-sync pyright --outputjson estuary-cdk/estuary_cdk \
-            | python3 .github/scripts/pyright_annotations.py estuary-cdk
+        run: uv run --no-sync pyright estuary-cdk/estuary_cdk
 
   # estuary-cdk declares `>=3.11,<4.0` rather than the workspace's 3.14,
   # because it is also consumed outside this repository -- source-netsuite is
