@@ -52,6 +52,6 @@ Copy the shape from the reference, not from memory:
 ## Backfill shape
 
 - `fetch_page(log, page_cursor, cutoff)` walks history from oldest to `cutoff`, one page or time window per invocation, yielding the `PageCursor` for the next.
-- The `PageCursor` carries progress across the CDK's 24-hour restart. What it may encode, and when to yield it, is `fetch-function-rules` (`FETCH-CHECKPOINT-STABLE-STATE`, `FETCH-VALUE-WATERMARK-RESUME`, `FETCH-DICT-CURSOR-WORKLIST`).
+- The `PageCursor` carries progress across the CDK's 24-hour restart. What it may encode, and when to yield it, is `fetch-function-rules` (`FETCH-CHECKPOINT-STABLE-STATE`, `FETCH-VALUE-WATERMARK-RESUME`, `FETCH-FANOUT-RESUME`).
 - Return without yielding a `PageCursor` to signal completion.
 - `cutoff` is where incremental takes over; documents at or after it are suppressed (`FETCH-SEAM-PRECISION`).
