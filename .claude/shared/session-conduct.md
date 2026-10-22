@@ -65,3 +65,14 @@ One more check before the first edit: **format the files you're about to touch**
 ### `CONDUCT-VERIFY-FIRST` · conduct-only
 
 Verify first, code second. For anything the provider's API does, the Bruno collection is the source of truth for "what does this endpoint actually return today" — not the docs, and not recall. See [provider-api-consent.md](provider-api-consent.md) for the rules on getting that evidence.
+
+---
+
+### `CONDUCT-END-TURN-WITH-ASK` · conduct-only
+
+In a background session, your last message is all the user sees of a turn in `claude agents`. End every turn, an interrupted one included, with a message that says one of:
+
+- **Input needed:** the decision or action, why it blocks you, and the options with the context to choose between them. In human-in-the-loop mode, ask it with `AskUserQuestion` so the row shows "Needs input".
+- **Nothing needed:** the phase you're in, what you do next, and what brings you back to the user.
+
+Write every path in that message in full: `$CLAUDE_JOB_DIR` exists only inside your session, and `echo "$CLAUDE_JOB_DIR"` gives its value.
