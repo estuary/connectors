@@ -14,12 +14,12 @@ import (
 const (
 	// A stage is reported once it has been the current stage this long, so a
 	// fast task doesn't report every stage of every transaction.
-	statusDwell = time.Minute
+	statusMinActivePeriod = time.Minute
 	// A reported stage is reported again this often, with its updated counts
 	// and elapsed time.
 	statusRefresh = time.Minute
-	// A task whose stages are all shorter than statusDwell reports a rollup of
-	// the transactions it completed over this window instead.
+	// A task whose stages are all shorter than statusMinActivePeriod reports a
+	// rollup of the transactions it completed over this window instead.
 	statusRollupWindow = 5 * time.Minute
 	statusTick         = time.Second
 )
@@ -287,7 +287,7 @@ func (t *statusTracker) next(now time.Time) string {
 	var key statusKey
 	var msg string
 	switch immediate := t.shown.stage == stageStarting || t.shown.stage == stageRecovery || t.shown.stage == stageSyncWait; {
-	case immediate || now.Sub(t.shownSince) >= statusDwell:
+	case immediate || now.Sub(t.shownSince) >= statusMinActivePeriod:
 		if t.shown == t.emitted && now.Sub(t.lastEmit) < statusRefresh {
 			return ""
 		}
