@@ -122,8 +122,11 @@ else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
   # Connectors structured as a library plus a cmd/ main (all the SQL ones)
   # match more than one package under ./<connector>/..., which `go build -o
-  # <file>` refuses. Prefer the cmd package when there is one.
-  if [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
+  # <file>` refuses. Prefer the cmd package when there is one, and
+  # cmd/connector where cmd holds several mains.
+  if [[ -d "$ROOT_DIR/$CONNECTOR/cmd/connector" ]]; then
+    BUILD_PKG="./$CONNECTOR/cmd/connector"
+  elif [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
     BUILD_PKG="./$CONNECTOR/cmd/..."
   else
     BUILD_PKG="./$CONNECTOR/..."
