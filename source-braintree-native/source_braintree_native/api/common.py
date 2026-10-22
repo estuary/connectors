@@ -63,7 +63,7 @@ async def request_with_search_timeout_retries(
             )
             await asyncio.sleep(delay)
 
-    assert False, "unreachable: the loop above always returns a response or raises."
+    raise AssertionError("unreachable: the loop above always returns a response or raises.")
 
 
 async def process_completed_fetches(

@@ -3,6 +3,7 @@ from logging import Logger
 from types import NoneType
 from typing import (
     AsyncGenerator,
+    Sequence,
 )
 
 import estuary_cdk.emitted_changes_cache as cache
@@ -29,7 +30,7 @@ from .shared import (
 from .properties import fetch_properties
 
 async def _request_list_page(
-    http: HTTPSession, log: Logger, offset: int, prop_names: list[str] = []
+    http: HTTPSession, log: Logger, offset: int, prop_names: Sequence[str] = ()
 ) -> ListSearch:
     url = f"{HUB}/crm/v3/lists/search"
 
@@ -37,7 +38,7 @@ async def _request_list_page(
         "count": 500,
         "offset": offset,
         "sort": "HS_LIST_ID",  # Required for list membership backfill checkpoints
-        "additionalProperties": prop_names,
+        "additionalProperties": list(prop_names),
     }
 
     return ListSearch.model_validate_json(
