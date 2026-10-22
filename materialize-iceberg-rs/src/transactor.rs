@@ -121,12 +121,10 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
 
         match request.kind {
             Some(request::Kind::Load(load)) => {
-                tracing::warn!("Load");
                 let binding = &mut bindings[load.binding as usize];
                 binding.pending_loads.push(load.key_packed);
             }
             Some(request::Kind::Flush(_)) => {
-                tracing::warn!("Flush");
                 for (index, binding) in bindings.iter_mut().enumerate() {
                     if binding.pending_loads.is_empty() {
                         continue;
@@ -172,7 +170,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 })?;
             }
             Some(request::Kind::Store(store)) => {
-                tracing::warn!("Store");
                 let binding = &mut bindings[store.binding as usize];
 
                 let raw_doc_text =
@@ -267,7 +264,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 binding.rows += 1;
             }
             Some(request::Kind::StartCommit(_)) => {
-                tracing::warn!("StartCommit");
                 for binding in bindings.iter_mut() {
                     binding.write_and_upload(&catalog).await?;
 
@@ -290,7 +286,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 })?;
             }
             Some(request::Kind::Acknowledge(_)) => {
-                tracing::warn!("Acknowledge");
                 for binding in bindings.iter_mut() {
                     binding.acknowledge(&catalog).await?;
                 }
