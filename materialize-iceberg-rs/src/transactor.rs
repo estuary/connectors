@@ -148,12 +148,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     binding.load_file_paths = result.file_paths;
 
                     for loaded in result.docs {
-                        let value: serde_json::Value =
-                            serde_json::from_slice(&loaded.doc_json).unwrap();
-                        tracing::warn!(
-                            doc_json = serde_json::to_string_pretty(&value).unwrap(),
-                            "Loaded"
-                        );
                         output.send(Response {
                             kind: Some(response::Kind::Loaded(response::Loaded {
                                 binding: index as u32,
@@ -178,7 +172,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 let doc_text: String = if store.exists {
                     let mut doc: serde_json::Value =
                         serde_json::from_str(raw_doc_text).context("doc_json is not valid JSON")?;
-                    tracing::warn!(doc = serde_json::to_string_pretty(&doc).unwrap(), "Store");
                     let meta = doc
                         .get_mut("_meta")
                         .and_then(|m| m.as_object_mut())
@@ -262,6 +255,12 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
 
                 binding.doc_builder.append_value(&doc_text);
                 binding.rows += 1;
+
+                binding.estimated_bytes +=
+                    store.key_packed.len() + store.values_packed.len() + doc_text.len();
+                if binding.estimated_bytes >= DATA_FILE_FLUSH_BYTES {
+                    binding.flush_data_file(&catalog).await?;
+                }
             }
             Some(request::Kind::StartCommit(_)) => {
                 for binding in bindings.iter_mut() {
@@ -356,6 +355,12 @@ pub(crate) fn build_object_store(
     }
 }
 
+/// Flush a binding's buffered rows into a new data file once this many
+/// bytes have accumulated, instead of waiting for the whole transaction
+/// to finish. Keeps peak memory (buffered Arrow arrays plus the encoded
+/// Parquet bytes) bounded regardless of transaction size.
+const DATA_FILE_FLUSH_BYTES: usize = 256 * 1024 * 1024;
+
 struct BindingState {
     table: String,
     state_key: String,
@@ -372,6 +377,11 @@ struct BindingState {
     value_builders: Vec<ColumnBuilder>,
     doc_builder: StringBuilder,
     rows: usize,
+    /// Running total of bytes buffered for the current (unflushed) data
+    /// file: key_packed + values_packed + doc text appended this chunk.
+    /// Reset to 0 each time a data file is flushed. A cheap proxy for the
+    /// eventual encoded Parquet size, using lengths already in hand.
+    estimated_bytes: usize,
     /// Raw `key_packed` from `Load` requests this transaction, buffered
     /// until `Flush` triggers the actual scan.
     pending_loads: Vec<Bytes>,
@@ -399,8 +409,18 @@ struct TransactionCounts {
 }
 
 impl BindingState {
-    async fn write_and_upload(&mut self, catalog: &Catalog) -> Result<()> {
-        if self.rows == 0 && self.pending_deletes.is_empty() {
+    /// Encodes whatever rows are currently buffered into one Parquet data
+    /// file, uploads it, and writes its manifest — a no-op if nothing is
+    /// buffered. Called both mid-transaction, once `estimated_bytes`
+    /// crosses `DATA_FILE_FLUSH_BYTES`, and at the end of a transaction via
+    /// `write_and_upload`, so a single commit may produce several data
+    /// files instead of one sized to the whole transaction.
+    ///
+    /// Does not reset `last_key` — the ascending-key invariant it guards
+    /// must hold across the whole transaction, not just within one data
+    /// file.
+    async fn flush_data_file(&mut self, catalog: &Catalog) -> Result<()> {
+        if self.rows == 0 {
             return Ok(());
         }
 
@@ -409,94 +429,108 @@ impl BindingState {
             .pending_snapshot_id
             .get_or_insert_with(|| self.checkpoint.sequence_number + 1);
 
-        if self.rows > 0 {
-            let lower_bounds: Vec<(i32, Vec<u8>)> = self
-                .key_bound_trackers
-                .iter()
-                .enumerate()
-                .filter_map(|(i, tracker)| {
-                    tracker.encoded().map(|(lower, _)| (i as i32 + 1, lower))
-                })
-                .collect();
-            let upper_bounds: Vec<(i32, Vec<u8>)> = self
-                .key_bound_trackers
-                .iter()
-                .enumerate()
-                .filter_map(|(i, tracker)| {
-                    tracker.encoded().map(|(_, upper)| (i as i32 + 1, upper))
-                })
-                .collect();
-            for tracker in &mut self.key_bound_trackers {
-                tracker.reset();
-            }
-            self.last_key = None;
+        let lower_bounds: Vec<(i32, Vec<u8>)> = self
+            .key_bound_trackers
+            .iter()
+            .enumerate()
+            .filter_map(|(i, tracker)| {
+                tracker.encoded().map(|(lower, _)| (i as i32 + 1, lower))
+            })
+            .collect();
+        let upper_bounds: Vec<(i32, Vec<u8>)> = self
+            .key_bound_trackers
+            .iter()
+            .enumerate()
+            .filter_map(|(i, tracker)| {
+                tracker.encoded().map(|(_, upper)| (i as i32 + 1, upper))
+            })
+            .collect();
+        for tracker in &mut self.key_bound_trackers {
+            tracker.reset();
+        }
 
-            let mut columns: Vec<ArrayRef> = self
-                .key_builders
-                .iter_mut()
-                .map(ColumnBuilder::finish)
-                .collect();
-            columns.extend(self.value_builders.iter_mut().map(ColumnBuilder::finish));
-            columns.push(Arc::new(self.doc_builder.finish()));
+        let mut columns: Vec<ArrayRef> = self
+            .key_builders
+            .iter_mut()
+            .map(ColumnBuilder::finish)
+            .collect();
+        columns.extend(self.value_builders.iter_mut().map(ColumnBuilder::finish));
+        columns.push(Arc::new(self.doc_builder.finish()));
 
-            let batch = RecordBatch::try_new(self.schema.clone(), columns)?;
+        let batch = RecordBatch::try_new(self.schema.clone(), columns)?;
 
-            let mut buf = Vec::new();
-            let file_metadata = {
-                let mut writer = ArrowWriter::try_new(&mut buf, self.schema.clone(), None)?;
-                writer.write(&batch)?;
-                writer.close()?
-            };
+        let mut buf = Vec::new();
+        let file_metadata = {
+            let mut writer = ArrowWriter::try_new(&mut buf, self.schema.clone(), None)?;
+            writer.write(&batch)?;
+            writer.close()?
+        };
 
-            let bytes = buf.len();
-            let rows = self.rows;
-            let path = ObjectPath::from(format!(
-                "{}/{}/data/{}.parquet",
-                catalog.prefix,
-                self.table,
-                Uuid::new_v4()
-            ));
+        let bytes = buf.len();
+        let rows = self.rows;
+        let path = ObjectPath::from(format!(
+            "{}/{}/data/{}.parquet",
+            catalog.prefix,
+            self.table,
+            Uuid::new_v4()
+        ));
 
-            let started = Instant::now();
-            catalog
-                .object_store
-                .put(&path, PutPayload::from(buf))
-                .await?;
-
-            tracing::info!(
-                table = %self.table,
-                path = %path,
-                rows,
-                bytes,
-                elapsed_ms = started.elapsed().as_millis(),
-                "wrote parquet data file"
-            );
-
-            let split_offsets = file_metadata
-                .row_groups()
-                .iter()
-                .filter_map(|rg| rg.file_offset())
-                .collect();
-
-            let pending_manifest = manifest::write_manifest(
-                catalog,
-                &self.table,
-                &self.table_schema.to_string(),
-                snapshot_id,
-                DataFileInfo {
-                    file_path: catalog.uri(&path.to_string()),
-                    record_count: rows as i64,
-                    file_size_in_bytes: bytes as i64,
-                    split_offsets,
-                    lower_bounds,
-                    upper_bounds,
-                },
-            )
+        let started = Instant::now();
+        catalog
+            .object_store
+            .put(&path, PutPayload::from(buf))
             .await?;
 
-            self.checkpoint.pending_manifests.push(pending_manifest);
-            self.rows = 0;
+        tracing::info!(
+            table = %self.table,
+            path = %path,
+            rows,
+            bytes,
+            elapsed_ms = started.elapsed().as_millis(),
+            "wrote parquet data file"
+        );
+
+        let split_offsets = file_metadata
+            .row_groups()
+            .iter()
+            .filter_map(|rg| rg.file_offset())
+            .collect();
+
+        let pending_manifest = manifest::write_manifest(
+            catalog,
+            &self.table,
+            &self.table_schema.to_string(),
+            snapshot_id,
+            DataFileInfo {
+                file_path: catalog.uri(&path.to_string()),
+                record_count: rows as i64,
+                file_size_in_bytes: bytes as i64,
+                split_offsets,
+                lower_bounds,
+                upper_bounds,
+            },
+        )
+        .await?;
+
+        self.checkpoint.pending_manifests.push(pending_manifest);
+        self.rows = 0;
+        self.estimated_bytes = 0;
+
+        Ok(())
+    }
+
+    async fn write_and_upload(&mut self, catalog: &Catalog) -> Result<()> {
+        if self.rows == 0 && self.pending_deletes.is_empty() {
+            return Ok(());
         }
+
+        self.flush_data_file(catalog).await?;
+        self.last_key = None;
+
+        let snapshot_id = *self
+            .checkpoint
+            .pending_snapshot_id
+            .get_or_insert_with(|| self.checkpoint.sequence_number + 1);
 
         for (file_path, positions) in self.pending_deletes.drain() {
             let pending_manifest = write_position_delete_file(
@@ -810,6 +844,7 @@ fn binding_state(
         value_builders,
         doc_builder: StringBuilder::new(),
         rows: 0,
+        estimated_bytes: 0,
         pending_loads: Vec::new(),
         load_file_paths: Vec::new(),
         pending_deletes: HashMap::new(),
