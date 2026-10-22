@@ -123,7 +123,7 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     """Enumerate every stream the connector exposes."""
-    # `add-stream` appends resources here. Empty until the first stream is added.
+    # `add-stream` inserts resources here, in the module order. Empty until the first stream is added.
     return []
 ```
 
