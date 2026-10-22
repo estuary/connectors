@@ -22,6 +22,7 @@ pub struct Snapshot {
     pub summary: BTreeMap<String, String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_snapshot(
     snapshot_id: i64,
     parent_snapshot_id: Option<i64>,

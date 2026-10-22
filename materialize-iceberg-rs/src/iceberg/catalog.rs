@@ -253,7 +253,7 @@ impl Catalog {
 
         let next_version = version + 1;
         let metadata_path = self.new_metadata_path(table, next_version);
-        let metadata_file = self.uri(&metadata_path.to_string());
+        let metadata_file = self.uri(metadata_path.as_ref());
         metadata.add_snapshot(snapshot);
         metadata.metadata_log.push(MetadataLogEntry {
             timestamp_ms: metadata.last_updated_ms,

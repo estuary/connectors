@@ -96,12 +96,12 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         .collect::<Result<Vec<_>>>()?;
 
     for binding in &mut bindings {
-        if binding.checkpoint.snapshot_id.is_none() {
-            if let Some(current) = catalog.current_snapshot(&binding.table).await? {
-                binding.checkpoint.snapshot_id = Some(current.snapshot_id);
-                binding.checkpoint.sequence_number = current.sequence_number;
-                binding.checkpoint.manifest_list = Some(current.manifest_list);
-            }
+        if binding.checkpoint.snapshot_id.is_none()
+            && let Some(current) = catalog.current_snapshot(&binding.table).await?
+        {
+            binding.checkpoint.snapshot_id = Some(current.snapshot_id);
+            binding.checkpoint.sequence_number = current.sequence_number;
+            binding.checkpoint.manifest_list = Some(current.manifest_list);
         }
     }
 
@@ -502,7 +502,7 @@ impl BindingState {
             &self.table_schema.to_string(),
             snapshot_id,
             DataFileInfo {
-                file_path: catalog.uri(&path.to_string()),
+                file_path: catalog.uri(path.as_ref()),
                 record_count: rows as i64,
                 file_size_in_bytes: bytes as i64,
                 split_offsets,
@@ -748,7 +748,7 @@ async fn write_position_delete_file(
         table_schema_json,
         snapshot_id,
         DeleteFileInfo {
-            file_path: catalog.uri(&path.to_string()),
+            file_path: catalog.uri(path.as_ref()),
             record_count,
             file_size_in_bytes,
             referenced_data_file: referenced_data_file.to_string(),

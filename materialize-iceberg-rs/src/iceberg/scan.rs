@@ -291,15 +291,15 @@ fn ranges_overlap(
     file_upper: &HashMap<i32, Bound>,
 ) -> bool {
     for (i, field_id) in key_field_ids.iter().enumerate() {
-        if let Some(upper) = file_upper.get(field_id) {
-            if batch_lower[i].compare(upper) == Ordering::Greater {
-                return false;
-            }
+        if let Some(upper) = file_upper.get(field_id)
+            && batch_lower[i].compare(upper) == Ordering::Greater
+        {
+            return false;
         }
-        if let Some(lower) = file_lower.get(field_id) {
-            if batch_upper[i].compare(lower) == Ordering::Less {
-                return false;
-            }
+        if let Some(lower) = file_lower.get(field_id)
+            && batch_upper[i].compare(lower) == Ordering::Less
+        {
+            return false;
         }
     }
     true
@@ -318,15 +318,15 @@ fn row_group_may_overlap(
             continue;
         };
         let (lower, upper) = stats_bounds(data_type, stats);
-        if let Some(upper) = upper {
-            if batch_lower[i].compare(&upper) == Ordering::Greater {
-                return false;
-            }
+        if let Some(upper) = upper
+            && batch_lower[i].compare(&upper) == Ordering::Greater
+        {
+            return false;
         }
-        if let Some(lower) = lower {
-            if batch_upper[i].compare(&lower) == Ordering::Less {
-                return false;
-            }
+        if let Some(lower) = lower
+            && batch_upper[i].compare(&lower) == Ordering::Less
+        {
+            return false;
         }
     }
     true

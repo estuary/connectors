@@ -1,5 +1,4 @@
-use super::*;
-use std::sync::Arc;
+#![allow(dead_code, unused_imports)]
 
 use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;

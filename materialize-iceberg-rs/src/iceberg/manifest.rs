@@ -231,7 +231,7 @@ async fn upload_manifest(
         .await
         .context("uploading manifest file")?;
 
-    Ok((catalog.uri(&path.to_string()), length))
+    Ok((catalog.uri(path.as_ref()), length))
 }
 
 /// Downloads and decodes a manifest file, returning its entries.
