@@ -82,6 +82,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `CONDUCT-GREP-BEFORE-CITE` | conduct | Grep for remembered symbols before recommending them |
 | `CONDUCT-ESTABLISH-BASELINE` | conduct | Baseline suite in background at session start; gate the first edit on it |
 | `CONDUCT-VERIFY-FIRST` | conduct | Live behavior over docs over recall |
+| `CONDUCT-END-TURN-WITH-ASK` | conduct | A background session ends every turn saying what it needs from the user, with absolute paths |
 
 ### Work mode — [`work-mode.md`](work-mode.md)
 

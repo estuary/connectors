@@ -1,6 +1,6 @@
-# Dispatching and monitoring stream-builders
+# Dispatching and monitoring background sessions
 
-Reference for `create-capture-connector` Phase 5.
+Reference for `create-capture-connector` Phase 5 (stream-builders) and Phase 7 (coders).
 
 ## The command
 
@@ -44,3 +44,21 @@ Phase 5 ends when every dispatched session is finished, or `failed` and either r
 Report orchestrator actions: a re-dispatch, a collected plan, an integration step, or a blocker the peek panel cannot show (an infrastructure outage, a hook denial). The user watches the sessions themselves in `claude agents`; human-in-the-loop users answer each session's plan-review gate there, and in autonomous mode there is nothing for them to answer.
 
 A blocked session's questions belong to its panel, with their options and context. When a session blocks, including after you send review findings back to a planner, say "`<session name>`'s panel has N decisions for you" and stop. The user answers there; the planner records the answers. Your part ends at naming the panel: the options, any recommendation and the answers all stay in it.
+
+## Coders
+
+```bash
+claude --bg --name "source-$1-code-<cluster>" --agent coder "<brief>"
+```
+
+No `--worktree`: the coder works in your checkout, on top of the code earlier coders left.
+
+The brief, everything coder's "What you receive" section lists:
+
+- connector `source-$1`, package `$PKG`;
+- the plan's absolute path and the streams in scope;
+- the landed code to reuse by name (models, helpers, resource templates earlier coders added), and where HEAD has moved since the plan was written;
+- the plan's acceptance checks: what the preview must show for each new stream;
+- `work mode: human-in-the-loop|autonomous`.
+
+The coder is finished once `~/.claude/jobs/<short-id>/tmp/handoff.md` exists and its final message names it; the same `state` caveats as above apply.

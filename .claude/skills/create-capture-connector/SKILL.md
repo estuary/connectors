@@ -2,17 +2,17 @@
 name: create-capture-connector
 description: Build a new multi-stream estuary-cdk pull capture connector end to end, from a stream list to a release-ready branch. Use for a brand-new `source-*`; `add-stream` extends an existing one.
 argument-hint: "[connector-name] [--autonomous|--human-in-the-loop] [stream-name...]"
-allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch Skill Agent AskUserQuestion
+allowed-tools: Bash Read Write Edit Glob Grep WebFetch WebSearch Skill Agent AskUserQuestion SendMessage
 ---
 
-Build `source-$1` covering the streams the user listed. You are the **orchestrator**: you cluster the streams, stand up the skeleton and auth, dispatch one background **`stream-builder`** session per cluster to plan, and integrate the plans serially. You hold dispatch authority and own every connector-code edit; stream-builders only plan.
+Build `source-$1` covering the streams the user listed. You are the **orchestrator**: you cluster the streams, stand up the skeleton and auth, dispatch one background **`stream-builder`** session per cluster to plan, and integrate the plans serially through one background **`coder`** session per plan. You hold dispatch authority and own integration: stream-builders only plan, coders only implement the plan they are given.
 
 ## Operating principles
 
 - **Delegate the verbose work.** Scaffolding and per-cluster research run in subagents; you consume their structured summaries and keep your own context a coordination log.
 - **Every user ask is a `GATE-*`** in [`work-mode.md`](../../shared/work-mode.md). Resolve the mode in Phase 0 and forward it in every dispatch (`CONDUCT-FORWARD-MODE`). Autonomous mode interrupts the user once, at Phase 4; every other gate resolves per the table and lands in the ledger.
 - **One barrier.** Skeleton, auth wiring and the user's encrypted `config.yaml` are committed before any stream-builder runs.
-- **Parallel plans, serial integration.** Clusters plan concurrently in their own worktrees; you integrate one cluster at a time into the shared files, so nothing writes concurrently.
+- **Parallel plans, serial integration.** Clusters plan concurrently in their own worktrees; coders implement one plan at a time in your checkout.
 - **Stream-builders escalate; you dispatch.** A `SPLIT RECOMMENDATION` is a request; you decide whether to dispatch for it.
 - Pull streams only. Webhook streams route to `create-webhook-connector` (Phase 7).
 
@@ -53,7 +53,7 @@ Resolve per the gate table; in autonomous mode this is the batched checkpoint, c
 
 One background session per cluster; the command, brief contents, monitoring cadence and chat policy are in [`dispatch.md`](dispatch.md). Handle a `SPLIT RECOMMENDATION` by dispatching a fresh stream-builder for the split-off streams.
 
-Phase 5 ends when every session is `done` with a finalized plan, or `failed` and re-dispatched or ledgered.
+Phase 5 ends when every session is finished (`dispatch.md` § Monitoring), or `failed` and re-dispatched or ledgered.
 
 ## Phase 6 — Collect plans
 
@@ -65,12 +65,14 @@ A **PENDING** plan is expected in a docs-only run: integrate it and carry its fi
 
 ## Phase 7 — Serial integration
 
-The plan replaces `add-stream`'s Phases 0–3 (the baseline suite has nothing to baseline yet, and `GATE-STREAM-DESIGN` was settled at `GATE-PLAN-REVIEW`), and this skill owns its Phases 6–7. One cluster at a time:
+The plan replaces `add-stream`'s Phases 0–3 (the baseline suite has nothing to baseline yet, and `GATE-STREAM-DESIGN` was settled at `GATE-PLAN-REVIEW`), and this skill owns its Phases 6–7. One plan at a time:
 
-- For each stream, run `add-stream` **Phases 4, 5 and 5.5 only**, implementing from the plan's design and citing its reference `file:line`. Implement the cluster polymorphically as the plan specifies: one parametrized fetch and model, not N copies.
-- `child-entities` where the plan flags a parent/child relationship.
+- Merge the plan's `bruno/` copy into `source-$1/bruno/`, so the coder sees its requests.
+- Dispatch a `coder` session for the plan (command and brief in [`dispatch.md`](dispatch.md) § Coders). It runs `add-stream` Phases 4, 5 and 5.5 in your checkout and writes a hand-off file.
+- When it finishes, review its diff against the plan, and dispatch `pr-review-toolkit:code-reviewer` over the diff, telling it to read `.claude/shared/rules-index.md` first. Send what needs fixing to the coder (`SendMessage`) and re-review until both are clean.
 - Webhook-classified streams bypass `add-stream`; wire them per `create-webhook-connector` Phase 3.
-- Merge the session's `bruno/` copy into `source-$1/bruno/`.
+
+The next coder starts only after the previous plan's diff is clean: it builds on that code.
 
 Done when every stream in every plan is registered, `basedpyright` is clean per Phase 5.5, and `uv run --group dev flowctl raw spec` passes. Then dispatch the `regenerate-flow-discovery` agent once, with the Phase 1 budget verdict, to land generated schemas and snapshots for the full stream set. In a docs-only run tell it there are no credentials: the scaffold's opt-in `test_capture` stays absent, so it refreshes the spec and discover snapshots only.
 
