@@ -99,14 +99,6 @@ python3 -c "import yaml" 2>/dev/null || {
   echo "PyYAML required: pip3 install pyyaml" >&2; exit 2;
 }
 
-# A connector's local stack may need environment of its own, such as an
-# emulator address for client libraries.
-if [[ -f "$BENCH_DIR/setup/${CONNECTOR}.env" ]]; then
-  set -o allexport
-  source "$BENCH_DIR/setup/${CONNECTOR}.env"
-  set +o allexport
-fi
-
 # Resolve config: explicit, then config.local.yaml, then config.yaml.
 if [[ -z "$CONFIG" ]]; then
   for cand in \
