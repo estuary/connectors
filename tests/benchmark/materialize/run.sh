@@ -176,9 +176,15 @@ for cand in \
 do
   if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
 done
+# setup/<connector>.compose.yaml, when present, sizes the integration-test stack
+# for benchmark loads.
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+if [[ -f "$BENCH_DIR/setup/${CONNECTOR}.compose.yaml" ]]; then
+  COMPOSE_ARGS+=(-f "$BENCH_DIR/setup/${CONNECTOR}.compose.yaml")
+fi
 if [[ -n "$COMPOSE_FILE" ]]; then
-  echo "starting docker-compose: $COMPOSE_FILE"
-  docker compose -f "$COMPOSE_FILE" up --wait
+  echo "starting docker-compose: ${COMPOSE_ARGS[*]}"
+  docker compose "${COMPOSE_ARGS[@]}" up --wait
   # Same grace period as tests/materialize/<connector>/setup.sh.
   sleep 5
 else
@@ -224,7 +230,7 @@ cleanup() {
     sweep_run
     if [[ -n "$COMPOSE_FILE" ]]; then
       echo "tearing down docker-compose"
-      docker compose -f "$COMPOSE_FILE" down -v || true
+      docker compose "${COMPOSE_ARGS[@]}" down -v || true
     fi
   fi
   return $status
