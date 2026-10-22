@@ -147,7 +147,7 @@ Copy the `authUrlTemplate`/`accessTokenBody` mustache shapes from the closest re
 ## Phase 5 — Smoke test
 
 ```bash
-uv run --group dev flowctl raw spec --source test.flow.yaml -o json --emit-raw
+uv run --group dev flowctl raw spec --source test.flow.yaml -o json
 ```
 
 Confirm the emitted `configSchema` shows the credential option(s) with the right titles and `secret` annotations, and that an `oauth2` block is present iff you defined one. `flowctl raw discover` should still succeed with zero bindings. Do not run `validate` or `preview` (no real creds; live auth is `bruno-probe-endpoint`'s job). Fix any Pydantic/import error before handing off — `for_provider` and `TYPE_CHECKING` mistakes surface here.
