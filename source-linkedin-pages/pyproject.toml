@@ -7,14 +7,16 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "estuary-cdk",
     # The vendored Airbyte CDK is pydantic v1 code; see estuary-cdk/vendor/README.md.
-    "estuary-cdk[airbyte-shim]",
+    "estuary-cdk-airbyte-shim",
 ]
 
 # The dependency is declared in [project.dependencies] above; this is where
 # uv finds it.
 [tool.uv.sources]
 estuary-cdk = { workspace = true }
+estuary-cdk-airbyte-shim = { workspace = true }
 
 [build-system]
 requires = ["hatchling==1.27.0"]

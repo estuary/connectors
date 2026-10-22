@@ -5,6 +5,7 @@ requires-python = "==3.14.*"
 [manifest]
 members = [
     "estuary-cdk",
+    "estuary-cdk-airbyte-shim",
     "source-ada",
     "source-aircall-native",
     "source-airtable",
@@ -558,16 +559,9 @@ dependencies = [
     { name = "xxhash" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 airbyte-shim = [
-    { name = "backoff" },
-    { name = "dpath" },
-    { name = "jsonref" },
-    { name = "jsonschema" },
-    { name = "pendulum" },
-    { name = "pyyaml" },
-    { name = "requests" },
-    { name = "requests-cache" },
+    { name = "estuary-cdk-airbyte-shim" },
 ]
 
 [package.metadata]
@@ -575,24 +569,47 @@ requires-dist = [
     { name = "aiocsv", specifier = ">=1.3.2,<2.0.0" },
     { name = "aiodns", specifier = ">=4.0.4,<5.0.0" },
     { name = "aiohttp", specifier = ">=3.14.3,<4.0.0" },
-    { name = "backoff", marker = "extra == 'airbyte-shim'" },
-    { name = "dpath", marker = "extra == 'airbyte-shim'", specifier = ">=2.1,<3.0" },
     { name = "google-auth", extras = ["requests"], specifier = ">=2.40.3" },
     { name = "ijson", specifier = ">=3.3.0,<4.0.0" },
-    { name = "jsonref", marker = "extra == 'airbyte-shim'", specifier = ">=1.1,<2.0" },
-    { name = "jsonschema", marker = "extra == 'airbyte-shim'", specifier = ">=4,<5" },
     { name = "orjson", specifier = ">=3.11.6,<4.0.0" },
-    { name = "pendulum", marker = "extra == 'airbyte-shim'", specifier = ">=3,<4" },
     { name = "pycron", specifier = ">=3.1.2,<4.0.0" },
     { name = "pydantic", specifier = ">=2.12,<3" },
-    { name = "pyyaml", marker = "extra == 'airbyte-shim'", specifier = ">=6.0.1" },
-    { name = "requests", marker = "extra == 'airbyte-shim'" },
-    { name = "requests-cache", marker = "extra == 'airbyte-shim'" },
     { name = "stream-unzip", specifier = "==0.0.101" },
     { name = "typing-extensions", specifier = ">=4.13,<5.0" },
     { name = "xxhash", specifier = ">=4.0.2,<5.0.0" },
 ]
-provides-extras = ["airbyte-shim"]
+
+[package.metadata.requires-dev]
+airbyte-shim = [{ name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" }]
+
+[[package]]
+name = "estuary-cdk-airbyte-shim"
+version = "0.0.0"
+source = { editable = "estuary-cdk/vendor" }
+dependencies = [
+    { name = "backoff" },
+    { name = "dpath" },
+    { name = "jsonref" },
+    { name = "jsonschema" },
+    { name = "pendulum" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "requests-cache" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "backoff" },
+    { name = "dpath", specifier = ">=2.1,<3.0" },
+    { name = "jsonref", specifier = ">=1.1,<2.0" },
+    { name = "jsonschema", specifier = ">=4,<5" },
+    { name = "pendulum", specifier = ">=3,<4" },
+    { name = "pydantic", specifier = ">=2.12,<3" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "requests" },
+    { name = "requests-cache" },
+]
 
 [[package]]
 name = "freezegun"
@@ -1714,13 +1731,15 @@ name = "source-airtable"
 version = "0.1.0"
 source = { editable = "source-airtable" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "types-requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
 ]
 
@@ -1780,13 +1799,15 @@ name = "source-asana"
 version = "0.1.0"
 source = { editable = "source-asana" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "types-requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
 ]
 
@@ -2071,7 +2092,8 @@ version = "0.1.0"
 source = { editable = "source-google-ads" }
 dependencies = [
     { name = "aiohttp" },
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "freezegun" },
     { name = "google-ads" },
     { name = "protobuf" },
@@ -2084,7 +2106,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.11" },
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "freezegun", specifier = ">=1.4.0,<2.0.0" },
     { name = "google-ads", specifier = ">=31.2.0,<32.0.0" },
     { name = "protobuf", specifier = ">=5.29.5" },
@@ -2161,13 +2184,15 @@ name = "source-hubspot"
 version = "0.1.0"
 source = { editable = "source-hubspot" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "types-requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
 ]
 
@@ -2236,11 +2261,15 @@ name = "source-iterable"
 version = "0.1.0"
 source = { editable = "source-iterable" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" }]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
+]
 
 [[package]]
 name = "source-iterable-native"
@@ -2277,7 +2306,8 @@ name = "source-jira-legacy"
 version = "0.1.0"
 source = { editable = "source-jira-legacy" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "pycares" },
     { name = "pydantic" },
     { name = "requests" },
@@ -2288,7 +2318,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "pycares", specifier = ">=4.9.0" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "requests", specifier = ">=2.32.4" },
@@ -2317,13 +2348,15 @@ name = "source-klaviyo"
 version = "0.1.0"
 source = { editable = "source-klaviyo" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]
 
@@ -2363,7 +2396,8 @@ version = "0.1.0"
 source = { editable = "source-linkedin-ads-v2" }
 dependencies = [
     { name = "aiohttp" },
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "pycares" },
     { name = "types-requests" },
     { name = "urllib3" },
@@ -2372,7 +2406,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.0" },
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "pycares", specifier = ">=4.9.0" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
     { name = "urllib3", specifier = ">=2.2.2" },
@@ -2383,11 +2418,15 @@ name = "source-linkedin-pages"
 version = "0.1.0"
 source = { editable = "source-linkedin-pages" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" }]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
+]
 
 [[package]]
 name = "source-looker"
@@ -2424,11 +2463,15 @@ name = "source-mixpanel-native"
 version = "0.1.0"
 source = { editable = "source-mixpanel-native" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" }]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
+]
 
 [[package]]
 name = "source-monday"
@@ -2465,14 +2508,16 @@ name = "source-notion"
 version = "0.1.0"
 source = { editable = "source-notion" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "pydantic" },
     { name = "types-requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
 ]
@@ -2574,13 +2619,15 @@ name = "source-recharge"
 version = "0.1.0"
 source = { editable = "source-recharge" }
 dependencies = [
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "types-requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "types-requests", specifier = ">=2.31,<3.0" },
 ]
 
@@ -2706,7 +2753,8 @@ source = { editable = "source-twilio" }
 dependencies = [
     { name = "certifi" },
     { name = "cryptography" },
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "peewee" },
     { name = "pendulum" },
     { name = "requests" },
@@ -2717,7 +2765,8 @@ dependencies = [
 requires-dist = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "cryptography", specifier = ">=50.0.0" },
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "peewee", specifier = ">=3.17.1" },
     { name = "pendulum", specifier = ">=3.0.0,<4.0.0" },
     { name = "requests", specifier = ">=2.32.4" },
@@ -2730,7 +2779,8 @@ version = "0.1.0"
 source = { editable = "source-zendesk-support" }
 dependencies = [
     { name = "aiohttp" },
-    { name = "estuary-cdk", extra = ["airbyte-shim"] },
+    { name = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim" },
     { name = "pytz" },
     { name = "requests" },
     { name = "requests-futures" },
@@ -2740,7 +2790,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.4,<4.0.0" },
-    { name = "estuary-cdk", extras = ["airbyte-shim"], editable = "estuary-cdk" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "estuary-cdk-airbyte-shim", editable = "estuary-cdk/vendor" },
     { name = "pytz", specifier = ">=2026.5,<2027.0" },
     { name = "requests", specifier = ">=2.33.0,<3.0.0" },
     { name = "requests-futures", specifier = ">=1.0.1,<2.0.0" },
