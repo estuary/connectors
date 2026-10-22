@@ -1,0 +1,120 @@
+[package]
+name = "materialize-iceberg-rs"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+
+[lib]
+doctest = false
+
+[dependencies.proto-flow]
+git = "https://github.com/estuary/flow"
+rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce"
+default-features = false
+
+[dependencies.tuple]
+git = "https://github.com/estuary/flow"
+rev = "8898a170a1cc979711b2efc0ed35c25b81ade1ce"
+default-features = false
+
+[dependencies.anyhow]
+version = "1.0"
+default-features = false
+
+[dependencies.apache-avro]
+version = "0.22.0"
+default-features = false
+
+[dependencies.arrow]
+version = "60.0.0"
+default-features = false
+
+[dependencies.axum]
+version = "0.8"
+default-features = false
+features = ["json", "tokio", "http1"]
+
+[dependencies.bytes]
+version = "1.11"
+default-features = false
+
+[dependencies.futures]
+version = "0.3"
+default-features = false
+features = ["std"]
+
+[dependencies.object_store]
+version = "0.14.2"
+default-features = false
+features = ["aws", "gcp"]
+
+[dependencies.parquet]
+version = "60.0.0"
+default-features = false
+features = ["arrow", "object_store"]
+
+[dependencies.prost]
+version = "0.14"
+default-features = false
+
+[dependencies.reqwest]
+version = "0.13"
+default-features = false
+features = ["json"]
+
+[dependencies.schemars]
+version = "1.2"
+default-features = false
+
+[dependencies.serde]
+version = "1.0"
+default-features = false
+features = ["derive"]
+
+[dependencies.serde_bytes]
+version = "0.11"
+
+[dependencies.serde_json]
+version = "1.0"
+default-features = false
+
+[dependencies.tokio]
+version = "1"
+default-features = false
+features = ["rt-multi-thread", "net"]
+
+[dependencies.tracing]
+version = "0.1"
+default-features = false
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+default-features = false
+features = ["std", "fmt", "json", "env-filter", "time"]
+
+[dependencies.uuid]
+version = "1.26.1"
+default-features = false
+features = ["v4"]
+
+[dev-dependencies.aws-config]
+version = "1.12.0"
+default-features = false
+features = ["rt-tokio", "default-https-client"]
+
+[dev-dependencies.aws-sdk-s3]
+version = "1.149.0"
+default-features = false
+features = ["rt-tokio", "http-1x", "default-https-client"]
+
+[dev-dependencies.insta]
+version = "1"
+default-features = false
+
+[dev-dependencies.parquet]
+version = "60.0.0"
+default-features = false
+features = ["json"]
+
+[dev-dependencies.serde_yaml]
+version = "0"
