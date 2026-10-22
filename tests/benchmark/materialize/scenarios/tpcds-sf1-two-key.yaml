@@ -1,0 +1,9 @@
+# tpcds-sf1.yaml without inventory, the one table keyed on three columns, for
+# destinations whose keys take at most two (DynamoDB's partition and sort key).
+tpcds:
+  scale: 1
+  transaction_size: 1GB
+  tables: [call_center, catalog_page, catalog_returns, catalog_sales, customer,
+           customer_address, customer_demographics, date_dim, household_demographics,
+           income_band, item, promotion, reason, ship_mode, store, store_returns,
+           store_sales, time_dim, warehouse, web_page, web_returns, web_sales, web_site]
