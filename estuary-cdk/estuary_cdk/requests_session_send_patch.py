@@ -13,4 +13,4 @@ def send(*args: Any, **kwargs: Any):
 
     return lib_send(*args, **kwargs)
 
-setattr(requests.Session, "send", send)
+requests.Session.send = send

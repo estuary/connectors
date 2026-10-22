@@ -18,7 +18,9 @@ async def _yield_until_pending(transactor: Transactor, expected: int) -> None:
     """Spin the event loop until `expected` slots are pending, or fail."""
 
     async def wait() -> None:
-        while (
+        # sleep(0) yields to the loop so queued tasks can run; there is no
+        # event to wait on, which is what ASYNC110 would have us use.
+        while (  # noqa: ASYNC110
             len(transactor._pending) < expected  # pyright: ignore[reportPrivateUsage]
         ):
             await asyncio.sleep(0)
