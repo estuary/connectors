@@ -4,12 +4,6 @@ How to run a connector session. Rules tagged `conduct-only` leave no trace in a 
 
 ---
 
-### `CONDUCT-TODO-LIST` · conduct-only
-
-Open the session with a TODO list: one task per phase of whatever skill you're running, plus any provider-specific work that comes up.
-
----
-
 ### `CONDUCT-CONSENT-DESTRUCTIVE` · conduct-only
 
 Ask the user for consent before any destructive operation — deleting generated files or directories, rewriting bindings, mutating provider state.

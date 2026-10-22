@@ -21,7 +21,6 @@ Build `source-$1` covering the streams the user listed. You are the **orchestrat
 - **Resolve the work mode** per `work-mode.md` § Resolving the mode: a flag in the prompt answers the mode question; the questionnaire always asks the seeding question. Record both: `python3 .claude/scripts/permissions.py set source-$1 --mode <m> --seeding <s>` (`CONDUCT-PERMISSIONS-FILE`).
 - Read the connector name and the **stream list**: the remaining positional arguments, or names in the prompt's prose. Missing or vague → `GATE-STREAM-LIST`.
 - Confirm `source-$1` does not exist (`ls source-$1`). If it does, stop: this is a creation skill.
-- Open the TODO list (`CONDUCT-TODO-LIST`): one item per phase, plus one per cluster once Phase 1 settles them.
 
 ## Phase 1 — Research & cluster
 

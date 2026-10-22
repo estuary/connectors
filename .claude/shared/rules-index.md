@@ -74,7 +74,6 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 
 | Rule | Check | Statement |
 | ---- | ----- | --------- |
-| `CONDUCT-TODO-LIST` | conduct | Open with a TODO list, one task per phase |
 | `CONDUCT-CONSENT-DESTRUCTIVE` | conduct | Consent before destructive ops |
 | `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY` | conduct | Push/PR always need confirmation; a purely formatting- or snapshot-only commit doesn't |
 | `CONDUCT-STATE-CONVENTIONS` | conduct | Say when you follow a convention, and when you deviate |
