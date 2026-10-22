@@ -110,6 +110,14 @@ installs a `distutils` shim. Since `streams/core.py` imports that module, losing
 have broken every shim connector at import time, not just boolean coercion — and relaxing the
 `jsonschema` ceiling would have lost it. `strtobool` is now carried in the module itself.
 
+## HTTP timeout
+
+Upstream passes no timeout to `requests`, which has no default of its own, so an idle connection
+can hang a capture indefinitely. `airbyte_cdk/__init__.py` patches `requests.Session.send` to
+fill in a two-hour timeout whenever the caller passes none. The patch covers `requests.Session`
+as a whole, not just `HttpStream._send`, because several connectors call `requests` directly.
+Since it sits in the package's `__init__.py`, importing any part of `airbyte_cdk` applies it.
+
 ## Modifying this tree
 
 This is a fork, not a mirror: edit it in place. It is not re-synced from upstream, and no new

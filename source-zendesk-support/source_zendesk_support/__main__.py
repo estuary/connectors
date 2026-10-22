@@ -1,5 +1,3 @@
-import estuary_cdk.requests_session_send_patch # Must be first.
-
 import asyncio
 import json
 
