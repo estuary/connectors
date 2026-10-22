@@ -14,7 +14,6 @@ on:
       - "docs/**"
       - ".claude/**"
       - ".github/workflows/python.yaml"
-      - ".github/workflows/estuary-cdk.yaml"
       - ".github/workflows/python-auto-rerun.yaml"
 
   pull_request:

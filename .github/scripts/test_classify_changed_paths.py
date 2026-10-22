@@ -108,11 +108,6 @@ class TestLanes(unittest.TestCase):
         # has to run the Python workflow as editing the matrix did.
         self.assertEqual(classify(".github/python-connectors.yaml"), (True, False, ALL))
 
-    def test_estuary_cdk_workflow_triggers_neither_connector_lane(self):
-        self.assertEqual(
-            classify(".github/workflows/estuary-cdk.yaml"), (False, False, [])
-        )
-
     def test_python_auto_rerun_workflow_triggers_neither_connector_lane(self):
         self.assertEqual(
             classify(".github/workflows/python-auto-rerun.yaml"), (False, False, [])

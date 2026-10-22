@@ -128,7 +128,7 @@ exclude = ["**/.venv", "**/__pycache__", "estuary-cdk/vendor"]
 # below would have to be kept in sync by hand -- and pyright picks its config
 # from the invocation directory, not the path argument, so `pyright
 # estuary-cdk/estuary_cdk` from the repo root would read this file anyway. The
-# 3.11 guarantee is carried by estuary-cdk.yaml's supported-Pythons job, which
+# 3.11 guarantee is carried by python.yaml's supported-Pythons job, which
 # compiles and tests on a real 3.11 interpreter.
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
