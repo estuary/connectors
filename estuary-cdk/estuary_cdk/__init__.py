@@ -174,3 +174,4 @@ class BaseConnector(Generic[Request], abc.ABC):
 
     async def exit(self, log: FlowLogger):
         return  # no-op default
+# tmp: CI selection test
