@@ -46,6 +46,23 @@ def cdk(*paths: str) -> bool:
     return verdict["cdk"] == "true"
 
 
+def verdict(*paths: str) -> dict[str, str]:
+    """Run the classifier, returning its raw verdict lines as a dict."""
+    stdin = "\n".join(paths) + "\n"
+    proc = subprocess.run(
+        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True
+    )
+    return dict(
+        line.split("=", 1) for line in proc.stdout.strip().splitlines() if "=" in line
+    )
+
+
+def rust(*paths: str) -> str | list[str]:
+    """Run the classifier, returning rust_connectors."""
+    connectors = verdict(*paths)["rust_connectors"]
+    return connectors if connectors == ALL else json.loads(connectors)
+
+
 class TestLanes(unittest.TestCase):
     def test_python_connector_is_python_only(self):
         self.assertEqual(
@@ -243,6 +260,74 @@ class TestCdk(unittest.TestCase):
 
     def test_empty_input_skips_cdk_checks(self):
         self.assertFalse(cdk())
+
+
+class TestRustConnectors(unittest.TestCase):
+    def test_rust_connector_builds_only_itself(self):
+        self.assertEqual(rust("source-kafka/src/main.rs"), ["source-kafka"])
+        self.assertEqual(rust("materialize-kafka/Cargo.toml"), ["materialize-kafka"])
+
+    def test_two_rust_connectors(self):
+        self.assertEqual(
+            rust("source-kafka/src/main.rs", "source-http-ingest/VERSION"),
+            ["source-http-ingest", "source-kafka"],
+        )
+
+    def test_go_code_builds_no_rust_connector(self):
+        for path in [
+            "sqlcapture/backfill.go",
+            "source-postgres/main.go",
+            "source-mysql/docker-compose.yaml",
+            "go.mod",
+            "go.sum",
+            "scripts/bulk-publish/main.go",
+            "materialize-iceberg/python/foo.py",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), [])
+
+    def test_bson_transcoder_builds_no_rust_connector(self):
+        # A Rust crate, but only the Go source-mongodb image builds it.
+        self.assertEqual(rust("bson-transcoder/src/main.rs"), [])
+
+    def test_python_and_docs_build_no_rust_connector(self):
+        for path in ["source-sentry/api.py", "estuary-cdk/estuary_cdk/http.py", "docs/x.md"]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), [])
+
+    def test_shared_materialization_tests_build_materialize_kafka(self):
+        self.assertEqual(rust("tests/materialize/run.sh"), ["materialize-kafka"])
+
+    def test_other_test_tooling_builds_every_rust_connector(self):
+        self.assertEqual(rust("tests/smoke.sh"), ALL)
+
+    def test_shared_inputs_build_every_rust_connector(self):
+        for path in [
+            "base-image/Dockerfile",
+            ".github/workflows/rust.yaml",
+            ".github/rust-connectors.yaml",
+            ".github/actions/deploy/action.yaml",
+            "connector-variant.Dockerfile",
+            ".dockerignore",
+            "fetch-flow.sh",
+            ".github/scripts/classify-changed-paths.sh",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), ALL)
+
+    def test_other_ci_files_build_no_rust_connector(self):
+        for path in [
+            ".github/workflows/go.yaml",
+            ".github/workflows/delayed-tag.yaml",
+            ".github/scripts/delayed_tag.py",
+            ".github/go-connectors.yaml",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), [])
+
+    def test_unrecognised_path_builds_every_rust_connector(self):
+        # When in doubt, build.
+        self.assertEqual(rust("build-local.sh"), ALL)
 
 
 class TestRobustness(unittest.TestCase):

@@ -119,5 +119,30 @@ class TestConnectorLists(unittest.TestCase):
         self.assertEqual(duplicates(everything), [])
 
 
+def copy_sources(dockerfile: Path) -> list[str]:
+    """The paths a Dockerfile copies from the build context."""
+    sources = []
+    for line in dockerfile.read_text().splitlines():
+        words = line.split()
+        if not words or words[0] not in ("COPY", "ADD"):
+            continue
+        if any(w.startswith("--from") for w in words):
+            continue
+        sources += [w for w in words[1:-1] if not w.startswith("--")]
+    return sources
+
+
+class TestDockerfileInputs(unittest.TestCase):
+    """Every input a connector's image copies must be one the classifier
+    connects to that connector, or a change to it would build nothing."""
+
+    def test_rust_images_copy_only_their_own_directory(self):
+        # The classifier's Rust rules assume it.
+        for name in names(RUST_LIST):
+            for source in copy_sources(REPO_ROOT / name / "Dockerfile"):
+                with self.subTest(connector=name, source=source):
+                    self.assertEqual(source.split("/")[0], name)
+
+
 if __name__ == "__main__":
     unittest.main()
