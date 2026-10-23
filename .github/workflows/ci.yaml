@@ -52,61 +52,16 @@ jobs:
     if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     outputs:
-      # PRs from dependabot don't have access to repository secrets and cannot
-      # push new images.  In that case dependant jobs should use the existing
-      # tagged base-image instead of the base-image built in this job.
-      tag: ${{ github.actor == 'dependabot[bot]' && steps.prep.outputs.version || steps.prep.outputs.tag }}
+      tag: ${{ steps.base_image.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Prepare
-        id: prep
-        run: |
-          TAG=$(echo $GITHUB_SHA | head -c7)
-          echo ::set-output name=tag::${TAG}
-          VERSION=$(cat base-image/VERSION | tr -d '\n')
-          echo ::set-output name=version::${VERSION}
-
-      - name: Login to GitHub package docker registry
-        uses: docker/login-action@v4
+      - id: base_image
+        uses: ./.github/actions/build-base-image
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          driver-opts: |
-            network=host
-
-      - name: Build base-image Docker Image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: base-image/Dockerfile
-          load: true
-          tags: ghcr.io/estuary/base-image:local
-
-      - name: Push base-image image
-        if: ${{ github.actor != 'dependabot[bot]' }}
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: base-image/Dockerfile
-          push: true
-          tags: ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
-
-      - name: Push base-image image with 'dev' tag
-        if: github.event_name == 'push'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: base-image/Dockerfile
-          push: true # See 'if' above
-          tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   build_connectors:
     runs-on: ubuntu-24.04
