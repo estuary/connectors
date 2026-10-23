@@ -115,9 +115,9 @@ class TestLanes(unittest.TestCase):
     def test_rust_connector_list_is_go_rust_only(self):
         self.assertEqual(classify(".github/rust-connectors.yaml"), (False, True, []))
 
-    def test_python_auto_rerun_workflow_triggers_neither_connector_lane(self):
+    def test_auto_rerun_workflow_triggers_neither_connector_lane(self):
         self.assertEqual(
-            classify(".github/workflows/python-auto-rerun.yaml"), (False, False, [])
+            classify(".github/workflows/connectors-auto-rerun.yaml"), (False, False, [])
         )
 
     def test_ruff_config_triggers_neither_connector_lane(self):

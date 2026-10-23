@@ -1,16 +1,16 @@
-name: Python Connectors auto-rerun
+name: Connectors auto-rerun
 
-# Python connectors only deploy when a change touches them, so a run on main
-# that fails for a transient reason (a test flake, a runner problem) leaves its
-# connectors on their old images until someone re-runs it. This re-runs the
-# failed jobs once, when the first attempt fails. A second failure is left for
-# a person.
+# A connector workflow run on main that fails for a transient reason (a test
+# flake, a runner problem) leaves the connectors it would have deployed on their
+# old images, and a connector a change touched isn't deployed again until it
+# next changes or the nightly run. This re-runs the failed jobs once, when the
+# first attempt fails. A second failure is left for a person.
 #
 # A rerun that lands after a newer deploy of the same connector can't move its
 # `dev` or version tag back: the deploy action only moves them forward.
 on:
   workflow_run:
-    workflows: [Python Connectors]
+    workflows: [Python Connectors, Go Connectors, Rust Connectors]
     types: [completed]
     # Filters on the run's head branch, so PR runs don't start this workflow
     # at all instead of showing up as skipped runs.

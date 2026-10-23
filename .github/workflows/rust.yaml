@@ -14,7 +14,7 @@ on:
       - "docs/**"
       - ".claude/**"
       - ".github/workflows/python.yaml"
-      - ".github/workflows/python-auto-rerun.yaml"
+      - ".github/workflows/connectors-auto-rerun.yaml"
 
   pull_request:
     branches: [main]
