@@ -8,7 +8,7 @@ on:
     branches: [main]
 
   pull_request:
-    branches: [main]
+    branches: [main, steven/tmp-ci-consistent-base]
 
   # Push runs only build the connectors a change touches, so a deploy that
   # failed, or a queued run a newer push replaced, stays missed until the
