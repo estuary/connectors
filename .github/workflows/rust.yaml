@@ -56,7 +56,7 @@ jobs:
       - name: Fetch Flow binaries
         uses: ./.github/actions/fetch-flow-artifact
 
-  # ci.yaml moves base-image's `dev` and version tags; this workflow only
+  # go.yaml moves base-image's `dev` and version tags; this workflow only
   # pushes the SHA tag its own connectors build on.
   build_base_image:
     needs: classify_changes
