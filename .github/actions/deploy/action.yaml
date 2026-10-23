@@ -20,6 +20,14 @@ inputs:
     description: Space-separated variant image names of this connector.
     default: ''
     required: false
+  name_variants:
+    description: >-
+      Whether to set CONNECTOR_NAME to each variant's own name, which Go and
+      Rust connectors read to identify themselves in log lines. Python images
+      run the module CONNECTOR_NAME names, so they keep the name their base
+      image sets.
+    default: "false"
+    required: false
 
 runs:
   using: "composite"
@@ -30,9 +38,14 @@ runs:
       run: |
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
           echo "Building and pushing ${VARIANT}:${{ inputs.tag }}...";
+          NAME_ARG=()
+          if [ "${{ inputs.name_variants }}" = true ]; then
+            NAME_ARG=(--build-arg "CONNECTOR_NAME=${VARIANT}")
+          fi
           docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local \
                        --label org.opencontainers.image.revision=${{ github.sha }} \
                        --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                       "${NAME_ARG[@]}" \
                        --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
                        --file connector-variant.Dockerfile .;
           bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};

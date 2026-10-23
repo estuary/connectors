@@ -109,7 +109,7 @@ jobs:
           echo ::set-output name=tag::${TAG}
           VERSION=$(cat ${{ matrix.connector.name }}/VERSION | tr -d '\n')
           echo ::set-output name=version::${VERSION}
-          VARIANTS="${{ matrix.connector.name }} $(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
+          VARIANTS="$(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
       - name: Restore Flow binaries
@@ -225,60 +225,13 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Push ${{ matrix.connector.name }} image(s) with commit SHA tag
-        run: |
-          for VARIANT in ${{ steps.prep.outputs.variants }}; do
-            echo "Building and pushing ${VARIANT}:${{ steps.prep.outputs.tag }}...";
-            docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector.name }}:local \
-                         --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
-                         --build-arg CONNECTOR_NAME=${VARIANT} \
-                         --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
-                         --label org.opencontainers.image.revision=$GITHUB_SHA \
-                         --file connector-variant.Dockerfile .;
-            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }};
-          done
-
-      - name: Push ${{ matrix.connector.name }} image(s) with 'dev' and '${{ steps.prep.outputs.version }}' tags
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          for VARIANT in ${{ steps.prep.outputs.variants }}; do
-            docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:dev;
-            docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
-            docker image push ghcr.io/estuary/${VARIANT}:dev;
-            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
-          done
-
-      - uses: dorny/paths-filter@v2
-        id: filter
+      - name: Deployment
+        uses: ./.github/actions/deploy
         with:
-          filters: |
-            connector:
-              - "${{ matrix.connector.name }}/**"
-
-      # Re-queue connector tag publishing over PostgREST (HTTPS) instead of a direct
-      # psql connection from CI.
-      - name: Re-queue connector tags for ${{ matrix.connector.name }}
-        if: github.event_name == 'push' && steps.filter.outputs.connector == 'true'
-        env:
-          RT_ID: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
-          RT_SECRET: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
-        run: |
-          set -euo pipefail
-          SUPABASE_URL="https://eyrcnmuzzyriypdajwdk.supabase.co"
-          # Public anon key, used only as the PostgREST apikey header.
-          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cmNubXV6enlyaXlwZGFqd2RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDg3NTA1NzksImV4cCI6MTk2NDMyNjU3OX0.y1OyXD3-DYMz10eGxzo1eeamVMMUwIIeOoMryTRAoco"
-
-          access_token=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/generate_access_token" \
-            -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
-            -d "{\"refresh_token_id\": \"$RT_ID\", \"secret\": \"$RT_SECRET\"}" | jq -r '.access_token')
-          if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
-            echo "failed to obtain control-plane access token"; exit 1
-          fi
-
-          for VARIANT in ${{ steps.prep.outputs.variants }}; do
-            echo "Re-queuing tags for ghcr.io/estuary/${VARIANT}";
-            curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/requeue_connector_tag" \
-              -H "apikey: $ANON_KEY" -H "Authorization: Bearer $access_token" \
-              -H "Content-Type: application/json" \
-              -d "{\"image_name\": \"ghcr.io/estuary/${VARIANT}\", \"image_tags\": [\":${{ steps.prep.outputs.version }}\", \":dev\"]}";
-          done
+          connector: ${{ matrix.connector.name }}
+          rt_id: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
+          rt_secret: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
+          tag_sha: ${{ steps.prep.outputs.tag }}
+          tag_version: ${{ steps.prep.outputs.version }}
+          variants: ${{ steps.prep.outputs.variants }}
+          name_variants: "true"
