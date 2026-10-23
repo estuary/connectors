@@ -109,6 +109,21 @@ struct ScanStats {
     row_groups_considered: usize,
     row_groups_pruned: usize,
     data_files_opened: usize,
+    /// Sum of `RowGroupMetaData::compressed_size()` across every surviving
+    /// row group opened this batch — the bytes actually fetched over the
+    /// network, known as soon as a file is opened (before any decoding).
+    row_group_compressed_bytes: usize,
+    /// Sum of `RowGroupMetaData::total_byte_size()` — Parquet's own
+    /// uncompressed-size accounting, distinct from Arrow's in-memory layout
+    /// (`decoded_bytes` below); comparing the two separates "decompression"
+    /// from "Arrow's own buffer/offset/validity overhead."
+    row_group_uncompressed_bytes: usize,
+    /// Sum of `RecordBatch::get_array_memory_size()` across every batch
+    /// actually pulled from the stream this batch — the real Arrow-side
+    /// footprint after decode, for whichever rows were actually consumed
+    /// (may be less than the full row group if a file was never fully
+    /// drained before a crash).
+    decoded_bytes: usize,
 }
 
 impl ScanStats {
@@ -118,6 +133,9 @@ impl ScanStats {
         self.row_groups_considered += other.row_groups_considered;
         self.row_groups_pruned += other.row_groups_pruned;
         self.data_files_opened += other.data_files_opened;
+        self.row_group_compressed_bytes += other.row_group_compressed_bytes;
+        self.row_group_uncompressed_bytes += other.row_group_uncompressed_bytes;
+        self.decoded_bytes += other.decoded_bytes;
     }
 }
 
@@ -256,6 +274,9 @@ pub(crate) async fn load(
         manifest_entries_pruned = stats.manifest_entries_pruned,
         row_groups_considered = stats.row_groups_considered,
         row_groups_pruned = stats.row_groups_pruned,
+        row_group_compressed_bytes = stats.row_group_compressed_bytes,
+        row_group_uncompressed_bytes = stats.row_group_uncompressed_bytes,
+        decoded_bytes = stats.decoded_bytes,
         elapsed_ms = started.elapsed().as_millis(),
         "load scan complete"
     );
@@ -358,7 +379,8 @@ async fn scan_batch(
     tracing::warn!(?deleted);
 
     let mut file_iters = Vec::with_capacity(data_files.len());
-    for (entry, sequence_number) in &data_files {
+    let num_data_files = data_files.len();
+    for (file_index, (entry, sequence_number)) in data_files.iter().enumerate() {
         let file_deleted = deleted.remove(&entry.file_path).unwrap_or_default();
         let iter = DataFileIter::open(
             catalog,
@@ -374,10 +396,27 @@ async fn scan_batch(
         stats.data_files_opened += 1;
         stats.row_groups_considered += iter.row_group_sizes.len();
         stats.row_groups_pruned += iter.row_group_sizes.len() - iter.surviving_groups.len();
+        stats.row_group_compressed_bytes += iter.row_group_compressed_bytes;
+        stats.row_group_uncompressed_bytes += iter.row_group_uncompressed_bytes;
+
+        tracing::info!(
+            file_path = %entry.file_path,
+            file_index,
+            of = num_data_files,
+            surviving_row_groups = iter.surviving_groups.len(),
+            row_group_compressed_bytes = iter.row_group_compressed_bytes,
+            row_group_uncompressed_bytes = iter.row_group_uncompressed_bytes,
+            // Running totals across every file opened for this batch so
+            // far — the number to watch for a jump right before a crash.
+            cumulative_compressed_bytes = stats.row_group_compressed_bytes,
+            cumulative_uncompressed_bytes = stats.row_group_uncompressed_bytes,
+            "opened data file for load scan"
+        );
+
         file_iters.push(iter);
     }
 
-    heap_merge(file_iters, batch, file_paths, emit).await?;
+    stats.decoded_bytes += heap_merge(file_iters, batch, file_paths, emit).await?;
 
     Ok(stats)
 }
@@ -492,6 +531,15 @@ struct DataFileIter {
     file_path: String,
     sequence_number: i64,
     exhausted: bool,
+    /// Sum of `compressed_size()` across this file's surviving row groups —
+    /// known at open time, before any of them are actually fetched.
+    row_group_compressed_bytes: usize,
+    /// Sum of `total_byte_size()` across the same — Parquet's own
+    /// uncompressed-size accounting.
+    row_group_uncompressed_bytes: usize,
+    /// Running total of `RecordBatch::get_array_memory_size()` across every
+    /// batch pulled from this file's stream so far.
+    decoded_bytes: usize,
 }
 
 impl DataFileIter {
@@ -538,6 +586,13 @@ impl DataFileIter {
             .collect();
 
         let exhausted = surviving_groups.is_empty();
+        let (row_group_compressed_bytes, row_group_uncompressed_bytes) = surviving_groups
+            .iter()
+            .map(|&i| {
+                let rg = &builder.metadata().row_groups()[i];
+                (rg.compressed_size() as usize, rg.total_byte_size() as usize)
+            })
+            .fold((0, 0), |(c_acc, u_acc), (c, u)| (c_acc + c, u_acc + u));
         // `next()` below only ever reads the key columns and `doc_index`
         // (flow_document) — the "value" columns in between exist purely so
         // Iceberg's own schema is complete, but their content is already
@@ -572,6 +627,9 @@ impl DataFileIter {
             file_path: file_path.to_string(),
             sequence_number,
             exhausted,
+            row_group_compressed_bytes,
+            row_group_uncompressed_bytes,
+            decoded_bytes: 0,
         })
     }
 
@@ -595,6 +653,15 @@ impl DataFileIter {
                     .context("reading load-scan row group")?
                 {
                     Some(batch) => {
+                        self.decoded_bytes += batch.get_array_memory_size();
+                        tracing::info!(
+                            file_path = %self.file_path,
+                            batch_rows = batch.num_rows(),
+                            batch_decoded_bytes = batch.get_array_memory_size(),
+                            decoded_bytes_so_far = self.decoded_bytes,
+                            row_group_compressed_bytes = self.row_group_compressed_bytes,
+                            "decoded parquet batch"
+                        );
                         self.current = Some(batch);
                         self.current_row = 0;
                     }
@@ -685,7 +752,7 @@ async fn heap_merge(
     batch: &[(usize, Vec<Bound>)],
     file_paths: &mut FilePathTable,
     emit: &mut impl FnMut(LoadedDoc) -> Result<()>,
-) -> Result<()> {
+) -> Result<usize> {
     let mut heap: BinaryHeap<Reverse<HeapItem>> = BinaryHeap::new();
     for (file_index, iter) in file_iters.iter_mut().enumerate() {
         if let Some((key, position, doc_text)) = iter.next().await? {
@@ -752,7 +819,7 @@ async fn heap_merge(
         }
     }
 
-    Ok(())
+    Ok(file_iters.iter().map(|iter| iter.decoded_bytes).sum())
 }
 
 async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec<i64>> {
