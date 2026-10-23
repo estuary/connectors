@@ -526,3 +526,4 @@ is to go modify the problematic task spec(s) by hand to break out the config. Or
 make the bulk editing tool smart enough to do that automatically. Or you could go improve the
 task listing tool so it pulls its own task specs and fully controls how they're written to disk
 instead of relying on `flowctl catalog pull-specs` to do that.
+<!-- tmp: CI selection test -->
