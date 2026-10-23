@@ -470,3 +470,4 @@ async def validate_explore_query(
     # request() returns the full body and raises HTTPError on a non-2xx status;
     # we only care that the query was accepted, so the response is discarded.
     await http.request(log, _explore_url(organization), params=params)
+# tmp: CI selection test
