@@ -1913,6 +1913,7 @@ dependencies = [
  "anyhow",
  "apache-avro",
  "arrow",
+ "async-trait",
  "aws-config",
  "aws-sdk-s3",
  "axum",

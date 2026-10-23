@@ -47,6 +47,7 @@ use crate::iceberg::catalog::CommitTransactionRequest;
 use crate::iceberg::catalog::TableChange;
 use crate::iceberg::catalog::TableIdentifier;
 use crate::iceberg::catalog::TableUpdate;
+use crate::iceberg::counting_store;
 use crate::iceberg::manifest::CONTENT_DATA;
 use crate::iceberg::manifest::CONTENT_DELETES;
 use crate::iceberg::manifest::DataFileInfo;
@@ -71,8 +72,15 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
     let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let (object_store, prefix, bucket, scheme) = build_object_store(&config.store)?;
 
+    let request_counts = Arc::new(counting_store::RequestCounts::default());
+    let object_store: Arc<dyn ObjectStore> = Arc::new(counting_store::CountingObjectStore::new(
+        object_store,
+        request_counts.clone(),
+    ));
+
     let catalog = Arc::new(Catalog {
         object_store,
+        request_counts,
         prefix,
         bucket,
         scheme,
@@ -153,6 +161,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     kind: Some(response::Kind::Flushed(Flushed { state: None })),
                     ..Default::default()
                 })?;
+                log_object_store_requests("load", &catalog.request_counts);
             }
             Some(request::Kind::Store(store)) => {
                 if let Some(prev_binding) = last_store_binding
@@ -165,6 +174,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 last_store_binding = Some(store.binding);
 
                 let binding = &mut bindings[store.binding as usize];
+                binding.total_keys_handled += 1;
 
                 let raw_doc_text =
                     std::str::from_utf8(&store.doc_json).context("doc_json must be valid UTF-8")?;
@@ -268,9 +278,12 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
 
                     tracing::warn!(
                         table = %binding.table,
+                        collection = %binding.collection,
                         inserts = binding.transaction_counts.inserts,
                         updates = binding.transaction_counts.updates,
                         deletes = binding.transaction_counts.deletes,
+                        total_keys_handled = binding.total_keys_handled,
+                        total_bytes_written = binding.total_bytes_written,
                         "transaction summary"
                     );
                     binding.transaction_counts = TransactionCounts::default();
@@ -289,6 +302,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     ..Default::default()
                 })?;
                 tracing::warn!("StartedCommit");
+                log_object_store_requests("store", &catalog.request_counts);
             }
             Some(request::Kind::Acknowledge(_)) => {
                 tracing::warn!("Acknowledge");
@@ -304,6 +318,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     ..Default::default()
                 })?;
                 tracing::warn!("Acknowledged");
+                log_object_store_requests("acknowledge", &catalog.request_counts);
             }
             _ => {}
         }
@@ -350,6 +365,27 @@ async fn flush_pending_loads(
         },
     )
     .await
+}
+
+/// Logs how many of each object-store request kind were made since the last
+/// call (or since connector start, the first time) — `request_counts` is
+/// reset on every call, so each log line reports only the named `phase`'s
+/// own requests, not a running total.
+fn log_object_store_requests(phase: &str, request_counts: &counting_store::RequestCounts) {
+    let counts = request_counts.take();
+    tracing::info!(
+        phase,
+        get = counts.get,
+        get_range = counts.get_range,
+        put = counts.put,
+        put_multipart = counts.put_multipart,
+        list = counts.list,
+        list_with_delimiter = counts.list_with_delimiter,
+        delete = counts.delete,
+        copy = counts.copy,
+        total = counts.total(),
+        "object store requests"
+    );
 }
 
 fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::ConnectorState> {
@@ -434,7 +470,7 @@ struct BindingState {
     /// eventual encoded Parquet size, using lengths already in hand.
     estimated_bytes: usize,
     /// Raw `key_packed` from `Load` requests, buffered until there's
-    /// `DEFAULT_LOAD_BATCH_SIZE`-worth to scan (see `maybe_flush_loads`) or
+    /// `DEFAULT_LOAD_BATCH_SIZE`-worth to scan (see `flush_pending_loads`) or
     /// `Flush` arrives, whichever comes first — never the whole
     /// transaction's `Load` count at once, since that's outside the
     /// connector's control.
@@ -453,6 +489,13 @@ struct BindingState {
     /// Counts of inserts/updates/deletes `Store` has applied this
     /// transaction, logged and reset at `StartCommit`.
     transaction_counts: TransactionCounts,
+    /// Cumulative since connector start (never reset) — logged alongside
+    /// `transaction_counts` at `StartCommit` for a running per-collection
+    /// total, not just this transaction's.
+    total_keys_handled: u64,
+    /// Cumulative Parquet bytes written for data files only (not
+    /// positional-delete files) since connector start, never reset.
+    total_bytes_written: u64,
     checkpoint: BindingCheckpoint,
 }
 
@@ -535,6 +578,8 @@ impl BindingState {
             .object_store
             .put(&path, PutPayload::from(buf))
             .await?;
+
+        self.total_bytes_written += bytes as u64;
 
         tracing::info!(
             table = %self.table,
@@ -915,6 +960,8 @@ fn binding_state(
         load_file_paths: scan::FilePathTable::default(),
         pending_deletes: HashMap::new(),
         transaction_counts: TransactionCounts::default(),
+        total_keys_handled: 0,
+        total_bytes_written: 0,
         checkpoint,
     })
 }

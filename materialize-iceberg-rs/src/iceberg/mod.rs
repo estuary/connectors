@@ -1,4 +1,5 @@
 pub mod catalog;
+pub(crate) mod counting_store;
 pub mod manifest;
 pub mod manifest_list;
 pub mod scan;
