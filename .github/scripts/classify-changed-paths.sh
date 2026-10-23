@@ -52,6 +52,7 @@ while IFS= read -r path || [ -n "$path" ]; do
         # python-auto-rerun.yaml only re-runs python.yaml's failed jobs.
         .github/workflows/python.yaml) lane="python" ;;
         .github/workflows/ci.yaml) lane="go_rust" ;;
+        .github/workflows/rust.yaml) lane="go_rust" ;;
         .github/workflows/python-auto-rerun.yaml) lane="none" ;;
         # The shared ruff config builds no connector, since connector lint only
         # reports, but estuary-cdk's lint gates on it.
