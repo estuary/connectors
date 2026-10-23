@@ -98,10 +98,13 @@ async def _fetch_incremental_cursor_export_resources(
     sideload_params: dict[str, str] | None = None,
 ) -> AsyncGenerator[TimestampedResource | str, None]:
     url = f"{url_base(subdomain)}/incremental"
+    params: dict[str, str | int] = {}
+
     match name:
         case "tickets":
             url += "/tickets/cursor"
             response_model = TicketsResponse
+            params["support_type_scope"] = "all"
         case "users":
             url += "/users/cursor"
             response_model = UsersResponse
@@ -109,8 +112,6 @@ async def _fetch_incremental_cursor_export_resources(
             raise RuntimeError(
                 f"Unknown incremental cursor pagination resource type {name}."
             )
-
-    params: dict[str, str | int] = {}
 
     if sideload_params:
         params.update(sideload_params)

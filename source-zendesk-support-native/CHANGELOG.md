@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-23
+
+### Fixed
+- `tickets`, `ticket_metrics`, `ticket_audits`, `ticket_comments`, and `side_conversations` now include tickets handled entirely by Zendesk's AI agent.
+
 ## 2026-10-12
 
 ### Fixed
