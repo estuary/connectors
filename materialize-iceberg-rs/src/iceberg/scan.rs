@@ -21,6 +21,7 @@ use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use futures::TryStreamExt;
 use object_store::path::Path as ObjectPath;
+use parquet::arrow::ProjectionMask;
 use parquet::arrow::async_reader::ParquetObjectReader;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
 use parquet::arrow::async_reader::ParquetRecordBatchStreamBuilder;
@@ -537,7 +538,21 @@ impl DataFileIter {
             .collect();
 
         let exhausted = surviving_groups.is_empty();
-        let stream = builder.with_row_groups(surviving_groups.clone()).build()?;
+        // `next()` below only ever reads the key columns and `doc_index`
+        // (flow_document) — the "value" columns in between exist purely so
+        // Iceberg's own schema is complete, but their content is already
+        // fully present inside flow_document's JSON. Projecting them away
+        // means the reader never has to decompress or decode them at all,
+        // rather than materializing Arrow arrays for data this scan path
+        // never touches.
+        let projection = ProjectionMask::leaves(
+            builder.parquet_schema(),
+            (0..key_types.len()).chain(std::iter::once(doc_index)),
+        );
+        let stream = builder
+            .with_row_groups(surviving_groups.clone())
+            .with_projection(projection)
+            .build()?;
 
         Ok(DataFileIter {
             stream,
@@ -549,7 +564,10 @@ impl DataFileIter {
             group_cursor: 0,
             consumed_in_group: 0,
             key_types: key_types.to_vec(),
-            doc_index,
+            // The projected batch only has the key columns followed by
+            // flow_document — not the original schema's `doc_index`, since
+            // the "value" columns between them were projected away.
+            doc_index: key_types.len(),
             deleted: deleted.into_iter().collect(),
             file_path: file_path.to_string(),
             sequence_number,
@@ -746,7 +764,11 @@ async fn read_delete_positions(catalog: &Catalog, file_path: &str) -> Result<Vec
     let builder = ParquetRecordBatchStreamBuilder::new(reader)
         .await
         .context("opening positional-delete file")?;
-    let mut stream = builder.build()?;
+    // Only "pos" (index 1 in `position_delete_schema`) is ever read below —
+    // skip decoding "file_path", which repeats the same referenced-file
+    // string on every row of this file.
+    let projection = ProjectionMask::leaves(builder.parquet_schema(), [1]);
+    let mut stream = builder.with_projection(projection).build()?;
 
     let mut positions = Vec::new();
     while let Some(batch) = stream
