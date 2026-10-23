@@ -1,4 +1,4 @@
-name: CI
+name: Go Connectors
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,11 +31,20 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       run: ${{ steps.classify.outputs.go_rust }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
       - id: classify
         uses: ./.github/actions/classify-changes
+
+      # The connector list lives in its own file so it can be read as data.
+      # Any change in the Go & Rust lane builds every Go connector.
+      - id: matrix
+        uses: ./.github/actions/select-connectors
+        with:
+          list: .github/go-connectors.yaml
+          connectors: all
 
   fetch_flow:
     needs: classify_changes
@@ -75,74 +84,11 @@ jobs:
     timeout-minutes: 60
     needs: [classify_changes, build_base_image, fetch_flow]
     if: needs.classify_changes.outputs.run == 'true'
+    name: ${{ matrix.connector.name }}
     strategy:
       fail-fast: false
       matrix:
-        connector:
-          - source-alpaca
-          - source-bigquery-batch
-          - source-db2-batch
-          - source-dropbox
-          - source-dynamodb
-          - source-firestore
-          - source-ga4-bigquery
-          - source-gcs
-          - source-google-drive
-          - source-google-pubsub
-          - source-hello-world
-          - source-http-file
-          - source-kinesis
-          - source-mongodb
-          - source-mysql
-          - source-mysql-batch
-          - source-onedrive
-          - source-oracle
-          - source-oracle-batch
-          - source-postgres
-          - source-postgres-batch
-          - source-redshift-batch
-          - source-s3
-          - source-sftp
-          - source-sharepoint
-          - source-snowflake
-          - source-sqlserver
-          - source-sqlserver-batch
-          - source-sqlserver-ct
-          - source-sqs
-          - source-test
-          - source-tpc-ds
-          - source-azure-blob-storage
-          - materialize-azure-blob-parquet
-          - materialize-azure-fabric-warehouse
-          - materialize-bigquery
-          - materialize-bigtable
-          - materialize-clickhouse
-          - materialize-databricks
-          - materialize-dynamodb
-          - materialize-elasticsearch
-          - materialize-eventbridge
-          - materialize-gcs-csv
-          - materialize-gcs-parquet
-          - materialize-google-pubsub
-          - materialize-google-sheets
-          - materialize-hubspot
-          - materialize-iceberg
-          - materialize-mongodb
-          - materialize-motherduck
-          - materialize-mysql
-          - materialize-pinecone
-          - materialize-postgres
-          - materialize-redshift
-          - materialize-s3-csv
-          - materialize-s3-iceberg
-          - materialize-s3-parquet
-          - materialize-slack
-          - materialize-snowflake
-          - materialize-sns
-          - materialize-spanner
-          - materialize-sqlite
-          - materialize-sqlserver
-          - materialize-webhook
+        connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -154,16 +100,16 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
-          VERSION=$(cat ${{ matrix.connector }}/VERSION | tr -d '\n')
+          VERSION=$(cat ${{ matrix.connector.name }}/VERSION | tr -d '\n')
           echo ::set-output name=version::${VERSION}
-          VARIANTS="${{ matrix.connector }} $(cat ${{ matrix.connector }}/VARIANTS 2>/dev/null || true)"
+          VARIANTS="${{ matrix.connector.name }} $(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
       # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
       # without this they fetch the module graph and compile it cold. Gate on the same
       # condition as the helper package test step.
       - name: Set up Go with module and build caching
-        if: hashFiles(format('{0}/*.go', matrix.connector)) != ''
+        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -171,8 +117,8 @@ jobs:
 
       # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
       # column types or keys drift from the spec.
-      - name: Verify generated table definitions for ${{ matrix.connector }}
-        if: matrix.connector == 'source-tpc-ds'
+      - name: Verify generated table definitions for ${{ matrix.connector.name }}
+        if: matrix.connector.name == 'source-tpc-ds'
         run: |
           go generate ./source-tpc-ds/...
           git diff --exit-code -- source-tpc-ds
@@ -224,24 +170,24 @@ jobs:
             "source-sqlserver-ct",
             "source-sqs",
             "source-mongodb"
-            ]'), matrix.connector)
+            ]'), matrix.connector.name)
         run: |
           set +e # Show logs even if startup fails
           # --wait blocks until every service's healthcheck passes. Bound it:
           # without a timeout a healthcheck which never goes green hangs the
           # job until the workflow-level limit rather than failing here.
-          docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait --wait-timeout 300
-          docker logs ${{ matrix.connector }}-db-1
+          docker compose --file ${{ matrix.connector.name }}/docker-compose.yaml up --wait --wait-timeout 300
+          docker logs ${{ matrix.connector.name }}-db-1
 
       - name: Test setup
-        if: matrix.connector == 'source-mongodb'
+        if: matrix.connector.name == 'source-mongodb'
         run: |
           bash source-mongodb/docker-compose-init.sh
 
       # The snowflake tests build a venv for the Snowpipe Streaming sidecar
       # with uv, so the venv holds the sidecar's locked dependencies.
       - name: Install uv for the sidecar test venv
-        if: matrix.connector == 'materialize-snowflake'
+        if: matrix.connector.name == 'materialize-snowflake'
         uses: astral-sh/setup-uv@v5
         with:
           version: "0.13.3"
@@ -252,7 +198,7 @@ jobs:
       # manifest. `--frozen` is right in both of those places; this is the step
       # that notices a dependency added without re-locking.
       - name: Check the Snowpipe sidecar's lock
-        if: matrix.connector == 'materialize-snowflake'
+        if: matrix.connector.name == 'materialize-snowflake'
         run: uv lock --check --project materialize-snowflake/sidecar
 
       # Run the tests of every in-repo helper package which this connector
@@ -260,18 +206,18 @@ jobs:
       # don't have to keep an explicit list up-to-date. Likewise instead of
       # having an explicit `contains()` clause governing Go connectors we'll
       # just identify them as connectors whose subdirectory contains Go files.
-      - name: Test Go helper packages for ${{ matrix.connector }}
-        if: hashFiles(format('{0}/*.go', matrix.connector)) != ''
+      - name: Test Go helper packages for ${{ matrix.connector.name }}
+        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
         env:
           GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
         run: |
           set -euo pipefail
           DEPS=$(go list -deps -test \
             -f '{{if and (not .ForTest) .Module (eq .Module.Path "github.com/estuary/connectors")}}{{.ImportPath}}{{end}}' \
-            './${{ matrix.connector }}/...')
+            './${{ matrix.connector.name }}/...')
           PKGS=$(echo "$DEPS" \
             | grep -v '\.test$' \
-            | grep -Ev '^github.com/estuary/connectors/${{ matrix.connector }}(/|$)' \
+            | grep -Ev '^github.com/estuary/connectors/${{ matrix.connector.name }}(/|$)' \
             | sort -u || true)
           [ -n "$PKGS" ] || exit 0
           go test -short -count=1 $PKGS
@@ -279,7 +225,7 @@ jobs:
       # Go connector tests which aren't run as part of Dockerfile builds. Most Go connectors
       # run their tests as part of the Docker build, but running the tests outside of there
       # makes GCP credentials plumbing for encrypted configs significantly simpler.
-      - name: Go Connector ${{ matrix.connector }} Database Tests
+      - name: Go Connector ${{ matrix.connector.name }} Database Tests
         if: |
           contains(fromJson('[
             "source-ga4-bigquery",
@@ -288,9 +234,9 @@ jobs:
             "source-sqlserver",
             "source-sqlserver-ct",
             "source-sqs"
-            ]'), matrix.connector)
+            ]'), matrix.connector.name)
         run: |
-          ${{ matrix.connector }}/run_tests.sh
+          ${{ matrix.connector.name }}/run_tests.sh
         env:
           # The estuary/flow repository contains a few large files in Git LFS. This can
           # present an issue with Go module checksums when using a commit-tagged version,
@@ -306,16 +252,16 @@ jobs:
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
 
-      - name: Build ${{ matrix.connector }} Docker Image
+      - name: Build ${{ matrix.connector.name }} Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.connector }}/Dockerfile
+          file: ${{ matrix.connector.name }}/Dockerfile
           load: true
           build-args: |
             BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
-          tags: ghcr.io/estuary/${{ matrix.connector }}:local
+          tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
 
       # Fetch the spec from the built image, to catch images which are entirely
       # broken. This is the only image-level coverage for connectors whose real
@@ -326,7 +272,7 @@ jobs:
       # preview-next test migration small, not a statement that other
       # connectors' images don't merit a smoke test -- they do, and the check
       # costs about a second.
-      - name: Source connector ${{ matrix.connector }} image smoke test
+      - name: Source connector ${{ matrix.connector.name }} image smoke test
         if: |
           contains(fromJson('[
             "source-dynamodb",
@@ -337,21 +283,21 @@ jobs:
             "source-s3",
             "source-sftp",
             "source-sqlserver"
-            ]'), matrix.connector)
-        run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/smoke.sh;
+            ]'), matrix.connector.name)
+        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/smoke.sh;
 
-      - name: Source connector ${{ matrix.connector }} integration tests
+      - name: Source connector ${{ matrix.connector.name }} integration tests
         if: |
           contains(fromJson('[
             "source-gcs",
             "source-kinesis",
             "source-s3",
             "source-sftp"
-            ]'), matrix.connector)
+            ]'), matrix.connector.name)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-        run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
+        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/run.sh;
 
       # On failure, hand back what the capture actually produced. A snapshot
       # mismatch isn't actionable without it, and these fixtures -- localstack,
@@ -363,34 +309,34 @@ jobs:
       # Uploads the documents only, never the generated catalog: that embeds
       # CONNECTOR_CONFIG, which for source-gcs is a live service account key,
       # and artifacts on a public repo are world-downloadable.
-      - name: Upload ${{ matrix.connector }} capture output
+      - name: Upload ${{ matrix.connector.name }} capture output
         if: |
           failure() && contains(fromJson('[
             "source-gcs",
             "source-kinesis",
             "source-s3",
             "source-sftp"
-            ]'), matrix.connector)
+            ]'), matrix.connector.name)
         uses: actions/upload-artifact@v4
         with:
-          name: capture-output-${{ matrix.connector }}
+          name: capture-output-${{ matrix.connector.name }}
           path: |
-            .build/tests/${{ matrix.connector }}/actual.jsonl
-            .build/tests/${{ matrix.connector }}/raw.jsonl
+            .build/tests/${{ matrix.connector.name }}/actual.jsonl
+            .build/tests/${{ matrix.connector.name }}/raw.jsonl
           retention-days: 7
           if-no-files-found: warn
 
       - name: Install duckdb
-        if: matrix.connector == 'materialize-motherduck'
+        if: matrix.connector.name == 'materialize-motherduck'
         uses: opt-nc/setup-duckdb-action@v1.2.9
         with:
           version: v1.3.1
 
-      - name: Materialization connector ${{ matrix.connector }} integration tests
-        if: startsWith(matrix.connector, 'materialize-')
+      - name: Materialization connector ${{ matrix.connector.name }} integration tests
+        if: startsWith(matrix.connector.name, 'materialize-')
 
         run: |
-          CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
+          CONNECTOR=${{ matrix.connector.name }} VERSION=local tests/materialize/run.sh;
 
       # The step above drives the connector through runtime-next. This one checks
       # runtime v1 liveness: the same tests through legacy `flowctl preview` as a
@@ -406,15 +352,15 @@ jobs:
       # both runtimes must leave the same destination -- and is snapshotted as
       # `<test>-runtime-v1` where the connector has one (see testutil's
       # runtimeV1Liveness, requireMatchesRuntimeNextSnapshot, runtimeV1SnapshotName).
-      - name: Materialization connector ${{ matrix.connector }} integration tests (runtime v1)
-        if: startsWith(matrix.connector, 'materialize-')
+      - name: Materialization connector ${{ matrix.connector.name }} integration tests (runtime v1)
+        if: startsWith(matrix.connector.name, 'materialize-')
         env:
           FLOW_TEST_RUNTIME: v1
           FLOW_TEST_FLOWCTL: flowctl-v1
         run: |
-          cd ${{ matrix.connector }}
+          cd ${{ matrix.connector.name }}
           TIMEOUT=20m
-          if [ "${{ matrix.connector }}" = "materialize-snowflake" ]; then
+          if [ "${{ matrix.connector.name }}" = "materialize-snowflake" ]; then
             TIMEOUT=30m
           fi
           go test -v ./... -timeout $TIMEOUT
@@ -425,22 +371,22 @@ jobs:
       # reachable, and the job log is no substitute, since secret redaction
       # rewrites the connector state these snapshots embed. The files hold
       # destination schemas and fixture rows, never endpoint configuration.
-      - name: Upload ${{ matrix.connector }} snapshot mismatches
-        if: failure() && startsWith(matrix.connector, 'materialize-')
+      - name: Upload ${{ matrix.connector.name }} snapshot mismatches
+        if: failure() && startsWith(matrix.connector.name, 'materialize-')
         uses: actions/upload-artifact@v4
         with:
-          name: snapshot-mismatch-${{ matrix.connector }}
-          path: ${{ matrix.connector }}/.snapshots/*.actual
+          name: snapshot-mismatch-${{ matrix.connector.name }}
+          path: ${{ matrix.connector.name }}/.snapshots/*.actual
           # `.snapshots` is hidden, and upload-artifact skips hidden files.
           include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Push ${{ matrix.connector }} image(s) with commit SHA tag
+      - name: Push ${{ matrix.connector.name }} image(s) with commit SHA tag
         run: |
           for VARIANT in ${{ steps.prep.outputs.variants }}; do
             echo "Building and pushing ${VARIANT}:${{ steps.prep.outputs.tag }}...";
-            docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector }}:local \
+            docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector.name }}:local \
                          --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                          --build-arg CONNECTOR_NAME=${VARIANT} \
                          --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
@@ -449,7 +395,7 @@ jobs:
             docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }};
           done
 
-      - name: Push ${{ matrix.connector }} image(s) with 'dev' and '${{ steps.prep.outputs.version }}' tags
+      - name: Push ${{ matrix.connector.name }} image(s) with 'dev' and '${{ steps.prep.outputs.version }}' tags
         if: ${{ github.event_name == 'push' }}
         run: |
           for VARIANT in ${{ steps.prep.outputs.variants }}; do
@@ -464,11 +410,11 @@ jobs:
         with:
           filters: |
             connector:
-              - "${{ matrix.connector }}/**"
+              - "${{ matrix.connector.name }}/**"
 
       # Re-queue connector tag publishing over PostgREST (HTTPS) instead of a direct
       # psql connection from CI.
-      - name: Re-queue connector tags for ${{ matrix.connector }}
+      - name: Re-queue connector tags for ${{ matrix.connector.name }}
         if: github.event_name == 'push' && steps.filter.outputs.connector == 'true'
         env:
           RT_ID: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}

@@ -101,13 +101,16 @@ class TestLanes(unittest.TestCase):
 
     def test_each_workflow_triggers_itself(self):
         self.assertEqual(classify(".github/workflows/python.yaml"), (True, False, ALL))
-        self.assertEqual(classify(".github/workflows/ci.yaml"), (False, True, []))
+        self.assertEqual(classify(".github/workflows/go.yaml"), (False, True, []))
         self.assertEqual(classify(".github/workflows/rust.yaml"), (False, True, []))
 
     def test_python_connector_list_is_python_only(self):
         # python.yaml reads its matrix from this file, so editing the list
         # has to run the Python workflow as editing the matrix did.
         self.assertEqual(classify(".github/python-connectors.yaml"), (True, False, ALL))
+
+    def test_go_connector_list_is_go_rust_only(self):
+        self.assertEqual(classify(".github/go-connectors.yaml"), (False, True, []))
 
     def test_rust_connector_list_is_go_rust_only(self):
         self.assertEqual(classify(".github/rust-connectors.yaml"), (False, True, []))
@@ -124,7 +127,7 @@ class TestLanes(unittest.TestCase):
 
     def test_nested_pyproject_does_not_make_a_go_connector_python(self):
         # materialize-iceberg/python/pyproject.toml exists. Classing its parent as
-        # Python would stop ci.yaml building a Go connector.
+        # Python would stop go.yaml building a Go connector.
         self.assertEqual(
             classify("materialize-iceberg/python/foo.py"), (False, True, [])
         )
