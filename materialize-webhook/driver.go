@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bytes"
@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -17,8 +20,13 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
-// driver implements the pm.DriverServer interface.
 type driver struct{}
+
+var _ boilerplate.Connector = &driver{}
+
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
 
 type customHeader struct {
 	Name  string `json:"name,omitempty" jsonschema:"title=Name"`
@@ -38,9 +46,20 @@ type headers struct {
 	CustomHeaders []customHeader `json:"customHeaders,omitempty" jsonschema:"title=Custom Headers"`
 }
 
+var featureFlagDefaults = map[string]common.FlagDefault{
+	// Sends an object of each document's selected fields instead of the full
+	// document, and makes every field selectable.
+	"field_selection": common.FlagEnabledForTasksCreatedAfter("2026-10-30"),
+}
+
 type config struct {
-	Address pf.Endpoint `json:"address" jsonschema:"title=Address,description=Base address URL. Must end in a trailing '/'."`
-	Headers headers     `json:"headers,omitempty"`
+	Address  pf.Endpoint    `json:"address" jsonschema:"title=Address,description=Base address URL. Must end in a trailing '/'."`
+	Headers  headers        `json:"headers,omitempty"`
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate returns an error if the config is not well-formed.
@@ -60,8 +79,18 @@ func (c config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string { return "" }
+
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 type resource struct {
 	RelativePath string `json:"relativePath" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
+
+	// address is the endpoint's base address, set by WithDefaults so that
+	// Parameters can resolve the binding's full URL.
+	address pf.Endpoint
 }
 
 func (r resource) Validate() error {
@@ -78,6 +107,30 @@ func (r resource) URL() *url.URL {
 	}
 	return u
 }
+
+func (r resource) WithDefaults(cfg config) resource {
+	r.address = cfg.Address
+	return r
+}
+
+// Parameters returns the binding's resolved webhook URL as its resource path.
+// Webhooks only support delta updates.
+func (r resource) Parameters() ([]string, bool, error) {
+	return []string{r.address.URL().ResolveReference(r.URL()).String()}, true, nil
+}
+
+// fieldConfig and mappedType are required by the Materializer but carry
+// nothing, since webhooks have no destination schema.
+type fieldConfig struct{}
+
+func (fieldConfig) Validate() error    { return nil }
+func (fieldConfig) CastToString() bool { return false }
+
+type mappedType struct{}
+
+func (mappedType) String() string                            { return "json" }
+func (mappedType) Compatible(boilerplate.ExistingField) bool { return true }
+func (mappedType) CanMigrate(boilerplate.ExistingField) bool { return false }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Webhook", &config{}).MarshalJSON()
@@ -97,12 +150,16 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 	}, nil
 }
 
-// Validate validates the Webhook configuration and constrains projections
-// to the document root (only).
+// Validate validates the Webhook configuration. Without the field_selection
+// flag, it constrains projections to the document root (only).
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+	flags, err := boilerplate.ResolveFlags(cfg, req.LastMaterialization)
+	if err != nil {
+		return nil, err
 	}
 
 	var out []*pm.Response_Validated_Binding
@@ -120,21 +177,10 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 
 		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range binding.Collection.Projections {
-			var constraint = new(pm.Response_Validated_Constraint)
-			switch {
-			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document must be materialized"
-			case projection.IsPrimaryKey:
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "Document keys must be included"
-			default:
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Webhooks only materialize the full document"
-			}
+			var constraint = projectionConstraint(projection, flags["field_selection"])
 			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
 				Field:      projection.Field,
-				Constraint: constraint,
+				Constraint: &constraint,
 			})
 		}
 
@@ -150,42 +196,209 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// Apply is a no-op.
-func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return &pm.Response_Applied{}, nil
+func projectionConstraint(projection pf.Projection, fieldSelection bool) pm.Response_Validated_Constraint {
+	var constraint pm.Response_Validated_Constraint
+	switch {
+	case fieldSelection && projection.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "The root document may be included as a field"
+	case fieldSelection && projection.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "Document keys should usually be included"
+	case fieldSelection:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "This field may be included"
+	case projection.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case projection.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Document keys must be included"
+	default:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Webhooks only materialize the full document"
+	}
+	return constraint
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
+}
+
+func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer, boilerplate.WithConfigUpdates([]string{"advanced", "feature_flags"}))
+}
+
+type materialization struct {
+	cfg          config
+	featureFlags map[string]bool
+}
+
+var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
+
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	return &materialization{cfg: cfg, featureFlags: featureFlags}, nil
+}
+
+func (d *materialization) Config() boilerplate.MaterializeCfg {
+	return boilerplate.MaterializeCfg{
+		NoCreateNamespaces:  true,
+		NoTruncateResources: true,
 	}
+}
 
-	var addresses []*url.URL
-	var paths [][]string
+// PopulateInfoSchema adds nothing: a webhook has no destination state to
+// introspect, so every binding is applied as a new resource, which is a no-op.
+func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	return nil
+}
 
-	for _, binding := range open.Materialization.Bindings {
-		paths = append(paths, binding.ResourcePath)
-		// Join paths of each binding with the base URL.
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, nil, nil, fmt.Errorf("parsing resource config: %w", err)
+func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	return &cerrors.PrereqErr{}
+}
+
+func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	return projectionConstraint(p, d.featureFlags["field_selection"])
+}
+
+func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
+	return mappedType{}, nil
+}
+
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateResource(ctx context.Context, b boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
+func (d *materialization) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	// Test cleanup invokes the returned fn without nil-checking it.
+	return "", func(context.Context) error { return nil }, nil
+}
+
+func (d *materialization) UpdateResource(
+	ctx context.Context,
+	path []string,
+	existing boilerplate.ExistingResource,
+	update boilerplate.BindingUpdate[config, resource, mappedType],
+) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
+func (d *materialization) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return false, nil
+}
+
+func (d *materialization) NewTransactor(
+	ctx context.Context,
+	req pm.Request_Open,
+	is boilerplate.InfoSchema,
+	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
+	be *m.BindingEvents,
+) (m.Transactor, error) {
+	var bindings []binding
+	for _, b := range mappedBindings {
+		var bound = binding{
+			// Join paths of each binding with the base URL.
+			address: d.cfg.Address.URL().ResolveReference(b.Config.URL()),
+			path:    b.ResourcePath,
 		}
-		addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
+		if d.featureFlags["field_selection"] {
+			bound.sendFields = true
+			var fs = b.FieldSelection
+			for _, field := range slices.Concat(fs.Keys, fs.Values) {
+				bound.fieldNames = append(bound.fieldNames, jsonFieldName(field))
+			}
+			if fs.Document != "" {
+				bound.documentName = jsonFieldName(fs.Document)
+			}
+		}
+		bindings = append(bindings, bound)
 	}
 
-	var transactor = &transactor{
-		addresses:     addresses,
-		paths:         paths,
-		customHeaders: cfg.Headers.CustomHeaders,
+	return &transactor{
+		bindings:      bindings,
+		customHeaders: d.cfg.Headers.CustomHeaders,
 		be:            be,
+	}, nil
+}
+
+func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (d *materialization) CleanupTestTask(ctx context.Context, name string) error {
+	return nil
+}
+
+// SnapshotTestResource is only used by integration tests, which wrap the
+// materialization with one that reads back the requests a test server received.
+func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
+	return nil, nil, fmt.Errorf("webhooks can't be read back")
+}
+
+func (d *materialization) Close(ctx context.Context) {}
+
+// jsonFieldName returns the field name as a JSON object key, with its colon.
+func jsonFieldName(field string) []byte {
+	var name, err = json.Marshal(field)
+	if err != nil {
+		panic(err) // Marshalling a string can't fail.
 	}
-	return transactor, &pm.Response_Opened{}, nil, nil
+	return append(name, ':')
+}
+
+type binding struct {
+	address    *url.URL
+	path       []string
+	sendFields bool
+	// fieldNames are the encoded names of the selected keys and values, and
+	// documentName that of the selected document, if any.
+	fieldNames   [][]byte
+	documentName []byte
+}
+
+// appendFields appends a JSON object of the stored document's selected
+// fields to buf.
+func (b *binding) appendFields(buf *bytes.Buffer, it *m.StoreIterator) error {
+	buf.WriteByte('{')
+	for i, v := range slices.Concat(it.Key, it.Values) {
+		if i != 0 {
+			buf.WriteByte(',')
+		}
+		buf.Write(b.fieldNames[i])
+		// Objects, arrays, and fields of several types are packed as JSON.
+		if raw, ok := v.([]byte); ok {
+			buf.Write(raw)
+		} else if encoded, err := json.Marshal(v); err != nil {
+			return fmt.Errorf("encoding value %v: %w", v, err)
+		} else {
+			buf.Write(encoded)
+		}
+	}
+	if b.documentName != nil {
+		if len(b.fieldNames) != 0 {
+			buf.WriteByte(',')
+		}
+		buf.Write(b.documentName)
+		buf.Write(it.RawJSON)
+	}
+	buf.WriteByte('}')
+	return nil
 }
 
 type transactor struct {
-	addresses     []*url.URL
-	paths         [][]string // Resource path of each binding, parallel to addresses.
+	bindings      []binding
 	customHeaders []customHeader
 	be            *m.BindingEvents
 }
@@ -254,7 +467,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	// sent counts the documents of each binding whose request succeeded, for
 	// the transaction health report; inBody is those in the pending request.
-	sent := make([]int64, len(d.addresses))
+	sent := make([]int64, len(d.bindings))
 	var inBody int64
 
 	previousBinding := -1
@@ -266,7 +479,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// Send a webhook if the binding switches or the body is over the cutoff
 		if it.Binding != previousBinding || body.Len() >= requestSizeCutoff {
 			body.WriteString("]")
-			if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
+			if err := d.sendWebhook(ctx, d.bindings[previousBinding].address.String(), body); err != nil {
 				return nil, fmt.Errorf("draining previous binding: %w", err)
 			}
 			sent[previousBinding] += inBody
@@ -282,15 +495,22 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			body.WriteString(",")
 		}
 
-		if _, err := body.Write(it.RawJSON); err != nil {
+		if b := &d.bindings[it.Binding]; b.sendFields {
+			if err := b.appendFields(&body, it); err != nil {
+				return nil, err
+			}
+		} else if _, err := body.Write(it.RawJSON); err != nil {
 			return nil, err
 		}
 		inBody++
 	}
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
 
 	if body.Len() > 0 {
 		body.WriteString("]")
-		if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
+		if err := d.sendWebhook(ctx, d.bindings[previousBinding].address.String(), body); err != nil {
 			return nil, fmt.Errorf("draining previous binding: %w", err)
 		}
 		sent[previousBinding] += inBody
@@ -299,7 +519,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	for i, n := range sent {
 		if n > 0 {
-			d.be.ReportRowStats(it.Round, d.paths[i], m.TotalRowStats(n))
+			d.be.ReportRowStats(it.Round, d.bindings[i].path, m.TotalRowStats(n))
 		}
 	}
 	return nil, nil
@@ -324,5 +544,3 @@ func backoff(attempt int) time.Duration {
 		return 10 * time.Second
 	}
 }
-
-func main() { boilerplate.RunMain(new(driver)) }

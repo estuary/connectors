@@ -1,0 +1,75 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-webhook/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "Base address URL. Must end in a trailing '/'."
+      },
+      "headers": {
+        "properties": {
+          "customHeaders": {
+            "items": {
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "title": "Name"
+                },
+                "value": {
+                  "type": "string",
+                  "title": "Value"
+                }
+              },
+              "additionalProperties": false,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Custom Headers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "advanced": {
+        "properties": {
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "address"
+    ],
+    "title": "Webhook"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-webhook/resource",
+    "properties": {
+      "relativePath": {
+        "type": "string",
+        "title": "Relative Path",
+        "description": "Path which is joined with the base Address to build a complete URL",
+        "x-collection-name": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "relativePath"
+    ],
+    "title": "Webhook URL"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-webhook"
+}
