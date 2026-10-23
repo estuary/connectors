@@ -212,3 +212,4 @@ func (c *capture) Run() error {
 		time.Sleep(interval)
 	}
 }
+this is not Go
