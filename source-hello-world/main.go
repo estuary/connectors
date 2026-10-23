@@ -212,3 +212,4 @@ func (c *capture) Run() error {
 		time.Sleep(interval)
 	}
 }
+// tmp: CI selection test
