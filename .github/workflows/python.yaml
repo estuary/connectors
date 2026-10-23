@@ -19,6 +19,12 @@ on:
     - cron: "0 8 * * *"
   workflow_dispatch:
 
+  # Cutting a release publishes estuary-cdk from the tag; see
+  # estuary-cdk/README.md. No connector is rebuilt -- the classifier
+  # special-cases this event.
+  release:
+    types: [published]
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   # Don't cancel in progress builds of main, since that can result in connector
@@ -390,3 +396,91 @@ jobs:
           if [ "$CDK" = true ] && { [ "$CDK_TESTS" != success ] || [ "$CDK_PYTHONS" != success ]; }; then
             echo "::error::estuary-cdk was due to be checked but its jobs ended $CDK_TESTS and $CDK_PYTHONS"; exit 1
           fi
+
+  # Publish estuary-cdk to PyPI: a `.devN` pre-release from every push to main
+  # that changes what the wheel carries, and the release itself from a tag.
+  # See estuary-cdk/README.md for the version scheme and the release steps.
+  #
+  # Deliberately absent from python_gate's needs: it publishes rather than
+  # checks, and a required check must not wait on it.
+  estuary_cdk_publish:
+    name: estuary-cdk publish
+    needs: [classify_changes, estuary_cdk, estuary_cdk_supported_pythons]
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/main' &&
+       needs.classify_changes.outputs.cdk == 'true')
+    runs-on: ubuntu-24.04
+    # Restricted to main and v* in repo settings. That, not the `if:` above,
+    # is what keeps the trusted-publishing credential out of reach of a pull
+    # request ref -- this workflow runs on those too.
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # cdk-release-version.py needs tags and history.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      - id: build
+        name: Build the wheel
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # A tag publishes unconditionally; the tag is the intent. A push
+          # publishes only when what the wheel carries changed: `cdk` is
+          # broader, firing also for the workspace lock, python.yaml, the
+          # connector list and ruff.toml, because estuary-cdk's *checks* must
+          # run for those. The paths below are what
+          # [tool.hatch.build.targets.wheel] packages; keep the two in step.
+          if [ "${GITHUB_EVENT_NAME}" = release ]; then
+            VERSION=$(.github/scripts/cdk-release-version.py "${GITHUB_REF_NAME}")
+          else
+            # An all-zero `before` (a branch's first push), or one this
+            # checkout does not have (a force push), means the comparison
+            # cannot be made. Publish rather than skip on that.
+            if [ -n "${BEFORE//0/}" ] &&
+               git cat-file -e "${BEFORE}^{commit}" 2> /dev/null &&
+               git diff --quiet "${BEFORE}" "${GITHUB_SHA}" -- \
+                 estuary-cdk/estuary_cdk/ estuary-cdk/pyproject.toml; then
+              echo "the wheel's contents are unchanged; nothing to publish"
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            VERSION=$(.github/scripts/cdk-release-version.py)
+          fi
+          echo "version: ${VERSION}"
+
+          # Stamping puts the manifest out of step with uv.lock, which
+          # `uv sync --locked` and `uv lock --check` both reject. `uv build`
+          # does not, and this job runs neither of the others.
+          python3 - "$VERSION" <<'PY'
+          import re, sys
+          path = "estuary-cdk/pyproject.toml"
+          text = open(path).read()
+          text, n = re.subn(
+              r'(?m)^version = "[^"]+"$', f'version = "{sys.argv[1]}"', text, count=1
+          )
+          assert n == 1, f"expected one version line in {path}, replaced {n}"
+          open(path, "w").write(text)
+          PY
+
+          uv build --package estuary_cdk --wheel --out-dir dist
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to PyPI
+        if: steps.build.outputs.publish == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Re-running a job that already published would otherwise fail on a
+          # filename PyPI holds; PyPI refuses to replace one.
+          skip-existing: true

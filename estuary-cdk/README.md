@@ -15,6 +15,44 @@ The CDK is designed for modern Python, which means:
 The rough architecture of the CDK is a framework, which calls a user-developed connector, which optionally calls "common" components that solve problems common to many connectors.
 The "framework" portion of the CDK tries to be as un-opinionated as possible, allowing any kind of connector use case, while common components are opinionated to reduce boilerplate and repetition across connectors.
 
+## Depending on the CDK from another repository
+
+Connectors here get the CDK as a uv workspace member. Projects outside this repository
+install it from PyPI:
+
+```toml
+dependencies = ["estuary-cdk>=0.3.0"]
+```
+
+Every push to `main` that changes what the wheel carries also publishes a pre-release,
+versioned `X.Y.Z.devN` — `X.Y.Z` names the next cut, `N` counts commits since the last one.
+Pre-releases are excluded from resolution unless a specifier asks for them:
+
+```toml
+dependencies = ["estuary-cdk>=0.4.0.dev0"]
+```
+
+`estuary_cdk.shim_airbyte_cdk` is the one module that will not work out there: it needs the
+vendored Airbyte fork under `vendor/`, a separate distribution that is not published.
+Everything else imports from the wheel alone, which CI checks on every change.
+
+## Cutting a release
+
+`vX.Y.Z` is a shared, repo-wide tag namespace — the same tag is this repository's Go module
+version. (At `v2` Go would require the module path to carry a `/v2` suffix, so it stops
+tracking these tags and `go get` pins to the last `v1`.)
+
+1. Tag the commit, and push branch and tag together: `git push --follow-tags`.
+2. Publish a GitHub release for the tag. That is what publishes `X.Y.Z` to PyPI.
+3. Raise `version` in this directory's `pyproject.toml` to the next release, and relock.
+
+Step 3 is the one that gets forgotten. Until it lands, the next push to `main` fails in
+`.github/scripts/cdk-release-version.py` rather than publishing a `.devN` that sorts below
+the release just cut.
+
+The release path runs only on a real cut, so it is cold when you first need it. Before the
+first one, point it at TestPyPI with a throwaway tag.
+
 ## Canonical Layout of a Connector
 
 A canonical connector consists of:
