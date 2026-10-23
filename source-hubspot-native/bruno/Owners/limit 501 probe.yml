@@ -1,0 +1,57 @@
+info:
+  name: limit 501 probe
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/owners?limit=501"
+  params:
+    - name: limit
+      value: "501"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - limit 501 rejected"
+    request:
+      url: "{{base_url}}/crm/v3/owners?limit=501"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "Maximum limit is 500",
+            "correlationId": "01a15b90-0848-720a-a3d8-929e109bed4a",
+            "context": {
+              "limit": [
+                "501"
+              ]
+            },
+            "category": "VALIDATION_ERROR"
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all owners](https://developers.hubspot.com/docs/api-reference/legacy/crm/owners/get-owners)
+
+  **WHY:** the connector sends `limit=500`, five times the documented default, and the
+  docs state no maximum. One past it shows the real ceiling and how it's enforced.
+
+  **DOCUMENTED (2026-10-20):** `limit` defaults to 100. No maximum is stated.
+
+  **LIMITATION (VERIFIED 2026-10-20):** `limit=501` is **rejected** with
+  `400 VALIDATION_ERROR`, "Maximum limit is 500". The maximum is undocumented, and the
+  connector's 500 is exactly that maximum.

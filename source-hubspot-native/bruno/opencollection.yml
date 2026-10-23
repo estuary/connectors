@@ -1,0 +1,237 @@
+opencollection: 1.0.0
+
+info:
+  name: HubSpot
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // HubSpot auth via the connector's sops-encrypted config.yaml. The access token
+        // is re-derived on every request and lives only on `req` — it is never persisted
+        // to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env HubSpot --sandbox developer`
+        //   GUI: switch the collection from "Safe Mode" to "Developer Mode"
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd — the GUI's
+        // cwd is wherever Bruno was launched from, only the CLI runs from bruno/.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials ?? {};
+        const pick = (k) => creds[k] ?? creds[`${k}_sops`];
+
+        // The connector accepts either OAuth credentials or a private-app access token
+        // (`EndpointConfig.credentials` in models.py).
+        let accessToken = pick('access_token');
+        if (!accessToken) {
+          const clientId = pick('client_id');
+          const clientSecret = pick('client_secret');
+          const refreshToken = pick('refresh_token');
+          if (!clientId || !clientSecret || !refreshToken) {
+            throw new Error('credentials.{client_id,client_secret,refresh_token}(_sops) missing');
+          }
+          // Same token endpoint and form the connector uses on every run
+          // (OAUTH2_SPEC.accessTokenUrlTemplate in models.py; the form is built by
+          // estuary_cdk.http.TokenSource._fetch_oauth2_token). The connector treats the
+          // refresh token as non-rotating (BaseOAuth2Credentials) and every test run
+          // reuses the one committed in config.yaml, so this exchange cannot invalidate it.
+          const resp = await bru.sendRequest({
+            method: 'POST',
+            url: 'https://api.hubapi.com/oauth/2026-09/token',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            data:
+              'grant_type=refresh_token' +
+              `&client_id=${encodeURIComponent(clientId)}` +
+              `&client_secret=${encodeURIComponent(clientSecret)}` +
+              `&refresh_token=${encodeURIComponent(refreshToken)}`,
+          });
+          accessToken = resp?.data?.access_token;
+          if (!accessToken) {
+            throw new Error(`token refresh failed with status ${resp?.status}`);
+          }
+        }
+        req.setHeader('Authorization', `Bearer ${accessToken}`);
+    - type: after-response
+      code: |-
+        // Redact noisy fields so any Response Example saved from a run is already clean.
+        // This mirrors FIELDS_TO_REDACT and PROPERTY_PATTERNS_TO_REDACT in
+        // tests/test_snapshots.py, with one deliberate exception: cursor fields
+        // (`updatedAt`, `lastmodifieddate`, `hs_lastmodifieddate`) stay visible, because
+        // the cursor probes in this collection have to read them. Keep the lists in sync
+        // otherwise, and minimal: they also hide fields from live `bru run` output.
+        const RECORD_FIELDS = ['url'];
+        const PROPERTY_PATTERNS = [/^hs_time_in_/, /^hs_date_entered_/, /^hs_date_exited_/];
+        const redactProps = (v) => {
+          if (Array.isArray(v)) return v.map(redactProps);
+          if (!v || typeof v !== 'object') return v;
+          const o = {};
+          for (const [k, x] of Object.entries(v)) {
+            o[k] = PROPERTY_PATTERNS.some((p) => p.test(k)) ? 'REDACTED' : redactProps(x);
+          }
+          return o;
+        };
+        const redactRecord = (r) => {
+          if (!r || typeof r !== 'object' || Array.isArray(r)) return r;
+          const o = { ...r };
+          for (const k of RECORD_FIELDS) if (k in o) o[k] = 'REDACTED';
+          return o;
+        };
+        const body = res.getBody();
+        // Only touch JSON object bodies; leave errors (429s, non-JSON) untouched. Record
+        // fields are blanked on the items of each top-level array (`results`, or a
+        // legacy envelope such as `contacts` or `events`).
+        if (body && typeof body === 'object' && !Array.isArray(body)) {
+          const out = redactProps(body);
+          for (const [k, x] of Object.entries(out)) {
+            if (Array.isArray(x)) out[k] = x.map(redactRecord);
+          }
+          res.setBody(out);
+        }
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Rate limit (public OAuth apps):** 110 requests per 10 seconds per installing
+      account, excluding the CRM Search API, which has its own stricter limits —
+      https://developers.hubspot.com/docs/api-usage-guidelines-and-limits
+      (DOCUMENTED 2026-10-19). VERIFIED 2026-10-20 on the test account's OAuth app:
+      responses carry `x-hubspot-ratelimit-max: 110` with
+      `x-hubspot-ratelimit-interval-milliseconds: 10000`, plus
+      `x-hubspot-ratelimit-secondly: 11`.
+    - **Throttling:** `429` with a JSON body whose `policyName` names the limit hit
+      (daily or ten-secondly). Rate-limit headers (`X-HubSpot-RateLimit-*`) are
+      returned on everything except Search API responses. Use the CDK's standard
+      backoff. (DOCUMENTED 2026-10-19, same page.)
+    - **API versions:** HubSpot moved to date-based versions (`2026-03`, `2026-09`, …)
+      in the URL path after the API name, e.g. `/crm/pipelines/2026-09/deals`. Each
+      version is supported for at least 18 months —
+      https://developers.hubspot.com/changelog/introducing-date-based-api-versioning
+      (DOCUMENTED 2026-10-16). The numbered legacy APIs (v1–v3) become unsupported in
+      September 2027 —
+      https://developers.hubspot.com/changelog/legacy-apis-and-legacy-apps-whats-going-unsupported-and-when
+      (DOCUMENTED 2026-10-16).
+    - **CRM Search API:** 5 requests per second per account, shared by every search
+      call; 10,000 results per query; at most 200 per page; at most 5 `filterGroups` of
+      6 filters (18 in total); no rate-limit headers on search responses; and "it may
+      take a few moments" before a change is searchable —
+      https://developers.hubspot.com/docs/api-reference/latest/crm/search-the-crm
+      (DOCUMENTED 2026-10-20).
+    - **Page-size enforcement (VERIFIED 2026-10-20):** v3 object lists (100, or 50
+      with history), batch reads (100, or 50 with history), search (200), owners (500)
+      and marketing events (100) all **reject** one-past-the-maximum with
+      `400 VALIDATION_ERROR`; nothing is clamped. The legacy v1 `count`/`limit`
+      params, marketing emails, forms and lists search accepted one-past values; on an
+      account with this little data, clamp vs truncation can't be observed there.
+    - **Missing-scope refusals (VERIFIED 2026-10-20)** come in two wordings: a
+      `MISSING_SCOPES` JSON body, and "EXTERNAL auth request is missing required
+      '…' scope" with no `category`. Both match the connector's `MISSING_SCOPE_REGEX`.
+    - **Auth:** OAuth refresh-token exchange at `POST /oauth/2026-09/token`, the same
+      call the connector makes (see the before-request script above).
+
+    ## Test account coverage
+
+    The test account behind `config.yaml` holds very little data: 3 contacts, 1
+    company, 1 deal, 1 marketing event and the default deal pipeline. It has no
+    engagements, tickets, email events, forms, lists, marketing emails, products, line
+    items or custom objects. Its OAuth app also lacks the `marketing.campaigns.read` and
+    `automation` scopes. That is why many shape, boundary and clamp questions are marked
+    `UNOBSERVABLE`: this collection never seeds data, because the capture snapshot is
+    recorded from the same account.
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions (`**WHY:**`
+    plus dated `VERIFIED` / `PENDING` / `UNOBSERVABLE` / `DOCUMENTED` findings, and
+    `**LIMITATION**` for endpoint constraints with connector consequences). Enumerate
+    markers with `grep -rl '\*\*PENDING' . | grep -v opencollection.yml`.
+
+    ### Per-endpoint limitations
+
+    One line each; the request's own docs hold the evidence.
+
+    - `Associations / batch read bare` — v4 is unsupported from March 30, 2027.
+    - `Associations / scope probe id 0 without carts scope` — the ID-`0` probe can't
+      detect a missing associated-object scope (always `207 NO_ASSOCIATIONS_FOUND`).
+    - `Campaigns / access check` — test app lacks `marketing.campaigns.read`.
+    - `Campaigns / sorted page` — `properties` rejects read-only or unknown properties.
+    - `Companies / recent modified bare` — last 30 days or 10K changes only.
+    - `Contact Lists / join-order bare` — docs say ascending order; the connector
+      assumes descending (possible missed memberships, unverified).
+    - `Contact Lists / join-order unknown list` — a deleted list returns 404 and fails
+      the memberships task.
+    - `Contact Lists / search bare` — an empty `hs_lastmodifieddate` is omitted
+      entirely, which the connector reads directly.
+    - `Contacts / search lastmodifieddate replacement` — moving realtime contacts to
+      search inherits the Search API limits.
+    - `Contacts / v1 recently updated bare` — announced retired; still answers today.
+    - `Custom Objects / bare` — the connector uses an undocumented path alias.
+    - `Deal Pipelines / v1 bare` — Pipelines API V1 is sunset on December 4, 2026; the
+      connector reads `Deal Pipelines / 2026-09 bare`.
+    - `Deals / recent modified bare` — last 30 days or 10k changes only.
+    - `Email Events / backfill page bare` — the backfill checkpoints an opaque `offset`
+      token whose lifetime is undocumented.
+    - `Engagements / modified after bare` — undocumented indexing delay.
+    - `Engagements / recent modified bare` — last 30 days or 10k changes only.
+    - `Form Submissions / unknown form probe` — a deleted form returns 404, which the
+      incremental sweep doesn't handle.
+    - `Marketing Events / limit 101` and `/ participations limit 101` — max 100.
+    - `Owners / archived audit` — deactivated users' owners are never captured.
+    - `Owners / limit 501 probe` — max 500 (undocumented).
+    - `Properties / sensitive data audit` — sensitive properties are never captured.
+    - `Tickets / change-log bare` — 1000 changes, 24 hours, no paging.
+    - `Workflows / bare` — test app lacks `automation`; no paging or time filter.
+    - `_crm-objects / list bare` — inline associations repeat an id per association
+      type.
+    - `_crm-objects / list archived audit` — archived (deleted) records are never
+      read, so deletions aren't captured.
+    - `_crm-objects / list limit 101 probe`, `/ list with history limit 51 probe`,
+      `/ batch read 101 inputs probe`, `/ batch read with history 51 inputs probe`,
+      `/ search limit 201 probe` — hard maximums of 100, 50, 100, 50 and 200.
+    - `_crm-objects / search offset 9801 probe` — the 10,000-result cap is a generic
+      400.
+    - `_crm-objects / search window` — relies on undocumented top-level `filters` and
+      microsecond ISO bounds.
+
+    ## Read-only collection
+
+    Nothing in this collection creates, updates or deletes HubSpot data, and there is
+    no `Seeding/` folder, so running it cannot disturb the test account that the
+    capture snapshot (`tests/snapshots/`) is recorded from. Requests are `GET`s, plus
+    four kinds of `POST` that only read: CRM search (`…/search`), object
+    `batch/read`, lists `search`, and v4 associations `batch/read`. The user approved
+    running those on 2026-10-20. Any other `POST`, `PUT`, `PATCH` or `DELETE` still
+    needs the user's go-ahead under the repo's provider-API rules.
+
+    ## Format
+
+    OpenCollection YAML (`opencollection.yml` + one `.yml` per request); requires
+    Bruno / bru CLI >= 3.0.0. Run requests from this directory with:
+    `bru run "<folder>/<request>.yml" --env HubSpot --sandbox developer`
+    (the developer sandbox is required by the sops pre-request script above).
+
+    ## Redaction
+
+    The after-response script mirrors `tests/test_snapshots.py`. It blanks `url` on
+    the items of each top-level array, and any property named `hs_time_in_*`,
+    `hs_date_entered_*` or `hs_date_exited_*`, wherever it appears. The one deliberate
+    exception is cursor fields: `updatedAt`, `lastmodifieddate` and
+    `hs_lastmodifieddate` stay visible, because cursor probes have to read them. The
+    `Deal Pipelines` examples were saved before this exception was added, so their
+    top-level `updatedAt` reads `REDACTED`.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

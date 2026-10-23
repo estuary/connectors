@@ -745,6 +745,9 @@
         "hs_gps_latitude": null,
         "hs_gps_longitude": null,
         "hs_has_active_subscription": null,
+        "hs_inbound_agent_inquiry_type": null,
+        "hs_inbound_agent_last_conversation_date": null,
+        "hs_inbound_agent_qualification_status": null,
         "hs_inferred_language_codes": null,
         "hs_intent_paid_up_to_date": null,
         "hs_intent_signals_enabled": null,
@@ -1496,6 +1499,7 @@
         "hs_last_call_id_with_followups": null,
         "hs_last_conversation_with_followups_object_coordinates": null,
         "hs_last_email_with_followups_object_coordinates": null,
+        "hs_last_followup_timestamp": null,
         "hs_last_gs_shared_message": null,
         "hs_last_meeting_id_with_followups": null,
         "hs_last_partner_shared_message_date": null,
@@ -2126,98 +2130,102 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "active": true,
+      "archived": false,
       "createdAt": "1970-01-01T00:00:00Z",
-      "default": true,
       "displayOrder": 0,
+      "id": "default",
       "label": " Sample Pipeline",
-      "objectType": "DEAL",
-      "objectTypeId": "0-3",
-      "pipelineId": "default",
       "stages": [
         {
-          "active": true,
-          "createdAt": 1743685132529,
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
           "displayOrder": 0,
+          "id": "appointmentscheduled",
           "label": "Appointment Scheduled",
           "metadata": {
             "isClosed": "false",
             "probability": "0.2"
           },
-          "stageId": "appointmentscheduled",
-          "updatedAt": 1743685150749
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
         },
         {
-          "active": true,
-          "createdAt": 1743685132529,
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
           "displayOrder": 1,
+          "id": "qualifiedtobuy",
           "label": "Qualified To Buy",
           "metadata": {
             "isClosed": "false",
             "probability": "0.4"
           },
-          "stageId": "qualifiedtobuy",
-          "updatedAt": 1743685150749
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
         },
         {
-          "active": true,
-          "createdAt": 1743685132529,
-          "displayOrder": 3,
-          "label": "Decision Maker Bought-In",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.8"
-          },
-          "stageId": "decisionmakerboughtin",
-          "updatedAt": 1743685150749
-        },
-        {
-          "active": true,
-          "createdAt": 1743685132529,
-          "displayOrder": 4,
-          "label": "Contract Sent",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.9"
-          },
-          "stageId": "contractsent",
-          "updatedAt": 1743685150749
-        },
-        {
-          "active": true,
-          "createdAt": 1743685132529,
-          "displayOrder": 6,
-          "label": "Closed Lost",
-          "metadata": {
-            "isClosed": "true",
-            "probability": "0.0"
-          },
-          "stageId": "closedlost",
-          "updatedAt": 1743685150749
-        },
-        {
-          "active": true,
-          "createdAt": 1743685132529,
-          "displayOrder": 5,
-          "label": "Closed Won",
-          "metadata": {
-            "isClosed": "true",
-            "probability": "1.0"
-          },
-          "stageId": "closedwon",
-          "updatedAt": 1743685150749
-        },
-        {
-          "active": true,
-          "createdAt": 1743685132529,
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
           "displayOrder": 2,
+          "id": "presentationscheduled",
           "label": "Presentation Scheduled",
           "metadata": {
             "isClosed": "false",
             "probability": "0.6"
           },
-          "stageId": "presentationscheduled",
-          "updatedAt": 1743685150749
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
+        },
+        {
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
+          "displayOrder": 3,
+          "id": "decisionmakerboughtin",
+          "label": "Decision Maker Bought-In",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.8"
+          },
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
+        },
+        {
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
+          "displayOrder": 4,
+          "id": "contractsent",
+          "label": "Contract Sent",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.9"
+          },
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
+        },
+        {
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
+          "displayOrder": 5,
+          "id": "closedwon",
+          "label": "Closed Won",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "1.0"
+          },
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
+        },
+        {
+          "archived": false,
+          "createdAt": "2025-04-03T12:58:52.529Z",
+          "displayOrder": 6,
+          "id": "closedlost",
+          "label": "Closed Lost",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "0.0"
+          },
+          "updatedAt": "2025-04-03T12:59:10.749Z",
+          "writePermissions": "CRM_PERMISSIONS_ENFORCEMENT"
         }
       ],
       "updatedAt": "redacted"

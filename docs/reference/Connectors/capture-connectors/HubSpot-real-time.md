@@ -16,7 +16,7 @@ The connector automatically discovers bindings for the following HubSpot resourc
 * [Contact Lists](https://developers.hubspot.com/docs/api-reference/crm-lists-v3/guide)
 * [Contacts](https://developers.hubspot.com/docs/api/crm/contacts)
 * [Custom Objects](https://developers.hubspot.com/docs/api/crm/crm-custom-objects)
-* [Deal Pipelines](https://developers.hubspot.com/beta-docs/guides/api/crm/pipelines)
+* [Deal Pipelines](https://developers.hubspot.com/docs/api-reference/latest/crm/pipelines/guide)
 * [Deals](https://developers.hubspot.com/docs/api/crm/deals)
 * [Email Events](https://developers.hubspot.com/docs/methods/email/get_events)
 * [Engagements](https://developers.hubspot.com/docs/api/crm/engagements)

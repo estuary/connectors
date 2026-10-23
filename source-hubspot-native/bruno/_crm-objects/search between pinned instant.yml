@@ -1,0 +1,91 @@
+info:
+  name: search between pinned instant
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "lastmodifieddate",
+            "operator": "BETWEEN",
+            "value": "{{crm_search_pin_value}}",
+            "highValue": "{{crm_search_pin_value}}"
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Set by `_crm-objects / search window`; fall back to the contact it pinned on
+        // 2026-10-20 when that request hasn't run in this session.
+        if (!bru.getVar('crm_search_pin_ts')) {
+          bru.setVar('crm_search_pin_id', '72811506244');
+          bru.setVar('crm_search_pin_ts', '2024-10-28T16:40:20.553Z');
+        }
+        // Format like the connector's dt_to_str: microseconds and a Z suffix.
+        const fmt = (ms) => new Date(ms).toISOString().replace(/Z$/, '000Z');
+        const pinMs = Date.parse(bru.getVar('crm_search_pin_ts'));
+        bru.setVar('crm_search_pin_value', fmt(pinMs));
+        bru.setVar('crm_search_pin_plus_1ms', fmt(pinMs + 1));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - pinned contact included at both bounds (projection - total, id and cursor)"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 1,
+            "results": [
+              {
+                "id": "72811506244",
+                "properties": {
+                  "lastmodifieddate": "2024-10-28T16:40:20.553Z"
+                },
+                "updatedAt": "2024-10-28T16:40:20.553Z"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** the delayed subtask reads windows as `[start, chunk_end]` and resumes at
+  `chunk_end + 1 ms` (`fetch_search_objects`). That loses records unless `BETWEEN`
+  includes both of its ends. This probe sets `value` and `highValue` to the same
+  instant: the exact `lastmodifieddate` of the oldest contact in
+  `_crm-objects / search window`, formatted as `dt_to_str` does
+  (`2024-10-28T16:40:20.553000Z`). Run `_crm-objects / search window` first in a fresh
+  session; otherwise the before-request script falls back to the contact it pinned on
+  2026-10-20 (`72811506244`).
+
+  **DOCUMENTED (2026-10-20):** the [search guide](https://developers.hubspot.com/docs/api-reference/legacy/crm/search-the-crm) doesn't say whether `BETWEEN` is inclusive.
+
+  **VERIFIED (2026-10-20):** `total: 1`, the pinned contact `72811506244`. `BETWEEN` is
+  **inclusive at both ends** at millisecond precision. It narrows three contacts to the
+  one modified at that instant.

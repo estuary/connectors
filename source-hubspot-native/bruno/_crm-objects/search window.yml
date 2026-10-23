@@ -1,0 +1,126 @@
+info:
+  name: search window
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "lastmodifieddate",
+            "operator": "BETWEEN",
+            "value": "2024-10-28T16:40:18.000000Z",
+            "highValue": "2026-10-20T00:00:00.000000Z"
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin the oldest match for `_crm-objects / search between pinned instant` and
+        // `_crm-objects / search gte pinned plus 1ms`.
+        const first = res.getBody()?.results?.[0];
+        if (first?.properties?.lastmodifieddate) {
+          bru.setVar('crm_search_pin_id', String(first.id));
+          bru.setVar('crm_search_pin_ts', first.properties.lastmodifieddate);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - total 2, older contact excluded, ascending"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 2,
+            "results": [
+              {
+                "id": "72811506244",
+                "properties": {
+                  "createdate": "2024-10-28T16:39:01.326Z",
+                  "email": "bh@hubspot.com",
+                  "firstname": "Brian",
+                  "hs_object_id": "72811506244",
+                  "lastmodifieddate": "2024-10-28T16:40:20.553Z",
+                  "lastname": "Halligan (Sample Contact)"
+                },
+                "createdAt": "2024-10-28T16:39:01.326Z",
+                "updatedAt": "2024-10-28T16:40:20.553Z",
+                "archived": false,
+                "url": "REDACTED"
+              },
+              {
+                "id": "225877317544",
+                "properties": {
+                  "createdate": "2026-06-02T17:19:07.527Z",
+                  "email": "test@test.com",
+                  "firstname": "John",
+                  "hs_object_id": "225877317544",
+                  "lastmodifieddate": "2026-06-03T01:33:01.284Z",
+                  "lastname": "Doe"
+                },
+                "createdAt": "2026-06-02T17:19:07.527Z",
+                "updatedAt": "2026-06-03T01:33:01.284Z",
+                "archived": false,
+                "url": "REDACTED"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** the body `_request_search_page` (`api/search_objects.py`) sends: one
+  top-level `filters` entry with `BETWEEN` on the last-modified property, an ascending
+  sort on the same property, and `limit: 200`. The bounds use `dt_to_str`'s format
+  (microseconds and `Z`). Contacts use `lastmodifieddate` (`fetch_delayed_contacts`);
+  every other searched object uses `hs_lastmodifieddate` (see
+  `_crm-objects / search companies default properties`). The lower bound sits 4 ms after the
+  oldest contact's `lastmodifieddate` (`16:40:17.996`), so the response shows whether
+  the filter narrows at all. The after-response script pins the oldest match for
+  `_crm-objects / search between pinned instant` and
+  `_crm-objects / search gte pinned plus 1ms`.
+
+  **DOCUMENTED (2026-10-20):** the reference and the [search guide](https://developers.hubspot.com/docs/api-reference/legacy/crm/search-the-crm) only show filters nested in
+  `filterGroups`, and the guide's `BETWEEN` example uses epoch-millisecond strings.
+  Contacts return "createdate, email, firstname, hs_object_id, lastmodifieddate, and
+  lastname" by default. "Only one sorting rule can be applied to any search." "It may
+  take a few moments for newly created or updated CRM objects to appear in search
+  results." The delayed subtask trails realtime by an hour (`DELAYED_LAG`) to cover
+  that lag.
+
+  **VERIFIED (2026-10-20):** `200`, `total: 2`: Brian (`2024-10-28T16:40:20.553Z`) then John
+  (`2026-06-03T01:33:01.284Z`), ascending, with no `paging`. Maria
+  (`16:40:17.996`, before the window) is left out. So HubSpot honors the **top-level
+  `filters`** form and **ISO-8601 bounds with microseconds**, even though the docs show
+  neither. Each result carries exactly the six default contact properties, including
+  the `lastmodifieddate` that `CustomObjectSearchResult` reads.
+
+  **LIMITATION (VERIFIED 2026-10-20):** the connector's search body depends on two forms
+  HubSpot doesn't document: top-level `filters`, and ISO strings with microseconds as
+  bounds. Both work today. The documented form is `"filterGroups": [{"filters": [...]}]`
+  with epoch-millisecond values.

@@ -1,0 +1,49 @@
+info:
+  name: unfiltered control
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/emails"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - empty, account has no marketing emails"
+    request:
+      url: "{{base_url}}/marketing/v3/emails"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 0,
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get all marketing emails (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-emails/get-emails)
+
+  **WHY:** a control for the empty results in this folder. It sends no parameters, so
+  HubSpot's defaults apply. If this is empty too, the emptiness belongs to the account,
+  not to the connector's window, sort or flags.
+
+  **VERIFIED (2026-10-20):** `200`, `{"total": 0, "results": []}`, the same as
+  `Marketing Emails / bare`. The account holds no marketing emails (and, per
+  `Marketing Emails / archived true`, no archived ones either). The capture snapshot
+  likewise has no `marketing_emails` documents.
+
+  **UNOBSERVABLE:** the per-email shape, for the same reason. Populating it would mean
+  creating emails in the test account, which this read-only collection doesn't do.

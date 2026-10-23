@@ -1,0 +1,74 @@
+info:
+  name: search limit 1 paging
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "lastmodifieddate",
+            "operator": "BETWEEN",
+            "value": "2024-10-28T16:40:18.000000Z",
+            "highValue": "2026-10-20T00:00:00.000000Z"
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 1
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - after is a numeric offset (projection - total, id, cursor and paging)"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 2,
+            "results": [
+              {
+                "id": "72811506244",
+                "properties": {
+                  "lastmodifieddate": "2024-10-28T16:40:20.553Z"
+                },
+                "updatedAt": "2024-10-28T16:40:20.553Z"
+              }
+            ],
+            "paging": {
+              "next": {
+                "after": "1"
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** `_fetch_all_ids_between` parses `paging.next.after` with `int()` and treats
+  it as an offset. Both the cap guard (`after + 200 > 10,000`) and the peek at offset
+  9,800 assume that. One result per page forces a `paging` block on the two-record
+  window from `_crm-objects / search window`.
+
+  **VERIFIED (2026-10-20):** `paging.next.after` is `"1"`: a numeric offset (results returned
+  so far), not a record id or an opaque token. There is no `paging.next.link`, which
+  matches `SearchPageResult`. `total` stays 2 whatever the `limit`.
