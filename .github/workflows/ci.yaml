@@ -91,8 +91,6 @@ jobs:
           - source-google-pubsub
           - source-hello-world
           - source-http-file
-          - source-http-ingest
-          - source-kafka
           - source-kinesis
           - source-mongodb
           - source-mysql
@@ -129,7 +127,6 @@ jobs:
           - materialize-google-sheets
           - materialize-hubspot
           - materialize-iceberg
-          - materialize-kafka
           - materialize-mongodb
           - materialize-motherduck
           - materialize-mysql
@@ -216,7 +213,6 @@ jobs:
           contains(fromJson('[
             "source-db2-batch",
             "source-dynamodb",
-            "source-kafka",
             "source-kinesis",
             "source-mysql",
             "source-mysql-batch",
@@ -310,25 +306,6 @@ jobs:
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
 
-      - name: Install system dependencies for Rust connectors
-        if: |
-          contains(fromJson('[
-            "materialize-kafka",
-            "source-kafka"
-            ]'), matrix.connector)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config cmake libssl-dev libsasl2-dev libclang-dev
-
-      # source-kafka's integration tests drive the connector as a local command
-      # against the broker and schema registry started above. They cover seven
-      # topic encodings and capture resumption, and are not run by the Docker
-      # build (which copies only src/).
-      - name: Rust Connector ${{ matrix.connector }} tests
-        if: matrix.connector == 'source-kafka'
-        timeout-minutes: 20
-        run: cargo test --locked --manifest-path source-kafka/Cargo.toml
-
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -357,7 +334,6 @@ jobs:
             "source-kinesis",
             "source-mysql",
             "source-postgres",
-            "source-kafka",
             "source-s3",
             "source-sftp",
             "source-sqlserver"
@@ -437,8 +413,6 @@ jobs:
           FLOW_TEST_FLOWCTL: flowctl-v1
         run: |
           cd ${{ matrix.connector }}
-          # Rust connectors have no Go packages to drive; run.sh skips them the same way.
-          if [ -f Cargo.toml ]; then echo "Rust connector; no runtime v1 pass"; exit 0; fi
           TIMEOUT=20m
           if [ "${{ matrix.connector }}" = "materialize-snowflake" ]; then
             TIMEOUT=30m

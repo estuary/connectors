@@ -102,11 +102,15 @@ class TestLanes(unittest.TestCase):
     def test_each_workflow_triggers_itself(self):
         self.assertEqual(classify(".github/workflows/python.yaml"), (True, False, ALL))
         self.assertEqual(classify(".github/workflows/ci.yaml"), (False, True, []))
+        self.assertEqual(classify(".github/workflows/rust.yaml"), (False, True, []))
 
     def test_python_connector_list_is_python_only(self):
         # python.yaml reads its matrix from this file, so editing the list
         # has to run the Python workflow as editing the matrix did.
         self.assertEqual(classify(".github/python-connectors.yaml"), (True, False, ALL))
+
+    def test_rust_connector_list_is_go_rust_only(self):
+        self.assertEqual(classify(".github/rust-connectors.yaml"), (False, True, []))
 
     def test_python_auto_rerun_workflow_triggers_neither_connector_lane(self):
         self.assertEqual(
