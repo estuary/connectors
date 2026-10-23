@@ -299,8 +299,10 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     })),
                     ..Default::default()
                 })?;
+                tracing::warn!("StartedCommit");
             }
             Some(request::Kind::Acknowledge(_)) => {
+                tracing::warn!("Acknowledge");
                 for binding in bindings.iter_mut() {
                     binding.acknowledge(&catalog).await?;
                 }
@@ -312,6 +314,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     })),
                     ..Default::default()
                 })?;
+                tracing::warn!("Acknowledged");
             }
             _ => {}
         }
