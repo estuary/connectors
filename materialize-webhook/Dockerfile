@@ -17,7 +17,7 @@ COPY materialize-webhook     ./materialize-webhook
 
 # Test and build the connector.
 RUN go test  -tags nozstd -short -v ./materialize-webhook/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-webhook/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-webhook/cmd/connector
 
 # Runtime Stage
 ################################################################################
