@@ -118,7 +118,7 @@ disable the runtime's load optimization, and records the machine type, the
 flowctl build and both commits under `environment` in each file. Compare a
 connector change against its baseline on the same machine type and flowctl
 build; anything else measures the environment. The current baselines ran on a
-c3-standard-22-lssd with flowctl from Flow master `a15bc3fcb0f`.
+c3-standard-22-lssd.
 
 `materialize-null` on the same machine and flowctl (172K docs/s at scale 1)
 is the ceiling those numbers sit under. Delta-update connectors, which never
