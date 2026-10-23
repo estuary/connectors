@@ -11,7 +11,8 @@ authors = [
 # -- widening it changes every member's resolution, not just this connector's.
 requires-python = ">=3.14,<3.15"
 dependencies = [
-    "estuary-cdk[airbyte-shim]",
+    "estuary-cdk",
+    "estuary-cdk-airbyte-shim",
     "freezegun>=1.4.0,<2.0.0",
     "google-ads>=31.2.0,<32.0.0",
     "protobuf>=5.29.5",
@@ -26,6 +27,7 @@ dependencies = [
 # uv finds it.
 [tool.uv.sources]
 estuary-cdk = { workspace = true }
+estuary-cdk-airbyte-shim = { workspace = true }
 
 [build-system]
 requires = ["hatchling==1.27.0"]

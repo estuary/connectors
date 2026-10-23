@@ -1,6 +1,6 @@
 [project]
 name = "estuary_cdk"
-version = "0.2.0"
+version = "0.3.0"
 description = "Estuary Connector Development Kit"
 authors = [
     { name = "Joseph Shearer", email = "joseph@estuary.dev" },
@@ -33,35 +33,19 @@ dependencies = [
 [project.urls]
 homepage = "https://github.com/estuary/connectors/tree/main/estuary-cdk"
 
-# Leaf dependencies of the vendored Airbyte CDK subset under `vendor/`.
-# See vendor/README.md. pydantic is already required above.
-#
-# These are the fork's own constraints, no longer `airbyte-cdk` 0.52.10's: the major
-# bounds are there because the fork is never re-synced upstream, so a breaking major
-# has to be absorbed by editing `vendor/` by hand.
-[project.optional-dependencies]
-airbyte-shim = [
-    "backoff",
-    "dpath>=2.1,<3.0",
-    "jsonref>=1.1,<2.0",
-    "jsonschema>=4,<5",
-    "pendulum>=3,<4",
-    "PyYAML>=6.0.1",
-    "requests",
-    "requests-cache",
-]
-# The wheel ships the vendored Airbyte fork alongside estuary_cdk, as three
-# top-level packages from two roots. `ignore-vcs` is required: the repo
-# .gitignore carries `vendor` for `go mod vendor` output, with an
-# `!estuary-cdk/vendor` negation, and hatchling reads that file relative to
-# THIS directory, where the negation's path no longer matches -- so the
-# vendored tree would be silently excluded from the wheel and from the
-# editable install's search path.
-[tool.hatch.build]
-ignore-vcs = true
+# The vendored Airbyte fork, built from `vendor/`; see vendor/README.md. Only
+# tests/test_airbyte_cdk.py needs it here -- the connectors still on the shim
+# depend on it directly. A group rather than an extra, because groups stay out
+# of wheel metadata: the published wheel must not name a distribution that
+# exists only in this workspace.
+[dependency-groups]
+airbyte-shim = ["estuary-cdk-airbyte-shim"]
+
+[tool.uv.sources]
+estuary-cdk-airbyte-shim = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
-packages = ["estuary_cdk", "vendor/airbyte_cdk", "vendor/airbyte_protocol"]
+packages = ["estuary_cdk"]
 
 [build-system]
 requires = ["hatchling==1.27.0"]
