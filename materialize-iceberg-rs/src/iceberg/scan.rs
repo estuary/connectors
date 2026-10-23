@@ -41,8 +41,11 @@ use super::single_value::compare_keys;
 /// rather than an entire (potentially arbitrarily long) transaction's worth
 /// of `Load` calls — each batch's matches are emitted via `load`'s `emit`
 /// callback as soon as that batch resolves, instead of accumulating across
-/// the whole call.
-const DEFAULT_LOAD_BATCH_SIZE: usize = 100000;
+/// the whole call. Also used by `transactor.rs` to trigger a `load` call as
+/// soon as a binding's queued `Load` keys reach this many, rather than
+/// waiting for `Flush` — a transaction's total `Load` count is outside the
+/// connector's control, so nothing here should scale with it.
+pub(crate) const DEFAULT_LOAD_BATCH_SIZE: usize = 100000;
 
 /// One matched document from [`load`]: the index into the `requested_keys`
 /// slice it answers, and the augmented `flow_document` JSON bytes (with
@@ -55,9 +58,14 @@ pub struct LoadedDoc {
     pub doc_json: Vec<u8>,
 }
 
-/// Assigns small integer indices to file paths, deduplicating repeats.
+/// Assigns small integer indices to file paths, deduplicating repeats. Lives
+/// on `BindingState` across a whole transaction (not just one `load` call) so
+/// that `_meta.file_path` indices stay consistent across however many
+/// threshold-triggered `load` calls a transaction's `Load` keys are split
+/// into — a fresh table per call would let two calls both hand out index 0
+/// to different files.
 #[derive(Default)]
-struct FilePathTable {
+pub(crate) struct FilePathTable {
     paths: Vec<String>,
     index: HashMap<String, usize>,
 }
@@ -71,6 +79,10 @@ impl FilePathTable {
         self.paths.push(path.to_string());
         self.index.insert(path.to_string(), i);
         i
+    }
+
+    pub(crate) fn get(&self, index: usize) -> Option<&str> {
+        self.paths.get(index).map(String::as_str)
     }
 }
 
@@ -115,20 +127,25 @@ impl ScanStats {
 /// Matched documents are passed to `emit` as soon as their batch resolves,
 /// rather than being accumulated and returned all at once — otherwise a
 /// transaction with many `Load` calls would hold every matched document in
-/// memory until the very last batch finished scanning. Returns the table of
-/// distinct data file paths referenced by emitted documents' injected
-/// `_meta.file_path` indices, in assignment order; deduplicated so its size
-/// is bounded by the number of distinct files touched by this call, not the
-/// number of matched rows.
-pub async fn load(
+/// memory until the very last batch finished scanning. Distinct data file
+/// paths referenced by emitted documents' injected `_meta.file_path`
+/// indices are interned into `file_paths` as they're found (in assignment
+/// order; deduplicated, so its size is bounded by the number of distinct
+/// files touched, not the number of matched rows) — it's an `&mut`
+/// parameter rather than a return value so a caller that invokes `load`
+/// more than once per transaction (see `DEFAULT_LOAD_BATCH_SIZE`'s doc
+/// comment) can keep assigning indices from the same table across calls.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn load(
     catalog: &Catalog,
     table: &str,
     collection: &str,
     schema: &Schema,
     num_keys: usize,
     requested_keys: &[Bytes],
+    file_paths: &mut FilePathTable,
     mut emit: impl FnMut(LoadedDoc) -> Result<()>,
-) -> Result<Vec<String>> {
+) -> Result<()> {
     let started = Instant::now();
 
     let Some(current) = catalog.current_snapshot(table).await? else {
@@ -139,7 +156,7 @@ pub async fn load(
             elapsed_ms = started.elapsed().as_millis(),
             "load scan: table has no snapshot yet"
         );
-        return Ok(Vec::new());
+        return Ok(());
     };
 
     let manifests =
@@ -171,7 +188,6 @@ pub async fn load(
         .collect();
     let doc_index = schema.fields().len() - 1;
 
-    let mut file_paths = FilePathTable::default();
     let mut stats = ScanStats::default();
     let mut matched = 0usize;
     let mut counting_emit = |doc: LoadedDoc| -> Result<()> {
@@ -198,7 +214,7 @@ pub async fn load(
             &key_types,
             doc_index,
             &batch,
-            &mut file_paths,
+            file_paths,
             &mut counting_emit,
         )
         .await?;
@@ -210,18 +226,19 @@ pub async fn load(
         collection,
         requested = requested_keys.len(),
         matched,
-        distinct_files_read = file_paths.paths.len(),
+        // Cumulative across every `load` call so far this transaction, since
+        // `file_paths` is shared across them — not just this one call's.
+        distinct_files_read_so_far = file_paths.paths.len(),
         data_files_opened = stats.data_files_opened,
         manifest_entries_considered = stats.manifest_entries_considered,
         manifest_entries_pruned = stats.manifest_entries_pruned,
         row_groups_considered = stats.row_groups_considered,
         row_groups_pruned = stats.row_groups_pruned,
-        files_read = ?file_paths.paths,
         elapsed_ms = started.elapsed().as_millis(),
         "load scan complete"
     );
 
-    Ok(file_paths.paths)
+    Ok(())
 }
 
 /// Unpacks one requested key's raw tuple bytes and converts it to a `Bound`

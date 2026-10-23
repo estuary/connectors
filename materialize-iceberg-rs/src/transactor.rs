@@ -132,37 +132,21 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
 
         match request.kind {
             Some(request::Kind::Load(load)) => {
+                let index = load.binding;
                 let binding = &mut bindings[load.binding as usize];
                 binding.pending_loads.push(load.key_packed);
+                // Scan as soon as a batch's worth has queued, rather than
+                // waiting for `Flush` — a transaction's total `Load` count
+                // is outside the connector's control, so `pending_loads`
+                // must never be allowed to grow to the whole transaction's
+                // size.
+                if binding.pending_loads.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
+                    flush_pending_loads(&catalog, output, index, binding).await?;
+                }
             }
             Some(request::Kind::Flush(_)) => {
                 for (index, binding) in bindings.iter_mut().enumerate() {
-                    if binding.pending_loads.is_empty() {
-                        continue;
-                    }
-
-                    let key_bytes: Vec<Bytes> = binding.pending_loads.drain(..).collect();
-
-                    let file_paths = scan::load(
-                        &catalog,
-                        &binding.table,
-                        &binding.collection,
-                        &binding.schema,
-                        binding.key_builders.len(),
-                        &key_bytes,
-                        |loaded| {
-                            output.send(Response {
-                                kind: Some(response::Kind::Loaded(response::Loaded {
-                                    binding: index as u32,
-                                    doc_json: loaded.doc_json.into(),
-                                })),
-                                ..Default::default()
-                            })
-                        },
-                    )
-                    .await?;
-
-                    binding.load_file_paths = file_paths;
+                    flush_pending_loads(&catalog, output, index as u32, binding).await?;
                 }
 
                 output.send(Response {
@@ -203,7 +187,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     let file_path = binding
                         .load_file_paths
                         .get(file_index)
-                        .cloned()
+                        .map(str::to_string)
                         .with_context(|| {
                             format!("_meta.file_path index {file_index} is out of range")
                         })?;
@@ -290,6 +274,11 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                         "transaction summary"
                     );
                     binding.transaction_counts = TransactionCounts::default();
+                    // `_meta.file_path` indices only need to resolve for
+                    // `Store` calls within the transaction that produced
+                    // them; starting the next one fresh keeps this table
+                    // from growing for the connector's whole lifetime.
+                    binding.load_file_paths = scan::FilePathTable::default();
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
@@ -319,6 +308,48 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
             _ => {}
         }
     }
+}
+
+/// Scans whatever `Load` keys are currently queued for `binding` and sends
+/// their matches, if any — a no-op if nothing's queued. Shared by both the
+/// threshold-triggered call in the `Load` arm and the end-of-transaction
+/// call in the `Flush` arm, since both need the same drain-scan-emit
+/// sequence.
+async fn flush_pending_loads(
+    catalog: &Catalog,
+    output: &mut Output,
+    index: u32,
+    binding: &mut BindingState,
+) -> Result<()> {
+    if binding.pending_loads.is_empty() {
+        return Ok(());
+    }
+
+    // `mem::take` rather than `drain(..)`: drain empties the Vec but keeps
+    // its allocated capacity, which would otherwise permanently retain
+    // this binding's largest-ever Load batch size in memory for the rest
+    // of the connector's lifetime.
+    let key_bytes: Vec<Bytes> = std::mem::take(&mut binding.pending_loads);
+
+    scan::load(
+        catalog,
+        &binding.table,
+        &binding.collection,
+        &binding.schema,
+        binding.key_builders.len(),
+        &key_bytes,
+        &mut binding.load_file_paths,
+        |loaded| {
+            output.send(Response {
+                kind: Some(response::Kind::Loaded(response::Loaded {
+                    binding: index,
+                    doc_json: loaded.doc_json.into(),
+                })),
+                ..Default::default()
+            })
+        },
+    )
+    .await
 }
 
 fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::ConnectorState> {
@@ -402,14 +433,18 @@ struct BindingState {
     /// Reset to 0 each time a data file is flushed. A cheap proxy for the
     /// eventual encoded Parquet size, using lengths already in hand.
     estimated_bytes: usize,
-    /// Raw `key_packed` from `Load` requests this transaction, buffered
-    /// until `Flush` triggers the actual scan.
+    /// Raw `key_packed` from `Load` requests, buffered until there's
+    /// `DEFAULT_LOAD_BATCH_SIZE`-worth to scan (see `maybe_flush_loads`) or
+    /// `Flush` arrives, whichever comes first — never the whole
+    /// transaction's `Load` count at once, since that's outside the
+    /// connector's control.
     pending_loads: Vec<Bytes>,
-    /// The file-path table from this transaction's `Flush`-triggered
-    /// `scan::load` call. `Store`'s `_meta.file_path` (an index into this,
-    /// not a path) is resolved through it — deduplicated by `scan::load`,
-    /// so its size is bounded by distinct files touched, not rows touched.
-    load_file_paths: Vec<String>,
+    /// The file-path table `scan::load` interns into across however many
+    /// calls this transaction makes (see `pending_loads`'s doc comment).
+    /// `Store`'s `_meta.file_path` (an index into this, not a path) is
+    /// resolved through it — deduplicated, so its size is bounded by
+    /// distinct files touched, not rows touched.
+    load_file_paths: scan::FilePathTable,
     /// Positions to mask with a positional delete this transaction, by the
     /// data file_path they were found in (`_meta.file_path`/
     /// `_meta.positional_delete` on the existing document, carried forward
@@ -558,7 +593,11 @@ impl BindingState {
             .pending_snapshot_id
             .get_or_insert_with(|| self.checkpoint.sequence_number + 1);
 
-        for (file_path, positions) in self.pending_deletes.drain() {
+        // `mem::take` rather than `drain()`: same reasoning as
+        // `pending_loads` above — drain keeps the HashMap's allocated
+        // capacity, permanently retaining this binding's largest-ever
+        // delete set.
+        for (file_path, positions) in std::mem::take(&mut self.pending_deletes) {
             let pending_manifest = write_position_delete_file(
                 catalog,
                 &self.table,
@@ -873,7 +912,7 @@ fn binding_state(
         rows: 0,
         estimated_bytes: 0,
         pending_loads: Vec::new(),
-        load_file_paths: Vec::new(),
+        load_file_paths: scan::FilePathTable::default(),
         pending_deletes: HashMap::new(),
         transaction_counts: TransactionCounts::default(),
         checkpoint,
