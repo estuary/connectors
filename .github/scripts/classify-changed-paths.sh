@@ -2,7 +2,7 @@
 #
 # Work out which connector CI lanes a set of changed paths affects.
 #
-# Reads changed paths on stdin, one per line, and writes five lines to stdout:
+# Reads changed paths on stdin, one per line, and writes six lines to stdout:
 #
 #   python=true|false        a path in the Python lane changed; it can be true
 #                            while python_connectors is [], for a Python
@@ -12,12 +12,18 @@
 #   python_connectors=...    the Python connectors to build: `all` when a path
 #                            shared by every one of them changed, otherwise a
 #                            compact JSON list of connector directories
+#   go_connectors=...        the Go connectors to build, in the same form
 #   rust_connectors=...      the Rust connectors to build, in the same form
+#
+# Go connectors are selected by go_connectors.py from the import graph in the
+# file $GO_IMPORT_GRAPH names (see that script). Without one, any change that
+# could affect a Go connector selects all of them.
 #
 # The lane chosen for each path is logged to stderr.
 set -euo pipefail
 
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 
 python=false
 go_rust=false
@@ -27,6 +33,11 @@ cdk=false
 # connector directories collected in $python_dirs are affected.
 python_all=false
 python_dirs=()
+
+# Likewise for the Go connectors, whose candidate paths go to go_connectors.py
+# once they're all collected.
+go_all=false
+go_paths=()
 
 # Likewise for the Rust connectors.
 rust_all=false
@@ -166,9 +177,14 @@ while IFS= read -r path || [ -n "$path" ]; do
                     python_all=true ;;
                 *) python_dirs+=("${path%%/*}") ;;
             esac
+            # materialize-snowflake's image also holds estuary-cdk.
+            case "$path" in
+                estuary-cdk/*) go_paths+=("$path") ;;
+            esac
             ;;
         go_rust)
             go_rust=true
+            go_paths+=("$path")
             rust_select "$path"
             ;;
         both)
@@ -176,6 +192,7 @@ while IFS= read -r path || [ -n "$path" ]; do
             python=true
             python_all=true
             go_rust=true
+            go_all=true
             rust_all=true
             ;;
     esac
@@ -200,6 +217,22 @@ else
     # under `set -u`.
     jq -cn '$ARGS.positional | unique' --args ${python_dirs[@]+"${python_dirs[@]}"} |
         sed 's/^/python_connectors=/'
+fi
+if [ "$go_all" = true ]; then
+    echo "go_connectors=all"
+elif [ "${#go_paths[@]}" -eq 0 ]; then
+    echo "go_connectors=[]"
+elif [ -z "${GO_IMPORT_GRAPH:-}" ]; then
+    echo "  no import graph; every Go connector" >&2
+    echo "go_connectors=all"
+elif ! go_connectors=$(printf '%s\n' "${go_paths[@]}" |
+        python3 -I "$SCRIPT_DIR/go_connectors.py" --graph "$GO_IMPORT_GRAPH" \
+            --connectors "$REPO_ROOT/.github/go-connectors.yaml" \
+            --rust-connectors "$REPO_ROOT/.github/rust-connectors.yaml"); then
+    echo "  go_connectors.py failed; every Go connector" >&2
+    echo "go_connectors=all"
+else
+    echo "go_connectors=${go_connectors}"
 fi
 if [ "$rust_all" = true ]; then
     echo "rust_connectors=all"
