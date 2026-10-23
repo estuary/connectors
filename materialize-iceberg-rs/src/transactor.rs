@@ -768,6 +768,8 @@ impl BindingState {
             return Ok(());
         }
 
+        tracing::info!(table = %self.table, "acknowledge: starting");
+
         let snapshot_id = self
             .checkpoint
             .pending_snapshot_id
@@ -777,6 +779,7 @@ impl BindingState {
             Some(path) => manifest_list::read_manifest_list(&catalog.object_store, path).await?,
             None => Vec::new(),
         };
+        tracing::info!(table = %self.table, "acknowledge: read prior manifest list");
 
         let manifest_list_path = manifest_list::write_manifest_list(
             &catalog.object_store,
@@ -788,6 +791,7 @@ impl BindingState {
             &self.checkpoint.pending_manifests,
         )
         .await?;
+        tracing::info!(table = %self.table, "acknowledge: wrote new manifest list");
 
         let data_manifests = self
             .checkpoint
@@ -816,7 +820,9 @@ impl BindingState {
             added_position_deletes,
         );
 
+        tracing::info!(table = %self.table, "acknowledge: calling commit_snapshot");
         self.commit_snapshot(catalog, snapshot).await?;
+        tracing::info!(table = %self.table, "acknowledge: commit_snapshot returned");
 
         self.checkpoint.snapshot_id = Some(snapshot_id);
         self.checkpoint.sequence_number = snapshot_id;
@@ -863,6 +869,7 @@ impl BindingState {
         let port = server::listen_port();
         let url = format!("http://127.0.0.1:{port}/v1/{CATALOG_PREFIX}/transactions/commit");
 
+        tracing::info!(table = %self.table, %url, "commit_snapshot: sending request");
         let response = catalog
             .http_client
             .post(&url)
@@ -870,6 +877,7 @@ impl BindingState {
             .send()
             .await
             .context("calling embedded catalog commit endpoint")?;
+        tracing::info!(table = %self.table, status = %response.status(), "commit_snapshot: got response");
 
         if !response.status().is_success() {
             let status = response.status();

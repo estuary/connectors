@@ -67,10 +67,12 @@ async fn commit_transaction(
     Json(request): Json<CommitTransactionRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     for change in request.table_changes {
+        tracing::info!(table = %change.identifier.name, "commit_transaction: received, committing");
         catalog
             .commit(&change.identifier.name, &change.updates)
             .await
             .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+        tracing::info!(table = %change.identifier.name, "commit_transaction: committed");
     }
 
     Ok(StatusCode::NO_CONTENT)

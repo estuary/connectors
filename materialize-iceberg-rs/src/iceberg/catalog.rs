@@ -161,6 +161,7 @@ impl Catalog {
     }
 
     async fn load_metadata(&self, table: &str) -> Result<Option<(u64, TableMetadata)>> {
+        tracing::info!(table, "load_metadata: getting version-hint");
         let version = match self.object_store.get(&self.version_hint_path(table)).await {
             Ok(result) => {
                 let bytes = result.bytes().await.context("reading version-hint")?;
@@ -173,8 +174,10 @@ impl Catalog {
             Err(object_store::Error::NotFound { .. }) => return Ok(None),
             Err(err) => return Err(err.into()),
         };
+        tracing::info!(table, version, "load_metadata: got version-hint");
 
         let metadata_path = self.find_metadata_path(table, version).await?;
+        tracing::info!(table, %metadata_path, "load_metadata: found metadata path");
 
         let bytes = self
             .object_store
@@ -184,6 +187,7 @@ impl Catalog {
             .bytes()
             .await
             .context("reading table metadata body")?;
+        tracing::info!(table, "load_metadata: fetched metadata body");
 
         let metadata: TableMetadata =
             serde_json::from_slice(&bytes).context("decoding table metadata")?;
@@ -242,7 +246,9 @@ impl Catalog {
             }
         }
 
+        tracing::info!(table, "Catalog::commit: loading existing metadata");
         let existing = self.load_metadata(table).await?;
+        tracing::info!(table, "Catalog::commit: loaded existing metadata");
         let version = existing.as_ref().map_or(0, |(version, _)| *version);
 
         let mut metadata = match existing {
@@ -270,10 +276,12 @@ impl Catalog {
         });
 
         let bytes = serde_json::to_vec_pretty(&metadata).context("encoding table metadata")?;
+        tracing::info!(table, "Catalog::commit: uploading table metadata");
         self.object_store
             .put(&metadata_path, PutPayload::from(bytes))
             .await
             .context("uploading table metadata")?;
+        tracing::info!(table, "Catalog::commit: updating version-hint");
         self.object_store
             .put(
                 &self.version_hint_path(table),
@@ -281,6 +289,7 @@ impl Catalog {
             )
             .await
             .context("updating version-hint")?;
+        tracing::info!(table, "Catalog::commit: done");
 
         Ok(metadata)
     }
