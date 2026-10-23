@@ -14,13 +14,13 @@ set -o nounset
   exit 1
 }
 
-CONFIG_JSON=$(sops -d --output-type json "$BENCH_CONFIG" 2>/dev/null ||
-  python3 -c 'import json,sys,yaml; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))' "$BENCH_CONFIG")
-
-python3 - "$CONFIG_JSON" <<'PY'
+# The decrypted config travels on stdin: a command line is readable by every
+# local user through /proc/<pid>/cmdline.
+{ sops -d "$BENCH_CONFIG" 2>/dev/null || cat "$BENCH_CONFIG"; } | python3 /dev/fd/3 3<<'PY'
 import json, sys, time, urllib.error, urllib.parse, urllib.request
+import yaml
 
-cfg = json.loads(sys.argv[1])
+cfg = yaml.safe_load(sys.stdin)
 creds, catalog = cfg["credentials"], cfg["catalog"]
 api = catalog["uri"].rstrip("/")  # .../api/catalog
 management = api.rsplit("/catalog", 1)[0] + "/management/v1"

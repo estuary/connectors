@@ -60,14 +60,16 @@ export MACHINE_TYPE CONNECTORS_COMMIT FLOW_COMMIT=${FLOW_COMMIT:-}
 edit_config() {
   local path=$1 script=$2
   if grep -q '^sops:' "$path"; then
-    local plain
-    plain=$(sops -d "$path" | python3 -c 'import sys, json, yaml; c = yaml.safe_load(sys.stdin); exec(sys.argv[1]); print(json.dumps(c))' "$script")
-    python3 - "$path" "$plain" <<'PY'
-import json, subprocess, sys
-path, plain = sys.argv[1], json.loads(sys.argv[2])
+    # The decrypted config travels on stdin: a command line is readable by
+    # every local user through /proc/<pid>/cmdline.
+    sops -d "$path" | python3 /dev/fd/3 "$path" "$script" 3<<'PY'
+import json, subprocess, sys, yaml
+path, script = sys.argv[1], sys.argv[2]
+c = yaml.safe_load(sys.stdin)
+exec(script)
 for key in ("advanced", "schema"):
-    if key in plain:
-        subprocess.run(["sops", "set", path, f'["{key}"]', json.dumps(plain[key])], check=True)
+    if key in c:
+        subprocess.run(["sops", "set", path, f'["{key}"]', json.dumps(c[key])], check=True)
 PY
   else
     python3 - "$path" "$script" <<'PY'
