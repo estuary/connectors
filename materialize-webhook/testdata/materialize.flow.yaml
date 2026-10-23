@@ -19,3 +19,21 @@ materializations:
       source: tests/data-types
       fields:
         recommended: true
+
+  acmeCo/tests/materialize-webhook-fields:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.fields.yaml
+    bindings:
+    - resource:
+        relativePath: simple-fields
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        relativePath: data-types-fields
+      source: tests/data-types
+      fields:
+        recommended: true
