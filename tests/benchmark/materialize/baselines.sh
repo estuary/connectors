@@ -40,7 +40,7 @@ RUNS=(
   materialize-redshift:materialize-redshift/testdata/config.local.yaml
   materialize-azure-fabric-warehouse:materialize-azure-fabric-warehouse/testdata/config.yaml
   materialize-motherduck:materialize-motherduck/testdata/config.s3.yaml
-  materialize-iceberg:materialize-iceberg/testdata/config.rest-local.yaml
+  materialize-iceberg:materialize-iceberg/testdata/config.bench.yaml
   materialize-s3-iceberg:materialize-s3-iceberg/testdata/config.yaml
   materialize-mongodb:materialize-mongodb/testdata/config.local.yaml
   materialize-elasticsearch:materialize-elasticsearch/testdata/config.local.yaml
