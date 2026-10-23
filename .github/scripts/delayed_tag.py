@@ -4,7 +4,7 @@ delayed_tag.py — compute the ':delayed' image tag plan for Estuary connectors.
 
 Subcommands
 -----------
-plan   Read ci.yaml and the connector lists, query GitHub for merged PRs,
+plan   Read the connector lists, query GitHub for merged PRs,
        then for each connector pick the most recent PR that (a) touched that
        connector's directory, (b) was merged at least CUTOFF_DAYS ago, and
        (c) has not been reverted on main. Writes plan.tsv and later.tsv.
@@ -211,12 +211,12 @@ def filter_backward_moves(
 # ---------------------------------------------------------------------------
 
 def load_connector_images(
-    ci_yaml: str, python_connectors: str, rust_connectors: str
+    go_connectors: str, python_connectors: str, rust_connectors: str
 ) -> list:
     """
-    Return the list of (image_name, source_dir) pairs from the workflow
-    matrix entries and the connector lists.  Variants in <connector>/VARIANTS
-    inherit their parent's source_dir.
+    Return the list of (image_name, source_dir) pairs from the connector
+    lists.  Variants in <connector>/VARIANTS inherit their parent's
+    source_dir.
     """
     def yq_list(query: str, path: str) -> list:
         try:
@@ -238,8 +238,7 @@ def load_connector_images(
         return names
 
     raw_connectors = (
-        yq_list('.jobs.build_connectors.strategy.matrix.connector[]', ci_yaml) +
-        yq_list('.jobs.build_connectors.strategy.matrix.include[].connector', ci_yaml) +
+        list_names(go_connectors) +
         list_names(rust_connectors) +
         list_names(python_connectors)
     )
@@ -1084,7 +1083,7 @@ def cmd_plan(args: argparse.Namespace) -> None:
     print(f'HEAD:   {head_sha[:7]}')
 
     connector_images = load_connector_images(
-        args.ci_yaml, args.python_connectors, args.rust_connectors
+        args.go_connectors, args.python_connectors, args.rust_connectors
     )
     print(f'Considering {len(connector_images)} connector image(s)')
 
@@ -1322,13 +1321,13 @@ def cmd_forward(args: argparse.Namespace) -> None:
     """
     selected = args.connector.strip()
     images = load_connector_images(
-        args.ci_yaml, args.python_connectors, args.rust_connectors
+        args.go_connectors, args.python_connectors, args.rust_connectors
     )
     family = resolve_family(images, selected)
     if not family:
         print(
             f'::error::unknown connector {selected!r}: not found in the '
-            f'ci.yaml matrix or the connector lists',
+            'connector lists',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1363,7 +1362,7 @@ def main(argv: Optional[list] = None) -> None:
 
     p = sub.add_parser('plan', help='compute per-connector boundary PRs')
     p.add_argument('--repo',          default=os.environ.get('GITHUB_REPOSITORY', ''))
-    p.add_argument('--ci-yaml',       default='.github/workflows/ci.yaml')
+    p.add_argument('--go-connectors', default='.github/go-connectors.yaml')
     p.add_argument('--python-connectors', default='.github/python-connectors.yaml')
     p.add_argument('--rust-connectors', default='.github/rust-connectors.yaml')
     p.add_argument('--cutoff-days',   type=int, default=14)
@@ -1403,7 +1402,7 @@ def main(argv: Optional[list] = None) -> None:
     )
     p.add_argument('--connector',   required=True,
                    help='connector image name, e.g. source-postgres')
-    p.add_argument('--ci-yaml',     default='.github/workflows/ci.yaml')
+    p.add_argument('--go-connectors', default='.github/go-connectors.yaml')
     p.add_argument('--python-connectors', default='.github/python-connectors.yaml')
     p.add_argument('--rust-connectors', default='.github/rust-connectors.yaml')
     p.add_argument('--output',      default='/tmp/forward_plan.tsv')
