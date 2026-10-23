@@ -83,7 +83,7 @@ class TestPrTouchesDir(unittest.TestCase):
         self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
 
     def test_root_files_dont_match(self):
-        pr = make_pr(1, 0, 'a', ['Makefile', 'go.sum', '.github/workflows/ci.yaml'])
+        pr = make_pr(1, 0, 'a', ['Makefile', 'go.sum', '.github/workflows/go.yaml'])
         self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
 
     def test_multiple_paths_one_matches(self):
@@ -363,7 +363,7 @@ class TestLoadConnectorImages(unittest.TestCase):
 
     def load(self, **overrides):
         paths = {
-            'ci_yaml': REPO_ROOT / '.github/workflows/ci.yaml',
+            'go_connectors': REPO_ROOT / '.github/go-connectors.yaml',
             'python_connectors': REPO_ROOT / '.github/python-connectors.yaml',
             'rust_connectors': REPO_ROOT / '.github/rust-connectors.yaml',
         }
@@ -381,6 +381,11 @@ class TestLoadConnectorImages(unittest.TestCase):
         with self.assertRaises(SystemExit), \
                 mock.patch('sys.stderr', new_callable=io.StringIO):
             self.load(python_connectors=REPO_ROOT / 'nonexistent.yaml')
+
+    def test_unreadable_go_list_is_fatal(self):
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.load(go_connectors=REPO_ROOT / 'nonexistent.yaml')
 
     def test_unreadable_rust_list_is_fatal(self):
         with self.assertRaises(SystemExit), \
