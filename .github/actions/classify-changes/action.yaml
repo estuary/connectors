@@ -5,15 +5,6 @@ description: >
   pyproject.toml rather than by name.
 
 outputs:
-  python:
-    description: >
-      Whether any path in the Python lane changed. python.yaml gates its
-      builds on its connector matrix instead, so this is informational, and
-      is what python.yaml falls back to if connector selection is reverted.
-    value: ${{ steps.classify.outputs.python }}
-  go_rust:
-    description: Whether the Go & Rust connector workflow needs to run.
-    value: ${{ steps.classify.outputs.go_rust }}
   python_connectors:
     description: >
       The Python connectors to build: `all`, or a JSON list of connector
@@ -67,10 +58,10 @@ runs:
       run: |
         set -uo pipefail
 
-        # Every failure path below runs both lanes.
+        # Every failure path below builds every connector in every lane.
         fallback() {
-          echo "$1; running both lanes to be safe"
-          printf 'python=true\ngo_rust=true\npython_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
+          echo "$1; building every connector to be safe"
+          printf 'python_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
           exit 0
         }
 
@@ -78,8 +69,8 @@ runs:
         # build everything.
         case "${{ github.event_name }}" in
           schedule | workflow_dispatch)
-            echo "${{ github.event_name }} run; running both lanes"
-            printf 'python=true\ngo_rust=true\npython_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
+            echo "${{ github.event_name }} run; building every connector"
+            printf 'python_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
             exit 0
             ;;
         esac
@@ -137,9 +128,7 @@ runs:
           value=$(sed -n "s/^$1=//p" <<< "$VERDICT")
           [ "$value" = all ] || jq -e 'type == "array"' <<< "$value" > /dev/null 2>&1
         }
-        if ! grep -Eq '^python=(true|false)$' <<< "$VERDICT" ||
-           ! grep -Eq '^go_rust=(true|false)$' <<< "$VERDICT" ||
-           ! grep -Eq '^cdk=(true|false)$' <<< "$VERDICT" ||
+        if ! grep -Eq '^cdk=(true|false)$' <<< "$VERDICT" ||
            ! is_connectors python_connectors ||
            ! is_connectors go_connectors ||
            ! is_connectors rust_connectors; then
