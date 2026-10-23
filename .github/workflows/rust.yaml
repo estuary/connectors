@@ -1,0 +1,279 @@
+name: Rust Connectors
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Don't cancel in progress builds of main, since that can result in connector
+  # specs not being updated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: &non_code_paths
+      - "**.md"
+      - "docs/**"
+      - ".claude/**"
+      - ".github/workflows/python.yaml"
+      - ".github/workflows/python-auto-rerun.yaml"
+
+  pull_request:
+    branches: [main]
+    paths-ignore: *non_code_paths
+
+jobs:
+  # Which connectors did this change touch? This job classifies every changed
+  # path, and the build jobs below gate on its answer.
+  #
+  # It can't be a `paths` filter because dynamically telling a Python connector
+  # from a Go or Rust one means looking for a pyproject.toml, which needs the
+  # checked out tree & nothing is checked out when `paths` filters are evaluated.
+  classify_changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.classify.outputs.go_rust }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: classify
+        uses: ./.github/actions/classify-changes
+
+      # The connector list lives in its own file so it can be read as data.
+      # Any change in the Go & Rust lane builds every Rust connector.
+      - id: matrix
+        uses: ./.github/actions/select-connectors
+        with:
+          list: .github/rust-connectors.yaml
+          connectors: all
+
+  fetch_flow:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Flow binaries
+        uses: ./.github/actions/fetch-flow-artifact
+
+  # ci.yaml moves base-image's `dev` and version tags; this workflow only
+  # pushes the SHA tag its own connectors build on.
+  build_base_image:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.base_image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: base_image
+        uses: ./.github/actions/build-base-image
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          push_dev_tags: "false"
+
+  build_connectors:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+      pull-requests: read
+    # Without this a wedged job runs to GitHub's six-hour default.
+    timeout-minutes: 60
+    needs: [classify_changes, build_base_image, fetch_flow]
+    if: needs.classify_changes.outputs.run == 'true'
+    name: ${{ matrix.connector.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare
+        id: prep
+        run: |
+          TAG=$(echo $GITHUB_SHA | head -c7)
+          echo ::set-output name=tag::${TAG}
+          VERSION=$(cat ${{ matrix.connector.name }}/VERSION | tr -d '\n')
+          echo ::set-output name=version::${VERSION}
+          VARIANTS="${{ matrix.connector.name }} $(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
+          echo ::set-output name=variants::${VARIANTS}
+
+      - name: Restore Flow binaries
+        uses: ./.github/actions/restore-flow-binaries
+
+      - name: Authenticate with GCloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: estuary-theatre
+          workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
+          service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: estuary-theatre
+
+      - name: Login to GitHub package docker registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver-opts: |
+            network=host
+
+      - name: Create docker network flow-test
+        run: docker network create flow-test
+
+      - name: Start Dockerized test infrastructure
+        if: |
+          contains(fromJson('[
+            "source-kafka"
+            ]'), matrix.connector.name)
+        run: |
+          set +e # Show logs even if startup fails
+          # --wait blocks until every service's healthcheck passes. Bound it:
+          # without a timeout a healthcheck which never goes green hangs the
+          # job until the workflow-level limit rather than failing here.
+          docker compose --file ${{ matrix.connector.name }}/docker-compose.yaml up --wait --wait-timeout 300
+          docker logs ${{ matrix.connector.name }}-db-1
+
+      - name: Install system dependencies for Rust connectors
+        if: |
+          contains(fromJson('[
+            "materialize-kafka",
+            "source-kafka"
+            ]'), matrix.connector.name)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config cmake libssl-dev libsasl2-dev libclang-dev
+
+      # source-kafka's integration tests drive the connector as a local command
+      # against the broker and schema registry started above. They cover seven
+      # topic encodings and capture resumption, and are not run by the Docker
+      # build (which copies only src/).
+      - name: Rust Connector ${{ matrix.connector.name }} tests
+        if: matrix.connector.name == 'source-kafka'
+        timeout-minutes: 20
+        run: cargo test --locked --manifest-path source-kafka/Cargo.toml
+
+      - name: Build ${{ matrix.connector.name }} Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.connector.name }}/Dockerfile
+          load: true
+          build-args: |
+            BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
+            CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
+          tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+
+      # Fetch the spec from the built image, to catch images which are entirely
+      # broken. This is the only image-level coverage for connectors whose real
+      # tests drive the connector as a local command or in-process driver.
+      #
+      # TODO(johnny): ungate this step so it runs for every connector in the
+      # matrix. The gate below is conservatism to keep the scope of the
+      # preview-next test migration small, not a statement that other
+      # connectors' images don't merit a smoke test -- they do, and the check
+      # costs about a second.
+      - name: Source connector ${{ matrix.connector.name }} image smoke test
+        if: |
+          contains(fromJson('[
+            "source-kafka"
+            ]'), matrix.connector.name)
+        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/smoke.sh;
+
+      - name: Materialization connector ${{ matrix.connector.name }} integration tests
+        if: startsWith(matrix.connector.name, 'materialize-')
+
+        run: |
+          CONNECTOR=${{ matrix.connector.name }} VERSION=local tests/materialize/run.sh;
+
+      # On a snapshot mismatch the harness writes this run's value beside the
+      # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed
+      # connector's snapshot can only be regenerated where its endpoint is
+      # reachable, and the job log is no substitute, since secret redaction
+      # rewrites the connector state these snapshots embed. The files hold
+      # destination schemas and fixture rows, never endpoint configuration.
+      - name: Upload ${{ matrix.connector.name }} snapshot mismatches
+        if: failure() && startsWith(matrix.connector.name, 'materialize-')
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-mismatch-${{ matrix.connector.name }}
+          path: ${{ matrix.connector.name }}/.snapshots/*.actual
+          # `.snapshots` is hidden, and upload-artifact skips hidden files.
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Push ${{ matrix.connector.name }} image(s) with commit SHA tag
+        run: |
+          for VARIANT in ${{ steps.prep.outputs.variants }}; do
+            echo "Building and pushing ${VARIANT}:${{ steps.prep.outputs.tag }}...";
+            docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ matrix.connector.name }}:local \
+                         --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                         --build-arg CONNECTOR_NAME=${VARIANT} \
+                         --tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} \
+                         --label org.opencontainers.image.revision=$GITHUB_SHA \
+                         --file connector-variant.Dockerfile .;
+            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }};
+          done
+
+      - name: Push ${{ matrix.connector.name }} image(s) with 'dev' and '${{ steps.prep.outputs.version }}' tags
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          for VARIANT in ${{ steps.prep.outputs.variants }}; do
+            docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:dev;
+            docker image tag ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.tag }} ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
+            docker image push ghcr.io/estuary/${VARIANT}:dev;
+            docker image push ghcr.io/estuary/${VARIANT}:${{ steps.prep.outputs.version }};
+          done
+
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            connector:
+              - "${{ matrix.connector.name }}/**"
+
+      # Re-queue connector tag publishing over PostgREST (HTTPS) instead of a direct
+      # psql connection from CI.
+      - name: Re-queue connector tags for ${{ matrix.connector.name }}
+        if: github.event_name == 'push' && steps.filter.outputs.connector == 'true'
+        env:
+          RT_ID: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
+          RT_SECRET: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
+        run: |
+          set -euo pipefail
+          SUPABASE_URL="https://eyrcnmuzzyriypdajwdk.supabase.co"
+          # Public anon key, used only as the PostgREST apikey header.
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cmNubXV6enlyaXlwZGFqd2RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDg3NTA1NzksImV4cCI6MTk2NDMyNjU3OX0.y1OyXD3-DYMz10eGxzo1eeamVMMUwIIeOoMryTRAoco"
+
+          access_token=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/generate_access_token" \
+            -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+            -d "{\"refresh_token_id\": \"$RT_ID\", \"secret\": \"$RT_SECRET\"}" | jq -r '.access_token')
+          if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
+            echo "failed to obtain control-plane access token"; exit 1
+          fi
+
+          for VARIANT in ${{ steps.prep.outputs.variants }}; do
+            echo "Re-queuing tags for ghcr.io/estuary/${VARIANT}";
+            curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/requeue_connector_tag" \
+              -H "apikey: $ANON_KEY" -H "Authorization: Bearer $access_token" \
+              -H "Content-Type: application/json" \
+              -d "{\"image_name\": \"ghcr.io/estuary/${VARIANT}\", \"image_tags\": [\":${{ steps.prep.outputs.version }}\", \":dev\"]}";
+          done
