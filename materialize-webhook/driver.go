@@ -45,9 +45,16 @@ type headers struct {
 	CustomHeaders []customHeader `json:"customHeaders,omitempty" jsonschema:"title=Custom Headers"`
 }
 
+var featureFlagDefaults = map[string]common.FlagDefault{}
+
 type config struct {
-	Address pf.Endpoint `json:"address" jsonschema:"title=Address,description=Base address URL. Must end in a trailing '/'."`
-	Headers headers     `json:"headers,omitempty"`
+	Address  pf.Endpoint    `json:"address" jsonschema:"title=Address,description=Base address URL. Must end in a trailing '/'."`
+	Headers  headers        `json:"headers,omitempty"`
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate returns an error if the config is not well-formed.
@@ -70,7 +77,7 @@ func (c config) Validate() error {
 func (c config) DefaultNamespace() string { return "" }
 
 func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
-	return "", nil
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 type resource struct {
@@ -201,7 +208,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 }
 
 func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer, boilerplate.WithConfigUpdates([]string{"advanced", "feature_flags"}))
 }
 
 type materialization struct {
