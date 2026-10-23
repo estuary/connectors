@@ -244,7 +244,7 @@ def cache_entry(workload: Workload, cache_dir: str) -> tuple[str, str]:
                            workload.tables, image()])
     digest = hashlib.sha256(identity.encode()).hexdigest()[:12]
     base = os.path.join(
-        cache_dir, f"tpcds-sf{workload.scale:g}-{workload.transaction_size}-{digest}")
+        cache_dir, f"tpcds-scale-{workload.scale:g}-{workload.transaction_size}-{digest}")
     return base + ".jsonl", base + ".state.json"
 
 

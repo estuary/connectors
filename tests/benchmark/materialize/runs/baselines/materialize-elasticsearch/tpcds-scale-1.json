@@ -1,18 +1,18 @@
 {
-  "connector": "materialize-bigquery",
-  "scenario": "tpcds-sf1.yaml",
+  "connector": "materialize-elasticsearch",
+  "scenario": "tpcds-scale-1.yaml",
   "seed": 0,
   "preview_exit_code": 0,
-  "apply_seconds": 6.755117056,
-  "wall_seconds": 418.304614912,
+  "apply_seconds": 1.292685056,
+  "wall_seconds": 522.27358976,
   "rounds_observed": 6,
   "scenario_transactions": 6,
   "total_docs": 19557335,
   "total_bytes": 6371608799,
   "observed_docs": 19557335,
   "observed_bytes": 6371608799,
-  "docs_per_sec": 46753.81122466061,
-  "mb_per_sec": 14.526351011146964,
+  "docs_per_sec": 37446.53259029844,
+  "mb_per_sec": 11.634591112651654,
   "tpcds": {
     "scale": 1.0,
     "transaction_size": 1073741824,
@@ -149,9 +149,9 @@
         "web_returns": 26928,
         "web_sales": 273072
       },
-      "wall_seconds": 33.655081984,
-      "mb_per_sec": 30.42631129053542,
-      "docs_per_sec": 65385.63777815696
+      "wall_seconds": 78.210852864,
+      "mb_per_sec": 13.09281210287141,
+      "docs_per_sec": 28136.23582172832
     },
     {
       "index": 1,
@@ -169,9 +169,9 @@
         "customer_demographics": 520400,
         "store_returns": 31657
       },
-      "wall_seconds": 63.314969088,
-      "mb_per_sec": 16.173118514018906,
-      "docs_per_sec": 33572.25045858653
+      "wall_seconds": 67.198512128,
+      "mb_per_sec": 15.238440053868263,
+      "docs_per_sec": 31632.039649197868
     },
     {
       "index": 2,
@@ -189,9 +189,9 @@
         "web_returns": 11917,
         "web_sales": 119230
       },
-      "wall_seconds": 72.477401856,
-      "mb_per_sec": 14.128549277040468,
-      "docs_per_sec": 33667.90113210981
+      "wall_seconds": 91.83856512,
+      "mb_per_sec": 11.150005907173743,
+      "docs_per_sec": 26570.123311612995
     },
     {
       "index": 3,
@@ -207,9 +207,9 @@
         "inventory": 1500288,
         "store_returns": 54519
       },
-      "wall_seconds": 85.64732928,
-      "mb_per_sec": 11.956007259156653,
-      "docs_per_sec": 33125.46957214356
+      "wall_seconds": 98.061389824,
+      "mb_per_sec": 10.442439092867533,
+      "docs_per_sec": 28931.957879569363
     },
     {
       "index": 4,
@@ -222,9 +222,9 @@
         "store_returns": 86406,
         "store_sales": 860131
       },
-      "wall_seconds": 76.91790592,
-      "mb_per_sec": 13.31290015307904,
-      "docs_per_sec": 59397.72989597271
+      "wall_seconds": 92.297437952,
+      "mb_per_sec": 11.094570165960908,
+      "docs_per_sec": 49500.27976265185
     },
     {
       "index": 5,
@@ -237,15 +237,15 @@
         "inventory": 4873750,
         "store_returns": 46035
       },
-      "wall_seconds": 86.291926784,
-      "mb_per_sec": 11.083749848034024,
-      "docs_per_sec": 62405.96543266079
+      "wall_seconds": 94.666831872,
+      "mb_per_sec": 10.103202055730913,
+      "docs_per_sec": 56885.0873480301
     }
   ],
   "environment": {
     "machine": "c3-standard-22-lssd",
     "flowctl": "flowctl dev",
     "flow_commit": "a15bc3fcb0f",
-    "connectors_commit": "b223d678e"
+    "connectors_commit": "49280a794"
   }
 }

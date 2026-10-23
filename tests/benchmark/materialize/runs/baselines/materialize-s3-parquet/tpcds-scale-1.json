@@ -1,18 +1,18 @@
 {
-  "connector": "materialize-redshift",
-  "scenario": "tpcds-sf1.yaml",
+  "connector": "materialize-s3-parquet",
+  "scenario": "tpcds-scale-1.yaml",
   "seed": 0,
   "preview_exit_code": 0,
-  "apply_seconds": 11.637402112,
-  "wall_seconds": 485.76342784,
+  "apply_seconds": 0.117598208,
+  "wall_seconds": 141.150060032,
   "rounds_observed": 6,
   "scenario_transactions": 6,
   "total_docs": 19557335,
   "total_bytes": 6371608799,
   "observed_docs": 19557335,
   "observed_bytes": 6371608799,
-  "docs_per_sec": 40261.02806249499,
-  "mb_per_sec": 12.50905135615895,
+  "docs_per_sec": 138557.04344416273,
+  "mb_per_sec": 43.0495011083721,
   "tpcds": {
     "scale": 1.0,
     "transaction_size": 1073741824,
@@ -149,9 +149,9 @@
         "web_returns": 26928,
         "web_sales": 273072
       },
-      "wall_seconds": 19.46082688,
-      "mb_per_sec": 52.618524755802895,
-      "docs_per_sec": 113076.33604518248
+      "wall_seconds": 28.981189888,
+      "mb_per_sec": 35.333262882269494,
+      "docs_per_sec": 75930.59527590919
     },
     {
       "index": 1,
@@ -169,9 +169,9 @@
         "customer_demographics": 520400,
         "store_returns": 31657
       },
-      "wall_seconds": 183.24833408,
-      "mb_per_sec": 5.58804806555362,
-      "docs_per_sec": 11599.701632605424
+      "wall_seconds": 21.841986304,
+      "mb_per_sec": 46.882205881803834,
+      "docs_per_sec": 97318.34689461035
     },
     {
       "index": 2,
@@ -189,9 +189,9 @@
         "web_returns": 11917,
         "web_sales": 119230
       },
-      "wall_seconds": 80.529561088,
-      "mb_per_sec": 12.715834157786691,
-      "docs_per_sec": 30301.444178163012
+      "wall_seconds": 21.74121984,
+      "mb_per_sec": 47.09949814823088,
+      "docs_per_sec": 112236.66463785687
     },
     {
       "index": 3,
@@ -207,9 +207,9 @@
         "inventory": 1500288,
         "store_returns": 54519
       },
-      "wall_seconds": 79.148587008,
-      "mb_per_sec": 12.93769262735617,
-      "docs_per_sec": 35845.339850643664
+      "wall_seconds": 22.265854976,
+      "mb_per_sec": 45.98970449159994,
+      "docs_per_sec": 127419.6747916517
     },
     {
       "index": 4,
@@ -222,9 +222,9 @@
         "store_returns": 86406,
         "store_sales": 860131
       },
-      "wall_seconds": 75.129078784,
-      "mb_per_sec": 13.62988097379633,
-      "docs_per_sec": 60811.99282551288
+      "wall_seconds": 24.095617024,
+      "mb_per_sec": 42.49737205222636,
+      "docs_per_sec": 189609.1307995716
     },
     {
       "index": 5,
@@ -237,9 +237,9 @@
         "inventory": 4873750,
         "store_returns": 46035
       },
-      "wall_seconds": 48.24704,
-      "mb_per_sec": 19.8237680566253,
-      "docs_per_sec": 111615.77995251107
+      "wall_seconds": 22.224192,
+      "mb_per_sec": 43.0359011647633,
+      "docs_per_sec": 242309.41669330432
     }
   ],
   "environment": {

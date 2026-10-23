@@ -1,4 +1,4 @@
-# tpcds-sf1.yaml as delta updates: no loads, and commits append rather than
+# tpcds-scale-1.yaml as delta updates: no loads, and commits append rather than
 # merge, so the run measures the connector's store path more than the
 # destination's merge.
 tpcds:

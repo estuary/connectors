@@ -7,7 +7,7 @@
 # Usage:
 #   tests/benchmark/materialize/baselines.sh --tpcds-cache DIR [ENTRY ...]
 #
-# An ENTRY is connector:config[:scenario] (scenario defaults to tpcds-sf1);
+# An ENTRY is connector:config[:scenario] (scenario defaults to tpcds-scale-1);
 # without entries every connector below runs. flowctl on PATH should be built
 # from Flow master. FLOW_COMMIT and MACHINE_TYPE, when set, are recorded too.
 
@@ -104,7 +104,7 @@ if "feature_flags" in adv:
 flowctl --version
 for run in "${RUNS[@]}"; do
   IFS=: read -r c src scenario <<<"$run"
-  scenario=${scenario:-tpcds-sf1}
+  scenario=${scenario:-tpcds-scale-1}
   out=$B/runs/baseline-$scenario-$c
   echo "=== $c start $(date -u +%FT%TZ)"
   cfg=$CFG/$c.$(basename "$src")

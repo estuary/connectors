@@ -1,6 +1,6 @@
 {
   "connector": "materialize-sqlserver",
-  "scenario": "tpcds-sf1.yaml",
+  "scenario": "tpcds-scale-1.yaml",
   "seed": 0,
   "preview_exit_code": 0,
   "apply_seconds": 0.462266112,

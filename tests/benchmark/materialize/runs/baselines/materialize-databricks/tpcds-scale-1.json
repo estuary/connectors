@@ -1,18 +1,18 @@
 {
-  "connector": "materialize-postgres",
-  "scenario": "tpcds-sf1.yaml",
+  "connector": "materialize-databricks",
+  "scenario": "tpcds-scale-1.yaml",
   "seed": 0,
   "preview_exit_code": 0,
-  "apply_seconds": 0.298728192,
-  "wall_seconds": 644.131623936,
+  "apply_seconds": 16.199106816,
+  "wall_seconds": 231.5561152,
   "rounds_observed": 6,
   "scenario_transactions": 6,
   "total_docs": 19557335,
   "total_bytes": 6371608799,
   "observed_docs": 19557335,
   "observed_bytes": 6371608799,
-  "docs_per_sec": 30362.327004679388,
-  "mb_per_sec": 9.433537246105027,
+  "docs_per_sec": 84460.45565718664,
+  "mb_per_sec": 26.24175854974083,
   "tpcds": {
     "scale": 1.0,
     "transaction_size": 1073741824,
@@ -149,9 +149,9 @@
         "web_returns": 26928,
         "web_sales": 273072
       },
-      "wall_seconds": 78.681395968,
-      "mb_per_sec": 13.014512367957206,
-      "docs_per_sec": 27967.97099145235
+      "wall_seconds": 22.875243264,
+      "mb_per_sec": 44.764551315841004,
+      "docs_per_sec": 96198.27752665423
     },
     {
       "index": 1,
@@ -169,9 +169,9 @@
         "customer_demographics": 520400,
         "store_returns": 31657
       },
-      "wall_seconds": 94.735169792,
-      "mb_per_sec": 10.809084957782387,
-      "docs_per_sec": 22437.55940551975
+      "wall_seconds": 58.062358784,
+      "mb_per_sec": 17.63621940646764,
+      "docs_per_sec": 36609.36352771376
     },
     {
       "index": 2,
@@ -189,9 +189,9 @@
         "web_returns": 11917,
         "web_sales": 119230
       },
-      "wall_seconds": 109.260070144,
-      "mb_per_sec": 9.372138808301811,
-      "docs_per_sec": 22333.52034996841
+      "wall_seconds": 38.15069824,
+      "mb_per_sec": 26.840938458125596,
+      "docs_per_sec": 63961.136036077965
     },
     {
       "index": 3,
@@ -207,9 +207,9 @@
         "inventory": 1500288,
         "store_returns": 54519
       },
-      "wall_seconds": 118.872972032,
-      "mb_per_sec": 8.614238149302807,
-      "docs_per_sec": 23866.720512685297
+      "wall_seconds": 34.329982976,
+      "mb_per_sec": 29.828156084870066,
+      "docs_per_sec": 82642.27809211018
     },
     {
       "index": 4,
@@ -222,9 +222,9 @@
         "store_returns": 86406,
         "store_sales": 860131
       },
-      "wall_seconds": 116.430574848,
-      "mb_per_sec": 8.794944135882853,
-      "docs_per_sec": 39240.11374129602
+      "wall_seconds": 38.311538944,
+      "mb_per_sec": 26.728250279730847,
+      "docs_per_sec": 119252.55747826114
     },
     {
       "index": 5,
@@ -237,9 +237,9 @@
         "inventory": 4873750,
         "store_returns": 46035
       },
-      "wall_seconds": 126.151441152,
-      "mb_per_sec": 7.581666302379454,
-      "docs_per_sec": 42687.8278268058
+      "wall_seconds": 39.826292992,
+      "mb_per_sec": 24.015243662543362,
+      "docs_per_sec": 135215.47187637383
     }
   ],
   "environment": {

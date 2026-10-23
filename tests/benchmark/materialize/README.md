@@ -64,9 +64,9 @@ tpcds:
 | Scenario | Scale | Documents |
 |---|---|---|
 | `tpcds-smoke.yaml` | 0.01 | 278K (112 MB) |
-| `tpcds-sf1.yaml`   | 1    | 19.6M (5.9 GB) |
-| `tpcds-sf10.yaml`  | 10   | 191M |
-| `tpcds-sf100.yaml` | 100  | 959M |
+| `tpcds-scale-1.yaml`   | 1    | 19.6M (5.9 GB) |
+| `tpcds-scale-10.yaml`  | 10   | 191M |
+| `tpcds-scale-100.yaml` | 100  | 959M |
 
 The collections are `bench/tpcds/<table>`, with the schemas and keys that
 `source-tpc-ds` discovers, and each binding's table is the TPC-DS table name.
@@ -107,7 +107,7 @@ transactions always do, so use a flowctl built from Flow master.
 ## Baselines
 
 `runs/baselines/<connector>/<scenario>.json` holds each connector's reference
-result. The TPC-DS ones (`tpcds-sf1.json`) come from `baselines.sh`, which runs
+result. The TPC-DS ones (`tpcds-scale-1.json`) come from `baselines.sh`, which runs
 every tabular materialization serially on one machine and one cached fixture:
 
 ```bash
@@ -241,7 +241,7 @@ connector run at that rate is bound by the harness, not the destination.
 ```bash
 echo '{}' > /tmp/null.yaml
 ./tests/benchmark/materialize/run.sh --connector materialize-null --config /tmp/null.yaml \
-    --scenario tests/benchmark/materialize/scenarios/tpcds-sf1.yaml --tpcds-cache /tmp/tpcds
+    --scenario tests/benchmark/materialize/scenarios/tpcds-scale-1.yaml --tpcds-cache /tmp/tpcds
 ```
 
 ## Output

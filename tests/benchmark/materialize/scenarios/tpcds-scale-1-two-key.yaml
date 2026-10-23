@@ -1,4 +1,4 @@
-# tpcds-sf1.yaml without inventory, the one table keyed on three columns, for
+# tpcds-scale-1.yaml without inventory, the one table keyed on three columns, for
 # destinations whose keys take at most two (DynamoDB's partition and sort key).
 tpcds:
   scale: 1
