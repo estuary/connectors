@@ -102,11 +102,6 @@ The cache is keyed on the image reference, so delete it after rebuilding a
 whether the capture finished (`tpcds.complete`). A run whose capture fails
 before finishing exits non-zero.
 
-The flowctl 0.6.13 release panics in `preview-next --fixture` once a
-transaction holds more than 65,536 documents
-(`assertion failed: entries.len() <= 1 << 16`) and then hangs. TPC-DS
-transactions always do, so use a flowctl built from Flow master.
-
 ## Baselines
 
 `runs/baselines/<connector>/<scenario>.json` holds each connector's reference
