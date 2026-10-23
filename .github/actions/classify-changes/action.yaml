@@ -50,6 +50,14 @@ runs:
             printf 'python=true\ngo_rust=true\npython_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
             exit 0
             ;;
+          # A release publishes estuary-cdk from a tag; nothing is changed, so
+          # no connector is rebuilt. `cdk=true` because the publish job waits
+          # on the CDK's own checks.
+          release)
+            echo "release run; estuary-cdk only"
+            printf 'python=false\ngo_rust=false\npython_connectors=[]\ncdk=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
         esac
 
         # Which paths changed comes from the API rather than from git history
