@@ -33,10 +33,7 @@ def _base64_encode(decoded: str) -> str:
     return base64.b64encode(decoded.encode("utf-8")).decode("utf-8")
 
 
-def _is_upstream_timeout(
-    status: int,
-    body: str
-) -> bool:
+def _is_upstream_timeout(status: int, body: str) -> bool:
     return status == 504 and "upstream request timeout" in body
 
 
@@ -67,18 +64,28 @@ async def _do_incremental_cursor_export_request(
         params["per_page"] = page_size
 
         try:
-            return await http.request_stream(log, url, params=params, should_retry=_should_retry_incremental_cursor_export_response)
+            return await http.request_stream(
+                log,
+                url,
+                params=params,
+                should_retry=_should_retry_incremental_cursor_export_response,
+            )
         except HTTPError as err:
             if _is_upstream_timeout(err.code, err.message):
-                log.debug("Received 504 upstream timeout response (will retry with a smaller page size)", {
-                    "url": url,
-                    "params": params,
-                })
+                log.debug(
+                    "Received 504 upstream timeout response (will retry with a smaller page size)",
+                    {
+                        "url": url,
+                        "params": params,
+                    },
+                )
                 page_size = page_size // 2
             else:
                 raise
 
-    raise Exception(f"Request to {url} failed with smallest possible page size. Query parameters were {params}")
+    raise Exception(
+        f"Request to {url} failed with smallest possible page size. Query parameters were {params}"
+    )
 
 
 async def _fetch_incremental_cursor_export_resources(
@@ -91,17 +98,20 @@ async def _fetch_incremental_cursor_export_resources(
     sideload_params: dict[str, str] | None = None,
 ) -> AsyncGenerator[TimestampedResource | str, None]:
     url = f"{url_base(subdomain)}/incremental"
+    params: dict[str, str | int] = {}
+
     match name:
         case "tickets":
             url += "/tickets/cursor"
             response_model = TicketsResponse
+            params["support_type_scope"] = "all"
         case "users":
             url += "/users/cursor"
             response_model = UsersResponse
         case _:
-            raise RuntimeError(f"Unknown incremental cursor pagination resource type {name}.")
-
-    params: dict[str, str | int] = {}
+            raise RuntimeError(
+                f"Unknown incremental cursor pagination resource type {name}."
+            )
 
     if sideload_params:
         params.update(sideload_params)
@@ -125,8 +135,11 @@ async def _fetch_incremental_cursor_export_resources(
             yield resource
 
         remainder = processor.get_remainder()
-        next_page_cursor, end_of_stream = remainder.after_cursor, remainder.end_of_stream
-        
+        next_page_cursor, end_of_stream = (
+            remainder.after_cursor,
+            remainder.end_of_stream,
+        )
+
         if not next_page_cursor:
             return
 
@@ -158,7 +171,9 @@ async def fetch_incremental_cursor_export_resources(
         start_date = s_to_dt(int(cursor))
         cursor = None
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, cursor, log)
+    generator = _fetch_incremental_cursor_export_resources(
+        http, subdomain, name, start_date, cursor, log
+    )
 
     async for result in generator:
         if isinstance(result, str):
@@ -180,7 +195,9 @@ async def backfill_incremental_cursor_export_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page, log)
+    generator = _fetch_incremental_cursor_export_resources(
+        http, subdomain, name, start_date, page, log
+    )
 
     async for result in generator:
         if isinstance(result, str) or result.updated_at < cutoff:
