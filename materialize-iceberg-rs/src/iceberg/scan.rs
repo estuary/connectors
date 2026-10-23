@@ -18,6 +18,7 @@ use arrow::array::StringArray;
 use arrow::datatypes::DataType;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use bytes::Bytes;
 use futures::TryStreamExt;
 use object_store::path::Path as ObjectPath;
 use parquet::arrow::async_reader::ParquetObjectReader;
@@ -125,7 +126,7 @@ pub async fn load(
     collection: &str,
     schema: &Schema,
     num_keys: usize,
-    requested_keys: &[Vec<Element<'_>>],
+    requested_keys: &[Bytes],
     mut emit: impl FnMut(LoadedDoc) -> Result<()>,
 ) -> Result<Vec<String>> {
     let started = Instant::now();
@@ -223,8 +224,16 @@ pub async fn load(
     Ok(file_paths.paths)
 }
 
-fn decode_key(key: &[Element<'_>], key_types: &[DataType]) -> Result<Vec<Bound>> {
-    key.iter()
+/// Unpacks one requested key's raw tuple bytes and converts it to a `Bound`
+/// per column. Done per batch rather than once for all of `requested_keys`
+/// up front — unpacking produces a separate small heap allocation per key,
+/// and a transaction can queue millions of `Load` calls for one binding
+/// before its `Flush`, so decoding them all at once meant every `load` call
+/// briefly held millions of tiny allocations live simultaneously.
+fn decode_key(key_packed: &[u8], key_types: &[DataType]) -> Result<Vec<Bound>> {
+    let elements: Vec<Element> = tuple::unpack(key_packed)?;
+    elements
+        .iter()
         .zip(key_types)
         .map(|(element, data_type)| {
             Bound::from_element(data_type, element)

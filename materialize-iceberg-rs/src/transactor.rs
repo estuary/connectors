@@ -142,10 +142,6 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     }
 
                     let key_bytes: Vec<Bytes> = binding.pending_loads.drain(..).collect();
-                    let requested_keys: Vec<Vec<Element>> = key_bytes
-                        .iter()
-                        .map(|key_packed| tuple::unpack(key_packed))
-                        .collect::<Result<_, _>>()?;
 
                     let file_paths = scan::load(
                         &catalog,
@@ -153,7 +149,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                         &binding.collection,
                         &binding.schema,
                         binding.key_builders.len(),
-                        &requested_keys,
+                        &key_bytes,
                         |loaded| {
                             output.send(Response {
                                 kind: Some(response::Kind::Loaded(response::Loaded {
@@ -541,12 +537,18 @@ impl BindingState {
     }
 
     async fn write_and_upload(&mut self, catalog: &Catalog) -> Result<()> {
+        // Always reset, even if this binding has nothing left to flush this
+        // call (e.g. a mid-transaction binding-change flush already handled
+        // its rows) — otherwise the ascending-key check below would compare
+        // the next transaction's first key against a stale key left over
+        // from this one.
+        self.last_key = None;
+
         if self.rows == 0 && self.pending_deletes.is_empty() {
             return Ok(());
         }
 
         self.flush_data_file(catalog).await?;
-        self.last_key = None;
 
         let snapshot_id = *self
             .checkpoint
