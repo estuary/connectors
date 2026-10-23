@@ -49,3 +49,11 @@ class SourcedSchema(BaseModel):
 
 class Checkpoint(BaseModel, Generic[ConnectorState]):
     state: ConnectorStateUpdate[ConnectorState] | None = None
+
+
+class BackfillBegin(BaseModel):
+    binding: int
+
+
+class BackfillComplete(BaseModel):
+    binding: int

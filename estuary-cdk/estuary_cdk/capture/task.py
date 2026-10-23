@@ -46,6 +46,8 @@ class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState
     captured: response.Captured | None = None
     sourcedSchema: response.SourcedSchema | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
+    backfillBegin: response.BackfillBegin | None = None
+    backfillComplete: response.BackfillComplete | None = None
 
 
 # Bounds applied to SourcedSchema locations that don't declare their own. They
@@ -389,6 +391,48 @@ class Task(_BaseTask):
                 {"task": self._name},
             )
             raise
+
+    async def _backfill_begin(
+        self,
+        binding: int,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ):
+        """Emit a BackfillBegin for the binding, then a checkpoint of `state`."""
+        # The runtime fails the session unless a backfill signal stands alone in
+        # its checkpoint, so nothing may be buffered ahead of it.
+        if self._buffer.tell() != 0:
+            raise RuntimeError(
+                "Implementation error: a BackfillBegin must stand alone in its checkpoint, but this task has buffered output"
+            )
+        b = (
+            Response(backfillBegin=response.BackfillBegin(binding=binding))
+            .model_dump_json(by_alias=True, exclude_unset=True)
+            .encode()
+        )
+        self._buffer.write(b)
+        self._buffer.write(b"\n")
+        await self.checkpoint(state)
+
+    async def _backfill_complete(
+        self,
+        binding: int,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ):
+        """Emit a BackfillComplete for the binding, then a checkpoint of `state`."""
+        # The runtime fails the session unless a backfill signal stands alone in
+        # its checkpoint, so nothing may be buffered ahead of it.
+        if self._buffer.tell() != 0:
+            raise RuntimeError(
+                "Implementation error: a BackfillComplete must stand alone in its checkpoint, but this task has buffered output"
+            )
+        b = (
+            Response(backfillComplete=response.BackfillComplete(binding=binding))
+            .model_dump_json(by_alias=True, exclude_unset=True)
+            .encode()
+        )
+        self._buffer.write(b)
+        self._buffer.write(b"\n")
+        await self.checkpoint(state)
 
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]
