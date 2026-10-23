@@ -101,6 +101,14 @@ are `Optional[str]` here and a connector's `spec.json` reaches the UI as written
 quietly accepted. They are `Optional[int]` now. Nothing in the subset calls that class's
 serializer, so its `dict()` override was renamed rather than reworked.
 
+Upstream's `Stream.read_full_refresh` and `Stream.read_incremental` passed the result of
+`stream_slices()` to `logger.debug` as an `extra`. Under the shim, that record goes through
+`estuary_cdk.logger.LogFormatter`, which serializes its fields with pydantic. v1 could not
+serialize a generator and raised a `TypeError` that `logging` swallowed, so the generator was
+left untouched. v2 serializes a generator by iterating it. At `DEBUG`, any stream whose slices
+come from a generator then read no records, and the sweep still succeeded. Both calls now log
+without the `extra`.
+
 ### `distutils`
 
 Upstream's `sources/utils/transform.py` does `from distutils.util import strtobool`. `distutils`
