@@ -174,6 +174,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 }
             }
             Some(request::Kind::Flush(_)) => {
+                tracing::warn!("Flush");
                 for (index, binding) in bindings.iter_mut().enumerate() {
                     flush_pending_loads(&catalog, output, index as u32, binding).await?;
                 }
@@ -358,6 +359,7 @@ async fn flush_pending_loads(
     index: u32,
     binding: &mut BindingState,
 ) -> Result<()> {
+    tracing::warn!("flush_pending_loads");
     if binding.pending_loads.is_empty() {
         return Ok(());
     }
