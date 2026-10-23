@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -17,8 +19,13 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
-// driver implements the pm.DriverServer interface.
 type driver struct{}
+
+var _ boilerplate.Connector = &driver{}
+
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
 
 type customHeader struct {
 	Name  string `json:"name,omitempty" jsonschema:"title=Name"`
@@ -60,8 +67,18 @@ func (c config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string { return "" }
+
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return "", nil
+}
+
 type resource struct {
 	RelativePath string `json:"relativePath" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
+
+	// address is the endpoint's base address, set by WithDefaults so that
+	// Parameters can resolve the binding's full URL.
+	address pf.Endpoint
 }
 
 func (r resource) Validate() error {
@@ -78,6 +95,30 @@ func (r resource) URL() *url.URL {
 	}
 	return u
 }
+
+func (r resource) WithDefaults(cfg config) resource {
+	r.address = cfg.Address
+	return r
+}
+
+// Parameters returns the binding's resolved webhook URL as its resource path.
+// Webhooks only support delta updates.
+func (r resource) Parameters() ([]string, bool, error) {
+	return []string{r.address.URL().ResolveReference(r.URL()).String()}, true, nil
+}
+
+// fieldConfig and mappedType are required by the Materializer but carry
+// nothing, since webhooks have no destination schema.
+type fieldConfig struct{}
+
+func (fieldConfig) Validate() error    { return nil }
+func (fieldConfig) CastToString() bool { return false }
+
+type mappedType struct{}
+
+func (mappedType) String() string                            { return "json" }
+func (mappedType) Compatible(boilerplate.ExistingField) bool { return true }
+func (mappedType) CanMigrate(boilerplate.ExistingField) bool { return false }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Webhook", &config{}).MarshalJSON()
@@ -120,21 +161,10 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 
 		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range binding.Collection.Projections {
-			var constraint = new(pm.Response_Validated_Constraint)
-			switch {
-			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document must be materialized"
-			case projection.IsPrimaryKey:
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "Document keys must be included"
-			default:
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "Webhooks only materialize the full document"
-			}
+			var constraint = projectionConstraint(projection)
 			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
 				Field:      projection.Field,
-				Constraint: constraint,
+				Constraint: &constraint,
 			})
 		}
 
@@ -150,38 +180,137 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-// Apply is a no-op.
-func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return &pm.Response_Applied{}, nil
+func projectionConstraint(projection pf.Projection) pm.Response_Validated_Constraint {
+	var constraint pm.Response_Validated_Constraint
+	switch {
+	case projection.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case projection.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Document keys must be included"
+	default:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Webhooks only materialize the full document"
+	}
+	return constraint
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
-	}
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
+}
 
+func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
+}
+
+type materialization struct {
+	cfg config
+}
+
+var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
+
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	return &materialization{cfg: cfg}, nil
+}
+
+func (d *materialization) Config() boilerplate.MaterializeCfg {
+	return boilerplate.MaterializeCfg{
+		NoCreateNamespaces:  true,
+		NoTruncateResources: true,
+	}
+}
+
+// PopulateInfoSchema adds nothing: a webhook has no destination state to
+// introspect, so every binding is applied as a new resource, which is a no-op.
+func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	return nil
+}
+
+func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	return &cerrors.PrereqErr{}
+}
+
+func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	return projectionConstraint(p)
+}
+
+func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
+	return mappedType{}, nil
+}
+
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateResource(ctx context.Context, b boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
+func (d *materialization) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	// Test cleanup invokes the returned fn without nil-checking it.
+	return "", func(context.Context) error { return nil }, nil
+}
+
+func (d *materialization) UpdateResource(
+	ctx context.Context,
+	path []string,
+	existing boilerplate.ExistingResource,
+	update boilerplate.BindingUpdate[config, resource, mappedType],
+) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
+func (d *materialization) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return false, nil
+}
+
+func (d *materialization) NewTransactor(
+	ctx context.Context,
+	req pm.Request_Open,
+	is boilerplate.InfoSchema,
+	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
+	be *m.BindingEvents,
+) (m.Transactor, error) {
 	var addresses []*url.URL
 	var paths [][]string
-
-	for _, binding := range open.Materialization.Bindings {
-		paths = append(paths, binding.ResourcePath)
+	for _, b := range mappedBindings {
+		paths = append(paths, b.ResourcePath)
 		// Join paths of each binding with the base URL.
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, nil, nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-		addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
+		addresses = append(addresses, d.cfg.Address.URL().ResolveReference(b.Config.URL()))
 	}
 
-	var transactor = &transactor{
+	return &transactor{
 		addresses:     addresses,
 		paths:         paths,
-		customHeaders: cfg.Headers.CustomHeaders,
+		customHeaders: d.cfg.Headers.CustomHeaders,
 		be:            be,
-	}
-	return transactor, &pm.Response_Opened{}, nil, nil
+	}, nil
 }
+
+func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (d *materialization) CleanupTestTask(ctx context.Context, name string) error {
+	return nil
+}
+
+// SnapshotTestResource is only used by integration tests, which wrap the
+// materialization with one that reads back the requests a test server received.
+func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
+	return nil, nil, fmt.Errorf("webhooks can't be read back")
+}
+
+func (d *materialization) Close(ctx context.Context) {}
 
 type transactor struct {
 	addresses     []*url.URL
@@ -327,5 +456,3 @@ func backoff(attempt int) time.Duration {
 		return 10 * time.Second
 	}
 }
-
-func main() { boilerplate.RunMain(new(driver)) }
