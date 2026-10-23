@@ -64,6 +64,17 @@ func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFu
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
 }
 
+// ctxWithIdleQueryTimeout is ctxWithQueryTimeout for a query that streams its
+// results: calling touch restarts the timeout, so a query that is slow but still
+// returning rows is never cancelled.
+func ctxWithIdleQueryTimeout(ctx context.Context, timeout time.Duration) (_ context.Context, touch func(), cancel func()) {
+	ctx, cancelCause := context.WithCancelCause(ctx)
+	var timer = time.AfterFunc(timeout, func() {
+		cancelCause(fmt.Errorf("no query results for %s (is the database disk full?)", timeout))
+	})
+	return ctx, func() { timer.Reset(timeout) }, func() { timer.Stop(); cancelCause(context.Canceled) }
+}
+
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
@@ -599,18 +610,19 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	loadCtx, cancel := ctxWithQueryTimeout(ctx)
+	loadCtx, touch, cancel := ctxWithIdleQueryTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	d.be.StartedEvaluatingLoads()
 	rows, err := txn.Query(loadCtx, d.load.unionSQL)
 	if err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
+		return fmt.Errorf("querying Load documents: %w", errors.Join(err, context.Cause(loadCtx)))
 	}
 	defer rows.Close()
 	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
+		touch()
 		var binding int
 		var document json.RawMessage
 
@@ -629,7 +641,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("querying Loads: %w", err)
+		return fmt.Errorf("querying Loads: %w", errors.Join(err, context.Cause(loadCtx)))
 	} else if err = txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing Load transaction: %w", err)
 	}
