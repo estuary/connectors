@@ -2,12 +2,8 @@
 #
 # Work out which connector CI lanes a set of changed paths affects.
 #
-# Reads changed paths on stdin, one per line, and writes six lines to stdout:
+# Reads changed paths on stdin, one per line, and writes four lines to stdout:
 #
-#   python=true|false        a path in the Python lane changed; it can be true
-#                            while python_connectors is [], for a Python
-#                            directory missing from the connector list
-#   go_rust=true|false       the Go & Rust connector workflow must run
 #   cdk=true|false           estuary-cdk's own tests and checks must run
 #   python_connectors=...    the Python connectors to build: `all` when a path
 #                            shared by every one of them changed, otherwise a
@@ -25,8 +21,6 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 
-python=false
-go_rust=false
 cdk=false
 
 # Set when a changed path feeds every Python connector. Otherwise only the
@@ -168,7 +162,6 @@ while IFS= read -r path || [ -n "$path" ]; do
 
     case "$lane" in
         python)
-            python=true
             case "$path" in
                 # The CDK (and the Dockerfiles connectors symlink to), the
                 # workflow and its connector list, and the workspace manifest
@@ -183,15 +176,12 @@ while IFS= read -r path || [ -n "$path" ]; do
             esac
             ;;
         go_rust)
-            go_rust=true
             go_paths+=("$path")
             rust_select "$path"
             ;;
         both)
             # Anything shared by both lanes is shared by every connector.
-            python=true
             python_all=true
-            go_rust=true
             go_all=true
             rust_all=true
             ;;
@@ -207,8 +197,6 @@ if [ "$python_all" = true ]; then
     cdk=true
 fi
 
-echo "python=${python}"
-echo "go_rust=${go_rust}"
 echo "cdk=${cdk}"
 if [ "$python_all" = true ]; then
     echo "python_connectors=all"

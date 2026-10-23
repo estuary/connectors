@@ -7,6 +7,7 @@ These tests pin both the routing rules and the "when in doubt, build" behaviour.
 """
 
 import json
+import os
 import subprocess
 import unittest
 from pathlib import Path
@@ -18,18 +19,24 @@ ALL = "all"
 
 
 def classify(*paths: str, terminate: bool = True) -> tuple[bool, bool, str | list[str]]:
-    """Run the classifier, returning (python, go_rust, python_connectors)."""
+    """Run the classifier, returning (python, go_rust, python_connectors).
+
+    `python` is whether the Python lane builds anything, and `go_rust` whether
+    the Go or the Rust lane does. With no import graph, any change that could
+    reach a Go connector selects all of them.
+    """
     stdin = "\n".join(paths) + ("\n" if terminate else "")
+    env = {k: v for k, v in os.environ.items() if k != "GO_IMPORT_GRAPH"}
     proc = subprocess.run(
-        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True
+        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True, env=env
     )
     verdict = dict(
         line.split("=", 1) for line in proc.stdout.strip().splitlines() if "=" in line
     )
     connectors = verdict["python_connectors"]
     return (
-        verdict["python"] == "true",
-        verdict["go_rust"] == "true",
+        connectors != "[]",
+        verdict["go_connectors"] != "[]" or verdict["rust_connectors"] != "[]",
         connectors if connectors == ALL else json.loads(connectors),
     )
 
@@ -70,9 +77,10 @@ class TestLanes(unittest.TestCase):
             (True, False, ["source-sentry"]),
         )
 
-    def test_python_cdk_is_python_only(self):
+    def test_python_cdk_also_reaches_the_go_lane(self):
+        # materialize-snowflake's image holds estuary-cdk for its sidecar.
         self.assertEqual(
-            classify("estuary-cdk/estuary_cdk/http.py"), (True, False, ALL)
+            classify("estuary-cdk/estuary_cdk/http.py"), (True, True, ALL)
         )
 
     def test_go_connector_is_go_only(self):
