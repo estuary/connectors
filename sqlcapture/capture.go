@@ -1211,3 +1211,4 @@ func (c *Capture) statusUpdate(status string) {
 		c.lastStatus = status
 	}
 }
+// tmp: CI selection test
