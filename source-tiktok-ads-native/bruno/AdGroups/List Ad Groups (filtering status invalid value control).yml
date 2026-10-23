@@ -1,0 +1,28 @@
+info:
+  name: List Ad Groups (filtering status invalid value control)
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"ADGROUP_STATUS_NOT_A_REAL_VALUE"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** an invalid value is rejected with the list of accepted `secondary_status` values, which confirms the real names.
+
+  **VERIFIED (2026-10-12, sandbox):** rejected with the 46 accepted values,
+  including `ADGROUP_STATUS_ALL`, `ADGROUP_STATUS_DELETE`,
+  `ADGROUP_STATUS_NOT_DELETE`, `ADGROUP_STATUS_CAMPAIGN_DELETE`,
+  `ADGROUP_STATUS_CAMPAIGN_DISABLE`. The first run was refused with `code
+  40100`: "App ... reaches the QPS limit 1": **the sandbox allows 1 request per
+  second per app.**

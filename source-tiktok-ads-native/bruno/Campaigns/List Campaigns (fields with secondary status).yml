@@ -1,0 +1,27 @@
+info:
+  name: List Campaigns (fields with secondary status)
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"CAMPAIGN_STATUS_ALL"}&fields=["campaign_id","campaign_name","operation_status","secondary_status","modify_time"]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** the default response gives a deleted campaign `operation_status: DISABLE` and no `secondary_status`, so nothing marks it deleted; this checks whether requesting `secondary_status` explicitly exposes the deletion.
+
+  **VERIFIED (2026-10-08, sandbox):** `secondary_status` is silently dropped even
+  when requested in `fields`; the other requested fields come back. The deleted
+  campaign remains indistinguishable from a paused one.
+  **PENDING:** production behavior, and whether `primary_status` is exposed
+  (the spike branch filters with `primary_status: STATUS_ALL`).

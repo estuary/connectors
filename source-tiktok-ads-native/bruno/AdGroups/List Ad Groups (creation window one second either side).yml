@@ -1,0 +1,24 @@
+info:
+  name: List Ad Groups (creation window one second either side)
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"creation_filter_start_time":"2026-10-08 23:07:58","creation_filter_end_time":"2026-10-08 23:08:00"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** the seed ad group's `create_time` should sit inside this window (adjusted once the bare probe shows its exact `create_time`).
+
+  **VERIFIED (2026-10-12, sandbox):** `total 1`: the seed ad group
+  (`create_time` 2026-10-08 23:07:59) falls inside (23:07:58, 23:08:00).
