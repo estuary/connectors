@@ -20,9 +20,11 @@ on:
     branches: [main]
     paths-ignore: *non_code_paths
 
-  # The nightly run builds and deploys every Go connector, picking up base
-  # image updates and redeploying any connector whose deploy failed. A manual
-  # run does the same; it only moves `dev` and version tags on main.
+  # Push runs only build the connectors a change touches, so a deploy that
+  # failed, or a queued run a newer push replaced, stays missed until the
+  # connector changes again. The nightly run builds and deploys every Go
+  # connector, fixing those within a day and picking up base image updates.
+  # A manual run does the same; it only moves `dev` and version tags on main.
   schedule:
     - cron: "0 8 * * *"
   workflow_dispatch:
@@ -37,7 +39,7 @@ jobs:
   classify_changes:
     runs-on: ubuntu-24.04
     outputs:
-      run: ${{ steps.classify.outputs.go_rust }}
+      run: ${{ steps.matrix.outputs.run }}
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
@@ -51,12 +53,12 @@ jobs:
         uses: ./.github/actions/classify-changes
 
       # The connector list lives in its own file so it can be read as data.
-      # Any change in the Go & Rust lane builds every Go connector.
+      # The matrix is the connectors the classifier reported, or all of them.
       - id: matrix
         uses: ./.github/actions/select-connectors
         with:
           list: .github/go-connectors.yaml
-          connectors: all
+          connectors: ${{ steps.classify.outputs.go_connectors }}
 
   fetch_flow:
     needs: classify_changes
