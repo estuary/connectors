@@ -6,19 +6,15 @@ concurrency:
   # specs not being updated.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# No `paths-ignore`: the `Rust connectors gate` check below has to report on
+# every PR to be usable as a required check. The classifier already skips the
+# builds for paths that build nothing.
 on:
   push:
     branches: [main]
-    paths-ignore: &non_code_paths
-      - "**.md"
-      - "docs/**"
-      - ".claude/**"
-      - ".github/workflows/python.yaml"
-      - ".github/workflows/connectors-auto-rerun.yaml"
 
   pull_request:
     branches: [main]
-    paths-ignore: *non_code_paths
 
   # Push runs only build the connectors a change touches, so a deploy that
   # failed, or a queued run a newer push replaced, stays missed until the
@@ -244,3 +240,21 @@ jobs:
           tag_version: ${{ steps.prep.outputs.version }}
           variants: ${{ steps.prep.outputs.variants }}
           name_variants: "true"
+
+  # One status check covering every job above, whichever connectors ran, so it
+  # can be made a required check. It must run with `always()`: GitHub counts a
+  # skipped job as passing a required check.
+  rust_gate:
+    name: Rust connectors gate # the check's name; keep it fixed
+    needs: [classify_changes, fetch_flow, build_base_image, build_connectors]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the same `run` output the build jobs gate on.
+      - uses: ./.github/actions/connectors-gate
+        with:
+          results: ${{ join(needs.*.result, ' ') }}
+          run: ${{ needs.classify_changes.outputs.run }}
+          build_result: ${{ needs.build_connectors.result }}
