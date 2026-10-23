@@ -19,6 +19,11 @@ outputs:
       The Python connectors to build: `all`, or a JSON list of connector
       directories.
     value: ${{ steps.classify.outputs.python_connectors }}
+  go_connectors:
+    description: >
+      The Go connectors to build: `all`, or a JSON list of connector
+      directories.
+    value: ${{ steps.classify.outputs.go_connectors }}
   rust_connectors:
     description: >
       The Rust connectors to build: `all`, or a JSON list of connector
@@ -32,18 +37,40 @@ runs:
   using: "composite"
   steps:
 
+    # The classifier picks Go connectors from the repository's import graph.
+    # Only the toolchain go.mod asks for is needed: `go list` parses imports
+    # from source, so nothing is downloaded and there's nothing to cache.
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: false
+
+    # `-e` reports packages whose dependencies can't be loaded instead of
+    # failing, and GOPROXY=off keeps it from fetching them; their imports are
+    # still listed. A failure leaves the file empty, which the classifier
+    # reads as "every Go connector".
+    - name: List the Go import graph
+      shell: bash
+      run: |
+        GOFLAGS=-mod=mod GOPROXY=off go list -e \
+          -f '{{.ImportPath}}|{{join .Imports ","}}|{{join .TestImports ","}}|{{join .XTestImports ","}}' \
+          ./... > "${RUNNER_TEMP}/go-import-graph.txt" 2> /dev/null ||
+          : > "${RUNNER_TEMP}/go-import-graph.txt"
+
     - name: Classify the changed paths
       id: classify
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        GO_IMPORT_GRAPH: ${{ runner.temp }}/go-import-graph.txt
       run: |
         set -uo pipefail
 
         # Every failure path below runs both lanes.
         fallback() {
           echo "$1; running both lanes to be safe"
-          printf 'python=true\ngo_rust=true\npython_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
+          printf 'python=true\ngo_rust=true\npython_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
           exit 0
         }
 
@@ -52,7 +79,7 @@ runs:
         case "${{ github.event_name }}" in
           schedule | workflow_dispatch)
             echo "${{ github.event_name }} run; running both lanes"
-            printf 'python=true\ngo_rust=true\npython_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
+            printf 'python=true\ngo_rust=true\npython_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
             exit 0
             ;;
         esac
@@ -114,6 +141,7 @@ runs:
            ! grep -Eq '^go_rust=(true|false)$' <<< "$VERDICT" ||
            ! grep -Eq '^cdk=(true|false)$' <<< "$VERDICT" ||
            ! is_connectors python_connectors ||
+           ! is_connectors go_connectors ||
            ! is_connectors rust_connectors; then
           fallback "classifier gave '${VERDICT}'"
         fi
