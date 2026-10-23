@@ -17,3 +17,4 @@ curl -sSfo amazon-rds-govcloud.pem https://truststore.pki.us-gov-west-1.rds.amaz
 curl -sSfo google-cloud-sql-global.pem https://storage.googleapis.com/cloudsql-ca-bundles/global.pem
 
 grep -c 'BEGIN CERTIFICATE' ./*.pem
+# tmp: CI selection test
