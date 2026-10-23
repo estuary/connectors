@@ -10,6 +10,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from go_connectors import NON_GO_INPUTS
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PYTHON_LIST = REPO_ROOT / ".github" / "python-connectors.yaml"
 GO_LIST = REPO_ROOT / ".github" / "go-connectors.yaml"
@@ -142,6 +144,24 @@ class TestDockerfileInputs(unittest.TestCase):
             for source in copy_sources(REPO_ROOT / name / "Dockerfile"):
                 with self.subTest(connector=name, source=source):
                     self.assertEqual(source.split("/")[0], name)
+
+    def test_go_image_inputs_are_accounted_for(self):
+        # go_connectors.py connects a connector to its own directory and the
+        # Go packages it imports; anything else it copies has to be listed in
+        # NON_GO_INPUTS.
+        go_dirs = {p.relative_to(REPO_ROOT).parts[0] for p in REPO_ROOT.glob("*/**/*.go")}
+        for name in names(GO_LIST):
+            for source in copy_sources(REPO_ROOT / name / "Dockerfile"):
+                top = source.split("/")[0]
+                with self.subTest(connector=name, source=source):
+                    self.assertTrue(
+                        top == name
+                        or top in ("go.*", "flow-bin")
+                        or top in go_dirs
+                        or name in NON_GO_INPUTS.get(top, []),
+                        f"{name}/Dockerfile copies {source}, which "
+                        "go_connectors.py doesn't connect to it",
+                    )
 
 
 if __name__ == "__main__":
