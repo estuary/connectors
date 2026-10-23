@@ -113,7 +113,9 @@ class Stream(ABC):
         slice_logger: SliceLogger,
     ) -> Iterable[StreamData]:
         slices = self.stream_slices(sync_mode=SyncMode.full_refresh, cursor_field=cursor_field)
-        logger.debug(f"Processing stream slices for {self.name} (sync_mode: full_refresh)", extra={"stream_slices": slices})
+        # `slices` is usually a generator, so it can't be logged as an `extra`:
+        # estuary_cdk's LogFormatter would drain it while serializing the record.
+        logger.debug(f"Processing stream slices for {self.name} (sync_mode: full_refresh)")
         for _slice in slices:
             if slice_logger.should_log_slice_message(logger):
                 yield slice_logger.create_slice_log_message(_slice)
@@ -138,7 +140,9 @@ class Stream(ABC):
             sync_mode=SyncMode.incremental,
             stream_state=stream_state,
         )
-        logger.debug(f"Processing stream slices for {self.name} (sync_mode: incremental)", extra={"stream_slices": slices})
+        # `slices` is usually a generator, so it can't be logged as an `extra`:
+        # estuary_cdk's LogFormatter would drain it while serializing the record.
+        logger.debug(f"Processing stream slices for {self.name} (sync_mode: incremental)")
 
         has_slices = False
         record_counter = 0
