@@ -20,6 +20,13 @@ on:
     branches: [main]
     paths-ignore: *non_code_paths
 
+  # The nightly run builds and deploys every Rust connector, picking up base
+  # image updates and redeploying any connector whose deploy failed. A manual
+  # run does the same; it only moves `dev` and version tags on main.
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
 jobs:
   # Which connectors did this change touch? This job classifies every changed
   # path, and the build jobs below gate on its answer.
