@@ -171,4 +171,177 @@ remove a single required field:
 add and remove many fields:
 
 Challenging Field Names Materialized Columns:
+Task: acmeCo/tests/materialize-webhook-fields
+
+Big Schema Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"boolField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"The root document may be included as a field"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"intField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"Document keys should usually be included"}
+{"Field":"multipleField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"numField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"objField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDurationField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIntegerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv4Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv6Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddr8Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddrField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringNumberField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRegexField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRelativeJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint32Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint64Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriTemplateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUuidField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+
+Big Schema Re-validated Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"boolField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"The root document may be included as a field"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"intField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"Document keys should usually be included"}
+{"Field":"multipleField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"numField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"objField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDurationField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIntegerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv4Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv6Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddr8Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddrField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringNumberField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRegexField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRelativeJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint32Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint64Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriTemplateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUuidField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+
+Big Schema Changed Types Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"boolField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"The root document may be included as a field"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"intField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"Document keys should usually be included"}
+{"Field":"multipleField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"numField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"objField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDurationField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIntegerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv4Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv6Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddr8Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddrField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringNumberField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRegexField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRelativeJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint32Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint64Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriTemplateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUuidField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+
+Big Schema Materialized Resource Schema With All Fields Required:
+
+Big Schema Materialized Resource Schema With No Fields Required:
+
+Big Schema Changed Types With Backfill Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"boolField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"The root document may be included as a field"}
+{"Field":"flow_published_at","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"intField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"Document keys should usually be included"}
+{"Field":"multipleField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"numField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"objField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDateTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringDurationField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnEmailField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIdnHostnameField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIntegerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv4Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIpv6Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringIriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddr8Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringMacAddrField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringNumberField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRegexField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringRelativeJsonPointerField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringTimeField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint32Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUint64Field","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriReferenceField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUriTemplateField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+{"Field":"stringUuidField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field may be included"}
+
+Big Schema Materialized Resource Schema Changed Types With Backfill:
+
+add a single field:
+
+remove a single optional field:
+
+remove a single required field:
+
+add and remove many fields:
+
+Challenging Field Names Materialized Columns:
 
