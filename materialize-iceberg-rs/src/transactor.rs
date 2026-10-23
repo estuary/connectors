@@ -148,6 +148,13 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
     // stuck on something.
     let mut awaiting_first_load = true;
 
+    // Total `Load` requests received so far this transaction, across all
+    // bindings — logged every `LOAD_COUNT_LOG_INTERVAL` so a stall's exact
+    // position is visible even when it happens well short of any binding's
+    // `DEFAULT_LOAD_BATCH_SIZE` threshold (which logs nothing on its own).
+    let mut loads_this_transaction: u64 = 0;
+    const LOAD_COUNT_LOG_INTERVAL: u64 = 10_000;
+
     loop {
         let request = match input.read()? {
             Some(req) => req,
@@ -159,6 +166,10 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 if awaiting_first_load {
                     tracing::info!("first Load received for transaction");
                     awaiting_first_load = false;
+                }
+                loads_this_transaction += 1;
+                if loads_this_transaction.is_multiple_of(LOAD_COUNT_LOG_INTERVAL) {
+                    tracing::info!(loads_this_transaction, "Load requests received so far");
                 }
 
                 let index = load.binding;
@@ -342,6 +353,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 tracing::warn!("Acknowledged");
                 log_object_store_requests("acknowledge", &catalog.request_counts);
                 awaiting_first_load = true;
+                loads_this_transaction = 0;
             }
             _ => {}
         }
