@@ -1,0 +1,21 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-webhook:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        relativePath: simple
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        relativePath: data-types
+      source: tests/data-types
+      fields:
+        recommended: true
