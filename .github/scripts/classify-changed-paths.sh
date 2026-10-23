@@ -2,7 +2,7 @@
 #
 # Work out which connector CI lanes a set of changed paths affects.
 #
-# Reads changed paths on stdin, one per line, and writes four lines to stdout:
+# Reads changed paths on stdin, one per line, and writes five lines to stdout:
 #
 #   python=true|false        a path in the Python lane changed; it can be true
 #                            while python_connectors is [], for a Python
@@ -12,6 +12,7 @@
 #   python_connectors=...    the Python connectors to build: `all` when a path
 #                            shared by every one of them changed, otherwise a
 #                            compact JSON list of connector directories
+#   rust_connectors=...      the Rust connectors to build, in the same form
 #
 # The lane chosen for each path is logged to stderr.
 set -euo pipefail
@@ -26,6 +27,60 @@ cdk=false
 # connector directories collected in $python_dirs are affected.
 python_all=false
 python_dirs=()
+
+# Likewise for the Rust connectors.
+rust_all=false
+rust_dirs=()
+rust_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT/.github/rust-connectors.yaml")
+
+# Which Rust connectors a path in the Go & Rust lane affects. A Rust
+# connector's image is built only from its own directory and base-image, so
+# path rules are enough. Anything they don't recognise builds every one.
+rust_select() {
+    local path=$1 top=${1%%/*} sub name
+    case "$path" in
+        # The workflow, its list, and the classifier that decides for it.
+        .github/workflows/rust.yaml | .github/rust-connectors.yaml | \
+        .github/scripts/classify-changed-paths.sh | .github/scripts/test_classify_changed_paths.py | \
+        base-image/*)
+            rust_all=true; return ;;
+        # Other workflows, CI scripts and connector lists build no Rust connector.
+        .github/workflows/* | .github/scripts/* | .github/*-connectors.yaml) return ;;
+        # Go's module files, and the Rust crate only source-mongodb builds.
+        go.mod | go.sum | bson-transcoder/*) return ;;
+        # The shared materialization tests run for every materialize-* connector.
+        tests/materialize/*)
+            for name in $rust_connectors; do
+                case "$name" in materialize-*) rust_dirs+=("$name") ;; esac
+            done
+            return ;;
+    esac
+
+    if [ "$top" != "$path" ] && grep -qxF "$top" <<< "$rust_connectors"; then
+        rust_dirs+=("$top"); return
+    fi
+
+    # A connector's own test fixtures, or shared test tooling.
+    case "$path" in
+        tests/*)
+            sub=${path#tests/}; sub=${sub%%/*}
+            if grep -qxF "$sub" <<< "$rust_connectors"; then
+                rust_dirs+=("$sub")
+            else
+                rust_all=true
+            fi
+            return ;;
+    esac
+
+    # Go code, which no Rust connector builds from: a .go file, or anything in
+    # a top-level directory holding Go code, such as a Go connector.
+    if [[ "$path" == *.go ]] ||
+       { [ "$top" != "$path" ] && [ -n "$(find "$REPO_ROOT/$top" -name '*.go' -print -quit 2>/dev/null)" ]; }; then
+        return
+    fi
+
+    rust_all=true
+}
 
 # Read stdin up front so it can be scanned before classifying. Deleting a
 # connector takes its pyproject.toml off disk, so the changed paths are the only
@@ -112,12 +167,16 @@ while IFS= read -r path || [ -n "$path" ]; do
                 *) python_dirs+=("${path%%/*}") ;;
             esac
             ;;
-        go_rust) go_rust=true ;;
+        go_rust)
+            go_rust=true
+            rust_select "$path"
+            ;;
         both)
-            # Anything shared by both lanes is shared by every Python connector.
+            # Anything shared by both lanes is shared by every connector.
             python=true
             python_all=true
             go_rust=true
+            rust_all=true
             ;;
     esac
 
@@ -141,4 +200,10 @@ else
     # under `set -u`.
     jq -cn '$ARGS.positional | unique' --args ${python_dirs[@]+"${python_dirs[@]}"} |
         sed 's/^/python_connectors=/'
+fi
+if [ "$rust_all" = true ]; then
+    echo "rust_connectors=all"
+else
+    jq -cn '$ARGS.positional | unique' --args ${rust_dirs[@]+"${rust_dirs[@]}"} |
+        sed 's/^/rust_connectors=/'
 fi
