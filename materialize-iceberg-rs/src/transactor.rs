@@ -141,6 +141,13 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
     // `StartCommit` finally iterates them.
     let mut last_store_binding: Option<u32> = None;
 
+    // Set right after `Acknowledge`, cleared on the next transaction's
+    // first `Load` — logging that moment tells us how long the runtime
+    // took to send the next transaction's first message, which a gap in
+    // the logs alone can't distinguish from the connector itself being
+    // stuck on something.
+    let mut awaiting_first_load = true;
+
     loop {
         let request = match input.read()? {
             Some(req) => req,
@@ -149,6 +156,11 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
 
         match request.kind {
             Some(request::Kind::Load(load)) => {
+                if awaiting_first_load {
+                    tracing::info!("first Load received for transaction");
+                    awaiting_first_load = false;
+                }
+
                 let index = load.binding;
                 let binding = &mut bindings[load.binding as usize];
                 binding.pending_loads.push(load.key_packed);
@@ -328,6 +340,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 })?;
                 tracing::warn!("Acknowledged");
                 log_object_store_requests("acknowledge", &catalog.request_counts);
+                awaiting_first_load = true;
             }
             _ => {}
         }
