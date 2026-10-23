@@ -61,12 +61,15 @@ tpcds:
   resource: { delta_updates: true }      # optional; merged into every binding
 ```
 
-| Scenario | Scale | Documents |
-|---|---|---|
-| `tpcds-smoke.yaml` | 0.01 | 278K (112 MB) |
-| `tpcds-scale-1.yaml`   | 1    | 19.6M (5.9 GB) |
-| `tpcds-scale-10.yaml`  | 10   | 191M |
-| `tpcds-scale-100.yaml` | 100  | 959M |
+| Scenario | Scale | Documents | Size |
+|---|---|---|---|
+| `tpcds-smoke.yaml`     | 0.01 | 278K  | 0.11 GB |
+| `tpcds-scale-1.yaml`   | 1    | 19.6M | 5.9 GB |
+| `tpcds-scale-10.yaml`  | 10   | 191M  | 56 GB |
+| `tpcds-scale-100.yaml` | 100  | 959M  | 432 GB |
+
+Sizes are the documents' JSON bytes. Scale 100's is from Flow's stats for a
+production load rather than a fixture.
 
 The collections are `bench/tpcds/<table>`, with the schemas and keys that
 `source-tpc-ds` discovers, and each binding's table is the TPC-DS table name.
