@@ -61,3 +61,4 @@ fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
         .context("building tokio runtime")?;
     Ok(runtime)
 }
+// tmp: CI selection test
