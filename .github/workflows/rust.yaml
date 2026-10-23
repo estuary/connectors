@@ -35,6 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Runs here rather than in the classifier's workflow so that it also
+      # runs on the change adding a connector.
+      - name: Check the connector lists
+        run: cd .github/scripts && python3 -m unittest test_connector_lists -v
+
       - id: classify
         uses: ./.github/actions/classify-changes
 
