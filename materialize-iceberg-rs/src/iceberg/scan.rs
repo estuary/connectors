@@ -86,6 +86,18 @@ impl FilePathTable {
     }
 }
 
+/// Manifest-derived state for one table's current snapshot, cached on
+/// `BindingState` for an entire transaction (see `load`'s doc comment) —
+/// the snapshot can't change until this transaction's own `Acknowledge`
+/// advances it, so re-fetching the table's metadata, manifest list, and
+/// manifest files for every threshold-triggered `load` call this
+/// transaction would just be identical, repeated network round trips.
+#[derive(Default)]
+pub(crate) struct SnapshotScan {
+    data_entries: Vec<(manifest::ManifestEntryInfo, i64)>,
+    delete_entries: Vec<manifest::ManifestEntryInfo>,
+}
+
 /// Counts for the `load`-scan summary log: how many manifest entries/row
 /// groups pruning ruled out versus how many were actually read, across
 /// every batch of one `load` call.
@@ -144,42 +156,51 @@ pub(crate) async fn load(
     num_keys: usize,
     requested_keys: &[Bytes],
     file_paths: &mut FilePathTable,
+    scan_cache: &mut Option<SnapshotScan>,
     mut emit: impl FnMut(LoadedDoc) -> Result<()>,
 ) -> Result<()> {
     let started = Instant::now();
 
-    let Some(current) = catalog.current_snapshot(table).await? else {
-        tracing::info!(
-            table,
-            collection,
-            requested = requested_keys.len(),
-            elapsed_ms = started.elapsed().as_millis(),
-            "load scan: table has no snapshot yet"
-        );
-        return Ok(());
-    };
+    if scan_cache.is_none() {
+        let mut data_entries = Vec::new();
+        let mut delete_entries = Vec::new();
 
-    let manifests =
-        manifest_list::read_manifest_list(&catalog.object_store, &current.manifest_list).await?;
+        match catalog.current_snapshot(table).await? {
+            Some(current) => {
+                let manifests = manifest_list::read_manifest_list(
+                    &catalog.object_store,
+                    &current.manifest_list,
+                )
+                .await?;
 
-    // Decoded once per `load` call, not once per batch: every batch of this
-    // call answers against the same snapshot, so re-fetching and re-decoding
-    // a manifest file from object storage for each of the (potentially
-    // thousands of) batches below would multiply its IO by the batch count
-    // for no benefit — batches only need to re-run the (cheap, in-memory)
-    // bounds pruning against these.
-    let mut data_entries = Vec::new();
-    for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
-        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
-        for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await? {
-            data_entries.push((entry, manifest_file.sequence_number));
+                for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DATA) {
+                    let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
+                    for entry in manifest::read_manifest(&catalog.object_store, manifest_path).await?
+                    {
+                        data_entries.push((entry, manifest_file.sequence_number));
+                    }
+                }
+                for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DELETES) {
+                    let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
+                    delete_entries.extend(
+                        manifest::read_manifest(&catalog.object_store, manifest_path).await?,
+                    );
+                }
+            }
+            None => {
+                tracing::info!(table, collection, "load scan: table has no snapshot yet");
+            }
         }
+
+        *scan_cache = Some(SnapshotScan {
+            data_entries,
+            delete_entries,
+        });
     }
-    let mut delete_entries = Vec::new();
-    for manifest_file in manifests.iter().filter(|m| m.content == CONTENT_DELETES) {
-        let manifest_path = catalog.strip_uri_prefix(&manifest_file.manifest_path)?;
-        delete_entries.extend(manifest::read_manifest(&catalog.object_store, manifest_path).await?);
-    }
+    let SnapshotScan {
+        data_entries,
+        delete_entries,
+    } = scan_cache.as_ref().expect("populated above");
 
     let key_field_ids: Vec<i32> = (1..=num_keys as i32).collect();
     let key_types: Vec<DataType> = schema.fields()[..num_keys]
@@ -208,8 +229,8 @@ pub(crate) async fn load(
 
         let batch_stats = scan_batch(
             catalog,
-            &data_entries,
-            &delete_entries,
+            data_entries,
+            delete_entries,
             &key_field_ids,
             &key_types,
             doc_index,

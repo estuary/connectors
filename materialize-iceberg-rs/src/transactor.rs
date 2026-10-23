@@ -354,6 +354,7 @@ async fn flush_pending_loads(
         binding.key_builders.len(),
         &key_bytes,
         &mut binding.load_file_paths,
+        &mut binding.scan_cache,
         |loaded| {
             output.send(Response {
                 kind: Some(response::Kind::Loaded(response::Loaded {
@@ -481,6 +482,12 @@ struct BindingState {
     /// resolved through it — deduplicated, so its size is bounded by
     /// distinct files touched, not rows touched.
     load_file_paths: scan::FilePathTable,
+    /// The current snapshot's manifest-derived state, cached for the whole
+    /// transaction across however many `load` calls it makes (see
+    /// `pending_loads`'s doc comment) — `None` until the first call
+    /// populates it, and reset to `None` only when `acknowledge` actually
+    /// advances the snapshot, since that's the only time it can go stale.
+    scan_cache: Option<scan::SnapshotScan>,
     /// Positions to mask with a positional delete this transaction, by the
     /// data file_path they were found in (`_meta.file_path`/
     /// `_meta.positional_delete` on the existing document, carried forward
@@ -718,6 +725,10 @@ impl BindingState {
         self.checkpoint.manifest_list = Some(manifest_list_path);
         self.checkpoint.pending_manifests.clear();
         self.checkpoint.pending_snapshot_id = None;
+        // The only point the snapshot `scan::load` caches per-transaction
+        // actually changes — invalidate it so the next transaction's first
+        // `load` call re-fetches instead of scanning stale manifest state.
+        self.scan_cache = None;
 
         Ok(())
     }
@@ -958,6 +969,7 @@ fn binding_state(
         estimated_bytes: 0,
         pending_loads: Vec::new(),
         load_file_paths: scan::FilePathTable::default(),
+        scan_cache: None,
         pending_deletes: HashMap::new(),
         transaction_counts: TransactionCounts::default(),
         total_keys_handled: 0,
