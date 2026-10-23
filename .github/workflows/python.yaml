@@ -43,8 +43,8 @@ jobs:
 
       # Runs here rather than in the classifier's workflow so that it also
       # runs on the change adding a connector.
-      - name: Check the connector list
-        run: cd .github/scripts && python3 -m unittest test_python_connectors -v
+      - name: Check the connector lists
+        run: cd .github/scripts && python3 -m unittest test_connector_lists -v
 
       - id: classify
         uses: ./.github/actions/classify-changes
@@ -52,19 +52,10 @@ jobs:
       # The connector list lives in its own file so it can be read as data.
       # The matrix is the connectors the classifier reported, or all of them.
       - id: matrix
-        env:
-          # Passed through env, never interpolated into the script.
-          CONNECTORS: ${{ steps.classify.outputs.python_connectors }}
-        run: |
-          ALL=$(yq -o=json -I=0 '.' .github/python-connectors.yaml)
-          if [ "$CONNECTORS" = all ]; then
-            MATRIX=$ALL
-          else
-            MATRIX=$(jq -c --argjson want "$CONNECTORS" 'map(select(.name | IN($want[])))' <<< "$ALL")
-          fi
-          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
-          # GitHub rejects an empty matrix, so the build jobs gate on this.
-          if [ "$MATRIX" = '[]' ]; then echo "run=false"; else echo "run=true"; fi >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/select-connectors
+        with:
+          list: .github/python-connectors.yaml
+          connectors: ${{ steps.classify.outputs.python_connectors }}
 
   fetch_flow:
     needs: classify_changes
@@ -320,23 +311,21 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+
+      # Reads the same `run` output the build jobs gate on.
+      - uses: ./.github/actions/connectors-gate
+        with:
+          results: ${{ join(needs.*.result, ' ') }}
+          run: ${{ needs.classify_changes.outputs.run }}
+          build_result: ${{ needs.py_connector.result }}
+
+      # Likewise for estuary-cdk, against the `cdk` output its jobs gate on.
       - env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
-          RUN: ${{ needs.classify_changes.outputs.run }}
-          PY: ${{ needs.py_connector.result }}
           CDK: ${{ needs.classify_changes.outputs.cdk }}
           CDK_TESTS: ${{ needs.estuary_cdk.result }}
           CDK_PYTHONS: ${{ needs.estuary_cdk_supported_pythons.result }}
         run: |
-          for r in $RESULTS; do
-            case "$r" in success|skipped) ;; *) echo "::error::a job ended $r"; exit 1 ;; esac
-          done
-          # "skipped" only counts as OK when there was nothing to build.
-          # This reads the same `run` output the build jobs gate on.
-          if [ "$RUN" = true ] && [ "$PY" != success ]; then
-            echo "::error::connectors were due to build but py_connector ended $PY"; exit 1
-          fi
-          # Likewise for estuary-cdk, against the `cdk` output its jobs gate on.
           if [ "$CDK" = true ] && { [ "$CDK_TESTS" != success ] || [ "$CDK_PYTHONS" != success ]; }; then
             echo "::error::estuary-cdk was due to be checked but its jobs ended $CDK_TESTS and $CDK_PYTHONS"; exit 1
           fi

@@ -83,7 +83,7 @@ class TestPrTouchesDir(unittest.TestCase):
         self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
 
     def test_root_files_dont_match(self):
-        pr = make_pr(1, 0, 'a', ['Makefile', 'go.sum', '.github/workflows/ci.yaml'])
+        pr = make_pr(1, 0, 'a', ['Makefile', 'go.sum', '.github/workflows/go.yaml'])
         self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
 
     def test_multiple_paths_one_matches(self):
@@ -361,21 +361,36 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 class TestLoadConnectorImages(unittest.TestCase):
 
-    def test_reads_the_python_connector_list(self):
-        images = load_connector_images(
-            str(REPO_ROOT / '.github/workflows/ci.yaml'),
-            str(REPO_ROOT / '.github/python-connectors.yaml'),
-        )
-        self.assertIn('source-sentry', [c.image_name for c in images])
+    def load(self, **overrides):
+        paths = {
+            'go_connectors': REPO_ROOT / '.github/go-connectors.yaml',
+            'python_connectors': REPO_ROOT / '.github/python-connectors.yaml',
+            'rust_connectors': REPO_ROOT / '.github/rust-connectors.yaml',
+        }
+        paths.update(overrides)
+        return load_connector_images(**{k: str(v) for k, v in paths.items()})
+
+    def test_reads_every_connector_list(self):
+        names = [c.image_name for c in self.load()]
+        self.assertIn('source-postgres', names)
+        self.assertIn('source-kafka', names)
+        self.assertIn('source-sentry', names)
 
     def test_unreadable_python_list_is_fatal(self):
         # Reading it as empty would drop every Python connector from the plan.
         with self.assertRaises(SystemExit), \
                 mock.patch('sys.stderr', new_callable=io.StringIO):
-            load_connector_images(
-                str(REPO_ROOT / '.github/workflows/ci.yaml'),
-                str(REPO_ROOT / 'nonexistent.yaml'),
-            )
+            self.load(python_connectors=REPO_ROOT / 'nonexistent.yaml')
+
+    def test_unreadable_go_list_is_fatal(self):
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.load(go_connectors=REPO_ROOT / 'nonexistent.yaml')
+
+    def test_unreadable_rust_list_is_fatal(self):
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.load(rust_connectors=REPO_ROOT / 'nonexistent.yaml')
 
 
 # ---------------------------------------------------------------------------
