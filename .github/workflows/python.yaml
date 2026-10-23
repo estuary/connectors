@@ -311,6 +311,55 @@ jobs:
           "$VIRTUAL_ENV/bin/python" -m compileall -q estuary_cdk vendor
           "$VIRTUAL_ENV/bin/python" -m pytest
 
+      # Everything above installs the shim, because the test suite exercises
+      # it. Consumers install the published wheel and nothing else, so any
+      # module-scope import of something uv.lock supplies but the manifest
+      # does not declare would break them while leaving this workflow green.
+      # `compileall` only parses, and a workspace install always carries
+      # vendor/. So: build the wheel, install it alone, import what it ships.
+      #
+      # The floor alone, because the wheel is py3-none-any and an undeclared
+      # dependency is not interpreter-specific; 3.11 is where version-gated
+      # markers bite.
+      - name: Imports without the vendored Airbyte fork
+        if: matrix.python-version == '3.11'
+        run: |
+          uv build --package estuary_cdk --wheel --out-dir /tmp/cdk-pure-dist
+          uv venv --python ${{ matrix.python-version }} /tmp/cdk-pure-venv
+          VIRTUAL_ENV=/tmp/cdk-pure-venv uv pip install /tmp/cdk-pure-dist/*.whl
+          /tmp/cdk-pure-venv/bin/python - <<'PY'
+          import importlib, importlib.util, pkgutil, sys
+          import estuary_cdk
+
+          # walk_packages, not iter_modules: the latter stops at the top level
+          # and would never reach estuary_cdk.capture.webhook.
+          names = sorted(
+              m.name
+              for m in pkgutil.walk_packages(estuary_cdk.__path__, prefix="estuary_cdk.")
+          )
+
+          failed, swept = [], 0
+          for name in names:
+              # The one exemption: importing the shim without the shim
+              # installed is supposed to fail.
+              if name == "estuary_cdk.shim_airbyte_cdk":
+                  continue
+              swept += 1
+              try:
+                  importlib.import_module(name)
+              except Exception as exc:
+                  failed.append(f"{name}: {type(exc).__name__}: {exc}")
+
+          for found in ("airbyte_cdk", "airbyte_protocol"):
+              if importlib.util.find_spec(found) is not None:
+                  failed.append(f"{found} is importable; the wheel is not the pure CDK")
+
+          print(f"swept {swept} modules")
+          for line in failed:
+              print(f"::error::{line}")
+          sys.exit(1 if failed else 0)
+          PY
+
   # One status check covering every job above, whichever connectors ran and
   # whether or not estuary-cdk's checks did, so it can be made a required
   # check. It must run with `always()`: GitHub counts a skipped job as passing
