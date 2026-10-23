@@ -478,7 +478,7 @@ const DATA_FILE_FLUSH_BYTES: usize = 256 * 1024 * 1024;
 /// every data file surviving pruning for a batch concurrently (to
 /// merge-sort them) — so a handful of large single-row-group files on the
 /// read path can multiply memory far beyond this constant's own name.
-const MAX_ROW_GROUP_BYTES: usize = 64 * 1024 * 1024;
+const MAX_ROW_GROUP_BYTES: usize = 32 * 1024 * 1024;
 
 fn data_file_writer_properties() -> WriterProperties {
     WriterProperties::builder()
