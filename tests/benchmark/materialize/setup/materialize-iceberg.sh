@@ -21,10 +21,4 @@ for _ in $(seq 120); do
 done
 [[ -s "$CREDS" ]] || { echo "Polaris did not write $CREDS" >&2; exit 1; }
 
-python3 - "$CREDS" "$BENCH_CONFIG" <<'PY'
-import json, sys
-creds, config = sys.argv[1:3]
-c = json.load(open(creds))
-text = open(config).read().replace("CREDENTIAL_PLACEHOLDER", f"{c['client_id']}:{c['client_secret']}")
-open(config, "w").write(text)
-PY
+python3 "$(dirname "$0")/materialize-iceberg.py" "$CREDS" "$BENCH_CONFIG"

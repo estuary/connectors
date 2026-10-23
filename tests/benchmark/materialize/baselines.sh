@@ -56,51 +56,6 @@ MACHINE_TYPE=${MACHINE_TYPE:-$(curl -sf -H "Metadata-Flavor: Google" \
 CONNECTORS_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "${CONNECTORS_COMMIT:-}")
 export MACHINE_TYPE CONNECTORS_COMMIT FLOW_COMMIT=${FLOW_COMMIT:-}
 
-# Edit a config copy, sops-encrypted or not, by a Python function of its dict.
-edit_config() {
-  local path=$1 script=$2
-  if grep -q '^sops:' "$path"; then
-    # The decrypted config travels on stdin: a command line is readable by
-    # every local user through /proc/<pid>/cmdline.
-    sops -d "$path" | python3 /dev/fd/3 "$path" "$script" 3<<'PY'
-import json, subprocess, sys, yaml
-path, script = sys.argv[1], sys.argv[2]
-c = yaml.safe_load(sys.stdin)
-exec(script)
-for key in ("advanced", "schema"):
-    if key in c:
-        subprocess.run(["sops", "set", path, f'["{key}"]', json.dumps(c[key])], check=True)
-PY
-  else
-    python3 - "$path" "$script" <<'PY'
-import sys, yaml
-path, script = sys.argv[1], sys.argv[2]
-c = yaml.safe_load(open(path))
-exec(script)
-yaml.safe_dump(c, open(path, "w"), sort_keys=False)
-PY
-  fi
-}
-
-# Copy a config for benchmarking. Integration-test configs set flags which make
-# the runtime Load every key; drop them. Fabric detects snapshot conflicts per
-# table, so a dedicated schema keeps other tasks' commits to the shared
-# flow_checkpoints_v1 from aborting the run's.
-prepare_config() {
-  local c=$1 src=$2 dst=$3
-  cp "$src" "$dst"
-  edit_config "$dst" '
-adv = c.get("advanced") or {}
-flags = [f for f in (adv.get("feature_flags") or "").split(",")
-         if f and f not in ("allow_existing_tables_for_new_bindings", "retain_existing_data_on_backfill")]
-if "feature_flags" in adv:
-    adv["feature_flags"] = ",".join(flags)
-'
-  if [[ "$c" == materialize-azure-fabric-warehouse ]]; then
-    edit_config "$dst" 'c["schema"] = "flow_bench_tpcds"'
-  fi
-}
-
 flowctl --version
 for run in "${RUNS[@]}"; do
   IFS=: read -r c src scenario <<<"$run"
@@ -108,7 +63,7 @@ for run in "${RUNS[@]}"; do
   out=$B/runs/baseline-$scenario-$c
   echo "=== $c start $(date -u +%FT%TZ)"
   cfg=$CFG/$c.$(basename "$src")
-  prepare_config "$c" "$src" "$cfg" || { echo "=== $c SKIP config"; continue; }
+  python3 "$B/baselines.py" prepare-config "$c" "$src" "$cfg" || { echo "=== $c SKIP config"; continue; }
   rm -rf "$out"
   timeout -s TERM 3h ./$B/run.sh --connector "$c" --config "$cfg" \
     --scenario "$B/scenarios/$scenario.yaml" \
@@ -116,19 +71,7 @@ for run in "${RUNS[@]}"; do
   rc=$?
   echo "=== $c rc=$rc end $(date -u +%FT%TZ) $(grep -E 'Docs/sec' "$out.log" | tr -s ' ')"
   if [[ $rc -eq 0 && -f "$out/results.json" ]]; then
-    mkdir -p "$B/runs/baselines/$c"
-    python3 - "$out/results.json" "$B/runs/baselines/$c/$scenario.json" "$(flowctl --version)" <<'PY'
-import json, os, sys
-src, dst, flowctl = sys.argv[1:4]
-r = json.load(open(src))
-r["environment"] = {
-    "machine": os.environ.get("MACHINE_TYPE") or None,
-    "flowctl": flowctl,
-    "flow_commit": os.environ.get("FLOW_COMMIT") or None,
-    "connectors_commit": os.environ.get("CONNECTORS_COMMIT") or None,
-}
-json.dump(r, open(dst, "w"), indent=2)
-PY
+    python3 "$B/baselines.py" record "$out/results.json" "$B/runs/baselines/$c/$scenario.json"
   fi
 done
 echo "=== all done"
