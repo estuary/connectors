@@ -113,6 +113,17 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         ..Default::default()
     })?;
 
+    // The binding a `Store` call most recently targeted. Flow sends `Store`
+    // requests grouped by (binding, key) ascending, so once this changes,
+    // the previous binding has seen every row it's going to see this
+    // transaction — flushing it immediately (rather than leaving its
+    // sub-threshold buffer sitting in memory until `StartCommit`) keeps at
+    // most one binding's buffer "hot" at a time, instead of every binding
+    // touched this transaction independently approaching
+    // `DATA_FILE_FLUSH_BYTES` and all still being unflushed when
+    // `StartCommit` finally iterates them.
+    let mut last_store_binding: Option<u32> = None;
+
     loop {
         let request = match input.read()? {
             Some(req) => req,
@@ -164,6 +175,15 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 })?;
             }
             Some(request::Kind::Store(store)) => {
+                if let Some(prev_binding) = last_store_binding
+                    && prev_binding != store.binding
+                {
+                    bindings[prev_binding as usize]
+                        .flush_data_file(&catalog)
+                        .await?;
+                }
+                last_store_binding = Some(store.binding);
+
                 let binding = &mut bindings[store.binding as usize];
 
                 let raw_doc_text =
