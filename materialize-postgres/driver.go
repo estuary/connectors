@@ -70,7 +70,7 @@ func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFu
 func ctxWithIdleQueryTimeout(ctx context.Context, timeout time.Duration) (_ context.Context, touch func(), cancel func()) {
 	ctx, cancelCause := context.WithCancelCause(ctx)
 	var timer = time.AfterFunc(timeout, func() {
-		cancelCause(fmt.Errorf("no query results for %s (is the database disk full?)", timeout))
+		cancelCause(fmt.Errorf("no query results for %s", timeout))
 	})
 	return ctx, func() { timer.Reset(timeout) }, func() { timer.Stop(); cancelCause(context.Canceled) }
 }
