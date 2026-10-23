@@ -73,6 +73,11 @@ pub struct Catalog {
     /// once per transaction phase by whoever logs it (see `transactor.rs`),
     /// so each phase's log line reports only what that phase did.
     pub(crate) request_counts: Arc<super::counting_store::RequestCounts>,
+    /// Used for the embedded catalog's self-HTTP commit call — built once
+    /// with a request timeout (see `transactor::REQUEST_TIMEOUT`) rather
+    /// than a fresh client per call, so a stuck connection fails loudly
+    /// instead of hanging indefinitely.
+    pub(crate) http_client: reqwest::Client,
     pub prefix: String,
     pub bucket: String,
     /// URI scheme identifying the object store backing `object_store`, e.g.

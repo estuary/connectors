@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use std::time::Instant;
 
 use anyhow::Context;
@@ -14,6 +15,7 @@ use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
+use object_store::ClientOptions;
 use object_store::ObjectStore;
 use object_store::ObjectStoreExt;
 use object_store::PutPayload;
@@ -79,9 +81,15 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         request_counts.clone(),
     ));
 
+    let http_client = reqwest::Client::builder()
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .context("building embedded-catalog HTTP client")?;
+
     let catalog = Arc::new(Catalog {
         object_store,
         request_counts,
+        http_client,
         prefix,
         bucket,
         scheme,
@@ -404,9 +412,17 @@ fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::Connector
     })
 }
 
+/// Applied to every network call this connector makes — both object-store
+/// requests and the embedded catalog's self-HTTP commit call — so a stuck
+/// connection fails loudly with an error (and the connector exits) instead
+/// of hanging indefinitely. No retry yet; a timeout here is a hard failure.
+pub(crate) const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+
 pub(crate) fn build_object_store(
     store: &StoreConfig,
 ) -> Result<(Arc<dyn ObjectStore>, String, String, &'static str)> {
+    let client_options = ClientOptions::new().with_timeout(REQUEST_TIMEOUT);
+
     match store {
         StoreConfig::S3(s3) => {
             let mut builder = AmazonS3Builder::new()
@@ -415,7 +431,8 @@ pub(crate) fn build_object_store(
                 .with_access_key_id(&s3.credentials.aws_access_key_id)
                 .with_secret_access_key(&s3.credentials.aws_secret_access_key)
                 // rustfs and MinIO require path-style addressing.
-                .with_virtual_hosted_style_request(false);
+                .with_virtual_hosted_style_request(false)
+                .with_client_options(client_options);
 
             if let Some(endpoint) = &s3.endpoint {
                 builder = builder.with_endpoint(endpoint).with_allow_http(true);
@@ -431,7 +448,8 @@ pub(crate) fn build_object_store(
         StoreConfig::Gcs(gcs) => {
             let builder = GoogleCloudStorageBuilder::new()
                 .with_bucket_name(&gcs.bucket)
-                .with_service_account_key(&gcs.credentials.service_account_json);
+                .with_service_account_key(&gcs.credentials.service_account_json)
+                .with_client_options(client_options);
 
             Ok((
                 Arc::new(builder.build()?),
@@ -742,7 +760,7 @@ impl BindingState {
             added_position_deletes,
         );
 
-        self.commit_snapshot(snapshot).await?;
+        self.commit_snapshot(catalog, snapshot).await?;
 
         self.checkpoint.snapshot_id = Some(snapshot_id);
         self.checkpoint.sequence_number = snapshot_id;
@@ -763,7 +781,7 @@ impl BindingState {
     /// table's schema is sent along on every commit — the catalog only
     /// applies it when the table doesn't exist yet, since schema evolution
     /// isn't supported.
-    async fn commit_snapshot(&self, snapshot: Snapshot) -> Result<()> {
+    async fn commit_snapshot(&self, catalog: &Catalog, snapshot: Snapshot) -> Result<()> {
         let request = CommitTransactionRequest {
             table_changes: vec![TableChange {
                 identifier: TableIdentifier {
@@ -789,7 +807,8 @@ impl BindingState {
         let port = server::listen_port();
         let url = format!("http://127.0.0.1:{port}/v1/{CATALOG_PREFIX}/transactions/commit");
 
-        let response = reqwest::Client::new()
+        let response = catalog
+            .http_client
             .post(&url)
             .json(&request)
             .send()
