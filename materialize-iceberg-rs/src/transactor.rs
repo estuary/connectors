@@ -22,6 +22,7 @@ use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::path::Path as ObjectPath;
 use parquet::arrow::ArrowWriter;
 use parquet::arrow::PARQUET_FIELD_ID_META_KEY;
+use parquet::file::properties::WriterProperties;
 use proto_flow::flow::Projection;
 use proto_flow::flow::materialization_spec;
 use proto_flow::flow::{self};
@@ -448,6 +449,25 @@ pub(crate) fn build_object_store(
 /// Parquet bytes) bounded regardless of transaction size.
 const DATA_FILE_FLUSH_BYTES: usize = 256 * 1024 * 1024;
 
+/// Caps each Parquet row group's estimated encoded size, so a single
+/// `DATA_FILE_FLUSH_BYTES`-sized file ends up as several smaller row groups
+/// rather than one — without this, the parquet crate's default `None`
+/// `WriterProperties` only caps row groups by row *count* (1,048,576 by
+/// default), so a file with fewer rows than that but still ~256MiB (e.g.
+/// wide rows, large `flow_document` text) becomes a single row group. The
+/// scan path (`iceberg::scan`) has to fetch a row group's entire compressed
+/// bytes in one request before it can decode anything from it, and opens
+/// every data file surviving pruning for a batch concurrently (to
+/// merge-sort them) — so a handful of large single-row-group files on the
+/// read path can multiply memory far beyond this constant's own name.
+const MAX_ROW_GROUP_BYTES: usize = 64 * 1024 * 1024;
+
+fn data_file_writer_properties() -> WriterProperties {
+    WriterProperties::builder()
+        .set_max_row_group_bytes(Some(MAX_ROW_GROUP_BYTES))
+        .build()
+}
+
 struct BindingState {
     table: String,
     collection: String,
@@ -566,7 +586,11 @@ impl BindingState {
 
         let mut buf = Vec::new();
         let file_metadata = {
-            let mut writer = ArrowWriter::try_new(&mut buf, self.schema.clone(), None)?;
+            let mut writer = ArrowWriter::try_new(
+                &mut buf,
+                self.schema.clone(),
+                Some(data_file_writer_properties()),
+            )?;
             writer.write(&batch)?;
             writer.close()?
         };
@@ -837,7 +861,8 @@ async fn write_position_delete_file(
 
     let mut buf = Vec::new();
     {
-        let mut writer = ArrowWriter::try_new(&mut buf, schema.clone(), None)?;
+        let mut writer =
+            ArrowWriter::try_new(&mut buf, schema.clone(), Some(data_file_writer_properties()))?;
         writer.write(&batch)?;
         writer.close()?;
     }
