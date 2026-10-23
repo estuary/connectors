@@ -460,7 +460,7 @@ The full cycle is:
 `Response.SourcedSchema` may be sent anywhere `Response.Captured` may, and
 `Request.Acknowledge` follows each commit when the connector has asked for
 it.
-[`Response.BackfillBegin` and `Response.BackfillComplete`][backfill-markers]
+[`Response.BackfillBegin` and `Response.BackfillComplete`][backfill-signals]
 may be sent between checkpoint sequences, each in a sequence of its own.
 When the connector exits between checkpoints, the cycle starts over from
 `Request.Open` after `interval`.
@@ -774,15 +774,16 @@ nothing a later sourced schema says can narrow it again.
 
 ## Response.BackfillBegin and Response.BackfillComplete
 
-`Response.BackfillBegin` and `Response.BackfillComplete` tell the runtime
-that the connector is restating a binding in full.
+`Response.BackfillBegin` and `Response.BackfillComplete` are the backfill
+signals.
+They tell the runtime that the connector is restating a binding.
 Each carries the `binding` index it applies to.
 Together they let the runtime infer deletions from a backfill.
 Anything the backfill does not capture again is treated as deleted from the
 source.
 
 `Response.BackfillBegin` marks the start of a backfill that restates the
-binding's source resource in full.
+binding.
 The runtime commits it in a transaction of its own, with no documents.
 It then stamps the commit time on every partition journal of the binding's
 collection, as the `estuary.dev/truncated-at` label.
@@ -799,14 +800,14 @@ depends on the materialization and its configuration.
 The [runtime-next README][runtime-next-truncation] describes both halves in
 detail.
 
-Note that a marker cannot be taken back.
+Note that a signal cannot be taken back.
 Once `Response.BackfillBegin` commits, future readers of the collection never
 see the documents published before it.
-This means a marker sent in error loses data.
+This means a signal sent in error loses data.
 
-Each marker must stand alone in its checkpoint sequence.
-The marker is followed directly by a `Response.Checkpoint`, with no
-`Response.Captured`, `Response.SourcedSchema`, or other marker in the same
+Each signal must stand alone in its checkpoint sequence.
+The signal is followed directly by a `Response.Checkpoint`, with no
+`Response.Captured`, `Response.SourcedSchema`, or other signal in the same
 sequence.
 The runtime fails the session otherwise.
 The rule keeps documents captured before a `Response.BackfillBegin` from
@@ -837,26 +838,27 @@ records in the connector state that the backfill has begun.
 `Response.BackfillComplete` is sent once after the backfill's last document.
 Partway through a backfill, the connector may stop being certain that the
 backfill captures every document.
-This happens when the user changes the configuration or turns the markers
+This happens when the user changes the configuration or turns the signals
 off.
 The connector then does not send `Response.BackfillComplete` for that
 backfill.
 Otherwise materializations would remove rows that the rest of the backfill
 might never capture again.
 
-### When to send backfill markers
+### When to send backfill signals
 
-A connector should send the markers only when it is certain that the
-backfill captures every document of the resource, each in full.
+A connector should send the signals only when it is certain that the
+backfill has full coverage.
+That means it captures every document of the resource, each in full.
 If in doubt, it should send neither.
 
-A backfill is complete when nothing limits what it reads.
+A backfill has full coverage when nothing limits what it reads.
 Some examples follow.
 - A database table read with no filter.
 - A snapshot that fetches the whole resource on every poll.
 
-A backfill is not complete when the connector's configuration or the source
-limits what it reads.
+A backfill does not have full coverage when the connector's configuration
+or the source limits what it reads.
 Some examples follow.
 - A start date or lookback window in the connector's configuration.
 - An API that retains only recent data, e.g. the last 30 days of events.
@@ -865,23 +867,23 @@ Some examples follow.
 - A refresh of only some fields of each document, such as the formula fields
   of `source-salesforce-native`.
 
-Connectors that send backfill markers should offer two
+Connectors that send backfill signals should offer two
 [feature flags][feature-flags] that control them.
-- `emit_backfill_signals` turns the markers on, and `no_emit_backfill_signals`
+- `emit_backfill_signals` turns the signals on, and `no_emit_backfill_signals`
   turns them off.
 - `ignore_config_for_backfill_signals` makes the connector ignore its
-  configuration when it determines whether a backfill is complete.
-  Setting it means the user accepts truncation even though the configuration
-  may limit a backfill.
+  configuration when it determines a backfill's coverage.
+  Setting it means the user accepts that the backfill restates the binding
+  even though the configuration may limit what it reads.
   Limits that do not come from the configuration, such as source retention or
   the connector's own periodic backfills of partial documents, still prevent
-  markers.
-  It has no effect while the markers are turned off.
+  signals.
+  It has no effect while the signals are turned off.
 
 `ignore_config_for_backfill_signals` is off by default, so the connector
 follows the rule above.
 `emit_backfill_signals` is typically on by default only for captures created
-after the connector starts sending markers so that existing captures keep
+after the connector starts sending signals so that existing captures keep
 their behavior until a user opts in.
 
 # Delivery guarantees and resumption patterns
@@ -1129,5 +1131,5 @@ is how connectors are developed and tested locally.
 [filesource]: ../../filesource
 [feature-flags]: ../feature_flags.md
 [captures-concept]: https://docs.estuary.dev/concepts/captures/
-[backfill-markers]: #responsebackfillbegin-and-responsebackfillcomplete
+[backfill-signals]: #responsebackfillbegin-and-responsebackfillcomplete
 [runtime-next-truncation]: https://github.com/estuary/flow/blob/master/crates/runtime-next/README.md#backfill-truncation-capture

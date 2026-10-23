@@ -76,6 +76,24 @@ See [Request.Discover](capture/README.md#requestdiscover).
    It means a shard replica is replaying its recovery log after starting up
    before it can become `STANDBY` or `PRIMARY`.
 
+### Backfill coverage
+
+How much of a binding's source resource a backfill reads.
+A backfill's coverage is full, bounded by configuration, or partial.
+With the connector's feature flags, it determines whether a backfill is a
+restatement and sends `BackfillBegin` and `BackfillComplete` signals.
+See [When to send backfill signals](capture/README.md#when-to-send-backfill-signals).
+
+### Backfill signals
+
+The `Response.BackfillBegin` and `Response.BackfillComplete` messages that a
+capture sends around a backfill to enable end-to-end truncation in the platform.
+At the BackfillBegin, the runtime stamps the `estuary.dev/truncated-at` label
+on the collection's journals, and readers treat earlier documents as stale.
+At the BackfillComplete, materializations delete or soft-delete the rows that
+the backfill did not write again.
+See [Response.BackfillBegin and Response.BackfillComplete](capture/README.md#responsebackfillbegin-and-responsebackfillcomplete).
+
 ### Binding
 
 The pairing of a collection with an endpoint resource within a task.
@@ -543,6 +561,17 @@ API, or a file prefix.
 For a materialization it is what is written: a table, a topic, or a folder.
 Its resource path is the list of components that identify it within the
 endpoint.
+
+### Restatement
+
+1. A backfill sent with backfill signals.
+   The rows of the binding's collection that it does not capture again count
+   as deleted.
+   A backfill either is a restatement or is not, decided by the backfill's
+   coverage and configured feature flags.
+2. A `configUpdate` event that re-emits a task's whole endpoint config, e.g.
+   with each date-gated feature flag written out.
+   See [feature_flags.md](feature_flags.md).
 
 ### Runtime
 
