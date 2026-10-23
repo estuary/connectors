@@ -45,5 +45,64 @@ services:
     ports:
       - "9702:9000"
 
+
+  bootstrap:
+    # Creates the bucket and the Polaris catalog that testdata/config*.yaml
+    # name, then stays up so that `docker compose up --wait` returns once they
+    # exist. The rustfs image is used for its curl.
+    image: rustfs/rustfs:latest
+    depends_on:
+      rustfs:
+        condition: service_healthy
+      polaris:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        curl -fsS --aws-sigv4 "aws:amz:us-east-1:s3" --user flow:flow \
+          -X PUT http://rustfs:9000/test-warehouse
+
+        token=$$(curl -fsS http://polaris:8181/api/catalog/v1/oauth/tokens \
+          -d grant_type=client_credentials -d client_id=root -d client_secret=s3cr3t \
+          -d scope=PRINCIPAL_ROLE:ALL | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+
+        # Clients reach rustfs on the host port; Polaris over the compose
+        # network. rustfs has no STS, so clients use the s3.* properties.
+        curl -fsS -H "Authorization: Bearer $$token" -H "Content-Type: application/json" \
+          http://polaris:8181/api/management/v1/catalogs -d '{"catalog": {
+            "name": "test_warehouse",
+            "type": "INTERNAL",
+            "readOnly": false,
+            "properties": {
+              "default-base-location": "s3://test-warehouse/warehouse",
+              "s3.endpoint": "http://localhost:9702",
+              "s3.access-key-id": "flow",
+              "s3.secret-access-key": "flow",
+              "s3.region": "us-east-1",
+              "s3.path-style-access": "true"
+            },
+            "storageConfigInfo": {
+              "storageType": "S3",
+              "allowedLocations": ["s3://test-warehouse/warehouse/"],
+              "roleArn": "arn:aws:iam::000000000000:role/dummy",
+              "region": "us-east-1",
+              "endpoint": "http://localhost:9702",
+              "endpointInternal": "http://rustfs:9000",
+              "pathStyleAccess": true,
+              "stsUnavailable": true
+            }
+          }}'
+
+        touch /tmp/ready
+        trap 'exit 0' TERM
+        while :; do sleep 1; done
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 500ms
+      retries: 60
+    networks:
+      materialize-s3-iceberg:
+
 networks:
   materialize-s3-iceberg:
