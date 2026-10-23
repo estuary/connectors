@@ -287,6 +287,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		inBody++
 	}
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
 
 	if body.Len() > 0 {
 		body.WriteString("]")
