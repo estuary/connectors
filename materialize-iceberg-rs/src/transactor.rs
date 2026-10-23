@@ -499,6 +499,35 @@ fn data_file_writer_properties() -> WriterProperties {
         .build()
 }
 
+/// Rows per `ArrowWriter::write` call in [`write_in_row_group_chunks`] — small
+/// enough that even a single chunk is comfortably under
+/// `MAX_ROW_GROUP_BYTES` for this connector's row sizes, so the writer's own
+/// proactive byte-based splitting (see that function's doc comment) gets a
+/// chance to engage before any single call can overshoot the cap.
+const WRITE_CHUNK_ROWS: usize = 10_000;
+
+/// `ArrowWriter::write`'s `max_row_group_bytes` splitting only proactively
+/// engages once the current row group already has some buffered rows (it
+/// needs an average-row-size estimate to decide how many more rows fit) —
+/// on a single `write(&batch)` call with the *entire* accumulated batch, that
+/// guard is never true until the whole batch is already written, so the cap
+/// is only enforced after the fact, too late to prevent one oversized row
+/// group. Writing in modest row-count chunks instead means the second and
+/// later chunks always have `buffered_rows > 0`, letting the writer actually
+/// split proactively.
+fn write_in_row_group_chunks(
+    writer: &mut ArrowWriter<&mut Vec<u8>>,
+    batch: &RecordBatch,
+) -> Result<()> {
+    let mut offset = 0;
+    while offset < batch.num_rows() {
+        let len = WRITE_CHUNK_ROWS.min(batch.num_rows() - offset);
+        writer.write(&batch.slice(offset, len))?;
+        offset += len;
+    }
+    Ok(())
+}
+
 struct BindingState {
     table: String,
     collection: String,
@@ -622,7 +651,7 @@ impl BindingState {
                 self.schema.clone(),
                 Some(data_file_writer_properties()),
             )?;
-            writer.write(&batch)?;
+            write_in_row_group_chunks(&mut writer, &batch)?;
             writer.close()?
         };
 
@@ -895,7 +924,7 @@ async fn write_position_delete_file(
     {
         let mut writer =
             ArrowWriter::try_new(&mut buf, schema.clone(), Some(data_file_writer_properties()))?;
-        writer.write(&batch)?;
+        write_in_row_group_chunks(&mut writer, &batch)?;
         writer.close()?;
     }
 
