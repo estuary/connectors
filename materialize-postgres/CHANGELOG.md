@@ -1,5 +1,13 @@
 # materialize-postgres
 
+## 2026-10-23
+
+### Fixed
+- Loading existing rows for a large transaction no longer fails after one hour
+  while rows are still being returned. Slow destinations, such as small Amazon
+  Aurora instances, previously retried the same transaction indefinitely with
+  `querying Loads: timeout: context deadline exceeded`.
+
 ## 2026-10-22
 
 ### Added
