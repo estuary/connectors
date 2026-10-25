@@ -211,6 +211,53 @@ class DerivedCollectionSpec(CollectionSpec, Generic[EndpointConfig, ResourceConf
     derivation: Derivation[EndpointConfig, ResourceConfig]
 
 
+class RawResourceConfig(BaseModel):
+    """A resource configuration which isn't modeled, such as that of a
+    last-applied specification, which may not parse as the current types.
+    Its properties are its `model_extra`."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class FieldSelection(BaseModel):
+    keys: list[str] = []
+    values: list[str] = []
+    # Field of the root document, if it's materialized.
+    document: str = ""
+    fieldConfig: dict[str, Any] = {}
+
+
+class SerPolicy(BaseModel):
+    # Limits of serialized documents and values. Zero is unlimited.
+    strTruncateAfter: NonNegativeInt = 0
+    nestedObjTruncateAfter: NonNegativeInt = 0
+    arrayTruncateAfter: NonNegativeInt = 0
+
+
+class MaterializationBinding(BaseModel, Generic[ResourceConfig]):
+    collection: CollectionSpec = UNLINKED
+    collectionIndex: NonNegativeInt = 0
+    resourceConfig: ResourceConfig
+    resourcePath: list[str]
+    priority: int = 0
+    fieldSelection: FieldSelection = FieldSelection()
+    deltaUpdates: bool = False
+    backfill: NonNegativeInt = 0
+    stateKey: str = ""
+    serPolicy: SerPolicy | None = None
+
+
+class MaterializationSpec(Linked, BaseModel, Generic[EndpointConfig, ResourceConfig]):
+    name: str
+    connectorType: ConnectorType
+    config: EndpointConfig
+    bindings: list[MaterializationBinding[ResourceConfig]] = []
+    linkedCollections: list[CollectionSpec] = []
+
+    def _link(self) -> None:
+        link_bindings(self.bindings, self.linkedCollections)
+
+
 class RangeSpec(BaseModel):
     keyBegin: NonNegativeInt = 0
     keyEnd: PositiveInt = 0xFFFFFFFF
