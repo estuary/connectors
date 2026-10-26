@@ -3,6 +3,8 @@ package sql
 import (
 	"encoding/base64"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -94,6 +96,16 @@ type MergeBound struct {
 	// LiteralUpper will also be an empty string if no condition should be
 	// used.
 	LiteralUpper string
+	// Ranges, when set, split LiteralLower..LiteralUpper at gaps between the
+	// observed values: every observed value lies within one of them. See
+	// WithDatetimeRanges.
+	Ranges []MergeRange
+}
+
+// MergeRange is one of the disjoint ranges of a MergeBound.
+type MergeRange struct {
+	LiteralLower string
+	LiteralUpper string
 }
 
 // MergeBoundsBuilder tracks and generates a MergeBound for each of a binding's
@@ -104,12 +116,19 @@ type MergeBoundsBuilder struct {
 	// exactDatetime reports whether a date-time key column can be bounded by
 	// the observed values themselves rather than by whole dates.
 	exactDatetime func(Column) bool
+	// maxRanges is the most ranges an exact date-time bound splits into, and
+	// rangeColumns marks the key columns it applies to.
+	maxRanges    int
+	rangeColumns []bool
 
 	lower []any
 	upper []any
 	// unbounded marks key columns whose observed values can't be ordered,
 	// such as a date-time that doesn't parse.
 	unbounded []bool
+	// spans are the observed values of each of rangeColumns, as sorted,
+	// disjoint spans.
+	spans [][]datetimeSpan
 }
 
 type MergeBoundsOption func(*MergeBoundsBuilder)
@@ -122,6 +141,13 @@ func WithExactDatetimeBounds(fn func(Column) bool) MergeBoundsOption {
 	return func(b *MergeBoundsBuilder) { b.exactDatetime = fn }
 }
 
+// WithDatetimeRanges splits the exact bound of a date-time key into up to
+// maxRanges ranges at the widest gaps between its observed values, so that a
+// few outlying keys don't stretch the bound over everything in between.
+func WithDatetimeRanges(maxRanges int) MergeBoundsOption {
+	return func(b *MergeBoundsBuilder) { b.maxRanges = maxRanges }
+}
+
 func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts ...MergeBoundsOption) *MergeBoundsBuilder {
 	var b = &MergeBoundsBuilder{
 		keyColumns: keyColumns,
@@ -129,6 +155,12 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 	}
 	for _, o := range opts {
 		o(b)
+	}
+	if b.maxRanges > 1 && b.exactDatetime != nil {
+		b.rangeColumns = make([]bool, len(keyColumns))
+		for idx, col := range keyColumns {
+			b.rangeColumns[idx] = isDatetimeColumn(col) && b.exactDatetime(col)
+		}
 	}
 	return b
 }
@@ -149,14 +181,18 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
 		b.unbounded = make([]bool, len(key))
+		b.spans = make([][]datetimeSpan, len(key))
 	}
 
 	for idx, k := range key {
 		if isDatetimeColumn(b.keyColumns[idx]) {
 			// Date-time strings order by their instant, which text order
 			// doesn't follow across offsets and precisions.
-			if lower, upper, ok := minMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
+			if lower, upper, ts, ok := minMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
 				b.lower[idx], b.upper[idx] = lower, upper
+				if b.rangeColumns != nil && b.rangeColumns[idx] && !b.unbounded[idx] {
+					b.spans[idx] = addDatetimeSpan(b.spans[idx], ts, k, spansPerRange*b.maxRanges)
+				}
 			} else {
 				b.unbounded[idx] = true
 			}
@@ -182,13 +218,14 @@ func parseDatetime(v any) (time.Time, bool) {
 }
 
 // minMaxDatetime returns the earlier of lower and k, and the later of upper
-// and k, compared as instants. It reports false if any isn't a date-time.
-func minMaxDatetime(lower, upper, k any) (any, any, bool) {
+// and k, compared as instants, along with the instant of k. It reports false
+// if any isn't a date-time.
+func minMaxDatetime(lower, upper, k any) (any, any, time.Time, bool) {
 	tl, okL := parseDatetime(lower)
 	tu, okU := parseDatetime(upper)
 	tk, okK := parseDatetime(k)
 	if !okL || !okU || !okK {
-		return nil, nil, false
+		return nil, nil, time.Time{}, false
 	}
 	if tk.Before(tl) {
 		lower = k
@@ -196,7 +233,7 @@ func minMaxDatetime(lower, upper, k any) (any, any, bool) {
 	if tk.After(tu) {
 		upper = k
 	}
-	return lower, upper, true
+	return lower, upper, tk, true
 }
 
 // dateBounds widens lower..upper to date literals that enclose every spelling
@@ -284,6 +321,9 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 
 		conditions[idx].LiteralLower = b.literaler(b.lower[idx])
 		conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
+		if len(b.spans[idx]) > 1 {
+			conditions[idx].Ranges = b.rangesOf(b.spans[idx])
+		}
 	}
 
 	// Reset for tracking the next transaction.
@@ -297,4 +337,75 @@ func (b *MergeBoundsBuilder) Reset() {
 	b.lower = nil
 	b.upper = nil
 	b.unbounded = nil
+	b.spans = nil
+}
+
+// spansPerRange is how many spans per output range a builder tracks. Past
+// that, the two spans with the narrowest gap between them merge.
+const spansPerRange = 8
+
+// minRangeGapDivisor sets the narrowest gap worth splitting a bound at, as a
+// fraction of the bound's span: a narrower one excludes too little to matter.
+const minRangeGapDivisor = 100
+
+// datetimeSpan is a closed range of observed date-time keys, along with the
+// keys at its ends for rendering as literals.
+type datetimeSpan struct {
+	lo, hi       time.Time
+	loKey, hiKey any
+}
+
+// addDatetimeSpan adds the observed key ts to spans, which hold at most limit
+// spans.
+func addDatetimeSpan(spans []datetimeSpan, ts time.Time, key any, limit int) []datetimeSpan {
+	var i = sort.Search(len(spans), func(i int) bool { return !spans[i].hi.Before(ts) })
+	if i < len(spans) && !spans[i].lo.After(ts) {
+		return spans
+	}
+	spans = slices.Insert(spans, i, datetimeSpan{lo: ts, hi: ts, loKey: key, hiKey: key})
+	if len(spans) > limit {
+		spans = mergeNarrowestGap(spans)
+	}
+	return spans
+}
+
+func mergeNarrowestGap(spans []datetimeSpan) []datetimeSpan {
+	var at int
+	for i := 1; i+1 < len(spans); i++ {
+		if spans[i+1].lo.Sub(spans[i].hi) < spans[at+1].lo.Sub(spans[at].hi) {
+			at = i
+		}
+	}
+	return mergeSpans(spans, at)
+}
+
+// mergeSpans merges spans[at+1] into spans[at].
+func mergeSpans(spans []datetimeSpan, at int) []datetimeSpan {
+	spans[at].hi, spans[at].hiKey = spans[at+1].hi, spans[at+1].hiKey
+	return slices.Delete(spans, at+1, at+2)
+}
+
+// rangesOf renders spans as at most maxRanges ranges split at their widest
+// gaps, or nil if no gap is worth a split.
+func (b *MergeBoundsBuilder) rangesOf(spans []datetimeSpan) []MergeRange {
+	for len(spans) > b.maxRanges {
+		spans = mergeNarrowestGap(spans)
+	}
+	var minGap = spans[len(spans)-1].hi.Sub(spans[0].lo) / minRangeGapDivisor
+	for i := 0; i+1 < len(spans); {
+		if spans[i+1].lo.Sub(spans[i].hi) < minGap {
+			spans = mergeSpans(spans, i)
+		} else {
+			i++
+		}
+	}
+	if len(spans) < 2 {
+		return nil
+	}
+
+	var out = make([]MergeRange, len(spans))
+	for i, s := range spans {
+		out[i] = MergeRange{LiteralLower: b.literaler(s.loKey), LiteralUpper: b.literaler(s.hiKey)}
+	}
+	return out
 }
