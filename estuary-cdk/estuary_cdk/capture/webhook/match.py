@@ -5,7 +5,7 @@ import re
 from abc import abstractmethod
 from collections.abc import Sequence
 from logging import Logger
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from typing_extensions import override
 
 from aiohttp import web
@@ -231,7 +231,7 @@ class BodyMatch(_KeyValueMatch, frozen=True):
             if not isinstance(parsed, dict):
                 raise ValueError(f"Invalid document type: {type(parsed)}")
 
-            raw_doc = parsed
+            raw_doc = cast(dict[str, Any], parsed)
 
         cursor: dict[str, Any] = raw_doc
         segments = self.key.split(".")
@@ -245,7 +245,7 @@ class BodyMatch(_KeyValueMatch, frozen=True):
                 )
                 return False
 
-            cursor = nested
+            cursor = cast(dict[str, Any], nested)
 
         value = cursor.get(segments[-1])
         if value is None:

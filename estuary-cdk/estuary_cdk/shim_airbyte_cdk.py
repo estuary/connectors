@@ -7,7 +7,7 @@ from pydantic.json_schema import (
     GenerateJsonSchema,
     JsonSchemaMode,
 )
-from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal
+from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal, cast
 import asyncio
 import logging
 import os
@@ -30,7 +30,7 @@ from airbyte_cdk.sources.source import Source as AirbyteSource
 # vendor/README.md), so these always come from airbyte_protocol.models. The
 # fallback to airbyte_cdk.models.airbyte_protocol that used to guard this
 # import was for floating upstream versions, which no longer applies.
-from airbyte_protocol.models import (
+from airbyte_protocol.models import (  # pyright: ignore[reportMissingTypeStubs]  # no stubs exist for this package
     SyncMode as AirbyteSyncMode,
     DestinationSyncMode as AirbyteDestinationSyncMode,
     ConfiguredAirbyteCatalog,
@@ -51,7 +51,7 @@ from airbyte_protocol.models import (
 DOCS_URL = os.getenv("DOCS_URL")
 
 
-EndpointConfig = dict
+EndpointConfig = dict[str, Any]
 """This shim imposes no bound on EndpointConfig"""
 
 
@@ -184,11 +184,11 @@ def set_additional_properties_false(schema: Any) -> Any:
     if not isinstance(schema, dict):
         return schema
 
-    _schema = schema.copy()
-    schema_type = _schema.get("type")
+    _schema = cast(dict[str, Any], schema).copy()
+    schema_type: Any = _schema.get("type")
 
     if schema_type == "object" or (
-        isinstance(schema_type, list) and "object" in schema_type
+        isinstance(schema_type, list) and "object" in cast(list[Any], schema_type)
     ):
         _schema["additionalProperties"] = False
 
@@ -196,25 +196,27 @@ def set_additional_properties_false(schema: Any) -> Any:
         if key == "properties" and isinstance(value, dict):
             _schema[key] = {
                 prop_key: set_additional_properties_false(prop_value)
-                for prop_key, prop_value in value.items()
+                for prop_key, prop_value in cast(dict[str, Any], value).items()
             }
         elif key == "items":
             if isinstance(value, dict):
                 _schema[key] = set_additional_properties_false(value)
             elif isinstance(value, list):
                 _schema[key] = [
-                    set_additional_properties_false(item) for item in value
+                    set_additional_properties_false(item)
+                    for item in cast(list[Any], value)
                 ]
         elif key in ["oneOf", "anyOf", "allOf"] and isinstance(value, list):
             _schema[key] = [
-                set_additional_properties_false(item) for item in value
+                set_additional_properties_false(item)
+                for item in cast(list[Any], value)
             ]
 
     return _schema
 
 
 @dataclass
-class CaptureShim(BaseCaptureConnector):
+class CaptureShim(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState]):
     delegate: AirbyteSource
     schema_inference: bool
     oauth2: OAuth2Spec | None
@@ -304,7 +306,7 @@ class CaptureShim(BaseCaptureConnector):
         self,
         log: Logger,
         discover: request.Discover[EndpointConfig],
-    ) -> response.Discovered:
+    ) -> response.Discovered[ResourceConfig]:
         resources = await self._all_resources(log, discover.config)
         return common.discovered(resources)
 

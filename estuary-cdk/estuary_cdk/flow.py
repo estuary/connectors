@@ -300,8 +300,8 @@ class OAuth2Spec(BaseModel):
 
 
 class ConnectorSpec(BaseModel):
-    configSchema: dict
-    resourceConfigSchema: dict
+    configSchema: dict[str, Any]
+    resourceConfigSchema: dict[str, Any]
     documentationUrl: str
     resourcePathPointers: list[str]
     oauth2: OAuth2Spec | None = None

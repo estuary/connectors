@@ -38,7 +38,7 @@ class ConnectorStatus:
 
         self.log = log
         self.binding_count = 0
-        self.binding_backfill_counts = defaultdict(int)
+        self.binding_backfill_counts: defaultdict[int, int] = defaultdict(int)
         self.should_log = False
 
     def inc_binding_count(self):

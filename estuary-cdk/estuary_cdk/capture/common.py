@@ -67,12 +67,12 @@ the tuple type allows for str or integer values to be used
 CURSOR_MARKER = "__flow_cursor__"
 
 
-def is_cursor_dict(item: dict) -> bool:
+def is_cursor_dict(item: dict[str, Any]) -> bool:
     """Check if a dict is a cursor by looking for the cursor marker."""
     return item.get(CURSOR_MARKER) is True
 
 
-def make_cursor_dict(data: dict) -> dict:
+def make_cursor_dict(data: dict[str, Any]) -> dict[str, Any]:
     """Convert a regular dict to a cursor dict by adding the marker.
     
     The intended way of using this is to first call `make_cursor_dict` on a dictionary that
@@ -106,7 +106,7 @@ def make_cursor_dict(data: dict) -> dict:
     return {CURSOR_MARKER: True, **data}
 
 
-def pop_cursor_marker(cursor: dict) -> dict:
+def pop_cursor_marker(cursor: dict[str, Any]) -> dict[str, Any]:
     """Remove the cursor marker from a cursor dict."""
     cursor.pop(CURSOR_MARKER, None)
     return cursor
@@ -146,7 +146,7 @@ class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
 
     PATH_POINTERS: ClassVar[list[str]]
 
-    meta_: dict | None = Field(
+    meta_: dict[str, Any] | None = Field(
         default=None, alias="_meta", title="Meta",
     )
 
@@ -303,9 +303,9 @@ class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
     backfillRequests: dict[str, bool | None] = {}
 
 
-_ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
+_ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState[Any])
 
-FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
+FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict[str, Any], None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 
@@ -317,7 +317,7 @@ not emitted by the connector.
 
 FetchPageFn = Callable[
     [Logger, PageCursor, LogCursor],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | dict[str, Any] | AssociatedDocument[Any] | PageCursor, None],
 ]
 """
 FetchPageFn fetches available checkpoints since the provided last PageCursor.
@@ -342,7 +342,7 @@ returning without yielding a final PageCursor.
 
 RecurringFetchPageFn = Callable[
     [Logger, PageCursor, LogCursor, bool],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | dict[str, Any] | AssociatedDocument[Any] | PageCursor, None],
 ]
 """
 RecurringFetchPagesFn fetches available checkpoints since the provided last PageCursor.
@@ -373,7 +373,7 @@ returning without yielding a final PageCursor.
 
 FetchChangesFn = Callable[
     [Logger, LogCursor],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
+    AsyncGenerator[_BaseDocument | dict[str, Any] | AssociatedDocument[Any] | LogCursor, None],
 ]
 """
 FetchChangesFn fetches available checkpoints since the provided last LogCursor.
@@ -407,7 +407,7 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 """
 
 
-def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+def is_recurring_fetch_page_fn(fn: FetchPageFn[Any] | RecurringFetchPageFn[Any], log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
     """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
     try:
         inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
@@ -440,7 +440,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
         as the model schema, rather than dynamically generating a schema.
         """
 
-        value: dict
+        value: dict[str, Any]
 
     name: str
     key: list[str]
@@ -507,7 +507,7 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
 def discovered(
     resources: list["Resource[_BaseDocument, _BaseResourceConfig, _BaseResourceState]"],
 ) -> response.Discovered[_BaseResourceConfig]:
-    bindings: list[response.DiscoveredBinding] = []
+    bindings: list[response.DiscoveredBinding[_BaseResourceConfig]] = []
 
     for resource in resources:
         if isinstance(resource.model, Resource.FixedSchema):
@@ -572,7 +572,7 @@ def discovered(
 
 
 _ResolvableBinding = TypeVar(
-    "_ResolvableBinding", bound=CaptureBinding | request.ValidateBinding
+    "_ResolvableBinding", bound=CaptureBinding[Any] | request.ValidateBinding[Any]
 )
 """_ResolvableBinding is either a CaptureBinding or a request.ValidateBinding"""
 
@@ -677,20 +677,18 @@ def open(
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
     async def _run(task: Task):
-        backfill_requests = []
-        if open.state.backfillRequests is not None:
-            for stateKey in open.state.backfillRequests.keys():
-                task.log.info(
-                    "clearing checkpoint due to backfill trigger",
-                    {"stateKey": stateKey},
-                )
-                backfill_requests.append(stateKey)
-                await task.checkpoint(
-                    ConnectorState(
-                        bindingStateV1={stateKey: None},
-                        backfillRequests={stateKey: None},
-                    )
-                )
+        backfill_requests: list[str] = []
+        for stateKey in open.state.backfillRequests.keys():
+            task.log.info(
+                "clearing checkpoint due to backfill trigger",
+                {"stateKey": stateKey},
+            )
+            backfill_requests.append(stateKey)
+            cleared: ConnectorState[_ResourceState] = ConnectorState(
+                bindingStateV1={stateKey: None},
+                backfillRequests={stateKey: None},
+            )
+            await task.checkpoint(cleared)
 
         soonest_future_scheduled_initialization: datetime | None = None
         NOW = datetime.now(tz=UTC)
@@ -814,7 +812,7 @@ def _assert_tombstone_covers_key(tombstone: BaseDocument, key: list[str]) -> Non
                 f"other than /_meta/row_id pre-set, but {key_pointer} is unset. "
                 f"Key: {key}, tombstone: {dump}"
             )
-            node = node[field_name]
+            node = cast(dict[str, Any], node)[field_name]
 
 
 def _tombstone_discriminator_values(
@@ -889,7 +887,10 @@ def open_binding(
 
         if isinstance(fetch_changes, dict):
             assert resource_state.inc and isinstance(resource_state.inc, dict)
-            for subtask_id, subtask_fetch_changes in fetch_changes.items():
+            # isinstance() against a union of callables narrows to a synthesized
+            # dict-and-callable intersection, so the subtask map is re-stated.
+            subtask_changes = cast(dict[str, FetchChangesFn[_BaseDocument]], fetch_changes)
+            for subtask_id, subtask_fetch_changes in subtask_changes.items():
                 inc_state = resource_state.inc.get(subtask_id)
                 assert inc_state
 
@@ -917,7 +918,7 @@ def open_binding(
 
         async def backfill_closure(
             task: Task,
-            fetch_page: FetchPageFn[_BaseDocument] | RecurringFetchPageFn,
+            fetch_page: FetchPageFn[_BaseDocument] | RecurringFetchPageFn[_BaseDocument],
             state: ResourceState.Backfill,
             subtask_id: str | None = None,
         ):
@@ -937,7 +938,8 @@ def open_binding(
 
         if isinstance(fetch_page, dict):
             assert resource_state.backfill and isinstance(resource_state.backfill, dict)
-            for subtask_id, subtask_fetch_page in fetch_page.items():
+            subtask_pages = cast(dict[str, FetchPageFn[_BaseDocument]], fetch_page)
+            for subtask_id, subtask_fetch_page in subtask_pages.items():
                 backfill_state = resource_state.backfill.get(subtask_id)
 
                 if not backfill_state:
@@ -1029,7 +1031,10 @@ def open_binding(
             snapshot_state = resource_state.snapshot
             assert snapshot_state is None or isinstance(snapshot_state, dict)
 
-            for subtask_id, subtask_fetch_snapshot in fetch_snapshot.items():
+            subtask_snapshots = cast(
+                dict[str, FetchSnapshotFn[_BaseDocument]], fetch_snapshot
+            )
+            for subtask_id, subtask_fetch_snapshot in subtask_snapshots.items():
                 subtask_state = (
                     snapshot_state.get(subtask_id) if snapshot_state else None
                 )
@@ -1169,7 +1174,9 @@ async def _binding_backfill_task(
     task: Task,
     subtask_id: str | None = None,
 ):
-    def _initialize_connector_state(state: ResourceState.Backfill) -> ConnectorState:
+    def _initialize_connector_state(
+        state: ResourceState.Backfill,
+    ) -> ConnectorState[ResourceState]:
         if subtask_id is not None:
             connector_state = ConnectorState(
                 bindingStateV1={
@@ -1208,10 +1215,10 @@ async def _binding_backfill_task(
 
         # Distinguish between FetchPageFn and RecurringFetchPageFn to provide the correct arguments.
         if is_recurring_fetch_page_fn(fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated):
-            fn = cast(RecurringFetchPageFn, fetch_page)
+            fn = cast(RecurringFetchPageFn[_BaseDocument], fetch_page)
             pages = fn(task.log, state.next_page, state.cutoff, is_connector_initiated)
         else:
-            fn = cast(FetchPageFn, fetch_page)
+            fn = cast(FetchPageFn[_BaseDocument], fetch_page)
             pages = fn(task.log, state.next_page, state.cutoff)
 
         async for item in pages:
@@ -1359,9 +1366,10 @@ async def _binding_incremental_task(
                     "incremental task triggered backfill", {"subtask_id": subtask_id}
                 )
                 task.stopping.event.set()
-                await task.checkpoint(
-                    ConnectorState(backfillRequests={binding.stateKey: True})
+                requested: ConnectorState[ResourceState] = ConnectorState(
+                    backfillRequests={binding.stateKey: True}
                 )
+                await task.checkpoint(requested)
                 return
             else:
                 # Ensure LogCursor types match

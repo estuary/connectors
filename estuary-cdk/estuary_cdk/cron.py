@@ -1,6 +1,6 @@
 from datetime import datetime, UTC, timedelta
 
-import pycron
+import pycron  # pyright: ignore[reportMissingTypeStubs]  # no stubs exist for this package
 
 CONNECTOR_RESTART_INTERVAL = timedelta(hours=24)
 SMALLEST_CRON_INCREMENT = timedelta(minutes=1)

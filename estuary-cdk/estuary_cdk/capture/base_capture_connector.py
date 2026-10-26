@@ -19,9 +19,6 @@ from ..flow import (
     ResourceConfig,
     RotatingOAuth2Credentials,
 )
-from ..flow import (
-    ConnectorState as GeneralConnectorState,
-)
 from ..http import HTTPMixin, TokenSource
 from ..logger import FlowLogger
 from ..utils import format_error_message, get_running_tasks_info, sort_dict
@@ -322,7 +319,7 @@ class BaseCaptureConnector(
             raise RuntimeError("malformed request", request)
 
     async def _emit(
-        self, response: Response[EndpointConfig, ResourceConfig, GeneralConnectorState]
+        self, response: Response[EndpointConfig, ResourceConfig, _ConnectorState]
     ):
         data = response.model_dump_json(by_alias=True, exclude_unset=True).encode()
         await emit_bytes(data + b"\n", self.output)

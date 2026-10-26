@@ -116,15 +116,21 @@ lint = [
     "pyright==1.1.408",
 ]
 
-# Type checking. Every workspace member is checked, but nothing gates on it:
-# the connectors carry a backlog in the low thousands, so findings are
-# surfaced as annotations and worked down separately. `vendor/` is excluded as
-# vendored Airbyte code that is never edited to satisfy a checker.
+# Type checking. Every workspace member is checked, but only estuary-cdk gates
+# on it: the connectors carry a backlog in the low thousands, so their findings
+# are surfaced as annotations and worked down separately. `vendor/` is excluded
+# as vendored Airbyte code that is never edited to satisfy a checker.
 [tool.pyright]
 include = [
     "estuary-cdk/estuary_cdk",
     "source-*",
 ]
+# The CDK is checked at full strict. The list promotes rules per-path -- an
+# executionEnvironment can't, as it has no say over typeCheckingMode -- so the
+# connectors stay at the `typeCheckingMode` below. It also forces
+# reportMissingTypeStubs back to an error for these paths, which the three
+# stub-less imports (pycron, ijson, airbyte_protocol) suppress inline.
+strict = ["estuary-cdk/estuary_cdk"]
 exclude = ["**/.venv", "**/__pycache__", "estuary-cdk/vendor"]
 # The workspace's own version. estuary-cdk supports 3.11 as well, but a
 # second config for it would be a net loss: a per-member `[tool.pyright]`
@@ -137,10 +143,9 @@ exclude = ["**/.venv", "**/__pycache__", "estuary-cdk/vendor"]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 
-# Rules from strict mode that are worth having on their own. Full strict is
-# dominated by the "Unknown type" family, which is a real annotation project
-# rather than a setting. reportMissingTypeStubs stays off: its hits are
-# pycron, ijson and airbyte_protocol, none of which we can produce stubs for.
+# Rules from strict mode that are worth having on their own, applied to the
+# connectors as well. reportMissingTypeStubs stays off: its hits are pycron,
+# ijson and airbyte_protocol, none of which we can produce stubs for.
 reportUnusedImport = "error"
 reportMissingParameterType = "error"
 reportInvalidTypeVarUse = "error"
