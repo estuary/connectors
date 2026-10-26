@@ -843,6 +843,27 @@ func TestCombineBounds(t *testing.T) {
 		require.Empty(t, out[1].LiteralUpper)
 	})
 
+	t.Run("ranges union across entries", func(t *testing.T) {
+		var split = bound("'2026-03-01T00:00:00Z'", "'2026-10-26T12:15:00Z'")
+		split.Ranges = []mergeRangeLiterals{
+			{"'2026-03-01T00:00:00Z'", "'2026-03-01T00:00:00Z'"},
+			{"'2026-10-26T12:00:00Z'", "'2026-10-26T12:15:00Z'"},
+		}
+		var items = []*checkpointItem{
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), split}},
+			{Bounds: []mergeBoundLiterals{bound("5", "50"), bound("'2026-10-26T12:10:00Z'", "'2026-10-26T12:30:00Z'")}},
+			{Bounds: []mergeBoundLiterals{bound("5", "50"), split}},
+		}
+		var out = combineBounds(keys, items)
+		require.Nil(t, out[0].Ranges)
+		require.Equal(t, "GREATEST('2026-10-26T12:15:00Z'::TIMESTAMP, '2026-10-26T12:30:00Z'::TIMESTAMP)", out[1].LiteralUpper)
+		require.Equal(t, []sql.MergeRange{
+			{LiteralLower: "'2026-03-01T00:00:00Z'", LiteralUpper: "'2026-03-01T00:00:00Z'"},
+			{LiteralLower: "'2026-10-26T12:00:00Z'", LiteralUpper: "'2026-10-26T12:15:00Z'"},
+			{LiteralLower: "'2026-10-26T12:10:00Z'", LiteralUpper: "'2026-10-26T12:30:00Z'"},
+		}, out[1].Ranges)
+	})
+
 	t.Run("a length mismatch drops all bounds of that entry's columns", func(t *testing.T) {
 		var items = []*checkpointItem{
 			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("'a'", "'b'")}},
@@ -857,6 +878,31 @@ func TestCombineBounds(t *testing.T) {
 
 // Root-level files from a checkpoint written before staging directories existed
 // merge in their own query, ahead of the directories.
+// A recovered entry's bound ranges survive the persisted state and bound its
+// MERGE.
+func TestAcknowledgeMergesWithRecoveredRanges(t *testing.T) {
+	var d = renderingTransactor(fullRangeKey)
+	require.NoError(t, d.UnmarshalState(json.RawMessage(`{"a_table.v1": {"00000000-ffffffff": {
+		"Directory": "txn-1",
+		"NeedsMerge": true,
+		"Bounds": [
+			{"Lower": "1", "Upper": "10"},
+			{"Lower": "'2026-03-01T00:00:00Z'", "Upper": "'2026-10-26T12:15:00Z'", "Ranges": [
+				{"Lower": "'2026-03-01T00:00:00Z'", "Upper": "'2026-03-01T00:00:00Z'"},
+				{"Lower": "'2026-10-26T12:00:00Z'", "Upper": "'2026-10-26T12:15:00Z'"}
+			]}
+		]
+	}}}`)))
+
+	_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	require.NoError(t, err)
+	require.Len(t, recording.executed, 1)
+	require.Contains(t, recording.executed[0], "l.id = r.id AND l.id >= 1 AND l.id <= 10")
+	require.Contains(t, recording.executed[0], "l.ts = r.ts AND ("+
+		"(l.ts >= '2026-03-01T00:00:00Z' AND l.ts <= '2026-03-01T00:00:00Z') OR "+
+		"(l.ts >= '2026-10-26T12:00:00Z' AND l.ts <= '2026-10-26T12:15:00Z'))")
+}
+
 func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 	var d = renderingTransactor(lowerRangeKey)
 	d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,
