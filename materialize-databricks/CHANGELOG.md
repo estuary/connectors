@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-26
+### Changed
+- Load and merge queries on tables with a `TIMESTAMP` key column split the
+  key range at wide gaps between the transaction's keys, so a few keys far
+  from the rest no longer widen the scan to everything in between.
+
 ## 2026-10-22
 
 ### Added

@@ -194,7 +194,7 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
 	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
 	{{- end }}
 {{ else -}}
 SELECT -1, ""
@@ -216,9 +216,21 @@ JOIN ({{ template "loadSource" $ }}) AS r
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
 {{- end }}
 {{ end }}
+
+-- The range condition of a key column's merge bound: one range of its lower
+-- and upper literals, or the union of its ranges when it has them.
+
+{{ define "boundCondition" -}}
+{{- if $.Bound.Ranges }} AND (
+	{{- range $i, $r := $.Bound.Ranges }}{{ if $i }} OR {{ end -}}
+	({{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $r.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $r.LiteralUpper }})
+	{{- end }})
+{{- else if $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $.Bound.LiteralUpper }}
+{{- end }}
+{{- end }}
 
 -- The staged files of a transaction: one relation per staging directory, and
 -- one scan per file for files staged at the root by earlier versions.
@@ -371,7 +383,7 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
   ON {{ range $ind, $bound := $.Bounds }}
     {{ if $ind -}} AND {{ end -}}
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-    {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+    {{- template "boundCondition" (BoundOn "l" $bound) }}
   {{- end }}
 	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
@@ -397,7 +409,9 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 		{{- end -}}
 	);
 {{ end }}
-  `)
+  `, template.FuncMap{
+		"BoundOn": func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+	})
 
 	return templates{
 		createTargetTable:       tplAll.Lookup("createTargetTable"),
@@ -423,6 +437,12 @@ type tableWithFiles struct {
 	Schema      string
 	// Tables are the staging tables a MERGE reads.
 	Tables []string
+}
+
+// boundOn is a merge bound on the key column of the table aliased Alias.
+type boundOn struct {
+	Alias string
+	Bound sql.MergeBound
 }
 
 // stagingCopy renders the creation of a staging table and the copy of a

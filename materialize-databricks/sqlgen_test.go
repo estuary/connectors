@@ -153,7 +153,99 @@ func TestSQLGeneration(t *testing.T) {
 		}
 	}
 
+	{
+		tbl := tables[0]
+		var bounds = []sql.MergeBound{
+			{
+				Column:       tbl.Keys[0],
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
+				Ranges: []sql.MergeRange{
+					{LiteralLower: testDialect.Literal(int64(10)), LiteralUpper: testDialect.Literal(int64(10))},
+					{LiteralLower: testDialect.Literal(int64(90)), LiteralUpper: testDialect.Literal(int64(100))},
+				},
+			},
+			{Column: tbl.Keys[1]},
+			{
+				Column:       tbl.Keys[2],
+				LiteralLower: testDialect.Literal("aGVsbG8K"),
+				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
+			},
+		}
+		for _, tpl := range []*template.Template{
+			testTemplates.loadQuery,
+			testTemplates.loadQueryNoFlowDocument,
+			testTemplates.mergeInto,
+		} {
+			var schema = stagedSchemaDDL(tbl.KeyPtrs(), false)
+			if tpl == testTemplates.mergeInto {
+				schema = stagedSchemaDDL(tbl.Columns(), true)
+			}
+			var rendered, err = RenderTableWithStaged(tbl, []string{"test-staging-path/txn-1"}, nil, schema, tpl, bounds)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + tbl.Identifier + " " + tpl.Name() + " ranges ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + tbl.Identifier + " ---\n\n")
+		}
+	}
+
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+// TestDatetimeKeyRanges renders the load query's bound of a TIMESTAMP key
+// whose values split into a band and an outlier.
+func TestDatetimeKeyRanges(t *testing.T) {
+	var projection = func(field string, inference pf.Inference) sql.Projection {
+		return sql.Projection{Projection: pf.Projection{Field: field, Ptr: "/" + field, Inference: inference}}
+	}
+	var shape = sql.TableShape{
+		Path: sql.TablePath{"schema", "events"},
+		Keys: []sql.Projection{
+			projection("created_at", pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}, Exists: pf.Inference_MUST}),
+			projection("id", pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}),
+		},
+		Document: func() *sql.Projection {
+			p := projection("flow_document", pf.Inference{Types: []string{"object"}})
+			return &p
+		}(),
+	}
+	var keys = []tuple.Tuple{
+		{"2026-10-26T12:00:00Z", "a"},
+		{"2026-03-01T00:00:00Z", "b"},
+		{"2026-10-26T12:15:00Z", "c"},
+		{"2026-10-26T12:05:00Z", "d"},
+	}
+
+	for _, tc := range []struct {
+		name       string
+		flags      map[string]bool
+		wantBounds string
+	}{
+		{"TIMESTAMP key splits at the gap", map[string]bool{"datetime_keys_as_string": false},
+			"schema.events.created_at = r.created_at AND (" +
+				"(schema.events.created_at >= '2026-03-01T00:00:00Z' AND schema.events.created_at <= '2026-03-01T00:00:00Z') OR " +
+				"(schema.events.created_at >= '2026-10-26T12:00:00Z' AND schema.events.created_at <= '2026-10-26T12:15:00Z'))"},
+		{"STRING key keeps one date range", map[string]bool{"datetime_keys_as_string": true},
+			"schema.events.created_at = r.created_at AND schema.events.created_at >= '2026-02-28' AND schema.events.created_at <= '2026-10-28'"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var dialect = createDatabricksDialect(tc.flags)
+			table, err := sql.ResolveTable(shape, dialect)
+			require.NoError(t, err)
+
+			var builder = sql.NewMergeBoundsBuilder(table.Keys, dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+			for _, k := range keys {
+				converted, err := table.ConvertKey(k)
+				require.NoError(t, err)
+				builder.NextKey(converted)
+			}
+
+			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadQuery, builder.Build())
+			require.NoError(t, err)
+			require.Contains(t, query, tc.wantBounds)
+			require.Contains(t, query, "schema.events.id = r.id AND schema.events.id >= 'a' AND schema.events.id <= 'd'")
+		})
+	}
 }
 
 // TestDatetimeKeyBounds resolves a table through the real dialect, so the
