@@ -1,0 +1,122 @@
+package connector
+
+import (
+	"bytes"
+	"context"
+	"crypto/md5"
+	stdsql "database/sql"
+	"encoding/base64"
+	"fmt"
+	"math"
+	"math/rand/v2"
+	"strings"
+	"testing"
+
+	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/stretchr/testify/require"
+)
+
+func TestStreamV2FileKey(t *testing.T) {
+	var raw = bytes.Repeat([]byte{1}, 32)
+	var key, err = streamV2FileKey(base64.StdEncoding.EncodeToString(raw))
+	require.NoError(t, err)
+	require.Equal(t, raw, key)
+
+	_, err = streamV2FileKey("not base64!")
+	require.ErrorContains(t, err, "decoding the pipe key")
+}
+
+func TestStreamV2CryptFileRoundTrips(t *testing.T) {
+	var key = bytes.Repeat([]byte{2}, 16)
+	var iv = bytes.Repeat([]byte{3}, 16)
+	var plain = []byte(`{"ID":"a"}` + "\n" + `{"ID":"b"}` + "\n")
+	var data = bytes.Clone(plain)
+
+	require.NoError(t, streamV2CryptFile(key, iv, data))
+	require.NotEqual(t, plain, data)
+	require.NoError(t, streamV2CryptFile(key, iv, data))
+	require.Equal(t, plain, data)
+}
+
+func TestStreamV2UploaderRejectsAnUnknownLocationType(t *testing.T) {
+	var _, err = newStreamV2Uploader(context.Background(), streamV2StageLocation{LocationType: "FAKE"})
+	require.ErrorContains(t, err, `location type "FAKE"`)
+}
+
+// TestStreamV2FileModeLive drives file mode against live Snowflake: a document
+// whose compressed size exceeds a rows request is stored through the pipe's stage,
+// encrypted under the pipe's key, and reads back whole.
+func TestStreamV2FileModeLive(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	var ctx = context.Background()
+	var cfg = mustGetCfg(t)
+
+	var dsn, err = cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	var accountName string
+	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
+
+	singleChannelLayout(t)
+	sm, err := newStreamManager(&cfg, "test/streamV2FileMode", accountName, 0)
+	require.NoError(t, err)
+	m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2FileMode", accountName,
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	require.NoError(t, err)
+
+	var tbl = sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+		Identifier: "STREAMV2_FILEMODE_" + testRunNonce,
+		Keys:       []sql.Column{{Identifier: `KEY`, MappedType: sql.MappedType{DDL: "INTEGER"}}},
+		Values:     []sql.Column{{Identifier: `VAL`, MappedType: sql.MappedType{DDL: "TEXT"}}},
+		StateKey:   "filemode",
+	}
+	var cleanup = func() {
+		db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	var createQuery strings.Builder
+	require.NoError(t, renderTemplates(testDialect).createTargetTable.Execute(&createQuery, &tbl))
+	_, err = db.ExecContext(ctx, createQuery.String())
+	require.NoError(t, err)
+
+	// Random letters compress to about three quarters of their size, so 6 MiB of
+	// them stays over the 4 MiB limit of a rows request.
+	var big = make([]byte, 6*1024*1024)
+	for i := range big {
+		big[i] = 'a' + byte(rand.IntN(26))
+	}
+	m.addBinding(cfg.Database, cfg.Schema, tbl.Identifier, tbl, nil)
+	require.NoError(t, m.writeRow(ctx, 0, packKey(1), []any{1, "small"}))
+	require.NoError(t, m.writeRow(ctx, 0, packKey(2), []any{2, string(big)}))
+	require.NoError(t, m.writeRow(ctx, 0, packKey(3), []any{3, "after"}))
+
+	entries, err := m.flush(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
+
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT KEY, LENGTH(VAL), MD5(VAL) FROM %s ORDER BY KEY", tbl.Identifier))
+	require.NoError(t, err)
+	defer rows.Close()
+	var got []string
+	for rows.Next() {
+		var key, length int
+		var sum string
+		require.NoError(t, rows.Scan(&key, &length, &sum))
+		got = append(got, fmt.Sprintf("%d:%d:%s", key, length, sum))
+	}
+	require.Equal(t, []string{
+		fmt.Sprintf("1:5:%x", md5.Sum([]byte("small"))),
+		fmt.Sprintf("2:%d:%x", len(big), md5.Sum(big)),
+		fmt.Sprintf("3:5:%x", md5.Sum([]byte("after"))),
+	}, got)
+}

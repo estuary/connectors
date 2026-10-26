@@ -319,7 +319,7 @@ Snowflake's [Snowpipe Streaming REST API](https://docs.snowflake.com/en/user-gui
 directly, and rows are sent to Snowflake as your collection documents are materialized rather than being staged first.
 Each shard of the task streams through four Snowflake channels, so a single shard can exceed the throughput limit that
 Snowflake places on one channel. Snowflake limits one request on this API to 4 MiB after compression, so a single
-document larger than that cannot be materialized through this path.
+document larger than that is uploaded to the table's Snowpipe stage and then registered with its channel.
 
 To use it, all of the following must be true:
 

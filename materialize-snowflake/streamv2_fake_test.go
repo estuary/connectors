@@ -3,9 +3,12 @@ package connector
 import (
 	"bufio"
 	"bytes"
+	"context"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -18,8 +21,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	"github.com/estuary/connectors/go/blob"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +54,36 @@ type fakeSnowpipe struct {
 	seededErrors int64
 	continuation map[string]int
 	state        fakeSnowpipeState
+	stage        *fakeStage
 }
+
+// fakeStage is an in-memory stage bucket, keyed by object name.
+type fakeStage struct {
+	mu      sync.Mutex
+	objects map[string][]byte
+}
+
+func (s *fakeStage) Upload(_ context.Context, key string, r io.Reader, _ ...blob.WriterOption) error {
+	var data, err = io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.objects[key] = data
+	return nil
+}
+
+func (s *fakeStage) get(key string) ([]byte, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var data, ok = s.objects[key]
+	return data, ok
+}
+
+// fakeSnowpipeFileAppends counts the file appends every fake has received, so a
+// test can check which path an append took.
+var fakeSnowpipeFileAppends atomic.Int64
 
 type fakeSnowpipeState struct {
 	Committed map[string]string `json:"committed"`
@@ -84,10 +118,14 @@ func fakeStreamV2Credentials(cfg *config) {
 // Streaming API.
 func fakeStreamV2Backend(t *testing.T, m *streamV2Manager) {
 	t.Helper()
-	m.client.accountURL = newFakeSnowpipe(t).URL
+	var ts, f = newFakeSnowpipe(t)
+	m.client.accountURL = ts.URL
+	m.client.newUploader = func(context.Context, streamV2StageLocation) (streamV2Uploader, error) {
+		return f.stage, nil
+	}
 }
 
-func newFakeSnowpipe(t *testing.T) *httptest.Server {
+func newFakeSnowpipe(t *testing.T) (*httptest.Server, *fakeSnowpipe) {
 	t.Helper()
 	var f = &fakeSnowpipe{
 		t:            t,
@@ -95,6 +133,7 @@ func newFakeSnowpipe(t *testing.T) *httptest.Server {
 		mode:         os.Getenv("FAKE_SNOWPIPE_MODE"),
 		continuation: make(map[string]int),
 		state:        fakeSnowpipeState{Committed: map[string]string{}, Errors: map[string]int64{}},
+		stage:        &fakeStage{objects: make(map[string][]byte)},
 	}
 	if seeded := os.Getenv("FAKE_SNOWPIPE_ROWS_ERROR_COUNT"); seeded != "" {
 		var n, err = strconv.ParseInt(seeded, 10, 64)
@@ -116,7 +155,8 @@ func newFakeSnowpipe(t *testing.T) *httptest.Server {
 	mux.HandleFunc("DELETE /v2/streaming/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{channel}", f.drop)
 	mux.HandleFunc("POST /v2/streaming/databases/{db}/schemas/{schema}/pipes/{pipe}", f.status)
 	mux.HandleFunc("POST /v2/streaming/data/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{channel}/rows", f.append)
-	return ts
+	mux.HandleFunc("POST /v2/streaming/data/databases/{db}/schemas/{schema}/pipes/{pipe}/channels/{channel}/filebuffer", f.appendFile)
+	return ts, f
 }
 
 // locked runs fn with the state loaded from the state file, and writes the state
@@ -192,7 +232,10 @@ func (f *fakeSnowpipe) drop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (f *fakeSnowpipe) status(w http.ResponseWriter, r *http.Request) {
-	if !strings.HasSuffix(r.PathValue("pipe"), ":bulk-channel-status") {
+	if strings.HasSuffix(r.PathValue("pipe"), ":pipe-info") {
+		f.pipeInfo(w, r)
+		return
+	} else if !strings.HasSuffix(r.PathValue("pipe"), ":bulk-channel-status") {
 		http.NotFound(w, r)
 		return
 	}
@@ -219,7 +262,84 @@ func (f *fakeSnowpipe) append(w http.ResponseWriter, r *http.Request) {
 		require.NoError(f.t, err)
 	}
 	fakeSnowpipeLargestAppend.Store(max(fakeSnowpipeLargestAppend.Load(), int64(len(body))))
+	f.ingest(w, channel, query.Get("continuationToken"), query.Get("endOffsetToken"), body)
+}
 
+// pipeInfo lends the caller the fake's stage. The location type is one no real
+// uploader handles, so a client must have been given the fake's stage directly.
+func (f *fakeSnowpipe) pipeInfo(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		EncryptionVersion string `json:"encryption_version"`
+	}
+	require.NoError(f.t, json.NewDecoder(r.Body).Decode(&req))
+	if req.EncryptionVersion == "" {
+		f.fail(w, 400, "ERR_UNSUPPORTED_ENCRYPTION_VERSION", "")
+		return
+	}
+	f.reply(w, 200, map[string]any{
+		"rowset_stage_location": map[string]any{
+			"location_type":  "FAKE",
+			"bucket_name":    "fake-stage",
+			"path_prefix":    "streamingrowset/" + r.PathValue("pipe") + "/",
+			"creds":          map[string]string{},
+			"expiry_time_ms": time.Now().Add(time.Hour).UnixMilli(),
+		},
+		"pipe_encryption_info": map[string]any{
+			"pipe_key":           fakePipeKey,
+			"pipe_key_id":        "fake-key-id",
+			"diversifier":        fakePipeDiversifier,
+			"encryption_version": req.EncryptionVersion,
+		},
+	})
+}
+
+// The key material every fake pipe lends.
+var (
+	fakePipeKey         = base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32))
+	fakePipeDiversifier = "fake-diversifier"
+)
+
+// appendFile ingests the one fragment of a file uploaded to the fake's stage, as
+// append ingests a request body.
+func (f *fakeSnowpipe) appendFile(w http.ResponseWriter, r *http.Request) {
+	var channel = r.PathValue("channel")
+	var fragments []streamV2FileFragment
+	require.NoError(f.t, json.NewDecoder(r.Body).Decode(&fragments))
+	require.Len(f.t, fragments, 1)
+	var fragment = fragments[0]
+
+	var name, found = strings.CutPrefix(fragment.FilePath, "fake-stage/")
+	require.True(f.t, found, "file path %q is not in the fake stage", fragment.FilePath)
+	var body, ok = f.stage.get(name)
+	if !ok {
+		f.fail(w, 400, "ERR_FILE_NOT_FOUND", "no such staged file: "+fragment.FilePath)
+		return
+	}
+	require.Equal(f.t, fragment.FileLengthBytes, len(body))
+	require.Equal(f.t, fmt.Sprintf("%x", md5.Sum(body)), fragment.FileEtag)
+
+	require.JSONEq(f.t, `"fake-key-id"`, string(fragment.MasterKeyID))
+	require.Equal(f.t, fakePipeDiversifier, fragment.Diversifier)
+	require.Equal(f.t, streamV2EncryptionVersion, fragment.EncryptionVersion)
+	var key, err = streamV2FileKey(fakePipeKey)
+	require.NoError(f.t, err)
+	iv, err := base64.StdEncoding.DecodeString(fragment.IVBase64)
+	require.NoError(f.t, err)
+	body = bytes.Clone(body)
+	require.NoError(f.t, streamV2CryptFile(key, iv, body))
+
+	// Snowflake detects the compression from the file's contents.
+	if decoded, err := fakeSnowpipeDecoder.DecodeAll(body, nil); err == nil {
+		body = decoded
+	}
+	require.Equal(f.t, fragment.FragmentRowCount, bytes.Count(body, []byte{'\n'}))
+	fakeSnowpipeFileAppends.Add(1)
+	f.ingest(w, channel, r.URL.Query().Get("continuationToken"), fragment.FragmentEndOffsetToken, body)
+}
+
+// ingest validates the NDJSON rows of one append, checks and advances the channel's
+// continuation token, and commits the append's end offset token.
+func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, endToken string, body []byte) {
 	var rejected int64
 	var scanner = bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(nil, 64*1024*1024)
@@ -239,13 +359,13 @@ func (f *fakeSnowpipe) append(w http.ResponseWriter, r *http.Request) {
 	}
 
 	f.locked(func() {
-		if query.Get("continuationToken") != fmt.Sprint(f.continuation[channel]) {
+		if continuation != fmt.Sprint(f.continuation[channel]) {
 			f.fail(w, 400, "STALE_CONTINUATION_TOKEN_SEQUENCER", "stale continuation token")
 			return
 		}
 		f.continuation[channel]++
 		if f.mode != "commit_never_lands" {
-			f.state.Committed[channel] = query.Get("endOffsetToken")
+			f.state.Committed[channel] = endToken
 		}
 		var errs, seeded = f.state.Errors[channel]
 		if !seeded {
