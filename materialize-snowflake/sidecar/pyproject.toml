@@ -12,7 +12,11 @@ authors = [
 # every member, and the connectors there are on 3.14.
 requires-python = ">=3.13,<3.15"
 dependencies = [
-    "estuary-cdk",
+    # From PyPI rather than this repository's estuary-cdk/, so a CDK change
+    # reaches this image only when the lock is upgraded (`uv lock
+    # --upgrade-package estuary-cdk`). PyPI has only pre-releases so far, so
+    # the floor names one.
+    "estuary-cdk>=0.3.0.dev31",
     # The SDK is pinned exactly: the append path hands its channels one
     # msgspec.Raw per row, which is an internal of the SDK rather than
     # something it documents -- see tests/test_sdk_raw_rows.py. msgspec is the
@@ -21,12 +25,6 @@ dependencies = [
     "snowpipe-streaming==1.6.2",
     "msgspec",
 ]
-
-# The dependency is declared in [project.dependencies] above; this is where uv
-# finds it. A path source rather than `workspace = true`, since this project is
-# outside the workspace.
-[tool.uv.sources]
-estuary-cdk = { path = "../../estuary-cdk", editable = true }
 
 # Outside the workspace, so these cannot come from the root's `dev` group.
 [dependency-groups]

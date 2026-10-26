@@ -59,10 +59,8 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-# The sidecar depends on estuary-cdk from this repository, so the CDK is copied
-# to where the sidecar's pyproject.toml expects it. Both are installed in
-# development mode, so the runtime stage carries both source trees too.
-COPY estuary-cdk                   /opt/estuary-cdk
+# The sidecar is installed in development mode, so the runtime stage carries
+# its source tree too.
 COPY materialize-snowflake/sidecar /opt/materialize-snowflake/sidecar
 WORKDIR /opt/materialize-snowflake/sidecar
 # `--frozen` makes the sidecar's uv.lock authoritative: the image installs what
@@ -79,7 +77,7 @@ RUN uv sync --frozen --no-dev
 RUN python3 -m venv /tmp/testvenv \
      && /tmp/testvenv/bin/pip install --no-cache-dir pytest "mypy>=1.8,<2" \
      && export SNOWPIPE_SDK_GUARD=required \
-        PYTHONPATH="/opt/materialize-snowflake/sidecar:/opt/estuary-cdk:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
+        PYTHONPATH="/opt/materialize-snowflake/sidecar:$(/opt/venv/bin/python -c 'import site; print(site.getsitepackages()[0])')" \
      && /tmp/testvenv/bin/python -m mypy --cache-dir /tmp/testvenv/mypy-cache \
      && /tmp/testvenv/bin/python -m pytest -q -p no:cacheprovider tests \
      && rm -rf /tmp/testvenv
@@ -98,7 +96,6 @@ RUN apt-get update -y \
 
 # The Snowpipe Streaming (high-performance) python SDK sidecar.
 COPY --from=pybuilder /opt/venv                   /opt/venv
-COPY --from=pybuilder /opt/estuary-cdk            /opt/estuary-cdk
 COPY --from=pybuilder /opt/materialize-snowflake  /opt/materialize-snowflake
 
 # Avoid running the connector as root.
