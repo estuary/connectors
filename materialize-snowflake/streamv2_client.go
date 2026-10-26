@@ -43,6 +43,11 @@ const streamV2MaxAppendBytes = 4 * 1024 * 1024
 // tests can shorten it.
 var streamV2WaitCommitTimeout = 10 * time.Minute
 
+// streamV2TokenExchangeTimeout bounds one token exchange, retries included,
+// because every request waits on the exchange and none can cancel it. It is a
+// var so that tests can shorten it.
+var streamV2TokenExchangeTimeout = 30 * time.Second
+
 // streamV2RoleNotGrantedCode is the error code of a token exchange refused
 // because the user does not hold the requested role.
 const streamV2RoleNotGrantedCode = "390186"

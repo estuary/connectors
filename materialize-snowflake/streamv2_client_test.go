@@ -235,6 +235,42 @@ func TestStreamV2ClientNamesARefusedRole(t *testing.T) {
 	}
 }
 
+// TestStreamV2ClientBoundsAHungTokenExchange covers a token endpoint that never
+// answers: the exchange fails at streamV2TokenExchangeTimeout instead of waiting
+// out every retry of send.
+func TestStreamV2ClientBoundsAHungTokenExchange(t *testing.T) {
+	var prior = streamV2TokenExchangeTimeout
+	streamV2TokenExchangeTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { streamV2TokenExchangeTimeout = prior })
+
+	var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {})
+	var mux = http.NewServeMux()
+	var ts = httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+	var release = make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	mux.HandleFunc("GET /v2/streaming/hostname", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, ts.Listener.Addr().String()) })
+	mux.HandleFunc("POST /oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	})
+	c.accountURL = ts.URL
+
+	var done = make(chan error, 1)
+	go func() {
+		var _, _, _, err = c.bearer(context.Background())
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the token exchange outlived its timeout")
+	}
+}
+
 // TestStreamV2ClientRejectsWhitespaceInRole covers a role containing whitespace,
 // which the space-separated OAuth scope cannot carry intact, so the token exchange
 // fails.
