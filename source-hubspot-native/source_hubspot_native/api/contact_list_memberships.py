@@ -214,7 +214,7 @@ async def fetch_contact_list_memberships(
     now = datetime.now(tz=UTC)
 
     async for item in _request_all_contact_list_memberships(http, log, start_date):
-        key = f"{item.listId}:{item.membershipTimestamp}"
+        key = f"{item.listId}:{item.recordId}"
 
         if cache.should_yield(
             Names.contact_list_memberships, key, item.membershipTimestamp
