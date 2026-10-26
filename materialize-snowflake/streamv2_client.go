@@ -294,9 +294,10 @@ func (e streamV2TokenExchange) Token() (*oauth2.Token, error) {
 		"scope":      {streamV2Scope(c.role, ingestURL)},
 	}
 	headers.Set("Content-Type", "application/x-www-form-urlencoded")
-	// oauth2.TokenSource takes no context, so the exchange is bounded only by the
-	// request timeout and retry limit of send.
-	res, err := c.send(context.Background(), "POST", c.accountURL+"/oauth/token", []byte(form.Encode()), headers)
+	// oauth2.TokenSource takes no context, so the exchange carries its own bound.
+	var ctx, cancel = context.WithTimeout(context.Background(), streamV2TokenExchangeTimeout)
+	defer cancel()
+	res, err := c.send(ctx, "POST", c.accountURL+"/oauth/token", []byte(form.Encode()), headers)
 	if err != nil {
 		err = fmt.Errorf("exchanging the JWT for a scoped token: %w", err)
 		var apiErr *streamV2APIError
