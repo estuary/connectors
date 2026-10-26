@@ -1,0 +1,84 @@
+info:
+  name: backfill page bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/email/public/v1/events?endTimestamp=1792454399999&limit=1000"
+  params:
+    - name: endTimestamp
+      value: "1792454399999"
+      type: query
+    - name: limit
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - endpoint live, no events, end-of-stream offset"
+    request:
+      url: "{{base_url}}/email/public/v1/events?endTimestamp=1792454399999&limit=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "hasMore": false,
+            "offset": "CgoY__________9_",
+            "events": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get email events (v1, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/reporting/email-analytics/events/get-email-public-v1-events)
+
+  **WHY:** the first page `fetch_email_events_page` (`api/email_events.py`) requests
+  when backfilling `email_events`: `endTimestamp = cutoff - 1 ms` and `limit=1000`. The
+  cutoff here is 2026-10-20T00:00:00Z, so the window runs from the start of the account
+  to the day before this run. The realtime and delayed subtasks call the same URL with
+  `startTimestamp` (and `endTimestamp`). This request answers whether the endpoint is
+  still live, and whether the connector's ±1 ms window arithmetic matches the
+  documented bounds.
+
+  **DOCUMENTED (2026-10-20):** `startTimestamp`: "Only return events which occurred at
+  or after the given timestamp (in milliseconds since epoch)." `endTimestamp`: "Only
+  return events which occurred at or before the given timestamp". `limit`: "If omitted,
+  the default value of 10 is used. The maximum allowed value is 1000." `offset`: "An
+  offset token returned by a previous call to this endpoint." `excludeFilteredEvents`
+  "The default value is false", so filtered events are included by default and that
+  default hides nothing. The page says nothing about result order, about how long an
+  `offset` token stays valid, or about a sunset. The connector's arithmetic matches the
+  documented bounds:
+  - The backfill sends `cutoff - 1` because `endTimestamp` is inclusive.
+  - The realtime subtask sends `since + 1 ms` because `startTimestamp` is inclusive.
+  - The delayed subtask sends `since` itself and so re-reads the boundary
+    millisecond, which is harmless.
+
+  **VERIFIED (2026-10-20):** live. `200` with the connector's existing scopes:
+  `{"hasMore": false, "offset": "CgoY__________9_", "events": []}`. The account has
+  **no email events**. An `offset` comes back even on an empty last page. Decoded, it
+  is a small protobuf whose only value is the int64 maximum: an end-of-stream read
+  position, not a session handle.
+
+  **UNOBSERVABLE:** the inclusive bounds at a real event's `created`, and the order of
+  results. Both need an email event, and producing one means sending marketing email
+  from the test account. The connector relies on the documented "at or after" and
+  "at or before".
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** the backfill checkpoints HubSpot's opaque
+  `offset` token as its page cursor (`fetch_email_events_page` yields `result.offset`).
+  The docs don't say how long a token stays valid. The token seen here looks like an
+  encoded position rather than a session, but nothing shows it survives days. A
+  backfill resumed after a long pause could fail if HubSpot rejects an old token.

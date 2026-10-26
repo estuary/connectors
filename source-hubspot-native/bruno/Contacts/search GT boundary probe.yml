@@ -1,0 +1,88 @@
+info:
+  name: search GT boundary probe
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/objects/2026-03/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filterGroups": [
+          {
+            "filters": [
+              {
+                "propertyName": "lastmodifieddate",
+                "operator": "GT",
+                "value": "{{pin_contact_lastmodifieddate}}"
+              }
+            ]
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Set by `Contacts / search lastmodifieddate replacement`. The fallback is
+        // that request's newest contact as of 2026-10-20, for out-of-order runs.
+        if (!bru.getVar('pin_contact_lastmodifieddate')) {
+          bru.setVar('pin_contact_id', '225877317544');
+          bru.setVar('pin_contact_lastmodifieddate', '2026-06-03T01:33:01.284Z');
+        }
+    - type: after-response
+      code: |-
+        const ids = (res.getBody()?.results || []).map((r) => r.id);
+        console.log('PINNED_CONTACT_PRESENT', ids.includes(bru.getVar('pin_contact_id')));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - GT pinned lastmodifieddate excludes pinned contact"
+    request:
+      url: "{{base_url}}/crm/objects/2026-03/contacts/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "total": 0,
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts (2026-03)](https://developers.hubspot.com/docs/api-reference/2026-03/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** boundary check on the replacement filter. HubSpot's migration example uses
+  `GT` on `lastmodifieddate`. Here the value is a real contact's exact
+  `lastmodifieddate`, so the pinned contact is in the response only if `GT` behaves
+  inclusively at HubSpot's millisecond resolution. A realtime subtask migrated to
+  search has to know this to pick its lower bound: an exclusive `GT` can take the
+  last checkpoint as is, while the connector's existing search uses `GTE` and
+  `BETWEEN` from a cursor it has already advanced by 1 ms. Run
+  `Contacts / search lastmodifieddate replacement` first in a fresh session; otherwise
+  the before-request script falls back to the contact pinned on 2026-10-20.
+
+  **VERIFIED (2026-10-20):** `GT` is **exclusive**. With the value set to contact
+  `225877317544`'s `lastmodifieddate`, `2026-06-03T01:33:01.284Z`, the response is
+  `total: 0`. The same filter 1 ms earlier returns that contact
+  (`Contacts / search GT boundary minus 1ms probe`), so the comparison is at
+  millisecond resolution and the exclusion is exactly at the pinned instant. A
+  realtime search can therefore send its checkpoint with `GT` as is: changes at the
+  checkpointed millisecond are not re-read, and nothing after it is skipped.

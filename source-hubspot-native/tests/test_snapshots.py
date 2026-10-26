@@ -8,6 +8,9 @@ from estuary_cdk.utils import compare_capture_records
 
 
 def test_capture(request, snapshot):
+    # Anything listed here or in PROPERTY_PATTERNS_TO_REDACT must also be redacted in
+    # the bruno collection's saved examples, except cursor fields its probes need to
+    # read (see the redaction note in bruno/opencollection.yml).
     FIELDS_TO_REDACT = [
         "url",
         "updatedAt",

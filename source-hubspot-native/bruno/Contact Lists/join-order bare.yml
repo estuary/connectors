@@ -1,0 +1,69 @@
+info:
+  name: join-order bare
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/crm/v3/lists/{{contact_list_id}}/memberships/join-order?limit=250"
+  params:
+    - name: limit
+      value: "250"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // contact_list_id arrives from `Contact Lists / search bare`'s after-response
+        // script. The test account has no lists (2026-10-20), so there is no id to
+        // pin as a fallback: fail loudly instead of requesting a malformed URL.
+        if (!bru.getVar('contact_list_id')) {
+          throw new Error(
+            'contact_list_id not set: run "Contact Lists / search bare" first in this '
+            + 'session, on an account that has at least one contact list',
+          );
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Fetch List Memberships Ordered by Added to List Date (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/lists/memberships/get-memberships-by-added-date)
+
+  **WHY:** the call `_request_contact_list_memberships`
+  (`api/contact_list_memberships.py`) makes for each contact list, in both the
+  memberships backfill and the incremental task: `limit=250`, then `after` from
+  `paging.next.after`. It skips memberships with `membershipTimestamp >= end` and
+  **returns at the first one older than `start`**, because its comment says "The
+  endpoint's sorted in descending join date order". This is the probe that settles the
+  order: run it on a list with members added at different times, and compare the first
+  and last `membershipTimestamp`.
+
+  **DOCUMENTED (2026-10-20):** "Fetch the memberships of a list in order sorted by the
+  time the records were added to the list. The `recordId`s are sorted in *ascending*
+  order if an `after` offset or no offset is provided. If only a `before` offset is
+  provided, then the records are sorted in *descending* order." `limit`: "The maximum
+  `limit` is 250." (default 100). The connector uses the maximum.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** the docs give the default order (no offset, or
+  `after`) as **ascending**, the opposite of what the connector assumes. If that holds,
+  an incremental poll (`start` = cursor minus `DELAYED_LAG`) returns at the first,
+  oldest membership of any list that already had members before the window. New
+  memberships on such lists are then never emitted. The backfill isn't affected, because
+  nothing is older than its `start` of 1970-01-01T00:00:01Z. One caveat: after its first
+  sentence, this description is word for word the one on the [by-recordId memberships
+  page](https://developers.hubspot.com/docs/api-reference/legacy/crm/lists/memberships/get-memberships-by-id),
+  so it may be copied boilerplate. Only a live run can settle the order.
+
+  **UNOBSERVABLE (not run, 2026-10-20):** the account has no lists
+  (`Contact Lists / search bare`), so there is no list id to pin. The before-request
+  script fails loudly instead of sending a malformed URL. Creating a list and adding
+  contacts would change the test account. Until this runs, treat the order as unknown.
+  The incremental path's early `return` is safe only if the order really is descending;
+  the alternatives are to filter every membership against the window without returning
+  early, or to page with `before`, which the docs say is descending.

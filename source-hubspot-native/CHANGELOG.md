@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-20
+
+### Added
+- Stages in `deal_pipelines` documents now include `writePermissions`.
+
+### Changed
+- The `deal_pipelines` binding now reads HubSpot's 2026-09 Pipelines API, so pipelines and
+  stages are identified by `id` instead of `pipelineId` and `stageId`.
+- `deal_pipelines` documents now report whether pipelines and stages are `archived`
+  instead of whether they are `active`.
+- Stage `createdAt` and `updatedAt` values in `deal_pipelines` are now date-time strings
+  instead of epoch milliseconds.
+- Stages in `deal_pipelines` documents are now listed in `displayOrder` order.
+- Destination tables for `deal_pipelines` gain `id` and `archived` columns and stop
+  populating `pipelineId` and `active`.
+
+### Removed
+- `deal_pipelines` documents no longer include `objectType`, `objectTypeId`, or `default`.
+
 ## 2026-09-30
 
 ### Changed
