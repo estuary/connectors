@@ -8,6 +8,7 @@
 ### Fixed
 - Long-running captures of `contact_list_memberships` no longer run out of memory.
 - The `contact_list_memberships` binding no longer skips a membership when another contact joins the same list in the same millisecond.
+- The `contact_list_memberships` binding no longer fails on accounts with ad hoc contact lists.
 
 ## 2026-09-30
 

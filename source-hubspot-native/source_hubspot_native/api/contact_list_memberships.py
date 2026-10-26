@@ -25,6 +25,8 @@ from .shared import (
     HUB,
 )
 
+AD_HOC_LIST_TYPE = "ADHOC"
+
 
 async def _request_contact_list_memberships(
     http: HTTPSession,
@@ -133,18 +135,28 @@ async def _request_all_contact_list_memberships(
     )
 
     control = ContactListMembershipControl()
-    all_list_ids = [
-        item.listId
-        async for item in request_contact_lists_in_time_range(
-            http,
-            log,
-            # We only care about listIds, so we do not want to make an extra request
-            #  asking for all the additional properties there are
-            False,
-            start,
-            end,
+    all_list_ids: list[int] = []
+    adhoc_list_ids: list[int] = []
+    async for item in request_contact_lists_in_time_range(
+        http,
+        log,
+        # We only care about listIds, so we do not want to make an extra request
+        #  asking for all the additional properties there are
+        False,
+        start,
+        end,
+    ):
+        # The memberships endpoint rejects ADHOC lists with a 400.
+        if item.processingType == AD_HOC_LIST_TYPE:
+            adhoc_list_ids.append(item.listId)
+        else:
+            all_list_ids.append(item.listId)
+
+    if adhoc_list_ids:
+        log.warning(
+            "skipping ADHOC contact lists",
+            extra={"list_ids": adhoc_list_ids},
         )
-    ]
     if not all_list_ids:
         return
 

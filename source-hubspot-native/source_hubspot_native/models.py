@@ -838,6 +838,7 @@ class ContactList(BaseDocument, extra="allow"):
     listId: int
     objectTypeId: ContactTypeId
     updatedAt: AwareDatetime
+    processingType: str
     additionalProperties: dict[str, Any]
 
     def get_cursor_value(self) -> datetime:
