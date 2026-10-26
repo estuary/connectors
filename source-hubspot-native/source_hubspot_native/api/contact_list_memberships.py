@@ -1,11 +1,9 @@
 import asyncio
 from asyncio.exceptions import CancelledError
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from logging import Logger
-from typing import (
-    AsyncGenerator,
-)
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import (
@@ -21,11 +19,11 @@ from ..models import (
     ContactListMembershipResponse,
     Names,
 )
-from .contact_lists import request_contact_lists_in_time_range, request_contact_lists
+from .contact_lists import request_contact_lists, request_contact_lists_in_time_range
 from .shared import (
-    HUB,
-    EPOCH_PLUS_ONE_SECOND,
     DELAYED_LAG,
+    EPOCH_PLUS_ONE_SECOND,
+    HUB,
 )
 
 
@@ -35,7 +33,7 @@ async def _request_contact_list_memberships(
     contact_list: ContactList,
     start: datetime,
     end: datetime | None = None,
-) -> AsyncGenerator[ContactListMembership, None]:
+) -> AsyncGenerator[ContactListMembership]:
     url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships/join-order"
     params: dict[str, int | str] = {"limit": 250}
 
@@ -102,14 +100,14 @@ async def _list_memberships_worker(
             msg = format_error_message(e)
             context.first_error = msg
 
-            raise Exception(
+            raise RuntimeError(
                 f"Contact list {contact_list.listId} worker was unexpectedly cancelled: {msg}"
             )
         # If a different worker already failed, then this worker task was cancelled by
         # the TaskGroup as part of its exception handling and it's safe to propagate the
         # CancelledError.
         else:
-            raise e
+            raise
     except BaseException as e:
         msg = format_error_message(e)
         if not context.first_error:
@@ -121,15 +119,15 @@ async def _list_memberships_worker(
                 "exception": msg,
             },
         )
-        raise e
+        raise
 
 
 async def _request_all_contact_list_memberships(
     http: HTTPSession, log: Logger, start: datetime, end: datetime | None = None
-) -> AsyncGenerator[ContactListMembership, None]:
+) -> AsyncGenerator[ContactListMembership]:
     log.info(
         "fetching contact list memberships",
-        {
+        extra={
             "start": start.isoformat(),
             "end": end.isoformat() if end else None,
         },
@@ -184,7 +182,7 @@ async def fetch_contact_list_memberships_page(
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
-) -> AsyncGenerator[ContactListMembership | PageCursor, None]:
+) -> AsyncGenerator[ContactListMembership | PageCursor]:
     assert isinstance(page, int | None)
     assert isinstance(cutoff, datetime)
 
@@ -209,7 +207,7 @@ async def fetch_contact_list_memberships_page(
 
 async def fetch_contact_list_memberships(
     http: HTTPSession, log: Logger, log_cursor: LogCursor
-) -> AsyncGenerator[ContactListMembership | LogCursor, None]:
+) -> AsyncGenerator[ContactListMembership | LogCursor]:
     assert isinstance(log_cursor, datetime)
 
     # We are deliberately not implementing the same delayed stream mechanism
