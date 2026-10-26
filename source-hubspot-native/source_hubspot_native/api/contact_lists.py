@@ -101,7 +101,8 @@ async def check_contact_list_memberships_access(
         url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
 
         response = ContactListMembershipResponse.model_validate_json(
-            (await http.request(log, url, params={"limit": 1})), context=contact_list
+            (await http.request(log, url, params={"limit": 1})),
+            context=contact_list.listId,
         )
         for membership in response.results:
             yield membership

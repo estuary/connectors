@@ -870,13 +870,13 @@ class ContactListMembershipResponse(BaseModel, extra="allow"):
     @model_validator(mode="before")
     @classmethod
     def _set_membership_list_ids(cls, values: dict[str, Any], info: ValidationInfo):
-        if not info.context or not isinstance(info.context, ContactList):
+        if not isinstance(info.context, int):
             raise RuntimeError(
-                f"Validation context is not set or is not of type ContactList: {info.context}"
+                f"Validation context is not a contact list id: {info.context}"
             )
 
         for membership in values["results"]:
-            membership["listId"] = info.context.listId
+            membership["listId"] = info.context
 
         return values
 
