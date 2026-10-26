@@ -80,6 +80,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Actions"
     ]
   },
   {
@@ -163,6 +166,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ActionInquiries"
     ]
   },
   {
@@ -240,6 +246,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Invoices"
     ]
   },
   {
@@ -317,6 +326,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Jobs"
     ]
   },
   {
@@ -394,6 +406,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "PromoCodes"
     ]
   },
   {
@@ -471,6 +486,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Deals"
     ]
   },
   {
@@ -548,6 +566,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ExceptionLists"
     ]
   },
   {
@@ -625,6 +646,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "UniqueUrls"
     ]
   },
   {
@@ -702,6 +726,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "TrackingValueRequests"
     ]
   },
   {
@@ -772,6 +799,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Campaigns"
     ]
   },
   {
@@ -842,6 +872,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Ads"
     ]
   },
   {
@@ -912,6 +945,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Catalogs"
     ]
   },
   {
@@ -982,6 +1018,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Reports"
     ]
   },
   {
@@ -1052,6 +1091,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "PhoneNumbers"
     ]
   },
   {
@@ -1129,6 +1171,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Contracts"
     ]
   },
   {
@@ -1206,6 +1251,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tasks"
     ]
   },
   {
@@ -1283,6 +1331,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Notes"
     ]
   },
   {
@@ -1360,6 +1411,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "BlockRedirectRules"
     ]
   },
   {
@@ -1430,6 +1484,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "MediaPartnerGroups"
     ]
   }
 ]

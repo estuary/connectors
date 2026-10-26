@@ -84,6 +84,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -154,6 +157,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "coupon_codes"
     ]
   },
   {
@@ -224,6 +230,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "coupons"
     ]
   },
   {
@@ -311,6 +320,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "events"
     ]
   },
   {
@@ -398,6 +410,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "flows"
     ]
   },
   {
@@ -485,6 +500,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "forms"
     ]
   },
   {
@@ -572,6 +590,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "images"
     ]
   },
   {
@@ -659,6 +680,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "lists"
     ]
   },
   {
@@ -729,6 +753,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "metrics"
     ]
   },
   {
@@ -816,6 +843,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "profiles"
     ]
   },
   {
@@ -886,6 +916,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "push_tokens"
     ]
   },
   {
@@ -973,6 +1006,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "segments"
     ]
   },
   {
@@ -1043,6 +1079,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tag_groups"
     ]
   },
   {
@@ -1113,6 +1152,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -1200,6 +1242,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "templates"
     ]
   }
 ]

@@ -109,6 +109,9 @@
     },
     "key": [
       "/date"
+    ],
+    "resourcePath": [
+      "daily_costs"
     ]
   },
   {
@@ -227,6 +230,9 @@
     "key": [
       "/date",
       "/service"
+    ],
+    "resourcePath": [
+      "daily_costs_by_service"
     ]
   },
   {
@@ -357,6 +363,9 @@
     "key": [
       "/date",
       "/linked_account_id"
+    ],
+    "resourcePath": [
+      "daily_costs_by_linked_account"
     ]
   }
 ]

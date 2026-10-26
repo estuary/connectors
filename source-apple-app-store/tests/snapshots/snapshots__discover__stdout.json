@@ -88,6 +88,9 @@
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_crashes"
     ]
   },
   {
@@ -179,6 +182,9 @@
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_downloads_detailed"
     ]
   },
   {
@@ -281,6 +287,9 @@
     "key": [
       "/app_id",
       "/id"
+    ],
+    "resourcePath": [
+      "app_reviews"
     ]
   },
   {
@@ -372,6 +381,9 @@
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_sessions_detailed"
     ]
   },
   {
@@ -463,6 +475,9 @@
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_store_discovery_and_engagement_detailed"
     ]
   },
   {
@@ -554,6 +569,9 @@
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_store_installs_and_deletions_detailed"
     ]
   }
 ]

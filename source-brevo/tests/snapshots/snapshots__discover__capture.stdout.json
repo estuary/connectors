@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "contacts_attributes"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "contacts_lists"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "contacts_folders"
     ]
   },
   {
@@ -277,6 +286,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "contacts_segments"
     ]
   },
   {
@@ -347,6 +359,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "senders"
     ]
   },
   {
@@ -417,6 +432,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "webhooks"
     ]
   },
   {
@@ -500,6 +518,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "contacts"
     ]
   }
 ]

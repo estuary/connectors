@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "articles"
     ]
   },
   {
@@ -144,6 +147,9 @@
     },
     "key": [
       "/_id"
+    ],
+    "resourcePath": [
+      "conversations"
     ]
   },
   {
@@ -221,6 +227,9 @@
     },
     "key": [
       "/_id"
+    ],
+    "resourcePath": [
+      "messages"
     ]
   },
   {
@@ -291,6 +300,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "platform_integrations"
     ]
   },
   {
@@ -361,6 +373,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "sources"
     ]
   },
   {
@@ -431,6 +446,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   }
 ]

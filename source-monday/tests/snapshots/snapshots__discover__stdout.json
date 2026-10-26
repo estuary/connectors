@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -290,6 +299,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "boards"
     ]
   },
   {
@@ -373,6 +385,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "items"
     ]
   }
 ]

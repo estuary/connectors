@@ -439,6 +439,9 @@
       "/catalogName",
       "/grain",
       "/timestamp"
+    ],
+    "resourcePath": [
+      "catalog_stats_hourly"
     ]
   },
   {
@@ -881,6 +884,9 @@
       "/catalogName",
       "/grain",
       "/timestamp"
+    ],
+    "resourcePath": [
+      "catalog_stats_daily"
     ]
   },
   {
@@ -1323,6 +1329,9 @@
       "/catalogName",
       "/grain",
       "/timestamp"
+    ],
+    "resourcePath": [
+      "catalog_stats_monthly"
     ]
   },
   {
@@ -1393,6 +1402,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "live_specs"
     ]
   },
   {
@@ -1463,6 +1475,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "task_status"
     ]
   },
   {
@@ -1552,6 +1567,9 @@
     "key": [
       "/catalogName",
       "/publicationId"
+    ],
+    "resourcePath": [
+      "publication_history"
     ]
   },
   {
@@ -1622,6 +1640,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "alerts"
     ]
   },
   {
@@ -1692,6 +1713,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "alert_configs"
     ]
   },
   {
@@ -1762,6 +1786,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "alert_subscriptions"
     ]
   },
   {
@@ -1832,6 +1859,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "storage_mappings"
     ]
   },
   {
@@ -1902,6 +1932,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "data_planes"
     ]
   },
   {
@@ -1972,6 +2005,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "service_accounts"
     ]
   },
   {
@@ -2042,6 +2078,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "connectors"
     ]
   },
   {
@@ -2112,6 +2151,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "invoices"
     ]
   }
 ]

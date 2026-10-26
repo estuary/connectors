@@ -80,6 +80,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "catalog_entries"
     ]
   },
   {
@@ -150,6 +153,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "catalog_resources"
     ]
   },
   {
@@ -233,6 +239,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "catalog_types"
     ]
   },
   {
@@ -316,6 +325,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "custom_fields"
     ]
   },
   {
@@ -386,6 +398,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "incident_attachments"
     ]
   },
   {
@@ -469,6 +484,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "incident_roles"
     ]
   },
   {
@@ -552,6 +570,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "incident_statuses"
     ]
   },
   {
@@ -622,6 +643,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "incident_timestamps"
     ]
   },
   {
@@ -705,6 +729,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "incident_types"
     ]
   },
   {
@@ -788,6 +815,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "incidents"
     ]
   },
   {
@@ -871,6 +901,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "severities"
     ]
   },
   {
@@ -941,6 +974,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

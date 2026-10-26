@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Feature"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Guide"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Page"
     ]
   },
   {
@@ -277,6 +286,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Report"
     ]
   },
   {
@@ -347,6 +359,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Segment"
     ]
   },
   {
@@ -424,6 +439,9 @@
     },
     "key": [
       "/accountId"
+    ],
+    "resourcePath": [
+      "Account"
     ]
   },
   {
@@ -501,6 +519,9 @@
     },
     "key": [
       "/visitorId"
+    ],
+    "resourcePath": [
+      "Visitor"
     ]
   },
   {
@@ -578,6 +599,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "TrackType"
     ]
   },
   {
@@ -648,6 +672,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "AccountMetadata"
     ]
   },
   {
@@ -718,6 +745,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "VisitorMetadata"
     ]
   },
   {
@@ -838,6 +868,9 @@
       "/serverName",
       "/userAgent",
       "/visitorId"
+    ],
+    "resourcePath": [
+      "GuideEvents"
     ]
   },
   {
@@ -964,6 +997,9 @@
       "/serverName",
       "/userAgent",
       "/visitorId"
+    ],
+    "resourcePath": [
+      "PollEvents"
     ]
   },
   {
@@ -1090,6 +1126,9 @@
       "/server",
       "/userAgent",
       "/visitorId"
+    ],
+    "resourcePath": [
+      "PageEvents"
     ]
   },
   {
@@ -1216,6 +1255,9 @@
       "/server",
       "/userAgent",
       "/visitorId"
+    ],
+    "resourcePath": [
+      "FeatureEvents"
     ]
   },
   {
@@ -1342,6 +1384,9 @@
       "/trackTypeId",
       "/userAgent",
       "/visitorId"
+    ],
+    "resourcePath": [
+      "TrackEvents"
     ]
   }
 ]

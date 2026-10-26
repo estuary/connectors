@@ -880,6 +880,9 @@
     "key": [
       "/ad_group_ad.ad.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "ad_group_ads"
     ]
   },
   {
@@ -957,6 +960,9 @@
     },
     "key": [
       "/ad_group_ad_label.resource_name"
+    ],
+    "resourcePath": [
+      "ad_group_ad_labels"
     ]
   },
   {
@@ -1195,6 +1201,9 @@
     "key": [
       "/ad_group.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "ad_groups"
     ]
   },
   {
@@ -1272,6 +1281,9 @@
     },
     "key": [
       "/ad_group_label.resource_name"
+    ],
+    "resourcePath": [
+      "ad_group_labels"
     ]
   },
   {
@@ -1465,6 +1477,9 @@
     "key": [
       "/customer.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "accounts"
     ]
   },
   {
@@ -1542,6 +1557,9 @@
     },
     "key": [
       "/campaign_label.resource_name"
+    ],
+    "resourcePath": [
+      "campaign_labels"
     ]
   },
   {
@@ -1696,6 +1714,9 @@
       "/click_view.gclid",
       "/segments.date",
       "/segments.ad_network_type"
+    ],
+    "resourcePath": [
+      "click_view"
     ]
   },
   {
@@ -1784,6 +1805,9 @@
     },
     "key": [
       "/geo_target_constant.id"
+    ],
+    "resourcePath": [
+      "geo_target_constant"
     ]
   },
   {
@@ -2344,6 +2368,9 @@
       "/campaign.id",
       "/segments.date",
       "/segments.hour"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -2665,6 +2692,9 @@
       "/customer.id",
       "/campaign.id",
       "/user_location_view.resource_name"
+    ],
+    "resourcePath": [
+      "user_location_report"
     ]
   },
   {
@@ -3070,6 +3100,9 @@
       "/segments.device",
       "/segments.date",
       "/customer.id"
+    ],
+    "resourcePath": [
+      "account_performance_report"
     ]
   },
   {
@@ -3609,6 +3642,9 @@
       "/customer.id",
       "/campaign.id",
       "/ad_group_criterion.criterion_id"
+    ],
+    "resourcePath": [
+      "display_topics_performance_report"
     ]
   },
   {
@@ -4149,6 +4185,9 @@
       "/customer.id",
       "/campaign.id",
       "/ad_group_criterion.criterion_id"
+    ],
+    "resourcePath": [
+      "display_keyword_performance_report"
     ]
   },
   {
@@ -4554,6 +4593,9 @@
       "/customer.id",
       "/campaign.id",
       "/segments.product_item_id"
+    ],
+    "resourcePath": [
+      "shopping_performance_report"
     ]
   },
   {
@@ -5446,6 +5488,9 @@
       "/campaign.id",
       "/customer.id",
       "/ad_group_ad.ad.id"
+    ],
+    "resourcePath": [
+      "ad_group_ad_report"
     ]
   },
   {
@@ -5536,6 +5581,9 @@
       "/ad_group.id",
       "/geographic_view.country_criterion_id",
       "/customer.descriptive_name"
+    ],
+    "resourcePath": [
+      "geographic_report"
     ]
   },
   {
@@ -5719,6 +5767,9 @@
       "/segments.date",
       "/ad_group.id",
       "/ad_group_criterion.criterion_id"
+    ],
+    "resourcePath": [
+      "keyword_report"
     ]
   },
   {
@@ -5853,6 +5904,9 @@
     "key": [
       "/customer.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "my_custom_query"
     ]
   }
 ]

@@ -93,6 +93,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Accounts"
     ]
   },
   {
@@ -189,6 +192,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Bill_Payments"
     ]
   },
   {
@@ -285,6 +291,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Bills"
     ]
   },
   {
@@ -381,6 +390,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Budgets"
     ]
   },
   {
@@ -477,6 +489,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Classes"
     ]
   },
   {
@@ -573,6 +588,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Credit_Memos"
     ]
   },
   {
@@ -669,6 +687,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Customers"
     ]
   },
   {
@@ -765,6 +786,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Departments"
     ]
   },
   {
@@ -861,6 +885,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Deposits"
     ]
   },
   {
@@ -957,6 +984,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Employees"
     ]
   },
   {
@@ -1053,6 +1083,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Estimates"
     ]
   },
   {
@@ -1149,6 +1182,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Invoices"
     ]
   },
   {
@@ -1245,6 +1281,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Items"
     ]
   },
   {
@@ -1341,6 +1380,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Journal_Entries"
     ]
   },
   {
@@ -1437,6 +1479,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Payment_Methods"
     ]
   },
   {
@@ -1533,6 +1578,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Payments"
     ]
   },
   {
@@ -1629,6 +1677,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Purchase_Orders"
     ]
   },
   {
@@ -1725,6 +1776,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Purchases"
     ]
   },
   {
@@ -1821,6 +1875,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Refund_Receipts"
     ]
   },
   {
@@ -1917,6 +1974,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Sales_Receipts"
     ]
   },
   {
@@ -2013,6 +2073,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tax_Agencies"
     ]
   },
   {
@@ -2109,6 +2172,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tax_Codes"
     ]
   },
   {
@@ -2205,6 +2271,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tax_Rates"
     ]
   },
   {
@@ -2301,6 +2370,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Terms"
     ]
   },
   {
@@ -2397,6 +2469,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Time_Activities"
     ]
   },
   {
@@ -2493,6 +2568,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Transfers"
     ]
   },
   {
@@ -2589,6 +2667,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Vendor_Credits"
     ]
   },
   {
@@ -2685,6 +2766,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Vendors"
     ]
   }
 ]

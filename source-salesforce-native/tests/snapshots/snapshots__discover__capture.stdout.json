@@ -80,6 +80,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Account"
     ]
   },
   {
@@ -163,6 +166,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Campaign"
     ]
   },
   {
@@ -246,6 +252,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Case"
     ]
   },
   {
@@ -329,6 +338,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Contact"
     ]
   },
   {
@@ -412,6 +424,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Entitlement"
     ]
   },
   {
@@ -495,6 +510,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Lead"
     ]
   },
   {
@@ -578,6 +596,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "LeadHistory"
     ]
   },
   {
@@ -661,6 +682,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "LiveChatTranscript"
     ]
   },
   {
@@ -744,6 +768,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "MessagingSession"
     ]
   },
   {
@@ -827,6 +854,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Opportunity"
     ]
   },
   {
@@ -910,6 +940,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ServiceAppointment"
     ]
   },
   {
@@ -993,6 +1026,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ServiceContract"
     ]
   },
   {
@@ -1076,6 +1112,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Task"
     ]
   },
   {
@@ -1159,6 +1198,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "User"
     ]
   },
   {
@@ -1242,6 +1284,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "WorkOrder"
     ]
   },
   {
@@ -1325,6 +1370,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "WorkOrderLineItem"
     ]
   }
 ]

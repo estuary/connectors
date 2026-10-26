@@ -86,6 +86,9 @@
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "daily_active_users"
     ]
   },
   {
@@ -193,6 +196,9 @@
       "/deviceCategory",
       "/operatingSystem",
       "/browser"
+    ],
+    "resourcePath": [
+      "devices"
     ]
   },
   {
@@ -282,6 +288,9 @@
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "four_weekly_active_users"
     ]
   },
   {
@@ -389,6 +398,9 @@
       "/country",
       "/city",
       "/date"
+    ],
+    "resourcePath": [
+      "locations"
     ]
   },
   {
@@ -484,6 +496,9 @@
       "/report_date",
       "/date",
       "/browser"
+    ],
+    "resourcePath": [
+      "my_custom_report_with_a_filter"
     ]
   },
   {
@@ -585,6 +600,9 @@
       "/date",
       "/hostName",
       "/pagePathPlusQueryString"
+    ],
+    "resourcePath": [
+      "pages"
     ]
   },
   {
@@ -686,6 +704,9 @@
       "/date",
       "/sessionSource",
       "/sessionMedium"
+    ],
+    "resourcePath": [
+      "traffic_sources"
     ]
   },
   {
@@ -775,6 +796,9 @@
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "website_overview"
     ]
   },
   {
@@ -864,6 +888,9 @@
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "weekly_active_users"
     ]
   }
 ]

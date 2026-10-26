@@ -199,7 +199,10 @@
       ],
       "stream": "campaigns",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "campaigns"
+    ]
   },
   {
     "documentSchema": {
@@ -1435,7 +1438,10 @@
       ],
       "stream": "companies",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "companies"
+    ]
   },
   {
     "documentSchema": {
@@ -1637,7 +1643,10 @@
       ],
       "stream": "contact_lists",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "contact_lists"
+    ]
   },
   {
     "documentSchema": {
@@ -3645,7 +3654,10 @@
       ],
       "stream": "contacts",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "contacts"
+    ]
   },
   {
     "documentSchema": {
@@ -3708,7 +3720,10 @@
     "resourceConfig": {
       "stream": "contacts_list_memberships",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "contacts_list_memberships"
+    ]
   },
   {
     "documentSchema": {
@@ -3864,7 +3879,10 @@
       ],
       "stream": "deal_pipelines",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "deal_pipelines"
+    ]
   },
   {
     "documentSchema": {
@@ -4908,7 +4926,10 @@
       ],
       "stream": "deals",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "deals"
+    ]
   },
   {
     "documentSchema": {
@@ -5953,7 +5974,10 @@
       ],
       "stream": "deals_archived",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "deals_archived"
+    ]
   },
   {
     "documentSchema": {
@@ -6350,7 +6374,10 @@
       ],
       "stream": "email_events",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "email_events"
+    ]
   },
   {
     "documentSchema": {
@@ -6410,7 +6437,10 @@
     "resourceConfig": {
       "stream": "email_subscriptions",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "email_subscriptions"
+    ]
   },
   {
     "documentSchema": {
@@ -7071,7 +7101,10 @@
       ],
       "stream": "engagements",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "engagements"
+    ]
   },
   {
     "documentSchema": {
@@ -7821,7 +7854,10 @@
       ],
       "stream": "engagements_calls",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "engagements_calls"
+    ]
   },
   {
     "documentSchema": {
@@ -8677,7 +8713,10 @@
       ],
       "stream": "engagements_emails",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "engagements_emails"
+    ]
   },
   {
     "documentSchema": {
@@ -9452,7 +9491,10 @@
       ],
       "stream": "engagements_meetings",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "engagements_meetings"
+    ]
   },
   {
     "documentSchema": {
@@ -9865,7 +9907,10 @@
       ],
       "stream": "engagements_notes",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "engagements_notes"
+    ]
   },
   {
     "documentSchema": {
@@ -10667,7 +10712,10 @@
       ],
       "stream": "engagements_tasks",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "engagements_tasks"
+    ]
   },
   {
     "documentSchema": {
@@ -11354,7 +11402,10 @@
       ],
       "stream": "forms",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "forms"
+    ]
   },
   {
     "documentSchema": {
@@ -11438,7 +11489,10 @@
       ],
       "stream": "form_submissions",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "form_submissions"
+    ]
   },
   {
     "documentSchema": {
@@ -12228,7 +12282,10 @@
       ],
       "stream": "line_items",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "line_items"
+    ]
   },
   {
     "documentSchema": {
@@ -12339,7 +12396,10 @@
       ],
       "stream": "owners",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "owners"
+    ]
   },
   {
     "documentSchema": {
@@ -12737,7 +12797,10 @@
       ],
       "stream": "products",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "products"
+    ]
   },
   {
     "documentSchema": {
@@ -14741,7 +14804,10 @@
     "resourceConfig": {
       "stream": "property_history",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "property_history"
+    ]
   },
   {
     "documentSchema": {
@@ -14860,7 +14926,10 @@
       ],
       "stream": "subscription_changes",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "subscription_changes"
+    ]
   },
   {
     "documentSchema": {
@@ -15935,7 +16004,10 @@
       ],
       "stream": "tickets",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "tickets"
+    ]
   },
   {
     "documentSchema": {
@@ -16071,7 +16143,10 @@
       ],
       "stream": "ticket_pipelines",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ticket_pipelines"
+    ]
   },
   {
     "documentSchema": {
@@ -16183,6 +16258,9 @@
       ],
       "stream": "workflows",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "workflows"
+    ]
   }
 ]

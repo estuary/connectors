@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Environments"
     ]
   },
   {
@@ -150,6 +153,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Issues"
     ]
   },
   {
@@ -220,6 +226,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Projects"
     ]
   },
   {
@@ -290,6 +299,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Releases"
     ]
   },
   {
@@ -360,6 +372,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Teams"
     ]
   },
   {
@@ -449,6 +464,9 @@
     "key": [
       "/trace",
       "/id"
+    ],
+    "resourcePath": [
+      "custom_explore_my_spans"
     ]
   }
 ]

@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Annotations"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Cohorts"
     ]
   },
   {
@@ -228,6 +234,9 @@
     "key": [
       "/_meta/project_id",
       "/uuid"
+    ],
+    "resourcePath": [
+      "Events"
     ]
   },
   {
@@ -319,6 +328,9 @@
     "key": [
       "/_meta/project_id",
       "/id"
+    ],
+    "resourcePath": [
+      "FeatureFlags"
     ]
   },
   {
@@ -389,6 +401,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Organizations"
     ]
   },
   {
@@ -493,6 +508,9 @@
     "key": [
       "/_meta/project_id",
       "/id"
+    ],
+    "resourcePath": [
+      "Persons"
     ]
   },
   {
@@ -563,6 +581,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Projects"
     ]
   },
   {
@@ -667,6 +688,9 @@
     "key": [
       "/_meta/project_id",
       "/session_id"
+    ],
+    "resourcePath": [
+      "Sessions"
     ]
   }
 ]

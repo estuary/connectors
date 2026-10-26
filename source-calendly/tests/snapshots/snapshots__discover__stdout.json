@@ -80,6 +80,9 @@
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "event_invitees"
     ]
   },
   {
@@ -163,6 +166,9 @@
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "event_types"
     ]
   },
   {
@@ -233,6 +239,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "groups"
     ]
   },
   {
@@ -303,6 +312,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "organization_memberships"
     ]
   },
   {
@@ -373,6 +385,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "routing_form_submissions"
     ]
   },
   {
@@ -443,6 +458,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "routing_forms"
     ]
   },
   {
@@ -526,6 +544,9 @@
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "scheduled_events"
     ]
   }
 ]
