@@ -135,6 +135,13 @@ type streamV2Client struct {
 	// channelsMu guards channels.
 	channelsMu sync.Mutex
 	channels   map[string]*streamV2OpenChannel
+
+	// pipesMu guards pipes, the stage and key material held per pipe path.
+	pipesMu sync.Mutex
+	pipes   map[string]*streamV2PipeInfo
+	// newUploader opens a stage location for upload. It is a field so that tests
+	// can substitute an in-memory stage.
+	newUploader func(ctx context.Context, stage streamV2StageLocation) (streamV2Uploader, error)
 }
 
 type streamV2OpenChannel struct {
@@ -175,14 +182,16 @@ func newStreamV2Client(cfg *config, accountURL, account string) (*streamV2Client
 	var transport = http.DefaultTransport.(*http.Transport).Clone()
 	transport.MaxIdleConnsPerHost = 64
 	var c = &streamV2Client{
-		http:       &http.Client{Timeout: streamV2RequestTimeout, Transport: transport},
-		accountURL: accountURL,
-		key:        key,
-		user:       cfg.Credentials.User,
-		account:    account,
-		role:       cfg.Role,
-		zstd:       enc,
-		channels:   make(map[string]*streamV2OpenChannel),
+		http:        &http.Client{Timeout: streamV2RequestTimeout, Transport: transport},
+		accountURL:  accountURL,
+		key:         key,
+		user:        cfg.Credentials.User,
+		account:     account,
+		role:        cfg.Role,
+		zstd:        enc,
+		channels:    make(map[string]*streamV2OpenChannel),
+		pipes:       make(map[string]*streamV2PipeInfo),
+		newUploader: newStreamV2Uploader,
 	}
 	return c, nil
 }
@@ -437,7 +446,9 @@ func (c *streamV2Client) channel(channelName string) (*streamV2OpenChannel, erro
 }
 
 // AppendRows sends one batch of NDJSON rows to the channel. startToken and endToken
-// are the offset tokens of the batch's first and last rows.
+// are the offset tokens of the batch's first and last rows. A batch whose
+// compressed body exceeds streamV2MaxAppendBytes is appended through the pipe's
+// stage instead.
 //
 // A retry after an ambiguous failure resends the same continuation token and
 // the same rows, which Snowflake accepts as a duplicate of the first delivery
@@ -467,9 +478,7 @@ func (c *streamV2Client) AppendRows(ctx context.Context, channelName, startToken
 	}
 	var compressed = c.zstd.EncodeAll(rows, make([]byte, 0, len(rows)/4))
 	if len(compressed) > streamV2MaxAppendBytes {
-		return fmt.Errorf(
-			"an append of %d document(s) totalling %d bytes compresses to %d bytes, which exceeds Snowflake's limit of %d bytes (4 MiB) per compressed Snowpipe Streaming request, so the snowpipe_streaming_v2 write path cannot write it and the task will fail the same way on every restart",
-			bytes.Count(rows, []byte{'\n'}), len(rows), len(compressed), streamV2MaxAppendBytes)
+		return c.appendFile(ctx, ch, channelName, startToken, endToken, rows, compressed)
 	}
 	if err := c.call(ctx, http.MethodPost, "data/"+ch.pipePath+"/channels/"+url.PathEscape(channelName)+"/rows", query, compressed, headers, &res); err != nil {
 		return err

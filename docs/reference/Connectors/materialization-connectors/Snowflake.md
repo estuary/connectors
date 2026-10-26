@@ -316,10 +316,10 @@ Snowpipe Streaming is used by default for [delta updates](#delta-updates) bindin
 Snowflake's [high-performance Snowpipe Streaming architecture](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-overview)
 is available behind the `snowpipe_streaming_v2` [feature flag](/guides/advanced-usage/feature-flags). The connector calls
 Snowflake's [Snowpipe Streaming REST API](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api)
-directly, and rows are sent to Snowflake as your collection documents are materialized rather than being staged first.
+directly, and rows are sent to Snowflake as your collection documents are materialized.
 Each shard of the task streams through four Snowflake channels, so a single shard can exceed the throughput limit that
-Snowflake places on one channel. Snowflake limits one request on this API to 4 MiB after compression, so a single
-document larger than that cannot be materialized through this path.
+Snowflake places on one channel. Snowflake limits one request on this API to 4 MiB after compression, so a larger
+batch of rows is uploaded to the table's Snowpipe stage and then registered with its channel.
 
 To use it, all of the following must be true:
 

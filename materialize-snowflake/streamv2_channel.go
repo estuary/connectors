@@ -14,9 +14,8 @@ import (
 // Recovery resumes from the offset that Snowflake reports as committed,
 // whatever batch boundaries the interrupted attempt cut.
 var (
-	streamV2BatchRows = 10_000
-	// Stays under streamV2MaxAppendBytes even for rows that compression cannot shrink.
-	streamV2BatchBytes = int(3.5 * 1024 * 1024)
+	streamV2BatchRows  = 1_000_000
+	streamV2BatchBytes = 32 * 1024 * 1024
 )
 
 // streamV2PaceBytesPerSecond is the uncompressed byte rate this write path allows

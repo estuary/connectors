@@ -127,10 +127,10 @@ func TestStreamV2NoAppendAfterAFailedAppend(t *testing.T) {
 	require.Nil(t, status.CommittedToken, "an append queued behind a failed append was committed")
 }
 
-// TestStreamV2RejectsAnOversizedAppend covers a document too large for one append
-// even after compression. The failure names the table, the document's compressed
-// size and Snowflake's limit, and says that a restart cannot get past it.
-func TestStreamV2RejectsAnOversizedAppend(t *testing.T) {
+// TestStreamV2OversizedAppendUsesFileMode covers a document too large for one
+// append request even after compression: it is uploaded to the pipe's stage and
+// registered with the channel instead, and commits like any other append.
+func TestStreamV2OversizedAppendUsesFileMode(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
 
@@ -150,12 +150,19 @@ func TestStreamV2RejectsAnOversizedAppend(t *testing.T) {
 	for i := range val {
 		val[i] = 'a' + byte(rand.IntN(26))
 	}
-	require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", string(val)}))
-	_, err := m.flush(ctx)
-	require.ErrorContains(t, err, "TBL")
-	require.Regexp(t, `an append of 1 document\(s\) totalling \d+ bytes compresses to \d+ bytes`, err.Error())
-	require.ErrorContains(t, err, "Snowflake's limit of 4194304 bytes (4 MiB) per compressed Snowpipe Streaming request")
-	require.ErrorContains(t, err, "the task will fail the same way on every restart")
+	fakeSnowpipeFileAppends.Store(0)
+	require.NoError(t, testWriteRow(ctx, m, 0, []any{"small", "v"}))
+	require.NoError(t, testWriteRow(ctx, m, 0, []any{"big", string(val)}))
+	require.NoError(t, testWriteRow(ctx, m, 0, []any{"after", "v"}))
+	var entries, err = m.flush(ctx)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), fakeSnowpipeFileAppends.Load(), "only the oversized row goes through file mode")
+	require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
+
+	status, err := m.client.ChannelStatus(ctx, m.bindings[0].activeChannels[0].channelName)
+	require.NoError(t, err)
+	require.NotNil(t, status.CommittedToken)
+	require.Equal(t, streamV2FormatOffsetToken(3, fullKeyRange), *status.CommittedToken)
 }
 
 // TestStreamV2AppendLargerThanTheBurst covers a row larger than the channel
