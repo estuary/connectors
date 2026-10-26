@@ -2,6 +2,9 @@
 
 ## 2026-10-26
 
+### Changed
+- The `contact_list_memberships` binding uses less memory on accounts with many contact lists.
+
 ### Fixed
 - Long-running captures of `contact_list_memberships` no longer run out of memory.
 

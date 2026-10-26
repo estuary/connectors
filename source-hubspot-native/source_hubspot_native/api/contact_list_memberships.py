@@ -14,7 +14,6 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.utils import format_error_message
 
 from ..models import (
-    ContactList,
     ContactListMembership,
     ContactListMembershipResponse,
     Names,
@@ -30,17 +29,17 @@ from .shared import (
 async def _request_contact_list_memberships(
     http: HTTPSession,
     log: Logger,
-    contact_list: ContactList,
+    list_id: int,
     start: datetime,
     end: datetime | None = None,
 ) -> AsyncGenerator[ContactListMembership]:
-    url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships/join-order"
+    url = f"{HUB}/crm/v3/lists/{list_id}/memberships/join-order"
     params: dict[str, int | str] = {"limit": 250}
 
     while True:
         response = ContactListMembershipResponse.model_validate_json(
             await http.request(log, url, params=params),
-            context=contact_list,
+            context=list_id,
         )
 
         for item in response.results:
@@ -74,20 +73,20 @@ class ContactListMembershipControl:
 async def _list_memberships_worker(
     http: HTTPSession,
     log: Logger,
-    contact_list: ContactList,
+    list_id: int,
     context: ContactListMembershipControl,
     start: datetime,
     end: datetime | None = None,
 ) -> None:
     try:
         async for item in _request_contact_list_memberships(
-            http, log, contact_list, start, end
+            http, log, list_id, start, end
         ):
             await context.results.put(item)
 
         log.debug(
             "finished fetching memberships for list",
-            {"listId": contact_list.listId},
+            {"listId": list_id},
         )
         await context.results.put(None)
     except CancelledError as e:
@@ -101,7 +100,7 @@ async def _list_memberships_worker(
             context.first_error = msg
 
             raise RuntimeError(
-                f"Contact list {contact_list.listId} worker was unexpectedly cancelled: {msg}"
+                f"Contact list {list_id} worker was unexpectedly cancelled: {msg}"
             )
         # If a different worker already failed, then this worker task was cancelled by
         # the TaskGroup as part of its exception handling and it's safe to propagate the
@@ -114,7 +113,7 @@ async def _list_memberships_worker(
             context.first_error = msg
 
         log.error(
-            f"Contact list {contact_list.listId} worker encountered an error.",
+            f"Contact list {list_id} worker encountered an error.",
             {
                 "exception": msg,
             },
@@ -134,8 +133,8 @@ async def _request_all_contact_list_memberships(
     )
 
     control = ContactListMembershipControl()
-    all_lists = [
-        item
+    all_list_ids = [
+        item.listId
         async for item in request_contact_lists_in_time_range(
             http,
             log,
@@ -146,18 +145,16 @@ async def _request_all_contact_list_memberships(
             end,
         )
     ]
-    if not all_lists:
+    if not all_list_ids:
         return
 
     async with asyncio.TaskGroup() as tg:
 
         async def dispatcher() -> None:
-            for contact_list in all_lists:
+            for list_id in all_list_ids:
                 _ = await control.task_slots.acquire()
                 _ = tg.create_task(
-                    _list_memberships_worker(
-                        http, log, contact_list, control, start, end
-                    )
+                    _list_memberships_worker(http, log, list_id, control, start, end)
                 )
 
         _ = tg.create_task(dispatcher())
@@ -169,7 +166,7 @@ async def _request_all_contact_list_memberships(
                 control.finished_tasks += 1
                 control.task_slots.release()
 
-                if control.finished_tasks == len(all_lists):
+                if control.finished_tasks == len(all_list_ids):
                     break
             else:
                 yield item
@@ -198,7 +195,7 @@ async def fetch_contact_list_memberships_page(
         return
 
     async for membership in _request_contact_list_memberships(
-        http, log, next_list, EPOCH_PLUS_ONE_SECOND
+        http, log, next_list.listId, EPOCH_PLUS_ONE_SECOND
     ):
         yield membership
 
