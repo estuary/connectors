@@ -1,4 +1,12 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufReader as FileBufReader;
+use std::io::BufWriter as FileBufWriter;
+use std::io::Read;
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
@@ -155,6 +163,14 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
     let mut loads_this_transaction: u64 = 0;
     const LOAD_COUNT_LOG_INTERVAL: u64 = 10_000;
 
+    // The prior transaction's `Acknowledge` commit, running in the
+    // background so `Load` keeps being read and staged while it's still in
+    // flight (see `commit_pending_acknowledge`'s doc comment). Always
+    // `None` by the time an `Acknowledge` arm runs again, since `Flush`
+    // unconditionally resolves it first and `Store`/`StartCommit` only
+    // happen after `Flush`.
+    let mut pending_ack: Option<tokio::task::JoinHandle<Result<Vec<BindingCheckpoint>>>> = None;
+
     loop {
         let request = match input.read()? {
             Some(req) => req,
@@ -172,20 +188,41 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     tracing::info!(loads_this_transaction, "Load requests received so far");
                 }
 
-                let index = load.binding;
                 let binding = &mut bindings[load.binding as usize];
-                binding.pending_loads.push(load.key_packed);
-                // Scan as soon as a batch's worth has queued, rather than
-                // waiting for `Flush` — a transaction's total `Load` count
-                // is outside the connector's control, so `pending_loads`
-                // must never be allowed to grow to the whole transaction's
-                // size.
-                if binding.pending_loads.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
-                    flush_pending_loads(&catalog, output, index, binding).await?;
-                }
+                binding.stage_pending_load(&load.key_packed)?;
             }
             Some(request::Kind::Flush(_)) => {
                 tracing::warn!("Flush");
+
+                // `Load` never scans — it only stages keys to disk — so any
+                // in-flight `Acknowledge` must be resolved first, both so
+                // `Response::Acknowledged` actually gets sent and so the
+                // scan below (via `catalog.current_snapshot`) reflects the
+                // commit it just made rather than stale pre-commit state.
+                if let Some(handle) = pending_ack.take() {
+                    let checkpoints = handle
+                        .await
+                        .context("acknowledge task panicked")??;
+                    for (binding, checkpoint) in bindings.iter_mut().zip(checkpoints) {
+                        binding.checkpoint = checkpoint;
+                        // The only point a binding's snapshot can have
+                        // advanced — always invalidate so the load-scan
+                        // below re-fetches instead of reusing a cache from
+                        // before this commit.
+                        binding.scan_cache = None;
+                    }
+
+                    let state = checkpoint_from_bindings(&bindings)?;
+                    output.send(Response {
+                        kind: Some(response::Kind::Acknowledged(Acknowledged {
+                            state: Some(state),
+                        })),
+                        ..Default::default()
+                    })?;
+                    tracing::warn!("Acknowledged");
+                    log_object_store_requests("acknowledge", &catalog.request_counts);
+                }
+
                 for (index, binding) in bindings.iter_mut().enumerate() {
                     flush_pending_loads(&catalog, output, index as u32, binding).await?;
                 }
@@ -339,56 +376,82 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
             }
             Some(request::Kind::Acknowledge(_)) => {
                 tracing::warn!("Acknowledge");
-                for binding in bindings.iter_mut() {
-                    binding.acknowledge(&catalog).await?;
-                }
-
-                let state = checkpoint_from_bindings(&bindings)?;
-                output.send(Response {
-                    kind: Some(response::Kind::Acknowledged(Acknowledged {
-                        state: Some(state),
-                    })),
-                    ..Default::default()
-                })?;
-                tracing::warn!("Acknowledged");
-                log_object_store_requests("acknowledge", &catalog.request_counts);
+                // Measured from here (request receipt), not from when the
+                // spawned commit below actually finishes — the runtime may
+                // send the next transaction's first `Load` well before
+                // that, now that it's no longer blocked on it.
                 awaiting_first_load = true;
                 loads_this_transaction = 0;
+
+                let jobs: Vec<AckJob> = bindings
+                    .iter_mut()
+                    .map(|binding| AckJob {
+                        table: binding.table.clone(),
+                        table_schema: binding.table_schema.clone(),
+                        last_column_id: binding.last_column_id,
+                        checkpoint: std::mem::take(&mut binding.checkpoint),
+                    })
+                    .collect();
+
+                let catalog = catalog.clone();
+                pending_ack = Some(tokio::spawn(commit_pending_acknowledge(catalog, jobs)));
             }
             _ => {}
         }
     }
 }
 
-/// Scans whatever `Load` keys are currently queued for `binding` and sends
-/// their matches, if any — a no-op if nothing's queued. Shared by both the
-/// threshold-triggered call in the `Load` arm and the end-of-transaction
-/// call in the `Flush` arm, since both need the same drain-scan-emit
-/// sequence.
+/// Reads back whatever `Load` keys `stage_pending_load` staged to disk for
+/// `binding` this transaction, scans for their matches, and sends them — a
+/// no-op if nothing was staged. Only called from the `Flush` arm, once any
+/// in-flight `Acknowledge` has resolved, so the scan sees this table's
+/// post-commit state (see the `Flush` arm's comment).
 async fn flush_pending_loads(
     catalog: &Catalog,
     output: &mut Output,
     index: u32,
     binding: &mut BindingState,
 ) -> Result<()> {
-    tracing::warn!("flush_pending_loads");
-    if binding.pending_loads.is_empty() {
+    let Some(writer) = binding.pending_loads_file.take() else {
         return Ok(());
+    };
+    let mut file = writer
+        .into_inner()
+        .context("flushing staged Load keys to disk")?;
+    file.seek(SeekFrom::Start(0))
+        .context("rewinding Load staging file")?;
+    let mut reader = FileBufReader::new(file);
+
+    let mut batch: Vec<Bytes> = Vec::new();
+    while let Some(key_packed) = read_pending_load_record(&mut reader)? {
+        batch.push(key_packed);
+        if batch.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
+            scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
+            batch.clear();
+        }
+    }
+    if !batch.is_empty() {
+        scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
     }
 
-    // `mem::take` rather than `drain(..)`: drain empties the Vec but keeps
-    // its allocated capacity, which would otherwise permanently retain
-    // this binding's largest-ever Load batch size in memory for the rest
-    // of the connector's lifetime.
-    let key_bytes: Vec<Bytes> = std::mem::take(&mut binding.pending_loads);
+    std::fs::remove_file(&binding.pending_loads_path).ok();
+    Ok(())
+}
 
+async fn scan_and_emit_loaded(
+    catalog: &Catalog,
+    output: &mut Output,
+    index: u32,
+    binding: &mut BindingState,
+    key_bytes: &[Bytes],
+) -> Result<()> {
     scan::load(
         catalog,
         &binding.table,
         &binding.collection,
         &binding.schema,
         binding.key_builders.len(),
-        &key_bytes,
+        key_bytes,
         &mut binding.load_file_paths,
         &mut binding.scan_cache,
         |loaded| {
@@ -402,6 +465,33 @@ async fn flush_pending_loads(
         },
     )
     .await
+}
+
+/// One `Load` key, length-prefixed the same way `Input`/`Output` frame
+/// protobuf messages (`src/lib.rs`): a 4-byte little-endian length followed
+/// by that many bytes.
+fn write_pending_load_record(writer: &mut impl Write, key_packed: &[u8]) -> Result<()> {
+    writer.write_all(&(key_packed.len() as u32).to_le_bytes())?;
+    writer.write_all(key_packed)?;
+    Ok(())
+}
+
+/// Reads one record written by `write_pending_load_record`, or `None` at a
+/// clean EOF between records.
+fn read_pending_load_record(reader: &mut impl Read) -> Result<Option<Bytes>> {
+    let mut length_bytes = [0; 4];
+    match reader.read_exact(&mut length_bytes) {
+        Ok(()) => (),
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(e) => return Err(e.into()),
+    }
+    let length = u32::from_le_bytes(length_bytes) as usize;
+
+    let mut buf = vec![0; length];
+    reader
+        .read_exact(&mut buf)
+        .context("reading staged Load key")?;
+    Ok(Some(Bytes::from(buf)))
 }
 
 /// Logs how many of each object-store request kind were made since the last
@@ -564,23 +654,27 @@ struct BindingState {
     /// Reset to 0 each time a data file is flushed. A cheap proxy for the
     /// eventual encoded Parquet size, using lengths already in hand.
     estimated_bytes: usize,
-    /// Raw `key_packed` from `Load` requests, buffered until there's
-    /// `DEFAULT_LOAD_BATCH_SIZE`-worth to scan (see `flush_pending_loads`) or
-    /// `Flush` arrives, whichever comes first — never the whole
-    /// transaction's `Load` count at once, since that's outside the
-    /// connector's control.
-    pending_loads: Vec<Bytes>,
+    /// Fixed for this binding's whole process lifetime — where
+    /// `stage_pending_load` stages this transaction's `Load` keys and
+    /// `flush_pending_loads` reads them back from at `Flush`, so `Load`
+    /// never has to hold them in memory or scan while an `Acknowledge` may
+    /// still be in flight (see the `Flush` arm's comment).
+    pending_loads_path: PathBuf,
+    /// Open only while this transaction has staged at least one `Load` key;
+    /// taken (and the file removed) by `flush_pending_loads`.
+    pending_loads_file: Option<FileBufWriter<File>>,
     /// The file-path table `scan::load` interns into across however many
-    /// calls this transaction makes (see `pending_loads`'s doc comment).
-    /// `Store`'s `_meta.file_path` (an index into this, not a path) is
-    /// resolved through it — deduplicated, so its size is bounded by
-    /// distinct files touched, not rows touched.
+    /// chunked calls `flush_pending_loads` makes reading back
+    /// `pending_loads_path` this transaction. `Store`'s `_meta.file_path`
+    /// (an index into this, not a path) is resolved through it —
+    /// deduplicated, so its size is bounded by distinct files touched, not
+    /// rows touched.
     load_file_paths: scan::FilePathTable,
-    /// The current snapshot's manifest-derived state, cached for the whole
-    /// transaction across however many `load` calls it makes (see
-    /// `pending_loads`'s doc comment) — `None` until the first call
-    /// populates it, and reset to `None` only when `acknowledge` actually
-    /// advances the snapshot, since that's the only time it can go stale.
+    /// The current snapshot's manifest-derived state, cached across
+    /// `flush_pending_loads`'s chunked `scan::load` calls — `None` until the
+    /// first call populates it, and reset to `None` in the `Flush` arm
+    /// whenever it just applied a resolved `Acknowledge`'s new checkpoint,
+    /// since that's the only time it can go stale.
     scan_cache: Option<scan::SnapshotScan>,
     /// Positions to mask with a positional delete this transaction, by the
     /// data file_path they were found in (`_meta.file_path`/
@@ -743,10 +837,9 @@ impl BindingState {
             .pending_snapshot_id
             .get_or_insert_with(|| self.checkpoint.sequence_number + 1);
 
-        // `mem::take` rather than `drain()`: same reasoning as
-        // `pending_loads` above — drain keeps the HashMap's allocated
-        // capacity, permanently retaining this binding's largest-ever
-        // delete set.
+        // `mem::take` rather than `drain()`: drain keeps the HashMap's
+        // allocated capacity, permanently retaining this binding's
+        // largest-ever delete set.
         for (file_path, positions) in std::mem::take(&mut self.pending_deletes) {
             let pending_manifest = write_position_delete_file(
                 catalog,
@@ -763,139 +856,189 @@ impl BindingState {
         Ok(())
     }
 
-    async fn acknowledge(&mut self, catalog: &Catalog) -> Result<()> {
-        if self.checkpoint.pending_manifests.is_empty() {
-            return Ok(());
-        }
-
-        tracing::info!(table = %self.table, "acknowledge: starting");
-
-        let snapshot_id = self
-            .checkpoint
-            .pending_snapshot_id
-            .unwrap_or(self.checkpoint.sequence_number + 1);
-
-        let prior_entries = match &self.checkpoint.manifest_list {
-            Some(path) => manifest_list::read_manifest_list(&catalog.object_store, path).await?,
-            None => Vec::new(),
+    /// Appends `key_packed` to this binding's on-disk `Load` staging file,
+    /// opening it if this is the first `Load` staged since the last
+    /// `flush_pending_loads` drained it. Never scans — see the `Flush`
+    /// arm's comment for why that has to wait.
+    fn stage_pending_load(&mut self, key_packed: &[u8]) -> Result<()> {
+        let writer = match &mut self.pending_loads_file {
+            Some(writer) => writer,
+            None => {
+                let file = File::create(&self.pending_loads_path)
+                    .context("creating Load staging file")?;
+                self.pending_loads_file = Some(FileBufWriter::new(file));
+                self.pending_loads_file.as_mut().unwrap()
+            }
         };
-        tracing::info!(table = %self.table, "acknowledge: read prior manifest list");
+        write_pending_load_record(writer, key_packed)
+    }
+}
 
-        let manifest_list_path = manifest_list::write_manifest_list(
-            &catalog.object_store,
-            &catalog.prefix,
-            &self.table,
-            snapshot_id,
-            snapshot_id,
-            prior_entries,
-            &self.checkpoint.pending_manifests,
-        )
-        .await?;
-        tracing::info!(table = %self.table, "acknowledge: wrote new manifest list");
+/// One binding's `Acknowledge` work, with everything it needs taken out of
+/// its `BindingState` by value so it can run on a spawned task independent
+/// of the `BindingState`s a connector's main loop keeps processing `Load`
+/// against (see `commit_pending_acknowledge`).
+struct AckJob {
+    table: String,
+    table_schema: serde_json::Value,
+    last_column_id: i32,
+    checkpoint: BindingCheckpoint,
+}
 
-        let data_manifests = self
-            .checkpoint
-            .pending_manifests
-            .iter()
-            .filter(|m| m.content == CONTENT_DATA);
-        let added_files_count: i32 = data_manifests.clone().map(|m| m.added_files_count).sum();
-        let added_rows_count: i64 = data_manifests.clone().map(|m| m.added_rows_count).sum();
-        let added_files_size: i64 = data_manifests.map(|m| m.added_files_size).sum();
-        let added_position_deletes: i64 = self
-            .checkpoint
-            .pending_manifests
-            .iter()
-            .filter(|m| m.content == CONTENT_DELETES)
-            .map(|m| m.added_rows_count)
-            .sum();
+/// Commits every binding's pending manifests, in order, exactly as the old
+/// inline per-binding loop in the `Acknowledge` arm did — the only
+/// difference is that this whole function now runs on a spawned task rather
+/// than being `.await`ed inline, so the main loop can keep reading and
+/// staging `Load` requests (to disk, via `BindingState::stage_pending_load`)
+/// while this is still in flight. The `Flush` arm joins the returned
+/// `JoinHandle` before evaluating any staged `Load`s, which is what
+/// guarantees those loads see this commit's result (read-committed) rather
+/// than racing it.
+async fn commit_pending_acknowledge(catalog: Arc<Catalog>, jobs: Vec<AckJob>) -> Result<Vec<BindingCheckpoint>> {
+    let mut checkpoints = Vec::with_capacity(jobs.len());
+    for job in jobs {
+        checkpoints.push(acknowledge_binding(&catalog, job).await?);
+    }
+    Ok(checkpoints)
+}
 
-        let snapshot = build_snapshot(
-            snapshot_id,
-            self.checkpoint.snapshot_id,
-            snapshot_id,
-            catalog.uri(&manifest_list_path),
-            added_files_count,
-            added_rows_count,
-            added_files_size,
-            added_position_deletes,
-        );
+async fn acknowledge_binding(catalog: &Catalog, job: AckJob) -> Result<BindingCheckpoint> {
+    let AckJob {
+        table,
+        table_schema,
+        last_column_id,
+        mut checkpoint,
+    } = job;
 
-        tracing::info!(table = %self.table, "acknowledge: calling commit_snapshot");
-        self.commit_snapshot(catalog, snapshot).await?;
-        tracing::info!(table = %self.table, "acknowledge: commit_snapshot returned");
-
-        self.checkpoint.snapshot_id = Some(snapshot_id);
-        self.checkpoint.sequence_number = snapshot_id;
-        self.checkpoint.manifest_list = Some(manifest_list_path);
-        self.checkpoint.pending_manifests.clear();
-        self.checkpoint.pending_snapshot_id = None;
-        // The only point the snapshot `scan::load` caches per-transaction
-        // actually changes — invalidate it so the next transaction's first
-        // `load` call re-fetches instead of scanning stale manifest state.
-        self.scan_cache = None;
-
-        Ok(())
+    if checkpoint.pending_manifests.is_empty() {
+        return Ok(checkpoint);
     }
 
-    /// Commits a snapshot by calling the connector's own embedded REST
-    /// catalog server, exercising the same `POST
-    /// /v1/{prefix}/transactions/commit` path a real client would use. The
-    /// table's schema is sent along on every commit — the catalog only
-    /// applies it when the table doesn't exist yet, since schema evolution
-    /// isn't supported.
-    async fn commit_snapshot(&self, catalog: &Catalog, snapshot: Snapshot) -> Result<()> {
-        let request = CommitTransactionRequest {
-            table_changes: vec![TableChange {
-                identifier: TableIdentifier {
-                    name: self.table.clone(),
+    tracing::info!(table = %table, "acknowledge: starting");
+
+    let snapshot_id = checkpoint
+        .pending_snapshot_id
+        .unwrap_or(checkpoint.sequence_number + 1);
+
+    let prior_entries = match &checkpoint.manifest_list {
+        Some(path) => manifest_list::read_manifest_list(&catalog.object_store, path).await?,
+        None => Vec::new(),
+    };
+    tracing::info!(table = %table, "acknowledge: read prior manifest list");
+
+    let manifest_list_path = manifest_list::write_manifest_list(
+        &catalog.object_store,
+        &catalog.prefix,
+        &table,
+        snapshot_id,
+        snapshot_id,
+        prior_entries,
+        &checkpoint.pending_manifests,
+    )
+    .await?;
+    tracing::info!(table = %table, "acknowledge: wrote new manifest list");
+
+    let data_manifests = checkpoint
+        .pending_manifests
+        .iter()
+        .filter(|m| m.content == CONTENT_DATA);
+    let added_files_count: i32 = data_manifests.clone().map(|m| m.added_files_count).sum();
+    let added_rows_count: i64 = data_manifests.clone().map(|m| m.added_rows_count).sum();
+    let added_files_size: i64 = data_manifests.map(|m| m.added_files_size).sum();
+    let added_position_deletes: i64 = checkpoint
+        .pending_manifests
+        .iter()
+        .filter(|m| m.content == CONTENT_DELETES)
+        .map(|m| m.added_rows_count)
+        .sum();
+
+    let snapshot = build_snapshot(
+        snapshot_id,
+        checkpoint.snapshot_id,
+        snapshot_id,
+        catalog.uri(&manifest_list_path),
+        added_files_count,
+        added_rows_count,
+        added_files_size,
+        added_position_deletes,
+    );
+
+    tracing::info!(table = %table, "acknowledge: calling commit_snapshot");
+    commit_snapshot(catalog, &table, table_schema, last_column_id, &snapshot).await?;
+    tracing::info!(table = %table, "acknowledge: commit_snapshot returned");
+
+    checkpoint.snapshot_id = Some(snapshot_id);
+    checkpoint.sequence_number = snapshot_id;
+    checkpoint.manifest_list = Some(manifest_list_path);
+    checkpoint.pending_manifests.clear();
+    checkpoint.pending_snapshot_id = None;
+
+    Ok(checkpoint)
+}
+
+/// Commits a snapshot by calling the connector's own embedded REST catalog
+/// server, exercising the same `POST /v1/{prefix}/transactions/commit` path
+/// a real client would use. The table's schema is sent along on every
+/// commit — the catalog only applies it when the table doesn't exist yet,
+/// since schema evolution isn't supported.
+async fn commit_snapshot(
+    catalog: &Catalog,
+    table: &str,
+    table_schema: serde_json::Value,
+    last_column_id: i32,
+    snapshot: &Snapshot,
+) -> Result<()> {
+    let request = CommitTransactionRequest {
+        table_changes: vec![TableChange {
+            identifier: TableIdentifier {
+                name: table.to_string(),
+            },
+            updates: vec![
+                TableUpdate::AddSchema {
+                    schema: table_schema,
+                    last_column_id,
                 },
-                updates: vec![
-                    TableUpdate::AddSchema {
-                        schema: self.table_schema.clone(),
-                        last_column_id: self.last_column_id,
-                    },
-                    TableUpdate::AddSnapshot {
-                        snapshot: snapshot.clone(),
-                    },
-                    TableUpdate::SetSnapshotRef {
-                        ref_name: "main".to_string(),
-                        ref_type: "branch".to_string(),
-                        snapshot_id: snapshot.snapshot_id,
-                    },
-                ],
-            }],
-        };
+                TableUpdate::AddSnapshot {
+                    snapshot: snapshot.clone(),
+                },
+                TableUpdate::SetSnapshotRef {
+                    ref_name: "main".to_string(),
+                    ref_type: "branch".to_string(),
+                    snapshot_id: snapshot.snapshot_id,
+                },
+            ],
+        }],
+    };
 
-        let port = server::listen_port();
-        let url = format!("http://127.0.0.1:{port}/v1/{CATALOG_PREFIX}/transactions/commit");
+    let port = server::listen_port();
+    let url = format!("http://127.0.0.1:{port}/v1/{CATALOG_PREFIX}/transactions/commit");
 
-        tracing::info!(table = %self.table, %url, "commit_snapshot: sending request");
-        let response = catalog
-            .http_client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await
-            .context("calling embedded catalog commit endpoint")?;
-        tracing::info!(table = %self.table, status = %response.status(), "commit_snapshot: got response");
+    tracing::info!(table, %url, "commit_snapshot: sending request");
+    let response = catalog
+        .http_client
+        .post(&url)
+        .json(&request)
+        .send()
+        .await
+        .context("calling embedded catalog commit endpoint")?;
+    tracing::info!(table, status = %response.status(), "commit_snapshot: got response");
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("catalog commit failed ({status}): {body}");
-        }
-
-        tracing::info!(
-            table = %self.table,
-            snapshot_id = snapshot.snapshot_id,
-            parent_snapshot_id = ?snapshot.parent_snapshot_id,
-            manifest_list = %snapshot.manifest_list,
-            summary = ?snapshot.summary,
-            "committed snapshot to table metadata"
-        );
-
-        Ok(())
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        anyhow::bail!("catalog commit failed ({status}): {body}");
     }
+
+    tracing::info!(
+        table,
+        snapshot_id = snapshot.snapshot_id,
+        parent_snapshot_id = ?snapshot.parent_snapshot_id,
+        manifest_list = %snapshot.manifest_list,
+        summary = ?snapshot.summary,
+        "committed snapshot to table metadata"
+    );
+
+    Ok(())
 }
 
 /// The reserved Iceberg field-ids for a positional-delete file's two
@@ -1075,7 +1218,11 @@ fn binding_state(
         doc_builder: StringBuilder::new(),
         rows: 0,
         estimated_bytes: 0,
-        pending_loads: Vec::new(),
+        pending_loads_path: std::env::temp_dir().join(format!(
+            "materialize-iceberg-pending-loads-{}.bin",
+            Uuid::new_v4()
+        )),
+        pending_loads_file: None,
         load_file_paths: scan::FilePathTable::default(),
         scan_cache: None,
         pending_deletes: HashMap::new(),
