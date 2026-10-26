@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-26
+
+### Fixed
+- Long-running captures of `contact_list_memberships` no longer run out of memory.
+
 ## 2026-09-30
 
 ### Changed
