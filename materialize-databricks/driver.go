@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -45,6 +46,9 @@ const deleteConcurrency = 16
 
 // maxConcurrentCommits is how many bindings commit at once.
 const maxConcurrentCommits = 5
+
+// maxConcurrentLoads is how many bindings' load queries run at once.
+const maxConcurrentLoads = 5
 
 // maxBoundRanges is the most ranges a date-time key's merge bound splits into.
 const maxBoundRanges = 8
@@ -463,7 +467,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	// Copy the staged files in parallel
 	var queries []string
 	var toDelete []string
 	for idx, b := range d.bindings {
@@ -493,42 +496,91 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	if len(queries) > 0 {
-		// Issue a union join of the target tables and their (now staged) load keys,
-		// and send results to the |loaded| callback.
-		d.be.StartedEvaluatingLoads()
-		var unionQuery = strings.Join(queries, "\nUNION ALL\n")
-		rows, err := db.QueryContext(ctx, unionQuery)
-		if err != nil {
-			return fmt.Errorf("querying Load documents: %w", err)
-		}
-		defer rows.Close()
-		d.be.FinishedEvaluatingLoads()
-
-		for rows.Next() {
-			var binding int
-			var document string
-
-			if err = rows.Scan(&binding, &document); err != nil {
-				return fmt.Errorf("scanning Load document: %w", err)
-			} else if binding > -1 {
-				doc := json.RawMessage([]byte(document))
-				if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
-					if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
-						return fmt.Errorf("stripping null fields: %w", err)
-					}
-				}
-				if err = loaded(binding, doc); err != nil {
-					return err
-				}
-			}
-		}
-
-		if err = rows.Err(); err != nil {
-			return fmt.Errorf("querying Loads: %w", err)
-		}
+	if len(queries) == 0 {
+		return nil
 	}
 
+	// Each binding's join of its target table and (now staged) load keys runs
+	// as its own query, so the warehouse can run them at once. One goroutine
+	// sends their documents, since Loaded responses are written in sequence.
+	var loadCtx, cancel = context.WithCancel(ctx)
+	defer cancel()
+	var docs = make(chan loadedDoc)
+	var sendErr = make(chan error, 1)
+	go func() {
+		var err = d.sendLoaded(docs, loaded)
+		if err != nil {
+			cancel()
+		}
+		sendErr <- err
+	}()
+
+	d.be.StartedEvaluatingLoads()
+	var evaluating atomic.Int32
+	evaluating.Store(int32(len(queries)))
+
+	var group, groupCtx = errgroup.WithContext(loadCtx)
+	group.SetLimit(maxConcurrentLoads)
+	for _, query := range queries {
+		group.Go(func() error {
+			rows, err := db.QueryContext(groupCtx, query)
+			if evaluating.Add(-1) == 0 {
+				d.be.FinishedEvaluatingLoads()
+			}
+			if err != nil {
+				return fmt.Errorf("querying Load documents: %w", err)
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var doc loadedDoc
+				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
+					return fmt.Errorf("scanning Load document: %w", err)
+				} else if doc.binding < 0 {
+					continue
+				}
+				select {
+				case docs <- doc:
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				}
+			}
+			if err := rows.Err(); err != nil {
+				return fmt.Errorf("querying Loads: %w", err)
+			}
+			return nil
+		})
+	}
+
+	var queryErr = group.Wait()
+	close(docs)
+	// A failure to send cancels the queries, so it's the cause of theirs.
+	if err := <-sendErr; err != nil {
+		return err
+	}
+	return queryErr
+}
+
+// loadedDoc is a document read by a binding's load query.
+type loadedDoc struct {
+	binding  int
+	document string
+}
+
+// sendLoaded sends each of docs as a Loaded response.
+func (d *transactor) sendLoaded(docs <-chan loadedDoc, loaded func(int, json.RawMessage) error) error {
+	for doc := range docs {
+		var raw = json.RawMessage(doc.document)
+		if b := d.bindings[doc.binding]; len(b.nullFieldsToStrip) > 0 {
+			var err error
+			if raw, err = sql.StripNullFields(raw, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if err := loaded(doc.binding, raw); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

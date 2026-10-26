@@ -2,6 +2,8 @@
 
 ## 2026-10-26
 ### Changed
+- A transaction's tables are loaded with one query each, up to five at a time,
+  instead of in a single query.
 - Load and merge queries on tables with a `TIMESTAMP` key column split the
   key range at wide gaps between the transaction's keys, so a few keys far
   from the rest no longer widen the scan to everything in between.
