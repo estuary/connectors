@@ -51,22 +51,21 @@ the bare words.
 | Term | Whose | What it means |
 | --- | --- | --- |
 | Channel | Snowflake | A named connection to one table. Snowflake stores a committed offset token for each channel, and that token is what recovery reads. |
-| Append | Snowflake | One call that sends a batch of rows to a channel. The v2 SDK names the method `append_rows`. |
+| Append | Snowflake | One call that sends a batch of rows to a channel. |
 | Offset token | Snowflake | An opaque string that the connector attaches to an append. Snowflake keeps the token of the last append it stored. |
 | Offset | Connector | The 1-based position of a document among those routed to its channel. The connector writes it into the offset token, and it is the number the checkpoint and the recovery logic compare. |
 | Commit | Snowflake | The moment the ingest service stores an offset token durably. No SQL transaction takes part. |
-| Sidecar | Estuary | The Python process that holds the Snowflake SDK. The connector talks to it over a unix socket. |
 | Binding | Estuary | One collection mapped to one table. |
 | Shard | Estuary | One running copy of the task. A shard owns a range of the key-hash space, and it subdivides that range across its channels. |
 | Transaction | Estuary | The unit of work that ends with a checkpoint. |
 
 ### How a row reaches the table
 
-Snowflake doesn't have a Snowpipe Streaming v2 SDK for Golang, so we use their
-Python SDK and communicate with a Python sidecar process via unix socket. The
-messages are NDJSON.
+The connector calls the Snowpipe Streaming REST API directly. Rows travel as
+zstd-compressed NDJSON, and a JWT signed with the configured private key is
+exchanged for a scoped token for the account's ingest host.
 
-The sidecar opens four Snowpipe channels for each Estuary binding+shard, one per
+The connector opens four Snowpipe channels for each Estuary binding+shard, one per
 equal key range of the shard's key-hash range. The connector routes each document
 to a channel by the same packed-key hash the runtime routes documents to shards
 by, so a channel's contents depend only on the data, never on how many shards the
@@ -81,24 +80,28 @@ each shard four times the single-channel ceiling.
    │  materialize-snowflake (Go)             │
    │                                         │
    │    convert ──► batch buffer ──► append  │
-   │                (10,000 rows or 8 MiB)   │
+   │                (10,000 rows or 3.5 MiB) │
    └────────────────────┬────────────────────┘
-                        │  one append at a time, per channel
-                        ▼
-   ┌─────────────────────────────────────────┐
-   │  Python sidecar                         │
-   │  (snowpipe-streaming SDK)               │
-   └────────────────────┬────────────────────┘
-                        │  HTTPS
+                        │  one append at a time, per channel,
+                        │  HTTPS, zstd-compressed NDJSON
                         ▼
                   Snowflake table
 ```
 
 The connector converts each document to a JSON row and holds it in a buffer. It
-appends the buffer to the channel at 10,000 rows or at 8 MiB, whichever limit it
-reaches first. One append per channel is pending at a time. A slow channel
-therefore applies back pressure to the buffer instead of opening more requests.
-All channels together buffer 128 MiB at most.
+appends the buffer to the channel at 10,000 rows or at 3.5 MiB, whichever limit
+it reaches first. The API caps one append request at 4 MiB after compression. A
+batch that still exceeds that cap, which only a single very large document can
+do, takes the stage path instead: the connector asks the pipe for a stage
+bucket and key (`:pipe-info`), encrypts the compressed rows with AES-CTR under
+that key, uploads them to the bucket as one file, and registers the file with
+the channel (`/filebuffer`). The channel then commits the file like any other
+append. These two endpoints are not documented by Snowflake. One append per
+channel is pending at a time. A slow channel therefore applies back pressure
+to the buffer instead of opening more requests.
+All channels together hold 128 MiB of rows at most, counting each batch until its
+append returns. A row that would pass that ceiling first appends every batch, then
+waits for appends to return.
 
 Every append carries an offset token. Snowflake stores the token of the last
 append that it committed, and the connector reads that token back when it starts.
@@ -184,5 +187,10 @@ own. Either half of that convergence can be interrupted and repeats safely.
   because the `snowpipe_streaming` path cannot reopen its channel on the table, is
   the task rejected at startup, naming the table and the count outstanding.
   Restore that path for one transaction, or backfill the binding.
-- The sidecar is crash-only. The connector never restarts it. The runtime restarts
-  the connector, and recovery replays through the offset token.
+- An API error that retries do not clear fails the transaction. The runtime
+  restarts the connector, and recovery replays through the offset token.
+- A document whose zstd-compressed JSON row exceeds 4 MiB is written through
+  the pipe's stage bucket rather than an append request. The stage is on the
+  cloud the Snowflake account runs on (GCS, S3 or Azure), and Snowflake lends
+  the credentials for it, so the connector needs no extra configuration. Only
+  the column type limits the document, such as 128 MiB for a VARIANT.
