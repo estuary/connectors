@@ -745,6 +745,9 @@
         "hs_gps_latitude": null,
         "hs_gps_longitude": null,
         "hs_has_active_subscription": null,
+        "hs_inbound_agent_inquiry_type": null,
+        "hs_inbound_agent_last_conversation_date": null,
+        "hs_inbound_agent_qualification_status": null,
         "hs_inferred_language_codes": null,
         "hs_intent_paid_up_to_date": null,
         "hs_intent_signals_enabled": null,
@@ -1496,6 +1499,7 @@
         "hs_last_call_id_with_followups": null,
         "hs_last_conversation_with_followups_object_coordinates": null,
         "hs_last_email_with_followups_object_coordinates": null,
+        "hs_last_followup_timestamp": null,
         "hs_last_gs_shared_message": null,
         "hs_last_meeting_id_with_followups": null,
         "hs_last_partner_shared_message_date": null,
@@ -2304,6 +2308,71 @@
         "attendanceState": "ATTENDED",
         "occurredAt": 1780282800000
       }
+    }
+  ],
+  [
+    "acmeCo/contact_lists",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "additionalProperties": {
+        "hs_classic_list_id": "1",
+        "hs_created_at": "1793040156183",
+        "hs_created_by_user_id": "73074756",
+        "hs_createdate": "1793040157468",
+        "hs_definition_updated_at": "1793040156183",
+        "hs_description": "Used to determine whether GET https://api.hubapi.com/crm/v3/lists/{listId}/memberships/join-order orders joins in ascending or descending order",
+        "hs_filter_source": "FILTER_BRANCH",
+        "hs_generated_by_ai": "false",
+        "hs_is_active_list": "false",
+        "hs_is_limit_exempt": "false",
+        "hs_is_lookalike_list": "false",
+        "hs_is_public": "true",
+        "hs_is_read_only": "false",
+        "hs_last_record_added_at": "1793040308469",
+        "hs_lastmodifieddate": "1793040308543",
+        "hs_list_access_level": "EVERYONE_EDIT",
+        "hs_list_id": "6",
+        "hs_list_name": "Join Order Test",
+        "hs_list_reference_count": "0",
+        "hs_list_size": "3",
+        "hs_list_version": "1",
+        "hs_num_references_blocking_delete": "0",
+        "hs_object_id": "600418691680",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "CrmObjectListUpdater",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "73074756",
+        "hs_object_type_id": "0-1",
+        "hs_processing_status": "COMPLETE",
+        "hs_processing_type": "MANUAL",
+        "hs_total_size_calculated_at": "1793040186285",
+        "hs_updated_at": "1793040156183",
+        "hs_updated_by_user_id": "73074756"
+      },
+      "createdAt": "2026-10-26T18:42:36.183Z",
+      "createdById": "73074756",
+      "filtersUpdatedAt": "2026-10-26T18:42:36.183Z",
+      "listId": 6,
+      "listVersion": 1,
+      "name": "Join Order Test",
+      "objectTypeId": "0-1",
+      "processingStatus": "COMPLETE",
+      "processingType": "MANUAL",
+      "updatedAt": "redacted",
+      "updatedById": "73074756"
+    }
+  ],
+  [
+    "acmeCo/contact_list_memberships",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "listId": 6,
+      "membershipTimestamp": "2026-10-26T18:45:08.469000Z",
+      "recordId": "225877317544"
     }
   ],
   [
