@@ -296,7 +296,12 @@ class BaseCRMObject(BaseDocument, extra="allow"):
         dict[str, list[History]] | None,
         # The merge reduction strategy is only allowed for objects and arrays. Since propertiesWithHistory can be null,
         # we use a conditional to only apply the reduce annotation when the field is an object.
-        Field(json_schema_extra={"if": {"type": "object"}, "then": {"reduce": {"strategy": ReductionStrategy.MERGE}}}),
+        Field(
+            json_schema_extra={
+                "if": {"type": "object"},
+                "then": {"reduce": {"strategy": ReductionStrategy.MERGE}},
+            }
+        ),
     ] = None
 
     class InlineAssociations(BaseModel):
@@ -327,7 +332,9 @@ class BaseCRMObject(BaseDocument, extra="allow"):
         # needles: null is ignored by format inference, and null overwrites the LHS value
         # per the merge reduction strategy specified in the read schmea so cleared properties
         # propagate correctly.
-        self.properties = {k: (None if v == "" else v) for k, v in self.properties.items()}
+        self.properties = {
+            k: (None if v == "" else v) for k, v in self.properties.items()
+        }
         if self.propertiesWithHistory:
             self.propertiesWithHistory = {
                 k: v for k, v in self.propertiesWithHistory.items() if len(v)
@@ -342,39 +349,36 @@ class BaseCRMObject(BaseDocument, extra="allow"):
         delattr(self, "associations")
         return self
 
-
     # sourced_schema builds a schema to be included in a SourcedSchema response to
     # the runtime. This ultimately tells Flow what each field's type is & causes resulting columns
     # to be included in materializations even when we haven't seen data for that field yet.
     # Emitting SourcedSchema responses also increased the inferred schema's complexity limit
     # from 1,000 to 10,000, which helps when CRMObjects have enough custom properties that the total
-    # property count exceeds the default complexity limit. 
+    # property count exceeds the default complexity limit.
     @classmethod
     def sourced_schema(cls, properties: list[Property]) -> dict[str, Any]:
         schema = {
             "additionalProperties": False,
             "type": "object",
             "properties": {
-                "archived": {
-                    "type": "boolean"
-                },
+                "archived": {"type": "boolean"},
                 "createdAt": {
                     "format": "date-time",
                     "maxLength": 32,
                     "minLength": 16,
-                    "type": "string"
+                    "type": "string",
                 },
                 "id": {
                     "maximum": 100000000000,
                     "minimum": 10000000000,
                     "title": "Id",
-                    "type": "integer"
+                    "type": "integer",
                 },
                 "updatedAt": {
                     "format": "date-time",
                     "maxLength": 32,
                     "minLength": 16,
-                    "type": "string"
+                    "type": "string",
                 },
             },
         }
@@ -398,11 +402,11 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                 case (
                     # HubSpot represents bool fields as strings. These fields are
                     # usually one of "Yes", "No", "True", or "False".
-                    PropertyTypes.bool |
-                    PropertyTypes.enumeration |
-                    PropertyTypes.string |
-                    PropertyTypes.object_coordinates |
-                    PropertyTypes.json
+                    PropertyTypes.bool
+                    | PropertyTypes.enumeration
+                    | PropertyTypes.string
+                    | PropertyTypes.object_coordinates
+                    | PropertyTypes.json
                 ):
                     pass
                 case PropertyTypes.number:

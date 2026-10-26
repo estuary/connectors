@@ -29,6 +29,7 @@ from .shared import (
 )
 from .properties import fetch_properties
 
+
 async def _request_list_page(
     http: HTTPSession, log: Logger, offset: int, prop_names: Sequence[str] = ()
 ) -> ListSearch:

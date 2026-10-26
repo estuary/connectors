@@ -28,6 +28,7 @@ from .shared import (
     DELAYED_LAG,
 )
 
+
 async def _request_contact_list_memberships(
     http: HTTPSession,
     log: Logger,
