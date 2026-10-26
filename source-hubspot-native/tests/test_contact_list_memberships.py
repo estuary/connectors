@@ -33,19 +33,24 @@ class FakeHTTP:
         return self._responses.pop(0)
 
 
-def _list_search_page() -> bytes:
+def _list_search_page(lists: dict[int, str] | None = None) -> bytes:
+    """`lists` maps list id to processing type."""
+    if lists is None:
+        lists = {LIST_ID: "DYNAMIC"}
     last_modified_ms = int(JOINED_AT.timestamp() * 1000)
     return json.dumps(
         {
             "lists": [
                 {
-                    "listId": LIST_ID,
+                    "listId": list_id,
                     "objectTypeId": "0-1",
+                    "processingType": processing_type,
                     "updatedAt": JOINED_AT.isoformat(),
                     "additionalProperties": {
                         "hs_lastmodifieddate": str(last_modified_ms)
                     },
                 }
+                for list_id, processing_type in lists.items()
             ],
             "hasMore": False,
             "offset": 1,
@@ -75,3 +80,24 @@ async def test_memberships_joining_one_list_in_the_same_millisecond_are_all_emit
     ]
 
     assert sorted(m.recordId for m in emitted) == ["1", "2"]
+
+
+@pytest.mark.asyncio
+async def test_adhoc_lists_are_not_requested():
+    cache.emitted_cache.pop(Names.contact_list_memberships, None)
+    # Only one memberships page is queued; requesting the ADHOC list would
+    # exhaust the fake and fail the test.
+    http = FakeHTTP(
+        [
+            _list_search_page({LIST_ID: "DYNAMIC", LIST_ID + 1: "ADHOC"}),
+            _memberships_page(["1"]),
+        ]
+    )
+
+    emitted = [
+        item
+        async for item in fetch_contact_list_memberships(http, log, LOG_CURSOR)  # type: ignore[arg-type]
+        if isinstance(item, ContactListMembership)
+    ]
+
+    assert [(m.listId, m.recordId) for m in emitted] == [(LIST_ID, "1")]

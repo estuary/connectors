@@ -2799,6 +2799,10 @@
           "title": "Updatedat",
           "type": "string"
         },
+        "processingType": {
+          "title": "Processingtype",
+          "type": "string"
+        },
         "additionalProperties": {
           "additionalProperties": true,
           "title": "Additionalproperties",
@@ -2809,6 +2813,7 @@
         "listId",
         "objectTypeId",
         "updatedAt",
+        "processingType",
         "additionalProperties"
       ],
       "title": "ContactList",
