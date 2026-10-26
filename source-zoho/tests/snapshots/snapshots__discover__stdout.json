@@ -86,6 +86,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Accounts"
     ]
   },
   {
@@ -175,6 +178,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Calls"
     ]
   },
   {
@@ -264,6 +270,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Campaigns"
     ]
   },
   {
@@ -353,6 +362,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Contacts"
     ]
   },
   {
@@ -442,6 +454,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "DealHistory"
     ]
   },
   {
@@ -531,6 +546,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Deals"
     ]
   },
   {
@@ -620,6 +638,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Events"
     ]
   },
   {
@@ -709,6 +730,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "File_Upload_1__s"
     ]
   },
   {
@@ -798,6 +822,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Leads"
     ]
   },
   {
@@ -887,6 +914,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Tasks"
     ]
   }
 ]

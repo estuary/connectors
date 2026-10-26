@@ -93,6 +93,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "logs"
     ]
   },
   {
@@ -189,6 +192,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "real_user_monitoring"
     ]
   }
 ]

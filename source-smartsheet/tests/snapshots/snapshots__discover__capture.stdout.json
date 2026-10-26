@@ -90,6 +90,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "sheets"
     ]
   },
   {
@@ -181,6 +184,9 @@
     "key": [
       "/_meta/sheet_id",
       "/id"
+    ],
+    "resourcePath": [
+      "sheet_rows"
     ]
   },
   {
@@ -251,6 +257,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "reports"
     ]
   },
   {
@@ -321,6 +330,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "report_rows"
     ]
   }
 ]

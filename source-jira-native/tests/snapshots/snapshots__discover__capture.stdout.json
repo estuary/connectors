@@ -68,7 +68,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "application_roles"
+    ]
   },
   {
     "recommendedName": "boards",
@@ -138,6 +141,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "boards"
     ]
   },
   {
@@ -208,6 +214,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "dashboards"
     ]
   },
   {
@@ -279,7 +288,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "epics"
+    ]
   },
   {
     "recommendedName": "filter_sharing",
@@ -350,7 +362,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "filter_sharing"
+    ]
   },
   {
     "recommendedName": "filters",
@@ -421,7 +436,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "filters"
+    ]
   },
   {
     "recommendedName": "groups",
@@ -492,7 +510,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "groups"
+    ]
   },
   {
     "recommendedName": "issue_changelogs",
@@ -576,7 +597,10 @@
       "/id",
       "/issueId"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_changelogs"
+    ]
   },
   {
     "recommendedName": "issue_comments",
@@ -660,7 +684,10 @@
       "/id",
       "/issueId"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_comments"
+    ]
   },
   {
     "recommendedName": "issue_custom_field_contexts",
@@ -731,7 +758,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_custom_field_contexts"
+    ]
   },
   {
     "recommendedName": "issue_custom_field_options",
@@ -802,7 +832,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_custom_field_options"
+    ]
   },
   {
     "recommendedName": "issue_field_configurations",
@@ -873,7 +906,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_field_configurations"
+    ]
   },
   {
     "recommendedName": "issue_fields",
@@ -943,6 +979,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "issue_fields"
     ]
   },
   {
@@ -1014,7 +1053,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_link_types"
+    ]
   },
   {
     "recommendedName": "issue_navigator_settings",
@@ -1085,7 +1127,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_navigator_settings"
+    ]
   },
   {
     "recommendedName": "issue_priorities",
@@ -1156,7 +1201,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_priorities"
+    ]
   },
   {
     "recommendedName": "issue_resolutions",
@@ -1227,7 +1275,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_resolutions"
+    ]
   },
   {
     "recommendedName": "issue_security_schemes",
@@ -1298,7 +1349,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_security_schemes"
+    ]
   },
   {
     "recommendedName": "issue_transitions",
@@ -1382,7 +1436,10 @@
       "/id",
       "/issueId"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_transitions"
+    ]
   },
   {
     "recommendedName": "issue_type_schemes",
@@ -1453,7 +1510,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_type_schemes"
+    ]
   },
   {
     "recommendedName": "issue_type_screen_schemes",
@@ -1524,7 +1584,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_type_screen_schemes"
+    ]
   },
   {
     "recommendedName": "issue_types",
@@ -1594,6 +1657,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "issue_types"
     ]
   },
   {
@@ -1678,7 +1744,10 @@
       "/id",
       "/issueId"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "issue_worklogs"
+    ]
   },
   {
     "recommendedName": "issues",
@@ -1755,6 +1824,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issues"
     ]
   },
   {
@@ -1826,7 +1898,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "labels"
+    ]
   },
   {
     "recommendedName": "permission_schemes",
@@ -1897,7 +1972,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "permission_schemes"
+    ]
   },
   {
     "recommendedName": "permissions",
@@ -1968,7 +2046,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "permissions"
+    ]
   },
   {
     "recommendedName": "project_avatars",
@@ -2039,7 +2120,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_avatars"
+    ]
   },
   {
     "recommendedName": "project_categories",
@@ -2110,7 +2194,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_categories"
+    ]
   },
   {
     "recommendedName": "project_components",
@@ -2181,7 +2268,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_components"
+    ]
   },
   {
     "recommendedName": "project_emails",
@@ -2252,7 +2342,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_emails"
+    ]
   },
   {
     "recommendedName": "project_roles",
@@ -2323,7 +2416,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_roles"
+    ]
   },
   {
     "recommendedName": "project_types",
@@ -2394,7 +2490,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_types"
+    ]
   },
   {
     "recommendedName": "project_versions",
@@ -2465,7 +2564,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "project_versions"
+    ]
   },
   {
     "recommendedName": "projects",
@@ -2535,6 +2637,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "projects"
     ]
   },
   {
@@ -2606,7 +2711,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "request_types"
+    ]
   },
   {
     "recommendedName": "screen_schemes",
@@ -2677,7 +2785,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "screen_schemes"
+    ]
   },
   {
     "recommendedName": "screen_tab_fields",
@@ -2748,7 +2859,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "screen_tab_fields"
+    ]
   },
   {
     "recommendedName": "screen_tabs",
@@ -2819,7 +2933,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "screen_tabs"
+    ]
   },
   {
     "recommendedName": "screens",
@@ -2890,7 +3007,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "screens"
+    ]
   },
   {
     "recommendedName": "service_desks",
@@ -2961,7 +3081,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "service_desks"
+    ]
   },
   {
     "recommendedName": "sprint_issues",
@@ -3032,7 +3155,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "sprint_issues"
+    ]
   },
   {
     "recommendedName": "sprints",
@@ -3102,6 +3228,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "sprints"
     ]
   },
   {
@@ -3173,7 +3302,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "statuses"
+    ]
   },
   {
     "recommendedName": "system_avatars",
@@ -3244,7 +3376,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "system_avatars"
+    ]
   },
   {
     "recommendedName": "teams",
@@ -3315,7 +3450,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "teams"
+    ]
   },
   {
     "recommendedName": "users",
@@ -3385,6 +3523,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -3456,7 +3597,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "workflow_schemes"
+    ]
   },
   {
     "recommendedName": "workflow_status_categories",
@@ -3527,7 +3671,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "workflow_status_categories"
+    ]
   },
   {
     "recommendedName": "workflow_statuses",
@@ -3598,7 +3745,10 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "workflow_statuses"
+    ]
   },
   {
     "recommendedName": "workflows",
@@ -3669,6 +3819,9 @@
     "key": [
       "/_meta/row_id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "workflows"
+    ]
   }
 ]

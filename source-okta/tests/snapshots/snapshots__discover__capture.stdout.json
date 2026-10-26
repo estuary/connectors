@@ -75,6 +75,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -153,6 +156,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "groups"
     ]
   },
   {
@@ -223,6 +229,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "applications"
     ]
   },
   {
@@ -293,6 +302,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "application_users"
     ]
   },
   {
@@ -377,6 +389,9 @@
     },
     "key": [
       "/uuid"
+    ],
+    "resourcePath": [
+      "system_log"
     ]
   }
 ]

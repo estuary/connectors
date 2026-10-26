@@ -68,6 +68,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "add_ons"
     ]
   },
   {
@@ -159,6 +162,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "credit_card_verifications"
     ]
   },
   {
@@ -250,6 +256,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "customers"
     ]
   },
   {
@@ -321,6 +330,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "discounts"
     ]
   },
   {
@@ -411,6 +423,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "disputes"
     ]
   },
   {
@@ -482,6 +497,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "merchant_accounts"
     ]
   },
   {
@@ -553,6 +571,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "plans"
     ]
   },
   {
@@ -644,6 +665,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "subscriptions"
     ]
   },
   {
@@ -734,6 +758,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "transactions"
     ]
   }
 ]

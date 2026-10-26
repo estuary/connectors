@@ -59,6 +59,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "cohorts"
     ]
   },
   {
@@ -128,6 +131,9 @@
     },
     "key": [
       "/distinct_id"
+    ],
+    "resourcePath": [
+      "cohort_members"
     ]
   },
   {
@@ -195,6 +201,9 @@
     "key": [
       "/funnel_id",
       "/date"
+    ],
+    "resourcePath": [
+      "funnels"
     ]
   },
   {
@@ -265,6 +274,9 @@
     },
     "key": [
       "/insert_id"
+    ],
+    "resourcePath": [
+      "export"
     ]
   },
   {
@@ -337,6 +349,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "annotations"
     ]
   },
   {
@@ -402,6 +417,9 @@
     },
     "key": [
       "/distinct_id"
+    ],
+    "resourcePath": [
+      "engage"
     ]
   }
 ]

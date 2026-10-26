@@ -99,6 +99,9 @@
       "/application_id",
       "/event_time",
       "/event_type"
+    ],
+    "resourcePath": [
+      "activities"
     ]
   },
   {
@@ -169,6 +172,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "ad_account"
     ]
   },
   {
@@ -239,6 +245,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "ad_creatives"
     ]
   },
   {
@@ -317,6 +326,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ad_sets"
     ]
   },
   {
@@ -395,6 +407,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ads"
     ]
   },
   {
@@ -484,6 +499,9 @@
       "/account_id",
       "/ad_id",
       "/date_start"
+    ],
+    "resourcePath": [
+      "ads_insights"
     ]
   },
   {
@@ -573,6 +591,9 @@
       "/account_id",
       "/ad_id",
       "/date_start"
+    ],
+    "resourcePath": [
+      "ads_insights_action_type"
     ]
   },
   {
@@ -674,6 +695,9 @@
       "/age",
       "/date_start",
       "/gender"
+    ],
+    "resourcePath": [
+      "ads_insights_age_and_gender"
     ]
   },
   {
@@ -769,6 +793,9 @@
       "/ad_id",
       "/comscore_market",
       "/date_start"
+    ],
+    "resourcePath": [
+      "ads_insights_comscore_market"
     ]
   },
   {
@@ -864,6 +891,9 @@
       "/ad_id",
       "/country",
       "/date_start"
+    ],
+    "resourcePath": [
+      "ads_insights_country"
     ]
   },
   {
@@ -971,6 +1001,9 @@
       "/impression_device",
       "/platform_position",
       "/publisher_platform"
+    ],
+    "resourcePath": [
+      "ads_insights_platform_and_device"
     ]
   },
   {
@@ -1066,6 +1099,9 @@
       "/ad_id",
       "/date_start",
       "/region"
+    ],
+    "resourcePath": [
+      "ads_insights_region"
     ]
   },
   {
@@ -1143,6 +1179,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -1213,6 +1252,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "custom_conversions"
     ]
   },
   {
@@ -1315,6 +1357,9 @@
       "/ad_id",
       "/date_start",
       "/publisher_platform"
+    ],
+    "resourcePath": [
+      "customads_insights_publisher_platform"
     ]
   },
   {
@@ -1393,6 +1438,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "images"
     ]
   },
   {
@@ -1471,6 +1519,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "videos"
     ]
   }
 ]

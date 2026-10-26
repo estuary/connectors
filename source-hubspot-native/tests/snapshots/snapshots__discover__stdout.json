@@ -223,6 +223,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "companies"
     ]
   },
   {
@@ -441,6 +444,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "contacts"
     ]
   },
   {
@@ -675,6 +681,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "deals"
     ]
   },
   {
@@ -997,6 +1006,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "engagements"
     ]
   },
   {
@@ -1231,6 +1243,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "tickets"
     ]
   },
   {
@@ -1441,6 +1456,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "products"
     ]
   },
   {
@@ -1699,6 +1717,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "line_items"
     ]
   },
   {
@@ -1941,6 +1962,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "orders"
     ]
   },
   {
@@ -2033,6 +2057,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "properties"
     ]
   },
   {
@@ -2131,6 +2158,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "deal_pipelines"
     ]
   },
   {
@@ -2229,6 +2259,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "owners"
     ]
   },
   {
@@ -2332,6 +2365,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "email_events"
     ]
   },
   {
@@ -2440,6 +2476,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "forms"
     ]
   },
   {
@@ -2523,6 +2562,9 @@
     "key": [
       "/formId",
       "/submittedAt"
+    ],
+    "resourcePath": [
+      "form_submissions"
     ]
   },
   {
@@ -2605,6 +2647,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "marketing_emails"
     ]
   },
   {
@@ -2675,6 +2720,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "marketing_events"
     ]
   },
   {
@@ -2745,6 +2793,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "marketing_event_participants"
     ]
   },
   {
@@ -2845,6 +2896,9 @@
     },
     "key": [
       "/listId"
+    ],
+    "resourcePath": [
+      "contact_lists"
     ]
   },
   {
@@ -2934,6 +2988,9 @@
     "key": [
       "/listId",
       "/recordId"
+    ],
+    "resourcePath": [
+      "contact_list_memberships"
     ]
   }
 ]

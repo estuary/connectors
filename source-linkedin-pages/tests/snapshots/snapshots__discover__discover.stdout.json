@@ -543,6 +543,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "organization_lookup"
     ]
   },
   {
@@ -695,6 +698,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "follower_statistics"
     ]
   },
   {
@@ -818,6 +824,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "share_statistics"
     ]
   },
   {
@@ -879,6 +888,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "total_follower_count"
     ]
   }
 ]

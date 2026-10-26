@@ -100,6 +100,9 @@
       "/Country",
       "/Media Source (pid)",
       "/Campaign (c)"
+    ],
+    "resourcePath": [
+      "daily_geo_aggregate_report"
     ]
   },
   {
@@ -271,6 +274,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "in-app-event"
     ]
   },
   {
@@ -442,6 +448,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "install"
     ]
   },
   {
@@ -613,6 +622,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "install-in-app-event"
     ]
   },
   {
@@ -784,6 +796,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "organic-install"
     ]
   },
   {
@@ -955,6 +970,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "organic-install-in-app-event"
     ]
   },
   {
@@ -1126,6 +1144,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "organic-reinstall"
     ]
   },
   {
@@ -1297,6 +1318,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "postback"
     ]
   },
   {
@@ -1468,6 +1492,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "postbacks-copy"
     ]
   },
   {
@@ -1639,6 +1666,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "re-attribution"
     ]
   },
   {
@@ -1810,6 +1840,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "re-attribution-in-app-event"
     ]
   },
   {
@@ -1981,6 +2014,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "re-download"
     ]
   },
   {
@@ -2152,6 +2188,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "re-engagement"
     ]
   },
   {
@@ -2323,6 +2362,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "re-engagement-in-app-event"
     ]
   },
   {
@@ -2494,6 +2536,9 @@
     },
     "key": [
       "/_meta/estuary_id"
+    ],
+    "resourcePath": [
+      "reinstall"
     ]
   }
 ]

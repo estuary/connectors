@@ -96,6 +96,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Accounts"
     ]
   },
   {
@@ -196,6 +199,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ApplicationFees"
     ]
   },
   {
@@ -292,6 +298,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ApplicationFeesRefunds"
     ]
   },
   {
@@ -393,6 +402,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "BalanceTransactions"
     ]
   },
   {
@@ -489,6 +501,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "BankAccounts"
     ]
   },
   {
@@ -585,6 +600,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Cards"
     ]
   },
   {
@@ -685,6 +703,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Charges"
     ]
   },
   {
@@ -785,6 +806,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "CheckoutSessions"
     ]
   },
   {
@@ -881,6 +905,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "CheckoutSessionsLine"
     ]
   },
   {
@@ -981,6 +1008,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Coupons"
     ]
   },
   {
@@ -1081,6 +1111,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "CreditNotes"
     ]
   },
   {
@@ -1177,6 +1210,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "CreditNotesLines"
     ]
   },
   {
@@ -1273,6 +1309,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "CustomerBalanceTransaction"
     ]
   },
   {
@@ -1373,6 +1412,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Customers"
     ]
   },
   {
@@ -1473,6 +1515,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Disputes"
     ]
   },
   {
@@ -1573,6 +1618,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "EarlyFraudWarning"
     ]
   },
   {
@@ -1673,6 +1721,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Events"
     ]
   },
   {
@@ -1769,6 +1820,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ExternalAccountCards"
     ]
   },
   {
@@ -1865,6 +1919,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ExternalBankAccount"
     ]
   },
   {
@@ -1966,6 +2023,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Files"
     ]
   },
   {
@@ -2067,6 +2127,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "FilesLink"
     ]
   },
   {
@@ -2167,6 +2230,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "InvoiceItems"
     ]
   },
   {
@@ -2263,6 +2329,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "InvoiceLineItems"
     ]
   },
   {
@@ -2363,6 +2432,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Invoices"
     ]
   },
   {
@@ -2463,6 +2535,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "PaymentIntents"
     ]
   },
   {
@@ -2559,6 +2634,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "PaymentMethods"
     ]
   },
   {
@@ -2659,6 +2737,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Payouts"
     ]
   },
   {
@@ -2755,6 +2836,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Persons"
     ]
   },
   {
@@ -2855,6 +2939,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Plans"
     ]
   },
   {
@@ -2955,6 +3042,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Prices"
     ]
   },
   {
@@ -3055,6 +3145,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Products"
     ]
   },
   {
@@ -3155,6 +3248,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "PromotionCode"
     ]
   },
   {
@@ -3255,6 +3351,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Refunds"
     ]
   },
   {
@@ -3355,6 +3454,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Reviews"
     ]
   },
   {
@@ -3451,6 +3553,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "SetupAttempts"
     ]
   },
   {
@@ -3551,6 +3656,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "SetupIntents"
     ]
   },
   {
@@ -3686,6 +3794,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "SubscriptionItems"
     ]
   },
   {
@@ -3786,6 +3897,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "SubscriptionSchedule"
     ]
   },
   {
@@ -3886,6 +4000,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Subscriptions"
     ]
   },
   {
@@ -3986,6 +4103,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "TopUps"
     ]
   },
   {
@@ -4082,6 +4202,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "TransferReversals"
     ]
   },
   {
@@ -4182,6 +4305,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "Transfers"
     ]
   },
   {
@@ -4283,6 +4409,9 @@
     },
     "key": [
       "/subscription_item"
+    ],
+    "resourcePath": [
+      "UsageRecords"
     ]
   },
   {
@@ -4385,7 +4514,10 @@
     "key": [
       "/id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "ValueListItems"
+    ]
   },
   {
     "recommendedName": "ValueLists",
@@ -4554,6 +4686,9 @@
     "key": [
       "/id"
     ],
-    "disable": true
+    "disable": true,
+    "resourcePath": [
+      "ValueLists"
+    ]
   }
 ]

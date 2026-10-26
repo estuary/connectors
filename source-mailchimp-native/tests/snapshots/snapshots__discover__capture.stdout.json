@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "lists"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "automations"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "interests"
     ]
   },
   {
@@ -277,6 +286,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "segment_members"
     ]
   },
   {
@@ -347,6 +359,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "interest_categories"
     ]
   },
   {
@@ -417,6 +432,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -487,6 +505,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "automation_emails"
     ]
   },
   {
@@ -571,6 +592,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -690,6 +714,9 @@
       "/_meta/email_id",
       "/action",
       "/timestamp"
+    ],
+    "resourcePath": [
+      "email_activity"
     ]
   },
   {
@@ -792,6 +819,9 @@
     "key": [
       "/list_id",
       "/id"
+    ],
+    "resourcePath": [
+      "list_members"
     ]
   },
   {
@@ -884,6 +914,9 @@
     "key": [
       "/list_id",
       "/id"
+    ],
+    "resourcePath": [
+      "segments"
     ]
   }
 ]

@@ -74,6 +74,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "applications"
     ]
   },
   {
@@ -151,6 +154,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "approvals"
     ]
   },
   {
@@ -221,6 +227,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "archive_reasons"
     ]
   },
   {
@@ -298,6 +307,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidate_tags"
     ]
   },
   {
@@ -375,6 +387,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidates"
     ]
   },
   {
@@ -452,6 +467,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "custom_fields"
     ]
   },
   {
@@ -529,6 +547,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "departments"
     ]
   },
   {
@@ -606,6 +627,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "feedback_form_definitions"
     ]
   },
   {
@@ -683,6 +707,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interview_events"
     ]
   },
   {
@@ -760,6 +787,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interview_plans"
     ]
   },
   {
@@ -837,6 +867,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interview_schedules"
     ]
   },
   {
@@ -907,6 +940,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "interview_stages"
     ]
   },
   {
@@ -984,6 +1020,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interviewer_pools"
     ]
   },
   {
@@ -1061,6 +1100,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interviews"
     ]
   },
   {
@@ -1131,6 +1173,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "job_postings"
     ]
   },
   {
@@ -1208,6 +1253,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "job_templates"
     ]
   },
   {
@@ -1285,6 +1333,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "jobs"
     ]
   },
   {
@@ -1362,6 +1413,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "locations"
     ]
   },
   {
@@ -1439,6 +1493,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "offers"
     ]
   },
   {
@@ -1516,6 +1573,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "openings"
     ]
   },
   {
@@ -1593,6 +1653,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "projects"
     ]
   },
   {
@@ -1663,6 +1726,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "sources"
     ]
   },
   {
@@ -1740,6 +1806,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "survey_form_definitions"
     ]
   },
   {
@@ -1817,6 +1886,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

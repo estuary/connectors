@@ -118,6 +118,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "AgentAvailabilityEvents"
     ]
   },
   {
@@ -239,6 +242,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "AgentStatusEvents"
     ]
   },
   {
@@ -360,6 +366,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ContactEvents"
     ]
   },
   {
@@ -481,6 +490,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ConversationEvents"
     ]
   },
   {
@@ -602,6 +614,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "CustomerEvents"
     ]
   },
   {
@@ -723,6 +738,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "PaymentRequestEvents"
     ]
   },
   {
@@ -844,6 +862,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "TaskEvents"
     ]
   }
 ]

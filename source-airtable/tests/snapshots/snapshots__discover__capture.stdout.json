@@ -67,6 +67,9 @@
     },
     "key": [
       "/_airtable_id"
+    ],
+    "resourcePath": [
+      "test_base/pizzas/tblY71QcPfB7SjY1f"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_airtable_id"
+    ],
+    "resourcePath": [
+      "test_base/soups/tblDi5DS0EjiYi83h"
     ]
   }
 ]

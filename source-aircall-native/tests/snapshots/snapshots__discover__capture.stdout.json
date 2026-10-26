@@ -74,6 +74,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "calls"
     ]
   },
   {
@@ -162,6 +165,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "contacts"
     ]
   },
   {
@@ -232,6 +238,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -302,6 +311,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "user_availability"
     ]
   },
   {
@@ -372,6 +384,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -442,6 +457,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "numbers"
     ]
   },
   {
@@ -512,6 +530,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -582,6 +603,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "webhooks"
     ]
   },
   {
@@ -652,6 +676,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "company"
     ]
   }
 ]
