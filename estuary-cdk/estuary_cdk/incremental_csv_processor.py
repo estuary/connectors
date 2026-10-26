@@ -3,7 +3,7 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, overload
+from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, cast, overload
 from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, model_validator
 from estuary_cdk.capture.common import BaseDocument
@@ -35,9 +35,10 @@ class BaseCSVRow(BaseDocument):
     @classmethod
     def handle_null_values(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            fields = cast(dict[str, Any], data)
             return {
                 key: None if isinstance(value, str) and value in cls.NULL_VALUES else value
-                for key, value in data.items()
+                for key, value in fields.items()
             }
         return data
 
@@ -59,7 +60,7 @@ class CSVConfig:
 class CSVProcessingError(Exception):
     """Exception raised when CSV processing fails."""
 
-    def __init__(self, message: str, config: dict | None = None):
+    def __init__(self, message: str, config: dict[str, Any] | None = None):
         self.config = config
         if config:
             config_str = ", ".join([f"{k}={repr(v)}" for k, v in config.items()])

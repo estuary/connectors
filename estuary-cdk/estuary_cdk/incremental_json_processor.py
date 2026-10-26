@@ -1,6 +1,6 @@
 from typing import Any, AsyncGenerator, Callable, Generic, List, Optional, TypeVar
 
-import ijson
+import ijson  # pyright: ignore[reportMissingTypeStubs]  # no stubs exist for this package
 from pydantic import BaseModel
 
 StreamedItem = TypeVar("StreamedItem", bound=BaseModel)
@@ -196,7 +196,7 @@ class _ObjectBuilder:
             case "map_key":
                 self.key = value
             case "start_map":
-                mappable = dict()
+                mappable: dict[str, Any] = {}
                 self.stack[-1](mappable)
 
                 def setter(value: Any) -> None:
@@ -205,7 +205,7 @@ class _ObjectBuilder:
 
                 self.stack.append(setter)
             case "start_array":
-                array = []
+                array: list[Any] = []
                 self.stack[-1](array)
 
                 self.stack.append(array.append)

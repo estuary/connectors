@@ -7,7 +7,7 @@ from ..flow import ResourceConfig, ConnectorState, ConnectorStateUpdate
 class DiscoveredBinding(BaseModel, Generic[ResourceConfig]):
     recommendedName: str
     resourceConfig: ResourceConfig
-    documentSchema: dict
+    documentSchema: dict[str, Any]
     key: list[str]
     isFallbackKey: bool = False
     disable: bool = False
@@ -45,7 +45,7 @@ class SourcedSchema(BaseModel):
     binding: int
     # Pydantic's BaseModel already has a schema_json field, and it complains if we overwrite it.
     # We use a serialization alias to avoid Pydantic's complaints and serialize the field name correctly.
-    schemaJson: dict = Field(serialization_alias="schema_json", alias="schema_json")
+    schemaJson: dict[str, Any] = Field(serialization_alias="schema_json", alias="schema_json")
 
     model_config = {"validate_by_name": True, "validate_by_alias": True}
 

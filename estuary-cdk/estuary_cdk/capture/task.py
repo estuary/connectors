@@ -6,7 +6,7 @@ import traceback
 from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, BinaryIO, Callable, Generic
+from typing import Any, BinaryIO, Callable, Generic, cast
 
 import orjson
 import xxhash
@@ -77,31 +77,32 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     """
 
     def normalize(location: dict[str, Any]) -> dict[str, Any]:
-        out = dict(location)
+        out: dict[str, Any] = dict(location)
 
         for keyword in ("properties", "patternProperties", "$defs", "definitions"):
             if isinstance(subschemas := out.get(keyword), dict):
                 out[keyword] = {
-                    name: normalize(s) if isinstance(s, dict) else s
-                    for name, s in subschemas.items()
+                    name: normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for name, s in cast(dict[str, Any], subschemas).items()
                 }
 
         for keyword in ("oneOf", "anyOf", "allOf", "prefixItems"):
             if isinstance(subschemas := out.get(keyword), list):
                 out[keyword] = [
-                    normalize(s) if isinstance(s, dict) else s for s in subschemas
+                    normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for s in cast(list[Any], subschemas)
                 ]
 
         # `items` may be a single schema or a tuple of them, and
         # `additionalProperties` is usually the boolean False.
         for keyword in ("items", "additionalProperties"):
-            match out.get(keyword):
-                case dict() as subschema:
-                    out[keyword] = normalize(subschema)
-                case list() as subschemas:
-                    out[keyword] = [
-                        normalize(s) if isinstance(s, dict) else s for s in subschemas
-                    ]
+            if isinstance(subschema := out.get(keyword), dict):
+                out[keyword] = normalize(cast(dict[str, Any], subschema))
+            elif isinstance(subschemas := out.get(keyword), list):
+                out[keyword] = [
+                    normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for s in cast(list[Any], subschemas)
+                ]
 
         # A location declaring properties is an object, and must be a closed one.
         if out.get("properties") or out.get("patternProperties"):
@@ -214,7 +215,7 @@ class _BaseTask:
     """When True, checkpoint() blocks until Flow ACKs the emitted checkpoint.
     Inherited by children via spawn_child."""
 
-    _buffer: tempfile.SpooledTemporaryFile
+    _buffer: tempfile.SpooledTemporaryFile[bytes]
     _hasher: xxhash.xxh3_128
     _name: str
     _output: BinaryIO
@@ -392,7 +393,7 @@ class Task(_BaseTask):
 
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]
-    ) -> asyncio.Task:
+    ) -> asyncio.Task[None]:
         """
         Spawn a child Task of this Task, using the given name suffix and coroutine.
         The child coroutine will be invoked with a child Task and be polled concurrently.
@@ -472,7 +473,7 @@ class MultipleWritersTask(_BaseTask):
 
     async def emit(
         self,
-        items: Iterable[AssociatedDocument],
+        items: Iterable[AssociatedDocument[Any]],
         state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
     ) -> None:
         """Capture each item against its binding and write one checkpoint.

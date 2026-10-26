@@ -5,7 +5,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
+from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar, cast
 
 import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
@@ -324,8 +324,10 @@ class TokenSource:
         elif isinstance(self.credentials, GoogleServiceAccount):
             assert isinstance(self.google_spec, GoogleServiceAccountSpec)
             if self._access_token is None:
+                # google-auth ships py.typed but leaves from_service_account_info,
+                # refresh and token unannotated, so each arrives partially unknown.
                 self._access_token = (
-                    GoogleServiceAccountCredentials.from_service_account_info(
+                    GoogleServiceAccountCredentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
                         json.loads(self.credentials.service_account),
                         scopes=self.google_spec.scopes,
                     )
@@ -337,13 +339,16 @@ class TokenSource:
                 case GoogleTokenState.FRESH:
                     pass
                 case GoogleTokenState.STALE | GoogleTokenState.INVALID:
-                    self._access_token.refresh(GoogleAuthRequest())
+                    self._access_token.refresh(GoogleAuthRequest())  # pyright: ignore[reportUnknownMemberType]
                 case _:
                     raise RuntimeError(
                         f"Unknown GoogleTokenState: {self._access_token.token_state}"
                     )
 
-            return (self.authorization_token_type, self._access_token.token)
+            return (
+                self.authorization_token_type,
+                cast(str, self._access_token.token),  # pyright: ignore[reportUnknownMemberType]
+            )
 
         assert (
             isinstance(self.credentials, BaseOAuth2Credentials)
