@@ -48,7 +48,9 @@ async def _request_contact_list_memberships(
             if end and item.membershipTimestamp >= end:
                 continue
             if item.membershipTimestamp < start:
-                # The endpoint's sorted in descending join date order, so we are now caught up
+                # Results are newest-first, so we are now caught up. HubSpot's
+                # OpenAPI spec says ascending; live responses contradict it, so
+                # don't trust it.
                 return
 
             yield item
