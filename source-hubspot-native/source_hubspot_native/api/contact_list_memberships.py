@@ -224,4 +224,9 @@ async def fetch_contact_list_memberships(
         ):
             yield item
 
+    # Entries older than this run's lower bound can never be looked up again,
+    # since later runs start no earlier.
+    evicted = cache.cleanup(Names.contact_list_memberships, start_date)
+    log.info("evicted contact list memberships from cache", extra={"evicted": evicted})
+
     yield now
