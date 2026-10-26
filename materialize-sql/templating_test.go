@@ -3,6 +3,7 @@ package sql
 import (
 	"fmt"
 	"math/rand"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -116,7 +117,7 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{"c"},
 			},
 			want: []MergeBound{
-				{colA, literaler("a"), literaler("c")},
+				{colA, literaler("a"), literaler("c"), nil},
 			},
 		},
 		{
@@ -128,9 +129,9 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{"c", true, int64(3)},
 			},
 			want: []MergeBound{
-				{colA, literaler("a"), literaler("c")},
-				{colB, "", ""},
-				{colC, literaler(int64(1)), literaler(int64(3))},
+				{colA, literaler("a"), literaler("c"), nil},
+				{colB, "", "", nil},
+				{colC, literaler(int64(1)), literaler(int64(3)), nil},
 			},
 		},
 		{
@@ -142,9 +143,9 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{"c", true, int64(2)},
 			},
 			want: []MergeBound{
-				{colA, literaler("a"), literaler("c")},
-				{colB, "", ""},
-				{colC, literaler(int64(1)), literaler(int64(3))},
+				{colA, literaler("a"), literaler("c"), nil},
+				{colB, "", "", nil},
+				{colC, literaler(int64(1)), literaler(int64(3)), nil},
 			},
 		},
 	} {
@@ -218,21 +219,21 @@ func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 		keys [][]any
 		want MergeBound
 	}{
-		{"dates by default", nil, keys, MergeBound{datetime, literaler("2025-05-03"), literaler("2025-05-07")}},
-		{"dates when the dialect declines exact bounds", declined, keys, MergeBound{datetime, literaler("2025-05-03"), literaler("2025-05-07")}},
+		{"dates by default", nil, keys, MergeBound{datetime, literaler("2025-05-03"), literaler("2025-05-07"), nil}},
+		{"dates when the dialect declines exact bounds", declined, keys, MergeBound{datetime, literaler("2025-05-03"), literaler("2025-05-07"), nil}},
 		{"exact bounds keep the original literals", exact, keys,
-			MergeBound{datetime, literaler("2025-05-04T22:59:59-01:00"), literaler("2025-05-05T00:00:01.5Z")}},
+			MergeBound{datetime, literaler("2025-05-04T22:59:59-01:00"), literaler("2025-05-05T00:00:01.5Z"), nil}},
 		{"a single key bounds itself", exact, keys[:1],
-			MergeBound{datetime, literaler("2025-05-05T02:00:00+02:00"), literaler("2025-05-05T02:00:00+02:00")}},
+			MergeBound{datetime, literaler("2025-05-05T02:00:00+02:00"), literaler("2025-05-05T02:00:00+02:00"), nil}},
 		{"a single key widens around its instant, not its wall clock", nil, keys[:1],
-			MergeBound{datetime, literaler("2025-05-04"), literaler("2025-05-07")}},
-		{"an unparseable value drops the bound", exact, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", ""}},
-		{"an unparseable value drops the date bound", nil, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", ""}},
-		{"a null key drops the bound", exact, withKey(nil, "k"), MergeBound{datetime, "", ""}},
-		{"dates before year 1 drop the bound", nil, withKey("0001-01-01T00:00:00Z", "k"), MergeBound{datetime, "", ""}},
-		{"dates after year 9999 drop the bound", nil, withKey("9999-12-31T00:00:00Z", "k"), MergeBound{datetime, "", ""}},
+			MergeBound{datetime, literaler("2025-05-04"), literaler("2025-05-07"), nil}},
+		{"an unparseable value drops the bound", exact, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", "", nil}},
+		{"an unparseable value drops the date bound", nil, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", "", nil}},
+		{"a null key drops the bound", exact, withKey(nil, "k"), MergeBound{datetime, "", "", nil}},
+		{"dates before year 1 drop the bound", nil, withKey("0001-01-01T00:00:00Z", "k"), MergeBound{datetime, "", "", nil}},
+		{"dates after year 9999 drop the bound", nil, withKey("9999-12-31T00:00:00Z", "k"), MergeBound{datetime, "", "", nil}},
 		{"year edges still get exact bounds", exact, withKey("0001-01-01T00:00:00Z", "k"),
-			MergeBound{datetime, literaler("0001-01-01T00:00:00Z"), literaler("2025-05-05T00:00:01.5Z")}},
+			MergeBound{datetime, literaler("0001-01-01T00:00:00Z"), literaler("2025-05-05T00:00:01.5Z"), nil}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewMergeBoundsBuilder([]Column{datetime, id}, literaler, tt.opts...)
@@ -241,13 +242,116 @@ func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 			}
 			got := b.Build()
 			require.Equal(t, tt.want, got[0])
-			require.Equal(t, MergeBound{id, literaler("k"), literaler("k")}, got[1], "other keys are unaffected")
+			require.Equal(t, MergeBound{id, literaler("k"), literaler("k"), nil}, got[1], "other keys are unaffected")
 
 			// The next transaction starts clean.
 			b.NextKey([]any{"2025-06-01T00:00:00Z", "k"})
 			require.Contains(t, []string{literaler("2025-05-31"), literaler("2025-06-01T00:00:00Z")}, b.Build()[0].LiteralLower)
 		})
 	}
+}
+
+func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
+	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}},
+	}}}
+	exact := WithExactDatetimeBounds(func(Column) bool { return true })
+	declined := WithExactDatetimeBounds(func(Column) bool { return false })
+
+	// A band of recent keys, and two outliers months before it.
+	band := func() []string {
+		var out []string
+		for i := 0; i < 500; i++ {
+			out = append(out, time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC).Add(time.Duration(i)*time.Second).Format(time.RFC3339Nano))
+		}
+		return out
+	}()
+	withOutliers := append([]string{"2026-03-01T10:00:00+01:00", "2025-11-30T00:00:00Z"}, band...)
+
+	build := func(keys []string, opts ...MergeBoundsOption) MergeBound {
+		b := NewMergeBoundsBuilder([]Column{datetime}, literaler, opts...)
+		for _, k := range keys {
+			b.NextKey([]any{k})
+		}
+		return b.Build()[0]
+	}
+
+	t.Run("outliers get ranges of their own", func(t *testing.T) {
+		got := build(withOutliers, exact, WithDatetimeRanges(8))
+		require.Equal(t, literaler("2025-11-30T00:00:00Z"), got.LiteralLower)
+		require.Equal(t, literaler(band[len(band)-1]), got.LiteralUpper)
+		require.Equal(t, []MergeRange{
+			{literaler("2025-11-30T00:00:00Z"), literaler("2025-11-30T00:00:00Z")},
+			{literaler("2026-03-01T10:00:00+01:00"), literaler("2026-03-01T10:00:00+01:00")},
+			{literaler(band[0]), literaler(band[len(band)-1])},
+		}, got.Ranges)
+	})
+
+	t.Run("evenly spread keys aren't split", func(t *testing.T) {
+		require.Nil(t, build(band, exact, WithDatetimeRanges(8)).Ranges)
+	})
+
+	t.Run("a range limit merges the narrowest gaps", func(t *testing.T) {
+		got := build(withOutliers, exact, WithDatetimeRanges(2))
+		require.Equal(t, []MergeRange{
+			{literaler("2025-11-30T00:00:00Z"), literaler("2026-03-01T10:00:00+01:00")},
+			{literaler(band[0]), literaler(band[len(band)-1])},
+		}, got.Ranges)
+	})
+
+	t.Run("ranges need exact bounds and the option", func(t *testing.T) {
+		require.Nil(t, build(withOutliers, exact).Ranges)
+		require.Nil(t, build(withOutliers, declined, WithDatetimeRanges(8)).Ranges)
+		require.Nil(t, build(withOutliers, WithDatetimeRanges(8)).Ranges)
+	})
+
+	t.Run("an unparseable value drops the ranges with the bound", func(t *testing.T) {
+		require.Equal(t, MergeBound{datetime, "", "", nil}, build(append(withOutliers, "nope"), exact, WithDatetimeRanges(8)))
+	})
+
+	t.Run("the next transaction starts clean", func(t *testing.T) {
+		b := NewMergeBoundsBuilder([]Column{datetime}, literaler, exact, WithDatetimeRanges(8))
+		for _, k := range withOutliers {
+			b.NextKey([]any{k})
+		}
+		require.NotNil(t, b.Build()[0].Ranges)
+		b.NextKey([]any{band[0]})
+		require.Nil(t, b.Build()[0].Ranges)
+	})
+
+	t.Run("ranges enclose every key", func(t *testing.T) {
+		rng := rand.New(rand.NewSource(1))
+		for i := 0; i < 200; i++ {
+			var keys []string
+			var instants []time.Time
+			for clusters := rng.Intn(100) + 1; clusters > 0; clusters-- {
+				center := time.Unix(rng.Int63n(2e9), 0)
+				for n := rng.Intn(20) + 1; n > 0; n-- {
+					ts := center.Add(time.Duration(rng.Int63n(int64(time.Hour))))
+					keys = append(keys, ts.In(time.FixedZone("", (rng.Intn(48)-24)*1800)).Format(time.RFC3339Nano))
+					instants = append(instants, ts)
+				}
+			}
+			rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i]; instants[i], instants[j] = instants[j], instants[i] })
+
+			got := build(keys, exact, WithDatetimeRanges(4))
+			require.LessOrEqual(t, len(got.Ranges), 4)
+			var parse = func(literal string) time.Time {
+				ts, err := time.Parse(time.RFC3339Nano, strings.Trim(literal, "'"))
+				require.NoError(t, err)
+				return ts
+			}
+			for j := 1; j < len(got.Ranges); j++ {
+				require.True(t, parse(got.Ranges[j-1].LiteralUpper).Before(parse(got.Ranges[j].LiteralLower)))
+			}
+			for _, ts := range instants {
+				require.True(t, len(got.Ranges) == 0 || slices.ContainsFunc(got.Ranges, func(r MergeRange) bool {
+					return !ts.Before(parse(r.LiteralLower)) && !ts.After(parse(r.LiteralUpper))
+				}), "%s is outside every range", ts)
+			}
+		}
+	})
 }
 
 // TestDateBoundsEncloseEverySpelling checks the property the date widening
