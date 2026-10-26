@@ -1,13 +1,6 @@
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader as FileBufReader;
-use std::io::BufWriter as FileBufWriter;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
-use std::io::Write;
-use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -23,10 +16,12 @@ use arrow::datatypes::Field;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
+use futures::TryStreamExt;
 use object_store::ClientOptions;
 use object_store::ObjectStore;
 use object_store::ObjectStoreExt;
 use object_store::PutPayload;
+use object_store::WriteMultipart;
 use object_store::aws::AmazonS3Builder;
 use object_store::gcp::GoogleCloudStorageBuilder;
 use object_store::path::Path as ObjectPath;
@@ -75,7 +70,16 @@ use crate::iceberg::state::BindingCheckpoint;
 use crate::iceberg::state::ConnectorState;
 use crate::server;
 
-pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open) -> Result<()> {
+pub async fn run_transactions(input: &mut Input, output: Output, open: Open) -> Result<()> {
+    // Shared so the `Acknowledge` task spawned below (see
+    // `commit_pending_acknowledge`) can send `Response::Acknowledged`
+    // itself, as soon as its commit finishes, without waiting for this loop
+    // to get back around to it — the runtime won't send `Flush` until it's
+    // seen `Acknowledged`, so deferring the send would deadlock whenever a
+    // transaction has no `Load` calls to otherwise give this loop a chance
+    // to notice.
+    let output = Arc::new(Mutex::new(output));
+
     let spec = open
         .materialization
         .expect("must have a materialization spec");
@@ -116,7 +120,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 .bindings
                 .remove(&binding.state_key)
                 .unwrap_or_default();
-            binding_state(binding, checkpoint)
+            binding_state(binding, checkpoint, &catalog.prefix)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -130,7 +134,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         }
     }
 
-    output.send(Response {
+    output.lock().unwrap().send(Response {
         kind: Some(response::Kind::Opened(Opened {
             runtime_checkpoint: None,
             ..Default::default()
@@ -189,16 +193,19 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 }
 
                 let binding = &mut bindings[load.binding as usize];
-                binding.stage_pending_load(&load.key_packed)?;
+                binding.stage_pending_load(&catalog, &load.key_packed).await?;
             }
             Some(request::Kind::Flush(_)) => {
                 tracing::warn!("Flush");
 
-                // `Load` never scans — it only stages keys to disk — so any
-                // in-flight `Acknowledge` must be resolved first, both so
-                // `Response::Acknowledged` actually gets sent and so the
-                // scan below (via `catalog.current_snapshot`) reflects the
-                // commit it just made rather than stale pre-commit state.
+                // `Load` never scans — it only stages keys in object storage
+                // — so any in-flight `Acknowledge` must be resolved first,
+                // so the scan below (via `catalog.current_snapshot`)
+                // reflects the commit it just made rather than stale
+                // pre-commit state. `Response::Acknowledged` itself was
+                // already sent by the spawned task (see
+                // `commit_pending_acknowledge`'s doc comment) — this is just
+                // applying its result to `bindings`.
                 if let Some(handle) = pending_ack.take() {
                     let checkpoints = handle
                         .await
@@ -211,23 +218,13 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                         // before this commit.
                         binding.scan_cache = None;
                     }
-
-                    let state = checkpoint_from_bindings(&bindings)?;
-                    output.send(Response {
-                        kind: Some(response::Kind::Acknowledged(Acknowledged {
-                            state: Some(state),
-                        })),
-                        ..Default::default()
-                    })?;
-                    tracing::warn!("Acknowledged");
-                    log_object_store_requests("acknowledge", &catalog.request_counts);
                 }
 
                 for (index, binding) in bindings.iter_mut().enumerate() {
-                    flush_pending_loads(&catalog, output, index as u32, binding).await?;
+                    flush_pending_loads(&catalog, &output, index as u32, binding).await?;
                 }
 
-                output.send(Response {
+                output.lock().unwrap().send(Response {
                     kind: Some(response::Kind::Flushed(Flushed { state: None })),
                     ..Default::default()
                 })?;
@@ -365,7 +362,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 }
 
                 let state = checkpoint_from_bindings(&bindings)?;
-                output.send(Response {
+                output.lock().unwrap().send(Response {
                     kind: Some(response::Kind::StartedCommit(StartedCommit {
                         state: Some(state),
                     })),
@@ -386,6 +383,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 let jobs: Vec<AckJob> = bindings
                     .iter_mut()
                     .map(|binding| AckJob {
+                        state_key: binding.state_key.clone(),
                         table: binding.table.clone(),
                         table_schema: binding.table_schema.clone(),
                         last_column_id: binding.last_column_id,
@@ -394,53 +392,84 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                     .collect();
 
                 let catalog = catalog.clone();
-                pending_ack = Some(tokio::spawn(commit_pending_acknowledge(catalog, jobs)));
+                let output = output.clone();
+                pending_ack = Some(tokio::spawn(commit_pending_acknowledge(
+                    catalog, output, jobs,
+                )));
             }
             _ => {}
         }
     }
 }
 
-/// Reads back whatever `Load` keys `stage_pending_load` staged to disk for
-/// `binding` this transaction, scans for their matches, and sends them — a
-/// no-op if nothing was staged. Only called from the `Flush` arm, once any
-/// in-flight `Acknowledge` has resolved, so the scan sees this table's
-/// post-commit state (see the `Flush` arm's comment).
+/// Reads back whatever `Load` keys `stage_pending_load` staged in object
+/// storage for `binding` this transaction, scans for their matches, and
+/// sends them — a no-op if nothing was staged. Only called from the `Flush`
+/// arm, once any in-flight `Acknowledge` has resolved, so the scan sees
+/// this table's post-commit state (see the `Flush` arm's comment).
 async fn flush_pending_loads(
     catalog: &Catalog,
-    output: &mut Output,
+    output: &Mutex<Output>,
     index: u32,
     binding: &mut BindingState,
 ) -> Result<()> {
-    let Some(writer) = binding.pending_loads_file.take() else {
+    let Some(upload) = binding.pending_loads_upload.take() else {
         return Ok(());
     };
-    let mut file = writer
-        .into_inner()
-        .context("flushing staged Load keys to disk")?;
-    file.seek(SeekFrom::Start(0))
-        .context("rewinding Load staging file")?;
-    let mut reader = FileBufReader::new(file);
+    upload
+        .finish()
+        .await
+        .context("completing Load staging upload")?;
 
+    let mut stream = catalog
+        .object_store
+        .get(&binding.pending_loads_path)
+        .await
+        .context("reading staged Load keys")?
+        .into_stream();
+
+    // Records (see `write_pending_load_record`) can straddle the boundary
+    // between successive chunks the stream hands back, so whatever's left
+    // over after parsing as many whole records as `pending` currently holds
+    // carries forward to be completed by the next chunk.
+    let mut pending: Vec<u8> = Vec::new();
     let mut batch: Vec<Bytes> = Vec::new();
-    while let Some(key_packed) = read_pending_load_record(&mut reader)? {
-        batch.push(key_packed);
-        if batch.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
-            scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
-            batch.clear();
+    while let Some(chunk) = stream
+        .try_next()
+        .await
+        .context("reading staged Load keys")?
+    {
+        pending.extend_from_slice(&chunk);
+
+        let mut consumed = 0;
+        while let Some((key_packed, record_len)) = take_pending_load_record(&pending[consumed..])
+        {
+            consumed += record_len;
+            batch.push(key_packed);
+            if batch.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
+                scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
+                batch.clear();
+            }
         }
+        pending.drain(..consumed);
     }
+    anyhow::ensure!(pending.is_empty(), "staged Load keys ended mid-record");
+
     if !batch.is_empty() {
         scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
     }
 
-    std::fs::remove_file(&binding.pending_loads_path).ok();
+    catalog
+        .object_store
+        .delete(&binding.pending_loads_path)
+        .await
+        .ok();
     Ok(())
 }
 
 async fn scan_and_emit_loaded(
     catalog: &Catalog,
-    output: &mut Output,
+    output: &Mutex<Output>,
     index: u32,
     binding: &mut BindingState,
     key_bytes: &[Bytes],
@@ -455,7 +484,7 @@ async fn scan_and_emit_loaded(
         &mut binding.load_file_paths,
         &mut binding.scan_cache,
         |loaded| {
-            output.send(Response {
+            output.lock().unwrap().send(Response {
                 kind: Some(response::Kind::Loaded(response::Loaded {
                     binding: index,
                     doc_json: loaded.doc_json.into(),
@@ -467,31 +496,26 @@ async fn scan_and_emit_loaded(
     .await
 }
 
-/// One `Load` key, length-prefixed the same way `Input`/`Output` frame
-/// protobuf messages (`src/lib.rs`): a 4-byte little-endian length followed
-/// by that many bytes.
-fn write_pending_load_record(writer: &mut impl Write, key_packed: &[u8]) -> Result<()> {
-    writer.write_all(&(key_packed.len() as u32).to_le_bytes())?;
-    writer.write_all(key_packed)?;
-    Ok(())
+/// Stages one `Load` key, length-prefixed the same way `Input`/`Output`
+/// frame protobuf messages (`src/lib.rs`): a 4-byte little-endian length
+/// followed by that many bytes. `WriteMultipart::write` is synchronous —
+/// actual uploads only happen once a chunk's worth has buffered (or
+/// `finish` is called), so this can't fail on its own.
+fn write_pending_load_record(upload: &mut WriteMultipart, key_packed: &[u8]) {
+    upload.write(&(key_packed.len() as u32).to_le_bytes());
+    upload.write(key_packed);
 }
 
-/// Reads one record written by `write_pending_load_record`, or `None` at a
-/// clean EOF between records.
-fn read_pending_load_record(reader: &mut impl Read) -> Result<Option<Bytes>> {
-    let mut length_bytes = [0; 4];
-    match reader.read_exact(&mut length_bytes) {
-        Ok(()) => (),
-        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
-        Err(e) => return Err(e.into()),
-    }
+/// Parses one record written by `write_pending_load_record` off the front
+/// of `buf`, if a complete one is present, returning its bytes and how much
+/// of `buf` it occupied — `None` if `buf` doesn't yet hold a whole record
+/// (the caller should accumulate more from the stream and retry).
+fn take_pending_load_record(buf: &[u8]) -> Option<(Bytes, usize)> {
+    let length_bytes: [u8; 4] = buf.get(..4)?.try_into().unwrap();
     let length = u32::from_le_bytes(length_bytes) as usize;
 
-    let mut buf = vec![0; length];
-    reader
-        .read_exact(&mut buf)
-        .context("reading staged Load key")?;
-    Ok(Some(Bytes::from(buf)))
+    let key_packed = buf.get(4..4 + length)?;
+    Some((Bytes::copy_from_slice(key_packed), 4 + length))
 }
 
 /// Logs how many of each object-store request kind were made since the last
@@ -516,11 +540,24 @@ fn log_object_store_requests(phase: &str, request_counts: &counting_store::Reque
 }
 
 fn checkpoint_from_bindings(bindings: &[BindingState]) -> Result<flow::ConnectorState> {
+    connector_state_json(
+        bindings
+            .iter()
+            .map(|binding| (binding.state_key.clone(), binding.checkpoint.clone())),
+    )
+}
+
+/// Builds the `flow::ConnectorState` payload a `Response`'s `state` field
+/// carries, from `(state_key, checkpoint)` pairs — shared by
+/// `checkpoint_from_bindings` (reading straight from `bindings`) and
+/// `commit_pending_acknowledge` (which has no `BindingState`s to read, only
+/// the checkpoints its spawned task just computed).
+fn connector_state_json(
+    bindings: impl IntoIterator<Item = (String, BindingCheckpoint)>,
+) -> Result<flow::ConnectorState> {
     let mut state = ConnectorState::default();
-    for binding in bindings {
-        state
-            .bindings
-            .insert(binding.state_key.clone(), binding.checkpoint.clone());
+    for (state_key, checkpoint) in bindings {
+        state.bindings.insert(state_key, checkpoint);
     }
 
     Ok(flow::ConnectorState {
@@ -583,6 +620,12 @@ pub(crate) fn build_object_store(
 /// to finish. Keeps peak memory (buffered Arrow arrays plus the encoded
 /// Parquet bytes) bounded regardless of transaction size.
 const DATA_FILE_FLUSH_BYTES: usize = 256 * 1024 * 1024;
+
+/// Part size for the multipart upload `stage_pending_load` writes staged
+/// `Load` keys to — bounds how much of a transaction's `Load` traffic sits
+/// buffered in memory before a part actually uploads, same role
+/// `DATA_FILE_FLUSH_BYTES` plays for `Store`.
+const PENDING_LOADS_CHUNK_BYTES: usize = 16 * 1024 * 1024;
 
 /// Caps each Parquet row group's estimated encoded size, so a single
 /// `DATA_FILE_FLUSH_BYTES`-sized file ends up as several smaller row groups
@@ -655,14 +698,14 @@ struct BindingState {
     /// eventual encoded Parquet size, using lengths already in hand.
     estimated_bytes: usize,
     /// Fixed for this binding's whole process lifetime — where
-    /// `stage_pending_load` stages this transaction's `Load` keys and
-    /// `flush_pending_loads` reads them back from at `Flush`, so `Load`
-    /// never has to hold them in memory or scan while an `Acknowledge` may
-    /// still be in flight (see the `Flush` arm's comment).
-    pending_loads_path: PathBuf,
-    /// Open only while this transaction has staged at least one `Load` key;
-    /// taken (and the file removed) by `flush_pending_loads`.
-    pending_loads_file: Option<FileBufWriter<File>>,
+    /// `stage_pending_load` stages this transaction's `Load` keys in object
+    /// storage and `flush_pending_loads` reads them back from at `Flush`, so
+    /// `Load` never has to hold them in memory or scan while an
+    /// `Acknowledge` may still be in flight (see the `Flush` arm's comment).
+    pending_loads_path: ObjectPath,
+    /// `Some` only while this transaction has staged at least one `Load`
+    /// key; taken, finished, and the object deleted by `flush_pending_loads`.
+    pending_loads_upload: Option<WriteMultipart>,
     /// The file-path table `scan::load` interns into across however many
     /// chunked calls `flush_pending_loads` makes reading back
     /// `pending_loads_path` this transaction. `Store`'s `_meta.file_path`
@@ -856,21 +899,24 @@ impl BindingState {
         Ok(())
     }
 
-    /// Appends `key_packed` to this binding's on-disk `Load` staging file,
-    /// opening it if this is the first `Load` staged since the last
-    /// `flush_pending_loads` drained it. Never scans — see the `Flush`
-    /// arm's comment for why that has to wait.
-    fn stage_pending_load(&mut self, key_packed: &[u8]) -> Result<()> {
-        let writer = match &mut self.pending_loads_file {
-            Some(writer) => writer,
-            None => {
-                let file = File::create(&self.pending_loads_path)
-                    .context("creating Load staging file")?;
-                self.pending_loads_file = Some(FileBufWriter::new(file));
-                self.pending_loads_file.as_mut().unwrap()
-            }
-        };
-        write_pending_load_record(writer, key_packed)
+    /// Appends `key_packed` to this binding's `Load` staging object in
+    /// object storage, starting a multipart upload to it if this is the
+    /// first `Load` staged since the last `flush_pending_loads` drained it.
+    /// Never scans — see the `Flush` arm's comment for why that has to wait.
+    async fn stage_pending_load(&mut self, catalog: &Catalog, key_packed: &[u8]) -> Result<()> {
+        if self.pending_loads_upload.is_none() {
+            let upload = catalog
+                .object_store
+                .put_multipart(&self.pending_loads_path)
+                .await
+                .context("starting Load staging upload")?;
+            self.pending_loads_upload = Some(WriteMultipart::new_with_chunk_size(
+                upload,
+                PENDING_LOADS_CHUNK_BYTES,
+            ));
+        }
+        write_pending_load_record(self.pending_loads_upload.as_mut().unwrap(), key_packed);
+        Ok(())
     }
 }
 
@@ -879,6 +925,7 @@ impl BindingState {
 /// of the `BindingState`s a connector's main loop keeps processing `Load`
 /// against (see `commit_pending_acknowledge`).
 struct AckJob {
+    state_key: String,
     table: String,
     table_schema: serde_json::Value,
     last_column_id: i32,
@@ -886,19 +933,43 @@ struct AckJob {
 }
 
 /// Commits every binding's pending manifests, in order, exactly as the old
-/// inline per-binding loop in the `Acknowledge` arm did — the only
-/// difference is that this whole function now runs on a spawned task rather
-/// than being `.await`ed inline, so the main loop can keep reading and
-/// staging `Load` requests (to disk, via `BindingState::stage_pending_load`)
-/// while this is still in flight. The `Flush` arm joins the returned
-/// `JoinHandle` before evaluating any staged `Load`s, which is what
-/// guarantees those loads see this commit's result (read-committed) rather
-/// than racing it.
-async fn commit_pending_acknowledge(catalog: Arc<Catalog>, jobs: Vec<AckJob>) -> Result<Vec<BindingCheckpoint>> {
+/// inline per-binding loop in the `Acknowledge` arm did, then sends
+/// `Response::Acknowledged` itself — the whole function runs on a spawned
+/// task rather than being `.await`ed inline, so the main loop can keep
+/// reading and staging `Load` requests (to object storage, via
+/// `BindingState::stage_pending_load`) while this is still in flight.
+///
+/// Sending `Acknowledged` here, as soon as the commit resolves, rather than
+/// leaving it to the main loop, matters because the runtime won't send
+/// `Flush` until it's seen `Acknowledged` — if a transaction has no `Load`
+/// calls, the main loop has no other reason to come back around and notice
+/// this task finished, so waiting for it to do so would deadlock. The
+/// `Flush` arm separately joins the returned `JoinHandle` to apply the new
+/// checkpoints to `bindings` before evaluating any staged `Load`s, which is
+/// what guarantees those loads see this commit's result (read-committed)
+/// rather than racing it.
+async fn commit_pending_acknowledge(
+    catalog: Arc<Catalog>,
+    output: Arc<Mutex<Output>>,
+    jobs: Vec<AckJob>,
+) -> Result<Vec<BindingCheckpoint>> {
+    let state_keys: Vec<String> = jobs.iter().map(|job| job.state_key.clone()).collect();
+
     let mut checkpoints = Vec::with_capacity(jobs.len());
     for job in jobs {
         checkpoints.push(acknowledge_binding(&catalog, job).await?);
     }
+
+    let state = connector_state_json(state_keys.into_iter().zip(checkpoints.iter().cloned()))?;
+    output.lock().unwrap().send(Response {
+        kind: Some(response::Kind::Acknowledged(Acknowledged {
+            state: Some(state),
+        })),
+        ..Default::default()
+    })?;
+    tracing::warn!("Acknowledged");
+    log_object_store_requests("acknowledge", &catalog.request_counts);
+
     Ok(checkpoints)
 }
 
@@ -908,6 +979,7 @@ async fn acknowledge_binding(catalog: &Catalog, job: AckJob) -> Result<BindingCh
         table_schema,
         last_column_id,
         mut checkpoint,
+        ..
     } = job;
 
     if checkpoint.pending_manifests.is_empty() {
@@ -1132,6 +1204,7 @@ async fn write_position_delete_file(
 fn binding_state(
     binding: &materialization_spec::Binding,
     checkpoint: BindingCheckpoint,
+    object_store_prefix: &str,
 ) -> Result<BindingState> {
     let field_selection = binding
         .field_selection
@@ -1203,8 +1276,14 @@ fn binding_state(
         "fields": iceberg_fields,
     });
 
+    let table = binding.resource_path[0].clone();
+    let pending_loads_path = ObjectPath::from(format!(
+        "{object_store_prefix}/{table}/pending-loads/{}.bin",
+        Uuid::new_v4()
+    ));
+
     Ok(BindingState {
-        table: binding.resource_path[0].clone(),
+        table,
         collection: collection.name.clone(),
         state_key: binding.state_key.clone(),
         schema: Arc::new(Schema::new(fields)),
@@ -1218,11 +1297,8 @@ fn binding_state(
         doc_builder: StringBuilder::new(),
         rows: 0,
         estimated_bytes: 0,
-        pending_loads_path: std::env::temp_dir().join(format!(
-            "materialize-iceberg-pending-loads-{}.bin",
-            Uuid::new_v4()
-        )),
-        pending_loads_file: None,
+        pending_loads_path,
+        pending_loads_upload: None,
         load_file_paths: scan::FilePathTable::default(),
         scan_cache: None,
         pending_deletes: HashMap::new(),

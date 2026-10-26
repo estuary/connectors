@@ -15,7 +15,6 @@ use proto_flow::materialize::response::Validated;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Read;
-use std::io::StdoutLock;
 use std::io::Write;
 use std::io::{self};
 use transactor::run_transactions;
@@ -76,7 +75,11 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
             }
             Some(request::Kind::Open(open)) => {
                 tracing::warn!("Open");
-                run_transactions(&mut input, &mut output, *open).await?;
+                // Takes `output` by value — it's shared (via an internal
+                // `Arc<Mutex<_>>`) with a background task `run_transactions`
+                // spawns for `Acknowledge`, so there's nothing left for this
+                // loop to send afterward anyway.
+                return run_transactions(&mut input, output, *open).await;
             }
             _ => {
                 anyhow::bail!("invalid request, expected spec|validate|apply|open");
@@ -131,7 +134,6 @@ impl Input {
 }
 
 pub struct Output {
-    w: StdoutLock<'static>,
     buf: BytesMut,
 }
 
@@ -139,18 +141,26 @@ pub struct Output {
 impl Output {
     pub fn new() -> Output {
         Output {
-            w: io::stdout().lock(),
             buf: BytesMut::new(),
         }
     }
 
+    /// Locks stdout fresh on every call rather than holding it for
+    /// `Output`'s whole lifetime — `StdoutLock` isn't `Send`, and
+    /// `transactor::run_transactions` shares one `Output` (behind an
+    /// `Arc<Mutex<_>>`) between its main loop and a background task so
+    /// `Acknowledge`'s response can be sent as soon as it's ready. That
+    /// `Mutex` is what actually serializes writes; stdout's own lock here
+    /// just satisfies `Write`.
     pub fn send(&mut self, response: Response) -> Result<()> {
         let length = response.encoded_len();
         self.buf.reserve(4 + length);
         self.buf.extend_from_slice(&(length as u32).to_le_bytes());
         response.encode(&mut self.buf)?;
-        self.w.write_all(&self.buf)?;
-        self.w.flush()?;
+
+        let mut w = io::stdout().lock();
+        w.write_all(&self.buf)?;
+        w.flush()?;
 
         self.buf.clear();
         Ok(())
