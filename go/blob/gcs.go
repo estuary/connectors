@@ -20,8 +20,9 @@ import (
 var _ Bucket = (*GCSBucket)(nil)
 
 type GCSBucket struct {
-	client *storage.Client
-	bucket string
+	client        *storage.Client
+	bucket        string
+	singleRequest bool
 }
 
 // NewGCSBucket creates a GCS object storage bucket. At least one ClientOption
@@ -38,6 +39,27 @@ func NewGCSBucket(ctx context.Context, bucket string, authOpt option.ClientOptio
 	}, nil
 }
 
+// NewGCSSingleRequestBucket creates a GCS object storage bucket whose uploads
+// are each a single request, so an object's MD5 attribute is the MD5 of its
+// bytes. At least one ClientOption must be provided to specify authentication.
+func NewGCSSingleRequestBucket(ctx context.Context, bucket string, authOpt option.ClientOption, otherOpts ...option.ClientOption) (*GCSBucket, error) {
+	b, err := NewGCSBucket(ctx, bucket, authOpt, otherOpts...)
+	if err != nil {
+		return nil, err
+	}
+	b.singleRequest = true
+	return b, nil
+}
+
+func (b *GCSBucket) newObjectWriter(ctx context.Context, key string) *storage.Writer {
+	w := b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
+	if b.singleRequest {
+		// A ChunkSize of 0 buffers nothing and sends the object in one request.
+		w.ChunkSize = 0
+	}
+	return w
+}
+
 func (b *GCSBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
 	r, err := b.client.Bucket(b.bucket).Object(key).NewReader(ctx)
 	if err != nil {
@@ -48,11 +70,11 @@ func (b *GCSBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, e
 }
 
 func (b *GCSBucket) NewWriter(ctx context.Context, key string, opts ...WriterOption) io.WriteCloser {
-	return b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
+	return b.newObjectWriter(ctx, key)
 }
 
 func (b *GCSBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-	w := b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
+	w := b.newObjectWriter(ctx, key)
 	w.Metadata = getWriterConfig(opts).metadata
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("copying r to w: %w", err)

@@ -100,6 +100,21 @@ type ObjectInfo struct {
 	Key string
 }
 
+// readSeeker returns r as an io.ReadSeeker, reading it fully into memory if it
+// is not one already. A single-request upload needs the body's length up front
+// and must be able to rewind it for retries.
+func readSeeker(r io.Reader) (io.ReadSeeker, error) {
+	if rs, ok := r.(io.ReadSeeker); ok {
+		return rs, nil
+	}
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("reading body: %w", err)
+	}
+	return bytes.NewReader(data), nil
+}
+
 type uploadFn func(context.Context, string, io.Reader, ...WriterOption) error
 
 // blobWriteCloser adapts a synchronous uploadFn into an io.WriterCloser.

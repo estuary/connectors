@@ -11,8 +11,10 @@ import (
 	"path"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/streaming"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -47,8 +49,9 @@ func WithAzureEndpoint(ep string) AzureConfigOption {
 var _ Bucket = (*AzureBlobBucket)(nil)
 
 type AzureBlobBucket struct {
-	client    *azblob.Client
-	container string
+	client        *azblob.Client
+	container     string
+	singleRequest bool
 }
 
 // NewAzureBlobBucket creates an Azure Blob object storage bucket. At least one
@@ -92,6 +95,19 @@ func NewAzureBlobBucket(ctx context.Context, container string, accountName strin
 	}, nil
 }
 
+// NewAzureSingleRequestBucket creates an Azure Blob object storage bucket whose
+// uploads are each a single Put Blob request, so a blob's Content-MD5 is the
+// MD5 of its bytes. At least one AzureConfigOption must be provided to specify
+// authentication; either storage account key or SAS token.
+func NewAzureSingleRequestBucket(ctx context.Context, container string, accountName string, authOpt AzureConfigOption, otherOpts ...AzureConfigOption) (*AzureBlobBucket, error) {
+	b, err := NewAzureBlobBucket(ctx, container, accountName, authOpt, otherOpts...)
+	if err != nil {
+		return nil, err
+	}
+	b.singleRequest = true
+	return b, nil
+}
+
 func (b *AzureBlobBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
 	r, err := b.client.DownloadStream(ctx, b.container, key, nil)
 	if err != nil {
@@ -108,18 +124,25 @@ func (b *AzureBlobBucket) NewWriter(ctx context.Context, key string, opts ...Wri
 func (b *AzureBlobBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
 	cfg := getWriterConfig(opts)
 
-	var uploadOpts *azblob.UploadStreamOptions
+	var meta map[string]*string
 	if cfg.metadata != nil {
-		uploadOpts = new(azblob.UploadStreamOptions)
-		meta := make(map[string]*string)
+		meta = make(map[string]*string)
 		for k, v := range cfg.metadata {
 			meta[k] = &v
 		}
-		uploadOpts.Metadata = meta
 	}
 
-	_, err := b.client.UploadStream(ctx, b.container, key, r, uploadOpts)
+	if !b.singleRequest {
+		_, err := b.client.UploadStream(ctx, b.container, key, r, &azblob.UploadStreamOptions{Metadata: meta})
+		return err
+	}
 
+	body, err := readSeeker(r)
+	if err != nil {
+		return err
+	}
+	_, err = b.client.ServiceClient().NewContainerClient(b.container).NewBlockBlobClient(key).
+		Upload(ctx, streaming.NopCloser(body), &blockblob.UploadOptions{Metadata: meta})
 	return err
 }
 

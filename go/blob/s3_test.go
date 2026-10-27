@@ -28,6 +28,17 @@ func TestIntegrationS3(t *testing.T) {
 		bucket, err := NewS3Bucket(context.Background(), cfg.Bucket, creds, func(o *s3.Options) { o.Region = cfg.Region })
 		require.NoError(t, err)
 		testBucket(t, bucket)
+	})
+
+	t.Run("resolved region", func(t *testing.T) {
+		bucket, err := NewS3Bucket(context.Background(), cfg.Bucket, creds)
+		require.NoError(t, err)
+		testBucket(t, bucket)
+	})
+
+	t.Run("single request", func(t *testing.T) {
+		bucket := NewS3SingleRequestBucket(cfg.Bucket, cfg.Region, creds)
+		testBucket(t, bucket)
 
 		t.Run("stored md5", func(t *testing.T) {
 			testStoredMD5(t, bucket, func(t *testing.T, key string) string {
@@ -36,11 +47,5 @@ func TestIntegrationS3(t *testing.T) {
 				return strings.Trim(*head.ETag, `"`)
 			})
 		})
-	})
-
-	t.Run("resolved region", func(t *testing.T) {
-		bucket, err := NewS3Bucket(context.Background(), cfg.Bucket, creds)
-		require.NoError(t, err)
-		testBucket(t, bucket)
 	})
 }
