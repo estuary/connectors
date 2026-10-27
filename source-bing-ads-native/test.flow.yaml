@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-bing-ads-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_bing_ads_native
+        config: config.yaml
+    bindings: []

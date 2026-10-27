@@ -1,0 +1,13 @@
+# Placeholder values: no real credentials exist yet. When filling in real sandbox
+# credentials, rename the secret keys with a _sops suffix (client_secret_sops,
+# refresh_token_sops, developer_token_sops) and sops-encrypt the file
+# (explainer 7.2 step 3). Flow strips the suffix after decryption.
+# BBD37VB98 is Microsoft's public developer token for the sandbox, not a secret:
+# https://learn.microsoft.com/en-us/advertising/guides/sandbox?view=bingads-13
+credentials:
+  credentials_title: OAuth Credentials
+  client_id: PLACEHOLDER
+  client_secret: PLACEHOLDER
+  refresh_token: PLACEHOLDER
+developer_token: BBD37VB98
+start_date: "2026-01-01T00:00:00Z"
