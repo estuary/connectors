@@ -178,8 +178,9 @@ type transactor struct {
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
 	profiler              *queryProfiler
-	// twoPhaseLoads loads documents only from the files that a first query,
-	// reading only key columns, finds rows matching the load keys in.
+	// twoPhaseLoads uses two queries to prune files: one that finds files
+	// where the rows matching the keys exist on, and another to read
+	// flow_document from those specific files.
 	twoPhaseLoads bool
 }
 
@@ -601,15 +602,18 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return queryErr
 }
 
-// bindingLoad is the load of a binding's table, with the fields of its
-// profile.
+// bindingLoad is the load query parameters of a binding, with the fields of
+// its query profile.
 type bindingLoad struct {
 	data   *tableWithFiles
 	fields log.Fields
 }
 
-// maxMatchedFiles is the most files a two-phase load restricts its read of
-// documents to. A load that matches more reads every file within its bounds.
+// maxMatchedFiles is the maximum number of files a two-phase load filters on.
+// A load that matches more, will omit the filter altogether, reading all the
+// files. With usually 256 MB to 1 GB per table file in Databricks, 5,000 files
+// is about 1.3 to 5 TB of table. Each file path is about 280 bytes so the
+// longest list is about 1.4 MB that takes about 2s to compile.
 const maxMatchedFiles = 5000
 
 // matchLoadFiles is the first phase of a two-phase load. It pins the load to
