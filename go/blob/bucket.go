@@ -22,6 +22,7 @@ import (
 
 type writerConfig struct {
 	metadata map[string]string
+	etag     *string
 }
 
 type WriterOption func(*writerConfig)
@@ -29,6 +30,21 @@ type WriterOption func(*writerConfig)
 func WithObjectMetadata(metadata map[string]string) WriterOption {
 	return func(cfg *writerConfig) {
 		cfg.metadata = metadata
+	}
+}
+
+// WithETag sets *etag, once an upload succeeds, to the ETag the store assigned
+// the object, exactly as the store returned it.
+func WithETag(etag *string) WriterOption {
+	return func(cfg *writerConfig) {
+		cfg.etag = etag
+	}
+}
+
+// setETag reports etag through the WithETag option, if one was given.
+func (cfg writerConfig) setETag(etag string) {
+	if cfg.etag != nil {
+		*cfg.etag = etag
 	}
 }
 
