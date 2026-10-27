@@ -43,7 +43,7 @@ from .utils import dt_to_str, str_to_dt
 # See: https://shopify.dev/docs/api/usage/access-scopes#authenticated-access-scopes
 scopes = [
     "read_locales",
-    "read_products",  # Products, ProductVariants, ProductVariantMarketPrices, Collections, InventoryItems
+    "read_products",  # Products, ProductVariants, ProductVariantMarketPrices, PriceListPrices, Collections, InventoryItems
     "read_orders",  # Orders, AbandonedCheckouts, Fulfillments, Transactions, Refunds, Risks
     "read_locations",  # Locations
     "read_inventory",  # InventoryItems, InventoryLevels, Locations
@@ -622,6 +622,8 @@ class ShopifyGraphQLResource(ShopifyDocument):
     # JSON pointers identifying a document within a store. The collection key prepends
     # /_meta/store when should_use_composite_key is enabled.
     KEY: ClassVar[list[str]] = ["/id"]
+    # Default interval between sweeps of a full-refresh stream.
+    SNAPSHOT_INTERVAL: ClassVar[timedelta] = timedelta(minutes=15)
     # Some resources are only queryable on Shopify Plus / Advanced plans or
     # partner dev stores regardless of granted scopes.
     REQUIRES_PLUS_OR_ADVANCED_PLAN: ClassVar[bool] = False

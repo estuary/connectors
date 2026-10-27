@@ -23,6 +23,7 @@ The following data resources are supported through the Shopify API:
 * [Locations](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/locations?example=Retrieve+a+list+of+locations)
    * Location Metafields
 * [Markets](https://shopify.dev/docs/api/admin-graphql/latest/queries/markets)
+   * [Price List Prices](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/priceLists)
 * [Orders](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/orders?example=Retrieve+a+list+of+orders)
    * Order Agreements
    * Order Metafields

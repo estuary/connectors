@@ -3,6 +3,9 @@
 ## 2026-10-27
 
 ### Added
+- New `price_list_prices` stream capturing each variant's price and
+  compare-at price on every price list, with the price list's currency,
+  adjustment, and catalog.
 - New `product_variant_market_prices` stream capturing each product variant's
   price and compare-at price in each country listed in the new
   `Market Price Countries` advanced setting.

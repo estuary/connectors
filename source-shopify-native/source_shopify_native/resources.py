@@ -185,6 +185,7 @@ PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
 FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.StaffMembers,
     gql.Markets,
+    gql.PriceListPrices,
 ]
 
 
@@ -750,7 +751,7 @@ def _build_snapshot_resource(
         open=open,
         initial_config=ResourceConfigWithSchedule(
             name=model.NAME,
-            interval=timedelta(minutes=15)
+            interval=model.SNAPSHOT_INTERVAL,
         ),
     )
 

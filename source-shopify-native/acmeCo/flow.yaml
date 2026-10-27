@@ -99,6 +99,11 @@ collections:
     key:
     - /_meta/store
     - /id
+  acmeCo/price_list_prices:
+    schema: price_list_prices.schema.yaml
+    key:
+    - /_meta/store
+    - /_meta/row_id
   acmeCo/product_media:
     schema: product_media.schema.yaml
     key:

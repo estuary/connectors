@@ -12,6 +12,7 @@ from .inventory.inventory_levels import InventoryLevels
 from .locations.locations import Locations
 from .locations.metafields import LocationMetafields
 from .markets import Markets
+from .price_lists import PriceListPrices
 from .products.products import Products
 from .products.variants import ProductVariants
 from .products.variant_market_prices import ProductVariantMarketPrices
@@ -47,6 +48,7 @@ __all__ = [
     "Locations",
     "LocationMetafields",
     "Markets",
+    "PriceListPrices",
     "Products",
     "ProductVariants",
     "ProductVariantMarketPrices",
