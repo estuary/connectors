@@ -100,27 +100,32 @@ runs:
         # out at 300 or 3000 files and truncate silently. A missing path can only
         # turn a lane off, so each branch proves its list is complete before a
         # "false" is believed.
+        #
+        # A renamed file's old path is only in `previous_filename`. It is listed
+        # too, since whatever used the file there is affected as much as its new
+        # home. COUNT then counts paths, which can only reach a cap early and
+        # build everything.
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           # Paginated but capped at 3000 files. A list sitting at the 3000
           # path cap cannot be assumed complete.
           gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
-            --jq '.[].filename' > changed.txt ||
+            --jq '.[] | .filename, (.previous_filename // empty)' > changed.txt ||
             fallback "could not list pull request files"
 
           COUNT=$(wc -l < changed.txt)
           [ "$COUNT" -lt 3000 ] ||
-            fallback "listed ${COUNT} files at the API's 3000-file cap"
+            fallback "listed ${COUNT} paths, at or above the API's 3000-file cap"
         else
           # The compare endpoint reports at most 300 files and does not paginate
           # them. They appear only on the first page, so a diff sitting at
           # the 300 path cap cannot be assumed complete.
           gh api "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" \
-            --jq '.files[].filename' > changed.txt ||
+            --jq '.files[] | .filename, (.previous_filename // empty)' > changed.txt ||
             fallback "could not compare ${{ github.event.before }}...${{ github.sha }}"
 
           COUNT=$(wc -l < changed.txt)
           [ "$COUNT" -lt 300 ] ||
-            fallback "compare returned ${COUNT} files at the API's 300-file cap"
+            fallback "compare returned ${COUNT} paths, at or above the API's 300-file cap"
         fi
 
         echo "${COUNT} changed path(s)"

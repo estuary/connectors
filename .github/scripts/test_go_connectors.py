@@ -129,6 +129,15 @@ class TestRules(unittest.TestCase):
             ["materialize-x", "source-b"],
         )
 
+    def test_moved_file_builds_both_sides(self):
+        # classify-changes lists a renamed file's old path as well as its new
+        # one. Moving a file out of sqlcapture can break its other importers.
+        self.assertEqual(
+            pick("sqlcapture/tuples.go", "source-a/tuples.go"), ["source-a", "source-b"]
+        )
+        # A package that moved away entirely is no longer in the graph.
+        self.assertEqual(pick("go/gone/x.go"), "all")
+
 
 def go_list_graph(path: Path) -> bool:
     """Write the repository's import graph to path, as the action does."""
