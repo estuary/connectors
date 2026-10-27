@@ -9,7 +9,6 @@ requires-python = ">=3.14"
 dependencies = [
     "estuary-cdk",
     "pydantic>=2,<3",
-    "gql>=3.5,<4.0",
 ]
 
 # The dependency is declared in [project.dependencies] above; this is where
