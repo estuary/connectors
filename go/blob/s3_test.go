@@ -2,6 +2,7 @@ package blob
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -27,6 +28,14 @@ func TestIntegrationS3(t *testing.T) {
 		bucket, err := NewS3Bucket(context.Background(), cfg.Bucket, creds, func(o *s3.Options) { o.Region = cfg.Region })
 		require.NoError(t, err)
 		testBucket(t, bucket)
+
+		t.Run("stored md5", func(t *testing.T) {
+			testStoredMD5(t, bucket, func(t *testing.T, key string) string {
+				head, err := bucket.client.HeadObject(context.Background(), &s3.HeadObjectInput{Bucket: &bucket.bucket, Key: &key})
+				require.NoError(t, err)
+				return strings.Trim(*head.ETag, `"`)
+			})
+		})
 	})
 
 	t.Run("resolved region", func(t *testing.T) {

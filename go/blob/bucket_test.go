@@ -3,6 +3,9 @@ package blob
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -178,4 +181,25 @@ func testBucket(t *testing.T, bucket Bucket) {
 		require.NoError(t, bucket.Delete(ctx, []string{bucket.URI(other)}))
 		require.Empty(t, listKeys(t, prefix))
 	})
+}
+
+// testStoredMD5 uploads an object larger than every provider's multipart or
+// chunking threshold and requires that the hash the provider stores for it,
+// as returned by storedMD5 in hex, is the MD5 of its bytes.
+func testStoredMD5(t *testing.T, bucket Bucket, storedMD5 func(t *testing.T, key string) string) {
+	var ctx = context.Background()
+	var key = path.Join("blob-integration-test", uuid.NewString(), "large")
+	t.Cleanup(func() {
+		if err := bucket.Delete(ctx, []string{bucket.URI(key)}); err != nil {
+			t.Logf("cleanup: %v", err)
+		}
+	})
+
+	var data = make([]byte, 40<<20)
+	_, err := rand.Read(data)
+	require.NoError(t, err)
+	var want = md5.Sum(data)
+
+	require.NoError(t, bucket.Upload(ctx, key, bytes.NewReader(data)))
+	require.Equal(t, hex.EncodeToString(want[:]), storedMD5(t, key))
 }
