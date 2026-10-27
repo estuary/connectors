@@ -8,6 +8,12 @@
   files and bytes they read and pruned. Load and merge queries also log the
   key bounds they were restricted to. The metrics are fetched in the
   background, without holding up the transaction.
+- A `two_phase_loads` feature flag, off by default. With it, each table's
+  load first finds the files holding rows that match its keys, reading only
+  the key columns, then reads documents from those files alone. Both queries
+  read the same version of the table. Loads whose matching rows are
+  concentrated in a few of the files they would otherwise read get faster,
+  and a load that matches no rows skips reading documents altogether.
 
 ## 2026-10-26
 ### Changed
