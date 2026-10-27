@@ -175,6 +175,7 @@ type transactor struct {
 	stagingPrefix         string
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
+	profiler              *queryProfiler
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -366,6 +367,7 @@ func newTransactor(
 	} else {
 		d.localStagingPath = tempDir
 	}
+	d.profiler = newQueryProfiler(wsClient.QueryHistory)
 
 	return d, nil
 }
@@ -467,7 +469,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var queries []string
+	var loads []bindingQuery
 	var toDelete []string
 	for idx, b := range d.bindings {
 		if !b.loadFile.started {
@@ -486,7 +488,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if loadQuery, err := RenderTableWithStaged(b.target, []string{b.loadFile.remoteDir()}, nil, b.loadSchema, loadTemplate, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			queries = append(queries, loadQuery)
+			loads = append(loads, bindingQuery{path: b.target.Path, query: loadQuery})
 			toDelete = append(toDelete, b.loadFile.remoteDir())
 		}
 	}
@@ -496,7 +498,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	if len(queries) == 0 {
+	if len(loads) == 0 {
 		return nil
 	}
 
@@ -517,13 +519,21 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	d.be.StartedEvaluatingLoads()
 	var evaluating atomic.Int32
-	evaluating.Store(int32(len(queries)))
+	evaluating.Store(int32(len(loads)))
 
 	var group, groupCtx = errgroup.WithContext(loadCtx)
 	group.SetLimit(maxConcurrentLoads)
-	for _, query := range queries {
-		group.Go(func() error {
-			rows, err := db.QueryContext(groupCtx, query)
+	for _, load := range loads {
+		group.Go(func() (err error) {
+			var queryCtx, trace = d.profiler.trace(groupCtx, log.Fields{"resourcePath": load.path, "query": "load"})
+			var executeTook time.Duration
+			var docCount, docBytes int
+			defer func() {
+				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
+			}()
+
+			rows, err := db.QueryContext(queryCtx, load.query)
+			executeTook = time.Since(trace.started)
 			if evaluating.Add(-1) == 0 {
 				d.be.FinishedEvaluatingLoads()
 			}
@@ -539,6 +549,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				} else if doc.binding < 0 {
 					continue
 				}
+				docCount, docBytes = docCount+1, docBytes+len(doc.document)
 				select {
 				case docs <- doc:
 				case <-groupCtx.Done():
@@ -559,6 +570,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return err
 	}
 	return queryErr
+}
+
+// bindingQuery is a query of the binding's table at path.
+type bindingQuery struct {
+	path  []string
+	query string
 }
 
 // loadedDoc is a document read by a binding's load query.
@@ -942,9 +959,14 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b 
 	var name = b.storeFile.txnDir + "_delta"
 	var data = &stagingCopy{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
 	for _, tpl := range []*template.Template{d.templates.createStagingTable, d.templates.copyIntoStaging} {
-		if query, err := renderTemplate(tpl, data); err != nil {
+		query, err := renderTemplate(tpl, data)
+		if err != nil {
 			return fmt.Errorf("%s template: %w", tpl.Name(), err)
-		} else if _, err := db.ExecContext(ctx, query); err != nil {
+		}
+		var queryCtx, trace = d.profiler.trace(ctx, log.Fields{"resourcePath": b.target.Path, "query": tpl.Name()})
+		_, err = db.ExecContext(queryCtx, query)
+		trace.finish(err, nil)
+		if err != nil {
 			return fmt.Errorf("%s: %w", tpl.Name(), err)
 		}
 	}
@@ -1142,7 +1164,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			}
 			queries = []string{item.Query}
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
+		if err := d.execQueries(ctx, db, b.target.Path, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -1157,7 +1179,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
+		if err := d.execQueries(ctx, db, b.target.Path, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -1179,14 +1201,15 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	return nil
 }
 
-// execQueries runs the given queries in order, passing each one's row stats
-// to report. tolerateMissing is set when recovering entries which may already
-// have been applied by a previous session whose state clearing didn't commit:
-// their staged files and staging tables (and possibly their target table) were
-// already deleted, or partly deleted, and it is okay to skip them in this case.
-func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
+// execQueries runs the given queries of the table at path in order, passing
+// each one's row stats to report. tolerateMissing is set when recovering
+// entries which may already have been applied by a previous session whose
+// state clearing didn't commit: their staged files and staging tables (and
+// possibly their target table) were already deleted, or partly deleted, and it
+// is okay to skip them in this case.
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, path []string, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
-		if stats, err := d.execQuery(ctx, db, query); err != nil {
+		if stats, err := d.execQuery(ctx, db, path, query); err != nil {
 			if tolerateMissing && isMissingError(err) {
 				continue
 			}
@@ -1248,10 +1271,13 @@ func isRetriableError(err error) bool {
 	})
 }
 
-// execQuery runs a commit query and returns the row counts of its result row.
-func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) (m.RowStats, error) {
+// execQuery runs a commit query of the table at path and returns the row
+// counts of its result row.
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, path []string, query string) (m.RowStats, error) {
 	for attempt := 0; ; attempt++ {
-		var rows, err = db.QueryContext(ctx, query)
+		var queryCtx, trace = d.profiler.trace(ctx, log.Fields{"resourcePath": path, "query": statementKind(query)})
+		var rows, err = db.QueryContext(queryCtx, query)
+		trace.finish(err, nil)
 		if err == nil {
 			return scanRowStats(rows), nil
 		} else if !isRetriableError(err) || attempt >= maxQueryRetries {
@@ -1434,4 +1460,5 @@ func pathsWithRoot(root string, paths []string) []string {
 }
 
 func (d *transactor) Destroy() {
+	d.profiler.stop()
 }
