@@ -26,7 +26,9 @@ To use this connector, you'll need:
 
 - An AWS root, IAM user or role with [read and write
   access](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_s3_rw-bucket.html)
-  to the S3 bucket.
+  to the S3 bucket. `s3:DeleteObject` is not required: the connector verifies
+  access by writing and reading a `.estuary-prerequisites-check` object under
+  the configured prefix, which it overwrites on each check.
 
   When authenticating as user, you'll need the **access key** and **secret access key**. See the
   [AWS blog](https://aws.amazon.com/blogs/security/wheres-my-secret-access-key/) for help finding

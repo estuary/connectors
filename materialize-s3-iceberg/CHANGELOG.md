@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-27
+
+### Changed
+- The bucket access check no longer requires `s3:DeleteObject`. It now writes
+  and reads a fixed `.estuary-prerequisites-check` object under the configured
+  prefix, overwriting it on each check instead of creating and deleting a new
+  object.
+
 ## 2026-08-25
 
 ### Added

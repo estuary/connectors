@@ -29,7 +29,6 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 	iso8601 "github.com/senseyeio/duration"
 	log "github.com/sirupsen/logrus"
@@ -427,7 +426,9 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 	}
 
 	s3client := s3store.Client()
-	testKey := path.Join(d.cfg.Prefix, uuid.NewString())
+	// Overwriting a fixed key on each check leaves no object behind without
+	// requiring s3:DeleteObject.
+	testKey := path.Join(d.cfg.Prefix, ".estuary-prerequisites-check")
 
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
@@ -449,14 +450,6 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
-		}
-		errs.Err(err)
-	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(d.cfg.Bucket),
-		Key:    aws.String(testKey),
-	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 		}
 		errs.Err(err)
 	}
