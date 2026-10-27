@@ -216,7 +216,6 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	stream.tables.discovery = make(map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo)
 	stream.tables.metadata = make(map[sqlcapture.StreamID]*mysqlTableMetadata)
 	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
-	stream.tables.nonTransactional = make(map[sqlcapture.StreamID]bool)
 	return stream, nil
 }
 
@@ -307,12 +306,11 @@ type mysqlReplicationStream struct {
 	// read from the replication goroutine.
 	tables struct {
 		sync.RWMutex
-		active           map[sqlcapture.StreamID]struct{}
-		discovery        map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo
-		metadata         map[sqlcapture.StreamID]*mysqlTableMetadata
-		keyColumns       map[sqlcapture.StreamID][]string
-		nonTransactional map[sqlcapture.StreamID]bool
-		dirtyMetadata    []sqlcapture.StreamID
+		active        map[sqlcapture.StreamID]struct{}
+		discovery     map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo
+		metadata      map[sqlcapture.StreamID]*mysqlTableMetadata
+		keyColumns    map[sqlcapture.StreamID][]string
+		dirtyMetadata []sqlcapture.StreamID
 	}
 }
 
@@ -1392,16 +1390,6 @@ func (rs *mysqlReplicationStream) tablesInSchema(schema string) []sqlcapture.Str
 	return tables
 }
 
-// isNonTransactional returns true if the stream ID refers to a table which
-// uses a storage engine such as MyISAM which doesn't support transactions.
-// Changes to non-transactional tables are never followed by a commit event,
-// so we have to take care of that for ourselves.
-func (rs *mysqlReplicationStream) isNonTransactional(streamID sqlcapture.StreamID) bool {
-	rs.tables.RLock()
-	defer rs.tables.RUnlock()
-	return rs.tables.nonTransactional[streamID]
-}
-
 func (rs *mysqlReplicationStream) keyColumns(streamID sqlcapture.StreamID) ([]string, bool) {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
@@ -1416,14 +1404,6 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 	// Do nothing if the table is already active.
 	if _, ok := rs.tables.active[streamID]; ok {
 		return nil
-	}
-
-	// Extract some details from the provided discovery info, if present.
-	var nonTransactional bool
-	if discovery != nil {
-		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
-			nonTransactional = extraDetails.StorageEngine == "MyISAM"
-		}
 	}
 
 	// If metadata JSON is present then parse it into a usable object. Otherwise
@@ -1509,7 +1489,6 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 	rs.tables.active[streamID] = struct{}{}
 	rs.tables.keyColumns[streamID] = keyColumns
 	rs.tables.metadata[streamID] = metadata
-	rs.tables.nonTransactional[streamID] = nonTransactional
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
 	return nil
 }
@@ -1521,7 +1500,6 @@ func (rs *mysqlReplicationStream) deactivateTable(streamID sqlcapture.StreamID) 
 	delete(rs.tables.active, streamID)
 	delete(rs.tables.keyColumns, streamID)
 	delete(rs.tables.metadata, streamID) // No need to mark metadata as dirty, just forget it
-	delete(rs.tables.nonTransactional, streamID)
 	return nil
 }
 
