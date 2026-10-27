@@ -2331,7 +2331,7 @@
         "hs_is_public": "true",
         "hs_is_read_only": "false",
         "hs_last_record_added_at": "1793040308469",
-        "hs_lastmodifieddate": "1793040308543",
+        "hs_lastmodifieddate": "redacted",
         "hs_list_access_level": "EVERYONE_EDIT",
         "hs_list_id": "6",
         "hs_list_name": "Join Order Test",
@@ -2347,7 +2347,7 @@
         "hs_object_type_id": "0-1",
         "hs_processing_status": "COMPLETE",
         "hs_processing_type": "MANUAL",
-        "hs_total_size_calculated_at": "1793040186285",
+        "hs_total_size_calculated_at": "redacted",
         "hs_updated_at": "1793040156183",
         "hs_updated_by_user_id": "73074756"
       },
