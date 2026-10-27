@@ -18,6 +18,12 @@ on:
   schedule:
     - cron: "0 8 * * *"
   workflow_dispatch:
+    inputs:
+      cdk_only:
+        description: >-
+          Check and publish estuary-cdk (without rebuilding any connector).
+        type: boolean
+        default: false
 
   # Cutting a release publishes estuary-cdk from the tag; see
   # estuary-cdk/README.md. No connector is rebuilt -- the classifier
@@ -41,7 +47,15 @@ jobs:
   classify_changes:
     runs-on: ubuntu-24.04
     outputs:
-      run: ${{ steps.matrix.outputs.run }}
+      # A `cdk_only` dispatch builds no connector, the shape the classifier
+      # already gives a release. `cdk` needs no override: the classifier
+      # reports it true for every manual run. The CDK's checks therefore run,
+      # and the publish job below still waits on them.
+      #
+      # `inputs.cdk_only` is a typed boolean, null on events that declare no
+      # inputs. `github.event.inputs.cdk_only` would be the string "false",
+      # which is truthy.
+      run: ${{ inputs.cdk_only && 'false' || steps.matrix.outputs.run }}
       matrix: ${{ steps.matrix.outputs.matrix }}
       cdk: ${{ steps.classify.outputs.cdk }}
     steps:
@@ -386,20 +400,25 @@ jobs:
             echo "::error::estuary-cdk was due to be checked but its jobs ended $CDK_TESTS and $CDK_PYTHONS"; exit 1
           fi
 
-  # Publish estuary-cdk to PyPI: a `.devN` pre-release from every push to main
-  # that changes what the wheel carries, and the release itself from a tag.
-  # See estuary-cdk/README.md for the version scheme and the release steps.
+  # Publish estuary-cdk to PyPI: a `.devN` pre-release when the CDK changes, and
+  # the release itself from a tag. See estuary-cdk/README.md for the version
+  # scheme and the release steps.
+  #
+  # cdk-release-version.py counts to the last commit that changed the CDK, so
+  # a run derives the version of that commit's wheel rather than of its own.
+  # The nightly therefore rebuilds a file PyPI already holds, and
+  # `skip-existing` drops the upload.
+  #
+  # GitHub sometimes dispatches no runs at all for a push. The next nightly
+  # resolves the version that push should have published, finds PyPI lacks it,
+  # and uploads it. A `cdk_only` dispatch does the same on demand.
   #
   # Deliberately absent from python_gate's needs: it publishes rather than
   # checks, and a required check must not wait on it.
   estuary_cdk_publish:
     name: estuary-cdk publish
-    needs: [classify_changes, estuary_cdk, estuary_cdk_supported_pythons]
-    if: >-
-      github.event_name == 'release' ||
-      (github.event_name == 'push' &&
-       github.ref == 'refs/heads/main' &&
-       needs.classify_changes.outputs.cdk == 'true')
+    needs: [estuary_cdk, estuary_cdk_supported_pythons]
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     # Restricted to main and v* in repo settings. That, not the `if:` above,
     # is what keeps the trusted-publishing credential out of reach of a pull
@@ -420,31 +439,12 @@ jobs:
           version: "0.13.3"
           enable-cache: true
 
-      - id: build
-        name: Build the wheel
-        env:
-          BEFORE: ${{ github.event.before }}
+      - name: Build the wheel
         run: |
-          # A tag publishes unconditionally; the tag is the intent. A push
-          # publishes only when what the wheel carries changed: `cdk` is
-          # broader, firing also for the workspace lock, python.yaml, the
-          # connector list and ruff.toml, because estuary-cdk's *checks* must
-          # run for those. The paths below are what
-          # [tool.hatch.build.targets.wheel] packages; keep the two in step.
+          # A tag publishes unconditionally; the tag is the intent.
           if [ "${GITHUB_EVENT_NAME}" = release ]; then
             VERSION=$(.github/scripts/cdk-release-version.py "${GITHUB_REF_NAME}")
           else
-            # An all-zero `before` (a branch's first push), or one this
-            # checkout does not have (a force push), means the comparison
-            # cannot be made. Publish rather than skip on that.
-            if [ -n "${BEFORE//0/}" ] &&
-               git cat-file -e "${BEFORE}^{commit}" 2> /dev/null &&
-               git diff --quiet "${BEFORE}" "${GITHUB_SHA}" -- \
-                 estuary-cdk/estuary_cdk/ estuary-cdk/pyproject.toml; then
-              echo "the wheel's contents are unchanged; nothing to publish"
-              echo "publish=false" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
             VERSION=$(.github/scripts/cdk-release-version.py)
           fi
           echo "version: ${VERSION}"
@@ -463,13 +463,12 @@ jobs:
           open(path, "w").write(text)
           PY
 
+          # The version may count to an older commit. Nothing since has
+          # changed the CDK, so this tree builds that commit's wheel.
           uv build --package estuary_cdk --wheel --out-dir dist
-          echo "publish=true" >> "$GITHUB_OUTPUT"
 
       - name: Publish to PyPI
-        if: steps.build.outputs.publish == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Re-running a job that already published would otherwise fail on a
-          # filename PyPI holds; PyPI refuses to replace one.
+          # PyPI refuses to replace a file it holds; most runs rebuild one.
           skip-existing: true

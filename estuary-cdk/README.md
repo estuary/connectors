@@ -24,8 +24,10 @@ install it from PyPI:
 dependencies = ["estuary-cdk>=0.3.0"]
 ```
 
-Every push to `main` that changes what the wheel carries also publishes a pre-release,
-versioned `X.Y.Z.devN` — `X.Y.Z` names the next cut, `N` counts commits since the last one.
+Changing the CDK on `main` also publishes a pre-release, versioned `X.Y.Z.devN` — `X.Y.Z`
+names the next cut, and `N` counts commits from the *last* cut to the CDK's last change.
+Two commits that build the same wheel share a version.
+
 Pre-releases are excluded from resolution unless a specifier asks for them:
 
 ```toml
@@ -46,9 +48,9 @@ tracking these tags and `go get` pins to the last `v1`.)
 2. Publish a GitHub release for the tag. That is what publishes `X.Y.Z` to PyPI.
 3. Raise `version` in this directory's `pyproject.toml` to the next release, and relock.
 
-Step 3 is the one that gets forgotten. Until it lands, the next push to `main` fails in
-`.github/scripts/cdk-release-version.py` rather than publishing a `.devN` that sorts below
-the release just cut.
+Until step 3 lands, every run that would publish — the nightly, or a push that
+changes the CDK — fails in `.github/scripts/cdk-release-version.py`
+rather than publishing a `.devN` that sorts below the release just cut.
 
 The release path runs only on a real cut, so it is cold when you first need it. Before the
 first one, point it at TestPyPI with a throwaway tag.
