@@ -19,6 +19,8 @@ def test_capture(request, snapshot):
         re.compile(r"^hs_date_exited_"),
         re.compile(r"^lastmodifieddate$"),
         re.compile(r"^hs_lastmodifieddate$"),
+        # HubSpot recalculates list sizes on its own schedule.
+        re.compile(r"^hs_total_size_calculated_at$"),
     ]
 
     result = subprocess.run(
@@ -51,7 +53,8 @@ def test_capture(request, snapshot):
     for l in unique_stream_lines:
         _collection, record = l[0], l[1]
 
-        for key in ["properties", "propertiesWithHistory"]:
+        # Lists carry their properties in `additionalProperties`.
+        for key in ["properties", "propertiesWithHistory", "additionalProperties"]:
             if key in record:
                 for prop in record[key].keys():
                     if any(
