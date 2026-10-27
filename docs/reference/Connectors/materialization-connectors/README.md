@@ -62,6 +62,7 @@ In the future, other open-source materialization connectors from third parties c
 * [CSV Files in GCS](./google-gcs-csv.md)
 * [CSV Files in S3](./amazon-s3-csv.md)
 * [Google Sheets](./Google-sheets.md)
+* [JSON Files in S3](./amazon-s3-json.md)
 
 ### Event connectors
 
