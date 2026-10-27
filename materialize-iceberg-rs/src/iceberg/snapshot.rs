@@ -1,0 +1,71 @@
+use std::collections::BTreeMap;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
+
+use serde::Deserialize;
+use serde::Serialize;
+
+/// An Iceberg snapshot, in the same shape as the Iceberg REST/JSON spec
+/// (`{"snapshot-id": ..., "manifest-list": ..., ...}`), so it can be embedded
+/// directly into a `CommitTransactionRequest`'s `add-snapshot` update and
+/// into table metadata's `snapshots` array.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Snapshot {
+    pub snapshot_id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_snapshot_id: Option<i64>,
+    pub sequence_number: i64,
+    pub timestamp_ms: i64,
+    pub manifest_list: String,
+    pub schema_id: i32,
+    pub summary: BTreeMap<String, String>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn build_snapshot(
+    snapshot_id: i64,
+    parent_snapshot_id: Option<i64>,
+    sequence_number: i64,
+    manifest_list: String,
+    added_files_count: i32,
+    added_rows_count: i64,
+    added_files_size: i64,
+    added_position_deletes: i64,
+) -> Snapshot {
+    let timestamp_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+
+    // "overwrite" when this commit includes position deletes (an
+    // update/delete took effect), "append" for a pure-insert commit.
+    let operation = if added_position_deletes > 0 {
+        "overwrite"
+    } else {
+        "append"
+    };
+
+    let mut summary = BTreeMap::new();
+    summary.insert("operation".to_string(), operation.to_string());
+    summary.insert(
+        "added-data-files".to_string(),
+        added_files_count.to_string(),
+    );
+    summary.insert("added-records".to_string(), added_rows_count.to_string());
+    summary.insert("added-files-size".to_string(), added_files_size.to_string());
+    summary.insert(
+        "added-position-deletes".to_string(),
+        added_position_deletes.to_string(),
+    );
+
+    Snapshot {
+        snapshot_id,
+        parent_snapshot_id,
+        sequence_number,
+        timestamp_ms,
+        manifest_list,
+        schema_id: 0,
+        summary,
+    }
+}

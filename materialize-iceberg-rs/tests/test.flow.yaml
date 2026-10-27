@@ -1,0 +1,103 @@
+materializations:
+  acmeCo/materialize-iceberg-rs:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config:
+          store:
+            type: S3
+            bucket: test-bucket
+            prefix: warehouse
+            region: us-east-1
+            credentials:
+              awsAccessKeyId: test_key
+              awsSecretAccessKey: test_secret
+            endpoint: http://localhost:9603
+    bindings:
+      - resource:
+          table: test_table
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+
+  acmeCo/materialize-iceberg-rs/restart:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config:
+          store:
+            type: S3
+            bucket: test-bucket
+            prefix: warehouse
+            region: us-east-1
+            credentials:
+              awsAccessKeyId: test_key
+              awsSecretAccessKey: test_secret
+            endpoint: http://localhost:9603
+    bindings:
+      - resource:
+          table: test_table_restart
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+
+  acmeCo/materialize-iceberg-rs/update:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config:
+          store:
+            type: S3
+            bucket: test-bucket
+            prefix: warehouse
+            region: us-east-1
+            credentials:
+              awsAccessKeyId: test_key
+              awsSecretAccessKey: test_secret
+            endpoint: http://localhost:9603
+    bindings:
+      - resource:
+          table: test_table_update
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+
+collections:
+  test/collection:
+    schema:
+      type: object
+      # Merge-on-read upsert materializations (like this connector's Load,
+      # which injects `_meta.file_path`/`_meta.positional_delete` into the
+      # Loaded document) rely on Flow carrying an LHS-only property forward
+      # through reduction untouched when the RHS delta doesn't mention it —
+      # that only happens under `reduce: {strategy: merge}`, not the default
+      # last-write-wins whole-document replace.
+      reduce: { strategy: merge }
+      properties:
+        id: { type: integer }
+        value: { type: string }
+        # Flow auto-populates `_meta` (e.g. `_meta.uuid`) on every document,
+        # including the fresh delta, so it exists on both sides of the
+        # reduction and needs its own merge annotation too — otherwise the
+        # root-level merge still replaces `_meta` wholesale with the delta's
+        # fresh one, dropping `_meta.file_path`/`_meta.positional_delete`.
+        _meta:
+          type: object
+          reduce: { strategy: merge }
+      required: [id]
+    key: [/id]

@@ -1,0 +1,150 @@
+---
+source: tests/test.rs
+expression: "serde_json::to_string_pretty(&got).unwrap()"
+---
+{
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "properties": {
+      "store": {
+        "description": "The object store backing the Iceberg table's data and metadata files.",
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "description": "Store data in Amazon S3, or an S3-compatible store.",
+            "properties": {
+              "bucket": {
+                "description": "Name of the S3 bucket to write data files to.",
+                "title": "Bucket",
+                "type": "string"
+              },
+              "credentials": {
+                "description": "AWS credentials used to write to the bucket.",
+                "properties": {
+                  "awsAccessKeyId": {
+                    "description": "AWS access key ID used to write to the bucket.",
+                    "title": "AWS Access Key ID",
+                    "type": "string"
+                  },
+                  "awsSecretAccessKey": {
+                    "description": "AWS secret access key used to write to the bucket.",
+                    "secret": true,
+                    "title": "AWS Secret Access Key",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "awsAccessKeyId",
+                  "awsSecretAccessKey"
+                ],
+                "title": "AWS Credentials",
+                "type": "object"
+              },
+              "endpoint": {
+                "advanced": true,
+                "description": "Endpoint URL of an S3-compatible store to use in place of AWS S3. Only needed for testing against a local S3-compatible store.",
+                "title": "Endpoint",
+                "type": "string"
+              },
+              "prefix": {
+                "description": "Key prefix under the bucket to write data files under.",
+                "title": "Prefix",
+                "type": "string"
+              },
+              "region": {
+                "description": "AWS region of the bucket.",
+                "title": "Region",
+                "type": "string"
+              },
+              "type": {
+                "const": "S3",
+                "default": "S3",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "bucket",
+              "prefix",
+              "region",
+              "credentials"
+            ],
+            "title": "S3",
+            "type": "object"
+          },
+          {
+            "description": "Store data in Google Cloud Storage.",
+            "properties": {
+              "bucket": {
+                "description": "Name of the GCS bucket to write data files to.",
+                "title": "Bucket",
+                "type": "string"
+              },
+              "credentials": {
+                "description": "Google Cloud credentials used to write to the bucket.",
+                "properties": {
+                  "serviceAccountJson": {
+                    "description": "Contents of a Google Cloud service account key file, in JSON format.",
+                    "secret": true,
+                    "title": "Service Account JSON",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "serviceAccountJson"
+                ],
+                "title": "GCS Credentials",
+                "type": "object"
+              },
+              "prefix": {
+                "description": "Key prefix under the bucket to write data files under.",
+                "title": "Prefix",
+                "type": "string"
+              },
+              "type": {
+                "const": "Gcs",
+                "default": "Gcs",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "bucket",
+              "prefix",
+              "credentials"
+            ],
+            "title": "Google Cloud Storage",
+            "type": "object"
+          }
+        ],
+        "title": "Object Store",
+        "type": "object"
+      }
+    },
+    "required": [
+      "store"
+    ],
+    "title": "Materialize Iceberg",
+    "type": "object"
+  },
+  "documentationUrl": "https://go.estuary.dev/materialize-iceberg-rs",
+  "protocol": 3032023,
+  "resourceConfigSchema": {
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "properties": {
+      "table": {
+        "description": "Name of the Iceberg table to materialize to.",
+        "title": "Table",
+        "type": "string",
+        "x-collection-name": true
+      }
+    },
+    "required": [
+      "table"
+    ],
+    "title": "Iceberg Resource Configuration",
+    "type": "object"
+  }
+}

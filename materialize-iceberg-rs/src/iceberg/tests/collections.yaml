@@ -1,0 +1,15 @@
+collections:
+  test/collection:
+    schema:
+      type: object
+      properties:
+        id: { type: string }
+        flow_published_at: { type: string }
+        value: { type: integer }
+        flow_document: {type: string}
+      required:
+      - id
+      - flow_published_at
+      - flow_document
+    key:
+    - /id
