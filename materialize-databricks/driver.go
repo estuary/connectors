@@ -453,8 +453,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	defer db.Close()
 
+	var keyCounts = make([]int, len(d.bindings))
 	for it.Next() {
 		var b = d.bindings[it.Binding]
+		keyCounts[it.Binding]++
 
 		if err := b.loadFile.start(ctx, db); err != nil {
 			return fmt.Errorf("starting load file: %w", err)
@@ -485,10 +487,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			loadTemplate = d.templates.loadQueryNoFlowDocument
 		}
 
-		if loadQuery, err := RenderTableWithStaged(b.target, []string{b.loadFile.remoteDir()}, nil, b.loadSchema, loadTemplate, b.loadMergeBounds.Build()); err != nil {
+		var bounds = b.loadMergeBounds.Build()
+		if loadQuery, err := RenderTableWithStaged(b.target, []string{b.loadFile.remoteDir()}, nil, b.loadSchema, loadTemplate, bounds); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			loads = append(loads, bindingQuery{path: b.target.Path, query: loadQuery})
+			loads = append(loads, bindingQuery{query: loadQuery, fields: log.Fields{
+				"resourcePath": b.target.Path,
+				"keys":         keyCounts[idx],
+				"bounds":       profileBounds(bounds),
+			}})
 			toDelete = append(toDelete, b.loadFile.remoteDir())
 		}
 	}
@@ -525,7 +532,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	group.SetLimit(maxConcurrentLoads)
 	for _, load := range loads {
 		group.Go(func() (err error) {
-			var queryCtx, trace = d.profiler.trace(groupCtx, log.Fields{"resourcePath": load.path, "query": "load"})
+			var queryCtx, trace = d.profiler.trace(groupCtx, "load", load.fields)
 			var executeTook time.Duration
 			var docCount, docBytes int
 			defer func() {
@@ -572,10 +579,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return queryErr
 }
 
-// bindingQuery is a query of the binding's table at path.
+// bindingQuery is a query of a binding's table, with the fields of its profile.
 type bindingQuery struct {
-	path  []string
-	query string
+	query  string
+	fields log.Fields
 }
 
 // loadedDoc is a document read by a binding's load query.
@@ -963,7 +970,7 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b 
 		if err != nil {
 			return fmt.Errorf("%s template: %w", tpl.Name(), err)
 		}
-		var queryCtx, trace = d.profiler.trace(ctx, log.Fields{"resourcePath": b.target.Path, "query": tpl.Name()})
+		var queryCtx, trace = d.profiler.trace(ctx, tpl.Name(), log.Fields{"resourcePath": b.target.Path})
 		_, err = db.ExecContext(queryCtx, query)
 		trace.finish(err, nil)
 		if err != nil {
@@ -1164,7 +1171,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			}
 			queries = []string{item.Query}
 		}
-		if err := d.execQueries(ctx, db, b.target.Path, queries, d.cpRecovery, report); err != nil {
+		if err := d.execQueries(ctx, db, log.Fields{"resourcePath": b.target.Path}, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -1175,11 +1182,16 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			needsMerge = needsMerge || item.NeedsMerge
 		}
 
-		queries, err := d.renderCommitQueries(b, coalesce, combineBounds(b.target.Keys, coalesce), needsMerge)
+		var bounds = combineBounds(b.target.Keys, coalesce)
+		queries, err := d.renderCommitQueries(b, coalesce, bounds, needsMerge)
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, b.target.Path, queries, d.cpRecovery, report); err != nil {
+		var profile = log.Fields{"resourcePath": b.target.Path}
+		if needsMerge {
+			profile["bounds"] = profileBounds(bounds)
+		}
+		if err := d.execQueries(ctx, db, profile, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -1201,15 +1213,15 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	return nil
 }
 
-// execQueries runs the given queries of the table at path in order, passing
-// each one's row stats to report. tolerateMissing is set when recovering
-// entries which may already have been applied by a previous session whose
-// state clearing didn't commit: their staged files and staging tables (and
-// possibly their target table) were already deleted, or partly deleted, and it
-// is okay to skip them in this case.
-func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, path []string, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
+// execQueries runs the given queries in order, passing each one's row stats
+// to report, and profiles them with the given fields. tolerateMissing is set
+// when recovering entries which may already have been applied by a previous
+// session whose state clearing didn't commit: their staged files and staging
+// tables (and possibly their target table) were already deleted, or partly
+// deleted, and it is okay to skip them in this case.
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, profile log.Fields, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
-		if stats, err := d.execQuery(ctx, db, path, query); err != nil {
+		if stats, err := d.execQuery(ctx, db, profile, query); err != nil {
 			if tolerateMissing && isMissingError(err) {
 				continue
 			}
@@ -1271,11 +1283,11 @@ func isRetriableError(err error) bool {
 	})
 }
 
-// execQuery runs a commit query of the table at path and returns the row
-// counts of its result row.
-func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, path []string, query string) (m.RowStats, error) {
+// execQuery runs a commit query, profiled with the given fields, and returns
+// the row counts of its result row.
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile log.Fields, query string) (m.RowStats, error) {
 	for attempt := 0; ; attempt++ {
-		var queryCtx, trace = d.profiler.trace(ctx, log.Fields{"resourcePath": path, "query": statementKind(query)})
+		var queryCtx, trace = d.profiler.trace(ctx, statementKind(query), profile)
 		var rows, err = db.QueryContext(queryCtx, query)
 		trace.finish(err, nil)
 		if err == nil {
