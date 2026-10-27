@@ -43,6 +43,38 @@ ConnectorState = TypeVar("ConnectorState")
 class Inference(BaseModel):
     """Inference of a projected location, from the collection's schema."""
 
+    # These enums mirror `flow.proto` and may gain variants at any time.
+    # Each field unions its enum with `str`, so that a variant we don't know
+    # yet parses as its raw string and re-serializes unchanged, rather than
+    # failing its whole message. `left_to_right` is required: Pydantic's
+    # default "smart" mode matches `str` first and never yields a variant.
+
+    class Exists(StrEnum):
+        INVALID = "INVALID"
+        MUST = "MUST"
+        MAY = "MAY"
+        IMPLICIT = "IMPLICIT"
+        CANNOT = "CANNOT"
+
+    class Reduce(StrEnum):
+        UNSET = "REDUCE_UNSET"
+        MULTIPLE = "REDUCE_MULTIPLE"
+        APPEND = "REDUCE_APPEND"
+        FIRST_WRITE_WINS = "REDUCE_FIRST_WRITE_WINS"
+        LAST_WRITE_WINS = "REDUCE_LAST_WRITE_WINS"
+        MAXIMIZE = "REDUCE_MAXIMIZE"
+        MERGE = "REDUCE_MERGE"
+        MINIMIZE = "REDUCE_MINIMIZE"
+        SET = "REDUCE_SET"
+        SUM = "REDUCE_SUM"
+        JSON_SCHEMA_MERGE = "REDUCE_JSON_SCHEMA_MERGE"
+
+    class Redact(StrEnum):
+        UNSET = "REDACT_UNSET"
+        MULTIPLE = "REDACT_MULTIPLE"
+        BLOCK = "REDACT_BLOCK"
+        SHA256 = "REDACT_SHA256"
+
     class String(BaseModel):
         contentType: str = ""
         format: str = ""
@@ -69,26 +101,12 @@ class Inference(BaseModel):
     description: str = ""
     default: Any = None
     secret: bool = False
-    exists: Literal["INVALID", "MUST", "MAY", "IMPLICIT", "CANNOT"] = "INVALID"
+    exists: Exists | str = Field(default=Exists.INVALID, union_mode="left_to_right")
     numeric: Numeric | None = None
     array: Array | None = None
     enum: list[Any] = []
-    reduce: Literal[
-        "REDUCE_UNSET",
-        "REDUCE_MULTIPLE",
-        "REDUCE_APPEND",
-        "REDUCE_FIRST_WRITE_WINS",
-        "REDUCE_LAST_WRITE_WINS",
-        "REDUCE_MAXIMIZE",
-        "REDUCE_MERGE",
-        "REDUCE_MINIMIZE",
-        "REDUCE_SET",
-        "REDUCE_SUM",
-        "REDUCE_JSON_SCHEMA_MERGE",
-    ] = "REDUCE_UNSET"
-    redact: Literal[
-        "REDACT_UNSET", "REDACT_MULTIPLE", "REDACT_BLOCK", "REDACT_SHA256"
-    ] = "REDACT_UNSET"
+    reduce: Reduce | str = Field(default=Reduce.UNSET, union_mode="left_to_right")
+    redact: Redact | str = Field(default=Redact.UNSET, union_mode="left_to_right")
     contentMediaType: str = ""
 
 
