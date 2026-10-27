@@ -1,19 +1,5 @@
 [
   [
-    "acmeCo/contacts_attributes",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "calculatedValue": "COUNT[BLACKLISTED,BLACKLISTED,<,NOW()]",
-      "category": "global",
-      "name": "BLACKLIST",
-      "type": "float"
-    }
-  ],
-  [
     "acmeCo/contacts_lists",
     {
       "_meta": {
