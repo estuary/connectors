@@ -207,6 +207,40 @@
     }
   ],
   [
+    "acmeCo/contact_lists",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archived": false,
+      "authorId": 73074756,
+      "createdAt": 1793040156183,
+      "dynamic": false,
+      "filters": [],
+      "ilsFilterBranch": "",
+      "internal": false,
+      "limitExempt": false,
+      "listId": 1,
+      "listType": "STATIC",
+      "metaData": {
+        "error": "",
+        "lastProcessingStateChangeAt": 1793040157468,
+        "lastSizeChangeAt": 1793040308543,
+        "listReferencesCount": null,
+        "parentFolderId": null,
+        "processing": "DONE",
+        "size": 3
+      },
+      "name": "Join Order Test",
+      "portalId": 47912630,
+      "readOnly": false,
+      "teamIds": [],
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/contacts",
     {
       "_meta": {
@@ -528,6 +562,22 @@
       },
       "updatedAt": "redacted",
       "url": "redacted"
+    }
+  ],
+  [
+    "acmeCo/contacts_list_memberships",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "canonical-vid": 72810357568,
+      "internal-list-id": 2147483643,
+      "is-member": true,
+      "static-list-id": 1,
+      "timestamp": 1793040291945,
+      "vid": 72810357568
     }
   ],
   [
