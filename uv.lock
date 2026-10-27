@@ -15,6 +15,7 @@ members = [
     "source-asana",
     "source-ashby",
     "source-aws-cost-explorer",
+    "source-bing-ads-native",
     "source-braintree-native",
     "source-brevo",
     "source-calendly",
@@ -1802,6 +1803,21 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "boto3", specifier = ">=1.40,<2.0" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-bing-ads-native"
+version = "0.1.0"
+source = { editable = "source-bing-ads-native" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
     { name = "estuary-cdk", editable = "estuary-cdk" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]

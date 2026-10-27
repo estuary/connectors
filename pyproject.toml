@@ -29,6 +29,7 @@ members = [
     "source-asana",
     "source-ashby",
     "source-aws-cost-explorer",
+    "source-bing-ads-native",
     "source-braintree-native",
     "source-brevo",
     "source-calendly",

@@ -102,6 +102,7 @@ incremental_window_size
 lookback_window
 lookback_window_size
 lookback_window_minutes
+lookback_days
 calls_lookback_window
 catalog_stats_lookback_hours
 insights_lookback_window
