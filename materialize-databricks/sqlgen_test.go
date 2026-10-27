@@ -155,6 +155,36 @@ func TestSQLGeneration(t *testing.T) {
 
 	{
 		tbl := tables[0]
+		var load = func(files ...string) *tableWithFiles {
+			return &tableWithFiles{
+				Table:        &tbl,
+				Directories:  []string{"test-staging-path/txn-1"},
+				Schema:       stagedSchemaDDL(tbl.KeyPtrs(), false),
+				Bounds:       []sql.MergeBound{{Column: tbl.Keys[0], LiteralLower: "10", LiteralUpper: "100"}, {Column: tbl.Keys[1]}, {Column: tbl.Keys[2]}},
+				Version:      "42",
+				MatchedFiles: files,
+			}
+		}
+		var files = []string{"s3://bucket/table/part-0.parquet", "s3://bucket/table/part-1's.parquet"}
+		for _, tc := range []struct {
+			name string
+			tpl  *template.Template
+			data *tableWithFiles
+		}{
+			{"loadMatchFiles", testTemplates.loadMatchFiles, load()},
+			{"loadQuery matched files", testTemplates.loadQuery, load(files...)},
+			{"loadQueryNoFlowDocument matched files", testTemplates.loadQueryNoFlowDocument, load(files...)},
+		} {
+			var rendered, err = renderTemplate(tc.tpl, tc.data)
+			require.NoError(t, err)
+			snap.WriteString("--- Begin " + tbl.Identifier + " " + tc.name + " ---")
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + tbl.Identifier + " ---\n\n")
+		}
+	}
+
+	{
+		tbl := tables[0]
 		var bounds = []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],

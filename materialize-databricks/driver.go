@@ -7,6 +7,7 @@ import (
 	stdsql "database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -176,6 +178,9 @@ type transactor struct {
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
 	profiler              *queryProfiler
+	// twoPhaseLoads loads documents only from the files that a first query,
+	// reading only key columns, finds rows matching the load keys in.
+	twoPhaseLoads bool
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -329,6 +334,7 @@ func newTransactor(
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
 		stagingPrefix:         stagingPrefix(materializationName),
+		twoPhaseLoads:         featureFlags["two_phase_loads"],
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -471,7 +477,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var loads []bindingQuery
+	var loadTemplate = d.templates.loadQuery
+	if d.cfg.Advanced.NoFlowDocument {
+		loadTemplate = d.templates.loadQueryNoFlowDocument
+	}
+
+	var loads []bindingLoad
 	var toDelete []string
 	for idx, b := range d.bindings {
 		if !b.loadFile.started {
@@ -482,22 +493,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
 
-		var loadTemplate = d.templates.loadQuery
-		if d.cfg.Advanced.NoFlowDocument {
-			loadTemplate = d.templates.loadQueryNoFlowDocument
-		}
-
 		var bounds = b.loadMergeBounds.Build()
-		if loadQuery, err := RenderTableWithStaged(b.target, []string{b.loadFile.remoteDir()}, nil, b.loadSchema, loadTemplate, bounds); err != nil {
-			return fmt.Errorf("loadQuery template: %w", err)
-		} else {
-			loads = append(loads, bindingQuery{query: loadQuery, fields: log.Fields{
+		loads = append(loads, bindingLoad{
+			data: &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
+			fields: log.Fields{
 				"resourcePath": b.target.Path,
 				"keys":         keyCounts[idx],
 				"bounds":       profileBounds(bounds),
-			}})
-			toDelete = append(toDelete, b.loadFile.remoteDir())
-		}
+			},
+		})
+		toDelete = append(toDelete, b.loadFile.remoteDir())
 	}
 	defer d.cleanUp(ctx, toDelete, nil)
 
@@ -532,6 +537,25 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	group.SetLimit(maxConcurrentLoads)
 	for _, load := range loads {
 		group.Go(func() (err error) {
+			var finishEvaluating = sync.OnceFunc(func() {
+				if evaluating.Add(-1) == 0 {
+					d.be.FinishedEvaluatingLoads()
+				}
+			})
+			defer finishEvaluating()
+
+			if d.twoPhaseLoads {
+				if matched, err := d.matchLoadFiles(groupCtx, db, load); err != nil {
+					return err
+				} else if !matched {
+					return nil
+				}
+			}
+			query, err := renderTemplate(loadTemplate, load.data)
+			if err != nil {
+				return fmt.Errorf("loadQuery template: %w", err)
+			}
+
 			var queryCtx, trace = d.profiler.trace(groupCtx, "load", load.fields)
 			var executeTook time.Duration
 			var docCount, docBytes int
@@ -539,11 +563,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
 			}()
 
-			rows, err := db.QueryContext(queryCtx, load.query)
+			rows, err := db.QueryContext(queryCtx, query)
 			executeTook = time.Since(trace.started)
-			if evaluating.Add(-1) == 0 {
-				d.be.FinishedEvaluatingLoads()
-			}
+			finishEvaluating()
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -579,10 +601,94 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return queryErr
 }
 
-// bindingQuery is a query of a binding's table, with the fields of its profile.
-type bindingQuery struct {
-	query  string
+// bindingLoad is the load of a binding's table, with the fields of its
+// profile.
+type bindingLoad struct {
+	data   *tableWithFiles
 	fields log.Fields
+}
+
+// maxMatchedFiles is the most files a two-phase load restricts its read of
+// documents to. A load that matches more reads every file within its bounds.
+const maxMatchedFiles = 5000
+
+// matchLoadFiles is the first phase of a two-phase load. It pins the load to
+// the table's current version, so that both phases read the same files, and
+// restricts it to the files holding rows that match its keys, found by reading
+// only the key columns. It reports whether any rows matched.
+func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, load bindingLoad) (bool, error) {
+	version, err := tableVersion(ctx, db, load.data.Table.Identifier)
+	if err != nil {
+		return false, err
+	}
+	load.data.Version = strconv.FormatInt(version, 10)
+	load.fields["version"] = version
+
+	query, err := renderTemplate(d.templates.loadMatchFiles, load.data)
+	if err != nil {
+		return false, fmt.Errorf("loadMatchFiles template: %w", err)
+	}
+	var queryCtx, trace = d.profiler.trace(ctx, "loadMatch", load.fields)
+	files, err := queryStrings(queryCtx, db, query)
+	trace.finish(err, log.Fields{"matchedFiles": len(files)})
+	if err != nil {
+		return false, fmt.Errorf("matching Load files: %w", err)
+	}
+
+	load.fields["matchedFiles"] = len(files)
+	if len(files) <= maxMatchedFiles {
+		load.data.MatchedFiles = files
+	}
+	return len(files) > 0, nil
+}
+
+// tableVersion is the latest version of a Delta table.
+func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64, error) {
+	rows, err := db.QueryContext(ctx, "DESCRIBE HISTORY "+identifier+" LIMIT 1")
+	if err != nil {
+		return 0, fmt.Errorf("describing history of %s: %w", identifier, err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return 0, err
+	}
+	var idx = slices.Index(cols, "version")
+	if idx < 0 || !rows.Next() {
+		return 0, errors.Join(fmt.Errorf("no version in the history of %s", identifier), rows.Err())
+	}
+	var vals = make([]any, len(cols))
+	var dest = make([]any, len(cols))
+	for i := range vals {
+		dest[i] = &vals[i]
+	}
+	if err := rows.Scan(dest...); err != nil {
+		return 0, fmt.Errorf("scanning history of %s: %w", identifier, err)
+	}
+	if version, ok := vals[idx].(int64); ok {
+		return version, nil
+	}
+	return 0, fmt.Errorf("history of %s has version %v of type %T", identifier, vals[idx], vals[idx])
+}
+
+// queryStrings runs a query and returns the values of its first column.
+func queryStrings(ctx context.Context, db *stdsql.DB, query string) ([]string, error) {
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			return nil, err
+		}
+		out = append(out, value)
+	}
+	return out, rows.Err()
 }
 
 // loadedDoc is a document read by a binding's load query.

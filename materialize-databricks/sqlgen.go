@@ -150,6 +150,7 @@ type templates struct {
 	alterTableColumns       *template.Template
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
+	loadMatchFiles          *template.Template
 	copyIntoDirect          *template.Template
 	createStagingTable      *template.Template
 	copyIntoStaging         *template.Template
@@ -188,14 +189,8 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
-	FROM {{ $.Table.Identifier }}
-	JOIN ({{ template "loadSource" $ }}) AS r
-	{{- range $ind, $bound := $.Bounds }}
-	{{ if $ind }}AND {{ else }}ON {{ end -}}
-	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
-	{{- end }}
+SELECT {{ $.Table.Binding }}, {{ $.LoadAlias }}.{{ $.Table.Document.Identifier }}
+	{{ template "loadJoin" $ }}
 {{ else -}}
 SELECT -1, ""
 {{ end -}}
@@ -204,21 +199,41 @@ SELECT -1, ""
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }}, 
+SELECT {{ $.Table.Binding }},
 to_json(struct(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document
-FROM {{ $.Table.Identifier }}
-JOIN ({{ template "loadSource" $ }}) AS r
-{{- range $ind, $bound := $.Bounds }}
-{{ if $ind }}AND {{ else }}ON {{ end -}}
-{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
-{{- end }}
+{{ template "loadJoin" $ }}
 {{ end }}
+
+-- The first phase of a two-phase load: the files of the table holding rows
+-- that match the load keys, found by reading only the key columns.
+
+{{ define "loadMatchFiles" }}
+SELECT DISTINCT {{ $.LoadAlias }}._metadata.file_path
+	{{ template "loadJoin" $ }}
+{{ end }}
+
+-- The join of the table and the load keys, at the pinned Version and
+-- restricted to MatchedFiles when a two-phase load sets them.
+
+{{ define "loadJoin" -}}
+FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS {{ $.LoadAlias }}{{ end }}
+	JOIN ({{ template "loadSource" $ }}) AS r
+	{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }}AND {{ else }}ON {{ end -}}
+	{{ $.LoadAlias }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- template "boundCondition" (BoundOn $.LoadAlias $bound) }}
+	{{- end }}
+	{{- if $.MatchedFiles }}
+	WHERE {{ $.LoadAlias }}._metadata.file_path IN (
+	{{- range $i, $file := $.MatchedFiles }}{{ if $i }}, {{ end }}{{ Literal $file }}{{ end -}}
+	)
+	{{- end }}
+{{- end }}
 
 -- The range condition of a key column's merge bound: one range of its lower
 -- and upper literals, or the union of its ranges when it has them.
@@ -418,6 +433,7 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		loadMatchFiles:          tplAll.Lookup("loadMatchFiles"),
 		copyIntoDirect:          tplAll.Lookup("copyIntoDirect"),
 		createStagingTable:      tplAll.Lookup("createStagingTable"),
 		copyIntoStaging:         tplAll.Lookup("copyIntoStaging"),
@@ -437,6 +453,19 @@ type tableWithFiles struct {
 	Schema      string
 	// Tables are the staging tables a MERGE reads.
 	Tables []string
+	// Version, when set, pins a load to that version of the table, and
+	// MatchedFiles restricts it to those of the table's files.
+	Version      string
+	MatchedFiles []string
+}
+
+// LoadAlias qualifies the table's columns in a load. A table read at a
+// version has no name to qualify them by, so it's aliased.
+func (t *tableWithFiles) LoadAlias() string {
+	if t.Version != "" {
+		return "l"
+	}
+	return t.Table.Identifier
 }
 
 // boundOn is a merge bound on the key column of the table aliased Alias.
