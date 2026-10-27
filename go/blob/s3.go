@@ -22,9 +22,10 @@ import (
 var _ Bucket = (*S3Bucket)(nil)
 
 type S3Bucket struct {
-	client   *s3.Client
-	bucket   string
-	uploader *manager.Uploader
+	client        *s3.Client
+	bucket        string
+	uploader      *manager.Uploader
+	singleRequest bool
 }
 
 // NewS3Bucket creates an S3 object storage bucket. clientOpts are optional, but
@@ -37,11 +38,7 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 		config.WithCredentialsProvider(creds),
 	}
 
-	httpClient := awshttp.NewBuildableClient().WithTransportOptions(func(tr *http.Transport) {
-		tr.MaxIdleConnsPerHost = 100 // up from the default of 2
-	})
-
-	configOpts = append(configOpts, config.WithHTTPClient(httpClient))
+	configOpts = append(configOpts, config.WithHTTPClient(newS3HTTPClient()))
 
 	// Resolve the region of the bucket. If one is explicitly provided in a
 	// clientOpt, use that directly. If not it must be determined dynamically.
@@ -73,6 +70,28 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 	}, nil
 }
 
+// NewS3SingleRequestBucket creates an S3 object storage bucket whose uploads are
+// each a single PutObject request, so an object's ETag is the MD5 of its bytes.
+// The client is configured only from its arguments, without the host's AWS
+// configuration or a lookup of the bucket's region.
+func NewS3SingleRequestBucket(bucket string, region string, creds aws.CredentialsProvider, clientOpts ...func(*s3.Options)) *S3Bucket {
+	return &S3Bucket{
+		client: s3.New(s3.Options{
+			Region:      region,
+			Credentials: creds,
+			HTTPClient:  newS3HTTPClient(),
+		}, clientOpts...),
+		bucket:        bucket,
+		singleRequest: true,
+	}
+}
+
+func newS3HTTPClient() *awshttp.BuildableClient {
+	return awshttp.NewBuildableClient().WithTransportOptions(func(tr *http.Transport) {
+		tr.MaxIdleConnsPerHost = 100 // up from the default of 2
+	})
+}
+
 func (b *S3Bucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
 	r, err := b.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(b.bucket),
@@ -90,13 +109,24 @@ func (b *S3Bucket) NewWriter(ctx context.Context, key string, opts ...WriterOpti
 }
 
 func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-	_, err := b.uploader.Upload(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket:   aws.String(b.bucket),
 		Key:      aws.String(key),
 		Body:     r,
 		Metadata: getWriterConfig(opts).metadata,
-	})
+	}
 
+	if !b.singleRequest {
+		_, err := b.uploader.Upload(ctx, input)
+		return err
+	}
+
+	body, err := readSeeker(r)
+	if err != nil {
+		return err
+	}
+	input.Body = body
+	_, err = b.client.PutObject(ctx, input)
 	return err
 }
 
