@@ -5,7 +5,8 @@
 - Load, staging and commit queries that run for at least five seconds are
   logged with the metrics Databricks records of them in its query history:
   time spent queued, compiling, executing and returning results, and the
-  files and bytes they read and pruned. The metrics are fetched in the
+  files and bytes they read and pruned. Load and merge queries also log the
+  key bounds they were restricted to. The metrics are fetched in the
   background, without holding up the transaction.
 
 ## 2026-10-26

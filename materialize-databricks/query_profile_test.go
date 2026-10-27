@@ -10,6 +10,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/apierr"
 	dbsql "github.com/databricks/databricks-sdk-go/service/sql"
 	"github.com/databricks/databricks-sql-go/driverctx"
+	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -47,12 +48,12 @@ func testProfiler(history queryHistory, minDuration time.Duration) (*queryProfil
 }
 
 func TestQueryTrace(t *testing.T) {
-	var fields = log.Fields{"resourcePath": []string{"a", "b"}, "query": "merge"}
+	var fields = log.Fields{"resourcePath": []string{"a", "b"}}
 
 	t.Run("nil profiler traces nothing", func(t *testing.T) {
 		var p *queryProfiler
 		var ctx = context.Background()
-		var traced, trace = p.trace(ctx, fields)
+		var traced, trace = p.trace(ctx, "merge", fields)
 		require.Equal(t, ctx, traced)
 		trace.finish(nil, nil)
 		p.stop()
@@ -60,7 +61,7 @@ func TestQueryTrace(t *testing.T) {
 
 	t.Run("queues a slow query with its id and fields", func(t *testing.T) {
 		var p, _ = testProfiler(nil, 0)
-		var ctx, trace = p.trace(context.Background(), fields)
+		var ctx, trace = p.trace(context.Background(), "merge", fields)
 		driverctx.NewContextWithQueryId(ctx, "q1")
 		trace.finish(errors.New("boom"), log.Fields{"docs": 3})
 
@@ -75,12 +76,12 @@ func TestQueryTrace(t *testing.T) {
 
 	t.Run("skips quick queries and queries without an id", func(t *testing.T) {
 		var p, _ = testProfiler(nil, time.Hour)
-		var ctx, trace = p.trace(context.Background(), fields)
+		var ctx, trace = p.trace(context.Background(), "merge", fields)
 		driverctx.NewContextWithQueryId(ctx, "q1")
 		trace.finish(nil, nil)
 
 		p.minDuration = 0
-		_, trace = p.trace(context.Background(), fields)
+		_, trace = p.trace(context.Background(), "merge", fields)
 		trace.finish(nil, nil)
 
 		require.Empty(t, p.queue)
@@ -90,7 +91,7 @@ func TestQueryTrace(t *testing.T) {
 		var p, _ = testProfiler(nil, 0)
 		p.queue = make(chan *profiledQuery, 1)
 		for range 2 {
-			var ctx, trace = p.trace(context.Background(), fields)
+			var ctx, trace = p.trace(context.Background(), "merge", fields)
 			driverctx.NewContextWithQueryId(ctx, "q1")
 			trace.finish(nil, nil)
 		}
@@ -175,6 +176,38 @@ func TestQueryProfilerFetch(t *testing.T) {
 		require.Nil(t, p.history)
 		require.Equal(t, []log.Fields{{"queryId": "q1"}}, *emitted)
 	})
+}
+
+func TestProfileBounds(t *testing.T) {
+	var bound = func(field, lower, upper string, ranges ...sql.MergeRange) sql.MergeBound {
+		var b = sql.MergeBound{LiteralLower: lower, LiteralUpper: upper, Ranges: ranges}
+		b.Field = field
+		return b
+	}
+
+	require.Equal(t, map[string]any{
+		"created_at": map[string]any{
+			"lower":      "'2025-12-16T12:00:00Z'",
+			"upper":      "'2026-10-27T13:30:00.5Z'",
+			"span":       "7561h30m0.5s",
+			"rangesSpan": "15m0.5s",
+			"ranges": [][2]string{
+				{"'2025-12-16T12:00:00Z'", "'2025-12-16T12:00:00Z'"},
+				{"'2026-10-27T13:15:00Z'", "'2026-10-27T13:30:00.5Z'"},
+			},
+		},
+		"day": map[string]any{"lower": "'2026-02-28'", "upper": "'2026-03-02'", "span": "48h0m0s"},
+		"id":  map[string]any{"lower": "'018f'", "upper": "'01a1'"},
+		"ok":  nil,
+	}, profileBounds([]sql.MergeBound{
+		bound("created_at", "'2025-12-16T12:00:00Z'", "'2026-10-27T13:30:00.5Z'",
+			sql.MergeRange{LiteralLower: "'2025-12-16T12:00:00Z'", LiteralUpper: "'2025-12-16T12:00:00Z'"},
+			sql.MergeRange{LiteralLower: "'2026-10-27T13:15:00Z'", LiteralUpper: "'2026-10-27T13:30:00.5Z'"},
+		),
+		bound("day", "'2026-02-28'", "'2026-03-02'"),
+		bound("id", "'018f'", "'01a1'"),
+		bound("ok", "", ""),
+	}))
 }
 
 func TestStatementKind(t *testing.T) {

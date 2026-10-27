@@ -12,6 +12,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/apierr"
 	dbsql "github.com/databricks/databricks-sdk-go/service/sql"
 	"github.com/databricks/databricks-sql-go/driverctx"
+	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -80,15 +81,17 @@ func (p *queryProfiler) stop() {
 // queryTrace measures one query run.
 type queryTrace struct {
 	p       *queryProfiler
+	kind    string
 	fields  log.Fields
 	started time.Time
 	id      atomic.Pointer[string]
 }
 
-// trace starts measuring a query, which must be run with the returned context
-// for the driver to report its ID. A nil profiler traces nothing.
-func (p *queryProfiler) trace(ctx context.Context, fields log.Fields) (context.Context, *queryTrace) {
-	var t = &queryTrace{p: p, fields: fields, started: time.Now()}
+// trace starts measuring a query of the given kind, which must be run with
+// the returned context for the driver to report its ID. A nil profiler traces
+// nothing.
+func (p *queryProfiler) trace(ctx context.Context, kind string, fields log.Fields) (context.Context, *queryTrace) {
+	var t = &queryTrace{p: p, kind: kind, fields: fields, started: time.Now()}
 	if p == nil {
 		return ctx, t
 	}
@@ -104,7 +107,7 @@ func (t *queryTrace) finish(err error, fields log.Fields) {
 		return
 	}
 
-	var q = &profiledQuery{id: *id, fields: log.Fields{"queryId": *id, "took": took.String()}, finished: time.Now()}
+	var q = &profiledQuery{id: *id, fields: log.Fields{"query": t.kind, "queryId": *id, "took": took.String()}, finished: time.Now()}
 	maps.Copy(q.fields, t.fields)
 	maps.Copy(q.fields, fields)
 	if err != nil {
@@ -236,6 +239,54 @@ func queuedMs(mt *dbsql.QueryMetrics) int64 {
 		return 0
 	}
 	return mt.QueryCompilationStartTimestamp - start
+}
+
+// profileBounds describes the key bounds of a load or MERGE: each key field's
+// bound literals and ranges, with the time they span for a date-time key, or
+// null for a field that isn't bounded.
+func profileBounds(bounds []sql.MergeBound) map[string]any {
+	var out = make(map[string]any, len(bounds))
+	for _, b := range bounds {
+		if b.LiteralLower == "" {
+			out[b.Field] = nil
+			continue
+		}
+
+		var bound = map[string]any{"lower": b.LiteralLower, "upper": b.LiteralUpper}
+		if span, ok := literalSpan(b.LiteralLower, b.LiteralUpper); ok {
+			bound["span"] = span.String()
+		}
+		if len(b.Ranges) > 0 {
+			var ranges = make([][2]string, len(b.Ranges))
+			var covered time.Duration
+			for i, r := range b.Ranges {
+				ranges[i] = [2]string{r.LiteralLower, r.LiteralUpper}
+				span, _ := literalSpan(r.LiteralLower, r.LiteralUpper)
+				covered += span
+			}
+			bound["ranges"] = ranges
+			bound["rangesSpan"] = covered.String()
+		}
+		out[b.Field] = bound
+	}
+	return out
+}
+
+// literalSpan is the time from one date-time literal to another.
+func literalSpan(lower, upper string) (time.Duration, bool) {
+	lo, okLower := literalTime(lower)
+	hi, okUpper := literalTime(upper)
+	return hi.Sub(lo), okLower && okUpper
+}
+
+func literalTime(literal string) (time.Time, bool) {
+	var value = strings.Trim(literal, "'")
+	for _, layout := range []string{time.RFC3339Nano, time.DateOnly} {
+		if t, err := time.Parse(layout, value); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // statementKind names a commit query by its leading keyword, such as "merge"
