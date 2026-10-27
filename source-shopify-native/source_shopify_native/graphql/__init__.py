@@ -14,6 +14,7 @@ from .locations.metafields import LocationMetafields
 from .markets import Markets
 from .products.products import Products
 from .products.variants import ProductVariants
+from .products.variant_market_prices import ProductVariantMarketPrices
 from .products.media import ProductMedia
 from .products.metafields import ProductMetafields
 from .products.metafields import ProductVariantMetafields
@@ -48,6 +49,7 @@ __all__ = [
     "Markets",
     "Products",
     "ProductVariants",
+    "ProductVariantMarketPrices",
     "ProductMedia",
     "ProductMetafields",
     "ProductVariantMetafields",

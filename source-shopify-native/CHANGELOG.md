@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-27
+
+### Added
+- New `product_variant_market_prices` stream capturing each product variant's
+  price and compare-at price in each country listed in the new
+  `Market Price Countries` advanced setting.
+
 ## 2026-09-30
 
 ### Changed

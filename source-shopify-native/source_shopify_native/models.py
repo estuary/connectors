@@ -29,8 +29,10 @@ from pydantic import (
     ConfigDict,
     Field,
     PrivateAttr,
+    StringConstraints,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
+    field_validator,
     model_validator,
 )
 
@@ -41,7 +43,7 @@ from .utils import dt_to_str, str_to_dt
 # See: https://shopify.dev/docs/api/usage/access-scopes#authenticated-access-scopes
 scopes = [
     "read_locales",
-    "read_products",  # Products, ProductVariants, Collections, InventoryItems
+    "read_products",  # Products, ProductVariants, ProductVariantMarketPrices, Collections, InventoryItems
     "read_orders",  # Orders, AbandonedCheckouts, Fulfillments, Transactions, Refunds, Risks
     "read_locations",  # Locations
     "read_inventory",  # InventoryItems, InventoryLevels, Locations
@@ -94,6 +96,12 @@ class ShopifyClientCredentials(ClientCredentialsOAuth2Credentials):
         default="Client Credentials",
         json_schema_extra={"type": "string"},
     )
+
+
+# An ISO 3166-1 alpha-2 country code, normalized to the upper case Shopify's CountryCode enum uses.
+CountryCode = Annotated[
+    str, StringConstraints(pattern=r"^[A-Za-z]{2}$", to_upper=True)
+]
 
 
 def default_start_date() -> datetime:
@@ -161,6 +169,21 @@ class EndpointConfig(BaseModel):
             ),
             json_schema_extra={"nonsensitive": True},
         )
+        market_price_countries: list[CountryCode] = Field(
+            default_factory=list,
+            title="Market Price Countries",
+            description=(
+                "Two-letter ISO country codes (ex: GB, DE, US) to capture product variant prices "
+                "for. The product_variant_market_prices stream is only available once at least one "
+                "country is listed."
+            ),
+        )
+
+        @field_validator("market_price_countries")
+        @classmethod
+        def dedupe_market_price_countries(cls, countries: list[str]) -> list[str]:
+            # Drop repeats so each country is requested once.
+            return list(dict.fromkeys(countries))
 
     advanced: Advanced = Field(
         default_factory=Advanced,  # type: ignore
@@ -596,6 +619,9 @@ class ShopifyGraphQLResource(ShopifyDocument):
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
     # Cron expression driving a periodic re-initialization of this stream's binding.
     BACKFILL_SCHEDULE: ClassVar[str] = ""
+    # JSON pointers identifying a document within a store. The collection key prepends
+    # /_meta/store when should_use_composite_key is enabled.
+    KEY: ClassVar[list[str]] = ["/id"]
     # Some resources are only queryable on Shopify Plus / Advanced plans or
     # partner dev stores regardless of granted scopes.
     REQUIRES_PLUS_OR_ADVANCED_PLAN: ClassVar[bool] = False

@@ -31,6 +31,7 @@ from .api import (
     backfill_incremental,
     backfill_incremental_unsorted,
     bulk_fetch_incremental,
+    bulk_fetch_product_variant_market_prices,
     bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
@@ -152,6 +153,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.ProductMedia,
     gql.ProductMetafields,
     gql.ProductVariants,
+    gql.ProductVariantMarketPrices,
     gql.ProductVariantMetafields,
     gql.FulfillmentOrders,
     gql.Fulfillments,
@@ -261,6 +263,15 @@ def _get_available_resources(
         available.add(resource)
 
     return available
+
+
+def _is_enabled_by_config(
+    model: type[ShopifyGraphQLResource], config: EndpointConfig
+) -> bool:
+    """Whether the config gives `model` anything to capture. Market prices need at least one country."""
+    if model is gql.ProductVariantMarketPrices:
+        return bool(config.advanced.market_price_countries)
+    return True
 
 
 def _stores_with_access_to(
@@ -529,13 +540,13 @@ def _build_incremental_resource(
     State format is always dictionary-based: {"inc": {"store_id": {...}}}
 
     Collection key format depends on config.advanced.should_use_composite_key:
-    - True: ["/_meta/store", "/id"]
-    - False: ["/id"]
+    - True: ["/_meta/store", *model.KEY]
+    - False: model.KEY
     """
     key = (
-        ["/_meta/store", "/id"]
+        ["/_meta/store", *model.KEY]
         if config.advanced.should_use_composite_key
-        else ["/id"]
+        else list(model.KEY)
     )
     use_backfill = not model.SHOULD_USE_BULK_QUERIES
     initial_state = _create_initial_state(
@@ -587,7 +598,16 @@ def _build_incremental_resource(
         for store_id in stores_with_access:
             ctx = store_contexts[store_id]
 
-            if model.SHOULD_USE_BULK_QUERIES:
+            if model is gql.ProductVariantMarketPrices:
+                fetch_changes[store_id] = functools.partial(
+                    bulk_fetch_product_variant_market_prices,
+                    ctx.http,
+                    config.advanced.window_size,
+                    ctx.bulk_job_manager,
+                    config.advanced.market_price_countries,
+                    store_id,
+                )
+            elif model.SHOULD_USE_BULK_QUERIES:
                 fetch_changes[store_id] = functools.partial(
                     bulk_fetch_incremental,
                     ctx.http,
@@ -647,7 +667,9 @@ def _build_incremental_resource(
     return Resource(
         name=model.NAME,
         key=key,
-        model=ShopifyGraphQLResource,
+        # A key beyond /id points at fields only the model itself declares, and Flow rejects a
+        # key location its schema doesn't know.
+        model=ShopifyGraphQLResource if model.KEY == ShopifyGraphQLResource.KEY else model,
         open=open,
         initial_state=initial_state,
         schema_inference=True,
@@ -821,6 +843,8 @@ async def discovered_resources(
 
     resources: list[Resource] = []
     for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
+        if not _is_enabled_by_config(model, config):
+            continue
         stores_with_access = _stores_with_access_to(model, store_contexts)
         if stores_with_access:
             resources.append(
@@ -848,6 +872,14 @@ async def bound_resources(
     resources: list[Resource] = []
     for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
         if model.NAME not in bound_stream_names:
+            continue
+
+        if not _is_enabled_by_config(model, config):
+            # Build the resource with no stores so the binding still resolves and opens idle.
+            log.warning(
+                f"Bound stream '{model.NAME}' has nothing to capture with the current config. Its binding will be idle."
+            )
+            resources.append(_build_resource(model, [], store_contexts, config))
             continue
 
         stores_with_access = _stores_with_access_to(model, store_contexts)

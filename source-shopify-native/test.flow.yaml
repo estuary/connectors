@@ -48,6 +48,11 @@ captures:
         schedule: ''
       target: acmeCo/product_variants
     - resource:
+        name: product_variant_market_prices
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/product_variant_market_prices
+    - resource:
         name: product_variant_metafields
         interval: PT5M
         schedule: ''

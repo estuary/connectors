@@ -294,6 +294,26 @@
     }
   ],
   [
+    "acmeCo/product_variant_market_prices",
+    {
+      "_meta": {
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "compareAtPrice": null,
+      "country": "GB",
+      "id": "gid://shopify/ProductVariant/43217823334445",
+      "price": {
+        "amount": "10.0",
+        "currencyCode": "USD"
+      },
+      "product": {
+        "id": "gid://shopify/Product/8086707830829"
+      },
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/product_variant_metafields",
     {
       "__parentId": "gid://shopify/Product/8086707830829",
