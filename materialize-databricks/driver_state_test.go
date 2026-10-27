@@ -29,12 +29,14 @@ const (
 )
 
 func testTransactor(rangeKey string, stateKeys ...string) *transactor {
+	var profiler, _ = testProfiler(nil, 0)
 	var d = &transactor{
 		cp:                    make(connectorState),
 		peerShardsCheckpoints: make(rangeCheckpoints),
 		primary:               rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
 		rangeKey:              rangeKey,
 		be:                    &m.BindingEvents{},
+		profiler:              profiler,
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{

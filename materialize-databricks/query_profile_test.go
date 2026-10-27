@@ -50,15 +50,6 @@ func testProfiler(history queryHistory, minDuration time.Duration) (*queryProfil
 func TestQueryTrace(t *testing.T) {
 	var fields = log.Fields{"resourcePath": []string{"a", "b"}}
 
-	t.Run("nil profiler traces nothing", func(t *testing.T) {
-		var p *queryProfiler
-		var ctx = context.Background()
-		var traced, trace = p.trace(ctx, "merge", fields)
-		require.Equal(t, ctx, traced)
-		trace.finish(nil, nil)
-		p.stop()
-	})
-
 	t.Run("queues a slow query with its id and fields", func(t *testing.T) {
 		var p, _ = testProfiler(nil, 0)
 		var ctx, trace = p.trace(context.Background(), "merge", fields)
