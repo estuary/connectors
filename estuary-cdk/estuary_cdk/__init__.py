@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
-from typing import Any, TypeVar, Callable, AsyncGenerator, Generic
+from typing import Any, ClassVar, TypeVar, Callable, AsyncGenerator, Generic
 import abc
 from types import FrameType
 import asyncio
@@ -10,7 +10,7 @@ import sys
 import traceback
 
 from .logger import init_logger, FlowLogger
-from .flow import ValidationError
+from .flow import ValidationError, set_retain_projections
 from .utils import get_running_tasks_info
 
 # Request type served by this connector.
@@ -56,6 +56,15 @@ class Stopped(Exception):
 # BaseConnector from which all Flow Connectors inherit.
 class BaseConnector(Generic[Request], abc.ABC):
 
+    retain_projections: ClassVar[bool] = True
+    """Whether this connector reads `CollectionSpec.projections`.
+
+    Set it to False to drop them as each specification is parsed, which costs
+    nothing and saves a capture of many fields tens of megabytes held for its
+    whole life. A connector which reads `binding.collection.projections` --
+    a materialization computing its field selection, say -- leaves it True.
+    """
+
     # request_class() returns the concrete class instance for Request served
     # by this connector. It's required to implement to enable parsing of
     # Requests prior to their being dispatched by the connector.
@@ -90,6 +99,8 @@ class BaseConnector(Generic[Request], abc.ABC):
             log = init_logger()
 
         assert isinstance(log, FlowLogger)  # Narrow type to non-None.
+
+        set_retain_projections(self.retain_projections)
 
         loop = asyncio.get_running_loop()
         this_task = asyncio.current_task(loop)

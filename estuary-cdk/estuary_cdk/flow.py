@@ -121,6 +121,23 @@ class Projection(BaseModel):
     inference: Inference = Inference()
 
 
+# Whether a parsed CollectionSpec keeps its `projections`. Flow sends one
+# projection per field of every bound collection, which a task holds for its
+# whole life: a capture of a few thousand fields pays tens of megabytes of a
+# one-gigabyte budget for them. A connector which doesn't read `projections`
+# declares `retain_projections = False`, and `serve()` records it here before
+# the first request is parsed, so the projections are dropped as they're read
+# rather than built and discarded.
+_retain_projections = True
+
+
+def set_retain_projections(retain: bool) -> None:
+    """Record a connector's `retain_projections`, for `serve()` to call before
+    any specification is parsed."""
+    global _retain_projections
+    _retain_projections = retain
+
+
 class CollectionSpec(BaseModel):
     name: str
     key: list[str]
@@ -128,6 +145,11 @@ class CollectionSpec(BaseModel):
     readSchema: dict[str, Any] | None = None
     partitionFields: list[str] = []
     projections: list[Projection] = []
+
+    @field_validator("projections", mode="before")
+    @classmethod
+    def _drop_projections(cls, value: Any) -> Any:
+        return value if _retain_projections else []
 
 
 # A binding or transform of a message names its collection in one of two forms.
