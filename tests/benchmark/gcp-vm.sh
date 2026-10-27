@@ -161,8 +161,12 @@ do_sync() {
   # rules every connector's main package is silently dropped and nothing
   # can be built on the VM. First matching rule wins, so they precede the
   # merge.
+  #
+  # The --exclude-from option excludes directories containing CACHEDIR.TAG,
+  # such as any rust target directories.
   rsync -az \
     --exclude='.git' \
+	--exclude-from=<(find . -name CACHEDIR.TAG -printf '%h/\n' | sed 's|^\.||') \
     --filter='+ /*/cmd/connector/' \
     --filter='+ /*/cmd/connector/**' \
     --filter=':- .gitignore' \

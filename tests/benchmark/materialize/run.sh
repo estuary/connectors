@@ -21,6 +21,7 @@
 #                            #   or    <connector>/testdata/config.yaml
 #     [--docker]             # run connector as Docker image (default: local binary)
 #     [--seed N]             # default: 0
+#     [--no-docker-compose]  # if set skip docker compose setup; implies --keep
 #     [--keep]               # don't tear down docker-compose on exit
 #     [--out-dir DIR]        # default: tests/benchmark/materialize/runs/<ts>
 #     [--shard-flag K=V]     # task shard flag, repeatable. Needed where a
@@ -50,6 +51,7 @@ CONFIG=""
 SEED=0
 KEEP=0
 OUT_DIR=""
+DOCKER_COMPOSE=1
 DOCKER=0
 SHARD_FLAGS=()
 TABLE_SUFFIX=""
@@ -62,6 +64,7 @@ while (($#)); do
     --scenario)  SCENARIO="$2";  shift 2 ;;
     --config)    CONFIG="$2";    shift 2 ;;
     --seed)      SEED="$2";      shift 2 ;;
+    --no-docker-compose) DOCKER_COMPOSE=0; KEEP=1; shift ;;
     --keep)      KEEP=1;         shift   ;;
     --docker)    DOCKER=1;       shift   ;;
     --out-dir)   OUT_DIR="$2";   shift 2 ;;
@@ -104,17 +107,28 @@ fi
 if (( DOCKER )); then
   echo "building docker image for $CONNECTOR"
   (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
+elif [[ -f "$ROOT_DIR/$CONNECTOR/Cargo.toml" ]]; then
+  CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
+  if [[ -x "$CONNECTOR_BIN" ]]; then
+	  echo "using prebuilt connector binary: $CONNECTOR_BIN due to presence of Cargo.toml"
+  else
+	  echo "no binary found at $CONNECTOR_BIN; expected due to presence of Cargo.toml" >&2
+	  exit 1
+  fi
 else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
   # Connectors structured as a library plus a cmd/ main (all the SQL ones)
   # match more than one package under ./<connector>/..., which `go build -o
   # <file>` refuses. Prefer the cmd package when there is one.
-  if [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
+  if [[ -d "$ROOT_DIR/$CONNECTOR/cmd/connector" ]]; then
+    BUILD_PKG="./$CONNECTOR/cmd/connector/..."
+  elif [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
     BUILD_PKG="./$CONNECTOR/cmd/..."
   else
     BUILD_PKG="./$CONNECTOR/..."
   fi
   echo "building connector binary: $CONNECTOR_BIN (from $BUILD_PKG)"
+  echo go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG"
   (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG")
   # "go build -o" against a pattern that matches no main package compiles the
   # libraries and exits 0 without writing anything, which surfaces much later
@@ -152,20 +166,22 @@ echo "task:      $TASK"
 # Bring up the connector's docker-compose stack (DB only). Some connectors
 # keep it under tests/materialize/<connector>/ (the integration-test convention),
 # others keep it at the connector root. Try both.
-COMPOSE_FILE=""
-for cand in \
-  "$ROOT_DIR/tests/materialize/$CONNECTOR/docker-compose.yaml" \
-  "$ROOT_DIR/$CONNECTOR/docker-compose.yaml"
-do
-  if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
-done
-if [[ -n "$COMPOSE_FILE" ]]; then
-  echo "starting docker-compose: $COMPOSE_FILE"
-  docker compose -f "$COMPOSE_FILE" up --wait
-  # Same grace period as tests/materialize/<connector>/setup.sh.
-  sleep 5
-else
-  echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
+if (( DOCKER_COMPOSE )); then
+	COMPOSE_FILE=""
+	for cand in \
+	  "$ROOT_DIR/tests/materialize/$CONNECTOR/docker-compose.yaml" \
+	  "$ROOT_DIR/$CONNECTOR/docker-compose.yaml"
+	do
+	  if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
+	done
+	if [[ -n "$COMPOSE_FILE" ]]; then
+	  echo "starting docker-compose: $COMPOSE_FILE"
+	  docker compose -f "$COMPOSE_FILE" up --wait
+	  # Same grace period as tests/materialize/<connector>/setup.sh.
+	  sleep 5
+	else
+	  echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
+	fi
 fi
 
 # clean up the destination resources using testctl
