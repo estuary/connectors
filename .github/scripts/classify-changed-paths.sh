@@ -38,6 +38,9 @@ rust_all=false
 rust_dirs=()
 rust_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT/.github/rust-connectors.yaml")
 
+# Every connector directory, from all three lanes' lists.
+all_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT"/.github/{python,go,rust}-connectors.yaml)
+
 # Which Rust connectors a path in the Go & Rust lane affects. A Rust
 # connector's image is built only from its own directory and base-image, so
 # path rules are enough. Anything they don't recognise builds every one.
@@ -105,7 +108,15 @@ while IFS= read -r path || [ -n "$path" ]; do
     lane=""
     case "$path" in
         # Documentation and agent tooling build nothing.
-        *.md | docs/* | .claude/*) lane="none" ;;
+        docs/* | .claude/*) lane="none" ;;
+        # Except a connector's own docs, such as its README or CHANGELOG. A
+        # change to them says the connector changed, so they build it like
+        # any other file in its directory.
+        *.md)
+            if ! grep -qxF "${path%%/*}" <<< "$all_connectors"; then
+                lane="none"
+            fi
+            ;;
 
         # Each workflow is triggered by edits to itself so a change to one
         # verifies itself rather than waiting on an unrelated connector edit.
