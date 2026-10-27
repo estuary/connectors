@@ -7,7 +7,6 @@ import (
 	stdsql "database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -33,6 +32,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
@@ -644,32 +644,13 @@ func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, load bin
 
 // tableVersion is the latest version of a Delta table.
 func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64, error) {
-	rows, err := db.QueryContext(ctx, "DESCRIBE HISTORY "+identifier+" LIMIT 1")
-	if err != nil {
+	var latest struct {
+		Version int64 `db:"version"`
+	}
+	if err := sqlx.NewDb(db, "databricks").Unsafe().GetContext(ctx, &latest, "DESCRIBE HISTORY "+identifier+" LIMIT 1"); err != nil {
 		return 0, fmt.Errorf("describing history of %s: %w", identifier, err)
 	}
-	defer rows.Close()
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return 0, err
-	}
-	var idx = slices.Index(cols, "version")
-	if idx < 0 || !rows.Next() {
-		return 0, errors.Join(fmt.Errorf("no version in the history of %s", identifier), rows.Err())
-	}
-	var vals = make([]any, len(cols))
-	var dest = make([]any, len(cols))
-	for i := range vals {
-		dest[i] = &vals[i]
-	}
-	if err := rows.Scan(dest...); err != nil {
-		return 0, fmt.Errorf("scanning history of %s: %w", identifier, err)
-	}
-	if version, ok := vals[idx].(int64); ok {
-		return version, nil
-	}
-	return 0, fmt.Errorf("history of %s has version %v of type %T", identifier, vals[idx], vals[idx])
+	return latest.Version, nil
 }
 
 // queryStrings runs a query and returns the values of its first column.
