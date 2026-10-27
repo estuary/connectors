@@ -25,6 +25,8 @@ from .resources import all_resources, validate_credentials
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
 ):
+    retain_projections = False
+
     def request_class(self):
         return Request[EndpointConfig, ResourceConfigWithSchedule, ConnectorState]
 

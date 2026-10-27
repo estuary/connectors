@@ -31,6 +31,8 @@ REQUESTS_PER_MINUTE = 30
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
 ):
+    retain_projections = False
+
     _request_times: deque[float] = deque()
     _request_lock = asyncio.Lock()
 
