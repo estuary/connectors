@@ -295,8 +295,12 @@ type mysqlReplicationStream struct {
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 	gtidString    string    // The GTID value of the last GTID event, formatted as a "<uuid>:<counter>" string.
 
-	uncommittedChanges      bool // True when there have been row changes since the last commit was processed.
-	nonTransactionalChanges bool // True when there have been row changes *on non-transactional tables* since the last commit was processed.
+	// withinTransaction is true from a transaction's BEGIN query event or first
+	// table map event until its XID or COMMIT event. Implicit flushes are
+	// suppressed while it is set. A cursor inside a transaction is not a valid
+	// resume point, because the row events after it reference table map events
+	// which a new binlog connection never receives.
+	withinTransaction bool
 
 	// The active tables set and associated metadata, guarded by a
 	// mutex so it can be modified from the main goroutine while it's
@@ -493,11 +497,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 					return err
 				}
-				rs.uncommittedChanges = false      // Reset uncommitted changes
-				rs.nonTransactionalChanges = false // Reset uncommitted non-transactional changes
 			}
+			rs.withinTransaction = false
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")
+			rs.withinTransaction = true
 		case *replication.GTIDEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("data", data).Trace("GTID Event")
@@ -516,20 +520,22 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			if string(data.Query) == "COMMIT" && rs.nonTransactionalChanges {
-				// If there are uncommitted non-transactional changes, we should treat a
-				// "COMMIT" query event as a transaction commit. This logic should match
-				// the XIDEvent handling.
-				if !binlogOffsetOverflow {
-					if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
-						return err
-					}
-					rs.uncommittedChanges = false      // Reset all uncommitted changes
-					rs.nonTransactionalChanges = false // Reset uncommitted non-transactional changes
-				}
-			} else {
+			switch query := string(data.Query); query {
+			case "BEGIN":
+				// A BEGIN query event opens a transaction. On MariaDB with GTIDs
+				// enabled there is no BEGIN event, and the transaction is opened by
+				// its first table map event.
+				rs.withinTransaction = true
+			case "COMMIT", "ROLLBACK":
+				// A transaction on non-transactional tables such as MyISAM ends with a
+				// COMMIT query event in place of an XID event, or with a ROLLBACK query
+				// event when it is rolled back after writing to such a table. The
+				// implicit flush below reports the commit.
 				implicitFlush = true // Implicit FlushEvent conversion permitted
-				if err := rs.handleQuery(ctx, parser, string(data.Schema), string(data.Query)); err != nil {
+				rs.withinTransaction = false
+			default:
+				implicitFlush = true // Implicit FlushEvent conversion permitted
+				if err := rs.handleQuery(ctx, parser, string(data.Schema), query); err != nil {
 					return fmt.Errorf("error processing query event: %w", err)
 				}
 			}
@@ -539,6 +545,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			cursor.Pos = uint32(data.Position)
 			binlogOffsetOverflow = false
 			binlogEstimatedOffset = uint64(data.Position)
+			// A transaction never spans binlog files, so a genuine rotate ends any
+			// open one. The artificial rotate event at the start of every binlog
+			// dump (including the re-sync which go-mysql performs after a dropped
+			// connection) only restates the position the dump begins at, which may
+			// be inside a transaction.
+			if event.Header.Flags&replication.LOG_EVENT_ARTIFICIAL_F == 0 {
+				rs.withinTransaction = false
+			}
 			logrus.WithFields(logrus.Fields{
 				"name": cursor.Name,
 				"pos":  cursor.Pos,
@@ -589,11 +603,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
 
-		// If the binlog event is eligible for implicit FlushEvent reporting and there
-		// are no uncommitted changes currently pending (for which we would want to wait
-		// until a real commit event to flush the output) then report a new FlushEvent
-		// with the latest position.
-		if implicitFlush && !rs.uncommittedChanges && !binlogOffsetOverflow {
+		// If the binlog event is eligible for implicit FlushEvent reporting and we
+		// are not inside a transaction then report a new FlushEvent with the
+		// latest position.
+		if implicitFlush && !rs.withinTransaction && !binlogOffsetOverflow {
 			if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 				return err
 			}
@@ -616,8 +629,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	if !rs.tableActive(streamID) {
 		return rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{})
 	}
-
-	var nonTransactionalTable = rs.isNonTransactional(streamID)
 
 	// Get column names and types from persistent metadata. If available, allow
 	// override the persistent column name tracking using binlog row metadata.
@@ -816,12 +827,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	for _, event := range events {
 		if err := rs.emitEvent(ctx, event); err != nil {
 			return err
-		}
-	}
-	if len(events) > 0 {
-		rs.uncommittedChanges = true // Set uncommitted changes flag
-		if nonTransactionalTable {
-			rs.nonTransactionalChanges = true // Set uncommitted non-transactional changes flag
 		}
 	}
 	return nil
