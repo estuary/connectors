@@ -18,6 +18,8 @@ use arrow::record_batch::RecordBatch;
 use bytes::Bytes;
 use futures::TryStreamExt;
 use object_store::ClientOptions;
+use object_store::GetOptions;
+use object_store::GetRange;
 use object_store::ObjectStore;
 use object_store::ObjectStoreExt;
 use object_store::PutPayload;
@@ -165,7 +167,7 @@ pub async fn run_transactions(input: &mut Input, output: Output, open: Open) -> 
     // position is visible even when it happens well short of any binding's
     // `DEFAULT_LOAD_BATCH_SIZE` threshold (which logs nothing on its own).
     let mut loads_this_transaction: u64 = 0;
-    const LOAD_COUNT_LOG_INTERVAL: u64 = 10_000;
+    const LOAD_COUNT_LOG_INTERVAL: u64 = 100_000;
 
     // The prior transaction's `Acknowledge` commit, running in the
     // background so `Load` keeps being read and staged while it's still in
@@ -421,37 +423,72 @@ async fn flush_pending_loads(
         .await
         .context("completing Load staging upload")?;
 
-    let mut stream = catalog
+    let total_len = catalog
         .object_store
-        .get(&binding.pending_loads_path)
+        .head(&binding.pending_loads_path)
         .await
         .context("reading staged Load keys")?
-        .into_stream();
+        .size;
 
     // Records (see `write_pending_load_record`) can straddle the boundary
-    // between successive chunks the stream hands back, so whatever's left
-    // over after parsing as many whole records as `pending` currently holds
+    // between successive chunks a stream hands back, so whatever's left over
+    // after parsing as many whole records as `pending` currently holds
     // carries forward to be completed by the next chunk.
+    let mut offset: u64 = 0;
     let mut pending: Vec<u8> = Vec::new();
     let mut batch: Vec<Bytes> = Vec::new();
-    while let Some(chunk) = stream
-        .try_next()
-        .await
-        .context("reading staged Load keys")?
-    {
-        pending.extend_from_slice(&chunk);
+    while offset < total_len {
+        // A fresh ranged read every time we resume here (rather than one
+        // stream held open across the whole file) so the object store
+        // connection is never left idle while `scan_and_emit_loaded` runs —
+        // that scan can take tens of seconds, comfortably past
+        // `REQUEST_TIMEOUT`, and an idle GCS/S3 stream left open across it
+        // fails with a timeout reading the stream's next chunk.
+        let mut stream = catalog
+            .object_store
+            .get_opts(
+                &binding.pending_loads_path,
+                GetOptions {
+                    range: Some(GetRange::Offset(offset)),
+                    ..Default::default()
+                },
+            )
+            .await
+            .context("reading staged Load keys")?
+            .into_stream();
 
-        let mut consumed = 0;
-        while let Some((key_packed, record_len)) = take_pending_load_record(&pending[consumed..])
+        while let Some(chunk) = stream
+            .try_next()
+            .await
+            .context("reading staged Load keys")?
         {
-            consumed += record_len;
-            batch.push(key_packed);
+            offset += chunk.len() as u64;
+            pending.extend_from_slice(&chunk);
+
+            let mut consumed = 0;
+            while let Some((key_packed, record_len)) =
+                take_pending_load_record(&pending[consumed..])
+            {
+                consumed += record_len;
+                batch.push(key_packed);
+                if batch.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
+                    break;
+                }
+            }
+            pending.drain(..consumed);
+
             if batch.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
-                scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
-                batch.clear();
+                break;
             }
         }
-        pending.drain(..consumed);
+        // `stream` drops here, closing its connection before the scan below
+        // runs — the whole point of re-opening per batch instead of reusing
+        // one stream across the file.
+
+        if batch.len() >= scan::DEFAULT_LOAD_BATCH_SIZE {
+            scan_and_emit_loaded(catalog, output, index, binding, &batch).await?;
+            batch.clear();
+        }
     }
     anyhow::ensure!(pending.is_empty(), "staged Load keys ended mid-record");
 

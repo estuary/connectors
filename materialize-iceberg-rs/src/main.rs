@@ -46,7 +46,7 @@ fn main() {
     setup_logging();
 
     if let Err(err) = run() {
-        tracing::error!(error = %err, "connector exiting");
+        tracing::error!(error = ?err, "connector exiting");
         std::process::exit(1);
     }
 }

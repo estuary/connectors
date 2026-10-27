@@ -654,14 +654,6 @@ impl DataFileIter {
                 {
                     Some(batch) => {
                         self.decoded_bytes += batch.get_array_memory_size();
-                        tracing::info!(
-                            file_path = %self.file_path,
-                            batch_rows = batch.num_rows(),
-                            batch_decoded_bytes = batch.get_array_memory_size(),
-                            decoded_bytes_so_far = self.decoded_bytes,
-                            row_group_compressed_bytes = self.row_group_compressed_bytes,
-                            "decoded parquet batch"
-                        );
                         self.current = Some(batch);
                         self.current_row = 0;
                     }
