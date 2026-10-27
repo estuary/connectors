@@ -24,6 +24,8 @@ from source_gainsight_nxt.models import (
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
 ):
+    retain_projections = False
+
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 

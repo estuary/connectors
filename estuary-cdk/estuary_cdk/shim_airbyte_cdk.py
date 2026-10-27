@@ -217,6 +217,8 @@ def set_additional_properties_false(schema: Any) -> Any:
 
 @dataclass
 class CaptureShim(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState]):
+    retain_projections = False
+
     delegate: AirbyteSource
     schema_inference: bool
     oauth2: OAuth2Spec | None
