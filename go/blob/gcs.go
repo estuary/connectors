@@ -74,13 +74,15 @@ func (b *GCSBucket) NewWriter(ctx context.Context, key string, opts ...WriterOpt
 }
 
 func (b *GCSBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+	cfg := getWriterConfig(opts)
 	w := b.newObjectWriter(ctx, key)
-	w.Metadata = getWriterConfig(opts).metadata
+	w.Metadata = cfg.metadata
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("copying r to w: %w", err)
 	} else if err := w.Close(); err != nil {
 		return fmt.Errorf("closing writer: %w", err)
 	}
+	cfg.setETag(w.Attrs().Etag)
 
 	return nil
 }

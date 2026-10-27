@@ -109,16 +109,21 @@ func (b *S3Bucket) NewWriter(ctx context.Context, key string, opts ...WriterOpti
 }
 
 func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+	cfg := getWriterConfig(opts)
 	input := &s3.PutObjectInput{
 		Bucket:   aws.String(b.bucket),
 		Key:      aws.String(key),
 		Body:     r,
-		Metadata: getWriterConfig(opts).metadata,
+		Metadata: cfg.metadata,
 	}
 
 	if !b.singleRequest {
-		_, err := b.uploader.Upload(ctx, input)
-		return err
+		out, err := b.uploader.Upload(ctx, input)
+		if err != nil {
+			return err
+		}
+		cfg.setETag(aws.ToString(out.ETag))
+		return nil
 	}
 
 	body, err := readSeeker(r)
@@ -126,8 +131,12 @@ func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...
 		return err
 	}
 	input.Body = body
-	_, err = b.client.PutObject(ctx, input)
-	return err
+	out, err := b.client.PutObject(ctx, input)
+	if err != nil {
+		return err
+	}
+	cfg.setETag(aws.ToString(out.ETag))
+	return nil
 }
 
 func (b *S3Bucket) URI(key string) string {

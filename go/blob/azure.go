@@ -133,17 +133,29 @@ func (b *AzureBlobBucket) Upload(ctx context.Context, key string, r io.Reader, o
 	}
 
 	if !b.singleRequest {
-		_, err := b.client.UploadStream(ctx, b.container, key, r, &azblob.UploadStreamOptions{Metadata: meta})
-		return err
+		resp, err := b.client.UploadStream(ctx, b.container, key, r, &azblob.UploadStreamOptions{Metadata: meta})
+		if err != nil {
+			return err
+		}
+		if resp.ETag != nil {
+			cfg.setETag(string(*resp.ETag))
+		}
+		return nil
 	}
 
 	body, err := readSeeker(r)
 	if err != nil {
 		return err
 	}
-	_, err = b.client.ServiceClient().NewContainerClient(b.container).NewBlockBlobClient(key).
+	resp, err := b.client.ServiceClient().NewContainerClient(b.container).NewBlockBlobClient(key).
 		Upload(ctx, streaming.NopCloser(body), &blockblob.UploadOptions{Metadata: meta})
-	return err
+	if err != nil {
+		return err
+	}
+	if resp.ETag != nil {
+		cfg.setETag(string(*resp.ETag))
+	}
+	return nil
 }
 
 func (b *AzureBlobBucket) URI(key string) string {
