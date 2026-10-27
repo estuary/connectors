@@ -323,7 +323,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 		var db = recordingDB(t, conflict)
 		recording.failFirst = 2
 
-		require.NoError(t, d.execQueries(context.Background(), db, []string{"COPY"}, false, noReport))
+		require.NoError(t, d.execQueries(context.Background(), db, nil, []string{"COPY"}, false, noReport))
 		require.Equal(t, 3, recording.attempts)
 		require.Equal(t, []string{"COPY"}, recording.executed)
 	})
@@ -331,7 +331,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 	t.Run("gives up after the retry budget", func(t *testing.T) {
 		var db = recordingDB(t, conflict)
 
-		var err = d.execQueries(context.Background(), db, []string{"COPY"}, false, noReport)
+		var err = d.execQueries(context.Background(), db, nil, []string{"COPY"}, false, noReport)
 		require.ErrorIs(t, err, conflict)
 		require.Equal(t, maxQueryRetries+1, recording.attempts)
 	})
@@ -339,7 +339,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 	t.Run("other errors are not retried", func(t *testing.T) {
 		var db = recordingDB(t, fmt.Errorf("[DELTA_CONCURRENT_APPEND] something else"))
 
-		require.Error(t, d.execQueries(context.Background(), db, []string{"COPY"}, false, noReport))
+		require.Error(t, d.execQueries(context.Background(), db, nil, []string{"COPY"}, false, noReport))
 		require.Equal(t, 1, recording.attempts)
 	})
 
@@ -350,7 +350,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		var err = d.execQueries(ctx, db, []string{"COPY"}, false, noReport)
+		var err = d.execQueries(ctx, db, nil, []string{"COPY"}, false, noReport)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Equal(t, 1, recording.attempts)
 	})

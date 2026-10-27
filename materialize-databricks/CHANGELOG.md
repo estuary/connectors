@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-27
+### Added
+- Load, staging and commit queries that run for at least five seconds are
+  logged with the metrics Databricks records of them in its query history:
+  time spent queued, compiling, executing and returning results, and the
+  files and bytes they read and pruned. The metrics are fetched in the
+  background, without holding up the transaction.
+
 ## 2026-10-26
 ### Changed
 - A transaction's tables are loaded with one query each, up to five at a time,
