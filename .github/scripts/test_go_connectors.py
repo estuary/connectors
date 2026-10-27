@@ -204,6 +204,10 @@ class TestRealGraph(unittest.TestCase):
         verdict = classify("estuary-cdk/estuary_cdk/http.py", graph=self.graph)
         self.assertEqual(go_connectors(verdict), ["materialize-snowflake"])
 
+    def test_connector_docs_build_only_that_connector(self):
+        got = go_connectors(classify("source-postgres/CHANGELOG.md", graph=self.graph))
+        self.assertEqual(got, ["source-postgres"])
+
     def test_python_connector_builds_no_go_connector(self):
         verdict = classify("source-sentry/source_sentry/api.py", graph=self.graph)
         self.assertEqual(go_connectors(verdict), [])

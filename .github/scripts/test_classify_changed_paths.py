@@ -121,8 +121,16 @@ class TestLanes(unittest.TestCase):
             classify(".claude/skills/add-stream/SKILL.md"), (False, False, [])
         )
 
-    def test_connector_changelog_is_neither(self):
-        self.assertEqual(classify("source-postgres/CHANGELOG.md"), (False, False, []))
+    def test_connector_docs_build_that_connector(self):
+        self.assertEqual(classify("source-postgres/CHANGELOG.md"), (False, True, []))
+        self.assertEqual(
+            classify("source-sentry/README.md"), (True, False, ["source-sentry"])
+        )
+
+    def test_shared_docs_are_neither(self):
+        for path in ["README.md", "sqlcapture/README.md", "estuary-cdk/README.md"]:
+            with self.subTest(path=path):
+                self.assertEqual(classify(path), (False, False, []))
 
     def test_each_workflow_triggers_itself(self):
         self.assertEqual(classify(".github/workflows/python.yaml"), (True, False, ALL))
@@ -234,8 +242,8 @@ class TestPythonConnectors(unittest.TestCase):
     def test_go_only_change_builds_none(self):
         self.assertEqual(classify("source-postgres/main.go")[2], [])
 
-    def test_connector_docs_build_none(self):
-        self.assertEqual(classify("source-sentry/CHANGELOG.md")[2], [])
+    def test_connector_docs_build_that_connector(self):
+        self.assertEqual(classify("source-sentry/CHANGELOG.md")[2], ["source-sentry"])
 
 
 class TestCdk(unittest.TestCase):
@@ -280,6 +288,10 @@ class TestRustConnectors(unittest.TestCase):
             rust("source-kafka/src/main.rs", "source-http-ingest/VERSION"),
             ["source-http-ingest", "source-kafka"],
         )
+
+    def test_rust_connector_docs_build_it(self):
+        self.assertEqual(rust("source-kafka/README.md"), ["source-kafka"])
+        self.assertEqual(rust("source-postgres/README.md"), [])
 
     def test_go_code_builds_no_rust_connector(self):
         for path in [
