@@ -72,10 +72,8 @@ func newQueryProfiler(history queryHistory) *queryProfiler {
 
 // stop ends the profiler, dropping the queries still awaiting their history.
 func (p *queryProfiler) stop() {
-	if p != nil {
-		p.cancel()
-		<-p.done
-	}
+	p.cancel()
+	<-p.done
 }
 
 // queryTrace measures one query run.
@@ -88,13 +86,9 @@ type queryTrace struct {
 }
 
 // trace starts measuring a query of the given kind, which must be run with
-// the returned context for the driver to report its ID. A nil profiler traces
-// nothing.
+// the returned context for the driver to report its ID.
 func (p *queryProfiler) trace(ctx context.Context, kind string, fields log.Fields) (context.Context, *queryTrace) {
 	var t = &queryTrace{p: p, kind: kind, fields: fields, started: time.Now()}
-	if p == nil {
-		return ctx, t
-	}
 	return driverctx.NewContextWithQueryIdCallback(ctx, func(id string) { t.id.Store(&id) }), t
 }
 
@@ -103,7 +97,7 @@ func (p *queryProfiler) trace(ctx context.Context, kind string, fields log.Field
 func (t *queryTrace) finish(err error, fields log.Fields) {
 	var took = time.Since(t.started)
 	var id = t.id.Load()
-	if t.p == nil || id == nil || took < t.p.minDuration {
+	if id == nil || took < t.p.minDuration {
 		return
 	}
 
