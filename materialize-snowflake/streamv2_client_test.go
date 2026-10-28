@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -317,4 +318,21 @@ func TestStreamV2ClientWaitCommitPollsOnePipeOnce(t *testing.T) {
 	require.Len(t, polls, 2)
 	require.ElementsMatch(t, []string{"CH0", "CH1"}, polls[0])
 	require.Equal(t, []string{"CH1"}, polls[1])
+}
+
+// TestStreamV2ClientWaitCommitFailsOnAForeignKeyRange covers a channel whose
+// committed offset token carries the awaited offset under another key range,
+// which only another writer can have committed. The wait fails at once.
+func TestStreamV2ClientWaitCommitFailsOnAForeignKeyRange(t *testing.T) {
+	var half = streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32 / 2}
+	var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"channel_statuses":{"CH":{"channel_status_code":"SUCCESS","last_committed_offset_token":%q}}}`,
+			streamV2FormatOffsetToken(2, half))
+	})
+	c.channels["CH"] = &streamV2OpenChannel{pipePath: streamV2PipePath("DB", "SCH", "T")}
+
+	var ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var _, err = c.WaitCommit(ctx, map[string]string{"CH": streamV2FormatOffsetToken(2, fullKeyRange)})
+	require.ErrorContains(t, err, "something other than this task is appending to the channel")
 }
