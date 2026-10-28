@@ -1,0 +1,41 @@
+info:
+  name: Delete Campaign
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{base_url}}/campaign/status/update/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "campaign_ids": [
+          "{{seed_deleted_campaign_id}}"
+        ],
+        "operation_status": "DELETE"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_deleted_adgroup_id') && !bru.getEnvVar('seed_deleted_adgroup_id')) await bru.runRequest('Seeding/Create Ad To Delete');
+        if (!bru.getVar('seed_deleted_campaign_id')) throw new Error('no seeded campaign to delete');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Update the status of campaigns" (`POST /open_api/v1.3/campaign/status/update/`).
+
+  **WHY:** deletes only the campaign `Create Campaign To Delete` made, after
+  its ad group and ad exist. Deletion is irreversible, which is why this never
+  takes an id from anywhere but that chained request.
+
+  **PENDING:** not yet run.

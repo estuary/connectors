@@ -1,0 +1,47 @@
+info:
+  name: Rename Campaign For Lag Probe
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{base_url}}/campaign/update/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "campaign_id": "{{lag_probe_campaign_id}}",
+        "campaign_name": "Estuary Seed Campaign lag probe {{$timestamp}}"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // The live campaign `Seeding / Create Campaign` made.
+        if (!bru.getVar('lag_probe_campaign_id')) bru.setVar('lag_probe_campaign_id', '1878524808566049');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok Business API SDK, `js_sdk/docs/CampaignCreationApi.md`
+  and `CampaignUpdateBody.md` (`POST /open_api/v1.3/campaign/update/`), in
+  https://github.com/tiktok/tiktok-business-api-sdk.
+
+  **Only the user runs this; never the assistant.**
+
+  **WHY:** gives the live seed campaign a new name, and so a new `modify_time`,
+  for `Campaigns / List Campaigns (visibility after rename)` to time how long
+  `campaign/get` takes to show the change. Entity polls stop
+  `EVENTUAL_CONSISTENCY_DELAY` behind the present on the assumption that
+  listings show a change within it. The name carries a timestamp, so each run
+  is a distinct change. Run `Seeding / Restore Campaign Name` afterwards.
+
+  **Outcome:** ran 2026-10-24, three times; finding VERIFIED in `Campaigns /
+  List Campaigns (visibility after rename)`.

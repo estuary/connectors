@@ -1,0 +1,65 @@
+info:
+  name: Create Ad Group
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/adgroup/create/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "campaign_id": "{{seed_campaign_id}}",
+        "adgroup_name": "Estuary Seed Ad Group",
+        "placement_type": "PLACEMENT_TYPE_NORMAL",
+        "placements": [
+          "PLACEMENT_TIKTOK"
+        ],
+        "location_ids": [
+          "6252001"
+        ],
+        "budget_mode": "BUDGET_MODE_DAY",
+        "budget": 50,
+        "schedule_type": "SCHEDULE_FROM_NOW",
+        "schedule_start_time": "{{seed_schedule_start}}",
+        "optimization_goal": "REACH",
+        "billing_event": "CPM",
+        "bid_type": "BID_TYPE_NO_BID",
+        "pacing": "PACING_MODE_SMOOTH",
+        "frequency": 2,
+        "frequency_schedule": 3,
+        "operation_status": "DISABLE"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_campaign_id') && !bru.getEnvVar('seed_campaign_id')) await bru.runRequest('Seeding/Create Campaign');
+        // TikTok rejects a start time in the past; start an hour from now, in UTC.
+        const start = new Date(Date.now() + 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+        bru.setVar('seed_schedule_start', start);
+    - type: after-response
+      code: |-
+        const data = res.getBody()?.data;
+        const item = Array.isArray(data) ? data[0] : data;
+        if (item?.adgroup_id != null) bru.setVar('seed_adgroup_id', String(item.adgroup_id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Create an ad group" (`POST /open_api/v1.3/adgroup/create/`).
+
+  **WHY:** the live ad group the Ad Groups snapshot captures. TikTok requires
+  an ad-group budget (above 20 USD per day); it never spends because the ad
+  group is DISABLE and sandbox ads are never delivered. Location 6252001 is
+  the United States.
+
+  **PENDING:** not yet run.

@@ -1,0 +1,23 @@
+info:
+  name: Ad Report Daily (legacy metrics)
+  type: http
+  seq: 18
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["ad_id","stat_time_day"]&metrics=["spend","cpc","cpm","impressions","clicks","ctr","reach","cost_per_1000_reached","frequency","video_play_actions","video_watched_2s","video_watched_6s","average_video_play","average_video_play_per_user","video_views_p25","video_views_p50","video_views_p75","video_views_p100","profile_visits","likes","comments","shares","follows","clicks_on_music_disc","real_time_app_install","real_time_app_install_cost","app_install","campaign_name","campaign_id","adgroup_name","placement_type","tt_app_id","tt_app_name","mobile_app_id","promotion_type","dpa_target_audience_type","conversion","cost_per_conversion","conversion_rate","real_time_conversion","real_time_cost_per_conversion","real_time_conversion_rate","result","cost_per_result","result_rate","real_time_result","real_time_cost_per_result","real_time_result_rate","secondary_goal_result","cost_per_secondary_goal_result","secondary_goal_result_rate","adgroup_id","ad_name","ad_text"]&page=1&page_size=1&start_date=2026-10-12&end_date=2026-10-12&filtering=[{"field_name":"ad_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** the legacy connector's `ads_reports_daily` metric list (54 metrics, from airbyte/source-tiktok-marketing:3.0.1), which the docs offer as a ready-to-paste custom report; it is the largest legacy list and includes every metric of the ad group and campaign lists.
+
+  **VERIFIED (2026-10-16, sandbox):** `code 0`: TikTok, which rejects an unknown metric by name, accepts all 54. The campaign and ad group lists are subsets of this one. The advertiser-level daily list adds `cash_spend` and `voucher_spend`, which the sandbox can't check (it rejects advertiser-level reports).

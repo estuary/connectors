@@ -1,0 +1,25 @@
+info:
+  name: Advertiser Info (inaccessible id)
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: '{{base_url}}/advertiser/info/?advertiser_ids=["{{advertiser_id}}","1234567890123456789"]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad account details"
+  (`GET /open_api/v1.3/advertiser/info/`).
+
+  **WHY:** whether an ID the token can't access is left out of `data.list` or fails the whole request. Validation's "cannot access these advertiser IDs" check and the start-up time-zone lookup both assume it is left out.
+
+  **VERIFIED (2026-10-15, sandbox):** rejected, `code 40001`: "The advertiser 1234567890123456789 doesn't exist or has been deleted." The whole request fails and no advertiser is returned, so an unknown ID can't be detected by its absence from `data.list`.
+
+  **PENDING:** an advertiser that exists but the token isn't authorized for, which needs a second account.

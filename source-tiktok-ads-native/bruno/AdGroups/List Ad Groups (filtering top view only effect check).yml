@@ -1,0 +1,27 @@
+info:
+  name: List Ad Groups (filtering top view only effect check)
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=100&filtering={"buying_types":["RESERVATION_TOP_VIEW"]}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** effect check for `buying_types` on ad groups: the seeded ad groups are auction, so 0 results means the filter is honored and 1 means it is silently ignored.
+
+  **VERIFIED (2026-10-12, sandbox):** with `page_size=1000` it is rejected,
+  `code 40002`: "'page_size' cannot exceed 100 when 'buying_types' contains
+  'RESERVATION_TOP_VIEW'" (a hard reject, so the 100 cap is enforced). With
+  `page_size=100`: `code 0`, `total 0`, so `buying_types` is honored for ad
+  groups (the seed ad group is auction).

@@ -1,0 +1,44 @@
+info:
+  name: Create Campaign To Delete
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{base_url}}/campaign/create/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "campaign_name": "Estuary Seed Campaign (deleted)",
+        "objective_type": "REACH",
+        "budget_mode": "BUDGET_MODE_INFINITE",
+        "operation_status": "DISABLE"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody()?.data;
+        const item = Array.isArray(data) ? data[0] : data;
+        if (item?.campaign_id != null) bru.setVar('seed_deleted_campaign_id', String(item.campaign_id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Create a campaign" (`POST /open_api/v1.3/campaign/create/`).
+
+  **WHY:** the campaign `Delete Campaign` deletes, so the probes can check
+  whether `campaign/get`, `adgroup/get` and `ad/get` hide deleted objects by
+  default and whether the `*_STATUS_ALL` filters return them.
+  `operation_status: DISABLE` is mandatory because TikTok defaults it to
+  `ENABLE`; `BUDGET_MODE_INFINITE` sets no campaign budget.
+
+  **PENDING:** not yet run.
