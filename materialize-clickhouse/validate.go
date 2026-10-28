@@ -30,7 +30,10 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	// The partition_by dry run creates a scratch table on the server Validate
+	// is connected to, whatever the endpoint's cluster setting, because the
+	// expression's validity does not depend on the engine.
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 
 	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
@@ -71,7 +74,16 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		// because a sorting key survives everything a user can do from the
 		// catalog: a backfill truncates the table and keeps its DDL, so there is
 		// no republication that would make the binding valid.
-		var meta, exists = tableMetas[rc.Table]
+		// In distributed mode the rows, and so the sorting key, live in the
+		// local table behind the Distributed proxy.
+		var storage = rc.Table
+		if cfg.distributed() {
+			storage = localTableName(rc.Table, cfg.clusterDDL())
+			if err := checkClusterTables(rc.Table, storage, tableMetas); err != nil {
+				return nil, err
+			}
+		}
+		var meta, exists = tableMetas[storage]
 		// Deduplicated because synthesizeFieldSelection approximates the eventual
 		// key selection, and a collection projecting one location under several
 		// names can name it more than once. The sorting key holds each column
@@ -195,6 +207,24 @@ func requireShardingKeyFields(vb *pm.Response_Validated_Binding, rc tableConfig,
 			}
 		}
 	}
+}
+
+// checkClusterTables rejects a pre-existing table at either name a
+// distributed binding will use unless it has the engine the connector would
+// have created it with, so that a name collision fails at publication rather
+// than at the first commit.
+func checkClusterTables(proxy, local string, metas map[string]tableKeyMeta) error {
+	if meta, exists := metas[proxy]; exists && meta.engine != "Distributed" {
+		return cerrors.NewUserError(nil, fmt.Sprintf(
+			"table %q already exists with engine %s; on a cluster the connector materializes through a Distributed table of that name over %q. Drop or rename the existing table, or set a different table name",
+			proxy, meta.engine, local))
+	}
+	if meta, exists := metas[local]; exists && !strings.HasPrefix(meta.engine, "Replicated") {
+		return cerrors.NewUserError(nil, fmt.Sprintf(
+			"table %q already exists with engine %s; on a cluster the connector stores rows for %q in a Replicated table of that name. Drop or rename the existing table, or change the local table suffix",
+			local, meta.engine, proxy))
+	}
+	return nil
 }
 
 // checkShardingKey enforces that a sharding key is only set in distributed

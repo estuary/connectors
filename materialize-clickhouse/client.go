@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -132,17 +133,62 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
 		return fmt.Errorf("creating table: %w", err)
 	}
+	if !c.ep.Config.distributed() {
+		return nil
+	}
+	var tpls = renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete, c.ep.Config.clusterDDL())
+	proxy, err := sql.RenderTableTemplate(tc.Table, tpls.createDistributedTable)
+	if err != nil {
+		return fmt.Errorf("rendering Distributed table: %w", err)
+	}
+	if _, err := c.db.ExecContext(ctx, proxy); err != nil {
+		return fmt.Errorf("creating Distributed table: %w", err)
+	}
 	return nil
 }
 
-func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmt = fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(path...))
-	return stmt, func(ctx context.Context) error {
-		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("executing delete table: %w", err)
+// dropStatements drops a binding's table, or on a cluster its Distributed
+// proxy and then its local table on every node, so that no reader ever sees
+// a proxy over a missing table.
+func (c *client) dropStatements(path []string) []string {
+	var cluster = c.ep.Config.clusterDDL()
+	if !cluster.distributed() {
+		return []string{fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(path...))}
+	}
+	var onCluster = "ON CLUSTER " + c.ep.Dialect.Identifier(cluster.Cluster)
+	return []string{
+		fmt.Sprintf("DROP TABLE IF EXISTS %s %s SYNC;", c.ep.Dialect.Identifier(path...), onCluster),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s %s SYNC;", c.ep.Dialect.Identifier(localTableName(path[0], cluster)), onCluster),
+	}
+}
+
+// truncateStatements empties a binding's table, or on a cluster the local
+// table that holds its rows on every node. SYNC because a replicated table
+// otherwise truncates asynchronously, and a queued truncate would drop the
+// rows the shard materializes once this backfill has been applied.
+func (c *client) truncateStatements(path []string) []string {
+	var cluster = c.ep.Config.clusterDDL()
+	if !cluster.distributed() {
+		return []string{fmt.Sprintf("TRUNCATE TABLE %s SYNC;", c.ep.Dialect.Identifier(path...))}
+	}
+	return []string{fmt.Sprintf("TRUNCATE TABLE %s ON CLUSTER %s SYNC;",
+		c.ep.Dialect.Identifier(localTableName(path[0], cluster)), c.ep.Dialect.Identifier(cluster.Cluster))}
+}
+
+func (c *client) execStatements(stmts []string, what string) boilerplate.ActionApplyFn {
+	return func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("executing %s: %w", what, err)
+			}
 		}
 		return nil
-	}, nil
+	}
+}
+
+func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	var stmts = c.dropStatements(path)
+	return strings.Join(stmts, "\n"), c.execStatements(stmts, "delete table"), nil
 }
 
 var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
@@ -158,7 +204,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigrateAddColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigrateAddColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate add column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -181,7 +227,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigratePopulateColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigratePopulateColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate populate column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -206,7 +252,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigrateDropColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigrateDropColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate drop column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -229,7 +275,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		}
 
 		var alterStmt strings.Builder
-		if err := renderTemplates(dialect, false).alterTargetMigrateRenameColumn.Execute(&alterStmt, d); err != nil {
+		if err := renderTemplates(dialect, false, clusterDDL{}).alterTargetMigrateRenameColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate rename column: %w", err)
 		}
 		stmts := make([]string, 0, len(instructions))
@@ -277,7 +323,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete).alterTargetColumns.Execute(&alterStmtBuilder, ta); err != nil {
+		if err := renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete, c.ep.Config.clusterDDL()).alterTargetColumns.Execute(&alterStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table statement: %w", err)
 		}
 		var alterStmt = alterStmtBuilder.String()
@@ -349,16 +395,8 @@ func (c *client) partitionKeyColumns(ctx context.Context, table string) (map[str
 }
 
 func (c *client) TruncateTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	// SYNC because a replicated table (every table on ClickHouse Cloud)
-	// otherwise truncates asynchronously, and a queued truncate would drop the
-	// rows the shard materializes once this backfill has been applied.
-	var stmt = fmt.Sprintf("TRUNCATE TABLE %s SYNC;", c.ep.Dialect.Identifier(path...))
-	return stmt, func(ctx context.Context) error {
-		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("executing truncate table: %w", err)
-		}
-		return nil
-	}, nil
+	var stmts = c.truncateStatements(path)
+	return strings.Join(stmts, "\n"), c.execStatements(stmts, "truncate table"), nil
 }
 
 func (c *client) InstallFence(_ context.Context, _ sql.Table, _ sql.Fence) (sql.Fence, error) {
@@ -370,9 +408,11 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
-// MustRecreateResource reports a changed partition_by, which can only be
-// applied by dropping and re-creating the table: ClickHouse never accepts
-// PARTITION BY via ALTER, and TRUNCATE preserves the partition key.
+// MustRecreateResource reports a change that can only be applied by dropping
+// and re-creating the table: a changed partition_by, because ClickHouse never
+// accepts PARTITION BY via ALTER and TRUNCATE preserves the partition key, or
+// a changed sharding_key, because it is fixed in the Distributed table's
+// engine definition.
 func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	if lastBinding == nil || newBinding == nil {
 		return false, nil
@@ -384,7 +424,10 @@ func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBindi
 	if err := json.Unmarshal(newBinding.ResourceConfigJson, &newRC); err != nil {
 		return false, fmt.Errorf("parsing new binding resource config: %w", err)
 	}
-	return strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy), nil
+	if strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy) {
+		return true, nil
+	}
+	return !slices.Equal(lastRC.ShardingKey, newRC.ShardingKey), nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {

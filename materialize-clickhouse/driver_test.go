@@ -240,7 +240,7 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 	cfg.Advanced.NoFlowDocument = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_no_flow_doc_object"
 
 	var shape = noFlowDocShape(tableName)
@@ -296,7 +296,7 @@ func TestNoFlowDocumentNullValues(t *testing.T) {
 	cfg.Advanced.NoFlowDocument = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_no_flow_doc_nulls"
 
 	var shape = noFlowDocShape(tableName)

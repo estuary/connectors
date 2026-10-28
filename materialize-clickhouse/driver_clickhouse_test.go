@@ -393,7 +393,7 @@ func TestAddBinding(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_add_binding"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -417,7 +417,7 @@ func TestAddBinding(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer tr.store.conn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 
 	require.Len(t, tr.bindings, 1)
 	require.NotEmpty(t, tr.bindings[0].load.querySQL)
@@ -500,7 +500,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_data_path"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -529,7 +529,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// Store: insert a row via stage table, then move to target.
@@ -556,7 +556,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 
 	var ep = &sql.Endpoint[config]{
 		Config:  cfg,
@@ -609,7 +609,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var be = &m.BindingEvents{}
 	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
@@ -704,7 +704,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_hard_delete"
 
 	// Build a table with a mix of nullable and non-nullable value columns.
@@ -804,7 +804,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// Insert a live row.
@@ -851,7 +851,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
 
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	return tr.bindings[0], storeConn, tr.load.conn
 }
 
@@ -925,7 +925,7 @@ func TestLoadNonExistentKey(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_load_nonexistent"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -944,7 +944,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_load_multi"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -987,7 +987,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_composite_key"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
@@ -1034,7 +1034,7 @@ func TestVersionDeduplication(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_version_dedup"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -1071,7 +1071,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_store_batch"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -1098,7 +1098,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 
 	var tableNameA = "test_multi_bind_a"
 	var tableNameB = "test_multi_bind_b"
@@ -1139,8 +1139,8 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.store.conn = storeConn
-	require.NoError(t, tr.addBinding(ctx, tableA))
-	require.NoError(t, tr.addBinding(ctx, tableB))
+	require.NoError(t, tr.addBinding(ctx, tableA, tableA.Path))
+	require.NoError(t, tr.addBinding(ctx, tableB, tableB.Path))
 	require.Len(t, tr.bindings, 2)
 	defer storeConn.Close()
 
@@ -1177,7 +1177,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_composite_tombstone"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
@@ -1207,7 +1207,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_move_partition_missing_target"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -1227,7 +1227,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	defer storeConn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	// Ensure the store stage table is empty and insert a row.
@@ -1273,7 +1273,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 
 	var cfg = testConfig()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var table = buildTestTable(t, dialect, tableName)
 
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
@@ -1297,7 +1297,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	return tr, tr.bindings[0]
 }
 
@@ -1503,7 +1503,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_recovery_partial_move"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 	var storeName = storeTableName(table, 0)
@@ -1535,7 +1535,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	require.NoError(t, tr.ensureTempTables(ctx, b))
@@ -1580,7 +1580,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var tableName = "test_recovery_truncated_commit"
 	var table = buildTestTable(t, dialect, tableName)
 	var storeName = storeTableName(table, 0)
@@ -1624,7 +1624,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 	require.NoError(t, err)
 	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
-	require.NoError(t, tr.addBinding(ctx, table))
+	require.NoError(t, tr.addBinding(ctx, table, table.Path))
 	var b = tr.bindings[0]
 
 	require.NoError(t, tr.ensureTempTables(ctx, b))
@@ -1860,7 +1860,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tr.store.conn.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tr.dialect.Identifier("test_subset_b"))))
 		require.NoError(t, tr.store.conn.Exec(ctx, createSQL))
-		require.NoError(t, tr.addBinding(ctx, table2))
+		require.NoError(t, tr.addBinding(ctx, table2, table2.Path))
 		b2 := tr.bindings[1]
 
 		require.NoError(t, tr.ensureTempTables(ctx, b1))

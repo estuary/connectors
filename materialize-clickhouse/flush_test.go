@@ -59,8 +59,8 @@ func TestAddBindingTruncateSQL(t *testing.T) {
 	}, dialect)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: renderTemplates(dialect, cfg.HardDelete), cfg: cfg, _range: &pf.RangeSpec{}}
-	require.NoError(t, tr.addBinding(t.Context(), table))
+	var tr = &transactor{dialect: dialect, templates: renderTemplates(dialect, cfg.HardDelete, clusterDDL{}), cfg: cfg, _range: &pf.RangeSpec{}}
+	require.NoError(t, tr.addBinding(t.Context(), table, table.Path))
 	require.Equal(t, "SELECT count() FROM the_table WHERE flow_published_at < toDateTime64(?, 6, 'UTC') SETTINGS select_sequential_consistency = 1;", tr.bindings[0].truncate.countSQL)
 	require.Equal(t, "DELETE FROM the_table WHERE flow_published_at < toDateTime64(?, 6, 'UTC');", tr.bindings[0].truncate.deleteSQL)
 }

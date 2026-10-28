@@ -142,7 +142,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tpls = renderTemplates(dialect, cfg.HardDelete, clusterDDL{})
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var be = &m.BindingEvents{}
 	var open = pm.Request_Open{Range: &pf.RangeSpec{}}

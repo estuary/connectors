@@ -287,6 +287,7 @@ var clickHouseDialect = func(database string) sql.Dialect {
 
 type templates struct {
 	createTargetTable                *template.Template
+	createDistributedTable           *template.Template
 	alterTargetColumns               *template.Template
 	alterTargetMigrateAddColumn      *template.Template
 	alterTargetMigratePopulateColumn *template.Template
@@ -321,7 +322,68 @@ func partitionExpr(rawResourceConfig json.RawMessage) (string, error) {
 	return strings.TrimSpace(rc.PartitionBy), nil
 }
 
-func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
+// clusterDDL is what the templates need to know about a ClickHouse cluster.
+// Its zero value renders single-server DDL.
+type clusterDDL struct {
+	Cluster     string
+	Database    string
+	LocalSuffix string
+}
+
+func (c clusterDDL) distributed() bool {
+	return c.Cluster != ""
+}
+
+func (c config) clusterDDL() clusterDDL {
+	if !c.distributed() {
+		return clusterDDL{}
+	}
+	return clusterDDL{Cluster: c.Cluster, Database: c.Database, LocalSuffix: c.localTableSuffix()}
+}
+
+// localTableName is the name of the per-shard table that stores a Distributed
+// table's rows.
+func localTableName(table string, cluster clusterDDL) string {
+	return table + cluster.LocalSuffix
+}
+
+// shardingKeyExpr renders the cityHash64 expression a Distributed table
+// places rows by: the sharding_key fields of the resource config, or every
+// key when none are configured.
+func shardingKeyExpr(table sql.Table) (string, error) {
+	var rc tableConfig
+	if len(table.ResourceConfigJson) > 0 {
+		if err := json.Unmarshal(table.ResourceConfigJson, &rc); err != nil {
+			return "", fmt.Errorf("parsing resource config for sharding_key: %w", err)
+		}
+	}
+	var cols []string
+	if len(rc.ShardingKey) == 0 {
+		for _, k := range table.Keys {
+			cols = append(cols, k.Identifier)
+		}
+	} else {
+		for _, f := range rc.ShardingKey {
+			var found bool
+			for _, k := range table.Keys {
+				if k.Field == f {
+					cols = append(cols, k.Identifier)
+					found = true
+					break
+				}
+			}
+			if !found {
+				return "", fmt.Errorf("sharding_key field %q is not a key of table %s", f, table.Identifier)
+			}
+		}
+	}
+	if len(cols) == 0 {
+		return "", fmt.Errorf("table %s has no key fields to shard by", table.Identifier)
+	}
+	return "cityHash64(" + strings.Join(cols, ", ") + ")", nil
+}
+
+func renderTemplates(dialect sql.Dialect, hardDelete bool, cluster clusterDDL) templates {
 	var isDeletedColumn string
 	var isDeletedEngineArg string
 	var isDeletedInsert string
@@ -329,6 +391,44 @@ func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
 		isDeletedColumn = ",\n\t\t_is_deleted UInt8 DEFAULT 0"
 		isDeletedEngineArg = ", _is_deleted"
 		isDeletedInsert = ", _is_deleted"
+	}
+
+	// Replicated* engines take the Keeper path and replica name first. The
+	// {uuid} macro gives every table, including one created AS another, its
+	// own path, and ON CLUSTER carries the UUID to every node so the replicas
+	// of one table share it.
+	var onCluster string
+	var deltaEngine = "MergeTree"
+	var replacingEngine = "ReplacingMergeTree(flow_published_at" + isDeletedEngineArg + ")"
+	if cluster.distributed() {
+		const keeper = "'/clickhouse/tables/{uuid}/{shard}', '{replica}'"
+		onCluster = " ON CLUSTER " + dialect.Identifier(cluster.Cluster)
+		deltaEngine = "ReplicatedMergeTree(" + keeper + ")"
+		replacingEngine = "ReplicatedReplacingMergeTree(" + keeper + ", flow_published_at" + isDeletedEngineArg + ")"
+	}
+	var funcs = template.FuncMap{
+		"PartitionExpr": partitionExpr,
+		"Distributed":   cluster.distributed,
+		"LocalIdentifier": func(v any) (string, error) {
+			table, err := asTable(v)
+			if err != nil {
+				return "", err
+			}
+			return dialect.Identifier(localTableName(table.Path[0], cluster)), nil
+		},
+		"DistributedEngine": func(v any) (string, error) {
+			table, err := asTable(v)
+			if err != nil {
+				return "", err
+			}
+			expr, err := shardingKeyExpr(table)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("Distributed(%s, %s, %s, %s)",
+				dialect.Literal(cluster.Cluster), dialect.Literal(cluster.Database),
+				dialect.Literal(localTableName(table.Path[0], cluster)), expr), nil
+		},
 	}
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
@@ -364,7 +464,7 @@ func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
 --     Added in ClickHouse 25.3.
 
 {{ define "createTargetTable" }}
-CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
+CREATE TABLE IF NOT EXISTS {{ if Distributed }}{{ LocalIdentifier $ }}{{ else }}{{$.Identifier}}{{ end }}`+onCluster+` (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}} {{$col.DDL}}
@@ -372,9 +472,9 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
     {{ if not $.DeltaUpdates }}`+isDeletedColumn+`{{ end }}
 )
 {{ if $.DeltaUpdates -}}
-ENGINE = MergeTree
+ENGINE = `+deltaEngine+`
 {{ else -}}
-ENGINE = ReplacingMergeTree(flow_published_at`+isDeletedEngineArg+`)
+ENGINE = `+replacingEngine+`
 {{ end -}}
 {{ with PartitionExpr $.ResourceConfigJson -}}
 PARTITION BY ({{ . }})
@@ -393,6 +493,13 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1
 {{- end -}}
 ;
+{{ end }}
+
+-- On a cluster the table readers query is a Distributed proxy over the
+-- local table that createTargetTable made on every shard.
+{{ define "createDistributedTable" }}
+CREATE TABLE IF NOT EXISTS {{$.Identifier}}`+onCluster+` AS {{ LocalIdentifier $ }}
+ENGINE = {{ DistributedEngine $ }};
 {{ end }}
 
 -- ClickHouse permits adding non-nullable columns. The default value for a
@@ -480,7 +587,7 @@ SETTINGS mutations_sync = 1;
 {{- end }}
 
 {{ define "createLoadTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "loadTableName" . }} (
+CREATE TABLE IF NOT EXISTS {{ template "loadTableName" . }}`+onCluster+` (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -503,7 +610,7 @@ SharedMergeTree -- so a queued truncate can execute after subsequent INSERTs
 and drop the rows they just staged.
 */}}
 {{ define "truncateLoadTable" }}
-TRUNCATE TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
+TRUNCATE TABLE IF EXISTS {{ template "loadTableName" . }}`+onCluster+` SYNC;
 {{ end }}
 
 {{ define "countLoadKeys" }}
@@ -599,7 +706,7 @@ SELECT ''::String LIMIT 0
 {{ end }}
 
 {{ define "dropLoadTable" }}
-DROP TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
+DROP TABLE IF EXISTS {{ template "loadTableName" . }}`+onCluster+` SYNC;
 {{ end }}
 
 ---- Store tables
@@ -648,7 +755,7 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
 {{- end }}
 
 {{ define "createStoreTable" }}
-CREATE TABLE IF NOT EXISTS {{ template "storeTableNameIdentifier" . }}
+CREATE TABLE IF NOT EXISTS {{ template "storeTableNameIdentifier" . }}`+onCluster+`
 AS {{$.Identifier}};
 {{ end }}
 
@@ -675,16 +782,17 @@ TO TABLE {{ $.Identifier }};
 {{ end }}
 
 {{ define "truncateStoreTable" }}
-TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
+TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }}`+onCluster+` SYNC;
 {{ end }}
 
 {{ define "dropStoreTable" }}
-DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
+DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }}`+onCluster+` SYNC;
 {{ end }}
-`, template.FuncMap{"PartitionExpr": partitionExpr})
+`, funcs)
 
 	return templates{
 		createTargetTable:                tplAll.Lookup("createTargetTable"),
+		createDistributedTable:           tplAll.Lookup("createDistributedTable"),
 		alterTargetColumns:               tplAll.Lookup("alterTargetColumns"),
 		alterTargetMigrateAddColumn:      tplAll.Lookup("alterTargetMigrateAddColumn"),
 		alterTargetMigratePopulateColumn: tplAll.Lookup("alterTargetMigratePopulateColumn"),
@@ -717,11 +825,32 @@ func storeTableName(table sql.Table, rangeKey uint32) string {
 	return fmt.Sprintf("flow_temp_store_%s_%s", strconv.FormatInt(int64(rangeKey), 16), table.Path[0])
 }
 
+// tableWithRangeKey is the data the temp-table templates render against: the
+// binding's table plus the hex key-begin of the shard range, which names the
+// range's own temp tables.
+type tableWithRangeKey struct {
+	sql.Table
+	RangeKey string
+}
+
+// asTable recovers the table from either form of template data.
+func asTable(v any) (sql.Table, error) {
+	switch t := v.(type) {
+	case sql.Table:
+		return t, nil
+	case *sql.Table:
+		return *t, nil
+	case tableWithRangeKey:
+		return t.Table, nil
+	case *tableWithRangeKey:
+		return t.Table, nil
+	default:
+		return sql.Table{}, fmt.Errorf("template data is %T, not a table", v)
+	}
+}
+
 func renderTableAndRangeKey(table sql.Table, rangeKey uint32, tpl *template.Template) (rendered string, err error) {
-	v := struct {
-		sql.Table
-		RangeKey string
-	}{
+	v := tableWithRangeKey{
 		Table:    table,
 		RangeKey: strconv.FormatInt(int64(rangeKey), 16),
 	}

@@ -1,0 +1,197 @@
+--- Begin all keys createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table_local ON CLUSTER flow_cluster (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC'),
+		flow_document String,
+		_is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}', flow_published_at, _is_deleted)
+ORDER BY (`id`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End all keys createTargetTable ---
+
+--- Begin all keys createDistributedTable ---
+
+CREATE TABLE IF NOT EXISTS target_table ON CLUSTER flow_cluster AS target_table_local
+ENGINE = Distributed('flow_cluster', 'test_db', 'target_table_local', cityHash64(`id`));
+--- End all keys createDistributedTable ---
+
+--- Begin all keys createLoadTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster (
+		`id` String
+)
+ENGINE = MergeTree
+ORDER BY (`id`);
+--- End all keys createLoadTable ---
+
+--- Begin all keys truncateLoadTable ---
+
+TRUNCATE TABLE IF EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End all keys truncateLoadTable ---
+
+--- Begin all keys dropLoadTable ---
+
+DROP TABLE IF EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End all keys dropLoadTable ---
+
+--- Begin all keys createStoreTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster
+AS target_table_local;
+--- End all keys createStoreTable ---
+
+--- Begin all keys truncateStoreTable ---
+
+TRUNCATE TABLE IF EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End all keys truncateStoreTable ---
+
+--- Begin all keys moveStorePartition ---
+
+ALTER TABLE flow_temp_store_0_target_table_local
+MOVE PARTITION ID ?
+TO TABLE target_table_local;
+--- End all keys moveStorePartition ---
+
+--- Begin all keys dropStoreTable ---
+
+DROP TABLE IF EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End all keys dropStoreTable ---
+
+--- Begin subset of keys createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table_local ON CLUSTER flow_cluster (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC'),
+		flow_document String,
+		_is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplicatedReplacingMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}', flow_published_at, _is_deleted)
+ORDER BY (`id`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End subset of keys createTargetTable ---
+
+--- Begin subset of keys createDistributedTable ---
+
+CREATE TABLE IF NOT EXISTS target_table ON CLUSTER flow_cluster AS target_table_local
+ENGINE = Distributed('flow_cluster', 'test_db', 'target_table_local', cityHash64(`id`));
+--- End subset of keys createDistributedTable ---
+
+--- Begin subset of keys createLoadTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster (
+		`id` String
+)
+ENGINE = MergeTree
+ORDER BY (`id`);
+--- End subset of keys createLoadTable ---
+
+--- Begin subset of keys truncateLoadTable ---
+
+TRUNCATE TABLE IF EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End subset of keys truncateLoadTable ---
+
+--- Begin subset of keys dropLoadTable ---
+
+DROP TABLE IF EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End subset of keys dropLoadTable ---
+
+--- Begin subset of keys createStoreTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster
+AS target_table_local;
+--- End subset of keys createStoreTable ---
+
+--- Begin subset of keys truncateStoreTable ---
+
+TRUNCATE TABLE IF EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End subset of keys truncateStoreTable ---
+
+--- Begin subset of keys moveStorePartition ---
+
+ALTER TABLE flow_temp_store_0_target_table_local
+MOVE PARTITION ID ?
+TO TABLE target_table_local;
+--- End subset of keys moveStorePartition ---
+
+--- Begin subset of keys dropStoreTable ---
+
+DROP TABLE IF EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End subset of keys dropStoreTable ---
+
+--- Begin delta updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS target_table_local ON CLUSTER flow_cluster (
+		`id` String,
+		value Nullable(String),
+		`_meta/op` String,
+		flow_published_at DateTime64(6, 'UTC'),
+		flow_document String
+)
+ENGINE = ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')
+ORDER BY (`id`)
+;
+--- End delta updates createTargetTable ---
+
+--- Begin delta updates createDistributedTable ---
+
+CREATE TABLE IF NOT EXISTS target_table ON CLUSTER flow_cluster AS target_table_local
+ENGINE = Distributed('flow_cluster', 'test_db', 'target_table_local', cityHash64(`id`));
+--- End delta updates createDistributedTable ---
+
+--- Begin delta updates createLoadTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster (
+		`id` String
+)
+ENGINE = MergeTree
+ORDER BY (`id`);
+--- End delta updates createLoadTable ---
+
+--- Begin delta updates truncateLoadTable ---
+
+TRUNCATE TABLE IF EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End delta updates truncateLoadTable ---
+
+--- Begin delta updates dropLoadTable ---
+
+DROP TABLE IF EXISTS flow_temp_load_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End delta updates dropLoadTable ---
+
+--- Begin delta updates createStoreTable ---
+
+CREATE TABLE IF NOT EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster
+AS target_table_local;
+--- End delta updates createStoreTable ---
+
+--- Begin delta updates truncateStoreTable ---
+
+TRUNCATE TABLE IF EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End delta updates truncateStoreTable ---
+
+--- Begin delta updates moveStorePartition ---
+
+ALTER TABLE flow_temp_store_0_target_table_local
+MOVE PARTITION ID ?
+TO TABLE target_table_local;
+--- End delta updates moveStorePartition ---
+
+--- Begin delta updates dropStoreTable ---
+
+DROP TABLE IF EXISTS flow_temp_store_0_target_table_local ON CLUSTER flow_cluster SYNC;
+--- End delta updates dropStoreTable ---
+
+
