@@ -1,10 +1,12 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta, UTC
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any
 from urllib import parse
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, model_validator
 
 from estuary_cdk.capture.common import (
+    BaseDocument,
     BaseOAuth2Credentials,
     ResourceState,
     OAuth2Spec,
@@ -124,4 +126,63 @@ class EndpointConfig(BaseModel):
 
 ConnectorState = GenericConnectorState[ResourceState]
 
-# Stream document models and resource registries are added by `add-stream`.
+
+@dataclass(frozen=True)
+class ParentIds:
+    """Validation context carrying the parent IDs a child entity's response
+    lacks, stamped onto each document as top-level fields."""
+
+    ids: dict[str, str]
+
+
+class StampedDocument(BaseDocument, extra="allow"):
+    @model_validator(mode="before")
+    @classmethod
+    def _stamp_parent_ids(cls, data: Any, info: ValidationInfo) -> Any:
+        if isinstance(info.context, ParentIds) and isinstance(data, dict):
+            return {**data, **info.context.ids}
+        return data
+
+
+# Entity IDs are longs, which the REST API sends as JSON strings.
+class Account(BaseDocument, extra="allow"):
+    Id: str
+    Name: str
+    ParentCustomerId: str
+
+
+class Campaign(StampedDocument):
+    Id: str
+    AccountId: str
+
+
+class AdGroup(StampedDocument):
+    Id: str
+    AccountId: str
+    CampaignId: str
+
+
+def _drop_asset_performance_labels(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            k: _drop_asset_performance_labels(v)
+            for k, v in value.items()
+            if k != "AssetPerformanceLabel"
+        }
+    if isinstance(value, list):
+        return [_drop_asset_performance_labels(v) for v in value]
+    return value
+
+
+class Ad(StampedDocument):
+    Id: str
+    AccountId: str
+    CampaignId: str
+    AdGroupId: str
+
+    # An asset's performance label is recomputed by Microsoft without anyone
+    # editing the ad, so keeping it would rewrite every ad on most snapshots.
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_volatile_fields(cls, data: Any) -> Any:
+        return _drop_asset_performance_labels(data)

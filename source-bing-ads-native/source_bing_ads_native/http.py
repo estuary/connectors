@@ -5,9 +5,13 @@ import aiohttp
 
 from estuary_cdk.http import HTTPMixin, ShouldRetryProtocol
 
+from .errors import should_retry as should_retry_fault
+
 
 class BingAdsHTTPMixin(HTTPMixin):
-    """Sends the `DeveloperToken` header on every authenticated request.
+    """Sends the `DeveloperToken` header on every authenticated request, and
+    retries its 5xx faults by Microsoft's fault code (see `errors.should_retry`)
+    unless the caller passes its own `should_retry`.
 
     The injection hooks `_request_stream`, the single chokepoint that `request`,
     `request_stream`, and `request_lines` all funnel through. Requests made
@@ -50,6 +54,6 @@ class BingAdsHTTPMixin(HTTPMixin):
             form,
             with_token,
             self._with_developer_token(headers, with_token),
-            should_retry,
+            should_retry or (should_retry_fault if with_token else None),
             timeout,
         )
