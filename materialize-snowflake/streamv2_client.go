@@ -29,7 +29,7 @@ import (
 // commit wait is a series of short status polls.
 const (
 	streamV2RequestTimeout     = 2 * time.Minute
-	streamV2CommitPollInterval = time.Second
+	streamV2CommitPollInterval = 5 * time.Second
 	streamV2MaxAttempts        = 6
 )
 
