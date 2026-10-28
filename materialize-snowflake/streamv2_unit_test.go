@@ -479,7 +479,7 @@ func TestStreamV2WaitCommitRejectsAnOvertakenOffset(t *testing.T) {
 
 	var start = time.Now()
 	_, err = client.WaitCommit(ctx, map[string]string{"ch": streamV2FormatOffsetToken(3, fullKeyRange)})
-	require.ErrorContains(t, err, "beyond the awaited")
+	require.ErrorContains(t, err, "in place of the awaited")
 	require.Less(t, time.Since(start), 5*time.Second)
 }
 

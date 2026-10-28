@@ -533,10 +533,10 @@ func (c *streamV2Client) channelStatuses(ctx context.Context, channelNames []str
 // WaitCommit blocks until the committed offset token of each channel in tokens
 // equals the token it maps to, and reports each channel's status as of the moment
 // it did. Every channel must be open on the same pipe, so that one request polls
-// them all. Only this connector appends to the channels, so a committed offset
-// beyond the one awaited, or a committed token this write path did not format,
-// means another writer has the channel, and the wait fails at once rather than at
-// its timeout.
+// them all. Only this connector appends to the channels, so a committed token
+// this write path did not format, or one other than the awaited token at or
+// beyond its offset, means another writer has the channel, and the wait fails at
+// once rather than at its timeout.
 func (c *streamV2Client) WaitCommit(ctx context.Context, tokens map[string]string) (map[string]*streamV2ChannelStatusResult, error) {
 	var offsets = make(map[string]int64, len(tokens))
 	for channelName, token := range tokens {
@@ -576,8 +576,8 @@ func (c *streamV2Client) WaitCommit(ctx context.Context, tokens map[string]strin
 				committed[channelName] = status
 			} else if offset, _, ok := streamV2ParseOffsetToken(*status.CommittedToken); !ok {
 				return nil, fmt.Errorf("channel %q reports committed offset token %q, which is not one this write path formats: something other than this task is appending to the channel", channelName, *status.CommittedToken)
-			} else if offset > offsets[channelName] {
-				return nil, fmt.Errorf("channel %q reports committed offset token %s, beyond the awaited %s: something other than this task is appending to the channel", channelName, *status.CommittedToken, token)
+			} else if offset >= offsets[channelName] {
+				return nil, fmt.Errorf("channel %q reports committed offset token %s in place of the awaited %s: something other than this task is appending to the channel", channelName, *status.CommittedToken, token)
 			}
 		}
 		if len(committed) == len(tokens) {
