@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-28
+
+### Fixed
+- The activities stream now only requests events newer than its cursor,
+  where previously every pass downloaded the week of activity Facebook
+  returns by default.
+
 ## 2026-10-27
 
 ### Changed
