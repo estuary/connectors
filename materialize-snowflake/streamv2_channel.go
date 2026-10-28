@@ -120,7 +120,9 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	if c.batch.empty() {
 		return nil
 	}
-	var startToken, endToken = c.offsetToken(c.batch.firstOffset), c.offsetToken(c.progress.routed)
+	// The channel's routed offset may already count a row that is not yet in the
+	// batch, so the end offset is the batch's own last row.
+	var startToken, endToken = c.offsetToken(c.batch.firstOffset), c.offsetToken(c.batch.firstOffset + int64(c.batch.rows) - 1)
 	var payload = c.batch.finish()
 	var toRelease = int64(min(len(payload), streamV2MaxHeldBytes))
 

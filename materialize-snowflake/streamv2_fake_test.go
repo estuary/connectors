@@ -262,7 +262,7 @@ func (f *fakeSnowpipe) append(w http.ResponseWriter, r *http.Request) {
 		require.NoError(f.t, err)
 	}
 	fakeSnowpipeLargestAppend.Store(max(fakeSnowpipeLargestAppend.Load(), int64(len(body))))
-	f.ingest(w, channel, query.Get("continuationToken"), query.Get("endOffsetToken"), body)
+	f.ingest(w, channel, query.Get("continuationToken"), query.Get("startOffsetToken"), query.Get("endOffsetToken"), body)
 }
 
 // pipeInfo lends the caller the fake's stage. The location type is one no real
@@ -334,16 +334,18 @@ func (f *fakeSnowpipe) appendFile(w http.ResponseWriter, r *http.Request) {
 	}
 	require.Equal(f.t, fragment.FragmentRowCount, bytes.Count(body, []byte{'\n'}))
 	fakeSnowpipeFileAppends.Add(1)
-	f.ingest(w, channel, r.URL.Query().Get("continuationToken"), fragment.FragmentEndOffsetToken, body)
+	f.ingest(w, channel, r.URL.Query().Get("continuationToken"), fragment.FragmentStartOffsetToken, fragment.FragmentEndOffsetToken, body)
 }
 
-// ingest validates the NDJSON rows of one append, checks and advances the channel's
-// continuation token, and commits the append's end offset token.
-func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, endToken string, body []byte) {
-	var rejected int64
+// ingest validates the NDJSON rows of one append and that its offset tokens span
+// exactly those rows, checks and advances the channel's continuation token, and
+// commits the append's end offset token.
+func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, startToken, endToken string, body []byte) {
+	var rejected, rows int64
 	var scanner = bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(nil, 64*1024*1024)
 	for scanner.Scan() {
+		rows++
 		var row map[string]any
 		if err := json.Unmarshal(scanner.Bytes(), &row); err != nil {
 			f.fail(w, 400, "invalid_rows", "row is not a JSON object: "+err.Error())
@@ -357,6 +359,10 @@ func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, endT
 		f.fail(w, 400, "invalid_rows", "last row lacks a newline")
 		return
 	}
+	var start, _, startOK = streamV2ParseOffsetToken(startToken)
+	var end, _, endOK = streamV2ParseOffsetToken(endToken)
+	require.True(f.t, startOK && endOK, "offset tokens %q and %q", startToken, endToken)
+	require.Equal(f.t, rows, end-start+1, "offset tokens %q to %q span a different number of rows than the append carries", startToken, endToken)
 
 	f.locked(func() {
 		if continuation != fmt.Sprint(f.continuation[channel]) {
