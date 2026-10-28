@@ -19,7 +19,16 @@ from .api import (
 )
 from .errors import INVALID_CREDENTIALS, fault_of
 from .http import BingAdsHTTPMixin
-from .models import EndpointConfig, OAUTH2_SPEC
+from .models import ConnectorState, EndpointConfig, OAUTH2_SPEC
+from .reports import (
+    REPORTS,
+    ReportDefinition,
+    TICK,
+    backfill_report,
+    day_cursor,
+    fetch_report,
+    utc_now,
+)
 
 ENTITY_INTERVAL = timedelta(hours=1)
 
@@ -91,6 +100,100 @@ def entity_resources(directory: AccountDirectory, http: BingAdsHTTPMixin) -> lis
     ]
 
 
+async def _reconcile_account_state(
+    account_ids: list[str],
+    binding: CaptureBinding[ResourceConfig],
+    state: ResourceState,
+    task: Task,
+) -> None:
+    """Give each newly discovered account its own report cursor and backfill.
+
+    The backfill covers every day before today, and incremental capture
+    starts with today, so the two meet without a gap. State for accounts no
+    longer captured is left in place, unused, so an account that reappears
+    resumes where it was.
+    """
+    assert isinstance(state.inc, dict) and isinstance(state.backfill, dict)
+
+    now = utc_now()
+    cutoff = day_cursor(now.date() - TICK)
+    added = [a for a in account_ids if a not in state.inc and a not in state.backfill]
+    for account_id in added:
+        state.inc[account_id] = ResourceState.Incremental(cursor=now)
+        state.backfill[account_id] = ResourceState.Backfill(cutoff=cutoff, next_page=None)
+
+    if added:
+        task.log.info(
+            "initializing report state for new accounts",
+            {"binding": binding.stateKey, "account_ids": added},
+        )
+        await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
+
+
+def report_resources(
+    directory: AccountDirectory, http: BingAdsHTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+    """One collection per built-in report, with an incremental cursor and a
+    backfill per account."""
+
+    async def open(
+        definition: ReportDefinition,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings: Any,
+    ):
+        contexts = await directory.accounts(task.log)
+        await _reconcile_account_state([c.id for c in contexts], binding, state, task)
+
+        row_model = definition.row_model()
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                c.id: functools.partial(
+                    fetch_report,
+                    http,
+                    c,
+                    definition,
+                    row_model,
+                    config.start_date,
+                    config.advanced.lookback_days,
+                )
+                for c in contexts
+            },
+            fetch_page={
+                c.id: functools.partial(
+                    backfill_report,
+                    http,
+                    c,
+                    definition,
+                    row_model,
+                    config.start_date,
+                )
+                for c in contexts
+            },
+        )
+
+    return [
+        common.Resource(
+            name=definition.name,
+            key=definition.key(),
+            model=definition.row_model(),
+            open=functools.partial(open, definition),
+            # Filled in per account when the binding opens, since accounts
+            # are only known once the API is called.
+            initial_state=ResourceState(inc={}, backfill={}),
+            initial_config=ResourceConfig(name=definition.name, interval=timedelta(hours=1)),
+            schema_inference=True,
+        )
+        for definition in REPORTS
+    ]
+
+
 async def all_resources(
     log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -101,4 +204,5 @@ async def all_resources(
 
     return [
         *entity_resources(directory, http),
+        *report_resources(directory, http, config),
     ]
