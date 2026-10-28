@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,6 +17,17 @@ func testClusterConfig() config {
 	var cfg = testConfig()
 	cfg.Address = "localhost:9101"
 	return cfg
+}
+
+// clusterConn opens a connection to the test-cluster node listening on port.
+func clusterConn(t *testing.T, port int) chdriver.Conn {
+	t.Helper()
+	var cfg = testClusterConfig()
+	cfg.Address = fmt.Sprintf("127.0.0.1:%d", port)
+	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	return conn
 }
 
 // TestClusterTopology pins the shape of the docker-compose cluster that the
