@@ -11,6 +11,10 @@ from .client import FacebookAPIClient, FacebookRequestParams, FacebookCursor
 from .insights import FacebookInsightsJobManager, TimeRange
 from .models import FacebookResource, FacebookInsightsResource, Images
 
+# The widest `since`/`until` window a single incremental pass requests for
+# resources with supports_since_param.
+MAX_SINCE_WINDOW = timedelta(days=1)
+
 
 async def snapshot_resource(
     client: FacebookAPIClient,
@@ -178,28 +182,35 @@ async def fetch_changes(
 
     Resources with an entity_prefix are bounded below server-side via
     `filtering`. Resources with supports_since_param send the cursor floored
-    to the second as `since`. The client-side `> log_cursor` check then
-    filters out records from the cursor's second which an earlier pass
-    emitted:
+    to the second as `since` and a window end as `until`. The window end is
+    MAX_SINCE_WINDOW after the floored cursor, or the last elapsed second if
+    that is earlier. The client-side `> log_cursor` check then filters out
+    records from the cursor's second which an earlier pass emitted:
 
-                 floor(cursor)  cursor                    now
+                 floor(cursor)  cursor      end = min(floor(cursor) + 1d,
+                      │           │                     last elapsed second)
     ──────────────────┼───────────┼────────────────────────┼──▶ time (1s ticks)
                       │           │                        │
     since ════════════[═══════════╪════════════════════════╪══▶
+    until ════════════╪═══════════╪════════════════════════]
     emitted ──────────┼───────────(════════════════════════]
                       │           └─ records at or before the cursor were
                       │              emitted by an earlier pass
                       └─ `since` is a whole-second Unix timestamp, so the
                          cursor's second is re-fetched and re-filtered
 
-    Whether `since` is inclusive at its bound is unknown. The client-side
-    check is correct either way.
+    The pass ends with the cursor at `end - 1s` or at the newest emitted
+    record, whichever is later, so an empty window still advances the cursor
+    and the `end` second is requested again by the next pass. Whether `since`
+    and `until` are inclusive at their bounds is unknown. The client-side
+    check and the one-second overlap make the result correct either way.
     """
     assert isinstance(log_cursor, datetime), (
         f"Expected datetime log_cursor, got {type(log_cursor)}"
     )
 
     params = FacebookRequestParams(fields=model.fields)
+    window_cursor: datetime | None = None
 
     if model.entity_prefix:
         params.filtering = [
@@ -210,7 +221,14 @@ async def fetch_changes(
             }
         ]
     elif model.supports_since_param:
-        params.since = int(log_cursor.timestamp())
+        floored_cursor = log_cursor.replace(microsecond=0)
+        horizon = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+        window_end = min(floored_cursor + MAX_SINCE_WINDOW, horizon)
+        window_cursor = window_end - timedelta(seconds=1)
+        if window_cursor <= log_cursor:
+            return
+        params.since = int(floored_cursor.timestamp())
+        params.until = int(window_end.timestamp())
     max_updated_at = log_cursor
     has_results = False
 
@@ -237,7 +255,9 @@ async def fetch_changes(
                 f"Could not parse {model.cursor_field} for item {getattr(doc, 'id', 'unknown')} for resource {model.name}: {e}"
             )
 
-    if has_results:
+    if window_cursor is not None:
+        yield max(max_updated_at, window_cursor)
+    elif has_results:
         yield max_updated_at
 
 

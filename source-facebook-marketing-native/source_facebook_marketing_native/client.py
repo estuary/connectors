@@ -173,6 +173,7 @@ class FacebookRequestParams(BaseModel):
     limit: int = DEFAULT_PAGE_SIZE
     after_cursor: str | None = None
     since: int | None = None  # Used for Activities stream (Unix timestamp)
+    until: int | None = None  # Used for Activities stream (Unix timestamp)
     filtering: list[dict] | None = None  # Used for standard incremental streams
 
     model_config = ConfigDict(
