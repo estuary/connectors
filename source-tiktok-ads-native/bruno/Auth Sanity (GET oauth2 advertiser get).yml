@@ -1,0 +1,28 @@
+info:
+  name: Auth Sanity (GET oauth2 advertiser get)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  # The collection script appends app_id/secret and the Access-Token header.
+  url: "{{base_url}}/oauth2/advertiser/get/"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get authorized ad accounts"
+  (`GET /open_api/v1.3/oauth2/advertiser/get/`).
+
+  **WHY:** the connector's `validate_credentials` probe. Confirms the stored
+  token authenticates and lists the advertisers it can access.
+
+  **UNOBSERVABLE in sandbox (2026-10-08):** the sandbox host answers HTTP 200 with
+  `code 40002`, an empty message and `data: {}`. The endpoint is production-only;
+  in sandbox mode `validate_credentials` uses `Advertiser Info` instead.
+  **PENDING:** production behavior.

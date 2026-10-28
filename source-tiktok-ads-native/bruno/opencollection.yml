@@ -1,0 +1,86 @@
+opencollection: 1.0.0
+
+info:
+  name: TikTok Ads
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // TikTok auth via the connector's sops-encrypted config.yaml. Everything
+        // decrypted here lives only on `req` for this request and is never persisted
+        // to a var or env file (API-TOKEN-EPHEMERAL). Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env TikTok --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        const config = JSON.parse(decrypted);
+        const creds = config?.credentials;
+        // Non-secret resource id, so a runtime var is fine (API-TOKEN-EPHEMERAL covers credentials only).
+        const advertiserId = config?.advertiser_ids?.[0];
+        if (advertiserId) bru.setVar('advertiser_id', String(advertiserId));
+        // TikTok rejects a numeric app_id (code 40002), and an unquoted ID in
+        // config.yaml decrypts as a number.
+        const rawAppId = creds?.client_id_sops ?? creds?.client_id;
+        const appId = rawAppId == null ? rawAppId : String(rawAppId);
+        const secret = creds?.client_secret_sops ?? creds?.client_secret;
+        const token = creds?.access_token_sops ?? creds?.access_token;
+        if (!appId || !secret) throw new Error('credentials.{client_id,client_secret} missing from decrypted config');
+
+        // The token exchange runs before an access token exists; it needs the app
+        // credentials in its JSON body instead of the Access-Token header.
+        if (req.getUrl().includes('/oauth2/access_token/')) {
+          const authCode = bru.getEnvVar('auth_code');
+          if (!authCode) throw new Error('pass the authorization code: --env-var auth_code=<code>');
+          req.setBody({ app_id: appId, secret: secret, auth_code: authCode });
+          return;
+        }
+
+        if (!token) throw new Error('credentials.{access_token_sops,access_token} missing from decrypted config');
+        // TikTok takes the raw token in `Access-Token`, matching the connector's TokenSource.
+        req.setHeader('Access-Token', token);
+        // `oauth2/advertiser/get` also needs the app credentials as query parameters.
+        if (req.getUrl().includes('/oauth2/advertiser/get/')) {
+          const sep = req.getUrl().includes('?') ? '&' : '?';
+          req.setUrl(
+            `${req.getUrl()}${sep}app_id=${encodeURIComponent(appId)}&secret=${encodeURIComponent(secret)}`,
+          );
+        }
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    Facts that hold for the whole TikTok API for Business account, not any single
+    endpoint. Findings are classified VERIFIED / PENDING / UNOBSERVABLE /
+    DOCUMENTED per `bruno-probe-endpoint`.
+
+    - **Base URL:** `https://business-api.tiktok.com/open_api/v1.3`.
+    - **Auth:** OAuth 2.0 returning a long-lived access token with no refresh
+      token. The token is sent raw in an `Access-Token` header. The token exchange
+      is `OAuth/Token Exchange`; it is run once by hand to produce the token stored
+      in `config.yaml`.
+    - **Error envelope:** DOCUMENTED. Responses are
+      `{"code", "message", "request_id", "data"}`; most failures come back as
+      HTTP 200 with a non-zero `code`. PENDING live confirmation.
+    - **Rate limits:** DOCUMENTED ("Rate limits", doc 1740029171730433). Limits
+      belong to the developer app, per endpoint: every capture using the same
+      app, including every OAuth capture through Estuary's app, shares them.
+      Apps start at Basic (10 per second, 600 per minute, 864,000 per day per
+      endpoint) and the owner can apply for higher levels. A throttled request
+      gets `40100`; after a per-minute throttle, TikTok asks for 5 minutes
+      without requests. VERIFIED (sandbox): the sandbox's limit is 1 per
+      second, and its throttle message names the app. PENDING: the level of
+      Estuary's production app.
+
+    ## Running
+
+    `bru run "<request>.yml" --env TikTok --sandbox developer` from this directory.

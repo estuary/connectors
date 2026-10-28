@@ -1,0 +1,27 @@
+info:
+  name: Advertiser Info (fields invalid value control)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: '{{base_url}}/advertiser/info/?advertiser_ids=["{{advertiser_id}}"]&fields=["advertiser_id","not_a_real_field"]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad account details"
+  (`GET /open_api/v1.3/advertiser/info/`).
+
+  **WHY:** an invalid `fields` value is rejected with the list of accepted fields, showing whether the default response (28 fields) omits any.
+
+  **VERIFIED (2026-10-13, sandbox):** rejected, `code 40002`, listing 33
+  accepted `fields`. The default response returns 29 of them; the four only
+  returned on request are `ads_only_mode`, `can_use_custom_identity`,
+  `company_name_editable` and `owner_bc_id`. An unknown `fields` value fails
+  the whole request.

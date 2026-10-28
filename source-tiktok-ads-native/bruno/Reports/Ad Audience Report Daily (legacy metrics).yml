@@ -1,0 +1,23 @@
+info:
+  name: Ad Audience Report Daily (legacy metrics)
+  type: http
+  seq: 19
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=AUDIENCE&data_level=AUCTION_AD&dimensions=["ad_id","stat_time_day","age","gender"]&metrics=["spend","cpc","cpm","impressions","clicks","ctr","campaign_name","campaign_id","adgroup_name","placement_type","tt_app_id","tt_app_name","mobile_app_id","promotion_type","dpa_target_audience_type","conversion","cost_per_conversion","conversion_rate","real_time_conversion","real_time_cost_per_conversion","real_time_conversion_rate","result","cost_per_result","result_rate","real_time_result","real_time_cost_per_result","real_time_result_rate","adgroup_id","ad_name","ad_text"]&page=1&page_size=1&start_date=2026-10-12&end_date=2026-10-12&filtering=[{"field_name":"ad_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** the legacy connector's `ads_audience_reports_daily` metric list (30 metrics), the largest legacy audience list.
+
+  **VERIFIED (2026-10-16, sandbox):** `code 0`: all 30 accepted with the age and gender breakdown. The campaign and ad group audience lists are subsets of this one.

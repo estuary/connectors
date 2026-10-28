@@ -1,0 +1,23 @@
+info:
+  name: Campaign Audience Report Hourly (country over limit)
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=AUDIENCE&data_level=AUCTION_CAMPAIGN&dimensions=["campaign_id","stat_time_hour","country_code"]&metrics=["spend"]&page=1&page_size=1000&start_date=2026-10-12&end_date=2026-10-12'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** the documented rule that `country_code` combines only with `stat_time_day`.
+
+  **VERIFIED (2026-10-13, sandbox):** rejected, `code 40002`: "The audience report does not supports 'stat_time_hour'". Audience reports are **daily only**, whatever the breakdown (stricter than the documented country-only rule).

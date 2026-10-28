@@ -1,0 +1,31 @@
+info:
+  name: List Ad Groups (filtering status delete)
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"ADGROUP_STATUS_DELETE"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** checks the ad-group deleted-only filter value, and whether deleting a campaign cascades: the ad group seeded under the deleted campaign should appear here if it does.
+
+  **VERIFIED (2026-10-12, sandbox):** `total 0`: **deleting a campaign does not
+  give its ad groups `ADGROUP_STATUS_DELETE`.** See `filtering status campaign
+  delete`.
+
+  **VERIFIED (2026-10-13, sandbox):** after `Seeding/Delete Ad Group`, `total 1`:
+  the directly deleted ad group `1878945492011522`, with `modify_time`
+  14:36:35 against `create_time` 14:36:27. **A direct ad-group delete lands
+  under `ADGROUP_STATUS_DELETE` and stamps `modify_time`, like a campaign
+  delete; only the cascade from a campaign delete does neither.**
