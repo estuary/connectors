@@ -88,6 +88,8 @@ poll
 pollSchedule
 polling_interval
 heartbeat_interval
+topology_refresh_interval
+insert_quorum_timeout
 maxAwaitTime
 minBackfillInterval
 min_backfill_interval
