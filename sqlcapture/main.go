@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -127,6 +129,9 @@ type Driver struct {
 	DocumentationURL string
 
 	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
+
+	// Optional: if set, Pull waits a random time up to the returned duration before connecting.
+	MaxStartupDelay func(cfg json.RawMessage) (time.Duration, error)
 }
 
 type prerequisitesError struct {
@@ -369,6 +374,23 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var ctx = stream.Context()
+
+	// Wait a random time before connecting, so that captures which start together spread out.
+	if d.MaxStartupDelay != nil {
+		var maxDelay, err = d.MaxStartupDelay(open.Capture.ConfigJson)
+		if err != nil {
+			return fmt.Errorf("error parsing max startup delay: %w", err)
+		}
+		if maxDelay > 0 {
+			var delay = time.Duration(rand.Int63n(int64(maxDelay)))
+			log.WithField("eventType", "connectorStatus").Infof("Waiting %s before connecting to database", delay.Round(time.Second))
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
 	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
 	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
