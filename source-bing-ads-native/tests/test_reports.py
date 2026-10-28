@@ -346,13 +346,13 @@ def _at(now: datetime):
 
 
 async def _incremental(
-    stub: ReportStub, cursor: datetime, lookback_days: int = 30,
+    stub: ReportStub, cursor: datetime, lookback_window_days: int = 30,
     start: datetime = datetime(2026, 1, 1, tzinfo=UTC),
 ) -> list[Any]:
     return await _drain(
         fetch_report(
             _session(stub), CONTEXT, CAMPAIGN_REPORT, CAMPAIGN_REPORT.row_model(),
-            start, lookback_days, LOG, cursor,
+            start, lookback_window_days, LOG, cursor,
         )
     )
 
@@ -388,7 +388,7 @@ async def test_zero_lookback_still_refetches_the_cursor_day(monkeypatch: pytest.
     monkeypatch.setattr(reports, "utc_now", _at(datetime(2026, 10, 10, 8, tzinfo=UTC)))
     stub = ReportStub()
 
-    await _incremental(stub, datetime(2026, 10, 8, 15, tzinfo=UTC), lookback_days=0)
+    await _incremental(stub, datetime(2026, 10, 8, 15, tzinfo=UTC), lookback_window_days=0)
 
     # Oct 8 was only partly over when last fetched.
     assert [_range(r) for r in stub.submitted] == [(date(2026, 10, 8), date(2026, 10, 10))]
@@ -413,7 +413,7 @@ async def test_catching_up_after_an_outage_checkpoints_each_window(monkeypatch: 
     monkeypatch.setattr(reports, "INCREMENTAL_WINDOW_DAYS", 3)
     stub = ReportStub()
 
-    items = await _incremental(stub, datetime(2026, 10, 3, 10, tzinfo=UTC), lookback_days=2)
+    items = await _incremental(stub, datetime(2026, 10, 3, 10, tzinfo=UTC), lookback_window_days=2)
 
     assert [_range(r) for r in stub.submitted] == [
         (date(2026, 10, 1), date(2026, 10, 3)),
@@ -439,7 +439,7 @@ async def test_lookback_windows_before_the_cursor_are_not_checkpointed(monkeypat
     monkeypatch.setattr(reports, "INCREMENTAL_WINDOW_DAYS", 3)
     stub = ReportStub()
 
-    items = await _incremental(stub, datetime(2026, 10, 9, 10, tzinfo=UTC), lookback_days=4)
+    items = await _incremental(stub, datetime(2026, 10, 9, 10, tzinfo=UTC), lookback_window_days=4)
 
     # Oct 5-7's checkpoint would be Oct 8, before the cursor.
     assert [_range(r) for r in stub.submitted] == [
