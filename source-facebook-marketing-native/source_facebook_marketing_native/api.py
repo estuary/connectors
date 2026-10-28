@@ -93,6 +93,23 @@ async def fetch_page(
 ) -> AsyncGenerator[FacebookResource | PageCursor, None]:
     """
     Fetch page function for standard incremental Facebook resources for a single account.
+
+    Resources with an entity_prefix are bounded on both ends server-side via
+    `filtering`. Resources with supports_since_param are bounded below
+    server-side by `since` and above by the client-side cutoff check:
+
+               start_date                          cutoff
+    ───────────────┼──────────────────────────────────┼─────▶ time (1s ticks)
+                   │                                  │
+    since ═════════[══════════════════════════════════╪═════▶
+    emitted ───────[══════════════════════════════════]
+                   │                                  └─ records after the
+                   │                                     cutoff belong to
+                   │                                     the incremental task
+                   └─ start_date floored to the second
+
+    Whether `since` is inclusive at its bound is unknown. The start of a
+    backfill window does not need to be exact.
     """
     assert isinstance(cutoff, datetime), f"Expected datetime cutoff, got {type(cutoff)}"
     assert isinstance(page_cursor, (str, type(None))), (
@@ -115,6 +132,8 @@ async def fetch_page(
                 "value": int(cutoff.timestamp()),
             },
         ]
+    elif model.supports_since_param:
+        params.since = int(start_date.timestamp())
 
     if page_cursor:
         params.after_cursor = page_cursor
@@ -156,6 +175,25 @@ async def fetch_changes(
 ) -> AsyncGenerator[FacebookResource | LogCursor, None]:
     """
     Fetch changes for standard incremental Facebook resources for a single account.
+
+    Resources with an entity_prefix are bounded below server-side via
+    `filtering`. Resources with supports_since_param send the cursor floored
+    to the second as `since`. The client-side `> log_cursor` check then
+    filters out records from the cursor's second which an earlier pass
+    emitted:
+
+                 floor(cursor)  cursor                    now
+    ──────────────────┼───────────┼────────────────────────┼──▶ time (1s ticks)
+                      │           │                        │
+    since ════════════[═══════════╪════════════════════════╪══▶
+    emitted ──────────┼───────────(════════════════════════]
+                      │           └─ records at or before the cursor were
+                      │              emitted by an earlier pass
+                      └─ `since` is a whole-second Unix timestamp, so the
+                         cursor's second is re-fetched and re-filtered
+
+    Whether `since` is inclusive at its bound is unknown. The client-side
+    check is correct either way.
     """
     assert isinstance(log_cursor, datetime), (
         f"Expected datetime log_cursor, got {type(log_cursor)}"
@@ -171,6 +209,8 @@ async def fetch_changes(
                 "value": int(log_cursor.timestamp()),
             }
         ]
+    elif model.supports_since_param:
+        params.since = int(log_cursor.timestamp())
     max_updated_at = log_cursor
     has_results = False
 
