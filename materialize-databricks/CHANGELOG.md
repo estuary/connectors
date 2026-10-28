@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-28
+### Changed
+- With `two_phase_loads`, a load restricts its read of documents to the files
+  holding its matching rows for up to 10,000 matched files, instead of 5,000.
+  Loads matching more files read every file within their key bounds.
+
 ## 2026-10-27
 ### Added
 - Load, staging and commit queries that run for at least five seconds are
