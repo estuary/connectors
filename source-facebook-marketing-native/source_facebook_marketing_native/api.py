@@ -6,7 +6,6 @@ from estuary_cdk.capture.common import (
     PageCursor,
     LogCursor,
 )
-from estuary_cdk.buffer_ordered import buffer_ordered
 
 from .client import FacebookAPIClient, FacebookRequestParams, FacebookCursor
 from .insights import FacebookInsightsJobManager, TimeRange
@@ -22,21 +21,14 @@ async def snapshot_resource(
 ) -> AsyncGenerator[FacebookResource, None]:
     params = FacebookRequestParams(fields=resource_model.fields)
 
-    async def _generator():
-        for account_id in accounts:
-
-            async def task():
-                results = []
-                async for item in client.fetch_all(
-                    resource_model, params, include_deleted, account_id=account_id
-                ):
-                    results.append(item)
-                return results
-
-            yield task()
-
-    async for results in buffer_ordered(_generator(), concurrency=len(accounts)):
-        for item in results:
+    # We tried using the CDK's buffer_ordered to improve throughput when fetching
+    # resources for multiple accounts, but that caused too many documents to
+    # be buffered in memory & caused captures to OOM. So, we go through each
+    # account one at a time to reduce memory usage.
+    for account_id in accounts:
+        async for item in client.fetch_all(
+            resource_model, params, include_deleted, account_id=account_id
+        ):
             yield item
 
 
@@ -83,20 +75,10 @@ async def snapshot_ad_creatives(
 
             yield creative
 
-    async def _generator():
-        for account_id in accounts:
-
-            async def task():
-                results = []
-                async for item in fetch_ad_creatives(account_id):
-                    results.append(item)
-                return results
-
-            yield task()
-
-    async for results in buffer_ordered(_generator(), concurrency=len(accounts)):
-        for item in results:
-            yield item
+    # One account at a time, for the same reason as snapshot_resource.
+    for account_id in accounts:
+        async for creative in fetch_ad_creatives(account_id):
+            yield creative
 
 
 async def fetch_page(
