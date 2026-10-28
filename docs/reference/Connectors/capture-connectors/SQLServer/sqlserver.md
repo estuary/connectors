@@ -259,6 +259,7 @@ these filters exclude will be deactivated the next time discovery runs.
 | `/advanced/skip_backfills`      | Skip Backfills      | A comma-separated list of fully-qualified table names which should not be backfilled.                                                       | string  |                            |
 | `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
 | `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+| `/advanced/max_startup_delay` | Maximum Startup Delay | How long the connector waits at most before connecting to the database and replicating changes on startup. The actual wait is random between zero and this duration. This is useful when many captures against the same server start at once, because it spreads out the load on the database. Accepts duration strings like `30s`, `10m30s`, or `2h`. No delay when unspecified. | string |  |
 
 #### Bindings
 

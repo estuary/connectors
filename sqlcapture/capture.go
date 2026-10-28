@@ -294,6 +294,21 @@ func ParseRediscoveryInterval(interval string) time.Duration {
 	return parsed
 }
 
+// ParseMaxStartupDelay parses a connector's 'max_startup_delay' config setting.
+// An empty value means "no delay".
+func ParseMaxStartupDelay(delay string) (time.Duration, error) {
+	if delay == "" {
+		return 0, nil
+	}
+	var parsed, err = time.ParseDuration(delay)
+	if err != nil {
+		return 0, fmt.Errorf("invalid 'max_startup_delay' configuration %q: %w", delay, err)
+	} else if parsed < 0 {
+		return 0, fmt.Errorf("invalid 'max_startup_delay' configuration %q: must not be negative", delay)
+	}
+	return parsed, nil
+}
+
 // streamingDiagnosticsThreshold returns how long a single streaming cycle must run before it's
 // considered to have gone on for an unexpectedly long time and replication diagnostics are
 // collected.

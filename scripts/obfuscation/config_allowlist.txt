@@ -176,3 +176,4 @@ fail_after
 exit_after
 rediscovery_interval
 scale
+max_startup_delay

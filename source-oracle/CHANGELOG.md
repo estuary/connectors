@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-28
+
+### Changed
+- Starting a capture now reads table schemas from the source database once instead of twice.
+
 ## 2026-10-21
 
 ### Changed

@@ -611,10 +611,10 @@ type bindingLoad struct {
 
 // maxMatchedFiles is the maximum number of files a two-phase load filters on.
 // A load that matches more, will omit the filter altogether, reading all the
-// files. With usually 256 MB to 1 GB per table file in Databricks, 5,000 files
-// is about 1.3 to 5 TB of table. Each file path is about 280 bytes so the
-// longest list is about 1.4 MB that takes about 2s to compile.
-const maxMatchedFiles = 5000
+// files. With usually 256 MB to 1 GB per table file in Databricks, 10,000
+// files is about 2.5 to 10 TB of table. Each file path is about 280 bytes so
+// the longest list is about 2.9 MB that takes about 3s to compile.
+const maxMatchedFiles = 10000
 
 // matchLoadFiles is the first phase of a two-phase load. It pins the load to
 // the table's current version, so that both phases read the same files, and
