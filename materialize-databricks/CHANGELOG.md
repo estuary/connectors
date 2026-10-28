@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-28
+### Fixed
+- A load no longer fails, restarting the task, when Databricks rate-limits
+  the download of its results (`cloud fetch batch loader failed to download
+  results: HTTP error 429`). Downloads that fail with a transient error are
+  now retried with backoff, honoring the `Retry-After` header.
+
 ## 2026-10-27
 ### Added
 - Load, staging and commit queries that run for at least five seconds are
