@@ -564,7 +564,7 @@ func (c *streamV2Client) WaitCommit(ctx context.Context, tokens map[string]strin
 
 		var statuses, err = c.channelStatuses(ctx, pending)
 		if err != nil && ctx.Err() != nil {
-			return nil, fmt.Errorf("offset tokens of channels %q were not committed within %s: %w", pending, streamV2WaitCommitTimeout, ctx.Err())
+			return nil, waitCommitError(ctx, pending)
 		} else if err != nil {
 			return nil, err
 		}
@@ -587,9 +587,18 @@ func (c *streamV2Client) WaitCommit(ctx context.Context, tokens map[string]strin
 		select {
 		case <-time.After(streamV2CommitPollInterval):
 		case <-ctx.Done():
-			return nil, fmt.Errorf("offset tokens of channels %q were not committed within %s: %w", pending, streamV2WaitCommitTimeout, ctx.Err())
+			return nil, waitCommitError(ctx, pending)
 		}
 	}
+}
+
+// waitCommitError is the error of a commit wait on the pending channels that
+// ended with ctx.
+func waitCommitError(ctx context.Context, pending []string) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("offset tokens of channels %q were not committed within %s: %w", pending, streamV2WaitCommitTimeout, ctx.Err())
+	}
+	return fmt.Errorf("waiting for offset tokens of channels %q to commit: %w", pending, ctx.Err())
 }
 
 // DropChannel drops a channel in Snowflake, which discards its committed offset
