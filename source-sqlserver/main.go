@@ -36,6 +36,7 @@ var sqlserverDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
 	Connect:          connectSQLServer,
+	MaxStartupDelay:  maxStartupDelay,
 }
 
 const defaultPort = "1433"
@@ -143,6 +144,7 @@ type advancedConfig struct {
 	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
 	SourceTag                   string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
 	RediscoveryInterval         string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	MaxStartupDelay             string `json:"max_startup_delay,omitempty" jsonschema:"title=Maximum Startup Delay,description=How long the connector waits at most before connecting to the database and replicating changes on startup. The actual wait is random between zero and this duration. This is useful when many captures against the same server start at once because it spreads out the load on the database. Accepts duration strings like '30s' or '10m30s' or '2h'. No delay when unspecified." jsonschema_extras:"pattern=^([0-9]+(ms|s|m|h))+$,nonsensitive=true"`
 	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 	WatermarksTable             string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=This property is deprecated for new captures as they will no longer use watermark writes by default. The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
@@ -193,6 +195,9 @@ func (c *Config) Validate() error {
 		}
 	}
 	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
+	}
+	if _, err := sqlcapture.ParseMaxStartupDelay(c.Advanced.MaxStartupDelay); err != nil {
 		return err
 	}
 
@@ -359,6 +364,15 @@ func configSchema() json.RawMessage {
 		panic(err)
 	}
 	return json.RawMessage(configSchema)
+}
+
+// maxStartupDelay parses the config on its own because Pull needs the delay before connecting.
+func maxStartupDelay(cfg json.RawMessage) (time.Duration, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return 0, fmt.Errorf("error parsing config json: %w", err)
+	}
+	return sqlcapture.ParseMaxStartupDelay(config.Advanced.MaxStartupDelay)
 }
 
 func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
