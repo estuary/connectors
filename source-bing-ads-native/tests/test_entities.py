@@ -20,6 +20,7 @@ from source_bing_ads_native.api import (
     snapshot_campaigns,
 )
 from source_bing_ads_native.errors import should_retry
+from source_bing_ads_native.http import with_developer_token
 
 LOG = getLogger(__name__)
 
@@ -299,4 +300,15 @@ async def test_ad_groups_and_ads_carry_parent_ids_in_order():
     ],
 )
 def test_should_retry_only_internal_errors(body: bytes, attempt: int, expected: bool):
-    assert should_retry(500, None, body, attempt) is expected  # type: ignore[arg-type]
+    assert should_retry(LOG, 500, None, body, attempt) is expected  # type: ignore[arg-type]
+
+
+def test_authenticated_request_needs_developer_token():
+    with pytest.raises(RuntimeError):
+        with_developer_token(None, None, with_token=True)
+    assert with_developer_token(None, None, with_token=False) is None
+
+    assert with_developer_token("token", {"CustomerId": "1"}, with_token=True) == {
+        "CustomerId": "1",
+        "DeveloperToken": "token",
+    }

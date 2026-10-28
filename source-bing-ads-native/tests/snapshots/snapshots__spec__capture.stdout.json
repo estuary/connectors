@@ -5,12 +5,12 @@
       "$defs": {
         "Advanced": {
           "properties": {
-            "lookback_days": {
+            "lookback_window_days": {
               "default": 30,
               "description": "Number of days of report data to re-fetch on each sync, to pick up late conversions and invalid-traffic credits.",
               "maximum": 90,
               "minimum": 0,
-              "title": "Lookback Days",
+              "title": "Lookback Window Days",
               "type": "integer"
             }
           },
@@ -68,6 +68,7 @@
         },
         "developer_token": {
           "description": "The Microsoft Advertising developer token sent with every API request.",
+          "minLength": 1,
           "secret": true,
           "title": "Developer Token",
           "type": "string"

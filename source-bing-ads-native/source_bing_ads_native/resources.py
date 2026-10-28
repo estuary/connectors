@@ -19,7 +19,7 @@ from .api import (
 )
 from .errors import INVALID_CREDENTIALS, fault_of
 from .http import BingAdsHTTPMixin
-from .models import ConnectorState, EndpointConfig, OAUTH2_SPEC
+from .models import ConnectorState, EndpointConfig, OAUTH2_SPEC, utc_now
 from .reports import (
     REPORTS,
     ReportDefinition,
@@ -27,21 +27,30 @@ from .reports import (
     backfill_report,
     day_cursor,
     fetch_report,
-    utc_now,
 )
 
 ENTITY_INTERVAL = timedelta(hours=1)
 
 
-def _configure_http(http: BingAdsHTTPMixin, config: EndpointConfig) -> None:
+# Microsoft's public developer token, which works only against the sandbox.
+# https://learn.microsoft.com/en-us/advertising/guides/get-started?view=bingads-13
+SANDBOX_DEVELOPER_TOKEN = "BBD37VB98"
+
+
+def _configure_http(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig) -> None:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     http.developer_token = config.developer_token
+    # Never log the token itself.
+    log.info(
+        "developer token configured",
+        {"is_sandbox_token": config.developer_token == SANDBOX_DEVELOPER_TOKEN},
+    )
 
 
 async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig):
     """Confirm the credentials authenticate and every account the capture
     will read can be read with the headers the capture uses."""
-    _configure_http(http, config)
+    _configure_http(log, http, config)
 
     try:
         await query_user(http, log)
@@ -54,8 +63,9 @@ async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: Endp
         if fault is not None and INVALID_CREDENTIALS in fault.codes():
             raise ValidationError(
                 [
-                    "Microsoft rejected the credentials or developer token. Confirm the "
-                    f"developer token is a production token.\n\n{fault.describe()}"
+                    "Microsoft rejected the credentials or the developer token. "
+                    "Re-authenticate with Microsoft, and confirm the developer token "
+                    f"is correct and is a production token.\n\n{fault.describe()}"
                 ]
             )
         raise
@@ -161,7 +171,7 @@ def report_resources(
                     definition,
                     row_model,
                     config.start_date,
-                    config.advanced.lookback_days,
+                    config.advanced.lookback_window_days,
                 )
                 for c in contexts
             },
@@ -199,7 +209,7 @@ async def all_resources(
 ) -> list[common.Resource]:
     """Enumerate every stream the connector exposes. Makes no API calls:
     accounts are discovered once, lazily, when a stream first needs them."""
-    _configure_http(http, config)
+    _configure_http(log, http, config)
     directory = AccountDirectory(http, config.account_ids)
 
     return [

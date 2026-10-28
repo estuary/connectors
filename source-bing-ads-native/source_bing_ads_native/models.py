@@ -75,9 +75,18 @@ else:
     OAuth2Credentials = BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
 
+DEFAULT_START_DATE_DAYS_AGO = 30
+DEFAULT_LOOKBACK_WINDOW_DAYS = 30
+MAX_LOOKBACK_WINDOW_DAYS = 90
+
+
+def utc_now() -> datetime:
+    """The current time. Tests patch it to pin "now"."""
+    return datetime.now(tz=UTC)
+
+
 def default_start_date():
-    dt = datetime.now(tz=UTC) - timedelta(days=30)
-    return dt
+    return utc_now() - timedelta(days=DEFAULT_START_DATE_DAYS_AGO)
 
 
 # The numeric Account ID the API takes, not the 8-character account number the UI
@@ -91,6 +100,7 @@ class EndpointConfig(BaseModel):
         title="Authentication",
     )
     developer_token: str = Field(
+        min_length=1,
         title="Developer Token",
         description="The Microsoft Advertising developer token sent with every API request.",
         json_schema_extra={"secret": True},
@@ -108,12 +118,12 @@ class EndpointConfig(BaseModel):
     )
 
     class Advanced(BaseModel):
-        lookback_days: int = Field(
-            default=30,
-            title="Lookback Days",
+        lookback_window_days: int = Field(
+            default=DEFAULT_LOOKBACK_WINDOW_DAYS,
+            title="Lookback Window Days",
             description="Number of days of report data to re-fetch on each sync, to pick up late conversions and invalid-traffic credits.",
             ge=0,
-            le=90,
+            le=MAX_LOOKBACK_WINDOW_DAYS,
         )
 
     advanced: Advanced = Field(
@@ -129,8 +139,13 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 @dataclass(frozen=True)
 class ParentIds:
-    """Validation context carrying the parent IDs a child entity's response
-    lacks, stamped onto each document as top-level fields."""
+    """IDs of a document's parent entities, which Microsoft's response omits.
+
+    For example, `Ads/QueryByAdGroupId` returns ads without their account,
+    campaign or ad group IDs. Passing `ParentIds({"AdGroupId": ...})` as the
+    pydantic validation context adds those IDs to each ad as top-level
+    fields, so every ad records which account, campaign and ad group it
+    belongs to."""
 
     ids: dict[str, str]
 

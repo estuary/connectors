@@ -17,6 +17,7 @@ from estuary_cdk.unzip_stream import UnzipStream
 
 from .api import AccountContext, reporting_url
 from .errors import fault_of
+from .models import MAX_LOOKBACK_WINDOW_DAYS, utc_now
 
 # One cap on in-flight report jobs (submit through download) for the whole
 # connector process. Microsoft doesn't publish the concurrent-report limit
@@ -39,7 +40,7 @@ BACKFILL_WINDOW_DAYS = 30
 # job. Only catching up after a long outage splits a sweep. Microsoft
 # documents no maximum custom date range, and Airbyte's connector requests
 # its whole start-date-to-today range in a single job.
-INCREMENTAL_WINDOW_DAYS = 92
+INCREMENTAL_WINDOW_DAYS = MAX_LOOKBACK_WINDOW_DAYS + 2
 
 TICK = timedelta(days=1)
 
@@ -437,17 +438,13 @@ def day_cursor(day: date) -> datetime:
     return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
-def utc_now() -> datetime:
-    return datetime.now(tz=UTC)
-
-
 async def fetch_report(
     http: HTTPSession,
     context: AccountContext,
     definition: ReportDefinition,
     row_model: type[ReportRow],
     start_date: datetime,
-    lookback_days: int,
+    lookback_window_days: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ReportRow | LogCursor, None]:
@@ -488,7 +485,7 @@ async def fetch_report(
     now = utc_now()
     today = now.date()
     cursor_day = log_cursor.date()
-    first_day = cursor_day - lookback_days * TICK if cursor_day < today else today
+    first_day = cursor_day - lookback_window_days * TICK if cursor_day < today else today
     first_day = max(first_day, earliest_day(definition, start_date, today))
 
     last_cursor = log_cursor

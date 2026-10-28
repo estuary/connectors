@@ -1,15 +1,16 @@
+from logging import Logger
+
 from pydantic import BaseModel, ValidationError as PydanticValidationError
 
 from estuary_cdk.http import HTTPError, Headers
 
 # Fault codes the connector reacts to.
 # https://learn.microsoft.com/en-us/advertising/guides/handle-service-errors-exceptions?view=bingads-13
+# https://learn.microsoft.com/en-us/advertising/guides/operation-error-codes?view=bingads-13
 INTERNAL_ERROR = 0
 INVALID_CREDENTIALS = 105
 USER_IS_NOT_AUTHORIZED = 106
 CALL_RATE_EXCEEDED = 117
-# Code 207 is also reused for an unrelated address error, so it's matched
-# together with its ErrorCode.
 CONCURRENT_REQUEST_OVER_LIMIT = (207, "ConcurrentRequestOverLimit")
 
 ACCESS_DENIED_CODES = {INVALID_CREDENTIALS, USER_IS_NOT_AUTHORIZED}
@@ -78,7 +79,9 @@ def fault_of(err: HTTPError) -> Fault | None:
     return parse_fault(err.message.split("Response:", 1)[1].strip())
 
 
-def should_retry(status: int, headers: Headers, body: bytes, attempt: int) -> bool:
+def should_retry(
+    log: Logger, status: int, headers: Headers, body: bytes, attempt: int
+) -> bool:
     """Retry only internal errors, a bounded number of times.
 
     Call-rate (117) and concurrent-report (207) faults are not retried: the
@@ -87,6 +90,10 @@ def should_retry(status: int, headers: Headers, body: bytes, attempt: int) -> bo
     it restarts from its last checkpoint.
     """
     if attempt >= MAX_INTERNAL_ERROR_ATTEMPTS:
+        log.debug(
+            "not retrying: reached the maximum attempts for internal errors",
+            {"attempt": attempt, "status": status},
+        )
         return False
 
     fault = parse_fault(body)
