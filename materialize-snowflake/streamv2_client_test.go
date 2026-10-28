@@ -336,3 +336,18 @@ func TestStreamV2ClientWaitCommitFailsOnAForeignKeyRange(t *testing.T) {
 	var _, err = c.WaitCommit(ctx, map[string]string{"CH": streamV2FormatOffsetToken(2, fullKeyRange)})
 	require.ErrorContains(t, err, "something other than this task is appending to the channel")
 }
+
+// TestStreamV2ClientWaitCommitReportsCancellation covers a commit wait whose
+// caller cancels it, which is not a commit that missed its timeout.
+func TestStreamV2ClientWaitCommitReportsCancellation(t *testing.T) {
+	var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"channel_statuses":{"CH":{"channel_status_code":"SUCCESS"}}}`)
+	})
+	c.channels["CH"] = &streamV2OpenChannel{pipePath: streamV2PipePath("DB", "SCH", "T")}
+
+	var ctx, cancel = context.WithCancel(context.Background())
+	time.AfterFunc(1500*time.Millisecond, cancel)
+	var _, err = c.WaitCommit(ctx, map[string]string{"CH": streamV2FormatOffsetToken(2, fullKeyRange)})
+	require.ErrorIs(t, err, context.Canceled)
+	require.NotContains(t, err.Error(), "were not committed within")
+}
