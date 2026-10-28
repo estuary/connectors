@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-27
+
+### Changed
+- The `ad_account`, `ad_creatives` and `custom_conversions` snapshots use less
+  memory. They now request each account's resources one at a time, instead of
+  requesting all accounts concurrently and buffering their data in memory. On
+  captures with several large accounts, these snapshots may take longer.
+
 ## 2026-08-19
 
 ### Fixed
