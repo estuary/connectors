@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -119,4 +120,17 @@ func TestStreamV2FileModeLive(t *testing.T) {
 		fmt.Sprintf("2:%d:%x", len(big), md5.Sum(big)),
 		fmt.Sprintf("3:5:%x", md5.Sum([]byte("after"))),
 	}, got)
+}
+
+// TestStreamV2RedactURLQuery covers a stage upload that fails before reaching the
+// service, whose error repeats the request URL with an Azure SAS token as its query.
+func TestStreamV2RedactURLQuery(t *testing.T) {
+	var err error = &url.Error{
+		Op:  "Put",
+		URL: "https://acct.blob.core.windows.net/c/k?sig=SECRETSIG&sv=1",
+		Err: fmt.Errorf("dial tcp: connection refused"),
+	}
+	err = fmt.Errorf("uploading: %w", streamV2RedactURLQuery(err))
+	require.NotContains(t, err.Error(), "SECRETSIG")
+	require.Contains(t, err.Error(), `"https://acct.blob.core.windows.net/c/k?REDACTED"`)
 }

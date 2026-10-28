@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -171,7 +172,7 @@ func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel
 	var name = info.Stage.PathPrefix + uuid.NewString() + ".ndjson"
 	var storeETag string
 	if err := info.uploader.Upload(ctx, name, bytes.NewReader(compressed), blob.WithETag(&storeETag)); err != nil {
-		return fmt.Errorf("uploading %d bytes to the %s stage of channel %q: %w", len(compressed), info.Stage.LocationType, channelName, err)
+		return fmt.Errorf("uploading %d bytes to the %s stage of channel %q: %w", len(compressed), info.Stage.LocationType, channelName, streamV2RedactURLQuery(err))
 	}
 	var sum = md5.Sum(compressed)
 	// Snowflake checks a file on an Azure stage against the blob's ETag, and a
@@ -217,4 +218,18 @@ func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel
 	}
 	ch.continuation = res.Continuation
 	return nil
+}
+
+// streamV2RedactURLQuery removes the query of the URL that err names, because a
+// stage credential can be lent as that query.
+func streamV2RedactURLQuery(err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return err
+	}
+	if u, parseErr := url.Parse(urlErr.URL); parseErr == nil && u.RawQuery != "" {
+		u.RawQuery = "REDACTED"
+		urlErr.URL = u.String()
+	}
+	return err
 }
