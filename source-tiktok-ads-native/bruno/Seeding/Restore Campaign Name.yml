@@ -1,0 +1,46 @@
+info:
+  name: Restore Campaign Name
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{base_url}}/campaign/update/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "campaign_id": "{{lag_probe_campaign_id}}",
+        "campaign_name": "Estuary Seed Campaign"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // The live campaign `Seeding / Create Campaign` made.
+        if (!bru.getVar('lag_probe_campaign_id')) bru.setVar('lag_probe_campaign_id', '1878524808566049');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok Business API SDK, `js_sdk/docs/CampaignCreationApi.md`
+  and `CampaignUpdateBody.md` (`POST /open_api/v1.3/campaign/update/`), in
+  https://github.com/tiktok/tiktok-business-api-sdk.
+
+  **Only the user runs this; never the assistant.**
+
+  **WHY:** puts back the name `Seeding / Create Campaign` gave the live seed
+  campaign after `Seeding / Rename Campaign For Lag Probe`, so the capture
+  snapshot keeps its name. Its `modify_time` stays moved; regenerate the
+  capture snapshot in the same change.
+
+  **Outcome:** ran 2026-10-24; the campaign is named `Estuary Seed Campaign`
+  again, with `modify_time` 2026-10-24 03:45:09. Finding VERIFIED in
+  `Campaigns / List Campaigns (visibility after rename)`.

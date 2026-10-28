@@ -1,0 +1,41 @@
+info:
+  name: Delete Ad Group
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{base_url}}/adgroup/status/update/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "adgroup_ids": ["{{seed_direct_deleted_adgroup_id}}"],
+        "operation_status": "DELETE"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_direct_deleted_adgroup_id') && !bru.getEnvVar('seed_direct_deleted_adgroup_id')) await bru.runRequest('Seeding/Create Ad Group To Delete Directly');
+        if (!bru.getVar('seed_direct_deleted_adgroup_id') && !bru.getEnvVar('seed_direct_deleted_adgroup_id')) throw new Error('no seeded ad group to delete');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Update the status of ad groups" (`POST /open_api/v1.3/adgroup/status/update/`).
+
+  **WHY:** deletes only the ad group `Create Ad Group To Delete Directly` made.
+  Deletion is irreversible, which is why this never takes an id from anywhere
+  but that chained request (or the same id passed with `--env-var`).
+
+  Outcome: ran 2026-10-13, about 5 s after creation; `code 0`,
+  `status: DELETE`. Finding VERIFIED in `List Ad Groups (filtering status
+  delete)`.
