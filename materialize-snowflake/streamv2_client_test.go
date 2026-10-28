@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -350,4 +351,20 @@ func TestStreamV2ClientWaitCommitReportsCancellation(t *testing.T) {
 	var _, err = c.WaitCommit(ctx, map[string]string{"CH": streamV2FormatOffsetToken(2, fullKeyRange)})
 	require.ErrorIs(t, err, context.Canceled)
 	require.NotContains(t, err.Error(), "were not committed within")
+}
+
+// TestStreamV2ClientBoundsAnErrorBody covers an error response with a large
+// body, such as an intermediary's HTML page, which the error message truncates.
+func TestStreamV2ClientBoundsAnErrorBody(t *testing.T) {
+	var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, strings.Repeat("x", 64<<10))
+	})
+	c.channels["CH"] = &streamV2OpenChannel{pipePath: streamV2PipePath("DB", "SCH", "T")}
+
+	var _, err = c.ChannelStatus(context.Background(), "CH")
+	var apiErr *streamV2APIError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, http.StatusBadRequest, apiErr.Status)
+	require.Less(t, len(err.Error()), 2<<10)
 }
