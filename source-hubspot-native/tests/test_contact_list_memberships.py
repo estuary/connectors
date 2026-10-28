@@ -7,7 +7,6 @@ from typing import Any
 
 import estuary_cdk.emitted_changes_cache as cache
 import pytest
-
 from source_hubspot_native.api.contact_list_memberships import (
     fetch_contact_list_memberships,
 )
@@ -101,3 +100,42 @@ async def test_adhoc_lists_are_not_requested():
     ]
 
     assert [(m.listId, m.recordId) for m in emitted] == [(LIST_ID, "1")]
+
+
+@pytest.mark.asyncio
+async def test_only_memberships_the_next_run_can_refetch_are_cached():
+    cache.emitted_cache.pop(Names.contact_list_memberships, None)
+
+    # Inside this run's window but before the next run's lower bound.
+    joined_long_ago = LOG_CURSOR - timedelta(minutes=30)
+    memberships = json.dumps(
+        {
+            "results": [
+                {"recordId": "1", "membershipTimestamp": JOINED_AT.isoformat()},
+                {"recordId": "2", "membershipTimestamp": joined_long_ago.isoformat()},
+            ],
+        }
+    ).encode()
+    http = FakeHTTP([_list_search_page(), memberships])
+
+    items = [
+        item
+        async for item in fetch_contact_list_memberships(http, log, LOG_CURSOR)  # type: ignore[arg-type]
+    ]
+    next_cursor = items[-1]
+    assert isinstance(next_cursor, datetime)
+
+    assert sorted(
+        m.recordId for m in items if isinstance(m, ContactListMembership)
+    ) == ["1", "2"]
+    assert list(cache.emitted_cache[Names.contact_list_memberships]) == [f"{LIST_ID}:1"]
+
+    # The next run refetches the recent membership and must not re-emit it.
+    http = FakeHTTP([_list_search_page(), _memberships_page(["1"])])
+    emitted = [
+        item
+        async for item in fetch_contact_list_memberships(http, log, next_cursor)  # type: ignore[arg-type]
+        if isinstance(item, ContactListMembership)
+    ]
+
+    assert emitted == []

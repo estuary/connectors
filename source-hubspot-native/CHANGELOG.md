@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-28
+
+### Changed
+- The `contact_list_memberships` binding uses less memory when catching up on list membership changes.
+
 ## 2026-10-26
 
 ### Changed
