@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -33,6 +34,25 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 
 	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
+
+	if cfg.distributed() {
+		if err := checkCluster(ctx, cfg); err != nil {
+			return nil, err
+		}
+	}
+	if req.LastMaterialization != nil {
+		var lastCfg config
+		if err := json.Unmarshal(req.LastMaterialization.ConfigJson, &lastCfg); err != nil {
+			return nil, fmt.Errorf("parsing last endpoint config: %w", err)
+		}
+		// Dropping the tables of a clustered binding is a cluster-wide
+		// operation, and the single-server path only ever drops one table on
+		// one node, so the switch is not something a backfill can perform.
+		if lastCfg.distributed() && !cfg.distributed() {
+			return nil, cerrors.NewUserError(nil, fmt.Sprintf(
+				"the 'cluster' setting cannot be removed once a materialization has used cluster %q; create a new materialization instead, after dropping the tables on the cluster", lastCfg.Cluster))
+		}
+	}
 
 	tableMetas, err := readTableKeyMeta(ctx, db, dialect, cfg.Database)
 	if err != nil {
@@ -64,33 +84,49 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			log.WithField("table", rc.Table).Warn(warning)
 		}
 
+		if err := checkShardingKey(rc, cfg, keys); err != nil {
+			return nil, err
+		}
+		if cfg.distributed() {
+			requireShardingKeyFields(resp.Bindings[i], rc, keys)
+		}
+
 		var last = boilerplate.FindLastBinding([]string{rc.Table}, req.LastMaterialization)
 		var lastExpr string
+		var lastShardingKey []string
 		if last != nil {
 			var lastRC tableConfig
 			if err := json.Unmarshal(last.ResourceConfigJson, &lastRC); err != nil {
 				return nil, fmt.Errorf("parsing last resource config: %w", err)
 			}
 			lastExpr = strings.TrimSpace(lastRC.PartitionBy)
+			lastShardingKey = lastRC.ShardingKey
 		}
 
-		// ClickHouse only accepts PARTITION BY at CREATE TABLE time, so a
-		// changed expression requires re-creating the table. Absent a
-		// backfill counter bump, block the publication with INCOMPATIBLE
-		// constraints, in the same way materialize-spanner handles its
-		// key-distribution setting.
+		// Each of these settings is fixed at CREATE TABLE time, so a change
+		// requires re-creating the table. Absent a backfill counter bump,
+		// block the publication with INCOMPATIBLE constraints, in the same
+		// way materialize-spanner handles its key-distribution setting.
 		// The constraint goes on every projection, not just key fields: an
 		// INCOMPATIBLE constraint on an unselected field is non-fatal to the
 		// control plane, and delta-updates bindings may deselect their key
 		// fields entirely. Constraining every projection guarantees at least
 		// one lands on a selected field, which is what blocks the publication.
-		if last != nil && rb.Backfill == last.Backfill && newExpr != lastExpr {
+		var recreateReason string
+		switch {
+		case last == nil || rb.Backfill != last.Backfill:
+		case newExpr != lastExpr:
+			recreateReason = fmt.Sprintf("'partition_by' changed from %q to %q; changing the partition key requires re-creating the table", lastExpr, newExpr)
+		case !slices.Equal(rc.ShardingKey, lastShardingKey):
+			recreateReason = fmt.Sprintf("'sharding_key' changed from %v to %v; changing the sharding key moves rows between shards, which requires re-creating the table", lastShardingKey, rc.ShardingKey)
+		}
+		if recreateReason != "" {
 			for _, p := range rb.Collection.Projections {
 				resp.Bindings[i].ProjectionConstraints = append(resp.Bindings[i].ProjectionConstraints, &pm.Response_Validated_ProjectionConstraint{
 					Field: p.Field,
 					Constraint: &pm.Response_Validated_Constraint{
 						Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
-						Reason: fmt.Sprintf("'partition_by' changed from %q to %q; changing the partition key requires re-creating the table. Backfill the binding to proceed.", lastExpr, newExpr),
+						Reason: recreateReason + ". Backfill the binding to proceed.",
 					},
 				})
 			}
@@ -113,6 +149,75 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 
 	return resp, nil
+}
+
+// checkCluster rejects a cluster that cannot host Distributed tables: any
+// cluster on ClickHouse Cloud, where the Distributed engine is unavailable
+// and there are no shards to target, or one the server does not know.
+func checkCluster(ctx context.Context, cfg config) error {
+	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	if err != nil {
+		return fmt.Errorf("connecting to check cluster %q: %w", cfg.Cluster, err)
+	}
+	defer conn.Close()
+
+	var cloudMode string
+	if err := conn.QueryRow(ctx, "SELECT value FROM system.settings WHERE name = 'cloud_mode'").Scan(&cloudMode); err != nil && !errors.Is(err, stdsql.ErrNoRows) {
+		return fmt.Errorf("querying cloud_mode: %w", err)
+	}
+	if cloudMode == "1" {
+		return cerrors.NewUserError(nil, "ClickHouse Cloud does not support Distributed tables. Remove the 'cluster' setting to materialize to ClickHouse Cloud.")
+	}
+	if _, err := readTopology(ctx, conn, cfg.Cluster); err != nil {
+		return cerrors.NewUserError(err, fmt.Sprintf("cluster %q is not usable: %v", cfg.Cluster, err))
+	}
+	return nil
+}
+
+// requireShardingKeyFields marks the fields the Distributed table hashes as
+// required, so that a field selection can never leave the sharding
+// expression without a column. Without a configured sharding key every key
+// field is hashed.
+func requireShardingKeyFields(vb *pm.Response_Validated_Binding, rc tableConfig, keys []string) {
+	var required = rc.ShardingKey
+	if len(required) == 0 {
+		required = keys
+	}
+	for _, pc := range vb.ProjectionConstraints {
+		if !slices.Contains(required, pc.Field) {
+			continue
+		}
+		switch pc.Constraint.Type {
+		case pm.Response_Validated_Constraint_FIELD_OPTIONAL, pm.Response_Validated_Constraint_LOCATION_RECOMMENDED:
+			pc.Constraint = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+				Reason: "This field is part of the table's sharding key on the cluster and must be materialized",
+			}
+		}
+	}
+}
+
+// checkShardingKey enforces that a sharding key is only set in distributed
+// mode and names only fields of the binding's key. A sharding-key field
+// outside the key would let rows with equal keys land on different shards,
+// where ReplacingMergeTree could never deduplicate them.
+func checkShardingKey(rc tableConfig, cfg config, keys []string) error {
+	if len(rc.ShardingKey) == 0 {
+		return nil
+	}
+	if !cfg.distributed() {
+		return cerrors.NewUserError(nil, fmt.Sprintf("table %q sets 'sharding_key' but the endpoint has no 'cluster'; a sharding key only applies when materializing to a cluster", rc.Table))
+	}
+	var missing []string
+	for _, f := range rc.ShardingKey {
+		if !slices.Contains(keys, f) {
+			missing = append(missing, f)
+		}
+	}
+	if len(missing) > 0 {
+		return cerrors.NewUserError(nil, fmt.Sprintf("table %q: 'sharding_key' fields %v are not part of the table's key %v; every sharding key field must be a key field", rc.Table, missing, keys))
+	}
+	return nil
 }
 
 // dryRunPartitionBy creates and immediately drops a scratch table having the
