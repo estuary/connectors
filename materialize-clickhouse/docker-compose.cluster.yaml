@@ -1,0 +1,94 @@
+# Two ClickHouse shards, two replicas each, coordinated by one Keeper.
+#
+# Every container shares the host network so that the host:port pairs
+# declared in remote_servers (see testdata/cluster/node.xml) are reachable
+# from the Go tests and from each node under the same address. Each node
+# therefore needs its own TCP, HTTP and interserver ports.
+x-node: &node
+  image: 'clickhouse/clickhouse-server:25.8'
+  platform: linux/amd64
+  network_mode: host
+  depends_on:
+    keeper:
+      condition: service_healthy
+  volumes:
+    # Mounted over the image's own config.d file so its wildcard listen_host
+    # entries do not fight the loopback-only listener every node uses here.
+    - ./testdata/cluster/node.xml:/etc/clickhouse-server/config.d/docker_related_config.xml:ro
+  deploy:
+    resources:
+      limits:
+        memory: 2g
+  ulimits:
+    nofile: 262144
+
+x-node-env: &node-env
+  CLICKHOUSE_USER: flow
+  CLICKHOUSE_PASSWORD: flow
+  CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+
+services:
+  keeper:
+    image: 'clickhouse/clickhouse-keeper:25.8'
+    platform: linux/amd64
+    network_mode: host
+    volumes:
+      - ./testdata/cluster/keeper.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc 127.0.0.1 9181 | grep -q imok"]
+      interval: 1s
+      retries: 60
+
+  ch-s1-r1:
+    <<: *node
+    environment:
+      <<: *node-env
+      CH_SHARD: "1"
+      CH_REPLICA: "r1"
+      CH_TCP_PORT: "9101"
+      CH_HTTP_PORT: "8124"
+      CH_INTERSERVER_PORT: "9109"
+    healthcheck: &node-health
+      # The image entrypoint cannot create CLICKHOUSE_DB because it talks to the
+      # default port 9000, so the health check creates the database instead.
+      # A node is healthy once it sees all four cluster members and Keeper.
+      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --port $$CH_TCP_PORT --user flow --password flow --multiquery --query \"CREATE DATABASE IF NOT EXISTS flow; SELECT throwIf((SELECT count() FROM system.clusters WHERE cluster = 'flow_cluster') != 4 OR (SELECT count() FROM system.zookeeper WHERE path = '/') = 0)\""]
+      interval: 2s
+      retries: 60
+
+  ch-s1-r2:
+    <<: *node
+    environment:
+      <<: *node-env
+      CH_SHARD: "1"
+      CH_REPLICA: "r2"
+      CH_TCP_PORT: "9102"
+      CH_HTTP_PORT: "8125"
+      CH_INTERSERVER_PORT: "9110"
+    healthcheck: *node-health
+
+  ch-s2-r1:
+    <<: *node
+    environment:
+      <<: *node-env
+      CH_SHARD: "2"
+      CH_REPLICA: "r1"
+      CH_TCP_PORT: "9103"
+      CH_HTTP_PORT: "8126"
+      CH_INTERSERVER_PORT: "9111"
+    healthcheck: *node-health
+
+  ch-s2-r2:
+    <<: *node
+    environment:
+      <<: *node-env
+      CH_SHARD: "2"
+      CH_REPLICA: "r2"
+      CH_TCP_PORT: "9104"
+      CH_HTTP_PORT: "8127"
+      CH_INTERSERVER_PORT: "9112"
+    healthcheck: *node-health

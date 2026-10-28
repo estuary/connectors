@@ -1,0 +1,68 @@
+<!-- Shared by every node of the test cluster. Per-node identity and ports
+     come from CH_* environment variables set in docker-compose.cluster.yaml. -->
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+
+    <listen_host>127.0.0.1</listen_host>
+    <tcp_port from_env="CH_TCP_PORT"/>
+    <http_port from_env="CH_HTTP_PORT"/>
+    <interserver_http_host>127.0.0.1</interserver_http_host>
+    <interserver_http_port from_env="CH_INTERSERVER_PORT"/>
+    <mysql_port remove="remove"/>
+    <postgresql_port remove="remove"/>
+
+    <macros>
+        <cluster>flow_cluster</cluster>
+        <shard from_env="CH_SHARD"/>
+        <replica from_env="CH_REPLICA"/>
+    </macros>
+
+    <zookeeper>
+        <node>
+            <host>127.0.0.1</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+    </distributed_ddl>
+
+    <remote_servers replace="replace">
+        <flow_cluster>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>127.0.0.1</host>
+                    <port>9101</port>
+                    <user>flow</user>
+                    <password>flow</password>
+                </replica>
+                <replica>
+                    <host>127.0.0.1</host>
+                    <port>9102</port>
+                    <user>flow</user>
+                    <password>flow</password>
+                </replica>
+            </shard>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>127.0.0.1</host>
+                    <port>9103</port>
+                    <user>flow</user>
+                    <password>flow</password>
+                </replica>
+                <replica>
+                    <host>127.0.0.1</host>
+                    <port>9104</port>
+                    <user>flow</user>
+                    <password>flow</password>
+                </replica>
+            </shard>
+        </flow_cluster>
+    </remote_servers>
+</clickhouse>
