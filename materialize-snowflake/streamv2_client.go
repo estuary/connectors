@@ -46,6 +46,10 @@ var streamV2WaitCommitTimeout = 10 * time.Minute
 // that tests can shorten it.
 var streamV2TokenExchangeTimeout = 30 * time.Second
 
+// streamV2MaxErrorMessageBytes bounds the message of an error response, whose
+// body may be an intermediary's whole HTML page.
+const streamV2MaxErrorMessageBytes = 1 << 10
+
 // streamV2RoleNotGrantedCode is the error code of a token exchange refused
 // because the user does not hold the requested role.
 const streamV2RoleNotGrantedCode = "390186"
@@ -390,6 +394,9 @@ func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte
 			} else if err == nil {
 				apiErr = &streamV2APIError{Status: res.StatusCode, Message: strings.TrimSpace(string(out))}
 				json.Unmarshal(out, apiErr)
+				if len(apiErr.Message) > streamV2MaxErrorMessageBytes {
+					apiErr.Message = strings.ToValidUTF8(apiErr.Message[:streamV2MaxErrorMessageBytes], "") + "…"
+				}
 				err = apiErr
 				// Retry-After is honored in its delay-seconds form.
 				if secs, err := strconv.Atoi(res.Header.Get("Retry-After")); err == nil {
