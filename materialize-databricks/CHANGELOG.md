@@ -1,6 +1,12 @@
 # Changelog
 
 ## 2026-10-28
+### Fixed
+- A load no longer fails, restarting the task, when Databricks rate-limits
+  the download of its results (`cloud fetch batch loader failed to download
+  results: HTTP error 429`). Downloads that fail with a transient error are
+  now retried with backoff, honoring the `Retry-After` header.
+
 ### Changed
 - With `two_phase_loads`, a load restricts its read of documents to the files
   holding its matching rows for up to 10,000 matched files, instead of 5,000.

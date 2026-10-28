@@ -41,7 +41,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/databricks/databricks-sdk-go v0.121.0
-	github.com/databricks/databricks-sql-go v1.10.0
+	github.com/databricks/databricks-sql-go v1.14.0
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/duckdb/duckdb-go/v2 v2.10505.0
 	github.com/elastic/go-elasticsearch/v8 v8.9.0

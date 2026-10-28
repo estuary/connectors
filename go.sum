@@ -349,6 +349,8 @@ github.com/databricks/databricks-sdk-go v0.121.0 h1:5bGlH1/X0hkb7vHM3riQd61HNloH
 github.com/databricks/databricks-sdk-go v0.121.0/go.mod h1:hWoHnHbNLjPKiTm5K/7bcIv3J3Pkgo5x9pPzh8K3RVE=
 github.com/databricks/databricks-sql-go v1.10.0 h1:U17EKVC+hLP87swFMe2N6UUVektwUgTvT2pMDaDc46g=
 github.com/databricks/databricks-sql-go v1.10.0/go.mod h1:qC010ucrtqrNXY2UOcoczbfPD4gJ1jr1y6TL7iqyxPk=
+github.com/databricks/databricks-sql-go v1.14.0 h1:pc6/WPEwKujCBlHbz/U2kVWou8BCvo2Hm3GJVsmyogU=
+github.com/databricks/databricks-sql-go v1.14.0/go.mod h1:knb3jMMEf7rYm+Hw0i6NFuYC12WX7jkSQNhuz/D5V1Q=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
