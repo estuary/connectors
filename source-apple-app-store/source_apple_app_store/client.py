@@ -175,20 +175,6 @@ class AppleAppStoreClient:
 
         return await self._paginated_request(url, AnalyticsReport, params)
 
-    async def get_analytics_report_details(
-        self, report_id: str
-    ) -> AnalyticsReport:
-        url = f"{API_BASE}/analyticsReports/{report_id}"
-
-        response = ApiResponse[AnalyticsReport].model_validate_json(
-            await self.http.request(
-                self.log,
-                url,
-            )
-        )
-
-        return response.data
-
     async def list_analytic_report_instances(
         self,
         report_id: str,
