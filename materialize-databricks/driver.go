@@ -334,6 +334,7 @@ func newTransactor(
 		be:                    be,
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
+		materializationName:   materializationName,
 		stagingPrefix:         stagingPrefix(materializationName),
 		twoPhaseLoads:         featureFlags["two_phase_loads"],
 	}
@@ -379,8 +380,11 @@ func newTransactor(
 	return d, nil
 }
 
+// openSQL is overridden in tests to capture the DSN.
+var openSQL = stdsql.Open
+
 func (t *transactor) openDB() (*stdsql.DB, error) {
-	if db, err := stdsql.Open("databricks", t.cfg.ToURI(t.materializationName)); err != nil {
+	if db, err := openSQL("databricks", t.cfg.ToURI(t.materializationName)); err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
 	} else {
 		return db, nil

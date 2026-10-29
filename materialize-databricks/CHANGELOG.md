@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-29
+### Fixed
+- Load, staging and commit queries now carry the `materialization_name` query
+  tag, so Databricks query history attributes them to the Estuary task.
+  Previously only the queries that create and alter tables carried it.
+
 ## 2026-10-28
 ### Fixed
 - A load no longer fails, restarting the task, when Databricks rate-limits
