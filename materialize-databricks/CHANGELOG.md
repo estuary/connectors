@@ -2,12 +2,12 @@
 
 ## 2026-10-29
 ### Changed
-- A table's load switches to two phases (see `two_phase_loads`) after a load
-  of it takes at least 20 seconds, and keeps them while they're faster than
-  that load. When they're slower, its loads go back to one phase, and try two
-  again after 10 more slow loads. The `no_adaptive_two_phase_loads` feature
-  flag turns this off, and `two_phase_loads` still runs every load in two
-  phases.
+- Each table chooses its own load mode, replacing the `two_phase_loads`
+  feature flag. After a load of a table takes at least 20 seconds, its loads
+  run in two phases: first finding the files holding rows that match its keys,
+  then reading documents from those files alone. They stay in two phases while
+  that's faster than the slow load. When it's slower, they go back to one
+  phase, and try two again after 10 more slow loads.
 - A MERGE of fewer than 100,000 rows reads them straight from the staged
   files, instead of first copying them into a staging table. This saves a
   query of a few seconds from each commit of small batches.

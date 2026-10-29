@@ -178,13 +178,6 @@ type transactor struct {
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
 	profiler              *queryProfiler
-	// twoPhaseLoads uses two queries to prune files: one that finds files
-	// where the rows matching the keys exist on, and another to read
-	// flow_document from those specific files.
-	twoPhaseLoads bool
-	// adaptiveLoads picks one or two phases for each binding's loads by how
-	// long they take.
-	adaptiveLoads bool
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -338,8 +331,6 @@ func newTransactor(
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
 		stagingPrefix:         stagingPrefix(materializationName),
-		twoPhaseLoads:         featureFlags["two_phase_loads"],
-		adaptiveLoads:         featureFlags["adaptive_two_phase_loads"],
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -554,12 +545,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			defer finishEvaluating()
 
 			var started = time.Now()
-			var twoPhase = d.twoPhaseLoads || d.adaptiveLoads && load.binding.loadMode.twoPhase
-			var observe = func() {
-				if d.adaptiveLoads && !d.twoPhaseLoads {
-					d.observeLoad(load.binding, twoPhase, time.Since(started))
-				}
-			}
+			var twoPhase = load.binding.loadMode.twoPhase
+			var observe = func() { d.observeLoad(load.binding, twoPhase, time.Since(started)) }
 
 			if twoPhase {
 				if matched, err := d.matchLoadFiles(groupCtx, db, load); err != nil {
