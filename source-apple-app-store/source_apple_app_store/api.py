@@ -87,8 +87,7 @@ async def _select_valid_report_instances(
 
     target_report = None
     for report in analytics_reports:
-        report_details = await client.get_analytics_report_details(report.id)
-        if report_details.attributes.name == model.report_name:
+        if report.attributes.name == model.report_name:
             target_report = report
             break
 
