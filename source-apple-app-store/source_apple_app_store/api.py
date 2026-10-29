@@ -6,11 +6,6 @@ from typing import AsyncGenerator
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPError
 
-from source_apple_app_store.utils import (
-    str_to_date,
-    date_to_str,
-)
-
 from .client import AppleAppStoreClient
 from .models import (
     AnalyticsReportAccessType,
@@ -20,60 +15,6 @@ from .models import (
     AppleAnalyticsRow,
     AppReview,
 )
-
-
-async def _get_or_create_analytics_report_request(
-    log: Logger,
-    client: AppleAppStoreClient,
-    app_id: str,
-    access_type: AnalyticsReportAccessType,
-) -> str:
-    try:
-        created_report_request = await client.create_analytics_report_request(
-            app_id,
-            access_type,
-        )
-        log.debug(f"Created report request {created_report_request.id} for app {app_id}")
-        return created_report_request.id
-    except HTTPError as e:
-        # Apple returns 409 when it won't create another request of this type,
-        # for example because the app already has one.
-        if e.code != 409:
-            raise
-
-        report_requests = await client.list_analytics_report_requests(
-            app_id,
-            access_type,
-        )
-        for request in report_requests:
-            log.debug(f"Checking request {request.id} for app {app_id}")
-            # assuming there is only one request
-            return request.id
-
-        log.warning(
-            "Report request was created after first run. This is likely due to concurrent requests. "
-            "Waiting for 60 seconds before trying to fetch the newly created report request.",
-        )
-
-        await asyncio.sleep(60)
-
-        report_requests = await client.list_analytics_report_requests(
-            app_id,
-            access_type,
-        )
-
-        for report_req in report_requests:
-            if report_req.attributes.stoppedDueToInactivity:
-                log.warning(
-                    f"Found report request with id {report_req.id}, but the report is inactive due to inactivity."
-                )
-                continue
-            else:
-                return report_req.id
-
-        raise RuntimeError(
-            f"Failed to discover or create report request for {app_id}"
-        ) from e
 
 
 async def _list_active_report_requests(
@@ -203,23 +144,6 @@ async def _stream_analytics_report_data(
             yield row
 
 
-async def _ongoing_analytics_report_request_exists(
-    client: AppleAppStoreClient,
-    app_id: str,
-) -> bool:
-    report_requests = await client.list_analytics_report_requests(
-        app_id,
-        AnalyticsReportAccessType.ONGOING,
-    )
-
-    for report_request in report_requests:
-        if report_request.attributes.accessType == AnalyticsReportAccessType.ONGOING:
-            if not report_request.attributes.stoppedDueToInactivity:
-                return True
-
-    return False
-
-
 async def fetch_incremental_analytics(
     client: AppleAppStoreClient,
     app_id: str,
@@ -330,38 +254,36 @@ async def fetch_backfill_analytics(
     """
     Fetches historical analytics data for backfill operations using ONE_TIME_SNAPSHOT report requests.
 
-    This function processes analytics data chronologically by waiting for report instances with specific
-    processed dates. It only operates when an ONGOING report request exists, ensuring proper data
-    continuity between backfill and incremental processing.
-
-    Workflow:
-        1. Parse page cursor to determine target report instance processed date and last check time
-        2. Verify an ONGOING analytics report request exists for the app
-        3. Get or create a ONE_TIME_SNAPSHOT analytics report request
-        4. Look for report instance with the target processed date > page (last_processed_date)
+    Emits the rows dated on or before the cutoff from one snapshot instance processed on or after
+    the cutoff day, then finishes. It only operates when an ONGOING report request exists, ensuring
+    proper data continuity between backfill and incremental processing.
 
     Notes:
-        - Report instances are expected to have processed dates in chronological order. This has been observed in testing.
-        - Only processes data if an ONGOING report request exists (prerequisite for proper setup); Does not guarantee data completeness since the ONE_TIME_SNAPSHOT
-        could have still been created before the ONGOING report request was created. There is no way to know the creation time of these requests according to documentation.
+        - A snapshot holds data up to the day Apple made it. An older one would leave a gap between
+        its last day and the cutoff that the incremental never reads, so it isn't used.
+        - An app can have several snapshot requests, and any of them may hold the instance.
+        - Apple allows one new snapshot request per app per month. Until a snapshot qualifies, the
+        backfill requests one and checks again every few minutes.
+        - A backfill that already read an older snapshot emits its dates again from the newer one.
+        The new rows have different keys because keys include the filename, so the destination
+        keeps both. Apple says consumers should use the newest file for each date.
     """
 
     assert isinstance(cutoff, datetime)
     assert page is None or isinstance(page, str)
 
-    if not page:
-        last_processed_date = date.fromisoformat("1970-01-01")
-        start_date = last_processed_date
-    else:
-        last_processed_date = str_to_date(page)
-        start_date = last_processed_date + timedelta(days=1)
+    # The page cursor no longer tracks progress, since one snapshot covers the
+    # whole backfill. Yielding it unchanged keeps the backfill running while
+    # it waits.
+    unchanged_page = page or "1970-01-01"
 
-    ongoing_report_exists = await _ongoing_analytics_report_request_exists(
+    ongoing_requests = await _list_active_report_requests(
         client,
         app_id,
+        AnalyticsReportAccessType.ONGOING,
     )
 
-    if not ongoing_report_exists:
+    if not ongoing_requests:
         log.warning(
             f"Delaying backfill for {model.report_name} since an ONGOING report request does not exist for {app_id} yet. "
             "Backfill requires an existing ONGOING report request to ensure proper data continuity.",
@@ -371,25 +293,30 @@ async def fetch_backfill_analytics(
             },
         )
         await asyncio.sleep(30)
-        yield date_to_str(last_processed_date)
+        yield unchanged_page
         return
 
-    report_request_id = await _get_or_create_analytics_report_request(
-        log,
+    snapshot_requests = await _list_active_report_requests(
         client,
         app_id,
         AnalyticsReportAccessType.ONE_TIME_SNAPSHOT,
     )
 
-    report_instances = await _select_valid_report_instances(
-        log,
-        client,
-        model,
-        report_request_id,
-        AnalyticsReportGranularity.DAILY,
-        start_date,
-    )
+    report_instances: list[AnalyticsReportInstance] = []
+    for report_request in snapshot_requests:
+        report_instances.extend(
+            await _select_valid_report_instances(
+                log,
+                client,
+                model,
+                report_request.id,
+                AnalyticsReportGranularity.DAILY,
+                cutoff.date(),
+            )
+        )
 
+    # min keeps the first of equal dates, so a tie goes to the request Apple
+    # lists first.
     report_instance = min(
         report_instances,
         key=lambda x: x.attributes.processingDate,
@@ -397,29 +324,39 @@ async def fetch_backfill_analytics(
     )
 
     if not report_instance:
-        log.warning(
-            f"Report instance not found for app {app_id} and report request {report_request_id}",
-            {
-                "app_id": app_id,
-                "report_name": model.report_name,
-                "report_request_id": report_request_id,
-            },
-        )
-
-        yield date_to_str(last_processed_date)
-    else:
-        async for row in _stream_analytics_report_data(
+        await _try_create_report_request(
             log,
             client,
             app_id,
-            model,
-            report_instance,
-        ):
-            if row.record_date <= cutoff.date():
-                yield row
+            AnalyticsReportAccessType.ONE_TIME_SNAPSHOT,
+        )
+        log.info(
+            f"Waiting for a snapshot of the {model.report_name} report made on or after {cutoff.date()} for app {app_id}. "
+            "Apple allows one new snapshot request per app per month.",
+            {
+                "app_id": app_id,
+                "report_name": model.report_name,
+                "report_request_ids": [
+                    report_request.id for report_request in snapshot_requests
+                ],
+            },
+        )
 
-        if report_instance.attributes.processingDate <= cutoff.date():
-            yield date_to_str(report_instance.attributes.processingDate)
+        # Apple allows one new snapshot request a month, so checking more often
+        # gains nothing. The CDK calls the backfill again as soon as it yields.
+        await asyncio.sleep(5 * 60)
+        yield unchanged_page
+        return
+
+    async for row in _stream_analytics_report_data(
+        log,
+        client,
+        app_id,
+        model,
+        report_instance,
+    ):
+        if row.record_date <= cutoff.date():
+            yield row
 
 
 async def fetch_incremental_reviews(
