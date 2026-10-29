@@ -89,6 +89,47 @@ func TestStreamV2ClientHonorsRetryAfter(t *testing.T) {
 	require.GreaterOrEqual(t, time.Since(first), 2*time.Second)
 }
 
+// TestStreamV2ClientRetryableStatuses covers Snowflake's retry policy: a 404 is
+// retried only when its body is not one of the API's error responses.
+func TestStreamV2ClientRetryableStatuses(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+		retried     bool
+	}{
+		{"408", http.StatusRequestTimeout, "application/json", `{"code":"TIMEOUT","message":"m"}`, true},
+		{"499", 499, "application/json", `{"code":"CLOSED","message":"m"}`, true},
+		{"404 with an HTML body", http.StatusNotFound, "text/html; charset=utf-8", `<html>not found</html>`, true},
+		{"404 with an empty JSON error", http.StatusNotFound, "application/json", `{"code":"","message":""}`, true},
+		{"404 with a JSON error", http.StatusNotFound, "application/json", `{"code":"ERR_TABLE_DOES_NOT_EXIST","message":"m"}`, false},
+		{"400", http.StatusBadRequest, "application/json", `{"code":"BAD","message":"m"}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls atomic.Int32
+			var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {
+				if calls.Add(1) == 1 {
+					w.Header().Set("Content-Type", tc.contentType)
+					w.WriteHeader(tc.status)
+					fmt.Fprint(w, tc.body)
+					return
+				}
+				fmt.Fprint(w, `{}`)
+			})
+
+			var err = c.call(context.Background(), http.MethodGet, "probe", nil, nil, nil, nil)
+			if tc.retried {
+				require.NoError(t, err)
+				require.Equal(t, int32(2), calls.Load())
+			} else {
+				require.Error(t, err)
+				require.Equal(t, int32(1), calls.Load())
+			}
+		})
+	}
+}
+
 // TestStreamV2ClientRefreshesAheadOfExpiry covers a scoped token within
 // streamV2TokenRefreshMargin of its expiry: the next request exchanges a fresh one.
 func TestStreamV2ClientRefreshesAheadOfExpiry(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"slices"
@@ -367,8 +368,8 @@ func (c *streamV2Client) call(ctx context.Context, method, path string, query ur
 	return nil
 }
 
-// send performs one HTTP request, retrying throttling, server errors and
-// transport errors with exponential backoff, and returns the response body.
+// send performs one HTTP request, retrying transport errors and the responses
+// streamV2Retryable allows with exponential backoff, and returns the response body.
 func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte, headers http.Header) ([]byte, error) {
 	var delay = time.Second
 	for attempt := 1; ; attempt++ {
@@ -384,6 +385,7 @@ func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte
 
 		res, err := c.http.Do(req)
 		var apiErr *streamV2APIError
+		var retryable = true
 		var retryAfter time.Duration
 		if err == nil {
 			var out []byte
@@ -398,6 +400,7 @@ func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte
 					apiErr.Message = strings.ToValidUTF8(apiErr.Message[:streamV2MaxErrorMessageBytes], "") + "…"
 				}
 				err = apiErr
+				retryable = streamV2Retryable(res, out)
 				// Retry-After is honored in its delay-seconds form.
 				if secs, err := strconv.Atoi(res.Header.Get("Retry-After")); err == nil {
 					retryAfter = min(time.Duration(secs)*time.Second, time.Minute)
@@ -405,7 +408,6 @@ func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte
 			}
 		}
 
-		var retryable = apiErr == nil || apiErr.Status == 429 || apiErr.Status >= 500
 		if !retryable || attempt == streamV2MaxAttempts || ctx.Err() != nil {
 			return nil, fmt.Errorf("%s %s: %w", method, req.URL.Host+req.URL.Path, err)
 		}
@@ -417,6 +419,26 @@ func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte
 		}
 		delay = min(2*delay, 30*time.Second)
 	}
+}
+
+// streamV2Retryable reports whether Snowflake's retry policy allows retrying a
+// failed response. A 404 is retryable only when its body is not one of the API's
+// error responses, because then it came from a proxy rather than the API.
+//
+// https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-error-handling#retry-policy
+func streamV2Retryable(res *http.Response, body []byte) bool {
+	switch {
+	case res.StatusCode == http.StatusRequestTimeout, res.StatusCode == http.StatusTooManyRequests, res.StatusCode == 499, res.StatusCode >= 500:
+		return true
+	case res.StatusCode != http.StatusNotFound:
+		return false
+	}
+	var mediaType, _, _ = mime.ParseMediaType(res.Header.Get("Content-Type"))
+	if mediaType == "text/html" {
+		return true
+	}
+	var e struct{ Code, Message string }
+	return mediaType == "application/json" && json.Unmarshal(body, &e) == nil && e.Code == "" && e.Message == ""
 }
 
 // OpenChannel opens a channel by name on the default pipe of the table, including
