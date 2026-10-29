@@ -31,7 +31,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	// In non-read-only mode we still need to verify watermarks table usability.
 	// In read-only non-replica mode we need to verify that sys.dm_cdc_log_scan_sessions is accessible.
 	// In read-only replica mode we have no additional requirements.
-	var isReplica, _ = isReplicaDatabase(ctx, db.conn)
+	var isReplica, _ = db.replicaStatus(ctx)
 	if !db.featureFlags["read_only"] {
 		checks = append(checks,
 			db.prerequisiteWatermarksTable,

@@ -154,7 +154,7 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	// SetupPrerequisites already verified that CDC is enabled, so it isn't checked again here.
 
 	// Check replica status. Some operations work differently on replicas.
-	isReplica, err := isReplicaDatabase(ctx, rs.conn)
+	isReplica, err := rs.db.replicaStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("error determining if database is a replica: %w", err)
 	}
@@ -1559,6 +1559,21 @@ func isReplicaDatabase(ctx context.Context, conn *sql.DB) (bool, error) {
 		log.WithError(err).Warn("error determining replica status, assuming primary")
 		return false, nil
 	}
+	return isReplica, nil
+}
+
+// replicaStatus determines whether the current database connection is to a read-only replica.
+// The prerequisite checks and the replication stream both need this when a capture starts,
+// so the result of the first successful query is cached.
+func (db *sqlserverDatabase) replicaStatus(ctx context.Context) (bool, error) {
+	if db.isReplica != nil {
+		return *db.isReplica, nil
+	}
+	isReplica, err := isReplicaDatabase(ctx, db.conn)
+	if err != nil {
+		return false, err
+	}
+	db.isReplica = &isReplica
 	return isReplica, nil
 }
 

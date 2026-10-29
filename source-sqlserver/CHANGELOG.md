@@ -4,6 +4,7 @@
 
 ### Changed
 - Starting a capture now checks whether CDC is enabled on the database once instead of twice.
+- Starting a capture now checks whether the database is a read-only replica once instead of twice.
 
 ## 2026-10-28
 

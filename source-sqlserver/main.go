@@ -450,6 +450,8 @@ type sqlserverDatabase struct {
 
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
 	loggedBackfill  map[sqlcapture.StreamID]struct{}                  // Tracks tables whose backfill query has been logged during this connector invocation
+
+	isReplica *bool // Cached result of replicaStatus, nil until its first successful query
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {
