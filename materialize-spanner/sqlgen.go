@@ -178,7 +178,6 @@ type templates struct {
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
 	dropLoadTable           *template.Template
-	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool) templates {
@@ -317,18 +316,6 @@ JOIN {{ $.Identifier}} AS r
 {{ define "dropLoadTable" }}
 DROP TABLE {{ template "temp_name" . }}
 {{ end }}
-
-{{ define "updateFence" }}
-UPDATE {{ Identifier $.TablePath }}
-	SET checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-	WHERE materialization = {{ Literal $.Materialization.String }}
-	AND key_begin = {{ $.KeyBegin }}
-	AND key_end = {{ $.KeyEnd }}
-	AND fence = {{ $.Fence }}
-
--- Verify the update succeeded (Spanner doesn't have @@ROWCOUNT)
--- We'll handle verification in the Go code instead
-{{ end }}
 `, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
 
 	return templates{
@@ -339,7 +326,6 @@ UPDATE {{ Identifier $.TablePath }}
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		dropLoadTable:           tplAll.Lookup("dropLoadTable"),
-		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }
 
