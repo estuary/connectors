@@ -113,6 +113,8 @@ docs:
       https://learn.microsoft.com/en-us/advertising/guides/authentication-oauth-get-tokens?view=bingads-13
       (DOCUMENTED 2026-10-29). The same page says refresh tokens have no
       specified lifetime and the server MAY issue a new one on refresh.
+    - **Token refresh (VERIFIED 2026-10-29, `Auth / refresh token rotation`):**
+      each refresh returns a new refresh token; access tokens last 3599 s.
     - **Sandbox hosts** insert `.sandbox` into the production hostname, e.g.
       `clientcenter.api.sandbox.bingads.microsoft.com` (`_host` in `api.py`).
     - **Rate limits:** not yet surveyed.
