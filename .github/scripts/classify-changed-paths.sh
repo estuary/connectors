@@ -181,10 +181,6 @@ while IFS= read -r path || [ -n "$path" ]; do
                     python_all=true ;;
                 *) python_dirs+=("${path%%/*}") ;;
             esac
-            # materialize-snowflake's image also holds estuary-cdk.
-            case "$path" in
-                estuary-cdk/*) go_paths+=("$path") ;;
-            esac
             ;;
         go_rust)
             go_paths+=("$path")
