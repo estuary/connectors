@@ -442,7 +442,9 @@ func streamV2Retryable(res *http.Response, body []byte) bool {
 }
 
 // OpenChannel opens a channel by name on the default pipe of the table, including
-// one that an earlier session left in Snowflake, and reports its status.
+// one that an earlier session left in Snowflake, and reports its status. Opening
+// discards any rows the channel holds uncommitted, so the caller must resend
+// every row after the committed offset token in that status.
 //
 // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api#open-a-named-channel
 func (c *streamV2Client) OpenChannel(ctx context.Context, database, schema, table, channelName string) (*streamV2ChannelStatusResult, error) {
