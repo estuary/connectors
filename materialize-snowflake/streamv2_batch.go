@@ -24,9 +24,8 @@ type streamV2Batch struct {
 // streamV2MinBatchCapacity is the size a payload starts with.
 const streamV2MinBatchCapacity = 8 * 1024
 
-// start opens the payload of a new batch. The payload starts small, because
-// heldBytes counts the bytes a batch's rows take, not the capacity it reserves.
-// It is always a new allocation, because the batch before it gave its bytes away.
+// start opens the payload of a new batch. It is always a new allocation, because
+// the batch before it gave its bytes away.
 func (b *streamV2Batch) start() {
 	b.payload = make([]byte, 0, streamV2MinBatchCapacity)
 }

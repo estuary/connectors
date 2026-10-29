@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -29,10 +28,6 @@ type streamV2Channel struct {
 	// binding is the binding whose table the channel writes to.
 	binding *streamV2Binding
 	client  *streamV2Client
-	// heldBytes limits the memory that batches and in-flight appends hold.
-	heldBytes *semaphore.Weighted
-	// sendAllBatches sends the buffered batch of every channel that shares heldBytes.
-	sendAllBatches func(context.Context) error
 	// channelName is the name of the Snowpipe channel.
 	channelName string
 	// keyRange is the key range this channel covers. The key range is embedded in
@@ -71,15 +66,13 @@ type streamV2Channel struct {
 }
 
 // newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, heldBytes *semaphore.Weighted, sendAllBatches func(context.Context) error, channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
 	var c = &streamV2Channel{
-		binding:        b,
-		client:         client,
-		heldBytes:      heldBytes,
-		sendAllBatches: sendAllBatches,
-		channelName:    channelName,
-		keyRange:       keyRange,
-		limiter:        rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
+		binding:     b,
+		client:      client,
+		channelName: channelName,
+		keyRange:    keyRange,
+		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
 		progress: struct {
 			routed       int64
 			checkpointed int64
@@ -109,10 +102,8 @@ func (c *streamV2Channel) wait() error {
 	return err
 }
 
-// sendBatch hands the payload of a non-empty batch to the channel's appends, and
-// releases the payload's bytes of heldBytes once its append returns. Once an
-// append of the channel has failed, sendBatch releases them at once and returns
-// that append's error.
+// sendBatch hands the payload of a non-empty batch to the channel's appends. Once
+// an append of the channel has failed, sendBatch returns that append's error.
 //
 // Ownership of the payload passes to the append, so the next batch starts a
 // payload of its own.
@@ -125,19 +116,16 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	// row is counted as routed before it is added to a batch.
 	var startToken, endToken = c.offsetToken(c.batch.firstOffset), c.offsetToken(c.batch.firstOffset + int64(c.batch.rows) - 1)
 	var payload = c.batch.finish()
-	var toRelease = int64(min(len(payload), streamV2MaxHeldBytes))
 
 	if c.appends == nil {
 		c.appends, c.appendsCtx = errgroup.WithContext(ctx)
 		c.appends.SetLimit(1)
 	} else if c.appendsCtx.Err() != nil {
-		c.heldBytes.Release(toRelease)
 		return fmt.Errorf("appending to channel %q of %s: %w", c.channelName, c.binding.table, c.appends.Wait())
 	}
 
 	var appendsCtx = c.appendsCtx
 	c.appends.Go(func() error {
-		defer c.heldBytes.Release(toRelease)
 		if err := streamV2Pace(appendsCtx, c.limiter, len(payload)); err != nil {
 			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
 		}
@@ -162,8 +150,7 @@ func streamV2Pace(ctx context.Context, limiter *rate.Limiter, n int) error {
 }
 
 // writeRow buffers one converted document under the channel's next offset. It sends
-// the channel's batch once the batch reaches its row or byte cap, and every channel's
-// batch once the bytes held across all of them reach the ceiling of heldBytes.
+// the channel's batch once the batch reaches its row or byte cap.
 //
 // A document at or below the channel's committed offset was already committed by an
 // interrupted attempt of this transaction. It still consumes its offset, so that later
@@ -188,17 +175,6 @@ func (c *streamV2Channel) writeRow(ctx context.Context, converted []any) error {
 		}
 	}
 
-	// The semaphore never grants more than its size, so a larger row takes all of it.
-	var toAcquire = int64(min(len(row), streamV2MaxHeldBytes))
-	if !c.heldBytes.TryAcquire(toAcquire) {
-		// Held bytes are released only as appends return, so every batch is sent.
-		if err := c.sendAllBatches(ctx); err != nil {
-			return err
-		}
-		if err := c.heldBytes.Acquire(ctx, toAcquire); err != nil {
-			return err
-		}
-	}
 	if c.batch.rows == 0 {
 		c.batch.start()
 		c.batch.firstOffset = offset

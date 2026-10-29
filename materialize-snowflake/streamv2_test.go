@@ -277,25 +277,6 @@ func TestStreamV2Manager(t *testing.T) {
 		require.Equal(t, 150, countRows())
 	})
 
-	t.Run("total held bytes are bounded", func(t *testing.T) {
-		// A ceiling small enough to be crossed by nearly every document appends
-		// buffers far short of a full batch. Batch boundaries are not part of the
-		// contract, so the only thing that may change is the number of appends.
-		truncate(t)
-		var restore = streamV2MaxHeldBytes
-		t.Cleanup(func() { streamV2MaxHeldBytes = restore })
-		streamV2MaxHeldBytes = 200
-
-		var m = newManager(fullRange)
-		m.addBinding(cfg.Database, cfg.Schema, tableName, target("bounded.v1"), nil)
-
-		writeRows(m, 0, 50)
-		entries, err := m.flush(ctx)
-		require.NoError(t, err)
-		require.Equal(t, int64(50), soleCheckpointItem(t, entries, 0).Routed)
-		require.Equal(t, 50, countRows())
-	})
-
 	t.Run("recovery skips documents Snowflake already committed", func(t *testing.T) {
 		truncate(t)
 		smallBatches(t)
