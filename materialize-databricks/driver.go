@@ -404,9 +404,9 @@ type binding struct {
 
 	// loadModes are the modes of loads by their loadBucket.
 	loadModes [loadBuckets]loadMode
-	// noTwoPhase is set when a two-phase load fails, to run every later load in
-	// one phase.
-	noTwoPhase bool
+	// noTwoPhaseUntil is when loads may run in two phases again after a
+	// two-phase load failed.
+	noTwoPhaseUntil time.Time
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -611,6 +611,9 @@ const (
 	maxRetryLoads    = 64
 	maxRetryInterval = 6 * time.Hour
 	loadBuckets      = 4
+	// twoPhaseFailedFor is how long loads run in one phase after a two-phase
+	// load fails, which may be transient or may recur on every load.
+	twoPhaseFailedFor = time.Hour
 )
 
 var errLoadDeadline = errors.New("load ran past its deadline")
@@ -697,11 +700,14 @@ func (d *transactor) loadModeChanged(load bindingLoad, changed bool, fields log.
 // loadBucket has it, and returns the rows of its documents with the trace to
 // finish once they're read. Rows are nil when two phases found no match.
 func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
-	if load.binding.noTwoPhase {
+	if time.Now().Before(load.binding.noTwoPhaseUntil) {
 		return d.queryLoad(ctx, db, tpl, load, 0)
 	}
 
-	var mode = &load.binding.loadModes[loadBucket(load.keys)]
+	var bucket = loadBucket(load.keys)
+	var mode = &load.binding.loadModes[bucket]
+	load.fields["bucket"] = bucket
+	load.fields["twoPhaseTook"] = mode.twoPhaseTook.String()
 	if deadline, ok := mode.onePhaseDeadline(time.Now()); ok {
 		rows, trace, err := d.queryLoad(ctx, db, tpl, load, deadline)
 		if errors.Is(err, errLoadDeadline) {
@@ -730,9 +736,9 @@ func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, tpl *templ
 	}
 
 	// Two phases may not work on a table at all, such as when its history
-	// can't be read, so this load and later ones run in one phase.
+	// can't be read, so this load and those of the next while run in one phase.
 	log.WithError(err).WithField("resourcePath", load.binding.target.Path).Warn("two-phase load failed, loading in one phase instead")
-	load.binding.noTwoPhase = true
+	load.binding.noTwoPhaseUntil = time.Now().Add(twoPhaseFailedFor)
 	load.data.Version, load.data.MatchedFiles = "", nil
 	delete(load.fields, "version")
 	delete(load.fields, "matchedFiles")
@@ -748,7 +754,11 @@ func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, tpl *template
 		return nil, nil, fmt.Errorf("loadQuery template: %w", err)
 	}
 
-	var queryCtx, trace = d.profiler.trace(ctx, "load", load.fields)
+	var fields = maps.Clone(load.fields)
+	if deadline > 0 {
+		fields["deadline"] = deadline.String()
+	}
+	var queryCtx, trace = d.profiler.trace(ctx, "load", fields)
 	var timedOut = func() bool { return false }
 	if deadline > 0 {
 		var cancel context.CancelCauseFunc
@@ -765,11 +775,11 @@ func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, tpl *template
 		}
 		err = errLoadDeadline
 	}
-	if err != nil {
-		trace.finish(err, log.Fields{"deadline": deadline.String()})
-		if errors.Is(err, errLoadDeadline) {
-			return nil, nil, err
-		}
+	if errors.Is(err, errLoadDeadline) {
+		trace.finish(err, log.Fields{"timedOut": true})
+		return nil, nil, err
+	} else if err != nil {
+		trace.finish(err, nil)
 		return nil, nil, fmt.Errorf("querying Load documents: %w", err)
 	}
 	return rows, trace, nil

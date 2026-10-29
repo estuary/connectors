@@ -170,6 +170,10 @@ func (p *queryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 	var rest = awaiting[:0]
 	for _, q := range awaiting {
 		if info := history[q.id]; info != nil && historyComplete(info) {
+			// A cancel sent before the warehouse has the query doesn't reach it.
+			if q.fields["timedOut"] == true && info.Status == dbsql.QueryStatusFinished {
+				log.WithFields(q.fields).Warn("a load cancelled at its deadline still ran to completion on the warehouse")
+			}
 			p.emit(withHistory(q.fields, info))
 		} else if p.history == nil || now.Sub(q.finished) >= profileMaxWait {
 			p.emit(q.fields)

@@ -1289,21 +1289,27 @@ func TestEvaluateLoadFallsBackToOnePhase(t *testing.T) {
 	var tpl = template.Must(template.New("load").Parse("SELECT doc FROM t{{ if .Version }} VERSION AS OF {{ .Version }}{{ end }}"))
 	var load = bindingLoad{binding: b, keys: 10, data: &tableWithFiles{Table: &b.target}, fields: log.Fields{}}
 
-	var db = recordingDB(t, fmt.Errorf("permission denied"))
-	recording.failMatching = "DESCRIBE HISTORY"
+	// The version lookup fails once.
+	var db = recordingDB(t, fmt.Errorf("connection reset"))
+	recording.failMatching, recording.failFirst = "DESCRIBE HISTORY", 1
 	b.loadModes[0] = loadMode{twoPhase: true, retryIn: 10, retryAt: time.Now().Add(time.Hour)}
 
 	rows, _, err := d.evaluateLoad(ctx, db, tpl, load)
 	require.NoError(t, err)
 	rows.Close()
-	require.True(t, b.noTwoPhase)
+	require.Greater(t, time.Until(b.noTwoPhaseUntil), 59*time.Minute)
 	require.Equal(t, []string{"SELECT doc FROM t"}, recording.executed)
 
-	// Later loads skip two phases altogether.
+	// Loads skip two phases for a while.
 	recording.executed = nil
-	b.loadModes[0].retryIn = 10
 	rows, _, err = d.evaluateLoad(ctx, db, tpl, load)
 	require.NoError(t, err)
 	rows.Close()
 	require.Equal(t, []string{"SELECT doc FROM t"}, recording.executed)
+
+	// Then try them again.
+	recording.executed = nil
+	b.noTwoPhaseUntil = time.Now()
+	_, _, _ = d.evaluateLoad(ctx, db, tpl, load)
+	require.Contains(t, recording.executed[0], "DESCRIBE HISTORY")
 }

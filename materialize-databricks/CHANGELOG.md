@@ -11,7 +11,7 @@
   phase once it's faster. Loads of under 1,000, 10,000, 100,000 and more keys
   choose separately. Cancelled loads appear in the warehouse's query history.
   A table whose two-phase load fails, such as when its history can't be
-  read, loads in one phase until the task restarts.
+  read, loads in one phase for the next hour.
 - A MERGE of fewer than 100,000 rows reads them straight from the staged
   files, instead of first copying them into a staging table. This saves a
   query of a few seconds from each commit of small batches.
