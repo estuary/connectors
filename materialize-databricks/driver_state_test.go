@@ -1156,26 +1156,64 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 }
 
 func TestLoadMode(t *testing.T) {
-	var m loadMode
-	var observe = func(took time.Duration) bool { return m.observe(m.twoPhase, took) }
-
-	require.False(t, observe(5*time.Second))
-	require.False(t, m.twoPhase)
-
-	// A slow one-phase load tries two phases, which stay while they're faster.
-	require.True(t, observe(time.Minute))
-	require.True(t, m.twoPhase)
-	require.False(t, observe(10*time.Second))
-	require.False(t, observe(time.Minute))
-	require.True(t, m.twoPhase)
-
-	// Slower two phases go back to one, until enough slow loads retry them.
-	require.True(t, observe(2*time.Minute))
-	require.False(t, m.twoPhase)
-	for range twoPhaseRetryLoads {
-		require.False(t, observe(time.Minute))
-		require.False(t, observe(5*time.Second))
+	// load runs a load as Load does, where one phase would take onePhase and
+	// two phases twoPhase, and returns the deadline of its one-phase query, or
+	// zero if it ran only in two phases.
+	var load = func(m *loadMode, onePhase, twoPhase time.Duration) time.Duration {
+		var deadline, ok = m.onePhaseDeadline()
+		if ok && onePhase <= deadline {
+			m.onePhaseFinished(onePhase)
+			return deadline
+		} else if ok {
+			m.onePhaseTimedOut()
+		}
+		m.twoPhaseFinished(twoPhase)
+		return deadline
 	}
-	require.True(t, observe(time.Minute))
-	require.True(t, m.twoPhase)
+	const s = time.Second
+
+	t.Run("fast loads stay in one phase", func(t *testing.T) {
+		var m loadMode
+		for range 100 {
+			require.Equal(t, loadDeadline, load(&m, 3*s, 6*s))
+			require.False(t, m.twoPhase)
+		}
+	})
+
+	t.Run("slow loads switch to two phases and retry one with backoff", func(t *testing.T) {
+		var m loadMode
+		require.Equal(t, loadDeadline, load(&m, 8*time.Minute, 15*s))
+		require.True(t, m.twoPhase)
+
+		var retries []int
+		for i := 1; i <= 300; i++ {
+			if load(&m, 8*time.Minute, 15*s) != 0 {
+				retries = append(retries, i)
+			}
+			require.True(t, m.twoPhase)
+		}
+		require.Equal(t, []int{2, 6, 14, 30, 62, 126, 190, 254}, retries)
+	})
+
+	t.Run("one phase returns once it's faster than two", func(t *testing.T) {
+		var m loadMode
+		load(&m, 25*s, 27*s)
+		require.True(t, m.twoPhase)
+		require.Zero(t, load(&m, 25*s, 27*s))
+		require.Equal(t, 27*s, load(&m, 25*s, 27*s))
+		require.False(t, m.twoPhase)
+		for range 10 {
+			require.Equal(t, 50*s, load(&m, 25*s, 27*s))
+			require.False(t, m.twoPhase)
+		}
+	})
+
+	t.Run("a finished retry slower than two phases backs off", func(t *testing.T) {
+		var m loadMode
+		load(&m, time.Minute, 10*s)
+		load(&m, time.Minute, 10*s)
+		require.Equal(t, loadDeadline, load(&m, 18*s, 10*s))
+		require.True(t, m.twoPhase)
+		require.Equal(t, 4, m.retryEvery)
+	})
 }

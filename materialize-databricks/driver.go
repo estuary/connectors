@@ -7,6 +7,7 @@ import (
 	stdsql "database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -544,39 +545,41 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			var started = time.Now()
-			var twoPhase = load.binding.loadMode.twoPhase
-			var observe = func() { d.observeLoad(load.binding, twoPhase, time.Since(started)) }
-
-			if twoPhase {
+			var mode = &load.binding.loadMode
+			var rows *stdsql.Rows
+			var trace *queryTrace
+			if deadline, ok := mode.onePhaseDeadline(); ok {
+				rows, trace, err = d.queryLoad(groupCtx, db, loadTemplate, load, deadline)
+				if errors.Is(err, errLoadDeadline) {
+					d.loadModeChanged(load.binding, mode.onePhaseTimedOut(), log.Fields{"deadline": deadline.String()})
+				} else if err != nil {
+					return err
+				} else {
+					var took = time.Since(trace.started)
+					d.loadModeChanged(load.binding, mode.onePhaseFinished(took), log.Fields{"took": took.String()})
+				}
+			}
+			if rows == nil {
+				var started = time.Now()
 				if matched, err := d.matchLoadFiles(groupCtx, db, load); err != nil {
 					return err
 				} else if !matched {
-					observe()
+					mode.twoPhaseFinished(time.Since(started))
 					return nil
 				}
+				if rows, trace, err = d.queryLoad(groupCtx, db, loadTemplate, load, 0); err != nil {
+					return err
+				}
+				mode.twoPhaseFinished(time.Since(started))
 			}
-			query, err := renderTemplate(loadTemplate, load.data)
-			if err != nil {
-				return fmt.Errorf("loadQuery template: %w", err)
-			}
+			var executeTook = time.Since(trace.started)
+			finishEvaluating()
+			defer rows.Close()
 
-			var queryCtx, trace = d.profiler.trace(groupCtx, "load", load.fields)
-			var executeTook time.Duration
 			var docCount, docBytes int
 			defer func() {
 				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
 			}()
-
-			rows, err := db.QueryContext(queryCtx, query)
-			executeTook = time.Since(trace.started)
-			finishEvaluating()
-			if err != nil {
-				return fmt.Errorf("querying Load documents: %w", err)
-			}
-			observe()
-			defer rows.Close()
-
 			for rows.Next() {
 				var doc loadedDoc
 				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
@@ -616,57 +619,117 @@ type bindingLoad struct {
 }
 
 const (
-	// twoPhaseMinLoad is how long a one-phase load must take for the next to
-	// try two phases.
-	twoPhaseMinLoad = 20 * time.Second
-	// twoPhaseRetryLoads is how many slow one-phase loads run before two phases
-	// are tried again, after they were slower.
-	twoPhaseRetryLoads = 10
+	// loadDeadline is the least time a one-phase load runs before it's
+	// cancelled and run in two phases. The driver can only cancel a query on
+	// the warehouse once its first few seconds have passed.
+	loadDeadline = 20 * time.Second
+	// maxRetryLoads is the most loads that run in two phases before one phase
+	// is tried again.
+	maxRetryLoads = 64
 )
 
-// loadMode is whether a binding's loads run in two phases. A one-phase load
-// reads the documents of every file within its key bounds, and a slow one
-// suggests that's many files. Two phases read only the files holding matching
-// keys, but cost a version lookup and a match query, so they're kept while
-// they're faster than the slow load that started them.
+var errLoadDeadline = errors.New("load ran past its deadline")
+
+// loadMode is whether a binding's loads run in one or two phases. Two phases
+// read documents from only the files holding matching keys, which is much
+// faster when those are few of the files within the key bounds and Databricks
+// would read all of them, but the version lookup and match query take a few
+// seconds. So loads run in one phase until one runs past its deadline, which
+// cancels it to run in two. Then one phase is tried again after 2, 4, 8 and
+// up to maxRetryLoads loads, and is kept once it's faster than two phases.
 type loadMode struct {
-	twoPhase     bool
-	onePhaseTook time.Duration
-	retryAfter   int
+	twoPhase bool
+	// took is how long the last one- and two-phase loads took to evaluate.
+	took       [2]time.Duration
+	retryIn    int
+	retryEvery int
 }
 
-// observe adapts the mode to a load that took the given time to evaluate, and
-// reports whether it changed.
-func (m *loadMode) observe(twoPhase bool, took time.Duration) bool {
-	if twoPhase {
-		if took <= m.onePhaseTook {
-			return false
-		}
-		m.twoPhase, m.retryAfter = false, twoPhaseRetryLoads
-		return true
+// onePhaseDeadline reports whether the next load runs in one phase, and how
+// long it may run.
+func (m *loadMode) onePhaseDeadline() (time.Duration, bool) {
+	if !m.twoPhase {
+		return max(loadDeadline, 2*m.took[0]), true
+	} else if m.retryIn--; m.retryIn > 0 {
+		return 0, false
 	}
+	return max(loadDeadline, m.took[1]), true
+}
 
-	m.onePhaseTook = took
-	if took < twoPhaseMinLoad {
-		return false
-	} else if m.retryAfter > 0 {
-		m.retryAfter--
+// onePhaseFinished records a one-phase load that finished by its deadline,
+// and reports whether the mode changed.
+func (m *loadMode) onePhaseFinished(took time.Duration) bool {
+	m.took[0] = took
+	if m.twoPhase && took >= m.took[1] {
+		m.backOff()
 		return false
 	}
+	var changed = m.twoPhase
+	m.twoPhase, m.retryEvery = false, 0
+	return changed
+}
+
+// onePhaseTimedOut records a one-phase load cancelled at its deadline, and
+// reports whether the mode changed.
+func (m *loadMode) onePhaseTimedOut() bool {
+	var changed = !m.twoPhase
 	m.twoPhase = true
-	return true
+	m.backOff()
+	return changed
 }
 
-func (d *transactor) observeLoad(b *binding, twoPhase bool, took time.Duration) {
-	var onePhaseTook = b.loadMode.onePhaseTook
-	if b.loadMode.observe(twoPhase, took) {
-		log.WithFields(log.Fields{
+func (m *loadMode) twoPhaseFinished(took time.Duration) {
+	m.took[1] = took
+}
+
+func (m *loadMode) backOff() {
+	m.retryEvery = min(max(2*m.retryEvery, 2), maxRetryLoads)
+	m.retryIn = m.retryEvery
+}
+
+func (d *transactor) loadModeChanged(b *binding, changed bool, fields log.Fields) {
+	if changed {
+		log.WithFields(fields).WithFields(log.Fields{
 			"resourcePath": b.target.Path,
-			"took":         took.String(),
-			"onePhaseTook": onePhaseTook.String(),
 			"twoPhase":     b.loadMode.twoPhase,
 		}).Info("switched load phases")
 	}
+}
+
+// queryLoad runs a binding's load query. Unless deadline is zero, a query
+// still running after it is cancelled with errLoadDeadline. A query that
+// succeeds returns its rows and the trace to finish once they're read.
+func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad, deadline time.Duration) (*stdsql.Rows, *queryTrace, error) {
+	query, err := renderTemplate(tpl, load.data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loadQuery template: %w", err)
+	}
+
+	var queryCtx, trace = d.profiler.trace(ctx, "load", load.fields)
+	var timedOut = func() bool { return false }
+	if deadline > 0 {
+		var cancel context.CancelCauseFunc
+		queryCtx, cancel = context.WithCancelCause(queryCtx)
+		var timer = time.AfterFunc(deadline, func() { cancel(errLoadDeadline) })
+		timedOut = func() bool { return !timer.Stop() }
+	}
+
+	rows, err := db.QueryContext(queryCtx, query)
+	if timedOut() {
+		// Rows outlive their query only when the timer didn't cancel them.
+		if rows != nil {
+			rows.Close()
+		}
+		err = errLoadDeadline
+	}
+	if err != nil {
+		trace.finish(err, log.Fields{"deadline": deadline.String()})
+		if errors.Is(err, errLoadDeadline) {
+			return nil, nil, err
+		}
+		return nil, nil, fmt.Errorf("querying Load documents: %w", err)
+	}
+	return rows, trace, nil
 }
 
 // maxMatchedFiles is the maximum number of files a two-phase load filters on.
