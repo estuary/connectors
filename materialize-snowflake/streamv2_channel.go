@@ -146,8 +146,10 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	return nil
 }
 
-// streamV2Pace waits until limiter allows n bytes. WaitN refuses an n larger than
-// the limiter's burst, so a larger n is waited for one burst at a time.
+// streamV2Pace blocks until limiter lets n bytes through. The limiter refills at a
+// steady rate and holds at most its burst size, and a single WaitN call fails if it
+// asks for more than the burst. So a payload larger than the burst is waited for in
+// pieces no larger than the burst, one after another.
 func streamV2Pace(ctx context.Context, limiter *rate.Limiter, n int) error {
 	for n > 0 {
 		var chunk = min(n, limiter.Burst())
