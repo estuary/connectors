@@ -1,0 +1,67 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"CampaignId": "{{campaign_id}}"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("campaign_id")) throw new Error("run `Campaigns / all types comma` first to set campaign_id");
+    - type: after-response
+      code: |-
+        // Chain the first ad group into `Ads / bare`.
+        const id = res.getBody()?.AdGroups?.[0]?.Id;
+        if (id) bru.setVar("ad_group_id", String(id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getadgroupsbycampaignid?view=bingads-13
+
+  **WHY:** the connector's `_ad_groups` in `api.py` sends exactly this body.
+  It checks the ad group shape and that each needs no `AccountId` field (the
+  connector stamps the parent IDs). Run `Campaigns / all types comma` first.
+
+  **VERIFIED (2026-10-29):** a PerformanceMax campaign returns
+  `{"AdGroups": []}`. Performance Max campaigns are built from asset groups,
+  not ad groups, so the `ad_groups` and `ads` streams never cover them.
+
+  **PENDING:** an ad group's shape. Needs a Search campaign with an ad group
+  in the sandbox (checklist 3.2); then re-run with its `campaign_id`.
+
+examples:
+  - name: 200 - PerformanceMax campaign has no ad groups
+    request:
+      url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "AdGroups": []
+          }

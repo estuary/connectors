@@ -125,3 +125,5 @@ docs:
 
     - `Accounts / page size 1001`: `Accounts/Search` pages max out at 1,000;
       1,001 is rejected with code 3032.
+    - `Campaigns / all types space`: over REST, multiple `CampaignType`
+      values must be comma-joined; the docs' space-delimited form is rejected.

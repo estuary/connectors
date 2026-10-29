@@ -1,0 +1,69 @@
+info:
+  name: poll
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{reporting_url}}/GenerateReport/Poll"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "ReportRequestId": "{{report_request_id}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("report_request_id")) throw new Error("run `Reports / submit account performance` first");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/reporting-service/pollgeneratereport?view=bingads-13
+
+  **WHY:** the connector's `_poll` in `reports.py`. It checks the status
+  values, and whether a successful job with no rows has a null
+  `ReportDownloadUrl` (the connector treats that as an empty report). The
+  download itself is a signed zip URL fetched without the access token, which
+  Bruno can't unzip; the capture test exercises it.
+
+  **VERIFIED (2026-10-29):** for an account with no activity today, the first
+  poll (about 6 s after submit) returned `Status: Success` with
+  `ReportDownloadUrl: null`, the empty-report case the connector skips.
+
+  **PENDING:** a `Pending` status and a non-null download URL. Needs same-day
+  activity on a sandbox entity (checklist 3.9) and a re-run.
+
+examples:
+  - name: 200 - success, no rows
+    request:
+      url: "{{reporting_url}}/GenerateReport/Poll"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "ReportRequestStatus": {
+              "Status": "Success",
+              "ReportDownloadUrl": null
+            }
+          }

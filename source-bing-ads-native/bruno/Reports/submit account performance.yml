@@ -1,0 +1,140 @@
+info:
+  name: submit account performance
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{reporting_url}}/GenerateReport/Submit"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "ReportRequest": {
+          "Type": "AccountPerformanceReportRequest",
+          "Format": "Csv",
+          "FormatVersion": "2.0",
+          "ReportName": "account_performance_report_daily",
+          "ExcludeColumnHeaders": false,
+          "ExcludeReportHeader": true,
+          "ExcludeReportFooter": true,
+          "ReturnOnlyCompleteData": false,
+          "Columns": [
+            "AccountId",
+            "TimePeriod",
+            "CurrencyCode",
+            "AdDistribution",
+            "DeviceType",
+            "Network",
+            "DeliveredMatchType",
+            "DeviceOS",
+            "TopVsOther",
+            "BidMatchType",
+            "AccountName",
+            "AccountNumber",
+            "PhoneImpressions",
+            "PhoneCalls",
+            "Clicks",
+            "Ctr",
+            "Spend",
+            "Impressions",
+            "CostPerConversion",
+            "Ptr",
+            "Assists",
+            "ReturnOnAdSpend",
+            "CostPerAssist",
+            "AverageCpc",
+            "AveragePosition",
+            "AverageCpm",
+            "Conversions",
+            "ConversionRate",
+            "ConversionsQualified",
+            "LowQualityClicks",
+            "LowQualityClicksPercent",
+            "LowQualityImpressions",
+            "LowQualitySophisticatedClicks",
+            "LowQualityConversions",
+            "LowQualityConversionRate",
+            "Revenue",
+            "RevenuePerConversion",
+            "RevenuePerAssist"
+          ],
+          "Scope": {
+            "AccountIds": [
+              "555638908"
+            ]
+          },
+          "Time": {
+            "CustomDateRangeStart": "TODAY",
+            "CustomDateRangeEnd": "TODAY",
+            "ReportTimeZone": "GreenwichMeanTimeDublinEdinburghLisbonLondon"
+          },
+          "Aggregation": "Daily"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Report today's GMT day, as the connector's incremental sweep ends.
+        // The sandbox only has data for entities changed that same day.
+        const now = new Date();
+        const today = { Day: now.getUTCDate(), Month: now.getUTCMonth() + 1, Year: now.getUTCFullYear() };
+        const body = req.getBody();
+        body.ReportRequest.Time.CustomDateRangeStart = today;
+        body.ReportRequest.Time.CustomDateRangeEnd = today;
+        req.setBody(body);
+    - type: after-response
+      code: |-
+        // Chain the job into `Reports / poll`. Not a credential.
+        const id = res.getBody()?.ReportRequestId;
+        if (id) bru.setVar("report_request_id", id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/reporting-service/submitgeneratereport?view=bingads-13
+
+  **WHY:** P1. The body is `_report_request` in `reports.py` for
+  `account_performance_report_daily`, generated from the connector rather than
+  copied, with the dates set to today. It checks Microsoft accepts the
+  connector's request shape and every column in its list (a rejected column
+  fails the whole request). Submitting starts a report job but changes no
+  account data.
+
+  **DOCUMENTED (2026-10-29):** the REST body names the derived request in
+  `ReportRequest.Type` (e.g. `AccountPerformanceReportRequest`), dates are
+  `{Day, Month, Year}` objects, and the `ReportRequestId` is valid for at most
+  one day.
+
+  **VERIFIED (2026-10-29):** accepted: `200` with a `ReportRequestId`, so the
+  connector's request shape and its Account report columns are valid (P1).
+
+examples:
+  - name: 200 - job accepted
+    request:
+      url: "{{reporting_url}}/GenerateReport/Submit"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "ReportRequestId": "506574079545868289_1793307872421"
+          }
