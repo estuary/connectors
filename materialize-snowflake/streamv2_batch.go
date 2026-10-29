@@ -19,20 +19,16 @@ type streamV2Batch struct {
 	payload     []byte
 	rows        int
 	firstOffset int64
-	// hint is the size of the batch finished before this one, up to a full batch,
-	// and it sizes the next payload.
-	hint int
 }
 
 // streamV2MinBatchCapacity is the size a payload starts with.
 const streamV2MinBatchCapacity = 8 * 1024
 
-// start opens the payload of a new batch. The size is a little over the batch
-// before it, so a full batch does not grow and copy a dozen times on its way to
-// the cap. The payload is always a new allocation, because the batch before it
-// gave its bytes away.
+// start opens the payload of a new batch. The payload starts small, because
+// heldBytes counts the bytes a batch's rows take, not the capacity it reserves.
+// It is always a new allocation, because the batch before it gave its bytes away.
 func (b *streamV2Batch) start() {
-	b.payload = make([]byte, 0, max(b.hint+b.hint/8, streamV2MinBatchCapacity))
+	b.payload = make([]byte, 0, streamV2MinBatchCapacity)
 }
 
 func (b *streamV2Batch) empty() bool {
@@ -47,7 +43,6 @@ func (b *streamV2Batch) size() int {
 func (b *streamV2Batch) finish() []byte {
 	var payload = b.payload
 
-	b.hint = min(len(payload), streamV2BatchBytes)
 	b.payload, b.rows, b.firstOffset = nil, 0, 0
 	return payload
 }

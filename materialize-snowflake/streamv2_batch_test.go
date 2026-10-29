@@ -289,14 +289,14 @@ func TestStreamV2BatchPayload(t *testing.T) {
 		require.Empty(t, b.payload)
 	})
 
-	t.Run("the next batch's payload is sized from the last", func(t *testing.T) {
+	t.Run("a batch after a large one starts small", func(t *testing.T) {
 		var b = streamV2Batch{}
 
 		require.NoError(t, addTestRow(&b, enc, 1, []any{strings.Repeat("k", 32*1024), nil, nil}))
-		var payload = b.finish()
+		b.finish()
 
 		require.NoError(t, addTestRow(&b, enc, 1, []any{"small", nil, nil}))
-		require.GreaterOrEqual(t, cap(b.payload), len(payload))
+		require.Equal(t, streamV2MinBatchCapacity, cap(b.payload))
 	})
 }
 
@@ -398,17 +398,4 @@ func addTestRow(b *streamV2Batch, enc *streamV2RowEncoder, offset int64, convert
 	b.payload = append(b.payload, row...)
 	b.rows++
 	return nil
-}
-
-// TestStreamV2BatchHintIsCapped covers a batch that follows one oversized row: its
-// payload starts no larger than a full batch would need.
-func TestStreamV2BatchHintIsCapped(t *testing.T) {
-	var b streamV2Batch
-	b.start()
-	b.payload = append(b.payload, make([]byte, 10*streamV2BatchBytes)...)
-	b.rows = 1
-	b.finish()
-
-	b.start()
-	require.LessOrEqual(t, cap(b.payload), streamV2BatchBytes+streamV2BatchBytes/8)
 }
