@@ -241,9 +241,8 @@ func TestStreamV2Manager(t *testing.T) {
 	// smallBatches cuts batches every two documents, so that a handful of rows
 	// exercises the boundaries a production batch needs ten thousand for.
 	var smallBatches = func(t *testing.T) {
-		var restore = streamV2BatchRows
-		t.Cleanup(func() { streamV2BatchRows = restore })
-		streamV2BatchRows = 2
+		t.Cleanup(func() { testBatchRows = 0 })
+		testBatchRows = 2
 	}
 
 	t.Run("happy path", func(t *testing.T) {

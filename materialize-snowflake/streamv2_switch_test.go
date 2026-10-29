@@ -498,9 +498,8 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 		// Cutting a batch per document is what leaves documents pending without
 		// a flush, which is the state an interruption has to find.
-		var restore = streamV2BatchRows
-		t.Cleanup(func() { streamV2BatchRows = restore })
-		streamV2BatchRows = 1
+		t.Cleanup(func() { testBatchRows = 0 })
+		testBatchRows = 1
 
 		// An interrupted transaction: Snowflake commits three documents and the
 		// session dies before any checkpoint records them.

@@ -161,10 +161,27 @@ func packKey(key tuple.TupleElement) []byte {
 	return tuple.Tuple{key}.Pack()
 }
 
+// testBatchRows, when not zero, makes testWriteRow send a channel's batch once it
+// holds that many documents, so that a handful of documents spans several appends.
+var testBatchRows int
+
 // testWriteRow stores one converted row under the key in its first value, which is
 // the KEY column of every table these tests store into.
 func testWriteRow(ctx context.Context, m *streamV2Manager, binding int, converted []any) error {
-	return m.writeRow(ctx, binding, packKey(converted[0]), converted)
+	if err := m.writeRow(ctx, binding, packKey(converted[0]), converted); err != nil {
+		return err
+	}
+	if testBatchRows == 0 {
+		return nil
+	}
+	for _, c := range m.bindings[binding].activeChannels {
+		if c.batch.rows >= testBatchRows {
+			if err := c.sendBatch(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // soleItem returns the one non-nil checkpoint item a flush produced for a binding,

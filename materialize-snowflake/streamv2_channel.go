@@ -10,14 +10,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// A channel sends its batch when it holds streamV2BatchRows documents or
-// streamV2BatchFileSizeLimit compressed bytes. These caps are a performance knob, not
-// checkpoint state. Recovery resumes from the offset that Snowflake reports as
-// committed, whatever batch boundaries the interrupted attempt cut.
-var (
-	streamV2BatchRows          = 1_000_000
-	streamV2BatchFileSizeLimit = writer.DefaultJsonFileSizeLimit
-)
+// A channel sends its batch when its file holds streamV2BatchFileSizeLimit compressed
+// bytes. The limit is a performance knob, not checkpoint state. Recovery resumes from
+// the offset that Snowflake reports as committed, whatever batch boundaries the
+// interrupted attempt cut.
+var streamV2BatchFileSizeLimit = writer.DefaultJsonFileSizeLimit
 
 // streamV2PaceBytesPerSecond is the uncompressed byte rate this write path allows
 // itself on one channel.
@@ -156,7 +153,7 @@ func streamV2Pace(ctx context.Context, limiter *rate.Limiter, n int) error {
 }
 
 // writeRow buffers one converted document under the channel's next offset. It sends
-// the channel's batch once the batch reaches its row or byte cap.
+// the channel's batch once the batch's file reaches its size limit.
 //
 // A document at or below the channel's committed offset was already committed by an
 // interrupted attempt of this transaction. It still consumes its offset, so that later
@@ -175,7 +172,7 @@ func (c *streamV2Channel) writeRow(ctx context.Context, converted []any) error {
 		return fmt.Errorf("table %s: %w", c.binding.table, err)
 	}
 
-	if c.batch.rows >= streamV2BatchRows || c.batch.size() >= streamV2BatchFileSizeLimit {
+	if c.batch.size() >= streamV2BatchFileSizeLimit {
 		return c.sendBatch(ctx)
 	}
 	return nil
