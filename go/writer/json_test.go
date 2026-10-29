@@ -116,6 +116,31 @@ func TestJsonWriterInputs(t *testing.T) {
 	}
 }
 
+func TestJsonWriterWrittenUncompressed(t *testing.T) {
+	var fields = []string{"str", "int"}
+	var rows = [][]any{{"one", 1}, {"two", 2}, {"three", 3}}
+
+	var plain, compressed bytes.Buffer
+	var pw = NewJsonWriter(&testWriter{w: &plain}, fields, WithJsonDisableCompression())
+	var zw = NewJsonWriter(&testWriter{w: &compressed}, fields)
+	for _, row := range rows {
+		require.NoError(t, pw.Write(row))
+		require.NoError(t, zw.Write(row))
+	}
+	require.NoError(t, pw.Close())
+	require.NoError(t, zw.Close())
+
+	r, err := gzip.NewReader(&compressed)
+	require.NoError(t, err)
+	got, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.Equal(t, plain.String(), string(got))
+
+	// Both counts are of the bytes that reached their own side of the compressor.
+	require.Equal(t, plain.Len(), zw.WrittenUncompressed())
+	require.Equal(t, plain.Len(), pw.WrittenUncompressed())
+}
+
 type testWriter struct {
 	w      io.Writer
 	closed bool

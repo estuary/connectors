@@ -44,11 +44,12 @@ func WithJsonSkipNulls() JsonOption {
 }
 
 type JsonWriter struct {
-	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
-	cwc   *countingWriteCloser
-	gz    *pgzip.Writer
-	shape *encrow.Shape
-	buf   []byte
+	w            io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
+	cwc          *countingWriteCloser
+	gz           *pgzip.Writer
+	shape        *encrow.Shape
+	buf          []byte
+	uncompressed int
 }
 
 // NewJsonWriter creates a JsonWriter from w. w is closed when JsonWriter is closed. If `fields`
@@ -116,12 +117,19 @@ func (w *JsonWriter) Write(vals []any) (err error) {
 	if _, err := w.w.Write(w.buf); err != nil {
 		return fmt.Errorf("writing gzip bytes: %w", err)
 	}
+	w.uncompressed += len(w.buf)
 
 	return nil
 }
 
+// Written returns the number of bytes written to the underlying writer, after compression.
 func (w *JsonWriter) Written() int {
 	return int(w.cwc.written.Load())
+}
+
+// WrittenUncompressed returns the number of bytes of rows written, before compression.
+func (w *JsonWriter) WrittenUncompressed() int {
+	return w.uncompressed
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
