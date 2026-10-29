@@ -182,6 +182,9 @@ type transactor struct {
 	// where the rows matching the keys exist on, and another to read
 	// flow_document from those specific files.
 	twoPhaseLoads bool
+	// adaptiveLoads picks one or two phases for each binding's loads by how
+	// long they take.
+	adaptiveLoads bool
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -336,6 +339,7 @@ func newTransactor(
 		templates:             renderTemplates(ep.Dialect),
 		stagingPrefix:         stagingPrefix(materializationName),
 		twoPhaseLoads:         featureFlags["two_phase_loads"],
+		adaptiveLoads:         featureFlags["adaptive_two_phase_loads"],
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -404,6 +408,9 @@ type binding struct {
 	// stagingTable is the Delta table of this transaction's store rows,
 	// relative to rootStagingPath. It's set only when the rows are merged.
 	stagingTable string
+	storeRows    int
+
+	loadMode loadMode
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -496,7 +503,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		var bounds = b.loadMergeBounds.Build()
 		loads = append(loads, bindingLoad{
-			data: &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
+			binding: b,
+			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
 			fields: log.Fields{
 				"resourcePath": b.target.Path,
 				"keys":         keyCounts[idx],
@@ -545,10 +553,19 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			if d.twoPhaseLoads {
+			var started = time.Now()
+			var twoPhase = d.twoPhaseLoads || d.adaptiveLoads && load.binding.loadMode.twoPhase
+			var observe = func() {
+				if d.adaptiveLoads && !d.twoPhaseLoads {
+					d.observeLoad(load.binding, twoPhase, time.Since(started))
+				}
+			}
+
+			if twoPhase {
 				if matched, err := d.matchLoadFiles(groupCtx, db, load); err != nil {
 					return err
 				} else if !matched {
+					observe()
 					return nil
 				}
 			}
@@ -570,6 +587,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
+			observe()
 			defer rows.Close()
 
 			for rows.Next() {
@@ -605,8 +623,63 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // bindingLoad is the load query parameters of a binding, with the fields of
 // its query profile.
 type bindingLoad struct {
-	data   *tableWithFiles
-	fields log.Fields
+	binding *binding
+	data    *tableWithFiles
+	fields  log.Fields
+}
+
+const (
+	// twoPhaseMinLoad is how long a one-phase load must take for the next to
+	// try two phases.
+	twoPhaseMinLoad = 20 * time.Second
+	// twoPhaseRetryLoads is how many slow one-phase loads run before two phases
+	// are tried again, after they were slower.
+	twoPhaseRetryLoads = 10
+)
+
+// loadMode is whether a binding's loads run in two phases. A one-phase load
+// reads the documents of every file within its key bounds, and a slow one
+// suggests that's many files. Two phases read only the files holding matching
+// keys, but cost a version lookup and a match query, so they're kept while
+// they're faster than the slow load that started them.
+type loadMode struct {
+	twoPhase     bool
+	onePhaseTook time.Duration
+	retryAfter   int
+}
+
+// observe adapts the mode to a load that took the given time to evaluate, and
+// reports whether it changed.
+func (m *loadMode) observe(twoPhase bool, took time.Duration) bool {
+	if twoPhase {
+		if took <= m.onePhaseTook {
+			return false
+		}
+		m.twoPhase, m.retryAfter = false, twoPhaseRetryLoads
+		return true
+	}
+
+	m.onePhaseTook = took
+	if took < twoPhaseMinLoad {
+		return false
+	} else if m.retryAfter > 0 {
+		m.retryAfter--
+		return false
+	}
+	m.twoPhase = true
+	return true
+}
+
+func (d *transactor) observeLoad(b *binding, twoPhase bool, took time.Duration) {
+	var onePhaseTook = b.loadMode.onePhaseTook
+	if b.loadMode.observe(twoPhase, took) {
+		log.WithFields(log.Fields{
+			"resourcePath": b.target.Path,
+			"took":         took.String(),
+			"onePhaseTook": onePhaseTook.String(),
+			"twoPhase":     b.loadMode.twoPhase,
+		}).Info("switched load phases")
+	}
 }
 
 // maxMatchedFiles is the maximum number of files a two-phase load filters on.
@@ -995,6 +1068,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
+			b.storeRows++
 		}
 
 		if it.Exists {
@@ -1031,7 +1105,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			NeedsMerge:   !b.target.DeltaUpdates && b.needsMerge,
 			round:        it.Round,
 		})
-		b.needsMerge, b.stagingTable = false, "" // reset for next round
+		b.needsMerge, b.stagingTable, b.storeRows = false, "", 0 // reset for next round
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -1043,14 +1117,19 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}, nil
 }
 
+// minStagingTableRows is the fewest store rows that are copied into a staging
+// table before their MERGE. Below it, the copy takes longer than it saves the
+// MERGE: at 100k rows of 1 KB, copying took 5s and saved the MERGE 0.5s.
+const minStagingTableRows = 100_000
+
 // copyIntoStagingTable waits for the binding's store files to upload and, if
-// they need a MERGE, copies them into a Delta table. The MERGE reads that table rather than
+// they need a MERGE of many rows, copies them into a Delta table. The MERGE reads that table rather than
 // the JSON files, so Databricks doesn't materialize the files during MERGE time. The table lives
 // in the staging volume by path and isn't registered in the catalog.
 func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
 	if err := b.storeFile.wait(); err != nil {
 		return err
-	} else if b.target.DeltaUpdates || !b.needsMerge {
+	} else if b.target.DeltaUpdates || !b.needsMerge || b.storeRows < minStagingTableRows {
 		return nil
 	}
 

@@ -1002,20 +1002,28 @@ func TestAcknowledgeMergesStagingTables(t *testing.T) {
 }
 
 func TestCopyIntoStagingTable(t *testing.T) {
-	for _, needsMerge := range []bool{false, true} {
+	for _, tc := range []struct {
+		needsMerge bool
+		storeRows  int
+		copies     bool
+	}{
+		{needsMerge: false, storeRows: minStagingTableRows, copies: false},
+		{needsMerge: true, storeRows: minStagingTableRows - 1, copies: false},
+		{needsMerge: true, storeRows: minStagingTableRows, copies: true},
+	} {
 		var db = recordingDB(t, nil)
 		var d = renderingTransactor(lowerRangeKey)
 		var b = d.bindings[0]
 		b.storeFile = newStagedFile(config{}, b.rootStagingPath, "abc", []string{"id", "ts", "_flow_delete"}, d.files)
 		b.storeFile.dir = filepath.Join(t.TempDir(), "local")
-		b.needsMerge = needsMerge
+		b.needsMerge, b.storeRows = tc.needsMerge, tc.storeRows
 
 		var ctx = context.Background()
 		require.NoError(t, b.storeFile.start(ctx, db))
 		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
 		require.NoError(t, d.copyIntoStagingTable(ctx, db, b))
 
-		if !needsMerge {
+		if !tc.copies {
 			require.Len(t, recording.executed, 1)
 			require.Empty(t, b.stagingTable)
 			continue
@@ -1145,4 +1153,29 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 		require.NotNil(t, d.cp["a_table.v1"])
 		require.NotNil(t, d.cp["b_table.v1"])
 	})
+}
+
+func TestLoadMode(t *testing.T) {
+	var m loadMode
+	var observe = func(took time.Duration) bool { return m.observe(m.twoPhase, took) }
+
+	require.False(t, observe(5*time.Second))
+	require.False(t, m.twoPhase)
+
+	// A slow one-phase load tries two phases, which stay while they're faster.
+	require.True(t, observe(time.Minute))
+	require.True(t, m.twoPhase)
+	require.False(t, observe(10*time.Second))
+	require.False(t, observe(time.Minute))
+	require.True(t, m.twoPhase)
+
+	// Slower two phases go back to one, until enough slow loads retry them.
+	require.True(t, observe(2*time.Minute))
+	require.False(t, m.twoPhase)
+	for range twoPhaseRetryLoads {
+		require.False(t, observe(time.Minute))
+		require.False(t, observe(5*time.Second))
+	}
+	require.True(t, observe(time.Minute))
+	require.True(t, m.twoPhase)
 }

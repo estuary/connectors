@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-29
+### Changed
+- A table's load switches to two phases (see `two_phase_loads`) after a load
+  of it takes at least 20 seconds, and keeps them while they're faster than
+  that load. When they're slower, its loads go back to one phase, and try two
+  again after 10 more slow loads. The `no_adaptive_two_phase_loads` feature
+  flag turns this off, and `two_phase_loads` still runs every load in two
+  phases.
+- A MERGE of fewer than 100,000 rows reads them straight from the staged
+  files, instead of first copying them into a staging table. This saves a
+  query of a few seconds from each commit of small batches.
+
 ## 2026-10-28
 ### Fixed
 - A load no longer fails, restarting the task, when Databricks rate-limits
