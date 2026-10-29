@@ -2,11 +2,14 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
@@ -89,6 +92,30 @@ func TestDatabricksConfig(t *testing.T) {
 	require.Equal(t, "my-client-secret", oauthWs.ClientSecret)
 	require.Empty(t, oauthWs.Token)
 	require.Nil(t, oauthWs.Credentials)
+}
+
+func TestTransactorQueryTags(t *testing.T) {
+	var origOpen = openSQL
+	var dsn string
+	openSQL = func(_, dataSourceName string) (*stdsql.DB, error) {
+		dsn = dataSourceName
+		return nil, errors.New("not connecting")
+	}
+	t.Cleanup(func() { openSQL = origOpen })
+
+	var ep = &sql.Endpoint[config]{
+		Config: config{
+			Address:     "db-something.cloud.databricks.com:443",
+			CatalogName: "mycatalog",
+			HTTPPath:    "/sql/1.0/warehouses/someid",
+			Credentials: credentialConfig{AuthType: "PAT", PersonalAccessToken: "secret"},
+			SchemaName:  "default",
+		},
+		Dialect: testDialect,
+	}
+	_, err := newTransactor(context.Background(), "acmeCo/my-materialization", nil, ep, sql.Fence{}, nil, pm.Request_Open{}, nil, nil)
+	require.ErrorContains(t, err, "not connecting")
+	require.Contains(t, dsn, "query_tags=materialization_name%3AacmeCo%2Fmy-materialization")
 }
 
 func TestSpecification(t *testing.T) {
