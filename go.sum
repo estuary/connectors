@@ -175,8 +175,8 @@ github.com/alexflint/go-scalar v1.2.0 h1:WR7JPKkeNpnYIOfHRa7ivM21aWAdHD0gEWHCx+W
 github.com/alexflint/go-scalar v1.2.0/go.mod h1:LoFvNMqS1CPrMVltza4LvnGKhaSpc3oyLEBUZVhhS2o=
 github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0 h1:9rsXPiOSewm+zGoupFzCjxiOcYjJcCMunuCrXiEsrSc=
 github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0/go.mod h1:Y5TZayiNItMSkAZ64uN0diRc8/77Xw3wqh7CFAXhl0o=
-github.com/andybalholm/brotli v1.2.2 h1:HzTuoo2ErYQqf5qvcJInB8uvqSVxRttzkFexPWtnceM=
-github.com/andybalholm/brotli v1.2.2/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
+github.com/andybalholm/brotli v1.2.7 h1:UgafRPGMam5ySHfRkhthMqOFA6IFoeF3D7mWIDLjG5A=
+github.com/andybalholm/brotli v1.2.7/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=
 github.com/antlr4-go/antlr/v4 v4.13.1/go.mod h1:GKmUxMtwp6ZgGwZSva4eWPC5mS6vUAmOABFgjdkM7Nw=
@@ -347,8 +347,6 @@ github.com/danieljoos/wincred v1.2.2 h1:774zMFJrqaeYCK2W57BgAem/MLi6mtSE47MB6BOJ
 github.com/danieljoos/wincred v1.2.2/go.mod h1:w7w4Utbrz8lqeMbDAK0lkNJUv5sAOkFi7nd/ogr0Uh8=
 github.com/databricks/databricks-sdk-go v0.121.0 h1:5bGlH1/X0hkb7vHM3riQd61HNloH0vKI0bjINvmNXnM=
 github.com/databricks/databricks-sdk-go v0.121.0/go.mod h1:hWoHnHbNLjPKiTm5K/7bcIv3J3Pkgo5x9pPzh8K3RVE=
-github.com/databricks/databricks-sql-go v1.10.0 h1:U17EKVC+hLP87swFMe2N6UUVektwUgTvT2pMDaDc46g=
-github.com/databricks/databricks-sql-go v1.10.0/go.mod h1:qC010ucrtqrNXY2UOcoczbfPD4gJ1jr1y6TL7iqyxPk=
 github.com/databricks/databricks-sql-go v1.14.0 h1:pc6/WPEwKujCBlHbz/U2kVWou8BCvo2Hm3GJVsmyogU=
 github.com/databricks/databricks-sql-go v1.14.0/go.mod h1:knb3jMMEf7rYm+Hw0i6NFuYC12WX7jkSQNhuz/D5V1Q=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
