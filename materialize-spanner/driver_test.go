@@ -38,7 +38,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("fence", func(t *testing.T) {
 		var testDialect = createSpannerDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
-		var testTemplates = renderTemplates(testDialect, false)
+		var testTemplates = renderTemplates(testDialect, false, "")
 
 		sql.RunFencingTest(
 			t,

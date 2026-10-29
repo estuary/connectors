@@ -178,9 +178,12 @@ type templates struct {
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
 	dropLoadTable           *template.Template
+	loadTableName           *template.Template
 }
 
-func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool) templates {
+// renderTemplates renders the templates for a dialect. loadTablePrefix names
+// the Load tables, and may be empty where no Load templates are rendered.
+func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool, loadTablePrefix string) templates {
 	// Conditionally add flow_key_hash column to schema definitions.
 	// Only include for regular tables (Binding >= 0), not for the checkpoints table (Binding == -1).
 	// The checkpoints table has very few rows and doesn't benefit from key distribution.
@@ -193,7 +196,7 @@ func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool) temp
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", fmt.Sprintf(`
 {{ define "temp_name" -}}
-flow_internal.flow_temp_table_{{ $.Binding }}
+%s{{ $.Binding }}
 {{- end }}
 
 -- Templated creation of a materialized table definition:
@@ -316,7 +319,7 @@ JOIN {{ $.Identifier}} AS r
 {{ define "dropLoadTable" }}
 DROP TABLE {{ template "temp_name" . }}
 {{ end }}
-`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
+`, loadTablePrefix, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
 
 	return templates{
 		createLoadTable:         tplAll.Lookup("createLoadTable"),
@@ -326,6 +329,7 @@ DROP TABLE {{ template "temp_name" . }}
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		dropLoadTable:           tplAll.Lookup("dropLoadTable"),
+		loadTableName:           tplAll.Lookup("temp_name"),
 	}
 }
 

@@ -82,7 +82,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		return nil, err
 	}
 
-	templates := renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization)
+	templates := renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization, "")
 
 	return &client{
 		dataClient:  clients.dataClient,

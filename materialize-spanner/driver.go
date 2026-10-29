@@ -111,6 +111,20 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, false, nil
 }
 
+// loadTablePrefix names the Load tables of one shard of a task. A shard drops
+// and recreates its Load tables when it starts and clears them at every Load,
+// so they must not be shared with other tasks or shards in the database.
+func loadTablePrefix(materialization string, keyBegin, keyEnd uint32) string {
+	readable := identifierSanitizerRegexp.ReplaceAllString(materialization, "_")
+	if len(readable) > 32 {
+		readable = readable[:32]
+	}
+	h := fnv.New64a()
+	h.Write([]byte(materialization))
+
+	return fmt.Sprintf("flow_internal.flow_temp_%s_%016x_%08x_%08x_", readable, h.Sum64(), keyBegin, keyEnd)
+}
+
 // initializeFlowInternalSchema builds DDL statements for flow_internal schema setup
 // It returns DDL statements to drop existing temporary tables, create the schema, and create all Load tables
 func initializeFlowInternalSchema(bindings []*spannerBinding) []string {
@@ -121,9 +135,8 @@ func initializeFlowInternalSchema(bindings []*spannerBinding) []string {
 
 	// Step 1: Drop all temporary tables if they exist
 	// Note: Spanner doesn't support dropping a schema with tables in it, so we drop tables individually
-	for idx := range bindings {
-		tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", idx)
-		ddlStatements = append(ddlStatements, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTableName))
+	for _, binding := range bindings {
+		ddlStatements = append(ddlStatements, fmt.Sprintf("DROP TABLE IF EXISTS %s", binding.loadTable))
 	}
 
 	// Step 2: Create the schema if it doesn't exist
@@ -153,7 +166,7 @@ var sqlDriver = &sql.Driver[config, tableConfig]{
 		}).Info("opening Spanner database")
 
 		dialect := createSpannerDialect(featureFlags)
-		templates := renderTemplates(dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
+		templates := renderTemplates(dialect, !cfg.Advanced.DisableKeyDistributionOptimization, "")
 
 		return &sql.Endpoint[config]{
 			Config:              cfg,
@@ -285,6 +298,7 @@ type transactor struct {
 type spannerBinding struct {
 	target             sql.Table
 	nullFieldsToStrip  []string
+	loadTable          string
 	createLoadTableSQL string
 	loadQuerySQL       string
 	dropLoadTableSQL   string
@@ -455,7 +469,8 @@ func newTransactor(
 		}
 	}()
 
-	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
+	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization,
+		loadTablePrefix(fence.Materialization.String(), fence.KeyBegin, fence.KeyEnd))
 
 	// Always query node count for partition calculation
 	// Partitions = nodes × 10 for parallel flushing
@@ -548,6 +563,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	}
+
+	loadTable, err := sql.RenderTableTemplate(target, t.templates.loadTableName)
+	if err != nil {
+		return fmt.Errorf("rendering loadTableName template: %w", err)
+	}
+	b.loadTable = loadTable
 
 	// Render createLoadTable template
 	createLoadTableSQL, err := sql.RenderTableTemplate(target, t.templates.createLoadTable)
@@ -667,7 +688,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		// Initialize state for this binding on first key
 		if bindingStates[bindingIdx] == nil {
-			tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
+			tempTableName := b.loadTable
 
 			log.WithField("table", tempTableName).Info("load: clearing temporary table")
 			// Clear any existing data from the table using a mutation
