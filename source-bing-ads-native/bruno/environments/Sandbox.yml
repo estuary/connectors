@@ -1,0 +1,7 @@
+variables:
+  - name: customer_management_url
+    value: https://clientcenter.api.sandbox.bingads.microsoft.com/CustomerManagement/v13
+  - name: config_path
+    value: ../config.yaml
+  - name: oauth_scope
+    value: https://si.ads.microsoft.com/msads.manage offline_access
