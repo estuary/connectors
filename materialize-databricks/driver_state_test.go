@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -19,6 +20,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,6 +95,8 @@ var recording struct {
 	// failMatching limits failWith to statements containing it when set.
 	failMatching string
 	attempts     int
+	// delay is how long each statement runs, unless its context ends first.
+	delay time.Duration
 }
 
 func (recordingDriver) Open(string) (driver.Conn, error) { return recordingConn{}, nil }
@@ -110,7 +114,16 @@ func (c recordingConn) ExecContext(ctx context.Context, query string, args []dri
 	return driver.RowsAffected(0), nil
 }
 
-func (recordingConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+func (recordingConn) QueryContext(ctx context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+	recording.mu.Lock()
+	var delay = recording.delay
+	recording.mu.Unlock()
+	select {
+	case <-time.After(delay):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
 	recording.mu.Lock()
 	defer recording.mu.Unlock()
 	recording.attempts++
@@ -139,7 +152,7 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	t.Helper()
 	registerRecordingDriver()
 
-	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts = nil, failWith, 0, "", 0
+	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts, recording.delay = nil, failWith, 0, "", 0, 0
 	db, err := stdsql.Open("recording", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -1159,13 +1172,16 @@ func TestLoadMode(t *testing.T) {
 	// load runs a load as Load does, where one phase would take onePhase and
 	// two phases twoPhase, and returns the deadline of its one-phase query, or
 	// zero if it ran only in two phases.
+	// Loads are a minute apart unless a test moves now.
+	var now = time.Now()
 	var load = func(m *loadMode, onePhase, twoPhase time.Duration) time.Duration {
-		var deadline, ok = m.onePhaseDeadline()
+		now = now.Add(time.Minute)
+		var deadline, ok = m.onePhaseDeadline(now)
 		if ok && onePhase <= deadline {
-			m.onePhaseFinished(onePhase)
+			m.onePhaseFinished(onePhase, now)
 			return deadline
 		} else if ok {
-			m.onePhaseTimedOut()
+			m.onePhaseTimedOut(now)
 		}
 		m.twoPhaseFinished(twoPhase)
 		return deadline
@@ -1193,17 +1209,31 @@ func TestLoadMode(t *testing.T) {
 			require.True(t, m.twoPhase)
 		}
 		require.Equal(t, []int{2, 6, 14, 30, 62, 126, 190, 254}, retries)
+
+		// Infrequent loads retry once maxRetryInterval has passed.
+		now = now.Add(maxRetryInterval)
+		require.Equal(t, loadDeadline, load(&m, 8*time.Minute, 15*s))
+	})
+
+	t.Run("growing loads switch once they take as long as two phases", func(t *testing.T) {
+		var m loadMode
+		for _, took := range []time.Duration{10 * s, 18 * s} {
+			require.Equal(t, loadDeadline, load(&m, took, 3*s))
+			require.False(t, m.twoPhase)
+		}
+		require.Equal(t, loadDeadline, load(&m, 30*s, 3*s))
+		require.True(t, m.twoPhase)
 	})
 
 	t.Run("one phase returns once it's faster than two", func(t *testing.T) {
 		var m loadMode
-		load(&m, 25*s, 27*s)
+		load(&m, 40*s, 45*s)
 		require.True(t, m.twoPhase)
-		require.Zero(t, load(&m, 25*s, 27*s))
-		require.Equal(t, 27*s, load(&m, 25*s, 27*s))
+		require.Zero(t, load(&m, 40*s, 45*s))
+		require.Equal(t, 45*s, load(&m, 40*s, 45*s))
 		require.False(t, m.twoPhase)
 		for range 10 {
-			require.Equal(t, 50*s, load(&m, 25*s, 27*s))
+			require.Equal(t, 45*s, load(&m, 40*s, 45*s))
 			require.False(t, m.twoPhase)
 		}
 	})
@@ -1216,4 +1246,64 @@ func TestLoadMode(t *testing.T) {
 		require.True(t, m.twoPhase)
 		require.Equal(t, 4, m.retryEvery)
 	})
+}
+
+func TestLoadBucket(t *testing.T) {
+	for keys, bucket := range map[int]int{
+		1: 0, 999: 0, 1_000: 1, 9_999: 1, 10_000: 2, 99_999: 2, 100_000: 3, 10_000_000: 3,
+	} {
+		require.Equal(t, bucket, loadBucket(keys), keys)
+	}
+}
+
+func TestQueryLoadDeadline(t *testing.T) {
+	var ctx = context.Background()
+	var d = testTransactor(lowerRangeKey)
+	var tpl = template.Must(template.New("load").Parse("SELECT 1"))
+	var load = bindingLoad{data: &tableWithFiles{}, fields: log.Fields{}}
+
+	var db = recordingDB(t, nil)
+	recording.delay = 200 * time.Millisecond
+
+	var started = time.Now()
+	_, _, err := d.queryLoad(ctx, db, tpl, load, 20*time.Millisecond)
+	require.ErrorIs(t, err, errLoadDeadline)
+	require.Less(t, time.Since(started), recording.delay)
+
+	for _, deadline := range []time.Duration{0, time.Minute} {
+		rows, trace, err := d.queryLoad(ctx, db, tpl, load, deadline)
+		require.NoError(t, err)
+		require.NotNil(t, trace)
+		// The deadline no longer applies once the query has returned.
+		time.Sleep(10 * time.Millisecond)
+		require.False(t, rows.Next())
+		require.NoError(t, rows.Err())
+		rows.Close()
+	}
+}
+
+func TestEvaluateLoadFallsBackToOnePhase(t *testing.T) {
+	var ctx = context.Background()
+	var d = renderingTransactor(lowerRangeKey)
+	var b = d.bindings[0]
+	var tpl = template.Must(template.New("load").Parse("SELECT doc FROM t{{ if .Version }} VERSION AS OF {{ .Version }}{{ end }}"))
+	var load = bindingLoad{binding: b, keys: 10, data: &tableWithFiles{Table: &b.target}, fields: log.Fields{}}
+
+	var db = recordingDB(t, fmt.Errorf("permission denied"))
+	recording.failMatching = "DESCRIBE HISTORY"
+	b.loadModes[0] = loadMode{twoPhase: true, retryIn: 10, retryAt: time.Now().Add(time.Hour)}
+
+	rows, _, err := d.evaluateLoad(ctx, db, tpl, load)
+	require.NoError(t, err)
+	rows.Close()
+	require.True(t, b.noTwoPhase)
+	require.Equal(t, []string{"SELECT doc FROM t"}, recording.executed)
+
+	// Later loads skip two phases altogether.
+	recording.executed = nil
+	b.loadModes[0].retryIn = 10
+	rows, _, err = d.evaluateLoad(ctx, db, tpl, load)
+	require.NoError(t, err)
+	rows.Close()
+	require.Equal(t, []string{"SELECT doc FROM t"}, recording.executed)
 }
