@@ -27,16 +27,27 @@ async def _get_or_create_analytics_report_request(
     app_id: str,
     access_type: AnalyticsReportAccessType,
 ) -> str:
-    report_request_id = None
-
     try:
-        report_request_id = await client.get_or_create_report_request(
+        created_report_request = await client.create_analytics_report_request(
             app_id,
             access_type,
         )
+        log.debug(f"Created report request {created_report_request.id} for app {app_id}")
+        return created_report_request.id
     except HTTPError as e:
+        # Apple returns 409 when it won't create another request of this type,
+        # for example because the app already has one.
         if e.code != 409:
             raise
+
+        report_requests = await client.list_analytics_report_requests(
+            app_id,
+            access_type,
+        )
+        for request in report_requests:
+            log.debug(f"Checking request {request.id} for app {app_id}")
+            # assuming there is only one request
+            return request.id
 
         log.warning(
             "Report request was created after first run. This is likely due to concurrent requests. "
@@ -57,15 +68,11 @@ async def _get_or_create_analytics_report_request(
                 )
                 continue
             else:
-                report_request_id = report_req.id
-                break
+                return report_req.id
 
-        if not report_request_id:
-            raise RuntimeError(
-                f"Failed to discover or create report request for {app_id}"
-            ) from e
-
-    return report_request_id
+        raise RuntimeError(
+            f"Failed to discover or create report request for {app_id}"
+        ) from e
 
 
 async def _select_valid_report_instances(

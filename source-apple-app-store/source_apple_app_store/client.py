@@ -10,7 +10,7 @@ from typing import (
     TypeVar,
 )
 
-from estuary_cdk.http import HTTPError, HTTPMixin
+from estuary_cdk.http import HTTPMixin
 from estuary_cdk.incremental_csv_processor import (
     CSVConfig,
     IncrementalCSVProcessor,
@@ -226,30 +226,6 @@ class AppleAppStoreClient:
         return await self._paginated_request(
             url, AnalyticsReportSegment, params
         )
-
-    async def get_or_create_report_request(
-        self,
-        app_id: str,
-        report_type: AnalyticsReportAccessType,
-    ) -> str:
-        try:
-            created_report_request = await self.create_analytics_report_request(
-                app_id,
-                report_type,
-            )
-            self.log.debug(f"Created report request {created_report_request.id} for app {app_id}")
-            return created_report_request.id
-        except HTTPError as e:
-            if e.code == 409:
-                report_requests = await self.list_analytics_report_requests(
-                    app_id,
-                    report_type,
-                )
-                for request in report_requests:
-                    self.log.debug(f"Checking request {request.id} for app {app_id}")
-                    # assuming there is only one request
-                    return request.id
-            raise
 
     async def stream_tsv_data(
         self,
