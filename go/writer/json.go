@@ -121,7 +121,7 @@ func (w *JsonWriter) Write(vals []any) (err error) {
 }
 
 func (w *JsonWriter) Written() int {
-	return w.cwc.written
+	return int(w.cwc.written.Load())
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
