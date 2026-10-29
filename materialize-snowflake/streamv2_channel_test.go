@@ -16,14 +16,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// TestStreamV2BatchStaysUnderTheCap covers the API's limit on an append body: a row
-// that would carry a batch over the byte cap starts the next batch instead, so no
-// append of more than one row exceeds the cap.
-func TestStreamV2BatchStaysUnderTheCap(t *testing.T) {
+// TestStreamV2BatchCutAtTheFileSizeLimit covers the size cap: a batch is sent once
+// its file holds streamV2BatchFileSizeLimit compressed bytes, checked after each row.
+func TestStreamV2BatchCutAtTheFileSizeLimit(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
-	defer func(n int) { streamV2BatchBytes = n }(streamV2BatchBytes)
-	streamV2BatchBytes = 1000
+	defer func(n int) { streamV2BatchFileSizeLimit = n }(streamV2BatchFileSizeLimit)
+	streamV2BatchFileSizeLimit = 1000
 
 	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/cap",
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
@@ -35,13 +34,22 @@ func TestStreamV2BatchStaysUnderTheCap(t *testing.T) {
 		StateKey:   "cap.v1",
 	}, nil)
 
-	fakeSnowpipeLargestAppend.Store(0)
-	for i := range 20 {
-		require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("k%d", i), strings.Repeat("v", 300)}))
+	// The compressor writes its output a block at a time, in the background, so the
+	// file grows some rows behind the batch. Rows are written until one of them
+	// finds the file over the limit and sends the batch.
+	var val = make([]byte, 256*1024)
+	for i := range val {
+		val[i] = 'a' + byte(rand.IntN(26))
 	}
+	var sent = false
+	for i := 0; i < 256 && !sent; i++ {
+		require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("k%d", i), string(val)}))
+		sent = m.bindings[0].activeChannels[0].batch.empty()
+	}
+	require.True(t, sent, "no batch was sent at the file size limit")
+
 	var _, err = m.flush(ctx)
 	require.NoError(t, err)
-	require.LessOrEqual(t, fakeSnowpipeLargestAppend.Load(), int64(streamV2BatchBytes))
 }
 
 // TestStreamV2NoAppendAfterAFailedAppend covers the order of a channel's appends:
@@ -62,19 +70,18 @@ func TestStreamV2NoAppendAfterAFailedAppend(t *testing.T) {
 		StateKey:   "failed.v1",
 	}, nil)
 
-	require.NoError(t, testWriteRow(ctx, m, 0, []any{"a", 1}))
+	require.NoError(t, m.ensureOpened(ctx, m.bindings[0]))
 	var c = m.bindings[0].activeChannels[0]
 	// An empty limiter holds the first append back, so the second is queued
 	// behind it while it is still pending.
 	c.limiter = rate.NewLimiter(100, 100)
 	c.limiter.AllowN(time.Now(), 100)
-	// The fake rejects a row that is not a JSON object.
-	for i, b := range c.batch.payload {
-		if b != '\n' {
-			c.batch.payload[i] = 'x'
-		}
-	}
+	// A batch without column names writes its rows as JSON arrays, which the fake
+	// rejects as not JSON objects.
+	c.batch.columns = nil
+	require.NoError(t, testWriteRow(ctx, m, 0, []any{"a", 1}))
 	require.NoError(t, c.sendBatch(ctx))
+	c.batch.columns = m.bindings[0].columns
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"b", 2}))
 	require.NoError(t, c.sendBatch(ctx))
 	require.ErrorContains(t, c.wait(), "row is not a JSON object")
@@ -167,17 +174,16 @@ func TestStreamV2SendFailsOnceAnAppendHasFailed(t *testing.T) {
 		StateKey:   "sendfails.v1",
 	}, nil)
 
-	require.NoError(t, testWriteRow(ctx, m, 0, []any{"a", 1}))
+	require.NoError(t, m.ensureOpened(ctx, m.bindings[0]))
 	var c = m.bindings[0].activeChannels[0]
-	// The fake rejects a row that is not a JSON object.
-	for i, b := range c.batch.payload {
-		if b != '\n' {
-			c.batch.payload[i] = 'x'
-		}
-	}
+	// A batch without column names writes its rows as JSON arrays, which the fake
+	// rejects as not JSON objects.
+	c.batch.columns = nil
+	require.NoError(t, testWriteRow(ctx, m, 0, []any{"a", 1}))
 	require.NoError(t, c.sendBatch(ctx))
 	<-c.appendsCtx.Done()
 
+	c.batch.columns = m.bindings[0].columns
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"b", 2}))
 	require.ErrorContains(t, c.sendBatch(ctx), "row is not a JSON object")
 }

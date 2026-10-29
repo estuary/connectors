@@ -3,6 +3,8 @@ package connector
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/md5"
 	stdsql "database/sql"
 	"encoding/base64"
@@ -10,6 +12,8 @@ import (
 	"math"
 	"math/rand/v2"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,13 +35,35 @@ func TestStreamV2FileKey(t *testing.T) {
 func TestStreamV2CryptFileRoundTrips(t *testing.T) {
 	var key = bytes.Repeat([]byte{2}, 16)
 	var iv = bytes.Repeat([]byte{3}, 16)
-	var plain = []byte(`{"ID":"a"}` + "\n" + `{"ID":"b"}` + "\n")
-	var data = bytes.Clone(plain)
+	// Larger than one chunk, so that the keystream carries across chunks.
+	var plain = bytes.Repeat([]byte(`{"ID":"a"}`+"\n"), 10_000)
 
-	require.NoError(t, streamV2CryptFile(key, iv, data))
-	require.NotEqual(t, plain, data)
-	require.NoError(t, streamV2CryptFile(key, iv, data))
-	require.Equal(t, plain, data)
+	var path = filepath.Join(t.TempDir(), "batch")
+	require.NoError(t, os.WriteFile(path, plain, 0o600))
+	file, err := os.OpenFile(path, os.O_RDWR, 0)
+	require.NoError(t, err)
+	defer file.Close()
+
+	sum, err := streamV2CryptFile(key, iv, file, int64(len(plain)))
+	require.NoError(t, err)
+	encrypted, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NotEqual(t, plain, encrypted)
+	var want = md5.Sum(encrypted)
+	require.Equal(t, want[:], sum)
+
+	// The keystream is the one a single pass over the whole file produces.
+	block, err := aes.NewCipher(key)
+	require.NoError(t, err)
+	var oneShot = make([]byte, len(plain))
+	cipher.NewCTR(block, iv).XORKeyStream(oneShot, plain)
+	require.Equal(t, oneShot, encrypted)
+
+	_, err = streamV2CryptFile(key, iv, file, int64(len(plain)))
+	require.NoError(t, err)
+	decrypted, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, plain, decrypted)
 }
 
 func TestStreamV2UploaderRejectsAnUnknownLocationType(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -95,7 +96,7 @@ func (c *streamV2Client) pipeInfo(ctx context.Context, pipePath string) (*stream
 	}
 	var body, _ = json.Marshal(map[string]any{"generate_new_token": true, "encryption_version": streamV2EncryptionVersion})
 	var info = new(streamV2PipeInfo)
-	if err := c.call(ctx, http.MethodPost, pipePath+":pipe-info", nil, body, nil, info); err != nil {
+	if err := c.call(ctx, http.MethodPost, pipePath+":pipe-info", nil, bytes.NewReader(body), nil, info); err != nil {
 		return nil, err
 	}
 	var uploader, err = c.newUploader(ctx, info.Stage)
@@ -137,23 +138,39 @@ func streamV2FileKey(pipeKeyBase64 string) ([]byte, error) {
 	return pipeKey, nil
 }
 
-// streamV2CryptFile applies AES-CTR under key and iv to data in place. CTR mode
-// is its own inverse, so the same call encrypts and decrypts.
-func streamV2CryptFile(key, iv, data []byte) error {
+// streamV2CryptFile applies AES-CTR under key and iv to the first size bytes of
+// file in place, and returns the MD5 of the bytes it leaves there. CTR mode is its
+// own inverse, so the same call encrypts and decrypts.
+func streamV2CryptFile(key, iv []byte, file *os.File, size int64) ([]byte, error) {
 	var block, err = aes.NewCipher(key)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	cipher.NewCTR(block, iv).XORKeyStream(data, data)
-	return nil
+	var stream = cipher.NewCTR(block, iv)
+	var sum = md5.New()
+
+	var buf = make([]byte, 32*1024)
+	for offset := int64(0); offset < size; {
+		var chunk = buf[:min(int64(len(buf)), size-offset)]
+		if n, err := file.ReadAt(chunk, offset); n < len(chunk) {
+			return nil, fmt.Errorf("reading the file at offset %d: %w", offset, err)
+		}
+		stream.XORKeyStream(chunk, chunk)
+		sum.Write(chunk)
+		if _, err := file.WriteAt(chunk, offset); err != nil {
+			return nil, fmt.Errorf("writing the file at offset %d: %w", offset, err)
+		}
+		offset += int64(len(chunk))
+	}
+	return sum.Sum(nil), nil
 }
 
-// appendFile appends rows to a channel through the pipe's stage. It encrypts the
-// compressed rows under the pipe's key, uploads them as one file, and registers
-// the file with the channel as one fragment. The caller holds ch.mu.
+// appendFile appends a batch's rows to a channel through the pipe's stage. It
+// encrypts the batch's file in place under the pipe's key, uploads it, and registers
+// it with the channel as one fragment. The caller holds ch.mu.
 //
 // The pipe-info and filebuffer endpoints are not documented by Snowflake.
-func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel, channelName, startToken, endToken string, rows, compressed []byte) error {
+func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel, channelName, startToken, endToken string, batch streamV2BatchFile, file *os.File) error {
 	var info, err = c.pipeInfo(ctx, ch.pipePath)
 	if err != nil {
 		return err
@@ -166,18 +183,19 @@ func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel
 	if _, err := rand.Read(iv); err != nil {
 		return err
 	}
-	if err := streamV2CryptFile(key, iv, compressed); err != nil {
-		return err
+	var size = int64(batch.compressedBytes)
+	sum, err := streamV2CryptFile(key, iv, file, size)
+	if err != nil {
+		return fmt.Errorf("encrypting the file of channel %q: %w", channelName, err)
 	}
 	var name = info.Stage.PathPrefix + uuid.NewString() + ".ndjson"
 	var storeETag string
-	if err := info.uploader.Upload(ctx, name, bytes.NewReader(compressed), blob.WithETag(&storeETag)); err != nil {
-		return fmt.Errorf("uploading %d bytes to the %s stage of channel %q: %w", len(compressed), info.Stage.LocationType, channelName, streamV2RedactURLQuery(err))
+	if err := info.uploader.Upload(ctx, name, io.NewSectionReader(file, 0, size), blob.WithETag(&storeETag)); err != nil {
+		return fmt.Errorf("uploading %d bytes to the %s stage of channel %q: %w", size, info.Stage.LocationType, channelName, streamV2RedactURLQuery(err))
 	}
-	var sum = md5.Sum(compressed)
 	// Snowflake checks a file on an Azure stage against the blob's ETag, and a
 	// file on an S3 or GCS stage against the MD5 of its bytes.
-	var fileETag = hex.EncodeToString(sum[:])
+	var fileETag = hex.EncodeToString(sum)
 	if info.Stage.LocationType == "AZURE" {
 		fileETag = storeETag
 	}
@@ -185,12 +203,12 @@ func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel
 		FilePath:                        info.Stage.BucketName + "/" + name,
 		ContentType:                     "application/x-ndjson",
 		FileEtag:                        fileETag,
-		FileLengthBytes:                 len(compressed),
-		FragmentLengthBytes:             len(compressed),
-		FragmentLengthUncompressedBytes: len(rows),
+		FileLengthBytes:                 batch.compressedBytes,
+		FragmentLengthBytes:             batch.compressedBytes,
+		FragmentLengthUncompressedBytes: batch.uncompressedBytes,
 		FragmentStartOffsetToken:        startToken,
 		FragmentEndOffsetToken:          endToken,
-		FragmentRowCount:                bytes.Count(rows, []byte{'\n'}),
+		FragmentRowCount:                batch.rows,
 		Diversifier:                     info.Encryption.Diversifier,
 		MasterKeyID:                     info.Encryption.PipeKeyID,
 		IVBase64:                        base64.StdEncoding.EncodeToString(iv),
@@ -201,8 +219,8 @@ func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel
 		"channel":      channelName,
 		"locationType": info.Stage.LocationType,
 		"rows":         fragment.FragmentRowCount,
-		"bytes":        len(rows),
-		"compressed":   len(compressed),
+		"bytes":        batch.uncompressedBytes,
+		"compressed":   batch.compressedBytes,
 	}).Info("appending rows through a staged file")
 
 	var query = url.Values{
@@ -213,7 +231,7 @@ func (c *streamV2Client) appendFile(ctx context.Context, ch *streamV2OpenChannel
 	var res struct {
 		Continuation string `json:"next_continuation_token"`
 	}
-	if err := c.call(ctx, http.MethodPost, "data/"+ch.pipePath+"/channels/"+url.PathEscape(channelName)+"/filebuffer", query, body, nil, &res); err != nil {
+	if err := c.call(ctx, http.MethodPost, "data/"+ch.pipePath+"/channels/"+url.PathEscape(channelName)+"/filebuffer", query, bytes.NewReader(body), nil, &res); err != nil {
 		return err
 	}
 	ch.continuation = res.Continuation

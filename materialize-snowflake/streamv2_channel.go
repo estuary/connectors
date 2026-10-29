@@ -3,18 +3,20 @@ package connector
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/estuary/connectors/go/writer"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
 
 // A channel sends its batch when it holds streamV2BatchRows documents or
-// streamV2BatchBytes bytes. These caps are a performance knob, not checkpoint state.
-// Recovery resumes from the offset that Snowflake reports as committed,
-// whatever batch boundaries the interrupted attempt cut.
+// streamV2BatchFileSizeLimit compressed bytes. These caps are a performance knob, not
+// checkpoint state. Recovery resumes from the offset that Snowflake reports as
+// committed, whatever batch boundaries the interrupted attempt cut.
 var (
-	streamV2BatchRows  = 1_000_000
-	streamV2BatchBytes = 32 * 1024 * 1024
+	streamV2BatchRows          = 1_000_000
+	streamV2BatchFileSizeLimit = writer.DefaultJsonFileSizeLimit
 )
 
 // streamV2PaceBytesPerSecond is the uncompressed byte rate this write path allows
@@ -72,6 +74,7 @@ func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, channelName 
 		client:      client,
 		channelName: channelName,
 		keyRange:    keyRange,
+		batch:       streamV2Batch{columns: b.columns},
 		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
 		progress: struct {
 			routed       int64
@@ -102,11 +105,9 @@ func (c *streamV2Channel) wait() error {
 	return err
 }
 
-// sendBatch hands the payload of a non-empty batch to the channel's appends. Once
-// an append of the channel has failed, sendBatch returns that append's error.
-//
-// Ownership of the payload passes to the append, so the next batch starts a
-// payload of its own.
+// sendBatch finishes a non-empty batch and hands its file to the channel's appends,
+// which remove the file once its append returns. Once an append of the channel has
+// failed, sendBatch returns that append's error.
 func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	if c.batch.empty() {
 		return nil
@@ -115,21 +116,26 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	// channel's routed count can be one ahead of the batch's last row, because a
 	// row is counted as routed before it is added to a batch.
 	var startToken, endToken = c.offsetToken(c.batch.firstOffset), c.offsetToken(c.batch.firstOffset + int64(c.batch.rows) - 1)
-	var payload = c.batch.finish()
+	file, err := c.batch.finish()
+	if err != nil {
+		return fmt.Errorf("finishing batch of channel %q: %w", c.channelName, err)
+	}
 
 	if c.appends == nil {
 		c.appends, c.appendsCtx = errgroup.WithContext(ctx)
 		c.appends.SetLimit(1)
 	} else if c.appendsCtx.Err() != nil {
+		os.Remove(file.path)
 		return fmt.Errorf("appending to channel %q of %s: %w", c.channelName, c.binding.table, c.appends.Wait())
 	}
 
 	var appendsCtx = c.appendsCtx
 	c.appends.Go(func() error {
-		if err := streamV2Pace(appendsCtx, c.limiter, len(payload)); err != nil {
+		defer os.Remove(file.path)
+		if err := streamV2Pace(appendsCtx, c.limiter, file.uncompressedBytes); err != nil {
 			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
 		}
-		return c.client.AppendRows(appendsCtx, c.channelName, startToken, endToken, payload)
+		return c.client.AppendRows(appendsCtx, c.channelName, startToken, endToken, file)
 	})
 	return nil
 }
@@ -162,27 +168,14 @@ func (c *streamV2Channel) writeRow(ctx context.Context, converted []any) error {
 		return nil
 	}
 
-	var row, err = c.binding.encoder.encodeRow(c.batch.scratch[:0], converted)
-	if err != nil {
-		return fmt.Errorf("encoding row for %s: %w", c.binding.table, err)
-	}
-	c.batch.scratch = row
-	// A row that would carry the batch over its byte cap starts the next one, so
-	// a batch is only ever over the cap when it holds a single row.
-	if c.batch.size()+len(row) > streamV2BatchBytes {
-		if err := c.sendBatch(ctx); err != nil {
-			return err
-		}
-	}
-
-	if c.batch.rows == 0 {
-		c.batch.start()
+	if c.batch.empty() {
 		c.batch.firstOffset = offset
 	}
-	c.batch.payload = append(c.batch.payload, row...)
-	c.batch.rows++
+	if err := c.batch.writeRow(converted); err != nil {
+		return fmt.Errorf("table %s: %w", c.binding.table, err)
+	}
 
-	if c.batch.rows >= streamV2BatchRows || c.batch.size() >= streamV2BatchBytes {
+	if c.batch.rows >= streamV2BatchRows || c.batch.size() >= streamV2BatchFileSizeLimit {
 		return c.sendBatch(ctx)
 	}
 	return nil

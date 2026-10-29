@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/klauspost/compress/zstd"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -125,7 +125,6 @@ type streamV2Client struct {
 	user       string
 	account    string
 	role       string
-	zstd       *zstd.Encoder
 
 	// ingestMu guards ingestURL, the ingest host's URL, which is discovered on
 	// first use.
@@ -178,10 +177,6 @@ func newStreamV2Client(cfg *config, accountURL, account string) (*streamV2Client
 	if err != nil {
 		return nil, err
 	}
-	enc, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedFastest), zstd.WithWindowSize(4<<20))
-	if err != nil {
-		return nil, err
-	}
 	// Every channel appends to the one ingest host, so the default of two idle
 	// connections per host would reconnect for most appends.
 	var transport = http.DefaultTransport.(*http.Transport).Clone()
@@ -193,7 +188,6 @@ func newStreamV2Client(cfg *config, accountURL, account string) (*streamV2Client
 		user:        cfg.Credentials.User,
 		account:     account,
 		role:        cfg.Role,
-		zstd:        enc,
 		channels:    make(map[string]*streamV2OpenChannel),
 		pipes:       make(map[string]*streamV2PipeInfo),
 		newUploader: newStreamV2Uploader,
@@ -294,7 +288,7 @@ func (c *streamV2Client) exchangeToken(ctx context.Context, ingestURL string) (*
 	headers.Set("Content-Type", "application/x-www-form-urlencoded")
 	ctx, cancel := context.WithTimeout(ctx, streamV2TokenExchangeTimeout)
 	defer cancel()
-	res, err := c.send(ctx, http.MethodPost, c.accountURL+"/oauth/token", []byte(form.Encode()), headers)
+	res, err := c.send(ctx, http.MethodPost, c.accountURL+"/oauth/token", strings.NewReader(form.Encode()), headers)
 	if err != nil {
 		err = fmt.Errorf("exchanging the JWT for a scoped token: %w", err)
 		var apiErr *streamV2APIError
@@ -330,7 +324,7 @@ func streamV2Scope(role, ingestHost string) string {
 // call sends one authenticated request to the ingest host and decodes its JSON
 // response into result, if result is not nil. A scoped token can be revoked
 // before it expires, so a 401 is retried once with a fresh token.
-func (c *streamV2Client) call(ctx context.Context, method, path string, query url.Values, body []byte, headers http.Header, result any) error {
+func (c *streamV2Client) call(ctx context.Context, method, path string, query url.Values, body streamV2Body, headers http.Header, result any) error {
 	if headers == nil {
 		headers = http.Header{}
 	}
@@ -368,14 +362,29 @@ func (c *streamV2Client) call(ctx context.Context, method, path string, query ur
 	return nil
 }
 
+// streamV2Body is a request body, which each attempt of the request reads in full.
+type streamV2Body interface {
+	io.ReaderAt
+	Size() int64
+}
+
 // send performs one HTTP request, retrying transport errors and the responses
 // streamV2Retryable allows with exponential backoff, and returns the response body.
-func (c *streamV2Client) send(ctx context.Context, method, u string, body []byte, headers http.Header) ([]byte, error) {
+func (c *streamV2Client) send(ctx context.Context, method, u string, body streamV2Body, headers http.Header) ([]byte, error) {
 	var delay = time.Second
 	for attempt := 1; ; attempt++ {
-		var req, err = http.NewRequestWithContext(ctx, method, u, bytes.NewReader(body))
+		var req, err = http.NewRequestWithContext(ctx, method, u, nil)
 		if err != nil {
 			return nil, err
+		}
+		if body != nil && body.Size() != 0 {
+			// Each attempt reads the body through its own reader, because the
+			// transport may still be reading an earlier attempt's after it returns.
+			req.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(io.NewSectionReader(body, 0, body.Size())), nil
+			}
+			req.Body, _ = req.GetBody()
+			req.ContentLength = body.Size()
 		}
 		for k, v := range headers {
 			req.Header[k] = v
@@ -454,7 +463,7 @@ func (c *streamV2Client) OpenChannel(ctx context.Context, database, schema, tabl
 		Continuation string                      `json:"next_continuation_token"`
 		Status       streamV2ChannelStatusResult `json:"channel_status"`
 	}
-	if err := c.call(ctx, http.MethodPut, pipePath+"/channels/"+url.PathEscape(channelName), nil, []byte("{}"), nil, &res); err != nil {
+	if err := c.call(ctx, http.MethodPut, pipePath+"/channels/"+url.PathEscape(channelName), nil, strings.NewReader("{}"), nil, &res); err != nil {
 		return nil, err
 	}
 	if err := res.Status.checkCode(channelName); err != nil {
@@ -476,9 +485,9 @@ func (c *streamV2Client) channel(channelName string) (*streamV2OpenChannel, erro
 	return nil, fmt.Errorf("channel %q is not open", channelName)
 }
 
-// AppendRows sends one batch of NDJSON rows to the channel. startToken and endToken
-// are the offset tokens of the batch's first and last rows. A batch whose
-// compressed body exceeds streamV2MaxAppendBytes is appended through the pipe's
+// AppendRows sends the rows of a finished batch's file to the channel. startToken and
+// endToken are the offset tokens of the batch's first and last rows. A batch whose
+// compressed file exceeds streamV2MaxAppendBytes is appended through the pipe's
 // stage instead.
 //
 // A retry after an ambiguous failure resends the same continuation token and
@@ -486,13 +495,25 @@ func (c *streamV2Client) channel(channelName string) (*streamV2OpenChannel, erro
 // and buffers once. The same token with different rows is rejected.
 //
 // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api#append-rows-to-a-named-channel
-func (c *streamV2Client) AppendRows(ctx context.Context, channelName, startToken, endToken string, rows []byte) error {
+func (c *streamV2Client) AppendRows(ctx context.Context, channelName, startToken, endToken string, batch streamV2BatchFile) error {
 	var ch, err = c.channel(channelName)
 	if err != nil {
 		return err
 	}
 	ch.mu.Lock()
 	defer ch.mu.Unlock()
+
+	// The file is opened for writing too, because an append through the stage
+	// encrypts it in place.
+	file, err := os.OpenFile(batch.path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if batch.compressedBytes > streamV2MaxAppendBytes {
+		return c.appendFile(ctx, ch, channelName, startToken, endToken, batch, file)
+	}
 
 	var query = url.Values{
 		"continuationToken": {ch.continuation},
@@ -502,16 +523,13 @@ func (c *streamV2Client) AppendRows(ctx context.Context, channelName, startToken
 	}
 	var headers = http.Header{
 		"Content-Type":     {"application/x-ndjson"},
-		"Content-Encoding": {"zstd"},
+		"Content-Encoding": {"gzip"},
 	}
 	var res struct {
 		Continuation string `json:"next_continuation_token"`
 	}
-	var compressed = c.zstd.EncodeAll(rows, make([]byte, 0, len(rows)/4))
-	if len(compressed) > streamV2MaxAppendBytes {
-		return c.appendFile(ctx, ch, channelName, startToken, endToken, rows, compressed)
-	}
-	if err := c.call(ctx, http.MethodPost, "data/"+ch.pipePath+"/channels/"+url.PathEscape(channelName)+"/rows", query, compressed, headers, &res); err != nil {
+	var body = io.NewSectionReader(file, 0, int64(batch.compressedBytes))
+	if err := c.call(ctx, http.MethodPost, "data/"+ch.pipePath+"/channels/"+url.PathEscape(channelName)+"/rows", query, body, headers, &res); err != nil {
 		return err
 	}
 	ch.continuation = res.Continuation
@@ -547,7 +565,7 @@ func (c *streamV2Client) channelStatuses(ctx context.Context, channelNames []str
 	var res struct {
 		Statuses map[string]*streamV2ChannelStatusResult `json:"channel_statuses"`
 	}
-	if err := c.call(ctx, http.MethodPost, pipePath+":bulk-channel-status", nil, body, nil, &res); err != nil {
+	if err := c.call(ctx, http.MethodPost, pipePath+":bulk-channel-status", nil, bytes.NewReader(body), nil, &res); err != nil {
 		return nil, err
 	}
 	for _, name := range channelNames {

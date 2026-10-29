@@ -211,7 +211,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 
 	// A dropped channel is out of service, so appending to it fails rather than
 	// quietly reviving it.
-	require.ErrorContains(t, client.AppendRows(ctx, channel, "1", "1", []byte("{}\n")), "is not open")
+	require.ErrorContains(t, client.AppendRows(ctx, channel, "1", "1", streamV2BatchFile{}), "is not open")
 
 	status, err := client.OpenChannel(ctx, "DB", "SCH", "TBL", channel)
 	require.NoError(t, err)

@@ -222,7 +222,8 @@ type streamV2Binding struct {
 	schema   string
 	table    string
 	stateKey string
-	encoder  *streamV2RowEncoder
+	// columns names the columns of the table that a row's values are written to.
+	columns []string
 
 	// priorCheckpoint is the streaming v2 state that the driver checkpoint recorded for this
 	// binding. The map key is the channel's key range, and the map covers every shard
@@ -358,7 +359,7 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 		schema:          schema,
 		table:           table,
 		stateKey:        target.StateKey,
-		encoder:         newStreamV2RowEncoder(names),
+		columns:         names,
 		priorCheckpoint: maps.Clone(prior),
 	}
 }
@@ -559,8 +560,8 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 
 // writeRow writes one converted document to the channel its key hash routes to.
 // A document of a different binding than the one before it first sends the
-// batches of that earlier binding, so that a binding's batches do not keep
-// holding bytes once it stops receiving documents.
+// batches of that earlier binding, so that a binding's batch files and their
+// compressors are closed once it stops receiving documents.
 func (m *streamV2Manager) writeRow(ctx context.Context, binding int, packedKey []byte, converted []any) error {
 	if m.lastBinding != -1 && binding != m.lastBinding {
 		for _, c := range m.bindings[m.lastBinding].activeChannels {

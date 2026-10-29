@@ -3,7 +3,10 @@ package connector
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
@@ -25,7 +28,6 @@ import (
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	"github.com/estuary/connectors/go/blob"
-	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 )
 
@@ -90,11 +92,14 @@ type fakeSnowpipeState struct {
 	Errors    map[string]int64  `json:"errors"`
 }
 
-var fakeSnowpipeDecoder, _ = zstd.NewReader(nil)
-
-// fakeSnowpipeLargestAppend is the largest uncompressed append body any fake has
-// received, so a test can check the batch cap.
-var fakeSnowpipeLargestAppend atomic.Int64
+// fakeSnowpipeGunzip decompresses a gzip append body or staged file.
+func fakeSnowpipeGunzip(compressed []byte) ([]byte, error) {
+	var r, err = gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(r)
+}
 
 // fakeTestKey is a private key for the fake, which accepts any token.
 var fakeTestKey = sync.OnceValue(func() string {
@@ -257,11 +262,10 @@ func (f *fakeSnowpipe) append(w http.ResponseWriter, r *http.Request) {
 	var query = r.URL.Query()
 	var body, err = io.ReadAll(r.Body)
 	require.NoError(f.t, err)
-	if r.Header.Get("Content-Encoding") == "zstd" {
-		body, err = fakeSnowpipeDecoder.DecodeAll(body, nil)
+	if r.Header.Get("Content-Encoding") == "gzip" {
+		body, err = fakeSnowpipeGunzip(body)
 		require.NoError(f.t, err)
 	}
-	fakeSnowpipeLargestAppend.Store(max(fakeSnowpipeLargestAppend.Load(), int64(len(body))))
 	f.ingest(w, channel, query.Get("continuationToken"), query.Get("startOffsetToken"), query.Get("endOffsetToken"), body)
 }
 
@@ -325,11 +329,14 @@ func (f *fakeSnowpipe) appendFile(w http.ResponseWriter, r *http.Request) {
 	require.NoError(f.t, err)
 	iv, err := base64.StdEncoding.DecodeString(fragment.IVBase64)
 	require.NoError(f.t, err)
-	body = bytes.Clone(body)
-	require.NoError(f.t, streamV2CryptFile(key, iv, body))
+	block, err := aes.NewCipher(key)
+	require.NoError(f.t, err)
+	var plain = make([]byte, len(body))
+	cipher.NewCTR(block, iv).XORKeyStream(plain, body)
+	body = plain
 
 	// Snowflake detects the compression from the file's contents.
-	if decoded, err := fakeSnowpipeDecoder.DecodeAll(body, nil); err == nil {
+	if decoded, err := fakeSnowpipeGunzip(body); err == nil {
 		body = decoded
 	}
 	require.Equal(f.t, fragment.FragmentRowCount, bytes.Count(body, []byte{'\n'}))
