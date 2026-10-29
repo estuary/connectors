@@ -1,5 +1,10 @@
 # source-sqlserver
 
+## 2026-10-29
+
+### Changed
+- Starting a capture now checks whether CDC is enabled on the database once instead of twice.
+
 ## 2026-10-28
 
 ### Added
