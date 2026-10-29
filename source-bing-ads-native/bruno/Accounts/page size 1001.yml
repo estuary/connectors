@@ -1,0 +1,68 @@
+info:
+  name: page size 1001
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{customer_management_url}}/Accounts/Search"
+  body:
+    type: json
+    data: |-
+      {
+        "Predicates": [{"Field": "UserId", "Operator": "Equals", "Value": "{{user_id}}"}],
+        "Ordering": [{"Field": "Id", "Order": "Ascending"}],
+        "PageInfo": {"Index": 0, "Size": 1001}
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `Customer Management / user query` sets user_id; fall back to the
+        // sandbox user's id when this runs on its own.
+        if (!bru.getVar('user_id')) bru.setVar('user_id', '202544887');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/customer-management-service/paging?view=bingads-13
+
+  **WHY:** the docs say "The maximum size for SearchAccounts is 1,000", and
+  the connector pages at exactly 1,000 (`ACCOUNTS_PAGE_SIZE`). One past the
+  maximum shows how the limit is enforced: rejected, or silently clamped.
+
+  **LIMITATION (VERIFIED 2026-10-29):** `Size: 1001` is rejected with `400`
+  `ApiFault` code 3032 "Paging info is invalid.", so the maximum is enforced
+  rather than clamped. The connector must never page above 1,000.
+
+examples:
+  - name: 400 - size 1001 rejected (3032)
+    request:
+      url: "{{customer_management_url}}/Accounts/Search"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "OperationErrors": [
+              {
+                "Code": 3032,
+                "Details": "",
+                "Message": "Paging info is invalid."
+              }
+            ],
+            "TrackingId": "c6511933-8f6e-4908-a988-73a79b958ba1",
+            "Type": "ApiFault"
+          }
