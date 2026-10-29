@@ -1012,6 +1012,9 @@ func TestStreamV2Datatypes(t *testing.T) {
 	for binding, tt := range []struct {
 		ddl  string
 		vals []any
+		// detail is a SQL expression of VAL, also snapshotted per row, for what
+		// the table dump does not show.
+		detail string
 	}{
 		{
 			ddl: "INTEGER",
@@ -1054,7 +1057,18 @@ func TestStreamV2Datatypes(t *testing.T) {
 				json.RawMessage(`[1,2,3]`),
 				json.RawMessage(`{"some":"doc"}`),
 				json.RawMessage(`{"nested":{"deep":["a",1,null,{"b":true},[]]},"unicode":"你好 🌟"}`),
+				// Numbers past what int64, uint64, NUMBER(38,0) and float64 hold,
+				// and a negative zero, which Snowflake stores in its own way.
+				json.RawMessage(`18446744073709551616`),
+				json.RawMessage(`-9223372036854775809`),
+				json.RawMessage(`99999999999999999999999999999999999999`),
+				json.RawMessage(`999999999999999999999999999999999999999`),
+				json.RawMessage(`12345678901234567890.123456789012345678`),
+				json.RawMessage(`1e400`),
+				json.RawMessage(`[1e-320,-0,-0.0]`),
+				json.RawMessage(`{"n":123456789012345678901234567890,"e":1.5e300,"s":"a\u0000b\u2028c"}`),
 			},
+			detail: "TO_JSON(VAL) || ' | ' || TYPEOF(VAL)",
 		},
 		{
 			ddl:  "BOOLEAN",
@@ -1065,7 +1079,10 @@ func TestStreamV2Datatypes(t *testing.T) {
 			// "NaN", "inf" and "-inf" are the sentinels this dialect substitutes
 			// for the special values of a `format: number` string, which have no
 			// JSON representation of their own.
-			vals: []any{int64(1234), nil, 1234.0, 4321.1234, math.MaxFloat64, math.SmallestNonzeroFloat64, "NaN", "inf", "-inf"},
+			vals: []any{int64(1234), nil, 1234.0, 4321.1234, math.MaxFloat64, math.SmallestNonzeroFloat64, "NaN", "inf", "-inf", math.Copysign(0, -1)},
+			// ATAN2(VAL, -1) tells the zeros apart: it is pi for zero and -pi for
+			// negative zero.
+			detail: "TO_VARCHAR(VAL) || ' | ' || TO_VARCHAR(ATAN2(VAL, -1))",
 		},
 		{
 			ddl:  "DATE",
@@ -1078,6 +1095,8 @@ func TestStreamV2Datatypes(t *testing.T) {
 		{
 			ddl:  "TIMESTAMP_TZ",
 			vals: timestamps,
+			// The table dump renders the instant in UTC, so this shows the offset.
+			detail: "TO_VARCHAR(VAL, 'YYYY-MM-DD HH24:MI:SS.FF9 TZH:TZM')",
 		},
 		{
 			ddl:  "TIMESTAMP_NTZ",
@@ -1119,6 +1138,20 @@ func TestStreamV2Datatypes(t *testing.T) {
 
 			dump, err := sql.StdDumpTable(ctx, db, tbl)
 			require.NoError(t, err)
+			if tt.detail != "" {
+				rows, err := db.QueryContext(ctx, fmt.Sprintf("SELECT KEY, %s FROM %s ORDER BY KEY", tt.detail, tbl.Identifier))
+				require.NoError(t, err)
+				defer rows.Close()
+				var detail strings.Builder
+				for rows.Next() {
+					var key int
+					var val stdsql.NullString
+					require.NoError(t, rows.Scan(&key, &val))
+					fmt.Fprintf(&detail, "%d, %s\n", key, val.String)
+				}
+				require.NoError(t, rows.Err())
+				dump += "\n\n" + tt.detail + "\n" + detail.String()
+			}
 			cupaloy.SnapshotT(t, dump)
 		})
 	}
