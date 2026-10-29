@@ -1,7 +1,9 @@
 package writer
 
 import (
+	"bytes"
 	"compress/flate"
+	stdjson "encoding/json"
 	"fmt"
 	"io"
 
@@ -25,8 +27,9 @@ const (
 )
 
 type jsonConfig struct {
-	disableCompression bool
-	skipNulls          bool
+	disableCompression   bool
+	skipNulls            bool
+	compactRawLineBreaks bool
 }
 
 type JsonOption func(*jsonConfig)
@@ -43,6 +46,15 @@ func WithJsonSkipNulls() JsonOption {
 	}
 }
 
+// WithJsonCompactRawLineBreaks compacts a pre-serialized JSON value that contains a
+// line break, so that every row is written on a single line. A value without one is
+// written as given, and an empty value is an error.
+func WithJsonCompactRawLineBreaks() JsonOption {
+	return func(cfg *jsonConfig) {
+		cfg.compactRawLineBreaks = true
+	}
+}
+
 type JsonWriter struct {
 	w            io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
 	cwc          *countingWriteCloser
@@ -50,6 +62,10 @@ type JsonWriter struct {
 	shape        *encrow.Shape
 	buf          []byte
 	uncompressed int
+
+	// fields names the values of a row, for errors about a single value.
+	fields               []string
+	compactRawLineBreaks bool
 }
 
 // NewJsonWriter creates a JsonWriter from w. w is closed when JsonWriter is closed. If `fields`
@@ -61,7 +77,9 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 	}
 
 	jw := &JsonWriter{
-		cwc: &countingWriteCloser{w: w},
+		cwc:                  &countingWriteCloser{w: w},
+		fields:               fields,
+		compactRawLineBreaks: cfg.compactRawLineBreaks,
 	}
 
 	if !cfg.disableCompression {
@@ -92,6 +110,12 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 }
 
 func (w *JsonWriter) Write(vals []any) (err error) {
+	if w.compactRawLineBreaks {
+		if vals, err = w.compactLineBreaks(vals); err != nil {
+			return err
+		}
+	}
+
 	w.buf = w.buf[:0]
 	if w.shape == nil {
 		// Serialize as a JSON array of values.
@@ -120,6 +144,39 @@ func (w *JsonWriter) Write(vals []any) (err error) {
 	w.uncompressed += len(w.buf)
 
 	return nil
+}
+
+// compactLineBreaks returns vals with each pre-serialized JSON value that contains a
+// line break replaced by its compacted form. vals itself is left unchanged.
+func (w *JsonWriter) compactLineBreaks(vals []any) ([]any, error) {
+	var out, copied = vals, false
+	for i, v := range vals {
+		raw, ok := v.(stdjson.RawMessage)
+		if !ok || raw == nil {
+			continue
+		} else if len(raw) == 0 {
+			return nil, fmt.Errorf("field %q: empty pre-serialized JSON value", w.fieldName(i))
+		} else if bytes.IndexByte(raw, '\n') < 0 && bytes.IndexByte(raw, '\r') < 0 {
+			continue
+		}
+
+		var compacted bytes.Buffer
+		if err := stdjson.Compact(&compacted, raw); err != nil {
+			return nil, fmt.Errorf("field %q: %w", w.fieldName(i), err)
+		}
+		if !copied {
+			out, copied = append([]any(nil), vals...), true
+		}
+		out[i] = stdjson.RawMessage(compacted.Bytes())
+	}
+	return out, nil
+}
+
+func (w *JsonWriter) fieldName(i int) string {
+	if i < len(w.fields) {
+		return w.fields[i]
+	}
+	return fmt.Sprintf("%d", i)
 }
 
 // Written returns the number of bytes written to the underlying writer, after compression.

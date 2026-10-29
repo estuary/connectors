@@ -141,6 +141,38 @@ func TestJsonWriterWrittenUncompressed(t *testing.T) {
 	require.Equal(t, plain.Len(), pw.WrittenUncompressed())
 }
 
+func TestJsonWriterCompactRawLineBreaks(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		input   any
+		want    string
+		wantErr string
+	}{
+		{name: "line breaks are compacted", input: json.RawMessage("{\"a\": 1,\n\"b\": \"x\\ny\"\r\n}"), want: `{"doc":{"a":1,"b":"x\ny"}}`},
+		{name: "a value without one is written as given", input: json.RawMessage(`{"a": 1,  "b": [ 2 ]}`), want: `{"doc":{"a": 1,  "b": [ 2 ]}}`},
+		{name: "a nil value is null", input: json.RawMessage(nil), want: `{"doc":null}`},
+		{name: "an empty value is an error", input: json.RawMessage{}, wantErr: `field "doc": empty pre-serialized JSON value`},
+		{name: "an invalid value with a line break is an error", input: json.RawMessage("{\n"), wantErr: `field "doc": unexpected end of JSON input`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			var w = NewJsonWriter(&testWriter{w: &buf}, []string{"doc"}, WithJsonDisableCompression(), WithJsonCompactRawLineBreaks())
+			var row = []any{tt.input}
+
+			var err = w.Write(row)
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				require.Zero(t, buf.Len())
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want+"\n", buf.String())
+			// The caller's row is left as it was.
+			require.Equal(t, tt.input, row[0])
+		})
+	}
+}
+
 type testWriter struct {
 	w      io.Writer
 	closed bool
