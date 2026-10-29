@@ -35,39 +35,35 @@ async def _get_or_create_analytics_report_request(
             access_type,
         )
     except HTTPError as e:
-        if e.code == 409:
-            log.warning(
-                "Report request was created after first run. This is likely due to concurrent requests. "
-                "Waiting for 60 seconds before trying to fetch the newly created report request.",
-                e,
-            )
+        if e.code != 409:
+            raise
 
-            await asyncio.sleep(60)
+        log.warning(
+            "Report request was created after first run. This is likely due to concurrent requests. "
+            "Waiting for 60 seconds before trying to fetch the newly created report request.",
+        )
 
-            report_requests = await client.list_analytics_report_requests(
-                app_id,
-                access_type,
-            )
+        await asyncio.sleep(60)
 
-            for report_req in report_requests:
-                if report_req.attributes.stoppedDueToInactivity:
-                    log.warning(
-                        f"Found report request with id {report_req.id}, but the report is inactive due to inactivity."
-                    )
-                    continue
-                else:
-                    report_request_id = report_req.id
-                    break
+        report_requests = await client.list_analytics_report_requests(
+            app_id,
+            access_type,
+        )
 
-            if not report_request_id:
-                raise RuntimeError(
-                    f"Failed to discover or create report request for {app_id}"
-                ) from e
-    finally:
+        for report_req in report_requests:
+            if report_req.attributes.stoppedDueToInactivity:
+                log.warning(
+                    f"Found report request with id {report_req.id}, but the report is inactive due to inactivity."
+                )
+                continue
+            else:
+                report_request_id = report_req.id
+                break
+
         if not report_request_id:
-            # This should never happen, but if it does, we'll raise a RuntimeError.
-            # The try/except block above would raise an exception before this point.
-            raise RuntimeError("Report request ID is missing")
+            raise RuntimeError(
+                f"Failed to discover or create report request for {app_id}"
+            ) from e
 
     return report_request_id
 
