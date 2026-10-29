@@ -16,6 +16,7 @@ from .models import (
     AnalyticsReportAccessType,
     AnalyticsReportGranularity,
     AnalyticsReportInstance,
+    AnalyticsReportRequest,
     AppleAnalyticsRow,
     AppReview,
 )
@@ -73,6 +74,58 @@ async def _get_or_create_analytics_report_request(
         raise RuntimeError(
             f"Failed to discover or create report request for {app_id}"
         ) from e
+
+
+async def _list_active_report_requests(
+    client: AppleAppStoreClient,
+    app_id: str,
+    access_type: AnalyticsReportAccessType,
+) -> list[AnalyticsReportRequest]:
+    report_requests = await client.list_analytics_report_requests(
+        app_id,
+        access_type,
+    )
+
+    return [
+        report_request
+        for report_request in report_requests
+        if report_request.attributes.accessType == access_type
+        and not report_request.attributes.stoppedDueToInactivity
+    ]
+
+
+async def _try_create_report_request(
+    log: Logger,
+    client: AppleAppStoreClient,
+    app_id: str,
+    access_type: AnalyticsReportAccessType,
+) -> bool:
+    """
+    Asks Apple to start producing reports of `access_type` for the app.
+    Returns False when Apple refuses with a 409.
+    """
+
+    try:
+        report_request = await client.create_analytics_report_request(
+            app_id,
+            access_type,
+        )
+    except HTTPError as e:
+        # Apple returns 409 when it won't create another request of this type,
+        # for example because the app already has one or, for snapshots,
+        # because one was made in the past month.
+        if e.code != 409:
+            raise
+        return False
+
+    log.info(
+        f"Created {access_type} report request {report_request.id} for app {app_id}",
+        {
+            "app_id": app_id,
+            "report_request_id": report_request.id,
+        },
+    )
+    return True
 
 
 async def _select_valid_report_instances(
@@ -178,26 +231,55 @@ async def fetch_incremental_analytics(
 
     last_processed_date = log_cursor.date()
 
-    report_request_id = await _get_or_create_analytics_report_request(
-        log,
+    report_requests = await _list_active_report_requests(
         client,
         app_id,
         AnalyticsReportAccessType.ONGOING,
     )
 
+    if not report_requests:
+        created = await _try_create_report_request(
+            log,
+            client,
+            app_id,
+            AnalyticsReportAccessType.ONGOING,
+        )
+        if not created:
+            log.warning(
+                f"Apple refused to create an ONGOING report request for app {app_id}, and none is listed as active. "
+                "This is expected right after another binding creates one. "
+                "If it persists, the app's existing ONGOING requests may have been stopped.",
+                {
+                    "app_id": app_id,
+                    "report_name": model.report_name,
+                },
+            )
+
+        # Apple publishes a new request's first instance a day or more after
+        # it's created, so there is nothing to read yet.
+        return
+
     now = datetime.now(tz=UTC)
     current_lag = now.date() - last_processed_date
     start_date = last_processed_date + timedelta(days=1)
 
-    report_instances = await _select_valid_report_instances(
-        log,
-        client,
-        model,
-        report_request_id,
-        AnalyticsReportGranularity.DAILY,
-        start_date,
-    )
+    # An app can have several ONGOING requests, and only some of them may
+    # have instances, so collect instances from all of them.
+    report_instances: list[AnalyticsReportInstance] = []
+    for report_request in report_requests:
+        report_instances.extend(
+            await _select_valid_report_instances(
+                log,
+                client,
+                model,
+                report_request.id,
+                AnalyticsReportGranularity.DAILY,
+                start_date,
+            )
+        )
 
+    # min keeps the first of equal dates, so a tie goes to the request Apple
+    # lists first.
     report_instance = min(
         report_instances,
         key=lambda x: x.attributes.processingDate,
@@ -213,6 +295,9 @@ async def fetch_incremental_analytics(
                 "report_name": model.report_name,
                 "completeness_lag": model.completeness_lag,
                 "current_lag": current_lag,
+                "report_request_ids": [
+                    report_request.id for report_request in report_requests
+                ],
             },
         )
 
