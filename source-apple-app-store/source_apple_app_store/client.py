@@ -1,4 +1,3 @@
-from datetime import date
 from logging import Logger
 from typing import (
     Any,
@@ -162,20 +161,6 @@ class AppleAppStoreClient:
             url, AnalyticsReportRequest, params
         )
 
-    async def get_analytics_report_request_details(
-        self, request_id: str
-    ) -> AnalyticsReportRequest:
-        url = f"{API_BASE}/analyticsReportRequests/{request_id}"
-
-        response = ApiResponse[AnalyticsReportRequest].model_validate_json(
-            await self.http.request(
-                self.log,
-                url,
-            )
-        )
-
-        return response.data
-
     async def list_analytics_reports(
         self,
         request_id: str,
@@ -208,7 +193,6 @@ class AppleAppStoreClient:
         self,
         report_id: str,
         granularity: AnalyticsReportGranularity,
-        processing_date: Optional[date] = None,
         limit: int = MAX_PAGE_SIZE,
     ) -> List[AnalyticsReportInstance]:
         assert limit > 0 and limit <= MAX_PAGE_SIZE, (
@@ -221,8 +205,6 @@ class AppleAppStoreClient:
             "limit": limit,
         }
 
-        if processing_date:
-            params["filter[processingDate]"] = processing_date.isoformat()
         if granularity:
             params["filter[granularity]"] = granularity.value
 
@@ -244,21 +226,6 @@ class AppleAppStoreClient:
         return await self._paginated_request(
             url, AnalyticsReportSegment, params
         )
-
-    async def get_analytics_report_segment_details(
-        self,
-        segment_id: str,
-    ) -> AnalyticsReportSegment:
-        url = f"{API_BASE}/analyticsReportSegments/{segment_id}"
-
-        response = ApiResponse[AnalyticsReportSegment].model_validate_json(
-            await self.http.request(
-                self.log,
-                url,
-            )
-        )
-
-        return response.data
 
     async def get_or_create_report_request(
         self,

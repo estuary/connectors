@@ -79,7 +79,6 @@ async def _select_valid_report_instances(
     report_request_id: str,
     granularity: AnalyticsReportGranularity,
     start_date: date | None = None,
-    end_date: date | None = None,
 ) -> list[AnalyticsReportInstance]:
     analytics_reports = await client.list_analytics_reports(report_request_id)
 
@@ -105,8 +104,6 @@ async def _select_valid_report_instances(
 
         processing_date = instance.attributes.processingDate
         if start_date and processing_date < start_date:
-            continue
-        if end_date and processing_date > end_date:
             continue
 
         valid_instances.append(instance)
