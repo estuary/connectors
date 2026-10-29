@@ -14,6 +14,14 @@ http:
       }
   auth: inherit
 
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the user id into `Accounts / bare`. Not a credential.
+        const id = res.getBody()?.User?.Id;
+        if (id) bru.setVar('user_id', String(id));
+
 settings:
   encodeUrl: true
   timeout: 0

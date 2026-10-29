@@ -117,6 +117,11 @@ docs:
       `clientcenter.api.sandbox.bingads.microsoft.com` (`_host` in `api.py`).
     - **Rate limits:** not yet surveyed.
 
+    - **Fault shapes:** auth failures come back as `{"Errors": [...], "Type":
+      "AdApiFaultDetail"}`, request faults as `{"OperationErrors": [...],
+      "Type": "ApiFault"}` (VERIFIED 2026-10-29). `errors.py` reads both.
+
     ## LIMITATION index
 
-    None yet.
+    - `Accounts / page size 1001`: `Accounts/Search` pages max out at 1,000;
+      1,001 is rejected with code 3032.
