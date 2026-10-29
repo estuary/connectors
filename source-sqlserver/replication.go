@@ -151,17 +151,7 @@ type tableReplicationInfo struct {
 }
 
 func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
-	var (
-		dbName     string
-		cdcEnabled bool
-	)
-	const query = `SELECT name, is_cdc_enabled FROM sys.databases WHERE name = db_name()`
-	if err := rs.conn.QueryRowContext(ctx, query).Scan(&dbName, &cdcEnabled); err != nil {
-		return fmt.Errorf("error querying cdc state: %w", err)
-	}
-	if !cdcEnabled {
-		return fmt.Errorf("CDC is not enabled on database %q", dbName)
-	}
+	// SetupPrerequisites already verified that CDC is enabled, so it isn't checked again here.
 
 	// Check replica status. Some operations work differently on replicas.
 	isReplica, err := isReplicaDatabase(ctx, rs.conn)
