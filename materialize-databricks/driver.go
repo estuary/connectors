@@ -331,6 +331,7 @@ func newTransactor(
 		be:                    be,
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
+		materializationName:   materializationName,
 		stagingPrefix:         stagingPrefix(materializationName),
 	}
 	db, err := d.openDB()

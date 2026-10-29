@@ -27,49 +27,52 @@ async def _get_or_create_analytics_report_request(
     app_id: str,
     access_type: AnalyticsReportAccessType,
 ) -> str:
-    report_request_id = None
-
     try:
-        report_request_id = await client.get_or_create_report_request(
+        created_report_request = await client.create_analytics_report_request(
             app_id,
             access_type,
         )
+        log.debug(f"Created report request {created_report_request.id} for app {app_id}")
+        return created_report_request.id
     except HTTPError as e:
-        if e.code == 409:
-            log.warning(
-                "Report request was created after first run. This is likely due to concurrent requests. "
-                "Waiting for 60 seconds before trying to fetch the newly created report request.",
-                e,
-            )
+        # Apple returns 409 when it won't create another request of this type,
+        # for example because the app already has one.
+        if e.code != 409:
+            raise
 
-            await asyncio.sleep(60)
+        report_requests = await client.list_analytics_report_requests(
+            app_id,
+            access_type,
+        )
+        for request in report_requests:
+            log.debug(f"Checking request {request.id} for app {app_id}")
+            # assuming there is only one request
+            return request.id
 
-            report_requests = await client.list_analytics_report_requests(
-                app_id,
-                access_type,
-            )
+        log.warning(
+            "Report request was created after first run. This is likely due to concurrent requests. "
+            "Waiting for 60 seconds before trying to fetch the newly created report request.",
+        )
 
-            for report_req in report_requests:
-                if report_req.attributes.stoppedDueToInactivity:
-                    log.warning(
-                        f"Found report request with id {report_req.id}, but the report is inactive due to inactivity."
-                    )
-                    continue
-                else:
-                    report_request_id = report_req.id
-                    break
+        await asyncio.sleep(60)
 
-            if not report_request_id:
-                raise RuntimeError(
-                    f"Failed to discover or create report request for {app_id}"
-                ) from e
-    finally:
-        if not report_request_id:
-            # This should never happen, but if it does, we'll raise a RuntimeError.
-            # The try/except block above would raise an exception before this point.
-            raise RuntimeError("Report request ID is missing")
+        report_requests = await client.list_analytics_report_requests(
+            app_id,
+            access_type,
+        )
 
-    return report_request_id
+        for report_req in report_requests:
+            if report_req.attributes.stoppedDueToInactivity:
+                log.warning(
+                    f"Found report request with id {report_req.id}, but the report is inactive due to inactivity."
+                )
+                continue
+            else:
+                return report_req.id
+
+        raise RuntimeError(
+            f"Failed to discover or create report request for {app_id}"
+        ) from e
 
 
 async def _select_valid_report_instances(
@@ -79,14 +82,12 @@ async def _select_valid_report_instances(
     report_request_id: str,
     granularity: AnalyticsReportGranularity,
     start_date: date | None = None,
-    end_date: date | None = None,
 ) -> list[AnalyticsReportInstance]:
     analytics_reports = await client.list_analytics_reports(report_request_id)
 
     target_report = None
     for report in analytics_reports:
-        report_details = await client.get_analytics_report_details(report.id)
-        if report_details.attributes.name == model.report_name:
+        if report.attributes.name == model.report_name:
             target_report = report
             break
 
@@ -105,8 +106,6 @@ async def _select_valid_report_instances(
 
         processing_date = instance.attributes.processingDate
         if start_date and processing_date < start_date:
-            continue
-        if end_date and processing_date > end_date:
             continue
 
         valid_instances.append(instance)
