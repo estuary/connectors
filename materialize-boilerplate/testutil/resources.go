@@ -298,8 +298,7 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 		}
 
 		if err := sopsCmd.Wait(); err != nil {
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
+			if _, ok := errors.AsType[*exec.ExitError](err); ok {
 				return nil, fmt.Errorf("decrypting %s with sops: %s", path, strings.TrimSpace(sopsStderr.String()))
 			}
 			return nil, fmt.Errorf("decrypting %s with sops (is it installed?): %w", path, err)
