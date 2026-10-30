@@ -97,7 +97,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	started := time.Now()
+	var started = time.Now()
 
 	// The commit of this transaction within the recovery log will permanently
 	// increment the current `round`. On recovery, the next connector will

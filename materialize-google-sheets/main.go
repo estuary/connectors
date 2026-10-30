@@ -60,7 +60,7 @@ func (c config) spreadsheetID() string {
 }
 
 func (c config) buildService(ctx context.Context) (*sheets.Service, error) {
-	creds, err := c.Credentials.GoogleCredentials(ctx, scopes...)
+	var creds, err = c.Credentials.GoogleCredentials(ctx, scopes...)
 	if err != nil {
 		return nil, fmt.Errorf("building sheets service: %w", err)
 	}
@@ -105,8 +105,8 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	es := schemagen.GenerateSchema("Google Sheets Materialization", &config{})
-	endpointSchema, err := es.MarshalJSON()
+	var es = schemagen.GenerateSchema("Google Sheets Materialization", &config{})
+	var endpointSchema, err = es.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -251,7 +251,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bind
 		return nil, nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
 
-	svc, err := cfg.buildService(ctx)
+	var svc, err = cfg.buildService(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
