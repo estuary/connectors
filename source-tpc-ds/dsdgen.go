@@ -49,7 +49,7 @@ func (g *generator) rowCount(ctx context.Context, table string) (int64, error) {
 	var stderr bytes.Buffer
 	var cmd = exec.CommandContext(ctx, g.bin, g.args(table, "-_ROWCOUNT", "Y")...)
 	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	var out, err = cmd.Output()
 	if err != nil {
 		return 0, fmt.Errorf("dsdgen row count for %s: %w: %s", table, err, strings.TrimSpace(stderr.String()))
 	}
@@ -69,12 +69,12 @@ func (g *generator) stream(ctx context.Context, table string, chunks, chunk int,
 	if chunks > 1 {
 		args = append(args, "-PARALLEL", strconv.Itoa(chunks), "-CHILD", strconv.Itoa(chunk))
 	}
-	cctx, cancel := context.WithCancel(ctx)
+	var cctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 	var cmd = exec.CommandContext(cctx, g.bin, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	stdout, err := cmd.StdoutPipe()
+	var stdout, err = cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}

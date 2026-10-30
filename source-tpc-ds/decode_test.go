@@ -29,7 +29,7 @@ func TestDecodeLine(t *testing.T) {
 		{"string escaping", `1|||say "hi" \ there|`, `{"id":1,"label":"say \"hi\" \\ there"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			doc, err := decodeLine(testTable, []byte(tc.line))
+			var doc, err = decodeLine(testTable, []byte(tc.line))
 			require.NoError(t, err)
 			require.Equal(t, tc.want, string(doc))
 		})
@@ -46,7 +46,7 @@ func TestDecodeLineRejects(t *testing.T) {
 		{"bad date", "1||19981231||", "not a YYYY-MM-DD date"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := decodeLine(testTable, []byte(tc.line))
+			var _, err = decodeLine(testTable, []byte(tc.line))
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
@@ -58,7 +58,7 @@ func TestRouteLine(t *testing.T) {
 	require.Len(t, tableByName("store_returns").Columns, 20)
 
 	var line = func(n int) []byte { return []byte(strings.Repeat("1|", n)) }
-	got, err := routeLine(parent, line(23))
+	var got, err = routeLine(parent, line(23))
 	require.NoError(t, err)
 	require.Equal(t, "store_sales", got.Name)
 

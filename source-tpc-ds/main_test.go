@@ -30,7 +30,7 @@ func requireDsdgen(t *testing.T) {
 func allBindings(t *testing.T) []*flow.CaptureSpec_Binding {
 	var out []*flow.CaptureSpec_Binding
 	for _, tbl := range tables {
-		res, err := json.Marshal(resource{Table: tbl.Name})
+		var res, err = json.Marshal(resource{Table: tbl.Name})
 		require.NoError(t, err)
 		out = append(out, &flow.CaptureSpec_Binding{
 			ResourceConfigJson: res,
@@ -43,7 +43,7 @@ func allBindings(t *testing.T) []*flow.CaptureSpec_Binding {
 }
 
 func TestSpec(t *testing.T) {
-	resp, err := (&st.CaptureSpec{Driver: new(driver)}).Spec(context.Background())
+	var resp, err = (&st.CaptureSpec{Driver: new(driver)}).Spec(context.Background())
 	require.NoError(t, err)
 	bs, err := json.MarshalIndent(resp, "", "  ")
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestDiscover(t *testing.T) {
 
 func TestValidate(t *testing.T) {
 	var cs = &st.CaptureSpec{Driver: new(driver), EndpointSpec: &config{Scale: 1}, Bindings: allBindings(t)}
-	validated, err := cs.Validate(context.Background(), t)
+	var validated, err = cs.Validate(context.Background(), t)
 	require.NoError(t, err)
 	require.Len(t, validated, 24)
 
@@ -81,7 +81,7 @@ func TestCapture(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	var validator = &digestValidator{onAllDone: cancel, bindings: 24}
 	var cs = &st.CaptureSpec{
@@ -102,10 +102,10 @@ func TestRestartAfterCompletion(t *testing.T) {
 	for _, tbl := range tables {
 		done.Bindings[boilerplate.StateKey(tbl.Name)] = &bindingState{Scale: "0.01", Chunks: 1, Completed: 1, Done: true}
 	}
-	checkpoint, err := json.Marshal(done)
+	var checkpoint, err = json.Marshal(done)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	var ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	var validator = &digestValidator{bindings: 24}
 	var cs = &st.CaptureSpec{
@@ -124,7 +124,7 @@ func TestScaleChangeFails(t *testing.T) {
 	t.Setenv("TEST_DATABASE", "yes")
 	requireDsdgen(t)
 
-	checkpoint, err := json.Marshal(state{Bindings: map[boilerplate.StateKey]*bindingState{
+	var checkpoint, err = json.Marshal(state{Bindings: map[boilerplate.StateKey]*bindingState{
 		"store_sales": {Scale: "1", Chunks: 1, Completed: 1, Done: true},
 	}})
 	require.NoError(t, err)
@@ -157,7 +157,7 @@ func (v *digestValidator) Output(collection string, data json.RawMessage) {
 	if v.collections == nil {
 		v.collections = map[string]*digestState{}
 	}
-	s, ok := v.collections[collection]
+	var s, ok = v.collections[collection]
 	if !ok {
 		s = &digestState{hash: sha256.New()}
 		v.collections[collection] = s
@@ -224,7 +224,7 @@ func TestChunkedMatchesUnchunked(t *testing.T) {
 	chunkTargetRows = 500
 	t.Cleanup(func() { chunkTargetRows = saved })
 
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	var validator = &digestValidator{onAllDone: cancel, bindings: 24}
 	var cs = &st.CaptureSpec{
@@ -262,7 +262,7 @@ func TestResume(t *testing.T) {
 		Validator:    validator,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	var seen int
 	cs.Capture(ctx, t, func(json.RawMessage) {
 		if seen++; seen == 60_000 {
@@ -292,7 +292,7 @@ func TestResume(t *testing.T) {
 }
 
 func captureSnapshotDigests(t *testing.T) map[string]string {
-	bs, err := os.ReadFile(".snapshots/TestCapture")
+	var bs, err = os.ReadFile(".snapshots/TestCapture")
 	require.NoError(t, err)
 	var d = digestsOf(string(bs))
 	require.Len(t, d, 24)
@@ -319,7 +319,7 @@ func TestReturnsWithoutParent(t *testing.T) {
 			bindings = append(bindings, b)
 		}
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	var validator = &digestValidator{onAllDone: cancel, bindings: 1}
 	var cs = &st.CaptureSpec{

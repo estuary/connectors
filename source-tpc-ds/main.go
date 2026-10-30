@@ -62,7 +62,7 @@ type driver struct{}
 var _ boilerplate.Connector = &driver{}
 
 func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("TPC-DS", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("TPC-DS", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -101,7 +101,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	}
 	var out []*pc.Response_Discovered_Binding
 	for _, t := range tables {
-		resourceJSON, err := json.Marshal(resource{Table: t.Name})
+		var resourceJSON, err = json.Marshal(resource{Table: t.Name})
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +184,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 			state:    bs,
 		})
 	}
-	gen, err := newGenerator(cfg.scaleString())
+	var gen, err = newGenerator(cfg.scaleString())
 	if err != nil {
 		return err
 	}

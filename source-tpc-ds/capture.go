@@ -71,7 +71,7 @@ func (c *capture) run() error {
 	var byParent = map[string]*streamRun{}
 	for _, b := range c.bindings {
 		var parent = streamOf(b.table)
-		s, ok := byParent[parent.Name]
+		var s, ok = byParent[parent.Name]
 		if !ok {
 			s = &streamRun{capture: c, parent: parent}
 			byParent[parent.Name] = s
@@ -80,7 +80,7 @@ func (c *capture) run() error {
 		s.members = append(s.members, b)
 	}
 
-	group, gctx := errgroup.WithContext(ctx)
+	var group, gctx = errgroup.WithContext(ctx)
 	for _, s := range streams {
 		group.Go(func() error { return s.run(gctx) })
 	}
@@ -115,7 +115,7 @@ func (s *streamRun) run(ctx context.Context) error {
 		}
 	}
 	if chunks == 0 {
-		rows, err := s.capture.gen.rowCount(ctx, s.parent.Name)
+		var rows, err = s.capture.gen.rowCount(ctx, s.parent.Name)
 		if err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 				t.docs = nil
 			}
 		}
-		checkpoint, err := s.buildCheckpoint(fn)
+		var checkpoint, err = s.buildCheckpoint(fn)
 		if err != nil {
 			return err
 		}
@@ -197,8 +197,8 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 		return map[string]any{"inFlight": map[string]int64{key: m.state.InFlight[key]}}
 	}
 
-	err := s.capture.gen.stream(ctx, s.parent.Name, chunks, chunk, func(line []byte) error {
-		table, err := routeLine(s.parent, line)
+	var err = s.capture.gen.stream(ctx, s.parent.Name, chunks, chunk, func(line []byte) error {
+		var table, err = routeLine(s.parent, line)
 		if err != nil {
 			return err
 		}
@@ -208,7 +208,7 @@ func (s *streamRun) runChunk(ctx context.Context, chunk, chunks int) error {
 			if t.b.table != table || idx < t.skip {
 				continue
 			}
-			doc, err := decodeLine(table, line)
+			var doc, err = decodeLine(table, line)
 			if err != nil {
 				return err
 			}
@@ -264,7 +264,7 @@ func (s *streamRun) buildCheckpoint(fn func(m *binding) map[string]any) (json.Ra
 }
 
 func (s *streamRun) checkpoint(fn func(m *binding) map[string]any) error {
-	checkpoint, err := s.buildCheckpoint(fn)
+	var checkpoint, err = s.buildCheckpoint(fn)
 	if err != nil {
 		return err
 	}
