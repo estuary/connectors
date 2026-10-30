@@ -10,7 +10,7 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	parserSpec, err := os.ReadFile("tests/parser_spec.json")
+	var parserSpec, err = os.ReadFile("tests/parser_spec.json")
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(configSchema(json.RawMessage(parserSpec)), "", "  ")

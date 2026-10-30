@@ -72,7 +72,7 @@ func (c config) PathRegex() string {
 }
 
 func newOneDriveStore(ctx context.Context, cfg config) (*oneDriveStore, error) {
-	authProvider, err := cfg.
+	var authProvider, err = cfg.
 		Credentials.getAuthProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error creating auth provider: %w", err)
@@ -84,12 +84,12 @@ func newOneDriveStore(ctx context.Context, cfg config) (*oneDriveStore, error) {
 		return nil, fmt.Errorf("error creating Graph adapter: %w", err)
 	}
 
-	httpClient := &http.Client{}
-	graphClient := msgraphsdk.NewGraphServiceClient(adapter)
+	var httpClient = &http.Client{}
+	var graphClient = msgraphsdk.NewGraphServiceClient(adapter)
 
-	driveID := cfg.DriveID
+	var driveID = cfg.DriveID
 	if driveID == "" {
-		drive, err := graphClient.Me().Drive().Get(ctx, nil)
+		var drive, err = graphClient.Me().Drive().Get(ctx, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching user's default drive: %w", err)
 		}
@@ -99,9 +99,9 @@ func newOneDriveStore(ctx context.Context, cfg config) (*oneDriveStore, error) {
 		driveID = *drive.GetId()
 	}
 
-	tokenSource := cfg.Credentials.getTokenSource(ctx)
+	var tokenSource = cfg.Credentials.getTokenSource(ctx)
 
-	store := oneDriveStore{
+	var store = oneDriveStore{
 		httpClient:  httpClient,
 		graphClient: graphClient,
 		config:      cfg,
@@ -130,7 +130,7 @@ type folderEntry struct {
 }
 
 func (odStore *oneDriveStore) check(ctx context.Context) error {
-	_, err := odStore.
+	var _, err = odStore.
 		graphClient.
 		Drives().
 		ByDriveId(odStore.driveID).
@@ -147,14 +147,14 @@ func (odStore *oneDriveStore) check(ctx context.Context) error {
 func (odStore *oneDriveStore) listFolderDirectChildren(
 	ctx context.Context, folderPath string,
 ) ([]models.DriveItemable, error) {
-	requestConfig := &drives.
+	var requestConfig = &drives.
 		ItemItemsItemChildrenRequestBuilderGetRequestConfiguration{
 		QueryParameters: &drives.ItemItemsItemChildrenRequestBuilderGetQueryParameters{
 			Orderby: []string{"name"},
 		},
 	}
 
-	items, err := odStore.
+	var items, err = odStore.
 		graphClient.
 		Drives().
 		ByDriveId(odStore.driveID).
@@ -192,13 +192,13 @@ func (odStore *oneDriveStore) listFolderDirectChildren(
 func (odStore *oneDriveStore) List(
 	ctx context.Context, query filesource.Query,
 ) (filesource.Listing, error) {
-	rootItems, err := odStore.
+	var rootItems, err = odStore.
 		listFolderDirectChildren(ctx, query.Prefix)
 	if err != nil {
 		return nil, fmt.Errorf("listing root folder: %w", err)
 	}
 
-	listing := &oneDriveListing{
+	var listing = &oneDriveListing{
 		store:     odStore,
 		ctx:       ctx,
 		stack:     []folderEntry{{path: query.Prefix, items: rootItems}},
@@ -212,7 +212,7 @@ func (odStore *oneDriveStore) List(
 func (odStore *oneDriveStore) Read(
 	ctx context.Context, obj filesource.ObjectInfo,
 ) (io.ReadCloser, filesource.ObjectInfo, error) {
-	token, err := odStore.tokenSource.Token()
+	var token, err = odStore.tokenSource.Token()
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, fmt.Errorf("getting access token: %w", err)
 	}
@@ -240,7 +240,7 @@ func (odStore *oneDriveStore) Read(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		var body, _ = io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return nil, filesource.ObjectInfo{}, fmt.Errorf("unexpected status %d: %s, body: %s", resp.StatusCode, resp.Status, string(body))
 	}
@@ -258,18 +258,18 @@ type oneDriveListing struct {
 
 func (listing *oneDriveListing) Next() (filesource.ObjectInfo, error) {
 	for {
-		stackSize := len(listing.stack)
+		var stackSize = len(listing.stack)
 		if stackSize == 0 {
 			return filesource.ObjectInfo{}, io.EOF
 		}
 
-		folder := &listing.stack[stackSize-1]
+		var folder = &listing.stack[stackSize-1]
 		if len(folder.items) == 0 {
 			listing.stack = listing.stack[:stackSize-1] // Pop up stack to parent folder.
 			continue
 		}
 
-		firstUnprocessedItem := folder.items[0]
+		var firstUnprocessedItem = folder.items[0]
 		folder.items = folder.items[1:]
 
 		var fullItemPath string
@@ -303,7 +303,7 @@ func (listing *oneDriveListing) Next() (filesource.ObjectInfo, error) {
 				}, nil
 			}
 
-			childItems, err := listing.
+			var childItems, err = listing.
 				store.
 				listFolderDirectChildren(listing.ctx, fullItemPath)
 			if err != nil {
@@ -420,7 +420,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 }
 
 func main() {
-	src := filesource.Source{
+	var src = filesource.Source{
 		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
 			var cfg config
 			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
