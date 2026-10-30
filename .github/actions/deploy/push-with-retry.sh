@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Push one image, retrying transient registry failures.
+# Run a command that pushes one image, retrying transient registry failures.
+#
+# Usage: push-with-retry.sh IMAGE COMMAND [ARG...]
+#
+# IMAGE only names the image in messages; COMMAND does the push.
 #
 # GHCR occasionally rejects a push partway through (e.g. `unknown blob`),
 # most often when several jobs push the same base layers at once. Layers the
@@ -8,10 +12,11 @@
 set -uo pipefail
 
 IMAGE="$1"
+shift
 DELAYS=(10 30 60)
 
 for attempt in 1 2 3 4; do
-    if docker image push "$IMAGE"; then
+    if "$@"; then
         exit 0
     fi
     if [ "$attempt" -eq 4 ]; then

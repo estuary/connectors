@@ -589,12 +589,14 @@ def image_digests(ref: str) -> frozenset:
     digest plus every child (platform) manifest digest.
 
     The nightly and forward workflows both publish ':delayed' via
-    `docker buildx imagetools create`, which wraps a connector's single-arch
-    image in a fresh manifest LIST. So ':delayed' carries a list digest that
-    matches no ':<sha7>' tag, while its child digest equals the single-arch
-    image that the ':<sha7>' tag points at. Returning both lets a caller match
-    ':delayed' back to its originating commit regardless of which layer the
-    ':<sha7>' tag sits on. Empty when the ref cannot be inspected.
+    `docker buildx imagetools create`. The deploy action pushes each ':<sha7>'
+    as an index holding the image and its attestations, which imagetools copies
+    as is, so ':delayed' carries the same top-level digest as ':<sha7>'. An
+    older single-arch ':<sha7>' image is instead wrapped in a fresh manifest
+    LIST, whose digest matches no ':<sha7>' tag while its child digest equals
+    the single-arch image. Returning both lets a caller match ':delayed' back
+    to its originating commit regardless of which layer the ':<sha7>' tag sits
+    on. Empty when the ref cannot be inspected.
     """
     try:
         out = subprocess.check_output(
@@ -634,7 +636,7 @@ def _list_package_versions(
 
 
 def current_delayed_commit(
-    image: str, owner: str, token: str, max_pages: int = 3,
+    image: str, owner: str, token: str, max_pages: int = 10,
 ) -> Optional[str]:
     """
     Return the commit (sha7) that ':delayed' currently points at, or None.
@@ -642,9 +644,13 @@ def current_delayed_commit(
     Inspects the live ':delayed' manifest to learn its content digests, then
     scans the package's versions (newest-first, stopping at the first match) for
     the version carrying one of those digests and reads its commit-SHA tag.
-    Stops after `max_pages`; ':delayed' always points at a recent image, so the
-    match is on the first page or two. Returns None on any failure so the guard
-    fails open (never blocks a legitimate forward move on a transient error).
+    Stops after `max_pages`. ':delayed' points at a recent image, but for an
+    image pushed with attestations the version that matches is the one its
+    ':<sha7>' push created, and each such deploy adds three versions (an index,
+    its image and its attestation manifest), so the pages allow for a few
+    hundred deploys since then.
+    Returns None on any failure so the guard fails open (never blocks a
+    legitimate forward move on a transient error).
     """
     digests = image_digests(f'ghcr.io/estuary/{image}:delayed')
     if not digests:

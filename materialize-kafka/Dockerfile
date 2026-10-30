@@ -11,6 +11,9 @@ RUN apt-get update \
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.91
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN rustup component add clippy
+# `cargo auditable build` embeds the binary's dependency list, for the
+# image's SBOM to read.
+RUN cargo install cargo-auditable --version 0.7.7 --locked
 
 WORKDIR /connector
 
@@ -29,7 +32,7 @@ RUN mkdir src \
     && touch src/lib.rs \
     && cargo test --release --locked --no-run \
     && cargo clippy --release --locked --no-deps \
-    && cargo build --release --locked \
+    && cargo auditable build --release --locked \
     && rm -r src
 
 COPY materialize-kafka/src ./src
@@ -39,7 +42,7 @@ RUN touch src/main.rs \
     && touch src/lib.rs \
     && cargo test --release --locked --offline \
     && cargo clippy --release --locked --offline --no-deps \
-    && cargo build --release --locked --offline
+    && cargo auditable build --release --locked --offline
 
 # Runtime Stage
 ################################################################################

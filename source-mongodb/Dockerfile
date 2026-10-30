@@ -4,9 +4,13 @@ FROM rust:1-slim-trixie AS rust-builder
 
 WORKDIR /builder
 
+# `cargo auditable build` embeds the binary's dependency list, for the image's
+# SBOM to read.
+RUN cargo install cargo-auditable --version 0.7.7 --locked
+
 COPY bson-transcoder ./bson-transcoder
 
-RUN cargo build --release --manifest-path bson-transcoder/Cargo.toml
+RUN cargo auditable build --release --manifest-path bson-transcoder/Cargo.toml
 
 # Go Build Stage
 ################################################################################
