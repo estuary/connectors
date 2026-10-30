@@ -124,7 +124,7 @@ func (s *gdStore) List(ctx context.Context, query filesource.Query) (filesource.
 
 			var path = path.Join(folder.path, file.Name)
 
-			modTime, err := time.Parse(time.RFC3339, file.ModifiedTime)
+			var modTime, err = time.Parse(time.RFC3339, file.ModifiedTime)
 			if err != nil {
 				return filesource.ObjectInfo{},
 					fmt.Errorf("file %q has invalid ModifiedTime %q", path, file.ModifiedTime)
