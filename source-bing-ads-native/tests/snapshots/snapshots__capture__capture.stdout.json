@@ -1,0 +1,96 @@
+[
+  [
+    "acmeCo/accounts",
+    {
+      "AccountFinancialStatus": "ClearFinancialStatus",
+      "AccountLifeCycleStatus": "Pending",
+      "AutoTagType": "Inactive",
+      "BackUpPaymentInstrumentId": null,
+      "BillToCustomerId": "387145414",
+      "BillingThresholdAmount": null,
+      "BusinessAddress": {
+        "BusinessName": "Example Domain",
+        "City": "New York",
+        "CountryCode": "US",
+        "Id": "641005255",
+        "Line1": "123 Main Street",
+        "Line2": null,
+        "Line3": null,
+        "Line4": null,
+        "PostalCode": "10001",
+        "StateOrProvince": "NY",
+        "TimeStamp": null
+      },
+      "CurrencyCode": "USD",
+      "ForwardCompatibilityMap": [
+        {
+          "Key": "AccountMode",
+          "Value": "0"
+        }
+      ],
+      "Id": "555638908",
+      "Language": "English",
+      "LastModifiedByUserId": "202544887",
+      "LastModifiedTime": "2026-10-29T16:25:43.157",
+      "LinkedAgencies": [],
+      "Name": "Example Domain",
+      "Number": "L104EQKR",
+      "ParentCustomerId": "387145414",
+      "PauseReason": null,
+      "PaymentMethodId": null,
+      "PaymentMethodType": null,
+      "PrimaryUserId": "202544887",
+      "SalesHouseCustomerId": null,
+      "SoldToPaymentInstrumentId": null,
+      "TaxInformation": [],
+      "TimeStamp": "AAAAABSiv8Q=",
+      "TimeZone": "PacificTimeUSCanadaTijuana",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/campaigns",
+    {
+      "AccountId": "555638908",
+      "AudienceAdsBidAdjustment": 0,
+      "BiddingScheme": {
+        "MaxCpc": {
+          "Amount": null
+        },
+        "Type": "MaxConversions"
+      },
+      "BudgetId": null,
+      "BudgetType": "DailyBudgetStandard",
+      "CampaignType": "PerformanceMax",
+      "DailyBudget": 26.95,
+      "ExperimentId": null,
+      "FinalUrlSuffix": null,
+      "ForwardCompatibilityMap": [],
+      "Id": "1150430564",
+      "Languages": [
+        "English"
+      ],
+      "Name": "PMax Example",
+      "Settings": [
+        {
+          "FinalUrlExpansionOptOut": false,
+          "Type": "PerformanceMaxSetting"
+        }
+      ],
+      "Status": "Active",
+      "SubType": null,
+      "TimeZone": "PacificTimeUSCanadaTijuana",
+      "TrackingUrlTemplate": null,
+      "UrlCustomParameters": null,
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ]
+]

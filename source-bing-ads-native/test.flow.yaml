@@ -1,10 +1,56 @@
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-bing-ads-native:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_bing_ads_native
+        - python
+        - -m
+        - source_bing_ads_native
         config: config.yaml
-    bindings: []
+        # config.yaml holds sandbox credentials, so point the connector at the
+        # sandbox's hosts and token scope (BING_ADS_ENVIRONMENT in api.py).
+        env:
+          BING_ADS_ENVIRONMENT: sandbox
+    bindings:
+    - resource:
+        name: accounts
+        interval: PT1H
+      target: acmeCo/accounts
+    - resource:
+        name: campaigns
+        interval: PT1H
+      target: acmeCo/campaigns
+    - resource:
+        name: ad_groups
+        interval: PT1H
+      target: acmeCo/ad_groups
+    - resource:
+        name: ads
+        interval: PT1H
+      target: acmeCo/ads
+    - resource:
+        name: account_performance_report_daily
+        interval: PT1H
+      target: acmeCo/account_performance_report_daily
+    - resource:
+        name: campaign_performance_report_daily
+        interval: PT1H
+      target: acmeCo/campaign_performance_report_daily
+    - resource:
+        name: ad_group_performance_report_daily
+        interval: PT1H
+      target: acmeCo/ad_group_performance_report_daily
+    - resource:
+        name: ad_performance_report_daily
+        interval: PT1H
+      target: acmeCo/ad_performance_report_daily
+    - resource:
+        name: keyword_performance_report_daily
+        interval: PT1H
+      target: acmeCo/keyword_performance_report_daily
+    - resource:
+        name: budget_summary_report
+        interval: PT1H
+      target: acmeCo/budget_summary_report

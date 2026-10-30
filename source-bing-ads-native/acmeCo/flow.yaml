@@ -1,0 +1,96 @@
+collections:
+  acmeCo/account_performance_report_daily:
+    schema: account_performance_report_daily.schema.yaml
+    key:
+    - /AccountId
+    - /TimePeriod
+    - /AdDistribution
+    - /BidMatchType
+    - /DeliveredMatchType
+    - /DeviceOS
+    - /DeviceType
+    - /Network
+    - /TopVsOther
+  acmeCo/accounts:
+    schema: accounts.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/ad_group_performance_report_daily:
+    schema: ad_group_performance_report_daily.schema.yaml
+    key:
+    - /AccountId
+    - /TimePeriod
+    - /AdDistribution
+    - /AdGroupId
+    - /BidMatchType
+    - /CampaignId
+    - /DeliveredMatchType
+    - /DeviceOS
+    - /DeviceType
+    - /Language
+    - /Network
+    - /TopVsOther
+  acmeCo/ad_groups:
+    schema: ad_groups.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/ad_performance_report_daily:
+    schema: ad_performance_report_daily.schema.yaml
+    key:
+    - /AccountId
+    - /TimePeriod
+    - /AdDistribution
+    - /AdGroupId
+    - /AdId
+    - /BidMatchType
+    - /CampaignId
+    - /DeliveredMatchType
+    - /DeviceOS
+    - /DeviceType
+    - /Language
+    - /Network
+    - /TopVsOther
+  acmeCo/ads:
+    schema: ads.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/budget_summary_report:
+    schema: budget_summary_report.schema.yaml
+    key:
+    - /AccountId
+    - /Date
+    - /CampaignId
+  acmeCo/campaign_performance_report_daily:
+    schema: campaign_performance_report_daily.schema.yaml
+    key:
+    - /AccountId
+    - /TimePeriod
+    - /AdDistribution
+    - /BidMatchType
+    - /CampaignId
+    - /DeliveredMatchType
+    - /DeviceOS
+    - /DeviceType
+    - /Network
+    - /TopVsOther
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/keyword_performance_report_daily:
+    schema: keyword_performance_report_daily.schema.yaml
+    key:
+    - /AccountId
+    - /TimePeriod
+    - /AdDistribution
+    - /AdGroupId
+    - /AdId
+    - /BidMatchType
+    - /CampaignId
+    - /DeliveredMatchType
+    - /DeviceOS
+    - /DeviceType
+    - /KeywordId
+    - /Language
+    - /Network
+    - /TopVsOther
