@@ -28,7 +28,7 @@ import (
 const testServerAddr = "localhost:18321"
 
 func TestSpec(t *testing.T) {
-	response, err := driver{}.Spec(context.Background(), &pm.Request_Spec{})
+	var response, err = driver{}.Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -50,7 +50,7 @@ func TestValidateConstraints(t *testing.T) {
 	}
 
 	var validate = func(flags, createdAt string) (map[string]pm.Response_Validated_Constraint_Type, error) {
-		validated, err := driver{}.Validate(context.Background(), &pm.Request_Validate{
+		var validated, err = driver{}.Validate(context.Background(), &pm.Request_Validate{
 			ConfigJson: json.RawMessage(fmt.Sprintf(`{"address":"https://example.com/hooks/","advanced":{"feature_flags":%q}}`, flags)),
 			Bindings: []*pm.Request_Validate_Binding{{
 				ResourceConfigJson: json.RawMessage(`{"relativePath":"things"}`),
@@ -95,7 +95,7 @@ func TestValidateConstraints(t *testing.T) {
 		{"task postdating the cutoff opting out", "no_field_selection", "2099-01-01", documentConstraints},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := validate(tt.flags, tt.createdAt)
+			var got, err = validate(tt.flags, tt.createdAt)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -106,7 +106,7 @@ func TestStorePayloads(t *testing.T) {
 	var mu sync.Mutex
 	var requests = make(map[string][]string)
 	var server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
+		var body, err = io.ReadAll(r.Body)
 		require.NoError(t, err)
 		mu.Lock()
 		requests[r.URL.Path] = append(requests[r.URL.Path], string(body))
@@ -117,7 +117,7 @@ func TestStorePayloads(t *testing.T) {
 	var open = func(fieldSelection bool, bindings ...pf.MaterializationSpec_Binding) m.Transactor {
 		var ctx = context.Background()
 		var cfg = config{Address: pf.Endpoint(server.URL + "/")}
-		materializer, err := NewMaterializer(ctx, "acmeCo/webhook", cfg, map[string]bool{"field_selection": fieldSelection})
+		var materializer, err = NewMaterializer(ctx, "acmeCo/webhook", cfg, map[string]bool{"field_selection": fieldSelection})
 		require.NoError(t, err)
 
 		var mapped []boilerplate.MappedBinding[config, resource, mappedType]
@@ -167,7 +167,7 @@ func TestStorePayloads(t *testing.T) {
 	var storeAll = func(transactor m.Transactor, requests ...*pm.Request) {
 		var stream = &fakeStream{requests: append(requests, &pm.Request{StartCommit: &pm.Request_StartCommit{}})}
 		var it = m.NewStoreIterator(context.Background(), stream, &pm.Request{Flush: &pm.Request_Flush{}})
-		_, err := transactor.Store(it)
+		var _, err = transactor.Store(it)
 		require.NoError(t, err)
 	}
 	storeAll(documents, store(0, tuple.Tuple{int64(1)}, tuple.Tuple{}))
@@ -207,7 +207,7 @@ func TestIntegration(t *testing.T) {
 	}
 	startTestServer(t)
 
-	makeResourceFn := func(s string, delta bool) resource {
+	var makeResourceFn = func(s string, delta bool) resource {
 		return resource{RelativePath: s}
 	}
 
@@ -231,11 +231,11 @@ var received = struct {
 func startTestServer(t *testing.T) {
 	t.Helper()
 
-	listener, err := net.Listen("tcp", testServerAddr)
+	var listener, err = net.Listen("tcp", testServerAddr)
 	require.NoError(t, err)
 
-	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
+	var server = &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body, err = io.ReadAll(r.Body)
 		var elements []json.RawMessage
 		if err == nil {
 			err = json.Unmarshal(body, &elements)
@@ -245,7 +245,7 @@ func startTestServer(t *testing.T) {
 			return
 		}
 
-		url := "http://" + r.Host + r.URL.Path
+		var url = "http://" + r.Host + r.URL.Path
 		received.Lock()
 		received.elements[url] = append(received.elements[url], elements...)
 		received.Unlock()
@@ -261,7 +261,7 @@ type materializationUnderTest struct {
 }
 
 func newMaterializerUnderTest(ctx context.Context, name string, cfg config, flags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	base, err := NewMaterializer(ctx, name, cfg, flags)
+	var base, err = NewMaterializer(ctx, name, cfg, flags)
 	if err != nil {
 		return nil, err
 	}

@@ -71,7 +71,7 @@ func (c config) Validate() error {
 	}
 
 	for i := range c.Headers.CustomHeaders {
-		header := c.Headers.CustomHeaders[i]
+		var header = c.Headers.CustomHeaders[i]
 		if err := header.Validate(); err != nil {
 			return fmt.Errorf("header: %w", err)
 		}
@@ -133,7 +133,7 @@ func (mappedType) Compatible(boilerplate.ExistingField) bool { return true }
 func (mappedType) CanMigrate(boilerplate.ExistingField) bool { return false }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Webhook", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Webhook", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -157,7 +157,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
-	flags, err := boilerplate.ResolveFlags(cfg, req.LastMaterialization)
+	var flags, err = boilerplate.ResolveFlags(cfg, req.LastMaterialization)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +429,7 @@ func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes
 			// Fallthrough
 		}
 
-		request, err := http.NewRequest("POST", address, bytes.NewReader((body.Bytes())))
+		var request, err = http.NewRequest("POST", address, bytes.NewReader((body.Bytes())))
 		if err != nil {
 			return fmt.Errorf("http.NewRequest(%s): %w", address, err)
 		}
@@ -437,7 +437,7 @@ func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes
 		request.Header.Add("Content-Type", "application/json")
 
 		for i := range d.customHeaders {
-			header := d.customHeaders[i]
+			var header = d.customHeaders[i]
 			request.Header.Add(header.Name, header.Value)
 		}
 
@@ -463,14 +463,14 @@ func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	const requestSizeCutoff = 1024 * 1024 * 1 // 1 MiB
 	var body bytes.Buffer
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// sent counts the documents of each binding whose request succeeded, for
 	// the transaction health report; inBody is those in the pending request.
-	sent := make([]int64, len(d.bindings))
+	var sent = make([]int64, len(d.bindings))
 	var inBody int64
 
-	previousBinding := -1
+	var previousBinding = -1
 	for it.Next(false) {
 		if previousBinding == -1 {
 			previousBinding = it.Binding
