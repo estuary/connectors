@@ -9,10 +9,10 @@ import (
 )
 
 func TestConfigSchema(t *testing.T) {
-	parserSchema := json.RawMessage("{}")
-	data := src.ConfigSchema(parserSchema)
+	var parserSchema = json.RawMessage("{}")
+	var data = src.ConfigSchema(parserSchema)
 
-	formatted, err := json.MarshalIndent(data, "", "  ")
+	var formatted, err = json.MarshalIndent(data, "", "  ")
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, formatted)

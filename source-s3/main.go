@@ -44,7 +44,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
 	}
 	subSchemas = append(subSchemas,
@@ -183,12 +183,12 @@ func (c config) CredentialsProvider(ctx context.Context) (aws.CredentialsProvide
 }
 
 func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
-	credProvider, err := cfg.CredentialsProvider(ctx)
+	var credProvider, err = cfg.CredentialsProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 	}
 
@@ -197,7 +197,7 @@ func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
 	}
 
 	if cfg.Advanced.Endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		var customResolver = aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: cfg.Advanced.Endpoint,
 				HostnameImmutable: true,
 				Source:            aws.EndpointSourceCustom,
@@ -211,7 +211,7 @@ func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(awsCfg)
+	var s3Client = s3.NewFromConfig(awsCfg)
 
 	if err := validateBucket(ctx, cfg, s3Client); err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
 func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error {
 	// All we care about is a successful listing rather than iterating on all objects, so MaxKeys =
 	// 1 in this query.
-	_, err := s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+	var _, err = s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  aws.String(cfg.Bucket),
 		Prefix:  aws.String(cfg.Prefix),
 		MaxKeys: aws.Int32(1),
@@ -257,7 +257,7 @@ func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error 
 	// not important here. We have verified our ability to list objects in this bucket (bucket
 	// exists & correct access) via the list operation, so we can interpret a "not found" as a
 	// successful outcome.
-	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
+	var objectKey = strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
 	if _, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &cfg.Bucket, Key: aws.String(objectKey)}); err != nil {
 		var notFoundErr *s3Types.NotFound
 		if !errors.As(err, &notFoundErr) {
@@ -284,7 +284,7 @@ func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.
 		// Pass.
 	} else {
 		// Trim last character to map StartAt into StartAfter.
-		_, startAt := filesource.PathToParts(query.StartAt)
+		var _, startAt = filesource.PathToParts(query.StartAt)
 		input.StartAfter = aws.String(startAt[:len(startAt)-1])
 	}
 
@@ -298,7 +298,7 @@ func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.
 func (s *s3Store) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	var bucket, key = filesource.PathToParts(obj.Path)
 
-	resp, err := s.s3.GetObject(ctx, &s3.GetObjectInput{
+	var resp, err = s.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:            aws.String(bucket),
 		Key:               aws.String(key),
 		IfUnmodifiedSince: aws.Time(obj.ModTime),
@@ -392,18 +392,18 @@ var src = filesource.Source{
 		return newS3Store(ctx, cfg.(config))
 	},
 	ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
-		authSchema := schemagen.GenerateSchema("Authentication", &CredentialsConfig{})
+		var authSchema = schemagen.GenerateSchema("Authentication", &CredentialsConfig{})
 		authSchema.Extras["order"] = 4
 		authSchema.Extras["x-iam-auth"] = true
 
 		var parserOrderSchema map[string]any
-		err := json.Unmarshal(parserSchema, &parserOrderSchema)
+		var err = json.Unmarshal(parserSchema, &parserOrderSchema)
 		if err != nil {
 			log.Errorf("unable to parse parser schema: %v", err)
 		}
 		parserOrderSchema["order"] = 5
 
-		schema := map[string]any{
+		var schema = map[string]any{
 			"$schema": "https://json-schema.org/draft/2020-12/schema",
 			"$id":     "https://github.com/estuary/connectors/source-s3/config",
 			"title":   "S3 Source",
