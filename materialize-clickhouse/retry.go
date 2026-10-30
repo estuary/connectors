@@ -76,8 +76,7 @@ func (p retryPolicy) retry(ctx context.Context, desc string, retryable func(erro
 // OOM kills, DDL errors) are never transient -- they need the query itself to
 // change, not a retry -- and neither is cancellation of our own context.
 func isTransientErr(err error) bool {
-	var exc *clickhouseproto.Exception
-	if errors.As(err, &exc) {
+	if exc, ok := errors.AsType[*clickhouseproto.Exception](err); ok {
 		// KEEPER_EXCEPTION wraps the coordination errors (connection loss,
 		// session expired), which clear on their own once the replica
 		// reconnects, so the statement is worth retrying.
@@ -94,6 +93,6 @@ func isTransientErr(err error) bool {
 	}
 	// Any other net.Error (dial failure, read/write timeout) also indicates a
 	// connection-level problem rather than a server-side rejection.
-	var netErr net.Error
-	return errors.As(err, &netErr)
+	var _, ok = errors.AsType[net.Error](err)
+	return ok
 }
