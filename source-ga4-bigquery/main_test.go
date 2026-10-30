@@ -33,7 +33,7 @@ const (
 
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
 func TestSpec(t *testing.T) {
-	response, err := ga4Driver.Spec(context.Background(), &pc.Request_Spec{})
+	var response, err = ga4Driver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -56,7 +56,7 @@ func TestResourceValidate(t *testing.T) {
 		{Name: "empty_stream_type", Resource: Resource{Dataset: "ds", StreamType: ""}, WantError: `invalid 'stream_type' ""`},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			err := tc.Resource.Validate()
+			var err = tc.Resource.Validate()
 			if tc.WantError == "" {
 				require.NoError(t, err)
 			} else {
@@ -213,8 +213,8 @@ func TestEvaluatePollCycle(t *testing.T) {
 		},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			state := tc.Initial
-			added := evaluatePollCycle(&state, tc.Suffixes, tc.WindowDays, tc.CaptureIntermediate, tc.MinDate)
+			var state = tc.Initial
+			var added = evaluatePollCycle(&state, tc.Suffixes, tc.WindowDays, tc.CaptureIntermediate, tc.MinDate)
 			require.Equal(t, tc.WantPending, state.Pending, "pending list (descending)")
 			require.Equal(t, tc.WantPrimaryThrough, state.PrimaryThrough, "primary_through")
 			require.Equal(t, tc.WantFinalThrough, state.FinalThrough, "final_through")
@@ -229,10 +229,10 @@ func TestEvaluatePollCycle(t *testing.T) {
 // TestEvaluatePollCycleIdempotent verifies that repeated polling cycles
 // without dataset changes produce no new enqueues.
 func TestEvaluatePollCycleIdempotent(t *testing.T) {
-	suffixes := []string{"20260101", "20260503", "20260504", "20260505", "20260506"}
-	state := streamState{}
+	var suffixes = []string{"20260101", "20260503", "20260504", "20260505", "20260506"}
+	var state = streamState{}
 
-	added := evaluatePollCycle(&state, suffixes, 4, false, "")
+	var added = evaluatePollCycle(&state, suffixes, 4, false, "")
 	require.Greater(t, added, 0, "first poll should enqueue something")
 
 	state.Pending = nil // simulate readout drainage
@@ -320,7 +320,7 @@ func TestBuildTableQuery(t *testing.T) {
 		},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			got := buildTableQuery("test-project", "analytics_1234", streams[tc.StreamType], "20260501", tc.Cursor)
+			var got = buildTableQuery("test-project", "analytics_1234", streams[tc.StreamType], "20260501", tc.Cursor)
 			require.Equal(t, tc.Want, got)
 		})
 	}
@@ -343,7 +343,7 @@ func TestBuildQueryParams(t *testing.T) {
 		{Name: "string_cursor_pseudo", StreamType: StreamPseudonymousUsers, Cursor: "p-1", WantValue: "p-1"},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			got := buildQueryParams(streams[tc.StreamType], tc.Cursor)
+			var got = buildQueryParams(streams[tc.StreamType], tc.Cursor)
 			if tc.WantValue == nil {
 				require.Nil(t, got)
 				return
@@ -358,14 +358,14 @@ func TestBuildQueryParams(t *testing.T) {
 // TestMarshalIncrementalCheckpoint verifies that incremental readout
 // checkpoints patch only the in-progress table state.
 func TestMarshalIncrementalCheckpoint(t *testing.T) {
-	current := &currentTable{
+	var current = &currentTable{
 		Suffix:    "20260501",
 		Cursor:    int64(123),
 		StartedAt: time.Unix(123, 0).UTC(),
 		Index:     1000,
 	}
 
-	got, err := marshalIncrementalCheckpoint("binding-key", current)
+	var got, err = marshalIncrementalCheckpoint("binding-key", current)
 	require.NoError(t, err)
 	require.JSONEq(t, `{
 		"bindingStateV1": {
@@ -419,8 +419,8 @@ func testDiscoveryConfig(t testing.TB) *Config {
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: TEST_DATABASE != \"yes\"", t.Name())
 	}
-	credPath := strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credBytes, err := os.ReadFile(credPath)
+	var credPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
+	var credBytes, err = os.ReadFile(credPath)
 	require.NoError(t, err)
 
 	return &Config{
@@ -443,8 +443,8 @@ func testDiscoveryConfig(t testing.TB) *Config {
 // follow-up tests that exercise actual data capture.
 func testBigQueryClient(t testing.TB) *bigquery.Client {
 	t.Helper()
-	cfg := testDiscoveryConfig(t)
-	bq, err := connectBigQuery(context.Background(), cfg)
+	var cfg = testDiscoveryConfig(t)
+	var bq, err = connectBigQuery(context.Background(), cfg)
 	require.NoError(t, err)
 	t.Cleanup(func() { bq.Close() })
 	return bq

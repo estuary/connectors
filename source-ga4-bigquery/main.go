@@ -93,7 +93,7 @@ func (c *Config) SetDefaults() {
 }
 
 func connectBigQuery(ctx context.Context, cfg *Config) (*bigquery.Client, error) {
-	credOption, err := cfg.credentialsClientOption()
+	var credOption, err = cfg.credentialsClientOption()
 	if err != nil {
 		return nil, err
 	}

@@ -41,8 +41,8 @@ func newTestCapture(t testing.TB) *blackbox.TranscriptCapture {
 	os.Setenv("SHUTDOWN_AFTER_POLLING", "yes")
 	t.Cleanup(func() { os.Unsetenv("SHUTDOWN_AFTER_POLLING") })
 
-	credPath := strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credBytes, err := os.ReadFile(credPath)
+	var credPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
+	var credBytes, err = os.ReadFile(credPath)
 	require.NoError(t, err)
 
 	tc, err := blackbox.NewWithTranscript("testdata/flow.yaml")
@@ -66,7 +66,7 @@ func newTestCapture(t testing.TB) *blackbox.TranscriptCapture {
 // and collection schema). The public sample only has events_YYYYMMDD tables,
 // so we expect exactly one binding.
 func TestDiscoverPublicSample(t *testing.T) {
-	tc := newTestCapture(t)
+	var tc = newTestCapture(t)
 	tc.Capture.DiscoveryFilter = regexp.MustCompile("/events$")
 	tc.DiscoverFull("Discover Public Sample")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
@@ -76,7 +76,7 @@ func TestDiscoverPublicSample(t *testing.T) {
 // sample and snapshots various aspects of the result. Note that this fetches
 // approximately 1GB of data from BigQuery.
 func TestCapturePublicSample(t *testing.T) {
-	tc := newTestCapture(t)
+	var tc = newTestCapture(t)
 	require.NoError(t, tc.Capture.EditConfig("advanced.min_date", "2021-01-27"))
 	tc.Capture.DiscoveryFilter = regexp.MustCompile("/events$")
 
@@ -95,7 +95,7 @@ func summarizeCapture(transcript string) string {
 	var checksum = sha256.Sum256([]byte(transcript))
 	fmt.Fprintf(&b, "=== Transcript Metadata ===\nChecksum: %s\nTotal Size: %d\n\n", hex.EncodeToString(checksum[:]), len(transcript))
 
-	lines := strings.Split(strings.TrimRight(transcript, "\n"), "\n")
+	var lines = strings.Split(strings.TrimRight(transcript, "\n"), "\n")
 	if len(lines) <= 2*headTailLines {
 		b.WriteString(strings.Join(lines, "\n"))
 		b.WriteString("\n")

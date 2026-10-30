@@ -174,7 +174,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	var bindings []*pc.Response_Discovered_Binding
 	var discoveryErrors []error
 	for _, dataset := range datasets {
-		streamsPresent, err := findStreams(ctx, bq, cfg.ProjectID, dataset)
+		var streamsPresent, err = findStreams(ctx, bq, cfg.ProjectID, dataset)
 		if err != nil {
 			if cfg.Dataset != "" {
 				return nil, fmt.Errorf("discovering GA4 exports in dataset %q: %w", dataset, err)
@@ -191,7 +191,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		slices.Sort(orderedTypes)
 
 		for _, streamType := range orderedTypes {
-			binding, err := buildDiscoveredBinding(dataset, streamType)
+			var binding, err = buildDiscoveredBinding(dataset, streamType)
 			if err != nil {
 				return nil, fmt.Errorf("building binding for %s/%s: %w", dataset, streamType, err)
 			}
@@ -212,7 +212,7 @@ func listDatasets(ctx context.Context, bq *bigquery.Client, projectID string) ([
 
 	var out []string
 	for {
-		ds, err := iter.Next()
+		var ds, err = iter.Next()
 		if err == iterator.Done {
 			break
 		} else if err != nil {
@@ -241,7 +241,7 @@ func findStreams(ctx context.Context, bq *bigquery.Client, projectID, dataset st
 		strings.Join(clauses, " OR "),
 	)
 
-	rows, err := bq.Query(query).Read(ctx)
+	var rows, err = bq.Query(query).Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("querying INFORMATION_SCHEMA.TABLES: %w", err)
 	}
@@ -281,7 +281,7 @@ func buildDiscoveredBinding(dataset string, streamType StreamType) (*pc.Response
 		Dataset:    dataset,
 		StreamType: streamType,
 	}
-	resourceJSON, err := json.Marshal(resource)
+	var resourceJSON, err = json.Marshal(resource)
 	if err != nil {
 		return nil, fmt.Errorf("serializing resource: %w", err)
 	}

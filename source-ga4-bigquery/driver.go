@@ -68,7 +68,7 @@ type Driver struct {
 
 // Spec returns metadata about the capture connector.
 func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("GA4 BigQuery Resource Spec", &Resource{}).MarshalJSON()
+	var resourceSchema, err = schemagen.GenerateSchema("GA4 BigQuery Resource Spec", &Resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -94,7 +94,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	}
 	cfg.SetDefaults()
 
-	bq, err := d.Connect(ctx, &cfg)
+	var bq, err = d.Connect(ctx, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 	cfg.SetDefaults()
 
-	bq, err := d.Connect(stream.Context(), &cfg)
+	var bq, err = d.Connect(stream.Context(), &cfg)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing polling schedule %q: %w", cfg.Advanced.PollSchedule, err)
 	}
 
-	c := &capture{
+	var c = &capture{
 		Driver:       d,
 		Config:       &cfg,
 		DB:           bq,
@@ -390,7 +390,7 @@ func (c *capture) runPollCycle(ctx context.Context, binding *bindingInfo) error 
 
 	state.LastPollStarted = time.Now().UTC()
 
-	suffixes, err := c.enumerateStreamTables(ctx, binding.resource.Dataset, stream)
+	var suffixes, err = c.enumerateStreamTables(ctx, binding.resource.Dataset, stream)
 	if err != nil {
 		return fmt.Errorf("enumerating tables for %s/%s: %w", binding.resource.Dataset, binding.resource.StreamType, err)
 	}
@@ -550,7 +550,7 @@ func (c *capture) enumerateStreamTables(ctx context.Context, dataset string, str
 		bqclient.QuoteIdentifier(dataset),
 		stream.TablePrefix,
 	)
-	rows, err := c.DB.Query(query).Read(ctx)
+	var rows, err = c.DB.Query(query).Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("querying INFORMATION_SCHEMA.TABLES: %w", err)
 	}
@@ -581,7 +581,7 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 	var query = buildTableQuery(c.Config.ProjectID, binding.resource.Dataset, stream, current.Suffix, current.Cursor)
 	var params = buildQueryParams(stream, current.Cursor)
 
-	queryCtx, cancel := context.WithCancel(ctx)
+	var queryCtx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
 	var watchdog = time.AfterFunc(pollingWatchdogFirstRowTimeout, func() {
@@ -603,7 +603,7 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 
 	var q = c.DB.Query(query)
 	q.Parameters = params
-	rows, err := q.Read(queryCtx)
+	var rows, err = q.Read(queryCtx)
 	if err != nil {
 		return wrapWatchdogErr(ctx, queryCtx, err)
 	}
@@ -666,7 +666,7 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 			},
 		}
 		for i, val := range row {
-			translated, err := datatypes.TranslateValue(val, rows.Schema[i])
+			var translated, err = datatypes.TranslateValue(val, rows.Schema[i])
 			if err != nil {
 				return fmt.Errorf("translating column %q: %w", rows.Schema[i].Name, err)
 			}
@@ -718,10 +718,10 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 func cursorValuesEqual(a, b any) bool {
 	switch av := a.(type) {
 	case int64:
-		bv, ok := b.(int64)
+		var bv, ok = b.(int64)
 		return ok && av == bv
 	case string:
-		bv, ok := b.(string)
+		var bv, ok = b.(string)
 		return ok && av == bv
 	case nil:
 		return b == nil
@@ -778,7 +778,7 @@ func buildQueryParams(stream *streamDef, cursor any) []bigquery.QueryParameter {
 }
 
 func (c *capture) checkpoint() error {
-	bs, err := json.Marshal(c.State)
+	var bs, err = json.Marshal(c.State)
 	if err != nil {
 		return fmt.Errorf("serializing state checkpoint: %w", err)
 	}
