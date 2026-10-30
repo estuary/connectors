@@ -9,7 +9,7 @@ import (
 )
 
 func TestComputeKeyHash_Float64(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name   string
 		values []interface{}
 	}{
@@ -24,7 +24,7 @@ func TestComputeKeyHash_Float64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hash1, err := computeKeyHash(tt.values)
+			var hash1, err = computeKeyHash(tt.values)
 			require.NoError(t, err)
 
 			hash2, err := computeKeyHash(tt.values)
@@ -42,7 +42,7 @@ func TestComputeKeyHash_Float64(t *testing.T) {
 }
 
 func TestComputeKeyHash_DifferentFloatsProduceDifferentHashes(t *testing.T) {
-	hash1, err := computeKeyHash([]interface{}{3.14})
+	var hash1, err = computeKeyHash([]interface{}{3.14})
 	require.NoError(t, err)
 
 	hash2, err := computeKeyHash([]interface{}{3.15})
@@ -57,14 +57,14 @@ func TestComputeKeyHash_DifferentFloatsProduceDifferentHashes(t *testing.T) {
 }
 
 func TestComputeKeyHash_JsonMarshalError(t *testing.T) {
-	_, err := computeKeyHash([]interface{}{make(chan int)})
+	var _, err = computeKeyHash([]interface{}{make(chan int)})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "marshaling key value")
 	assert.Contains(t, err.Error(), "chan int")
 }
 
 func TestComputeKeyHash_VariousTypes(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name   string
 		values []interface{}
 	}{
@@ -79,7 +79,7 @@ func TestComputeKeyHash_VariousTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hash1, err := computeKeyHash(tt.values)
+			var hash1, err = computeKeyHash(tt.values)
 			require.NoError(t, err)
 
 			hash2, err := computeKeyHash(tt.values)
@@ -91,7 +91,7 @@ func TestComputeKeyHash_VariousTypes(t *testing.T) {
 }
 
 func TestComputeKeyHash_OrderMatters(t *testing.T) {
-	hash1, err := computeKeyHash([]interface{}{int64(1), int64(2), int64(3)})
+	var hash1, err = computeKeyHash([]interface{}{int64(1), int64(2), int64(3)})
 	require.NoError(t, err)
 
 	hash2, err := computeKeyHash([]interface{}{int64(3), int64(2), int64(1)})

@@ -48,7 +48,7 @@ func TestTableConfig(t *testing.T) {
 	}
 	require.NoError(t, validTable.Validate())
 
-	path, delta, err := validTable.Parameters()
+	var path, delta, err = validTable.Parameters()
 	require.NoError(t, err)
 	require.Equal(t, []string{"my_table"}, path)
 	require.False(t, delta, "delta updates should always be false for Spanner")

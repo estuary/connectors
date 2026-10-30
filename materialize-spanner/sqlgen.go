@@ -25,7 +25,7 @@ func sanitizeSpannerIdentifier(identifier string) string {
 	}
 
 	// Replace invalid characters with underscores
-	sanitized := identifierSanitizerRegexp.ReplaceAllString(identifier, "_")
+	var sanitized = identifierSanitizerRegexp.ReplaceAllString(identifier, "_")
 
 	// Ensure it starts with a letter (Spanner requirement)
 	if !identifierStartsWithLetterRegexp.MatchString(sanitized) {
@@ -36,11 +36,11 @@ func sanitizeSpannerIdentifier(identifier string) string {
 }
 
 func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
-	primaryKeyTextType := sql.MapStatic("STRING(MAX)")
+	var primaryKeyTextType = sql.MapStatic("STRING(MAX)")
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
-	datetimeMapping := sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))
+	var dateMapping = sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	var datetimeMapping = sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetimes_as_string"] {
@@ -48,7 +48,7 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("INT64"),
@@ -117,7 +117,7 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 				if part == "" {
 					continue
 				}
-				sanitized := sanitizeSpannerIdentifier(part)
+				var sanitized = sanitizeSpannerIdentifier(part)
 				if slices.Contains(SPANNER_RESERVED_WORDS, strings.ToLower(sanitized)) {
 					parts = append(parts, sql.QuoteTransform("`", "``")(sanitized))
 				} else {
@@ -185,8 +185,8 @@ func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool) temp
 	// Conditionally add flow_key_hash column to schema definitions.
 	// Only include for regular tables (Binding >= 0), not for the checkpoints table (Binding == -1).
 	// The checkpoints table has very few rows and doesn't benefit from key distribution.
-	hashColumnDef := ""
-	hashKeyPrefix := ""
+	var hashColumnDef = ""
+	var hashKeyPrefix = ""
 	if keyDistributionOptimization {
 		hashColumnDef = "{{ if ge $.Binding 0 }}flow_key_hash INT64 NOT NULL,{{ end }}"
 		hashKeyPrefix = "{{ if ge $.Binding 0 }}flow_key_hash, {{ end }}"

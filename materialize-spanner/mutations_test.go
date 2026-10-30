@@ -14,7 +14,7 @@ import (
 )
 
 func TestToSpannerValue_NullTypes(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		columnType string
 		expected   interface{}
 	}{
@@ -33,7 +33,7 @@ func TestToSpannerValue_NullTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.columnType, func(t *testing.T) {
-			result, err := toSpannerValue(nil, "test_col", tt.columnType)
+			var result, err = toSpannerValue(nil, "test_col", tt.columnType)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result, "Null value should return correct type for "+tt.columnType)
 		})
@@ -41,13 +41,13 @@ func TestToSpannerValue_NullTypes(t *testing.T) {
 }
 
 func TestToSpannerValue_UnknownTypeDefaultsToNullString(t *testing.T) {
-	result, err := toSpannerValue(nil, "test_col", "UNKNOWN_TYPE")
+	var result, err = toSpannerValue(nil, "test_col", "UNKNOWN_TYPE")
 	require.NoError(t, err)
 	assert.Equal(t, spanner.NullString{Valid: false}, result)
 }
 
 func TestToSpannerValue_Uint64Overflow(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name  string
 		value uint64
 		error bool
@@ -60,7 +60,7 @@ func TestToSpannerValue_Uint64Overflow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := toSpannerValue(tt.value, "test_col", "INT64")
+			var result, err = toSpannerValue(tt.value, "test_col", "INT64")
 			if tt.error {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "exceeds Spanner INT64 maximum")
@@ -76,7 +76,7 @@ func TestToSpannerValue_Uint64Overflow(t *testing.T) {
 
 func TestToSpannerValue_Uint64ToNumeric(t *testing.T) {
 	// Test that uint64 values beyond INT64 range can be stored in NUMERIC columns
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		value    uint64
 		expected *big.Rat
@@ -89,9 +89,9 @@ func TestToSpannerValue_Uint64ToNumeric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := toSpannerValue(tt.value, "test_col", "NUMERIC")
+			var result, err = toSpannerValue(tt.value, "test_col", "NUMERIC")
 			require.NoError(t, err)
-			rat, ok := result.(*big.Rat)
+			var rat, ok = result.(*big.Rat)
 			require.True(t, ok, "expected *big.Rat, got %T", result)
 			assert.Equal(t, 0, tt.expected.Cmp(rat), "expected %s, got %s", tt.expected.String(), rat.String())
 		})
@@ -102,7 +102,7 @@ func TestToSpannerValue_IntegerToFloat64(t *testing.T) {
 	// Test that integer values are properly converted to float64 for FLOAT64 columns.
 	// This is important because Spanner requires float64 values for FLOAT64 columns,
 	// and integer values in JSON may arrive as int64 when they have no decimal point.
-	tests := []struct {
+	var tests = []struct {
 		name       string
 		value      interface{}
 		columnType string
@@ -125,9 +125,9 @@ func TestToSpannerValue_IntegerToFloat64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := toSpannerValue(tt.value, "score", tt.columnType)
+			var result, err = toSpannerValue(tt.value, "score", tt.columnType)
 			require.NoError(t, err)
-			f64, ok := result.(float64)
+			var f64, ok = result.(float64)
 			require.True(t, ok, "expected float64, got %T", result)
 			assert.Equal(t, tt.expected, f64)
 		})
@@ -136,7 +136,7 @@ func TestToSpannerValue_IntegerToFloat64(t *testing.T) {
 
 func TestToSpannerValue_IntegerStaysInt64ForNonFloat(t *testing.T) {
 	// Test that integer values remain int64 for INT64 columns
-	tests := []struct {
+	var tests = []struct {
 		name       string
 		value      interface{}
 		columnType string
@@ -150,9 +150,9 @@ func TestToSpannerValue_IntegerStaysInt64ForNonFloat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := toSpannerValue(tt.value, "count", tt.columnType)
+			var result, err = toSpannerValue(tt.value, "count", tt.columnType)
 			require.NoError(t, err)
-			i64, ok := result.(int64)
+			var i64, ok = result.(int64)
 			require.True(t, ok, "expected int64, got %T", result)
 			assert.Equal(t, tt.expected, i64)
 		})
@@ -160,12 +160,12 @@ func TestToSpannerValue_IntegerStaysInt64ForNonFloat(t *testing.T) {
 }
 
 func TestPartitionedBatches_AddMutation_BoundsChecking(t *testing.T) {
-	pb := newPartitionedBatches(5)
-	values := []interface{}{int64(123)}
-	mutation := spanner.Insert("test_table", []string{"col1"}, values)
-	mutationSize := calculateMutationByteSize(values)
+	var pb = newPartitionedBatches(5)
+	var values = []interface{}{int64(123)}
+	var mutation = spanner.Insert("test_table", []string{"col1"}, values)
+	var mutationSize = calculateMutationByteSize(values)
 
-	tests := []struct {
+	var tests = []struct {
 		name          string
 		partitionIdx  int
 		expectError   bool
@@ -181,7 +181,7 @@ func TestPartitionedBatches_AddMutation_BoundsChecking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := pb.addMutation(tt.partitionIdx, mutation, 1, mutationSize)
+			var err = pb.addMutation(tt.partitionIdx, mutation, 1, mutationSize)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -193,9 +193,9 @@ func TestPartitionedBatches_AddMutation_BoundsChecking(t *testing.T) {
 }
 
 func TestPartitionedBatches_GetBatch_BoundsChecking(t *testing.T) {
-	pb := newPartitionedBatches(5)
+	var pb = newPartitionedBatches(5)
 
-	tests := []struct {
+	var tests = []struct {
 		name          string
 		partitionIdx  int
 		expectError   bool
@@ -210,7 +210,7 @@ func TestPartitionedBatches_GetBatch_BoundsChecking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			batch, err := pb.getBatch(tt.partitionIdx)
+			var batch, err = pb.getBatch(tt.partitionIdx)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -224,16 +224,16 @@ func TestPartitionedBatches_GetBatch_BoundsChecking(t *testing.T) {
 }
 
 func TestPartitionedBatches_Reset_BoundsChecking(t *testing.T) {
-	pb := newPartitionedBatches(5)
-	values := []interface{}{int64(123)}
-	mutation := spanner.Insert("test_table", []string{"col1"}, values)
-	mutationSize := calculateMutationByteSize(values)
+	var pb = newPartitionedBatches(5)
+	var values = []interface{}{int64(123)}
+	var mutation = spanner.Insert("test_table", []string{"col1"}, values)
+	var mutationSize = calculateMutationByteSize(values)
 
 	// Add some mutations first
 	require.NoError(t, pb.addMutation(0, mutation, 1, mutationSize))
 	require.NoError(t, pb.addMutation(2, mutation, 1, mutationSize))
 
-	tests := []struct {
+	var tests = []struct {
 		name          string
 		partitionIdx  int
 		expectError   bool
@@ -248,7 +248,7 @@ func TestPartitionedBatches_Reset_BoundsChecking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := pb.reset(tt.partitionIdx)
+			var err = pb.reset(tt.partitionIdx)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -260,9 +260,9 @@ func TestPartitionedBatches_Reset_BoundsChecking(t *testing.T) {
 }
 
 func TestPartitionedBatches_GetPartitionIndex(t *testing.T) {
-	pb := newPartitionedBatches(10)
+	var pb = newPartitionedBatches(10)
 
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		hash     int64
 		expected int
@@ -275,7 +275,7 @@ func TestPartitionedBatches_GetPartitionIndex(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := pb.getPartitionIndex(tt.hash)
+			var result = pb.getPartitionIndex(tt.hash)
 			assert.Equal(t, tt.expected, result)
 			// Verify result is always in valid range
 			assert.GreaterOrEqual(t, result, 0)
@@ -285,7 +285,7 @@ func TestPartitionedBatches_GetPartitionIndex(t *testing.T) {
 }
 
 func TestCalculateValueSize(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		value    interface{}
 		expected int
@@ -337,7 +337,7 @@ func TestCalculateValueSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateValueSize(tt.value)
+			var result = calculateValueSize(tt.value)
 			assert.Equal(t, tt.expected, result, "Size mismatch for %s", tt.name)
 		})
 	}
@@ -348,12 +348,12 @@ func TestCalculateValueSize_UnknownType(t *testing.T) {
 	type unknownType struct {
 		field string
 	}
-	result := calculateValueSize(unknownType{field: "test"})
+	var result = calculateValueSize(unknownType{field: "test"})
 	assert.Equal(t, 100, result, "Unknown types should return 100 byte estimate")
 }
 
 func TestCalculateMutationByteSize(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		values   []interface{}
 		expected int
@@ -421,7 +421,7 @@ func TestCalculateMutationByteSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateMutationByteSize(tt.values)
+			var result = calculateMutationByteSize(tt.values)
 			assert.Equal(t, tt.expected, result, "Size mismatch for %s", tt.name)
 		})
 	}
@@ -431,7 +431,7 @@ func TestCalculateMutationByteSize_AccuracyVsEstimate(t *testing.T) {
 	// This test demonstrates that the actual calculation is more accurate than
 	// the old fixed estimate of 100 bytes per column
 
-	tests := []struct {
+	var tests = []struct {
 		name              string
 		values            []interface{}
 		oldEstimate       int // numColumns * 100
@@ -466,7 +466,7 @@ func TestCalculateMutationByteSize_AccuracyVsEstimate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateMutationByteSize(tt.values)
+			var result = calculateMutationByteSize(tt.values)
 			assert.Equal(t, tt.actualSize, result)
 
 			// The new calculation is different from the old estimate

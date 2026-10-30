@@ -123,7 +123,7 @@ func initializeFlowInternalSchema(bindings []*spannerBinding) []string {
 	// Step 1: Drop all temporary tables if they exist
 	// Note: Spanner doesn't support dropping a schema with tables in it, so we drop tables individually
 	for idx := range bindings {
-		tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", idx)
+		var tempTableName = fmt.Sprintf("flow_internal.flow_temp_table_%d", idx)
 		ddlStatements = append(ddlStatements, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTableName))
 	}
 
@@ -153,8 +153,8 @@ var sqlDriver = &sql.Driver[config, tableConfig]{
 			"database": cfg.Database,
 		}).Info("opening Spanner database")
 
-		dialect := createSpannerDialect(featureFlags)
-		templates := renderTemplates(dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
+		var dialect = createSpannerDialect(featureFlags)
+		var templates = renderTemplates(dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
 
 		return &sql.Endpoint[config]{
 			Config:              cfg,
@@ -193,7 +193,7 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	// First run standard validation
-	resp, err := sqlDriver.Validate(ctx, req)
+	var resp, err = sqlDriver.Validate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		// This forces table re-creation (not just truncation) when the setting changes,
 		// because the primary key structure changes (flow_key_hash is added or removed).
 		for idx, binding := range resp.Bindings {
-			reqBinding := req.Bindings[idx]
+			var reqBinding = req.Bindings[idx]
 			for _, p := range reqBinding.Collection.Projections {
 				if p.IsPrimaryKey {
 					log.WithFields(log.Fields{
@@ -295,15 +295,15 @@ type spannerBinding struct {
 // hashSingleValue computes FNV-1a 64-bit hash of a single value.
 // Used for partition routing when key distribution optimization is disabled.
 func hashSingleValue(val interface{}) (int64, error) {
-	h := fnv.New64a()
+	var h = fnv.New64a()
 
 	switch v := val.(type) {
 	case int64:
-		buf := make([]byte, 8)
+		var buf = make([]byte, 8)
 		binary.LittleEndian.PutUint64(buf, uint64(v))
 		h.Write(buf)
 	case float64:
-		buf := make([]byte, 8)
+		var buf = make([]byte, 8)
 		binary.LittleEndian.PutUint64(buf, math.Float64bits(v))
 		h.Write(buf)
 	case string:
@@ -320,7 +320,7 @@ func hashSingleValue(val interface{}) (int64, error) {
 		h.Write([]byte{0})
 	default:
 		// For any other type, convert to JSON string for consistent serialization
-		jsonBytes, err := json.Marshal(v)
+		var jsonBytes, err = json.Marshal(v)
 		if err != nil {
 			return 0, fmt.Errorf("marshaling value of type %T for hashing: %w", v, err)
 		}
@@ -333,17 +333,17 @@ func hashSingleValue(val interface{}) (int64, error) {
 // computeKeyHash computes a deterministic hash of the given key values using FNV-1a 64-bit algorithm.
 // The hash provides uniform distribution to avoid write hotspots in Spanner.
 func computeKeyHash(keyValues []interface{}) (int64, error) {
-	h := fnv.New64a()
+	var h = fnv.New64a()
 
 	for _, val := range keyValues {
 		// Serialize each value deterministically to bytes
 		switch v := val.(type) {
 		case int64:
-			buf := make([]byte, 8)
+			var buf = make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, uint64(v))
 			h.Write(buf)
 		case float64:
-			buf := make([]byte, 8)
+			var buf = make([]byte, 8)
 			binary.LittleEndian.PutUint64(buf, math.Float64bits(v))
 			h.Write(buf)
 		case string:
@@ -360,7 +360,7 @@ func computeKeyHash(keyValues []interface{}) (int64, error) {
 			h.Write([]byte{0})
 		default:
 			// For any other type, convert to JSON string for consistent serialization
-			jsonBytes, err := json.Marshal(v)
+			var jsonBytes, err = json.Marshal(v)
 			if err != nil {
 				return 0, fmt.Errorf("marshaling key value of type %T for hashing: %w", v, err)
 			}
@@ -376,17 +376,17 @@ func computeKeyHash(keyValues []interface{}) (int64, error) {
 // This is used to calculate the number of partitions for key distribution.
 func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []option.ClientOption) (int, error) {
 	// Create instance admin client
-	instanceAdminClient, err := instance.NewInstanceAdminClient(ctx, opts...)
+	var instanceAdminClient, err = instance.NewInstanceAdminClient(ctx, opts...)
 	if err != nil {
 		return 0, fmt.Errorf("creating instance admin client: %w", err)
 	}
 	defer instanceAdminClient.Close()
 
 	// Build instance path
-	instancePath := fmt.Sprintf("projects/%s/instances/%s", projectID, instanceID)
+	var instancePath = fmt.Sprintf("projects/%s/instances/%s", projectID, instanceID)
 
 	// Get instance information
-	req := &instancepb.GetInstanceRequest{
+	var req = &instancepb.GetInstanceRequest{
 		Name: instancePath,
 	}
 	inst, err := instanceAdminClient.GetInstance(ctx, req)
@@ -396,8 +396,8 @@ func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []op
 
 	// Calculate node count based on instance configuration
 	// Spanner can have either NodeCount or ProcessingUnits configured
-	nodeCount := int(inst.GetNodeCount())
-	processingUnits := inst.GetProcessingUnits()
+	var nodeCount = int(inst.GetNodeCount())
+	var processingUnits = inst.GetProcessingUnits()
 
 	if nodeCount == 0 && processingUnits > 0 {
 		// Convert processing units to node count
@@ -439,7 +439,7 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (_ m.Transactor, err error) {
-	cfg := ep.Config
+	var cfg = ep.Config
 
 	// Create shared Spanner clients
 	clients, err := newSpannerClients(ctx, cfg)
@@ -454,7 +454,7 @@ func newTransactor(
 		}
 	}()
 
-	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
+	var templates = renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
 
 	// Always query node count for partition calculation
 	// Partitions = nodes × 10 for parallel flushing
@@ -466,7 +466,7 @@ func newTransactor(
 	if err != nil {
 		return nil, fmt.Errorf("querying node count: %w", err)
 	}
-	numPartitions := nodeCount * 10
+	var numPartitions = nodeCount * 10
 
 	log.WithFields(log.Fields{
 		"nodeCount":                   nodeCount,
@@ -474,7 +474,7 @@ func newTransactor(
 		"keyDistributionOptimization": !cfg.Advanced.DisableKeyDistributionOptimization,
 	}).Info("calculated partitions for parallel flushing")
 
-	t := &transactor{
+	var t = &transactor{
 		client:        clients.dataClient,
 		adminClient:   clients.adminClient,
 		dbPath:        clients.dbPath,
@@ -491,14 +491,14 @@ func newTransactor(
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 		// Debug: dump actual table schema from Spanner
-		tableName := binding.Path[len(binding.Path)-1]
-		schemaIter := clients.dataClient.Single().Query(ctx, spanner.Statement{
+		var tableName = binding.Path[len(binding.Path)-1]
+		var schemaIter = clients.dataClient.Single().Query(ctx, spanner.Statement{
 			SQL:    "SELECT column_name, spanner_type, is_nullable FROM information_schema.columns WHERE table_name = @table ORDER BY ordinal_position",
 			Params: map[string]interface{}{"table": tableName},
 		})
 		var schemaCols []string
 		for {
-			row, err := schemaIter.Next()
+			var row, err = schemaIter.Next()
 			if err != nil {
 				break
 			}
@@ -517,11 +517,11 @@ func newTransactor(
 	}
 
 	// Build DDL statements for flow_internal schema and Load tables
-	ddlStatements := initializeFlowInternalSchema(t.bindings)
+	var ddlStatements = initializeFlowInternalSchema(t.bindings)
 
 	// Execute all DDL statements in a single operation for efficiency
 	log.WithField("statements", len(ddlStatements)).Info("executing flow_internal schema initialization")
-	ddlCtx, cancel := context.WithTimeout(ctx, ddlTimeout)
+	var ddlCtx, cancel = context.WithTimeout(ctx, ddlTimeout)
 	defer cancel()
 
 	op, err := clients.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
@@ -540,14 +540,14 @@ func newTransactor(
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
-	b := &spannerBinding{target: target}
+	var b = &spannerBinding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	}
 
 	// Render createLoadTable template
-	createLoadTableSQL, err := sql.RenderTableTemplate(target, t.templates.createLoadTable)
+	var createLoadTableSQL, err = sql.RenderTableTemplate(target, t.templates.createLoadTable)
 	if err != nil {
 		return fmt.Errorf("rendering createLoadTable template: %w", err)
 	}
@@ -610,9 +610,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 // timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
 func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {
-	start := time.Now()
-	ts, err := t.client.Apply(ctx, mutations)
-	duration := time.Since(start)
+	var start = time.Now()
+	var ts, err = t.client.Apply(ctx, mutations)
+	var duration = time.Since(start)
 
 	log.WithFields(log.Fields{
 		"operation": operation,
@@ -625,18 +625,18 @@ func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner
 
 // Load implements the Load phase using temporary tables with optimal batching
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	loadStart := time.Now()
+	var loadStart = time.Now()
 	var clearDuration, queryDuration time.Duration
 	var loadedCount int
 
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// Create async batch flusher for parallel mutation flushes
-	flusher := newAsyncBatchFlusher(ctx, t, "load-insert-keys")
+	var flusher = newAsyncBatchFlusher(ctx, t, "load-insert-keys")
 	log.WithField("partitions", t.numPartitions).Info("load: using partition-based batching")
 
 	defer func() {
-		keyInsertionDuration := clearDuration + flusher.getTotalDuration()
+		var keyInsertionDuration = clearDuration + flusher.getTotalDuration()
 		log.WithFields(log.Fields{
 			"totalDuration":        time.Since(loadStart).Seconds(),
 			"keyInsertionDuration": keyInsertionDuration.Seconds(),
@@ -652,31 +652,31 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		tempTableName    string
 		keyColumnNames   []string
 	}
-	bindingStates := make(map[int]*bindingState)
+	var bindingStates = make(map[int]*bindingState)
 
-	hadLoads := false
+	var hadLoads = false
 
 	// Step 1: Iterate through keys, create temp tables, and insert keys with optimal batching
 	for it.Next() {
 		hadLoads = true
-		bindingIdx := it.Binding
-		b := t.bindings[bindingIdx]
+		var bindingIdx = it.Binding
+		var b = t.bindings[bindingIdx]
 
 		// Initialize state for this binding on first key
 		if bindingStates[bindingIdx] == nil {
-			tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
+			var tempTableName = fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
 
 			log.WithField("table", tempTableName).Info("load: clearing temporary table")
 			// Clear any existing data from the table using a mutation
 			// Load tables are persistent and pre-created, so we need to delete old data
-			deleteMutation := spanner.Delete(tempTableName, spanner.AllKeys())
-			_, duration, err := t.timedSpannerApply(ctx, []*spanner.Mutation{deleteMutation}, "load-clear-temp-table")
+			var deleteMutation = spanner.Delete(tempTableName, spanner.AllKeys())
+			var _, duration, err = t.timedSpannerApply(ctx, []*spanner.Mutation{deleteMutation}, "load-clear-temp-table")
 			if err != nil {
 				return fmt.Errorf("clearing temporary load table for binding %d: %w", bindingIdx, err)
 			}
 			clearDuration += duration
 
-			keyColumnNames := make([]string, 0, len(b.target.Keys)+1)
+			var keyColumnNames = make([]string, 0, len(b.target.Keys)+1)
 
 			// If key distribution optimization is enabled, prepend flow_key_hash column
 			if !t.cfg.Advanced.DisableKeyDistributionOptimization {
@@ -694,22 +694,22 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
-		state := bindingStates[bindingIdx]
+		var state = bindingStates[bindingIdx]
 
 		// Convert the key
-		converted, err := b.target.ConvertKey(it.Key)
+		var converted, err = b.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		}
 
 		// Convert key values to Spanner-compatible types
-		spannerKeyVals := make([]interface{}, 0, len(converted)+1)
+		var spannerKeyVals = make([]interface{}, 0, len(converted)+1)
 
 		// Compute partition index for routing
 		var partitionHash int64
 		if !t.cfg.Advanced.DisableKeyDistributionOptimization {
 			// When optimization enabled: compute full key hash for flow_key_hash column and partition routing
-			keyHash, err := computeKeyHash(converted)
+			var keyHash, err = computeKeyHash(converted)
 			if err != nil {
 				return fmt.Errorf("computing key hash for load: %w", err)
 			}
@@ -718,7 +718,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else {
 			// When optimization disabled: hash only first key value for partition routing
 			// This allows customers with well-distributed keys to benefit from parallel flushing
-			hash, err := hashSingleValue(converted[0])
+			var hash, err = hashSingleValue(converted[0])
 			if err != nil {
 				return fmt.Errorf("hashing first key value for partition routing: %w", err)
 			}
@@ -726,7 +726,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		for i, keyVal := range converted {
-			spannerVal, err := toSpannerValue(keyVal, b.target.Keys[i].Identifier, b.target.Keys[i].DDL)
+			var spannerVal, err = toSpannerValue(keyVal, b.target.Keys[i].Identifier, b.target.Keys[i].DDL)
 			if err != nil {
 				return fmt.Errorf("converting key value for %s: %w", b.target.Keys[i].Identifier, err)
 			}
@@ -735,19 +735,19 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		// Add INSERT mutation for this key
 		// Note: Each column counts as one mutation in Spanner's mutation count
-		mutation := spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
+		var mutation = spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
 
 		// Calculate actual byte size of the mutation values
-		mutationSize := calculateMutationByteSize(spannerKeyVals)
+		var mutationSize = calculateMutationByteSize(spannerKeyVals)
 
 		// Route to partition based on hash
-		partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
+		var partitionIdx = flusher.partitionedBatch.getPartitionIndex(partitionHash)
 		if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals), mutationSize); err != nil {
 			return fmt.Errorf("adding load mutation: %w", err)
 		}
 
 		// Check if any partitions are ready to flush and launch async
-		readyPartitions := flusher.partitionedBatch.getReadyPartitions()
+		var readyPartitions = flusher.partitionedBatch.getReadyPartitions()
 		if err := flusher.flushPartitionsAsync(readyPartitions); err != nil {
 			return fmt.Errorf("flushing ready partitions during load: %w", err)
 		}
@@ -762,7 +762,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Flush any remaining mutations asynchronously
-	nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
+	var nonEmptyPartitions = flusher.partitionedBatch.getNonEmptyPartitions()
 	if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
 		return fmt.Errorf("flushing remaining partitions during load: %w", err)
 	}
@@ -780,15 +780,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	var unionQueries []string
 	for bindingIdx := range bindingStates {
-		b := t.bindings[bindingIdx]
+		var b = t.bindings[bindingIdx]
 		unionQueries = append(unionQueries, b.loadQuerySQL)
 	}
 
 	log.Info("load: querying documents")
-	queryStart := time.Now()
-	combinedQuery := strings.Join(unionQueries, "\nUNION ALL\n")
-	iter := t.client.Single().Query(ctx, spanner.Statement{SQL: combinedQuery})
-	err := iter.Do(func(row *spanner.Row) error {
+	var queryStart = time.Now()
+	var combinedQuery = strings.Join(unionQueries, "\nUNION ALL\n")
+	var iter = t.client.Single().Query(ctx, spanner.Statement{SQL: combinedQuery})
+	var err = iter.Do(func(row *spanner.Row) error {
 		var bindingNum int64
 		var document spanner.NullJSON
 
@@ -806,7 +806,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				rawDoc = json.RawMessage(v)
 			default:
 				// If it's a structured value, marshal it to JSON
-				marshaled, err := json.Marshal(v)
+				var marshaled, err = json.Marshal(v)
 				if err != nil {
 					return fmt.Errorf("marshaling document: %w", err)
 				}
@@ -837,18 +837,18 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 // Store implements the Store phase using Spanner mutations with optimal batching
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	storeStart := time.Now()
+	var storeStart = time.Now()
 	var storeCount int
 	var storeBytes int
 	// stored counts the mutations applied per binding, for the transaction
 	// health report: Apply returns no counts, and partitions mix bindings.
-	stored := make([]int64, len(t.bindings))
-	round := it.Round
+	var stored = make([]int64, len(t.bindings))
+	var round = it.Round
 
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// Create async batch flusher for parallel mutation flushes
-	flusher := newAsyncBatchFlusher(ctx, t, "store")
+	var flusher = newAsyncBatchFlusher(ctx, t, "store")
 	log.WithField("partitions", t.numPartitions).Info("store: using partition-based batching")
 
 	// Ensure flusher is cleaned up on error paths
@@ -866,25 +866,25 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	for it.Next(t.cfg.HardDelete) {
 		storeCount++
 		stored[it.Binding]++
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
 		var mutation *spanner.Mutation
 
 		if it.Delete && t.cfg.HardDelete {
 			// Convert only the key columns for deletion
-			keyValues, err := b.target.ConvertKey(it.Key)
+			var keyValues, err = b.target.ConvertKey(it.Key)
 			if err != nil {
 				return nil, fmt.Errorf("converting delete keys: %w", err)
 			}
 
 			// Convert key values to Spanner-compatible types
-			spannerKeyValues := make([]interface{}, 0, len(keyValues)+1)
+			var spannerKeyValues = make([]interface{}, 0, len(keyValues)+1)
 
 			// Compute partition index for routing
 			var partitionHash int64
 			if !t.cfg.Advanced.DisableKeyDistributionOptimization {
 				// When optimization enabled: compute full key hash for flow_key_hash column and partition routing
-				keyHash, err := computeKeyHash(keyValues)
+				var keyHash, err = computeKeyHash(keyValues)
 				if err != nil {
 					return nil, fmt.Errorf("computing key hash for delete: %w", err)
 				}
@@ -892,7 +892,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				partitionHash = keyHash
 			} else {
 				// When optimization disabled: hash only first key value for partition routing
-				hash, err := hashSingleValue(keyValues[0])
+				var hash, err = hashSingleValue(keyValues[0])
 				if err != nil {
 					return nil, fmt.Errorf("hashing first key value for partition routing: %w", err)
 				}
@@ -900,7 +900,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			for i, val := range keyValues {
-				spannerVal, err := toSpannerValue(val, b.columnNames[b.keyColumnIdxs[i]], b.columnTypes[b.keyColumnIdxs[i]])
+				var spannerVal, err = toSpannerValue(val, b.columnNames[b.keyColumnIdxs[i]], b.columnTypes[b.keyColumnIdxs[i]])
 				if err != nil {
 					return nil, fmt.Errorf("converting key value for column %s: %w", b.columnNames[b.keyColumnIdxs[i]], err)
 				}
@@ -908,21 +908,21 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			// Create a Delete mutation
-			key := spanner.Key(spannerKeyValues)
+			var key = spanner.Key(spannerKeyValues)
 			mutation = spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
 
 			// Calculate actual byte size of the mutation values
-			mutationSize := calculateMutationByteSize(spannerKeyValues)
+			var mutationSize = calculateMutationByteSize(spannerKeyValues)
 			storeBytes += mutationSize
 
 			// Route to partition based on hash
-			partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
+			var partitionIdx = flusher.partitionedBatch.getPartitionIndex(partitionHash)
 			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding delete mutation: %w", err)
 			}
 
 			// Check if any partitions are ready to flush and launch async
-			readyPartitions := flusher.partitionedBatch.getReadyPartitions()
+			var readyPartitions = flusher.partitionedBatch.getReadyPartitions()
 			if err := flusher.flushPartitionsAsync(readyPartitions); err != nil {
 				return nil, fmt.Errorf("flushing ready partitions during store delete: %w", err)
 			}
@@ -930,21 +930,21 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		} else {
 			// Build mutation for insert or update
 			// Spanner's InsertOrUpdate handles both cases
-			values, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+			var values, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 			if err != nil {
 				return nil, fmt.Errorf("converting store values: %w", err)
 			}
 
 			// Convert values to Spanner-compatible types
-			spannerValues := make([]interface{}, 0, len(values)+1)
+			var spannerValues = make([]interface{}, 0, len(values)+1)
 
 			// Compute partition index for routing
 			// The key values are the first len(b.target.Keys) values
-			keyValues := values[:len(b.target.Keys)]
+			var keyValues = values[:len(b.target.Keys)]
 			var partitionHash int64
 			if !t.cfg.Advanced.DisableKeyDistributionOptimization {
 				// When optimization enabled: compute full key hash for flow_key_hash column and partition routing
-				keyHash, err := computeKeyHash(keyValues)
+				var keyHash, err = computeKeyHash(keyValues)
 				if err != nil {
 					return nil, fmt.Errorf("computing key hash for store: %w", err)
 				}
@@ -952,7 +952,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				partitionHash = keyHash
 			} else {
 				// When optimization disabled: hash only first key value for partition routing
-				hash, err := hashSingleValue(keyValues[0])
+				var hash, err = hashSingleValue(keyValues[0])
 				if err != nil {
 					return nil, fmt.Errorf("hashing first key value for partition routing: %w", err)
 				}
@@ -961,11 +961,11 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			for i, val := range values {
 				// When key distribution optimization is enabled, column indices are offset by 1
-				colIdx := i
+				var colIdx = i
 				if !t.cfg.Advanced.DisableKeyDistributionOptimization {
 					colIdx = i + 1
 				}
-				spannerVal, err := toSpannerValue(val, b.columnNames[colIdx], b.columnTypes[colIdx])
+				var spannerVal, err = toSpannerValue(val, b.columnNames[colIdx], b.columnTypes[colIdx])
 				if err != nil {
 					return nil, fmt.Errorf("converting value for column %s: %w", b.columnNames[colIdx], err)
 				}
@@ -975,7 +975,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			mutation = spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
 
 			// Debug: log value types for troubleshooting
-			valueTypes := make([]string, len(spannerValues))
+			var valueTypes = make([]string, len(spannerValues))
 			for vi, sv := range spannerValues {
 				valueTypes[vi] = fmt.Sprintf("%s=%T", b.columnNames[vi], sv)
 			}
@@ -985,17 +985,17 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}).Debug("store: mutation value types")
 
 			// Calculate actual byte size of the mutation values
-			mutationSize := calculateMutationByteSize(spannerValues)
+			var mutationSize = calculateMutationByteSize(spannerValues)
 			storeBytes += mutationSize
 
 			// Route to partition based on hash
-			partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
+			var partitionIdx = flusher.partitionedBatch.getPartitionIndex(partitionHash)
 			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerValues), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding store mutation: %w", err)
 			}
 
 			// Check if any partitions are ready to flush and launch async
-			readyPartitions := flusher.partitionedBatch.getReadyPartitions()
+			var readyPartitions = flusher.partitionedBatch.getReadyPartitions()
 			if err := flusher.flushPartitionsAsync(readyPartitions); err != nil {
 				return nil, fmt.Errorf("flushing ready partitions during store: %w", err)
 			}
@@ -1008,11 +1008,11 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	// Return the StartCommit function
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		commitStart := time.Now()
+		var commitStart = time.Now()
 		var commitDuration time.Duration
 
 		defer func() {
-			storeDuration := time.Since(storeStart)
+			var storeDuration = time.Since(storeStart)
 			commitDuration = time.Since(commitStart)
 
 			log.WithFields(log.Fields{
@@ -1026,7 +1026,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}()
 
 		// Marshal the checkpoint
-		checkpointBytes, err := runtimeCheckpoint.Marshal()
+		var checkpointBytes, err = runtimeCheckpoint.Marshal()
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
@@ -1036,21 +1036,21 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		// Add fence update mutation to the current batch
 		// Use the standard checkpoint table name
-		fenceValues := []interface{}{
+		var fenceValues = []interface{}{
 			t.fence.Materialization.String(),
 			int64(t.fence.KeyBegin), // Convert uint32 to int64
 			int64(t.fence.KeyEnd),   // Convert uint32 to int64
 			int64(t.fence.Fence),    // Convert uint64 to int64
 			base64.StdEncoding.EncodeToString(checkpointBytes),
 		}
-		fenceMutation := spanner.InsertOrUpdate(
+		var fenceMutation = spanner.InsertOrUpdate(
 			sql.DefaultFlowCheckpoints,
 			[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
 			fenceValues,
 		)
 
 		// Flush all data partitions first (before fence)
-		nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
+		var nonEmptyPartitions = flusher.partitionedBatch.getNonEmptyPartitions()
 		if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("flushing remaining partitions during commit: %w", err))
 		}

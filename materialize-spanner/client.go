@@ -44,7 +44,7 @@ type spannerClients struct {
 
 // newSpannerClients creates new Spanner data and admin clients.
 func newSpannerClients(ctx context.Context, cfg config) (*spannerClients, error) {
-	dbPath := fmt.Sprintf("projects/%s/instances/%s/databases/%s",
+	var dbPath = fmt.Sprintf("projects/%s/instances/%s/databases/%s",
 		cfg.ProjectID, cfg.InstanceID, cfg.Database)
 
 	var opts []option.ClientOption
@@ -52,7 +52,7 @@ func newSpannerClients(ctx context.Context, cfg config) (*spannerClients, error)
 		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
 	}
 
-	adminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
+	var adminClient, err = database.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating Spanner admin client: %w", err)
 	}
@@ -76,12 +76,12 @@ func (c *spannerClients) Close() {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	clients, err := newSpannerClients(ctx, ep.Config)
+	var clients, err = newSpannerClients(ctx, ep.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	templates := renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization)
+	var templates = renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization)
 
 	return &client{
 		dataClient:  clients.dataClient,
@@ -94,10 +94,10 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
 	// Build the database path
-	dbPath := fmt.Sprintf("projects/%s/instances/%s/databases/%s",
+	var dbPath = fmt.Sprintf("projects/%s/instances/%s/databases/%s",
 		cfg.ProjectID, cfg.InstanceID, cfg.Database)
 
 	var opts []option.ClientOption
@@ -106,7 +106,7 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	}
 
 	// Try to create a client to verify connectivity
-	client, err := spanner.NewClient(ctx, dbPath, opts...)
+	var client, err = spanner.NewClient(ctx, dbPath, opts...)
 	if err != nil {
 		if strings.Contains(err.Error(), "PermissionDenied") {
 			errs.Err(fmt.Errorf("permission denied: check your credentials and IAM roles"))
@@ -120,8 +120,8 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	defer client.Close()
 
 	// Verify we can query the database
-	stmt := spanner.Statement{SQL: "SELECT 1"}
-	iter := client.Single().Query(ctx, stmt)
+	var stmt = spanner.Statement{SQL: "SELECT 1"}
+	var iter = client.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
 	if _, err := iter.Next(); err != nil && err != iterator.Done {
@@ -224,10 +224,10 @@ func (c *client) FlushDDL(ctx context.Context) error {
 
 	log.WithField("count", len(c.pendingDDL)).Info("flushing batched DDL statements")
 
-	ddlCtx, cancel := context.WithTimeout(ctx, ddlTimeout)
+	var ddlCtx, cancel = context.WithTimeout(ctx, ddlTimeout)
 	defer cancel()
 
-	op, err := c.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
+	var op, err = c.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   c.dbPath,
 		Statements: c.pendingDDL,
 	})
@@ -250,15 +250,15 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	// Build list of schemas to query
-	schemas := make([]string, 0, len(resourcePaths))
+	var schemas = make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
+		var loc = c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
 	}
 
 	// Deduplicate schemas
-	schemaSet := make(map[string]bool)
-	uniqueSchemas := make([]string, 0, len(schemas))
+	var schemaSet = make(map[string]bool)
+	var uniqueSchemas = make([]string, 0, len(schemas))
 	for _, s := range schemas {
 		if !schemaSet[s] {
 			schemaSet[s] = true
@@ -267,7 +267,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	// Query for tables first
-	tablesStmt := spanner.Statement{
+	var tablesStmt = spanner.Statement{
 		SQL: fmt.Sprintf(`
 			SELECT table_schema, table_name
 			FROM information_schema.tables
@@ -275,11 +275,11 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		`, strings.Join(uniqueSchemas, ",")),
 	}
 
-	tablesIter := c.dataClient.Single().Query(ctx, tablesStmt)
+	var tablesIter = c.dataClient.Single().Query(ctx, tablesStmt)
 	defer tablesIter.Stop()
 
 	for {
-		row, err := tablesIter.Next()
+		var row, err = tablesIter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -296,7 +296,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	// Query for columns
-	columnsStmt := spanner.Statement{
+	var columnsStmt = spanner.Statement{
 		SQL: fmt.Sprintf(`
 			SELECT table_schema, table_name, column_name, is_nullable, spanner_type
 			FROM information_schema.columns
@@ -304,11 +304,11 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		`, strings.Join(uniqueSchemas, ",")),
 	}
 
-	columnsIter := c.dataClient.Single().Query(ctx, columnsStmt)
+	var columnsIter = c.dataClient.Single().Query(ctx, columnsStmt)
 	defer columnsIter.Stop()
 
 	for {
-		row, err := columnsIter.Next()
+		var row, err = columnsIter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -365,7 +365,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		c.addPendingDDL(stmt)
@@ -377,10 +377,10 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	// Spanner doesn't have TRUNCATE TABLE, so we use DELETE FROM without WHERE clause.
 	// Use Partitioned DML to avoid mutation limits on large tables.
 	// See: https://cloud.google.com/spanner/docs/dml-partitioned
-	stmt := fmt.Sprintf("DELETE FROM %s WHERE TRUE", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DELETE FROM %s WHERE TRUE", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.dataClient.PartitionedUpdate(ctx, spanner.Statement{SQL: stmt})
+		var _, err = c.dataClient.PartitionedUpdate(ctx, spanner.Statement{SQL: stmt})
 		return err
 	}, nil
 }
@@ -390,9 +390,9 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.DropNotNulls) > 0 {
 		// Query information_schema to get full column definitions
-		colDDL := make(map[string]string)
+		var colDDL = make(map[string]string)
 
-		stmt := spanner.Statement{
+		var stmt = spanner.Statement{
 			SQL: `SELECT column_name, spanner_type, column_default
 			      FROM information_schema.columns
 			      WHERE table_schema = @schema AND table_name = @table`,
@@ -402,11 +402,11 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			},
 		}
 
-		iter := c.dataClient.Single().Query(ctx, stmt)
+		var iter = c.dataClient.Single().Query(ctx, stmt)
 		defer iter.Stop()
 
 		for {
-			row, err := iter.Next()
+			var row, err = iter.Next()
 			if err == iterator.Done {
 				break
 			}
@@ -423,7 +423,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			}
 
 			// Build the DDL: spanner_type [DEFAULT (expression)]
-			ddl := spannerType
+			var ddl = spannerType
 			if columnDefault.Valid {
 				ddl += " DEFAULT " + columnDefault.StringVal
 			}
@@ -433,8 +433,8 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 		// Update the Type field with the complete DDL (without NOT NULL)
 		for idx := range ta.DropNotNulls {
-			col := ta.DropNotNulls[idx].Name
-			ddl, ok := colDDL[col]
+			var col = ta.DropNotNulls[idx].Name
+			var ddl, ok = colDDL[col]
 			if !ok {
 				return "", nil, fmt.Errorf("could not determine DDL for column %q", col)
 			}
@@ -465,7 +465,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
-	allStatements := append(ddlStatements, migrationSteps...)
+	var allStatements = append(ddlStatements, migrationSteps...)
 	return strings.Join(allStatements, "\n"), func(ctx context.Context) error {
 		if len(ddlStatements) == 0 && len(migrationSteps) == 0 {
 			return nil
@@ -486,7 +486,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 				continue
 			}
 
-			isDML := strings.HasPrefix(strings.ToUpper(stmt), "UPDATE") ||
+			var isDML = strings.HasPrefix(strings.ToUpper(stmt), "UPDATE") ||
 				strings.HasPrefix(strings.ToUpper(stmt), "DELETE")
 
 			if isDML {
@@ -508,16 +508,16 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	// Query INFORMATION_SCHEMA.SCHEMATA for Cloud Spanner
-	stmt := spanner.Statement{
+	var stmt = spanner.Statement{
 		SQL: `SELECT schema_name FROM information_schema.schemata WHERE schema_name != ''`,
 	}
 
-	iter := c.dataClient.Single().Query(ctx, stmt)
+	var iter = c.dataClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
 	var schemas []string
 	for {
-		row, err := iter.Next()
+		var row, err = iter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -536,7 +536,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
-	stmt := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))
+	var stmt = fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))
 
 	c.addPendingDDL(stmt)
 
@@ -549,16 +549,16 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	}
 
 	// Strip trailing semicolons from statements (Spanner DDL API doesn't accept them)
-	cleanedStatements := make([]string, len(statements))
+	var cleanedStatements = make([]string, len(statements))
 	for i, stmt := range statements {
 		cleanedStatements[i] = strings.TrimSuffix(strings.TrimSpace(stmt), ";")
 	}
 
 	// Execute DDL statements
-	ddlCtx, cancel := context.WithTimeout(ctx, ddlTimeout)
+	var ddlCtx, cancel = context.WithTimeout(ctx, ddlTimeout)
 	defer cancel()
 
-	op, err := c.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
+	var op, err = c.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   c.dbPath,
 		Statements: cleanedStatements,
 	})
@@ -571,14 +571,14 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	// The checkpoints table is created by CreateTable during Apply, not here.
-	tableName := checkpoints.Identifier
+	var tableName = checkpoints.Identifier
 
 	// Use a read-write transaction to implement fencing logic
 	var resultFence sql.Fence
-	_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+	var _, err = c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		// Step 1: Increment fence of ANY checkpoint that overlaps our key range
 		// This uses DML UPDATE since mutations don't support conditional updates
-		updateStmt := spanner.Statement{
+		var updateStmt = spanner.Statement{
 			SQL: fmt.Sprintf(`UPDATE %s SET fence = fence + 1
 				WHERE materialization = @materialization
 				AND key_end >= @key_begin
@@ -594,7 +594,7 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 		}
 
 		// Step 2: Read the checkpoint with the narrowest range that fully contains our range
-		selectStmt := spanner.Statement{
+		var selectStmt = spanner.Statement{
 			SQL: fmt.Sprintf(`SELECT fence, key_begin, key_end, checkpoint FROM %s
 				WHERE materialization = @materialization
 				AND key_begin <= @key_begin
@@ -608,10 +608,10 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 			},
 		}
 
-		iter := txn.Query(ctx, selectStmt)
+		var iter = txn.Query(ctx, selectStmt)
 		defer iter.Stop()
 
-		row, err := iter.Next()
+		var row, err = iter.Next()
 		var readFence int64
 		var readBegin, readEnd int64
 		var checkpoint spanner.NullString
@@ -640,7 +640,7 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 			// Exact match exists, no need to insert
 		} else {
 			// Insert new row using mutation
-			mutation := spanner.Insert(
+			var mutation = spanner.Insert(
 				tableName,
 				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
 				[]interface{}{
@@ -668,17 +668,17 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
-	checkpointsTable := c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
-	stmt := spanner.Statement{
+	var checkpointsTable = c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+	var stmt = spanner.Statement{
 		SQL: fmt.Sprintf("SELECT materialization FROM %s", checkpointsTable),
 	}
 
-	iter := c.dataClient.Single().Query(ctx, stmt)
+	var iter = c.dataClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
 	var out []string
 	for {
-		row, err := iter.Next()
+		var row, err = iter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -697,21 +697,21 @@ func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
-	checkpointsTable := c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
-	_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		stmt := spanner.Statement{
+	var checkpointsTable = c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+	var _, err = c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		var stmt = spanner.Statement{
 			SQL:    fmt.Sprintf("DELETE FROM %s WHERE materialization = @taskName", checkpointsTable),
 			Params: map[string]interface{}{"taskName": taskName},
 		}
-		_, err := txn.Update(ctx, stmt)
+		var _, err = txn.Update(ctx, stmt)
 		return err
 	})
 	return err
 }
 
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
-	loc := c.ep.Dialect.TableLocator(path)
-	tableIdentifier := c.ep.Dialect.Identifier(path...)
+	var loc = c.ep.Dialect.TableLocator(path)
+	var tableIdentifier = c.ep.Dialect.Identifier(path...)
 
 	// Snapshots must be deterministic. The Spanner service returns rows in
 	// primary-key order in practice, but the Cloud Spanner Emulator (which
@@ -719,7 +719,7 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 	// guarantee ordering without an explicit ORDER BY. Look up this table's
 	// primary key columns and order by them so snapshots are stable across both
 	// backends.
-	pkStmt := spanner.Statement{
+	var pkStmt = spanner.Statement{
 		SQL: `SELECT column_name FROM information_schema.index_columns
 			WHERE table_schema = @schema AND table_name = @table AND index_type = 'PRIMARY_KEY'
 			ORDER BY ordinal_position`,
@@ -728,11 +728,11 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 			"table":  loc.TableName,
 		},
 	}
-	pkIter := c.dataClient.Single().Query(ctx, pkStmt)
+	var pkIter = c.dataClient.Single().Query(ctx, pkStmt)
 	defer pkIter.Stop()
 	var orderBy []string
 	for {
-		row, err := pkIter.Next()
+		var row, err = pkIter.Next()
 		if errors.Is(err, iterator.Done) {
 			break
 		}
@@ -747,19 +747,19 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 	}
 	pkIter.Stop()
 
-	stmt := spanner.Statement{
+	var stmt = spanner.Statement{
 		SQL: fmt.Sprintf("SELECT * FROM %s", tableIdentifier),
 	}
 	if len(orderBy) > 0 {
 		stmt.SQL += " ORDER BY " + strings.Join(orderBy, ", ")
 	}
 
-	iter := c.dataClient.Single().Query(ctx, stmt)
+	var iter = c.dataClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
 	var columnsSet bool
 	for {
-		row, err := iter.Next()
+		var row, err = iter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -774,8 +774,8 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 			columnsSet = true
 		}
 
-		values := make([]spanner.GenericColumnValue, row.Size())
-		ptrs := make([]interface{}, row.Size())
+		var values = make([]spanner.GenericColumnValue, row.Size())
+		var ptrs = make([]interface{}, row.Size())
 		for i := range values {
 			ptrs[i] = &values[i]
 		}
@@ -783,7 +783,7 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 			return nil, nil, fmt.Errorf("scanning row: %w", err)
 		}
 
-		rowValues := make([]any, len(values))
+		var rowValues = make([]any, len(values))
 		for i, v := range values {
 			rowValues[i] = formatSpannerValue(v)
 		}

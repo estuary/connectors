@@ -17,7 +17,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{Table: table}
 	}
 
@@ -49,9 +49,9 @@ func TestIntegration(t *testing.T) {
 				if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
 				}
-				spannerClient := sqlClient.(*client).dataClient
-				_, err := spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-					_, err := txn.Update(ctx, spanner.Statement{SQL: fenceUpdate.String()})
+				var spannerClient = sqlClient.(*client).dataClient
+				var _, err = spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+					var _, err = txn.Update(ctx, spanner.Statement{SQL: fenceUpdate.String()})
 					return err
 				})
 				return err

@@ -35,7 +35,7 @@ func TestMain(m *testing.M) {
 	if err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "-d").Run(); err != nil {
 		log.Fatalf("starting docker compose: %v", err)
 	}
-	teardown := func() {
+	var teardown = func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	}
 
@@ -49,7 +49,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("bootstrapping spanner emulator: %v", err)
 	}
 
-	code := m.Run()
+	var code = m.Run()
 	teardown()
 	os.Exit(code)
 }
@@ -59,7 +59,7 @@ func TestMain(m *testing.M) {
 // AlreadyExists errors are ignored so repeated runs against a long-lived
 // emulator don't fail.
 func bootstrapEmulator() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	var ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	var instanceAdmin *instance.InstanceAdminClient
@@ -103,7 +103,7 @@ func bootstrapEmulator() error {
 		}
 	}
 
-	cfg := config{ProjectID: testProjectID, InstanceID: testInstanceID, Database: testDatabase}
+	var cfg = config{ProjectID: testProjectID, InstanceID: testInstanceID, Database: testDatabase}
 	clients, err := newSpannerClients(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("creating admin client: %w", err)
