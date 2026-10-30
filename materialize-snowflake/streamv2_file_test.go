@@ -8,14 +8,17 @@ import (
 	"crypto/md5"
 	stdsql "database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -159,4 +162,33 @@ func TestStreamV2RedactURLQuery(t *testing.T) {
 	err = fmt.Errorf("uploading: %w", streamV2RedactURLQuery(err))
 	require.NotContains(t, err.Error(), "SECRETSIG")
 	require.Contains(t, err.Error(), `"https://acct.blob.core.windows.net/c/k?REDACTED"`)
+}
+
+// TestStreamV2PipeInfoRequiresBase64Binary covers the binary input format a pipe
+// reports. Binary values are written as base64, so a pipe that reads them in any
+// other format is refused before a file is appended to it.
+func TestStreamV2PipeInfoRequiresBase64Binary(t *testing.T) {
+	for _, format := range []string{"", "BASE64", "HEX"} {
+		t.Run(format, func(t *testing.T) {
+			var c = newTestStreamV2Client(t, func(w http.ResponseWriter, r *http.Request) {
+				var res = map[string]any{
+					"rowset_stage_location": map[string]any{"location_type": "FAKE", "expiry_time_ms": time.Now().Add(time.Hour).UnixMilli()},
+				}
+				if format != "" {
+					res["parameter_overrides"] = map[string]string{"binary_input_format": format}
+				}
+				require.NoError(t, json.NewEncoder(w).Encode(res))
+			})
+			c.newUploader = func(context.Context, streamV2StageLocation) (streamV2Uploader, error) {
+				return &fakeStage{objects: make(map[string][]byte)}, nil
+			}
+
+			var _, err = c.pipeInfo(context.Background(), streamV2PipePath("DB", "SCH", "T"))
+			if format == "HEX" {
+				require.ErrorContains(t, err, `binary input format "HEX"`)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
