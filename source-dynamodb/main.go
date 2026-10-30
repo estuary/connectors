@@ -35,7 +35,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
 	}
 	subSchemas = append(subSchemas,
@@ -145,7 +145,7 @@ func (c *config) parseIdleBackoffMax() (time.Duration, error) {
 	if c.Advanced.IdleBackoffMax == "" {
 		return defaultIdleBackoffMax, nil
 	}
-	d, err := time.ParseDuration(c.Advanced.IdleBackoffMax)
+	var d, err = time.ParseDuration(c.Advanced.IdleBackoffMax)
 	if err != nil {
 		return 0, fmt.Errorf("invalid idleBackoffMax %q: %w", c.Advanced.IdleBackoffMax, err)
 	}
@@ -196,12 +196,12 @@ func (r *resource) Validate() error {
 }
 
 func (c *config) toClient(ctx context.Context) (*client, error) {
-	credProvider, err := c.CredentialsProvider(ctx)
+	var credProvider, err = c.CredentialsProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(c.Region),
 		awsConfig.WithRetryer(func() aws.Retryer {
@@ -215,7 +215,7 @@ func (c *config) toClient(ctx context.Context) (*client, error) {
 	}
 
 	if c.Advanced.Endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		var customResolver = aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: c.Advanced.Endpoint}, nil
 		})
 

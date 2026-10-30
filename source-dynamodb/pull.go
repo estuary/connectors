@@ -62,14 +62,14 @@ type table struct {
 }
 
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	ctx := stream.Context()
+	var ctx = stream.Context()
 
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.toClient(ctx)
+	var client, err = cfg.toClient(ctx)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
@@ -89,7 +89,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		return fmt.Errorf("parsing idleBackoffMax: %w", err)
 	}
 
-	c := capture{
+	var c = capture{
 		client:            client,
 		stream:            stream,
 		config:            cfg,
@@ -103,14 +103,14 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		return err
 	}
 
-	tables := []*table{}
+	var tables = []*table{}
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		t, err := c.initializeTable(ctx, idx, res.Table, boilerplate.StateKey(binding.StateKey), res.RcuAllocation)
+		var t, err = c.initializeTable(ctx, idx, res.Table, boilerplate.StateKey(binding.StateKey), res.RcuAllocation)
 		if err != nil {
 			return fmt.Errorf("initializing table: %w", err)
 		}
@@ -118,9 +118,9 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		tables = append(tables, t)
 	}
 
-	eg, groupCtx := errgroup.WithContext(ctx)
+	var eg, groupCtx = errgroup.WithContext(ctx)
 	for _, table := range tables {
-		table := table
+		var table = table
 		eg.Go(func() error {
 			return c.captureTable(groupCtx, table)
 		})

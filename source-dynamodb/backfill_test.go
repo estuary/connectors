@@ -8,7 +8,7 @@ import (
 )
 
 func TestResumeKeyRoundTrip(t *testing.T) {
-	av := map[string]types.AttributeValue{
+	var av = map[string]types.AttributeValue{
 		"string": &types.AttributeValueMemberS{
 			Value: "stringValue",
 		},
@@ -23,9 +23,9 @@ func TestResumeKeyRoundTrip(t *testing.T) {
 		},
 	}
 
-	keyFields := []string{"string", "decimal", "integer", "binary"}
+	var keyFields = []string{"string", "decimal", "integer", "binary"}
 
-	enc, err := encodeKey(keyFields, av)
+	var enc, err = encodeKey(keyFields, av)
 	require.NoError(t, err)
 
 	got, err := decodeKey(keyFields, enc)

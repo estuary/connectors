@@ -10,14 +10,14 @@ import (
 )
 
 func TestDiscovery(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	client, cfg := testClient(t)
+	var client, cfg = testClient(t)
 
 	t.Run("single table with a partition key", func(t *testing.T) {
-		tableName := "discoverTable"
+		var tableName = "discoverTable"
 
-		cleanup := func() {
+		var cleanup = func() {
 			deleteTable(ctx, t, client, tableName)
 		}
 		cleanup()
@@ -32,7 +32,7 @@ func TestDiscovery(t *testing.T) {
 
 		var sanitizers = make(map[string]*regexp.Regexp)
 		sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
-		cs := &st.CaptureSpec{
+		var cs = &st.CaptureSpec{
 			Driver:       driver{},
 			EndpointSpec: &cfg,
 			Validator:    &st.SortedCaptureValidator{},
@@ -43,10 +43,10 @@ func TestDiscovery(t *testing.T) {
 	})
 
 	t.Run("additional table without stream enabled", func(t *testing.T) {
-		tableName := "discoverTable"
-		otherTableName := "noStreamTable"
+		var tableName = "discoverTable"
+		var otherTableName = "noStreamTable"
 
-		cleanup := func() {
+		var cleanup = func() {
 			deleteTable(ctx, t, client, tableName)
 			deleteTable(ctx, t, client, otherTableName)
 		}
@@ -66,7 +66,7 @@ func TestDiscovery(t *testing.T) {
 			enableStream: false,
 		})
 
-		cs := &st.CaptureSpec{
+		var cs = &st.CaptureSpec{
 			Driver:       driver{},
 			EndpointSpec: &cfg,
 			Validator:    &st.SortedCaptureValidator{},
@@ -77,11 +77,11 @@ func TestDiscovery(t *testing.T) {
 	})
 
 	t.Run("multiple tables with various types", func(t *testing.T) {
-		tableName := "discoverTable"
-		otherTableName := "secondTable"
-		lastTableName := "thirdTable"
+		var tableName = "discoverTable"
+		var otherTableName = "secondTable"
+		var lastTableName = "thirdTable"
 
-		cleanup := func() {
+		var cleanup = func() {
 			deleteTable(ctx, t, client, tableName)
 			deleteTable(ctx, t, client, otherTableName)
 			deleteTable(ctx, t, client, lastTableName)
@@ -112,7 +112,7 @@ func TestDiscovery(t *testing.T) {
 			enableStream: true,
 		})
 
-		cs := &st.CaptureSpec{
+		var cs = &st.CaptureSpec{
 			Driver:       driver{},
 			EndpointSpec: &cfg,
 			Validator:    &st.SortedCaptureValidator{},

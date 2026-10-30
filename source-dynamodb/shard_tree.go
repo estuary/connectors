@@ -14,7 +14,7 @@ type shardTree struct {
 // buildShardTrees returns a listing of trees, with the root node of each tree being a shard with no
 // existing parent shard.
 func buildShardTrees(shards map[string]streamTypes.Shard) []*shardTree {
-	nodes := make(map[string]*shardTree)
+	var nodes = make(map[string]*shardTree)
 
 	// Determine shard relationships.
 	for shardId, shard := range shards {
@@ -24,10 +24,10 @@ func buildShardTrees(shards map[string]streamTypes.Shard) []*shardTree {
 	}
 
 	// Root shards are those without a parent, or where the parent no longer exists.
-	roots := []*shardTree{}
+	var roots = []*shardTree{}
 
 	for shardId, shard := range shards {
-		hasParent := false
+		var hasParent = false
 
 		if shard.ParentShardId != nil {
 			// Add this shard as a child of its parent shard, if the parent shard is still around.

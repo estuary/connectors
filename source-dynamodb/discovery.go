@@ -34,7 +34,7 @@ type columnSchema struct {
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
-	out := &jsonschema.Schema{
+	var out = &jsonschema.Schema{
 		Type:   s.jsonType,
 		Extras: make(map[string]interface{}),
 	}
@@ -68,7 +68,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.toClient(ctx)
+	var client, err = cfg.toClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
@@ -81,7 +81,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, cerrors.NewUserError(nil, noDiscoveredTablesMsg)
 	}
 
-	bindings := make([]*pc.Response_Discovered_Binding, 0, len(tables))
+	var bindings = make([]*pc.Response_Discovered_Binding, 0, len(tables))
 
 	for _, table := range tables {
 		log.WithFields(log.Fields{
@@ -91,11 +91,11 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			"streamArn": table.streamArn,
 		}).Debug("discovered table")
 
-		anchor := table.name
+		var anchor = table.name
 
-		properties := make(map[string]*jsonschema.Schema)
-		required := []string{}
-		keyPtrs := []string{}
+		var properties = make(map[string]*jsonschema.Schema)
+		var required = []string{}
+		var keyPtrs = []string{}
 
 		for idx, k := range table.keyFields {
 			properties[k] = dynamodbTypeToJSON[table.keyTypes[idx]].toType()
@@ -103,7 +103,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			keyPtrs = append(keyPtrs, "/"+k)
 		}
 
-		schema := jsonschema.Schema{
+		var schema = jsonschema.Schema{
 			Definitions: jsonschema.Definitions{
 				anchor: &jsonschema.Schema{
 					Type: "object",
@@ -212,7 +212,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			Extras: map[string]interface{}{"x-infer-schema": true},
 		}
 
-		rawSchema, err := schema.MarshalJSON()
+		var rawSchema, err = schema.MarshalJSON()
 		if err != nil {
 			return nil, fmt.Errorf("marshalling schema json: %w", err)
 		}
@@ -237,11 +237,11 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 }
 
 func discoverTables(ctx context.Context, c *client) ([]discoveredTable, error) {
-	allTableNames := []string{}
+	var allTableNames = []string{}
 
 	var exclusiveStartTableName *string
 	for {
-		listing, err := c.db.ListTables(ctx, &dynamodb.ListTablesInput{
+		var listing, err = c.db.ListTables(ctx, &dynamodb.ListTablesInput{
 			ExclusiveStartTableName: exclusiveStartTableName,
 		})
 		if err != nil {
@@ -261,15 +261,15 @@ func discoverTables(ctx context.Context, c *client) ([]discoveredTable, error) {
 	// https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-api,
 	// you can send up to 2,500 DescribeTable requests per second, so we are very unlikely to exceed
 	// any API rate limits.
-	out := []discoveredTable{}
+	var out = []discoveredTable{}
 	var mu sync.Mutex
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(10)
 
 	for _, t := range allTableNames {
-		t := t
+		var t = t
 		group.Go(func() error {
-			discovered, include, err := discoverTable(groupCtx, c, t)
+			var discovered, include, err = discoverTable(groupCtx, c, t)
 			if err != nil {
 				return fmt.Errorf("discovering table: %w", err)
 			}
@@ -292,7 +292,7 @@ func discoverTables(ctx context.Context, c *client) ([]discoveredTable, error) {
 }
 
 func discoverTable(ctx context.Context, c *client, table string) (discoveredTable, bool, error) {
-	tableDescribe, err := c.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+	var tableDescribe, err = c.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 		TableName: aws.String(table),
 	})
 	if err != nil {
@@ -329,7 +329,7 @@ func discoverTable(ctx context.Context, c *client, table string) (discoveredTabl
 		log.WithField("table", tableDescribe.Table.TableName).Warn("could not determine provisioned RCUs for table; backfill reads will not be limited unless explicitly configured")
 	}
 
-	out := discoveredTable{
+	var out = discoveredTable{
 		name:      table,
 		streamArn: *tableDescribe.Table.LatestStreamArn,
 		rcus:      rcus,
@@ -337,7 +337,7 @@ func discoverTable(ctx context.Context, c *client, table string) (discoveredTabl
 
 	// Streams are enabled on the table and the stream is active. Determine the hash key and
 	// optional sort key schema.
-	foundTypes := make(map[string]types.ScalarAttributeType)
+	var foundTypes = make(map[string]types.ScalarAttributeType)
 	for _, def := range tableDescribe.Table.AttributeDefinitions {
 		foundTypes[*def.AttributeName] = def.AttributeType
 	}

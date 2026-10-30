@@ -19,17 +19,17 @@ import (
 )
 
 func TestCapture(t *testing.T) {
-	table1 := "tableOne"
-	table2 := "tableTwo"
-	table3 := "tableThree"
+	var table1 = "tableOne"
+	var table2 = "tableTwo"
+	var table3 = "tableThree"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
 	// Use artificially small chunks to exercise multiple required backfill requests.
 	cfg.Advanced.ScanLimit = 3
 
-	cleanup := func() {
+	var cleanup = func() {
 		deleteTable(ctx, t, client, table1)
 		deleteTable(ctx, t, client, table2)
 		deleteTable(ctx, t, client, table3)
@@ -60,11 +60,11 @@ func TestCapture(t *testing.T) {
 		enableStream: true,
 	})
 
-	stringPkVals := func(idx int) any {
+	var stringPkVals = func(idx int) any {
 		return fmt.Sprintf("pk val %d", idx)
 	}
 
-	numberPkVals := func(idx int) any {
+	var numberPkVals = func(idx int) any {
 		if idx%2 == 0 {
 			return idx
 		}
@@ -72,7 +72,7 @@ func TestCapture(t *testing.T) {
 		return float64(idx) + 0.5
 	}
 
-	binaryPkVals := func(idx int) any {
+	var binaryPkVals = func(idx int) any {
 		return []byte(fmt.Sprintf("pk val %d", idx))
 	}
 
@@ -80,7 +80,7 @@ func TestCapture(t *testing.T) {
 	addTestTableData(ctx, t, client, table2, 5, 0, "partitionKeyNumber", numberPkVals, "sortKey", "firstColumn", "secondColumn")
 	addTestTableData(ctx, t, client, table3, 5, 0, "partitionKeyBinary", binaryPkVals, "sortKey", "firstColumn", "secondColumn", "thirdColumn")
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -94,8 +94,8 @@ func TestCapture(t *testing.T) {
 	}
 
 	// Run the capture, stopping it before it has completed the entire backfill.
-	count := 0
-	captureCtx, cancel := context.WithCancel(context.Background())
+	var count = 0
+	var captureCtx, cancel = context.WithCancel(context.Background())
 	cs.Capture(captureCtx, t, func(msg json.RawMessage) {
 		count++
 		if count == 10 {
@@ -118,12 +118,12 @@ func TestCapture(t *testing.T) {
 }
 
 func TestCaptureDataTypes(t *testing.T) {
-	table := "datatypes"
+	var table = "datatypes"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		deleteTable(ctx, t, client, table)
 	}
 	cleanup()
@@ -138,7 +138,7 @@ func TestCaptureDataTypes(t *testing.T) {
 
 	// Ref:
 	// https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html#HowItWorks.DataTypeDescriptors
-	av := map[string]types.AttributeValue{
+	var av = map[string]types.AttributeValue{
 		"pk": &types.AttributeValueMemberS{
 			Value: "pk",
 		},
@@ -194,13 +194,13 @@ func TestCaptureDataTypes(t *testing.T) {
 		},
 	}
 
-	_, err := client.db.PutItem(ctx, &dynamodb.PutItemInput{
+	var _, err = client.db.PutItem(ctx, &dynamodb.PutItemInput{
 		Item:      av,
 		TableName: aws.String(table),
 	})
 	require.NoError(t, err)
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       driver{},
 		EndpointSpec: &cfg,
 		Validator:    &st.OrderedCaptureValidator{},
@@ -214,12 +214,12 @@ func TestCaptureDataTypes(t *testing.T) {
 }
 
 func TestCaptureOperations(t *testing.T) {
-	table := "operations"
+	var table = "operations"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		deleteTable(ctx, t, client, table)
 	}
 	cleanup()
@@ -232,7 +232,7 @@ func TestCaptureOperations(t *testing.T) {
 		enableStream: true,
 	})
 
-	create := map[string]types.AttributeValue{
+	var create = map[string]types.AttributeValue{
 		"pk": &types.AttributeValueMemberS{
 			Value: "backfill",
 		},
@@ -241,13 +241,13 @@ func TestCaptureOperations(t *testing.T) {
 		},
 	}
 
-	_, err := client.db.PutItem(ctx, &dynamodb.PutItemInput{
+	var _, err = client.db.PutItem(ctx, &dynamodb.PutItemInput{
 		Item:      create,
 		TableName: aws.String(table),
 	})
 	require.NoError(t, err)
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       driver{},
 		EndpointSpec: &cfg,
 		Validator:    &st.OrderedCaptureValidator{},
@@ -258,7 +258,7 @@ func TestCaptureOperations(t *testing.T) {
 	// Capture documents from the backfill.
 	advanceCapture(ctx, t, cs)
 
-	streamCreate := map[string]types.AttributeValue{
+	var streamCreate = map[string]types.AttributeValue{
 		"pk": &types.AttributeValueMemberS{
 			Value: "stream",
 		},
@@ -272,7 +272,7 @@ func TestCaptureOperations(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	streamUpdate := map[string]types.AttributeValue{
+	var streamUpdate = map[string]types.AttributeValue{
 		"pk": &types.AttributeValueMemberS{
 			Value: "stream",
 		},
@@ -301,7 +301,7 @@ func TestCaptureOperations(t *testing.T) {
 }
 
 func commonSanitizers() map[string]*regexp.Regexp {
-	sanitizers := make(map[string]*regexp.Regexp)
+	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"<SHARD_ID>"`] = regexp.MustCompile(`"shardId\-\d+\-\w+"`)
 	sanitizers[`"<STREAM_ARN>"`] = regexp.MustCompile(`"arn:aws:dynamodb:\w+:\d+:.+?\.\d+"`)
@@ -314,7 +314,7 @@ func commonSanitizers() map[string]*regexp.Regexp {
 func resourceSpecJson(t *testing.T, r resource) json.RawMessage {
 	t.Helper()
 
-	out, err := json.Marshal(r)
+	var out, err = json.Marshal(r)
 	require.NoError(t, err)
 
 	return out
@@ -323,7 +323,7 @@ func resourceSpecJson(t *testing.T, r resource) json.RawMessage {
 func bindings(t *testing.T, tableNames ...string) []*flow.CaptureSpec_Binding {
 	t.Helper()
 
-	out := []*flow.CaptureSpec_Binding{}
+	var out = []*flow.CaptureSpec_Binding{}
 	for _, tbl := range tableNames {
 		out = append(out, &flow.CaptureSpec_Binding{
 			ResourceConfigJson: resourceSpecJson(t, resource{Table: tbl, RcuAllocation: 1000}),
@@ -339,7 +339,7 @@ func bindings(t *testing.T, tableNames ...string) []*flow.CaptureSpec_Binding {
 
 func advanceCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
-	captureCtx, cancelCapture := context.WithCancel(ctx)
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
 
 	const shutdownDelay = 1000 * time.Millisecond
 	var shutdownWatchdog *time.Timer

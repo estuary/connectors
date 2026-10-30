@@ -24,7 +24,7 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 	var workersCtx context.Context
 
 	for {
-		currentShards, err := c.listShards(ctx, t.streamArn)
+		var currentShards, err = c.listShards(ctx, t.streamArn)
 		if err != nil {
 			return fmt.Errorf("listing shards: %w", err)
 		}
@@ -68,7 +68,7 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 			// - we can only get correct ordering relative to individual keys by reading shards in
 			// this way.
 			for _, shardTree := range buildShardTrees(currentShards) {
-				shardTree := shardTree
+				var shardTree = shardTree
 				workers.Go(func() error {
 					return c.readShardTree(workersCtx, t, shardTree, workers, workersStop, false, 0)
 				})
@@ -95,7 +95,7 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 // catchupStreams is similar to streamTable, but only does a single pass of reading all currently
 // closed shards to the end, or to the first record newer than horizon.
 func (c *capture) catchupStreams(ctx context.Context, t *table, horizon time.Duration) error {
-	currentShards, err := c.listShards(ctx, t.streamArn)
+	var currentShards, err = c.listShards(ctx, t.streamArn)
 	if err != nil {
 		return fmt.Errorf("listing shards: %w", err)
 	}
@@ -104,9 +104,9 @@ func (c *capture) catchupStreams(ctx context.Context, t *table, horizon time.Dur
 		return fmt.Errorf("pruning shards: %w", err)
 	}
 
-	workers, workersCtx := errgroup.WithContext(ctx)
+	var workers, workersCtx = errgroup.WithContext(ctx)
 	for _, shardTree := range buildShardTrees(currentShards) {
-		shardTree := shardTree
+		var shardTree = shardTree
 		workers.Go(func() error {
 			return c.readShardTree(workersCtx, t, shardTree, workers, make(chan struct{}), true, horizon)
 		})
@@ -122,7 +122,7 @@ func (c *capture) pruneShards(table *table, activeShards map[string]streamTypes.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	prune := []string{}
+	var prune = []string{}
 	for id, state := range c.state.Tables[table.stateKey].Shards {
 		if _, ok := activeShards[id]; !ok {
 			// This is a shard we previously saw but now do not. Was it completely read?
@@ -142,7 +142,7 @@ func (c *capture) pruneShards(table *table, activeShards map[string]streamTypes.
 		}
 	}
 
-	stateUpdate := captureState{
+	var stateUpdate = captureState{
 		Tables: map[boilerplate.StateKey]tableState{
 			table.stateKey: {Shards: make(map[string]*shardState)},
 		},
@@ -197,7 +197,7 @@ func (c *capture) readShardTree(
 		// Read all of this shards children. Child shards can be read in parallel after the parent
 		// shard is closed and has been completely read.
 		for _, child := range l.children {
-			child := child
+			var child = child
 			workers.Go(func() error {
 				return c.readShardTree(ctx, t, child, workers, workersStop, catchup, horizon)
 			})
@@ -238,19 +238,19 @@ func (c *capture) readShard(
 	workersStop <-chan struct{},
 	horizon time.Duration,
 ) error {
-	state := c.getSequenceState(t.stateKey, *shard.ShardId)
+	var state = c.getSequenceState(t.stateKey, *shard.ShardId)
 	if state.FinishedReading {
 		// Don't re-read already fully read shards.
 		return nil
 	}
 
-	lastReadSeq := state.LastReadSequence
+	var lastReadSeq = state.LastReadSequence
 
-	iterOutput, err := c.client.stream.GetShardIterator(ctx, t.getShardIteratorInput(shard, lastReadSeq))
+	var iterOutput, err = c.client.stream.GetShardIterator(ctx, t.getShardIteratorInput(shard, lastReadSeq))
 	if err != nil {
 		return fmt.Errorf("getting shard iterator: %w", err)
 	}
-	iter := iterOutput.ShardIterator
+	var iter = iterOutput.ShardIterator
 
 	log.WithFields(log.Fields{
 		"table":     t.tableName,
@@ -263,8 +263,8 @@ func (c *capture) readShard(
 	// calls to GetRecords when tailing an open shard where there may be minimal new data available.
 	// An open shard whose reads keep coming back empty is paced down further by an additional,
 	// growing wait; see idleBackoff.
-	limiter := rate.NewLimiter(rate.Every(time.Second), 1)
-	isOpen := shard.SequenceNumberRange.EndingSequenceNumber == nil
+	var limiter = rate.NewLimiter(rate.Every(time.Second), 1)
+	var isOpen = shard.SequenceNumberRange.EndingSequenceNumber == nil
 	if !isOpen {
 		// If this shard is closed, read it to the end as fast as possible.
 		limiter.SetLimit(rate.Inf)
@@ -295,15 +295,15 @@ func (c *capture) readShard(
 			return err
 		}
 
-		recs, err := c.client.stream.GetRecords(ctx, &dynamodbstreams.GetRecordsInput{
+		var recs, err = c.client.stream.GetRecords(ctx, &dynamodbstreams.GetRecordsInput{
 			ShardIterator: iter,
 		})
 		if err != nil {
 			return fmt.Errorf("getting stream records: %w", err)
 		}
 
-		reachedHorizon := false
-		lastItemIdx := 0
+		var reachedHorizon = false
+		var lastItemIdx = 0
 		for _, r := range recs.Records {
 			if horizon != 0 && time.Since(*r.Dynamodb.ApproximateCreationDateTime) <= horizon {
 				// If this record is more recent than the desired time horizon, we will checkpoint
@@ -325,7 +325,7 @@ func (c *capture) readShard(
 
 		// Checkpoint new records or the fact that this shard is closed.
 		if lastItemIdx > 0 || recs.NextShardIterator == nil {
-			newState := shardState{
+			var newState = shardState{
 				LastReadSequence: lastReadSeq,
 				FinishedReading:  !reachedHorizon && recs.NextShardIterator == nil,
 			}
@@ -392,7 +392,7 @@ func (c *capture) readShard(
 }
 
 func (t *table) getShardIteratorInput(shard streamTypes.Shard, lastReadSeq string) *dynamodbstreams.GetShardIteratorInput {
-	input := &dynamodbstreams.GetShardIteratorInput{
+	var input = &dynamodbstreams.GetShardIteratorInput{
 		ShardId:   shard.ShardId,
 		StreamArn: aws.String(t.streamArn),
 	}
@@ -410,7 +410,7 @@ func (t *table) getShardIteratorInput(shard streamTypes.Shard, lastReadSeq strin
 }
 
 func (c *capture) listShards(ctx context.Context, streamArn string) (map[string]streamTypes.Shard, error) {
-	shards := make(map[string]streamTypes.Shard)
+	var shards = make(map[string]streamTypes.Shard)
 
 	var exclusiveStartShardId *string
 	for {
@@ -418,7 +418,7 @@ func (c *capture) listShards(ctx context.Context, streamArn string) (map[string]
 			return nil, fmt.Errorf("list shards limiter wait: %w", err)
 		}
 
-		streamDescribe, err := c.client.stream.DescribeStream(ctx, &dynamodbstreams.DescribeStreamInput{
+		var streamDescribe, err = c.client.stream.DescribeStream(ctx, &dynamodbstreams.DescribeStreamInput{
 			StreamArn:             aws.String(streamArn),
 			ExclusiveStartShardId: exclusiveStartShardId,
 		})

@@ -9,32 +9,32 @@ import (
 )
 
 func TestBuildShardTrees(t *testing.T) {
-	nilParent := streamTypes.Shard{
+	var nilParent = streamTypes.Shard{
 		ParentShardId: nil,
 		ShardId:       aws.String("nilParent"),
 	}
-	child := streamTypes.Shard{
+	var child = streamTypes.Shard{
 		ParentShardId: nilParent.ShardId,
 		ShardId:       aws.String("child"),
 	}
-	absentParent := streamTypes.Shard{
+	var absentParent = streamTypes.Shard{
 		ParentShardId: aws.String("notHere"),
 		ShardId:       aws.String("absentParent"),
 	}
-	sibling1 := streamTypes.Shard{
+	var sibling1 = streamTypes.Shard{
 		ParentShardId: absentParent.ShardId,
 		ShardId:       aws.String("sibling1"),
 	}
-	sibling2 := streamTypes.Shard{
+	var sibling2 = streamTypes.Shard{
 		ParentShardId: absentParent.ShardId,
 		ShardId:       aws.String("sibling2"),
 	}
-	childOfSibling1 := streamTypes.Shard{
+	var childOfSibling1 = streamTypes.Shard{
 		ParentShardId: sibling1.ShardId,
 		ShardId:       aws.String("childOfSibling1"),
 	}
 
-	shards := map[string]streamTypes.Shard{
+	var shards = map[string]streamTypes.Shard{
 		*nilParent.ShardId:       nilParent,
 		*absentParent.ShardId:    absentParent,
 		*child.ShardId:           child,
@@ -43,7 +43,7 @@ func TestBuildShardTrees(t *testing.T) {
 		*childOfSibling1.ShardId: childOfSibling1,
 	}
 
-	expect1 := shardTree{
+	var expect1 = shardTree{
 		shard: absentParent,
 		children: []*shardTree{
 			{
@@ -62,7 +62,7 @@ func TestBuildShardTrees(t *testing.T) {
 		},
 	}
 
-	expect2 := shardTree{
+	var expect2 = shardTree{
 		shard: nilParent,
 		children: []*shardTree{
 			{

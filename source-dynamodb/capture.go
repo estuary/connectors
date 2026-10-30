@@ -70,7 +70,7 @@ func (c *capture) getSequenceState(sk boilerplate.StateKey, shardId string) shar
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	s := c.state.Tables[sk].Shards[shardId]
+	var s = c.state.Tables[sk].Shards[shardId]
 	if s == nil {
 		// Simplify caller handling by providing an empty state rather than `nil` if the shard
 		// hasn't been checkpointed yet.
@@ -80,13 +80,13 @@ func (c *capture) getSequenceState(sk boilerplate.StateKey, shardId string) shar
 }
 
 func (c *capture) initializeTable(ctx context.Context, binding int, tableName string, sk boilerplate.StateKey, configuredRcus int) (*table, error) {
-	t := &table{
+	var t = &table{
 		tableName:  tableName,
 		stateKey:   sk,
 		bindingIdx: binding,
 	}
 
-	d, hasStream, err := discoverTable(ctx, c.client, tableName)
+	var d, hasStream, err = discoverTable(ctx, c.client, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("discover table %s for capture: %w", tableName, err)
 	} else if !hasStream {
@@ -109,7 +109,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		log.WithField("table", tableName).Info("no RCU limit set for the table and no provisioned limit detected; backfills will use unlimited RCUs")
 	}
 
-	state := c.state.Tables[sk]
+	var state = c.state.Tables[sk]
 
 	if state.Shards == nil {
 		// Never emitted a document from reading a shard.
@@ -126,7 +126,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		// Set the number of backfill segments for parallel scans. This must not change after the
 		// backfill has started. It can be overridden via advanced configuration but changing that
 		// after the backfill has started will have no effect.
-		segments := defaultBackfillSegments
+		var segments = defaultBackfillSegments
 		if c.config.Advanced.BackfillSegments != 0 {
 			segments = c.config.Advanced.BackfillSegments
 		}
@@ -147,7 +147,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		// have been closed prior to the backfill starting by definition will not have any records
 		// added to them while the backfill is on-going. It would not be incorrect to capture the
 		// values from these shards, but is unnecessary.
-		shards, err := c.listShards(ctx, state.StreamArn)
+		var shards, err = c.listShards(ctx, state.StreamArn)
 		if err != nil {
 			return nil, fmt.Errorf("listing shards: %w", err)
 		}
@@ -167,7 +167,7 @@ func (c *capture) initializeTable(ctx context.Context, binding int, tableName st
 		}
 
 		// Emit this initial table state.
-		stateUpdate := captureState{
+		var stateUpdate = captureState{
 			Tables: map[boilerplate.StateKey]tableState{
 				sk: state,
 			},
@@ -323,10 +323,10 @@ func (c *capture) emitBackfill(
 	records []map[string]types.AttributeValue,
 	keyFields []string,
 ) error {
-	docs := make([]json.RawMessage, 0, len(records))
+	var docs = make([]json.RawMessage, 0, len(records))
 
 	for _, r := range records {
-		doc, err := decodeAttributes(r, keyFields)
+		var doc, err = decodeAttributes(r, keyFields)
 		if err != nil {
 			return err
 		}
@@ -349,7 +349,7 @@ func (c *capture) emitBackfill(
 
 	c.state.Tables[sk].BackfillSegmentProgress[segment] = state
 
-	stateUpdate := captureState{
+	var stateUpdate = captureState{
 		Tables: map[boilerplate.StateKey]tableState{
 			sk: {
 				BackfillSegmentProgress: map[int]segmentState{
@@ -376,15 +376,15 @@ func (c *capture) emitStream(
 	records []streamTypes.Record,
 	keyFields []string,
 ) error {
-	docs := make([]json.RawMessage, 0, len(records))
+	var docs = make([]json.RawMessage, 0, len(records))
 
 	for _, r := range records {
-		doc, err := decodeStreamRecordAttributes(r.Dynamodb.NewImage, keyFields)
+		var doc, err = decodeStreamRecordAttributes(r.Dynamodb.NewImage, keyFields)
 		if err != nil {
 			return err
 		}
 
-		meta := streamRecordMeta{
+		var meta = streamRecordMeta{
 			EventId:                     r.EventID,
 			Op:                          dynamoOpsToChangeOps[r.EventName],
 			ApproximateCreationDateTime: r.Dynamodb.ApproximateCreationDateTime,
@@ -452,7 +452,7 @@ func (c *capture) emitStream(
 
 	c.state.Tables[sk].Shards[shardId] = &state
 
-	stateUpdate := captureState{
+	var stateUpdate = captureState{
 		Tables: map[boilerplate.StateKey]tableState{
 			sk: {
 				Shards: map[string]*shardState{
@@ -493,7 +493,7 @@ type userIdentity struct {
 }
 
 func decodeStreamRecordAttributes(attrs map[string]streamTypes.AttributeValue, keyFields []string) (map[string]any, error) {
-	item, err := attributevalue.FromDynamoDBStreamsMap(attrs)
+	var item, err = attributevalue.FromDynamoDBStreamsMap(attrs)
 	if err != nil {
 		return nil, fmt.Errorf("converting from streams attribute value: %w", err)
 	}
@@ -506,7 +506,7 @@ func decodeAttributes(attrs map[string]types.AttributeValue, keyFields []string)
 	// attributevalue.UnmarshalMap decodes a types.AttributeValue to an `any` by converting the
 	// DynamoDB value to its corresponding native Go type and value, which works quite well for
 	// building a JSON document.
-	record := make(map[string]any)
+	var record = make(map[string]any)
 
 	if err := attributevalue.UnmarshalMap(attrs, &record); err != nil {
 		return nil, fmt.Errorf("unmarshalling attributevalue: %w", err)

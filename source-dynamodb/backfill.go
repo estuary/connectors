@@ -35,7 +35,7 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 
 	// Try to match the read capacity units consumed with either the configured RCU limit or the
 	// provisioned RCUs for the table.
-	rcuLimiter := rate.NewLimiter(rate.Limit(t.effectiveRcus), 1)
+	var rcuLimiter = rate.NewLimiter(rate.Limit(t.effectiveRcus), 1)
 	if t.effectiveRcus == 0 {
 		// If no RCU limit was set or determined from the table there will be no limit.
 		rcuLimiter.SetLimit(rate.Inf)
@@ -54,13 +54,13 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 
 	// Arrange for stopCh to be closed after the provided duration to signal the backfill workers to
 	// stop.
-	stopCh := make(chan struct{})
-	stopTimer := time.AfterFunc(dur, func() { close(stopCh) })
+	var stopCh = make(chan struct{})
+	var stopTimer = time.AfterFunc(dur, func() { close(stopCh) })
 	defer stopTimer.Stop()
 
 	// Run the backfill workers. They will continuously pull segments from t.activeSegments and run
 	// backfill scans, returning only if they run out of segments or stopCh is closed.
-	eg, groupCtx := errgroup.WithContext(ctx)
+	var eg, groupCtx = errgroup.WithContext(ctx)
 	for idx := 0; idx < backfillConcurrency; idx++ {
 		eg.Go(func() error {
 			return c.backfillWorker(groupCtx, t, scanLimit, rcuLimiter, stopCh)
@@ -78,18 +78,18 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 	}
 
 	// Approximate completion time of the table backfill.
-	finished := time.Now()
+	var finished = time.Now()
 
 	// Checkpoint that the table is done backfilling.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	ts := c.state.Tables[t.stateKey]
+	var ts = c.state.Tables[t.stateKey]
 	ts.BackfillFinishedAt = &finished
 	c.state.Tables[t.stateKey] = ts
 	t.backfillComplete = true
 
-	stateUpdate := captureState{
+	var stateUpdate = captureState{
 		Tables: map[boilerplate.StateKey]tableState{
 			t.stateKey: {BackfillFinishedAt: &finished},
 		},
@@ -109,7 +109,7 @@ func (c *capture) backfill(ctx context.Context, t *table, dur time.Duration) err
 
 func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32, limiter *rate.Limiter, stopCh <-chan struct{}) error {
 	// Initialized as a dummy value; this will be adjusted (increased) based on actual requests.
-	rcusPerRequest := 1
+	var rcusPerRequest = 1
 
 	for {
 		var segment int
@@ -131,9 +131,9 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 			"segment": segment,
 		}).Debug("backfilling segment")
 
-		state := c.getSegmentState(t.stateKey, segment)
+		var state = c.getSegmentState(t.stateKey, segment)
 
-		startKey, err := decodeKey(t.keyFields, state.ExclusiveStartKey)
+		var startKey, err = decodeKey(t.keyFields, state.ExclusiveStartKey)
 		if err != nil {
 			return fmt.Errorf("unpacking resume key for segment %d of table %s: %w", segment, t.tableName, err)
 		}
@@ -145,14 +145,14 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 			return err
 		}
 
-		newState := segmentState{}
+		var newState = segmentState{}
 		if scanned.LastEvaluatedKey == nil {
 			newState.FinishedAt = time.Now()
 			// Retain the most recent start key rather than setting it to nil, mostly for the
 			// benefit of test snapshots.
 			newState.ExclusiveStartKey = state.ExclusiveStartKey
 		} else {
-			newStartKey, err := encodeKey(t.keyFields, scanned.LastEvaluatedKey)
+			var newStartKey, err = encodeKey(t.keyFields, scanned.LastEvaluatedKey)
 			if err != nil {
 				return fmt.Errorf("encoding resume key for segment %d of table %s: %w", segment, t.tableName, err)
 			}
@@ -223,7 +223,7 @@ func (c *capture) doScan(
 		if err := c.sem.Acquire(ctx, 1); err != nil {
 			return nil, err
 		}
-		scanned, err := c.client.db.Scan(ctx, &dynamodb.ScanInput{
+		var scanned, err = c.client.db.Scan(ctx, &dynamodb.ScanInput{
 			TableName:              aws.String(t.tableName),
 			ConsistentRead:         aws.Bool(true),
 			ExclusiveStartKey:      startKey,
@@ -267,7 +267,7 @@ func (c *capture) doScan(
 }
 
 func encodeKey(keyFields []string, av map[string]types.AttributeValue) ([]byte, error) {
-	fields := make(map[string]any)
+	var fields = make(map[string]any)
 	for k, v := range av {
 		fields[k] = v
 	}
@@ -280,9 +280,9 @@ func decodeKey(keyFields []string, key []byte) (map[string]types.AttributeValue,
 		return nil, nil
 	}
 
-	out := make(map[string]types.AttributeValue)
+	var out = make(map[string]types.AttributeValue)
 
-	tuple, err := sqlcapture.UnpackTuple(key, decodeKeyFDB)
+	var tuple, err = sqlcapture.UnpackTuple(key, decodeKeyFDB)
 	if err != nil {
 		return nil, fmt.Errorf("unpacking tuple: %w", err)
 	}

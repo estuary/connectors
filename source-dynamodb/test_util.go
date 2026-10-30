@@ -29,9 +29,9 @@ func testClient(t *testing.T) (*client, config) {
 		return nil, config{}
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	config := config{
+	var config = config{
 		AWSAccessKeyID:     *accessKeyId,
 		AWSSecretAccessKey: *secretAccessKey,
 		Region:             *region,
@@ -41,7 +41,7 @@ func testClient(t *testing.T) (*client, config) {
 		},
 	}
 
-	client, err := config.toClient(ctx)
+	var client, err = config.toClient(ctx)
 	require.NoError(t, err)
 
 	return client, config
@@ -61,7 +61,7 @@ type createTableParams struct {
 func createTable(ctx context.Context, t *testing.T, client *client, params createTableParams) {
 	t.Helper()
 
-	input := &dynamodb.CreateTableInput{
+	var input = &dynamodb.CreateTableInput{
 		TableName: aws.String(params.tableName),
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
@@ -100,7 +100,7 @@ func createTable(ctx context.Context, t *testing.T, client *client, params creat
 		}
 	}
 
-	_, err := client.db.CreateTable(ctx, input)
+	var _, err = client.db.CreateTable(ctx, input)
 	require.NoError(t, err)
 	waitForTableActive(ctx, t, client, params.tableName)
 }
@@ -109,7 +109,7 @@ func waitForTableActive(ctx context.Context, t *testing.T, client *client, table
 	t.Helper()
 
 	for {
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		var d, err = client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(tableName),
 		})
 		require.NoError(t, err)
@@ -123,7 +123,7 @@ func waitForTableActive(ctx context.Context, t *testing.T, client *client, table
 func deleteTable(ctx context.Context, t *testing.T, client *client, table string) {
 	t.Helper()
 
-	_, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
+	var _, err = client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(table),
 	})
 
@@ -135,7 +135,7 @@ func deleteTable(ctx context.Context, t *testing.T, client *client, table string
 	}
 
 	for {
-		_, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		var _, err = client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(table),
 		})
 		if err != nil {
@@ -159,7 +159,7 @@ func addTestTableData(
 	cols ...string,
 ) {
 	for idx := startAtItem; idx < startAtItem+numItems; idx++ {
-		item := make(map[string]any)
+		var item = make(map[string]any)
 		item[pkName] = pkData(idx)
 		if skName != "" {
 			item[skName] = fmt.Sprintf("sk val %d", idx)
@@ -169,7 +169,7 @@ func addTestTableData(
 			item[col] = fmt.Sprintf("%s val %d", col, idx)
 		}
 
-		itemAttr, err := attributevalue.MarshalMap(item)
+		var itemAttr, err = attributevalue.MarshalMap(item)
 		require.NoError(t, err)
 
 		_, err = c.db.PutItem(ctx, &dynamodb.PutItemInput{
