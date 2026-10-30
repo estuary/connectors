@@ -19,7 +19,7 @@ import (
 
 func newEd25519Key(t *testing.T) (ssh.PublicKey, ssh.Signer) {
 	t.Helper()
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	var pub, priv, err = ed25519.GenerateKey(rand.Reader)
 	require.NoError(t, err)
 	signer, err := ssh.NewSignerFromKey(priv)
 	require.NoError(t, err)
@@ -30,7 +30,7 @@ func newEd25519Key(t *testing.T) (ssh.PublicKey, ssh.Signer) {
 
 func newRSAKey(t *testing.T) (ssh.PublicKey, ssh.Signer) {
 	t.Helper()
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	var priv, err = rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	signer, err := ssh.NewSignerFromKey(priv)
 	require.NoError(t, err)
@@ -39,7 +39,7 @@ func newRSAKey(t *testing.T) (ssh.PublicKey, ssh.Signer) {
 
 func newECDSAKey(t *testing.T) (ssh.PublicKey, ssh.Signer) {
 	t.Helper()
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var priv, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	signer, err := ssh.NewSignerFromKey(priv)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func keyLine(key ssh.PublicKey) string {
 var testRemote = &net.TCPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 2222}
 
 func TestParseKnownHosts(t *testing.T) {
-	edKey, _ := newEd25519Key(t)
+	var edKey, _ = newEd25519Key(t)
 
 	for _, tt := range []struct {
 		name    string
@@ -126,7 +126,7 @@ func TestParseKnownHosts(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			pins, err := parseKnownHosts(tt.content)
+			var pins, err = parseKnownHosts(tt.content)
 			switch {
 			case tt.wantErr != "":
 				require.ErrorContains(t, err, tt.wantErr)
@@ -144,10 +144,10 @@ func TestParseKnownHosts(t *testing.T) {
 }
 
 func TestHostKeyCallback(t *testing.T) {
-	serverKey, _ := newEd25519Key(t)
-	otherKey, _ := newEd25519Key(t)
-	rsaKey, _ := newRSAKey(t)
-	serverKeyB64 := base64.StdEncoding.EncodeToString(serverKey.Marshal())
+	var serverKey, _ = newEd25519Key(t)
+	var otherKey, _ = newEd25519Key(t)
+	var rsaKey, _ = newRSAKey(t)
+	var serverKeyB64 = base64.StdEncoding.EncodeToString(serverKey.Marshal())
 	const address = "myserver.com:2222"
 
 	for _, tt := range []struct {
@@ -250,13 +250,13 @@ func TestHostKeyCallback(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			address := address
+			var address = address
 			if tt.address != "" {
 				address = tt.address
 			}
-			pins, err := parseKnownHosts(tt.content)
+			var pins, err = parseKnownHosts(tt.content)
 			require.NoError(t, err)
-			cb := pins.callback(address)
+			var cb = pins.callback(address)
 
 			err = cb(address, testRemote, tt.presented)
 			if len(tt.wantErr) == 0 {
@@ -275,13 +275,13 @@ func TestHostKeyCallback(t *testing.T) {
 }
 
 func TestHostKeyCallbackCertificateAuthority(t *testing.T) {
-	caKey, caSigner := newEd25519Key(t)
-	hostKey, _ := newEd25519Key(t)
-	_, rogueCASigner := newEd25519Key(t)
+	var caKey, caSigner = newEd25519Key(t)
+	var hostKey, _ = newEd25519Key(t)
+	var _, rogueCASigner = newEd25519Key(t)
 	const address = "sftp.example.com:22"
 
-	sign := func(signer ssh.Signer) ssh.PublicKey {
-		cert := &ssh.Certificate{
+	var sign = func(signer ssh.Signer) ssh.PublicKey {
+		var cert = &ssh.Certificate{
 			Key:             hostKey,
 			CertType:        ssh.HostCert,
 			ValidPrincipals: []string{"sftp.example.com"},
@@ -291,9 +291,9 @@ func TestHostKeyCallbackCertificateAuthority(t *testing.T) {
 		return cert
 	}
 
-	pins, err := parseKnownHosts("@cert-authority *.example.com " + keyLine(caKey))
+	var pins, err = parseKnownHosts("@cert-authority *.example.com " + keyLine(caKey))
 	require.NoError(t, err)
-	cb := pins.callback(address)
+	var cb = pins.callback(address)
 
 	require.NoError(t, cb(address, testRemote, sign(caSigner)))
 
@@ -326,12 +326,12 @@ func TestHostKeyCallbackCertificateAuthority(t *testing.T) {
 // revoked after a compromise must not stay usable through a certificate the CA issued for it
 // before the revocation.
 func TestHostKeyCallbackRevokedThroughCertificate(t *testing.T) {
-	caKey, caSigner := newEd25519Key(t)
-	hostKey, _ := newEd25519Key(t)
-	otherKey, _ := newEd25519Key(t)
+	var caKey, caSigner = newEd25519Key(t)
+	var hostKey, _ = newEd25519Key(t)
+	var otherKey, _ = newEd25519Key(t)
 	const address = "sftp.example.com:22"
 
-	cert := &ssh.Certificate{
+	var cert = &ssh.Certificate{
 		Key:             hostKey,
 		CertType:        ssh.HostCert,
 		ValidPrincipals: []string{"sftp.example.com"},
@@ -339,7 +339,7 @@ func TestHostKeyCallbackRevokedThroughCertificate(t *testing.T) {
 	}
 	require.NoError(t, cert.SignCert(rand.Reader, caSigner))
 
-	pins, err := parseKnownHosts("@cert-authority *.example.com " + keyLine(caKey) + "\n@revoked * " + keyLine(hostKey))
+	var pins, err = parseKnownHosts("@cert-authority *.example.com " + keyLine(caKey) + "\n@revoked * " + keyLine(hostKey))
 	require.NoError(t, err)
 	err = pins.callback(address)(address, testRemote, cert)
 	require.Error(t, err)
@@ -356,8 +356,8 @@ func TestHostKeyCallbackRevokedThroughCertificate(t *testing.T) {
 // is where a user first hears about a bad paste or a missing one. It also covers the Skip Host Key
 // Verification opt-out.
 func TestConfigValidateKnownHosts(t *testing.T) {
-	edKey, _ := newEd25519Key(t)
-	valid := config{
+	var edKey, _ = newEd25519Key(t)
+	var valid = config{
 		Address:     "myserver.com:2222",
 		Directory:   "/data",
 		KnownHosts:  "[myserver.com]:2222 " + keyLine(edKey),
@@ -365,7 +365,7 @@ func TestConfigValidateKnownHosts(t *testing.T) {
 	}
 	require.NoError(t, valid.Validate())
 
-	cfg := valid
+	var cfg = valid
 	cfg.KnownHosts = ""
 	require.ErrorContains(t, cfg.Validate(), "missing SSH Known Hosts")
 
@@ -384,8 +384,8 @@ func TestConfigValidateKnownHosts(t *testing.T) {
 }
 
 func TestHostKeyAlgorithms(t *testing.T) {
-	edKey, _ := newEd25519Key(t)
-	rsaKey, _ := newRSAKey(t)
+	var edKey, _ = newEd25519Key(t)
+	var rsaKey, _ = newRSAKey(t)
 	var certAlgos []string
 	for _, algo := range ssh.SupportedAlgorithms().HostKeys {
 		if strings.Contains(algo, "-cert-v01@") {
@@ -452,11 +452,11 @@ func TestHostKeyAlgorithms(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			address := "host:22"
+			var address = "host:22"
 			if tt.address != "" {
 				address = tt.address
 			}
-			pins, err := parseKnownHosts(tt.content)
+			var pins, err = parseKnownHosts(tt.content)
 			require.NoError(t, err)
 			require.Equal(t, tt.algos, pins.hostKeyAlgorithms(address))
 		})
@@ -468,25 +468,25 @@ func TestHostKeyAlgorithms(t *testing.T) {
 // a pin on the ed25519 key must steer negotiation so that a correct pin
 // connects.
 func TestHostKeyNegotiation(t *testing.T) {
-	_, rsaSigner := newRSAKey(t)
-	edKey, edSigner := newEd25519Key(t)
-	_, otherSigner := newEd25519Key(t)
+	var _, rsaSigner = newRSAKey(t)
+	var edKey, edSigner = newEd25519Key(t)
+	var _, otherSigner = newEd25519Key(t)
 
-	serverConfig := &ssh.ServerConfig{NoClientAuth: true}
+	var serverConfig = &ssh.ServerConfig{NoClientAuth: true}
 	serverConfig.AddHostKey(rsaSigner)
 	serverConfig.AddHostKey(edSigner)
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	var listener, err = net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer listener.Close()
 	go func() {
 		for {
-			conn, err := listener.Accept()
+			var conn, err = listener.Accept()
 			if err != nil {
 				return
 			}
 			go func() {
-				sconn, chans, reqs, err := ssh.NewServerConn(conn, serverConfig)
+				var sconn, chans, reqs, err = ssh.NewServerConn(conn, serverConfig)
 				if err != nil {
 					return
 				}
@@ -498,12 +498,12 @@ func TestHostKeyNegotiation(t *testing.T) {
 			}()
 		}
 	}()
-	address := listener.Addr().String()
+	var address = listener.Addr().String()
 
-	dial := func(t *testing.T, content string) error {
-		pins, err := parseKnownHosts(content)
+	var dial = func(t *testing.T, content string) error {
+		var pins, err = parseKnownHosts(content)
 		require.NoError(t, err)
-		clientConfig := &ssh.ClientConfig{
+		var clientConfig = &ssh.ClientConfig{
 			HostKeyCallback:   pins.callback(address),
 			HostKeyAlgorithms: pins.hostKeyAlgorithms(address),
 		}
@@ -518,15 +518,15 @@ func TestHostKeyNegotiation(t *testing.T) {
 		require.NoError(t, dial(t, knownhosts.Line([]string{address}, edKey)))
 	})
 	t.Run("wrong key is refused", func(t *testing.T) {
-		err := dial(t, knownhosts.Line([]string{address}, otherSigner.PublicKey()))
+		var err = dial(t, knownhosts.Line([]string{address}, otherSigner.PublicKey()))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "does not match")
 	})
 	t.Run("pin of a key type the server does not hold fails in negotiation", func(t *testing.T) {
 		// Only pinned key types are negotiated, so the handshake itself fails, and
 		// the ssh package names both sides' algorithms in the error.
-		ecdsaKey, _ := newECDSAKey(t)
-		err := dial(t, knownhosts.Line([]string{address}, ecdsaKey))
+		var ecdsaKey, _ = newECDSAKey(t)
+		var err = dial(t, knownhosts.Line([]string{address}, ecdsaKey))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "no common algorithm for host key")
 		require.Contains(t, err.Error(), ssh.KeyAlgoECDSA256)
@@ -545,11 +545,11 @@ func TestHostKeyNegotiation(t *testing.T) {
 		// defaults apply. Whichever key the server then presents must come back
 		// paste-ready, rather than the handshake failing with "no common algorithm
 		// for host key".
-		err := dial(t, "[elsewhere]:1 "+keyLine(otherSigner.PublicKey()))
+		var err = dial(t, "[elsewhere]:1 "+keyLine(otherSigner.PublicKey()))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "have no entry for")
 		require.Contains(t, err.Error(), address)
-		presented := []string{keyLine(edKey), keyLine(rsaSigner.PublicKey())}
+		var presented = []string{keyLine(edKey), keyLine(rsaSigner.PublicKey())}
 		require.True(t,
 			strings.Contains(err.Error(), presented[0]) || strings.Contains(err.Error(), presented[1]),
 			"error must echo one of the server's own host keys, got: %v", err)

@@ -15,7 +15,7 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	parserSpec, err := os.ReadFile("tests/parser_spec.json")
+	var parserSpec, err = os.ReadFile("tests/parser_spec.json")
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(configSchema(json.RawMessage(parserSpec)), "", "  ")
@@ -31,15 +31,15 @@ type tree struct {
 // []os.FileInfo to satisfy the dirEntry interface. This whole apparatus is in place so the
 // fstest.MapFS can be used for these unit tests.
 func (t *tree) ReadDir(s string) ([]os.FileInfo, error) {
-	entries, err := t.fs.ReadDir(s)
+	var entries, err = t.fs.ReadDir(s)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]os.FileInfo, 0, len(entries))
+	var out = make([]os.FileInfo, 0, len(entries))
 
 	for _, e := range entries {
-		info, err := e.Info()
+		var info, err = e.Info()
 		if err != nil {
 			return nil, err
 		}
@@ -78,11 +78,11 @@ var testFs = fstest.MapFS{
 }
 
 func TestListing(t *testing.T) {
-	testTree := &tree{
+	var testTree = &tree{
 		fs: testFs,
 	}
 
-	tests := []struct {
+	var tests = []struct {
 		name      string
 		root      string
 		recursive bool
@@ -128,13 +128,13 @@ func TestListing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			l, err := newSftpListing(nil, testTree, tt.root, tt.recursive, tt.startAt)
+			var l, err = newSftpListing(nil, testTree, tt.root, tt.recursive, tt.startAt)
 			require.NoError(t, err)
 
 			var snap strings.Builder
 			for info, err := l.Next(); err != io.EOF; info, err = l.Next() {
 				require.NoError(t, err)
-				bytes, err := json.MarshalIndent(info, "", "\t")
+				var bytes, err = json.MarshalIndent(info, "", "\t")
 				require.NoError(t, err)
 				snap.Write(bytes)
 				snap.WriteByte('\n')

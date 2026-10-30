@@ -48,7 +48,7 @@ func lineError(line int, cause error) error {
 // only reads files. The content goes in verbatim so that the line numbers
 // knownhosts reports are the user's.
 func newKnownHostsCallback(content string) (ssh.HostKeyCallback, error) {
-	f, err := os.CreateTemp("", "known_hosts")
+	var f, err = os.CreateTemp("", "known_hosts")
 	if err != nil {
 		return nil, fmt.Errorf("creating known_hosts file: %w", err)
 	}
@@ -86,11 +86,11 @@ func parseKnownHosts(content string) (*knownHosts, error) {
 		return nil, nil
 	}
 
-	verify, err := newKnownHostsCallback(content)
+	var verify, err = newKnownHostsCallback(content)
 	if err != nil {
 		return nil, err
 	}
-	pins := knownHosts{verify: verify}
+	var pins = knownHosts{verify: verify}
 
 	for i, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)
@@ -101,8 +101,8 @@ func parseKnownHosts(content string) (*knownHosts, error) {
 		// ssh.ParseKnownHosts allows a single trailing comment word where
 		// knownhosts allows any number, so only the entry's own columns are handed
 		// to it.
-		fields := strings.Fields(line)
-		columns := 3
+		var fields = strings.Fields(line)
+		var columns = 3
 		if strings.HasPrefix(fields[0], "@") {
 			columns = 4
 		}
@@ -110,7 +110,7 @@ func parseKnownHosts(content string) (*knownHosts, error) {
 			fields = fields[:columns]
 		}
 
-		marker, hosts, key, _, _, err := ssh.ParseKnownHosts([]byte(strings.Join(fields, " ")))
+		var marker, hosts, key, _, _, err = ssh.ParseKnownHosts([]byte(strings.Join(fields, " ")))
 		if err != nil {
 			return nil, lineError(i+1, err)
 		}
@@ -174,7 +174,7 @@ func (p *knownHosts) callback(address string) ssh.HostKeyCallback {
 			return fmt.Errorf("the %s host key in the certificate presented by %s is revoked by the configured SSH Known Hosts", cert.Key.Type(), address)
 		}
 
-		err := p.verify(hostname, remote, key)
+		var err = p.verify(hostname, remote, key)
 		if err == nil {
 			return nil
 		}
@@ -248,7 +248,7 @@ func algorithmsForKeyType(keyType string) []string {
 // Only the entries that cover `address` steer anything.
 func (p *knownHosts) hostKeyAlgorithms(address string) []string {
 	var algos []string
-	add := func(candidates ...string) {
+	var add = func(candidates ...string) {
 		for _, c := range candidates {
 			if !slices.Contains(algos, c) {
 				algos = append(algos, c)

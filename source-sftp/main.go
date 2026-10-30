@@ -172,7 +172,7 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 		user = cfg.Username
 	}
 
-	sshConfig := ssh.ClientConfig{
+	var sshConfig = ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{},
 	}
@@ -210,7 +210,7 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 		return nil, fmt.Errorf("invalid credentials.type %q", cfg.Credentials.Type)
 	}
 
-	conn, err := ssh.Dial("tcp", cfg.Address, &sshConfig)
+	var conn, err = ssh.Dial("tcp", cfg.Address, &sshConfig)
 	if err != nil {
 		return nil, fmt.Errorf("tcp connection to '%s': %w", cfg.Address, err)
 	}
@@ -228,7 +228,7 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	// Some SFTP servers like AWS Transfer Family may reject Stat operations due to permission
 	// restrictions. In that case, fall back to RealPath and ReadDir to validate the user
 	// provided an actual directory.
-	info, statErr := client.Stat(cfg.Directory)
+	var info, statErr = client.Stat(cfg.Directory)
 	if statErr != nil {
 		if _, err := client.RealPath(cfg.Directory); err != nil {
 			return nil, fmt.Errorf("resolving directory '%s': %w", cfg.Directory, statErr)
@@ -285,7 +285,7 @@ type sftpListing struct {
 }
 
 func newSftpListing(client *sftp.Client, fs dirLister, root string, recursive bool, startAt string) (*sftpListing, error) {
-	l := &sftpListing{
+	var l = &sftpListing{
 		client:    client,
 		fs:        fs,
 		recursive: recursive,
@@ -310,14 +310,14 @@ func (l *sftpListing) Next() (filesource.ObjectInfo, error) {
 		}
 
 		// Pop the next file in lexical order.
-		next := l.stack[len(l.stack)-1]
+		var next = l.stack[len(l.stack)-1]
 		l.stack = l.stack[:len(l.stack)-1]
 
 		// If this file is a symlink, it might be a symlink to a directory. We don't descend into
 		// directories so they should not be included in any listing output. If the file is a
 		// symlink to a non-directory, we should report the info of the referent file.
 		if next.Mode()&os.ModeSymlink != 0 {
-			info, err := l.client.Stat(next.path)
+			var info, err = l.client.Stat(next.path)
 			if err != nil {
 				return filesource.ObjectInfo{}, fmt.Errorf("stat'ing symbolic link: %w", err)
 			}
@@ -360,16 +360,16 @@ func (l *sftpListing) Next() (filesource.ObjectInfo, error) {
 }
 
 func (l *sftpListing) pushDir(dir string) error {
-	infos, err := l.fs.ReadDir(dir)
+	var infos, err = l.fs.ReadDir(dir)
 	if err != nil {
 		return err
 	}
 
 	// Filter out file names < query.StartAt and map to visits.
-	visits := []visit{}
+	var visits = []visit{}
 	for _, info := range infos {
-		filePath := filepath.Join(dir, info.Name())
-		startAt := l.startAt
+		var filePath = filepath.Join(dir, info.Name())
+		var startAt = l.startAt
 
 		// If this is a directory, filter it out based on the directory part of startAt. If we've
 		// process files like `a/b.csv` already, we still need to process files like `a/c.csv` and
@@ -408,7 +408,7 @@ type visit struct {
 }
 
 func (s *sftpSource) Read(_ context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	file, err := s.client.Open(obj.Path)
+	var file, err = s.client.Open(obj.Path)
 	if err != nil {
 		return nil, obj, fmt.Errorf("opening path %s for reading: %w", obj.Path, err)
 	}
@@ -421,9 +421,9 @@ func (s *sftpSource) Read(_ context.Context, obj filesource.ObjectInfo) (io.Read
 	obj.Size = info.Size()
 	obj.ModTime = info.ModTime()
 
-	r, w := io.Pipe()
+	var r, w = io.Pipe()
 
-	f := &sftpFile{
+	var f = &sftpFile{
 		file:   file,
 		reader: r,
 		writer: w,
@@ -448,7 +448,7 @@ type sftpFile struct {
 
 func (f *sftpFile) transfer() error {
 	// Pump data to the pipe using WriteTo to utilize concurrent read workers.
-	_, err := f.file.WriteTo(f.writer)
+	var _, err = f.file.WriteTo(f.writer)
 
 	// Errors from WriteTo will be propagated to calls to read. CloseWithError always returns `nil`.
 	return f.writer.CloseWithError(err)
@@ -491,8 +491,8 @@ func main() {
 }
 
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
-	knownHostsDescriptionJSON, _ := json.Marshal(knownHostsDescription)
-	skipHostKeyVerificationDescriptionJSON, _ := json.Marshal(skipHostKeyVerificationDescription)
+	var knownHostsDescriptionJSON, _ = json.Marshal(knownHostsDescription)
+	var skipHostKeyVerificationDescriptionJSON, _ = json.Marshal(skipHostKeyVerificationDescription)
 	return json.RawMessage(`{
         "$schema": "http://json-schema.org/draft-07/schema#",
         "properties": {
