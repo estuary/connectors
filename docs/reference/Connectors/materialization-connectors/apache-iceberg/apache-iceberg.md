@@ -777,6 +777,13 @@ If you do not use Glue for your catalog or otherwise do not configure automatic 
 you should conduct [regular maintenance](https://iceberg.apache.org/docs/latest/maintenance/)
 for your materialized tables to ensure optimal query performance.
 
+Every backfill drops and recreates the table. With S3 Tables, the connector requests a purge of the
+dropped table's files. Other catalogs, including AWS Glue, remove only the catalog entry by default
+and keep the files in storage. To delete them, run Iceberg's
+[`remove_orphan_files`](https://iceberg.apache.org/docs/latest/spark-procedures/#remove_orphan_files) on the new table with `older_than` set to the time of the backfill.
+Glue's [orphan file deletion](#glue-table-optimizers) optimizer only deletes files created after the
+optimizer itself, so it may not remove them.
+
 ### Merge-on-read
 
 By default, a merge rewrites every data file that holds an updated or deleted row. This is Iceberg's
