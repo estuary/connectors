@@ -61,7 +61,7 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
+		var host, port, err = net.SplitHostPort(config.Address)
 		if err != nil {
 			return nil, fmt.Errorf("splitting address to host and port: %w", err)
 		}
@@ -149,12 +149,12 @@ type credentialConfig struct {
 }
 
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
 	}
 	subSchemas = append(subSchemas, (iam.IAMConfig{}).OneOfSubSchemas()...)
 
-	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
+	var schema = schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
 
 	return schema
 }
@@ -354,7 +354,7 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 		case UserPassword:
 			pass = c.Credentials.Password
 		case AWSIAM:
-			credProvider, err := c.Credentials.AWSCredentialsProvider()
+			var credProvider, err = c.Credentials.AWSCredentialsProvider()
 			if err != nil {
 				return "", err
 			}

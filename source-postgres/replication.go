@@ -196,7 +196,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		// which includes situations like "DB version upgrade")
 		//
 		// TODO(wgd): Upgrade this check to an actual failure once it's been verified to work in prod.
-		serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+		var serverFlushLSN, err = queryLatestServerLSN(ctx, db.conn)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +227,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		}
 
 		// Initialize our start LSN to the current server flush LSN.
-		serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+		var serverFlushLSN, err = queryLatestServerLSN(ctx, db.conn)
 		if err != nil {
 			return nil, err
 		}
@@ -1129,7 +1129,7 @@ func (s *replicationStream) getTableProcessingInfo(relID uint32) (info *tablePro
 	// be possible to have a relation ID here for which we don't know the stream ID, but
 	// we have an error check just in case.
 	s.tables.RLock()
-	streamID, ok := s.tables.relationStreamID[relID]
+	var streamID, ok = s.tables.relationStreamID[relID]
 	if !ok {
 		s.tables.RUnlock()
 		return nil, false, fmt.Errorf("unknown relation ID %d", relID)

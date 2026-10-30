@@ -246,7 +246,7 @@ func decodeDimensionedArray(m *pgtype.Map, oid uint32, format int16, src []byte)
 		return nil, nil
 	}
 	var dst pgtype.Array[any]
-	err := m.PlanScan(oid, format, &dst).Scan(src, &dst)
+	var err = m.PlanScan(oid, format, &dst).Scan(src, &dst)
 	return dst, err
 }
 

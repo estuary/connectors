@@ -119,7 +119,7 @@ func (db *postgresDatabase) PeriodicChecks(ctx context.Context) error {
 		log.WithError(err).Debug("unable to query long-running transactions")
 	} else if len(longTxns) > 0 {
 		for _, txn := range longTxns {
-			logFields := log.Fields{
+			var logFields = log.Fields{
 				"pid":      txn.PID,
 				"duration": txn.Duration.String(),
 				"query":    txn.Query,

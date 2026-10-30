@@ -110,7 +110,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 
 	// Execute the backfill query to fetch rows from the database
 	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
-	rows, err := db.conn.Query(ctx, query, args...)
+	var rows, err = db.conn.Query(ctx, query, args...)
 	if err != nil {
 		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -208,11 +208,11 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		// assume that the raw bytes of the result value are the string representation of the XID.
 		if db.config.Advanced.MinimumBackfillXID != "" && xminIndex >= 0 {
 			var xminStr = string(rawValues[xminIndex])
-			xmin, err := strconv.ParseUint(xminStr, 10, 64)
+			var xmin, err = strconv.ParseUint(xminStr, 10, 64)
 			if err != nil {
 				return false, nil, fmt.Errorf("invalid xmin value %q: %w", xminStr, err)
 			}
-			minXID, _ := strconv.ParseUint(db.config.Advanced.MinimumBackfillXID, 10, 64) // Error ignored as it's validated at config load
+			var minXID, _ = strconv.ParseUint(db.config.Advanced.MinimumBackfillXID, 10, 64) // Error ignored as it's validated at config load
 
 			if compareXID32(uint32(xmin), uint32(minXID)) < 0 {
 				continue // Skip this row
@@ -438,7 +438,7 @@ func (db *postgresDatabase) explainQuery(ctx context.Context, streamID sqlcaptur
 		"id":    streamID,
 		"query": explainQuery,
 	}).Info("explain backfill query")
-	explainResult, err := db.conn.Query(ctx, explainQuery, args...)
+	var explainResult, err = db.conn.Query(ctx, explainQuery, args...)
 	if err != nil {
 		logrus.WithField("id", streamID).Error("unable to execute query")
 		return

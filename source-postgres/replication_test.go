@@ -15,7 +15,7 @@ func TestDecodeStrayStreamAbort(t *testing.T) {
 
 	// Byte1('A'), Int32 top-level XID, Int32 subtransaction XID.
 	var msg = []byte{'A', 0x00, 0xa8, 0x73, 0x99, 0x00, 0xa8, 0x73, 0x9a}
-	event, err := s.decodeMessage(0, msg)
+	var event, err = s.decodeMessage(0, msg)
 	require.NoError(t, err)
 	require.Nil(t, event)
 

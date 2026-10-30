@@ -72,7 +72,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -96,7 +96,7 @@ var connectorBinary string
 //
 // Split out from TestMain because os.Exit would skip deferred cleanup of the build.
 func runTests(m *testing.M) int {
-	buildDir, err := os.MkdirTemp("", "source-postgres-build-*")
+	var buildDir, err = os.MkdirTemp("", "source-postgres-build-*")
 	if err != nil {
 		log.WithField("err", err).Error("error creating build directory")
 		return 1
@@ -130,7 +130,7 @@ func blackboxTestSetup(t testing.TB) (*postgresTestDatabase, *blackbox.Transcrip
 	var fullName = testSchemaName + "." + baseName
 
 	// Setup: Create black-box test capture
-	tc, err := blackbox.NewWithTranscript("testdata/flow.yaml")
+	var tc, err = blackbox.NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)

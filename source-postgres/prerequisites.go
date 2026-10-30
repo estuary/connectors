@@ -219,7 +219,7 @@ func (db *postgresDatabase) prerequisiteWatermarksInPublication(ctx context.Cont
 	//
 	// (*Config).Validate() has previously verified that this value contains a period. The first
 	// part is the schema and the second part is the table.
-	tableParts := strings.Split(db.config.Advanced.WatermarksTable, ".")
+	var tableParts = strings.Split(db.config.Advanced.WatermarksTable, ".")
 	return db.addTableToPublication(ctx, tableParts[0], tableParts[1])
 }
 

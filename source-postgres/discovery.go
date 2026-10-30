@@ -101,7 +101,7 @@ func (db *postgresDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableI
 	slices.Sort(includeSchemas)
 	includeSchemas = slices.Compact(includeSchemas)
 
-	tables, err := listTables(ctx, db.conn, includeSchemas, db.config.Advanced.CaptureAsPartitions)
+	var tables, err = listTables(ctx, db.conn, includeSchemas, db.config.Advanced.CaptureAsPartitions)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (db *postgresDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableI
 	// and the legacy Advanced one are OR'd together for back-compat.
 	var discoverUnpublished = db.config.Advanced.DiscoverUnpublishedTables || db.config.DiscoveryFilters.DiscoverUnpublishedTables
 	if !discoverUnpublished {
-		publicationStatus, err := listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
+		var publicationStatus, err = listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 // column descriptions, primary keys, generated columns, secondary indexes) for
 // one batch of requested tables and merges the results into dst.
 func (db *postgresDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, requested []sqlcapture.TableID) error {
-	tables, err := getTables(ctx, db.conn, requested)
+	var tables, err = getTables(ctx, db.conn, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database tables: %w", err)
 	}
