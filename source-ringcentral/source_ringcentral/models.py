@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import Any, ClassVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
@@ -108,6 +108,12 @@ class RingCentralResource(BaseDocument, extra="allow"):
             if not hasattr(cls, attr):
                 raise TypeError(f"{cls.__name__} must define {attr}")
 
+    @classmethod
+    def response_model[T: RingCentralResource](
+        cls: type[T],
+    ) -> type[PaginatedResponse[T]]:
+        return NavigationResponse[cls]
+
 
 class FullRefreshResource(RingCentralResource):
     KEY: ClassVar[str] = "/_meta/row_id"
@@ -147,6 +153,13 @@ class InternalContact(FullRefreshResource):
     RATE_GROUP: ClassVar[RateGroup] = RateGroup.MEDIUM
     REQUIRED_SCOPES: ClassVar[set[Scope]] = {Scope.READ_ACCOUNTS}
 
+    @classmethod
+    def response_model[T: RingCentralResource](
+        cls: type[T],
+    ) -> type[PaginatedResponse[T]]:
+        # The company directory endpoint returns `paging` but no `navigation`.
+        return PagingResponse[cls]
+
 
 class ExternalContact(FullRefreshResource):
     NAME: ClassVar[str] = "external_contacts"
@@ -184,9 +197,6 @@ class Message(IncrementalResource):
         return self.creationTime
 
 
-TResource = TypeVar("TResource", bound=RingCentralResource)
-
-
 class Page(BaseModel, extra="allow"):
     uri: str
 
@@ -195,6 +205,30 @@ class Navigation(BaseModel, extra="allow"):
     nextPage: Page | None = None
 
 
-class PaginatedResponse(BaseModel, Generic[TResource], extra="allow"):
+class Paging(BaseModel, extra="allow"):
+    page: int
+    totalPages: int
+
+
+class PaginatedResponse[TResource: RingCentralResource](BaseModel, extra="allow"):
     records: list[TResource] = Field(default_factory=list)
-    navigation: Navigation | None = None
+
+    @property
+    def has_more(self) -> bool:
+        raise NotImplementedError
+
+
+class NavigationResponse[TResource: RingCentralResource](PaginatedResponse[TResource]):
+    navigation: Navigation
+
+    @property
+    def has_more(self) -> bool:
+        return self.navigation.nextPage is not None
+
+
+class PagingResponse[TResource: RingCentralResource](PaginatedResponse[TResource]):
+    paging: Paging
+
+    @property
+    def has_more(self) -> bool:
+        return self.paging.page < self.paging.totalPages
