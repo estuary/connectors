@@ -559,9 +559,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
 				} else if doc.binding < 0 {
-					if doc.document == "" {
-						continue
-					} else if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
+					if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
 						return fmt.Errorf("parsing load match counts %q: %w", doc.document, err)
 					}
 					continue
@@ -575,7 +573,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 			if err := rows.Err(); err != nil {
 				return fmt.Errorf("querying Loads: %w", err)
-			} else if matched >= 0 && docCount != matched {
+			} else if docCount != matched {
 				// Files rewritten between the script's match and its read of
 				// documents, such as by OPTIMIZE, hide their rows from the read.
 				return fmt.Errorf("load of %s read %d of the %d rows matching its keys, as the table's files changed during the load", load.binding.target.Identifier, docCount, matched)

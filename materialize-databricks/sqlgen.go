@@ -187,12 +187,8 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 -- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
 
 {{ define "loadQuery" }}
-{{ if $.Table.Document -}}
 SELECT {{ $.Table.Binding }}, l.{{ $.Table.Document.Identifier }}
 	{{ template "loadJoin" $ }}
-{{ else -}}
-SELECT -1, ""
-{{ end -}}
 {{ end }}
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
