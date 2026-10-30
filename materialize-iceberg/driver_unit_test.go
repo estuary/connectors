@@ -15,7 +15,7 @@ import (
 )
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
-	tr := &transactor{
+	var tr = &transactor{
 		cp: map[string]*pendingMerge{
 			"a_table.v1": {MergeBinding: python.MergeBinding{Binding: 0, Query: "MERGE INTO a"}},
 		},
@@ -27,7 +27,7 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	// The staged entry's state key is not requested: no merge job may run
 	// (the nil compute runner would panic otherwise) and no state update is
 	// returned, so the entry remains pending in the persisted state.
-	state, err := tr.Acknowledge(context.Background(), nil, []string{"other_table.v1"})
+	var state, err = tr.Acknowledge(context.Background(), nil, []string{"other_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
 	require.NotNil(t, tr.cp["a_table.v1"])
@@ -60,9 +60,9 @@ func TestResourceParameters(t *testing.T) {
 		{name: "preserve sanitizes", mode: identifierCasePreserve, namespace: "My-Ns", table: "My-Table", wantPath: []string{"My_Ns", "My_Table"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config{Namespace: "Default_Ns", Advanced: advancedConfig{TableIdentifierCase: tt.mode}}
-			res := resource{Table: tt.table, Namespace: tt.namespace}.WithDefaults(cfg)
-			path, _, err := res.Parameters()
+			var cfg = config{Namespace: "Default_Ns", Advanced: advancedConfig{TableIdentifierCase: tt.mode}}
+			var res = resource{Table: tt.table, Namespace: tt.namespace}.WithDefaults(cfg)
+			var path, _, err = res.Parameters()
 			require.NoError(t, err)
 			require.Equal(t, tt.wantPath, path)
 		})
@@ -84,14 +84,14 @@ func TestDefaultNamespace(t *testing.T) {
 		{name: "preserve sanitizes", mode: identifierCasePreserve, namespace: "Default-Ns", want: "Default_Ns"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config{Namespace: tt.namespace, Advanced: advancedConfig{TableIdentifierCase: tt.mode}}
+			var cfg = config{Namespace: tt.namespace, Advanced: advancedConfig{TableIdentifierCase: tt.mode}}
 			require.Equal(t, tt.want, cfg.DefaultNamespace())
 		})
 	}
 }
 
 func TestDeprecatedLowercaseColumnNamesIsHidden(t *testing.T) {
-	resp, err := (Driver{}).Spec(context.Background(), &pm.Request_Spec{})
+	var resp, err = (Driver{}).Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 	require.NotContains(t, string(resp.ConfigSchemaJson), "lowercase_column_names",
 		"a deprecated option must not be offered to new users in the config schema")
@@ -119,12 +119,12 @@ func TestFieldNameCase(t *testing.T) {
 		{name: "deprecated lowercase_column_names agreeing with field_name_case", mode: identifierCaseLowercase, lowercaseColumnNames: true, want: "myfield"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			d := &materialization{cfg: config{Advanced: advancedConfig{
+			var d = &materialization{cfg: config{Advanced: advancedConfig{
 				FieldNameCase:        tt.mode,
 				LowercaseColumnNames: tt.lowercaseColumnNames,
 			}}}
 
-			m, _ := d.MapType(boilerplate.Projection{
+			var m, _ = d.MapType(boilerplate.Projection{
 				Projection: pf.Projection{Field: "MyField"},
 				FlatType:   boilerplate.FlatTypeBoolean{},
 			}, fieldConfig{})
@@ -132,7 +132,7 @@ func TestFieldNameCase(t *testing.T) {
 
 			// The name a column is created with must match the name the
 			// boilerplate translates the field to when looking for that column.
-			translate := d.Config().TranslateField
+			var translate = d.Config().TranslateField
 			if translate == nil {
 				translate = func(f string) string { return f }
 			}
@@ -144,13 +144,13 @@ func TestFieldNameCase(t *testing.T) {
 func TestValidate(t *testing.T) {
 	// The required fields are stubbed so that Validate reaches the
 	// table_identifier_case check.
-	cfg := config{
+	var cfg = config{
 		URL:       "https://example.com/api/catalog",
 		Warehouse: "warehouse",
 		Namespace: "ns",
 		Advanced:  advancedConfig{TableIdentifierCase: "camelCase"},
 	}
-	err := cfg.Validate()
+	var err = cfg.Validate()
 	require.ErrorContains(t, err, "table_identifier_case")
 
 	// Valid values pass the table_identifier_case check. Validate may still
@@ -166,18 +166,18 @@ func TestValidate(t *testing.T) {
 func TestValidateFieldNameCase(t *testing.T) {
 	// The required fields are stubbed so that Validate reaches the
 	// field_name_case checks.
-	baseCfg := config{
+	var baseCfg = config{
 		URL:       "https://example.com/api/catalog",
 		Warehouse: "warehouse",
 		Namespace: "ns",
 	}
 
-	cfg := baseCfg
+	var cfg = baseCfg
 	cfg.Advanced.FieldNameCase = "camelCase"
 	require.ErrorContains(t, cfg.Validate(), "field_name_case")
 
 	for _, v := range []identifierCase{"", identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve} {
-		cfg := baseCfg
+		var cfg = baseCfg
 		cfg.Advanced.FieldNameCase = v
 		if err := cfg.Validate(); err != nil {
 			require.NotContains(t, err.Error(), "field_name_case")
@@ -196,11 +196,11 @@ func TestValidateFieldNameCase(t *testing.T) {
 		{mode: identifierCasePreserve, conflict: true},
 	} {
 		t.Run("lowercase_column_names with "+string(tt.mode), func(t *testing.T) {
-			cfg := baseCfg
+			var cfg = baseCfg
 			cfg.Advanced.LowercaseColumnNames = true
 			cfg.Advanced.FieldNameCase = tt.mode
 
-			err := cfg.Validate()
+			var err = cfg.Validate()
 			if tt.conflict {
 				require.ErrorContains(t, err, "lowercase_column_names")
 				require.ErrorContains(t, err, "field_name_case")
@@ -213,10 +213,10 @@ func TestValidateFieldNameCase(t *testing.T) {
 
 func TestErrorWithVariantHint(t *testing.T) {
 	// Polaris 1.4 (Iceberg Java) rejecting a variant column in a v2 table.
-	variantErr := errors.New("failed to POST .../tables: 500 Internal Server Error (Code: 500, Message: Invalid schema for v2:\n- Invalid type for doc: variant is not supported until v3, Type: IllegalStateException)")
+	var variantErr = errors.New("failed to POST .../tables: 500 Internal Server Error (Code: 500, Message: Invalid schema for v2:\n- Invalid type for doc: variant is not supported until v3, Type: IllegalStateException)")
 	// Iceberg Java's TableMetadata message for a version the library predates.
-	versionErr := errors.New("failed to POST .../tables: 400 Bad Request (Code: 400, Message: Unsupported format version: v3 (supported: v2), Type: IllegalArgumentException)")
-	otherErr := errors.New("failed to POST: 403 Forbidden (Message: not authorized)")
+	var versionErr = errors.New("failed to POST .../tables: 400 Bad Request (Code: 400, Message: Unsupported format version: v3 (supported: v2), Type: IllegalArgumentException)")
+	var otherErr = errors.New("failed to POST: 403 Forbidden (Message: not authorized)")
 
 	require.ErrorContains(t, errorWithVariantHint(variantErr, true), variantRemedy)
 	require.ErrorContains(t, errorWithVariantHint(versionErr, true), variantRemedy)

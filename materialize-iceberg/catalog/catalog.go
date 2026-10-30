@@ -53,7 +53,7 @@ type tableConfig struct {
 // time as a native time.Time, which is a lot easier to work with.
 func (t *tableConfig) UnmarshalJSON(data []byte) error {
 	type Alias tableConfig
-	aux := &struct {
+	var aux = &struct {
 		ExpirationTime string `json:"expiration-time"`
 		*Alias
 	}{
@@ -65,7 +65,7 @@ func (t *tableConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	if aux.ExpirationTime != "" {
-		millis, err := strconv.Atoi(aux.ExpirationTime)
+		var millis, err = strconv.Atoi(aux.ExpirationTime)
 		if err != nil {
 			return err
 		}
@@ -206,12 +206,12 @@ type Catalog struct {
 }
 
 func New(ctx context.Context, catalogUrl string, warehouse string, opts ...CatalogOption) (*Catalog, error) {
-	cfg := &catalogOpts{}
+	var cfg = &catalogOpts{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	parsedCatalogUrl, err := url.Parse(catalogUrl)
+	var parsedCatalogUrl, err = url.Parse(catalogUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse catalog url: %w", err)
 	}
@@ -230,12 +230,12 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 			// as with Dremio Cloud (catalog.dremio.cloud vs.
 			// login.dremio.cloud). An absolute oauth2ServerUri is used as-is;
 			// otherwise it is treated as a path relative to the catalog URL.
-			resolvedTokenURL := parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String()
+			var resolvedTokenURL = parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String()
 			if u, err := url.Parse(cfg.oauth2ServerUri); err == nil && u.IsAbs() && u.Host != "" {
 				resolvedTokenURL = cfg.oauth2ServerUri
 			}
 
-			clientCredCfg := &clientcredentials.Config{
+			var clientCredCfg = &clientcredentials.Config{
 				ClientID:     clientID,
 				ClientSecret: clientSecret,
 				TokenURL:     resolvedTokenURL,
@@ -264,8 +264,8 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 		return nil, errors.New("must provide an authentication option")
 	}
 
-	baseURL := parsedCatalogUrl.JoinPath("v1")
-	rc := &Catalog{
+	var baseURL = parsedCatalogUrl.JoinPath("v1")
+	var rc = &Catalog{
 		// Retries use resty's default conditions (429 and 5xx except 501).
 		// SetAllowNonIdempotentRetry covers POST requests, which we need
 		// because Snowflake Polaris has been observed returning transient
@@ -305,7 +305,7 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 			prefix = p
 		}
 		if u, ok := catalogCfg.Defaults["uri"]; ok {
-			uri, err := url.Parse(u)
+			var uri, err = url.Parse(u)
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse defaults.uri %q: %w", uri, err)
 			}
@@ -317,7 +317,7 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 			prefix = p
 		}
 		if u, ok := catalogCfg.Overrides["uri"]; ok {
-			uri, err := url.Parse(u)
+			var uri, err = url.Parse(u)
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse overrides.uri %q: %w", uri, err)
 			}
@@ -342,17 +342,17 @@ func (c *Catalog) ListNamespaces(ctx context.Context) ([]string, error) {
 		NextPageToken string     `json:"next-page-token"`
 	}
 
-	pageSize := "100"
-	pageToken := ""
+	var pageSize = "100"
+	var pageToken = ""
 
 	var names []string
 	for {
-		params := [][]string{{"pageSize", pageSize}}
+		var params = [][]string{{"pageSize", pageSize}}
 		if pageToken != "" {
 			params = append(params, []string{"pageToken", pageToken})
 		}
 
-		res, err := doGet[resp](ctx, c, "/namespaces", params)
+		var res, err = doGet[resp](ctx, c, "/namespaces", params)
 		if err != nil {
 			return nil, err
 		}
@@ -391,17 +391,17 @@ func (c *Catalog) ListTables(ctx context.Context, ns string) ([]string, error) {
 		NextPageToken string `json:"next-page-token"`
 	}
 
-	pageSize := "100"
-	pageToken := ""
+	var pageSize = "100"
+	var pageToken = ""
 
 	var names []string
 	for {
-		params := [][]string{{"pageSize", pageSize}}
+		var params = [][]string{{"pageSize", pageSize}}
 		if pageToken != "" {
 			params = append(params, []string{"pageToken", pageToken})
 		}
 
-		res, err := doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), params)
+		var res, err = doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), params)
 		if err != nil {
 			return nil, err
 		}
@@ -443,7 +443,7 @@ func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []stri
 		return nil, nil, 0, fmt.Errorf("parsing table metadata: %w", err)
 	}
 
-	versionRaw, ok := fields["format-version"]
+	var versionRaw, ok = fields["format-version"]
 	if !ok {
 		return raw, nil, 0, nil
 	}
@@ -467,7 +467,7 @@ func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []stri
 	}
 	slices.Sort(dropped)
 
-	sanitized, err := json.Marshal(fields)
+	var sanitized, err = json.Marshal(fields)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("re-encoding sanitized table metadata: %w", err)
 	}
@@ -481,7 +481,7 @@ func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table,
 		RawMeta          json.RawMessage `json:"metadata"`
 	}
 
-	res, err := doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables/%s", ns, name))
+	var res, err = doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables/%s", ns, name))
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +536,7 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 		StageCreate bool              `json:"stage-create"` // always false, required to exist & be false for s3tables catalogs
 	}
 
-	req := createTableRequest{
+	var req = createTableRequest{
 		Name:        name,
 		Schema:      sch,
 		Location:    location,
@@ -578,7 +578,7 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 }
 
 func (c *Catalog) DeleteTable(ctx context.Context, ns string, name string) error {
-	req := c.baseReq(ctx)
+	var req = c.baseReq(ctx)
 	if c.isS3tables {
 		// This must be set if using s3tables. For glue, it must _not_ be set.
 		// For other REST catalogs (Snowflake open catalog, for example) it
@@ -604,7 +604,7 @@ func (c *Catalog) UpdateTable(ctx context.Context, ns string, name string, reqs 
 		Updates      []TableUpdate      `json:"updates"`
 	}
 
-	req := tableUpdateRequest{
+	var req = tableUpdateRequest{
 		Requirements: reqs,
 		Updates:      upds,
 	}
@@ -643,7 +643,7 @@ func (c *Catalog) baseReq(ctx context.Context) *resty.Request {
 func doGet[T any](ctx context.Context, client *Catalog, path string, params ...[][]string) (*T, error) {
 	var res T
 
-	req := client.baseReq(ctx)
+	var req = client.baseReq(ctx)
 	if len(params) > 0 {
 		for _, param := range params[0] {
 			req.SetQueryParam(param[0], param[1])
@@ -653,7 +653,7 @@ func doGet[T any](ctx context.Context, client *Catalog, path string, params ...[
 	if got, err := req.SetResult(&res).Get(path); err != nil {
 		return nil, fmt.Errorf("failed to get %s: %w", path, err)
 	} else if !got.IsSuccess() {
-		e := got.Error().(*errorResponse)
+		var e = got.Error().(*errorResponse)
 		if e.Error.Type == "IcebergTableNotFoundException" {
 			return nil, ErrTableNotFound
 		}
@@ -688,7 +688,7 @@ type sigv4Transport struct {
 }
 
 func (t *sigv4Transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	h := sha256.New()
+	var h = sha256.New()
 
 	var hsh string
 	if req.Body != nil {

@@ -41,8 +41,8 @@ var region = flag.String("region", "", "AWS region for using SigV4 authenticatio
 var signingName = flag.String("signing-name", "", "Signing name for using SigV4 authentication")
 
 func getCatalog(ctx context.Context) (*catalog.Catalog, error) {
-	usingClientCredentialAuth := *clientCredential != ""
-	usingSigV4Auth := *awsAccessKeyID != ""
+	var usingClientCredentialAuth = *clientCredential != ""
+	var usingSigV4Auth = *awsAccessKeyID != ""
 
 	if *catalogUrl == "" {
 		return nil, errors.New("missing required flag for catalog url")
@@ -65,7 +65,7 @@ func getCatalog(ctx context.Context) (*catalog.Catalog, error) {
 		opts = append(opts, catalog.WithSigV4(*signingName, *awsAccessKeyID, *awsSecretAccessKey, *region, ""))
 	}
 
-	cat, err := catalog.New(ctx, *catalogUrl, *warehouse, opts...)
+	var cat, err = catalog.New(ctx, *catalogUrl, *warehouse, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -113,16 +113,16 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "%s\n", scriptDescription)
 	}
 	flag.Parse()
-	args := flag.Args()
+	var args = flag.Args()
 
 	if len(flag.Args()) < 2 {
 		fmt.Println("must provide at least 2 positional arguments")
 		os.Exit(1)
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	cat, err := getCatalog(ctx)
+	var cat, err = getCatalog(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func doList(ctx context.Context, cat *catalog.Catalog, args []string) (string, e
 
 	var out strings.Builder
 	if args[0] == "namespaces" {
-		ns, err := cat.ListNamespaces(ctx)
+		var ns, err = cat.ListNamespaces(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -172,7 +172,7 @@ func doList(ctx context.Context, cat *catalog.Catalog, args []string) (string, e
 			out.WriteString(fmt.Sprintf("%s\n", n))
 		}
 	} else if args[0] == "tables" {
-		ns, err := cat.ListNamespaces(ctx)
+		var ns, err = cat.ListNamespaces(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -180,12 +180,12 @@ func doList(ctx context.Context, cat *catalog.Catalog, args []string) (string, e
 		for _, n := range ns {
 			out.WriteString(fmt.Sprintf("Tables in namespace %s:\n", n))
 
-			tables, err := cat.ListTables(ctx, n)
+			var tables, err = cat.ListTables(ctx, n)
 			if err != nil {
 				return "", err
 			}
 
-			count := 1
+			var count = 1
 			for _, t := range tables {
 				out.WriteString(fmt.Sprintf("%d: %s.%s\n", count, n, t))
 				count++
@@ -203,7 +203,7 @@ func doDescribeTable(ctx context.Context, cat *catalog.Catalog, args []string) (
 		return "", errors.New("must provide positional argument for the table to describe as 'namespace.table'")
 	}
 
-	ns, name, err := tableParts(args[0])
+	var ns, name, err = tableParts(args[0])
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +231,7 @@ func doReadTable(ctx context.Context, cat *catalog.Catalog, args []string) (stri
 		return "", errors.New("must provide positional argument for the table to read as 'namespace.table'")
 	}
 
-	ns, name, err := tableParts(args[0])
+	var ns, name, err = tableParts(args[0])
 	if err != nil {
 		return "", err
 	}
@@ -252,7 +252,7 @@ func doReadTable(ctx context.Context, cat *catalog.Catalog, args []string) (stri
 	}
 	defer db.Close()
 
-	initQueries := []string{
+	var initQueries = []string{
 		"INSTALL iceberg;",
 		"LOAD iceberg;",
 		"INSTALL httpfs;",
@@ -284,13 +284,13 @@ func doReadTable(ctx context.Context, cat *catalog.Catalog, args []string) (stri
 	}
 
 	var out bytes.Buffer
-	enc := json.NewEncoder(&out)
+	var enc = json.NewEncoder(&out)
 	enc.SetEscapeHTML(false)
 
 	for rows.Next() {
-		row := make(map[string]any)
-		values := make([]any, len(cols))
-		valuePtrs := make([]any, len(cols))
+		var row = make(map[string]any)
+		var values = make([]any, len(cols))
+		var valuePtrs = make([]any, len(cols))
 
 		for i := range values {
 			valuePtrs[i] = &values[i]
@@ -324,7 +324,7 @@ func doPurgeTable(ctx context.Context, cat *catalog.Catalog, args []string) (str
 		return "", errors.New("must provide positional argument for the table to delete as 'namespace.table'")
 	}
 
-	ns, name, err := tableParts(args[0])
+	var ns, name, err = tableParts(args[0])
 	if err != nil {
 		return "", err
 	}
@@ -334,13 +334,13 @@ func doPurgeTable(ctx context.Context, cat *catalog.Catalog, args []string) (str
 		return "", err
 	}
 
-	loc := table.Metadata.Location()
+	var loc = table.Metadata.Location()
 
 	if !*force {
 		fmt.Printf("Are you sure you want to DELETE %q from the catalog and all of its files from %q?\n", args[0], loc)
 		fmt.Println("Enter Y to continue, anything else to cancel:")
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
+		var reader = bufio.NewReader(os.Stdin)
+		var input, err = reader.ReadString('\n')
 		if err != nil {
 			return "", err
 		}
@@ -365,18 +365,18 @@ func doPurgeTable(ctx context.Context, cat *catalog.Catalog, args []string) (str
 		return "", err
 	}
 
-	s3client := s3.NewFromConfig(cfg)
+	var s3client = s3.NewFromConfig(cfg)
 
 	loc = strings.TrimPrefix(loc, "s3://")
-	split := strings.SplitN(loc, "/", 2)
+	var split = strings.SplitN(loc, "/", 2)
 	if len(split) != 2 {
 		return "", fmt.Errorf("error parsing bucket/prefix: %v\n", loc)
 	}
-	bucket := split[0]
-	prefix := split[1]
+	var bucket = split[0]
+	var prefix = split[1]
 
 	for _, p := range []string{"data", "metadata"} {
-		prefix := path.Join(prefix, p)
+		var prefix = path.Join(prefix, p)
 		if err := cleanPrefix(ctx, s3client, bucket, prefix); err != nil {
 			return "", fmt.Errorf("failed to purge prefix %q: %w", prefix, err)
 		}
@@ -390,20 +390,20 @@ func doPurgeTable(ctx context.Context, cat *catalog.Catalog, args []string) (str
 }
 
 func cleanPrefix(ctx context.Context, s3client *s3.Client, bucket string, prefix string) error {
-	paginator := s3.NewListObjectsV2Paginator(s3client, &s3.ListObjectsV2Input{
+	var paginator = s3.NewListObjectsV2Paginator(s3client, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
 	})
 
-	count := 0
+	var count = 0
 	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
+		var page, err = paginator.NextPage(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get next page: %w", err)
 		}
 		count += len(page.Contents)
 
-		thisPage := make([]types.ObjectIdentifier, 0, len(page.Contents))
+		var thisPage = make([]types.ObjectIdentifier, 0, len(page.Contents))
 		for _, obj := range page.Contents {
 			thisPage = append(thisPage, types.ObjectIdentifier{Key: obj.Key})
 		}
@@ -427,7 +427,7 @@ func cleanPrefix(ctx context.Context, s3client *s3.Client, bucket string, prefix
 }
 
 func tableParts(fqn string) (ns string, name string, err error) {
-	parts := strings.Split(fqn, ".")
+	var parts = strings.Split(fqn, ".")
 	if len(parts) < 2 {
 		return "", "", fmt.Errorf("invalid table FQN %q: must be of the form 'namespace.table'", fqn)
 	} else if len(parts) > 2 {
@@ -438,8 +438,8 @@ func tableParts(fqn string) (ns string, name string, err error) {
 }
 
 func resolveCredentials(table *catalog.Table) (types.BucketLocationConstraint, aws.Credentials, error) {
-	metadataLocation := table.MetadataLocation
-	creds := aws.Credentials{
+	var metadataLocation = table.MetadataLocation
+	var creds = aws.Credentials{
 		AccessKeyID:     table.Config.S3_AccessKeyId,
 		SecretAccessKey: table.Config.S3_SecretAccessKey,
 		SessionToken:    table.Config.S3_SessionToken,
@@ -453,7 +453,7 @@ func resolveCredentials(table *catalog.Table) (types.BucketLocationConstraint, a
 		creds.SecretAccessKey = *awsSecretAccessKey
 		awsRegion = types.BucketLocationConstraint(*region)
 	} else {
-		gotRegion, err := getBucketRegion(metadataLocation)
+		var gotRegion, err = getBucketRegion(metadataLocation)
 		if err != nil {
 			return "", aws.Credentials{}, err
 		}
@@ -468,10 +468,10 @@ func getBucketRegion(uri string) (string, error) {
 	// already know it using the AWS Go SDKs, but this silly mechanism actually
 	// seems to work 100% of the time.
 	uri = strings.TrimPrefix(uri, "s3://")
-	split := strings.SplitN(uri, "/", 2)
-	bucket := split[0]
+	var split = strings.SplitN(uri, "/", 2)
+	var bucket = split[0]
 
-	resp, err := http.DefaultClient.Head(fmt.Sprintf("https://%s.s3.amazonaws.com", bucket))
+	var resp, err = http.DefaultClient.Head(fmt.Sprintf("https://%s.s3.amazonaws.com", bucket))
 	if resp != nil && resp.Header != nil {
 		if bucketRegion := resp.Header.Get("x-amz-bucket-region"); bucketRegion != "" {
 			return bucketRegion, nil

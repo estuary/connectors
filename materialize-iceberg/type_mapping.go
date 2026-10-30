@@ -68,7 +68,7 @@ func mapProjection(p boilerplate.Projection, translateField boilerplate.Translat
 	var converter boilerplate.ElementConverter
 
 	m.Name = translateField(p.Field)
-	useVariant := variantColumns && !p.IsPrimaryKey
+	var useVariant = variantColumns && !p.IsPrimaryKey
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:
@@ -138,7 +138,7 @@ func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, ma
 	var fields []iceberg.NestedField
 
 	// In Iceberg terms, identifier fields are the "keys" of a table.
-	identifierFields, lastId := appendProjectionsAsFields(&fields, res.Keys, 0, false)
+	var identifierFields, lastId = appendProjectionsAsFields(&fields, res.Keys, 0, false)
 	_, lastId = appendProjectionsAsFields(&fields, res.Values, lastId, false)
 	if p := res.Document; p != nil {
 		appendProjectionsAsFields(&fields, []boilerplate.MappedProjection[mapped]{*p}, lastId, false)
@@ -179,7 +179,7 @@ func computeSchemaForUpdatedTable(
 
 	var tempMigrateProjections []boilerplate.MappedProjection[mapped]
 	for _, f := range update.FieldsToMigrate {
-		temp := f.To
+		var temp = f.To
 		temp.Mapped.Name += migrateFieldSuffix
 		tempMigrateProjections = append(tempMigrateProjections, temp)
 	}
@@ -191,14 +191,14 @@ func computeSchemaForUpdatedTable(
 	// optional, matching how materialize-sql treats newly-added columns as
 	// nullable regardless of MustExist and only enforces required-ness at
 	// fresh table creation.
-	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID, true)
+	var _, lastId = appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID, true)
 	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId, true)
 
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
 
 func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrate []boilerplate.MigrateField[mapped]) *iceberg.Schema {
-	fieldWasMigrated := func(f iceberg.NestedField) bool {
+	var fieldWasMigrated = func(f iceberg.NestedField) bool {
 		return slices.ContainsFunc(fieldsToMigrate, func(field boilerplate.MigrateField[mapped]) bool {
 			return f.Name == field.From.Name
 		})
@@ -234,7 +234,7 @@ func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrat
 }
 
 func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.MappedProjection[mapped], startID int, forceOptional bool) ([]int, int) {
-	id := startID
+	var id = startID
 	var ids []int
 
 	for _, p := range ps {
@@ -244,7 +244,7 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 			id += 1
 		}
 
-		required := !forceOptional && ((p.MustExist && !p.Mapped.Nullable) || p.IsPrimaryKey)
+		var required = !forceOptional && ((p.MustExist && !p.Mapped.Nullable) || p.IsPrimaryKey)
 
 		*dst = append(*dst, iceberg.NestedField{
 			ID:       id,

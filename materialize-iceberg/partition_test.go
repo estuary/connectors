@@ -50,9 +50,9 @@ func TestPartitionedTable(t *testing.T) {
 	ensureDockerUp(t)
 
 	for name, configPath := range localConfigTemplates {
-		name := strings.TrimSuffix(strings.TrimPrefix(path.Base(name), "config."), ".yaml")
+		var name = strings.TrimSuffix(strings.TrimPrefix(path.Base(name), "config."), ".yaml")
 		t.Run(name, func(t *testing.T) {
-			raw, err := boilerplate.ReadConfigFile(configPath)
+			var raw, err = boilerplate.ReadConfigFile(configPath)
 			require.NoError(t, err)
 			var cfg config
 			require.NoError(t, json.Unmarshal(raw, &cfg))
@@ -66,13 +66,13 @@ func TestPartitionedTable(t *testing.T) {
 const partitionBuckets = 8
 
 func runPartitionedTable(t *testing.T, cfg config) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	flags := common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
-	matIface, err := NewMaterializer(ctx, "acmeCo/tests/partitioned", cfg, flags)
+	var flags = common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
+	var matIface, err = NewMaterializer(ctx, "acmeCo/tests/partitioned", cfg, flags)
 	require.NoError(t, err)
-	mat := matIface.(*materialization)
-	spark, ok := mat.compute.(*sparkClient)
+	var mat = matIface.(*materialization)
+	var spark, ok = mat.compute.(*sparkClient)
 	require.True(t, ok, "this test drives the local spark daemon")
 
 	// Setup stages the PySpark scripts and records their locations, which
@@ -80,23 +80,23 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	_, err = mat.Setup(ctx, nil)
 	require.NoError(t, err)
 
-	suffix := fmt.Sprintf("_flow_test_%d", time.Now().Unix())
+	var suffix = fmt.Sprintf("_flow_test_%d", time.Now().Unix())
 
-	project := func(field, ptr string, types []string, isKey bool) realBoilerplate.MappedProjection[mapped] {
-		p := realBoilerplate.MapProjection(pf.Projection{
+	var project = func(field, ptr string, types []string, isKey bool) realBoilerplate.MappedProjection[mapped] {
+		var p = realBoilerplate.MapProjection(pf.Projection{
 			Field:        field,
 			Ptr:          ptr,
 			IsPrimaryKey: isKey,
 			Inference:    pf.Inference{Types: types, Exists: pf.Inference_MUST},
 		}, fieldConfig{})
-		mt, _ := mat.MapType(p, fieldConfig{})
+		var mt, _ = mat.MapType(p, fieldConfig{})
 		return realBoilerplate.MappedProjection[mapped]{Projection: p, Mapped: mt}
 	}
-	newBinding := func(table string) (realBoilerplate.MappedBinding[config, resource, mapped], []string) {
-		res := resource{Table: table}.WithDefaults(cfg)
-		path, _, err := res.Parameters()
+	var newBinding = func(table string) (realBoilerplate.MappedBinding[config, resource, mapped], []string) {
+		var res = resource{Table: table}.WithDefaults(cfg)
+		var path, _, err = res.Parameters()
 		require.NoError(t, err)
-		doc := project("flow_document", "", []string{"object"}, false)
+		var doc = project("flow_document", "", []string{"object"}, false)
 		return realBoilerplate.MappedBinding[config, resource, mapped]{
 			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: path},
 			Config:                      res,
@@ -105,34 +105,34 @@ func runPartitionedTable(t *testing.T, cfg config) {
 			Document:                    &doc,
 		}, path
 	}
-	create := func(mb realBoilerplate.MappedBinding[config, resource, mapped], path []string) {
-		_, err := mat.CreateNamespace(ctx, path[0])
+	var create = func(mb realBoilerplate.MappedBinding[config, resource, mapped], path []string) {
+		var _, err = mat.CreateNamespace(ctx, path[0])
 		require.NoError(t, err)
 		_, apply, err := mat.CreateResource(ctx, mb)
 		require.NoError(t, err)
 		require.NoError(t, apply(ctx))
 		t.Cleanup(func() {
-			_, del, err := mat.DeleteResource(context.Background(), path)
+			var _, del, err = mat.DeleteResource(context.Background(), path)
 			require.NoError(t, err)
 			_ = del(context.Background())
 		})
 	}
-	fqn := func(path []string) string {
+	var fqn = func(path []string) string {
 		return fmt.Sprintf("`estuary`.%s.%s", quoteIdentifier(path[0]), quoteIdentifier(path[1]))
 	}
-	sparkExec := func(query string) error {
+	var sparkExec = func(query string) error {
 		return spark.postDaemon(ctx, "exec", python.ExecInput{Query: query}, &daemonResult{})
 	}
-	partitionSpec := func(path []string) string {
-		tbl, err := mat.catalog.GetTable(ctx, path[0], path[1])
+	var partitionSpec = func(path []string) string {
+		var tbl, err = mat.catalog.GetTable(ctx, path[0], path[1])
 		require.NoError(t, err)
-		spec := tbl.Metadata.PartitionSpec()
+		var spec = tbl.Metadata.PartitionSpec()
 		return spec.String()
 	}
 
 	// The control table stays unpartitioned so the plans can be compared.
-	partitioned, partitionedPath := newBinding("partitioned" + suffix)
-	control, controlPath := newBinding("control" + suffix)
+	var partitioned, partitionedPath = newBinding("partitioned" + suffix)
+	var control, controlPath = newBinding("control" + suffix)
 	create(partitioned, partitionedPath)
 	create(control, controlPath)
 
@@ -147,22 +147,22 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	}
 	var rows []row
 	for i := range 50 {
-		id := fmt.Sprintf("k%02d", i)
+		var id = fmt.Sprintf("k%02d", i)
 		rows = append(rows, row{id: id, n: int64(i), doc: fmt.Sprintf(`{"id":%q,"n":%d}`, id, i)})
 	}
 
-	stage := func(fields []string, values [][]any) string {
-		key := stagedFileClient{}.NewKey([]string{cfg.Compute.BucketPath, "partition-" + uuid.NewString(), "staged"})
-		w := stagedFileClient{}.NewWriter(mat.bucket.NewWriter(ctx, key), fields)
+	var stage = func(fields []string, values [][]any) string {
+		var key = stagedFileClient{}.NewKey([]string{cfg.Compute.BucketPath, "partition-" + uuid.NewString(), "staged"})
+		var w = stagedFileClient{}.NewWriter(mat.bucket.NewWriter(ctx, key), fields)
 		for _, v := range values {
 			require.NoError(t, w.Write(v))
 		}
 		require.NoError(t, w.Close())
 		return mat.bucket.URI(key)
 	}
-	columnsOf := func(mb realBoilerplate.MappedBinding[config, resource, mapped]) (cols, keys []python.NestedField) {
+	var columnsOf = func(mb realBoilerplate.MappedBinding[config, resource, mapped]) (cols, keys []python.NestedField) {
 		for _, p := range mb.SelectedProjections() {
-			f := python.NestedField{Name: p.Field, Type: p.Mapped.type_.Type()}
+			var f = python.NestedField{Name: p.Field, Type: p.Mapped.type_.Type()}
 			if p.IsPrimaryKey {
 				keys = append(keys, f)
 			}
@@ -170,8 +170,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 		}
 		return cols, keys
 	}
-	boundsOf := func(mb realBoilerplate.MappedBinding[config, resource, mapped], ids []string) []mergeBound {
-		b := newMergeBoundsBuilder(mb.Keys)
+	var boundsOf = func(mb realBoilerplate.MappedBinding[config, resource, mapped], ids []string) []mergeBound {
+		var b = newMergeBoundsBuilder(mb.Keys)
 		for _, id := range ids {
 			b.nextKey([]any{id})
 		}
@@ -180,8 +180,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 
 	// merge runs the connector's merge query for the rows exactly as
 	// Acknowledge would, through the merge entry point.
-	merge := func(mb realBoilerplate.MappedBinding[config, resource, mapped], rows []row) {
-		cols, _ := columnsOf(mb)
+	var merge = func(mb realBoilerplate.MappedBinding[config, resource, mapped], rows []row) {
+		var cols, _ = columnsOf(mb)
 		var values [][]any
 		var ids []string
 		for _, r := range rows {
@@ -210,8 +210,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 
 	// loadQuery renders the connector's load query for the given keys, with
 	// the staged key file the query's temporary view reads.
-	loadQuery := func(mb realBoilerplate.MappedBinding[config, resource, mapped], ids []string) (string, python.LoadBinding) {
-		_, keys := columnsOf(mb)
+	var loadQuery = func(mb realBoilerplate.MappedBinding[config, resource, mapped], ids []string) (string, python.LoadBinding) {
+		var _, keys = columnsOf(mb)
 		var values [][]any
 		for _, id := range ids {
 			values = append(values, []any{id})
@@ -227,8 +227,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	// runLoad runs a query through the load entry point and returns the
 	// lines of its output files, so it serves both a real load and an
 	// EXPLAIN of one.
-	runLoad := func(query string, lb python.LoadBinding) []string {
-		outputPrefix := path.Join(cfg.Compute.BucketPath, uuid.NewString())
+	var runLoad = func(query string, lb python.LoadBinding) []string {
+		var outputPrefix = path.Join(cfg.Compute.BucketPath, uuid.NewString())
 		require.NoError(t, mat.compute.runJob(ctx, computeJob{
 			Input: python.LoadInput{
 				Query:          query,
@@ -246,11 +246,11 @@ func runPartitionedTable(t *testing.T, cfg config) {
 			if !strings.HasPrefix(path.Base(obj.Key), "part-") {
 				continue
 			}
-			r, err := mat.bucket.NewReader(ctx, obj.Key)
+			var r, err = mat.bucket.NewReader(ctx, obj.Key)
 			require.NoError(t, err)
 			gzr, err := gzip.NewReader(r)
 			require.NoError(t, err)
-			scanner := bufio.NewScanner(gzr)
+			var scanner = bufio.NewScanner(gzr)
 			scanner.Buffer(make([]byte, 0, 64*1024), math.MaxInt64)
 			for scanner.Scan() {
 				lines = append(lines, scanner.Text())
@@ -266,11 +266,11 @@ func runPartitionedTable(t *testing.T, cfg config) {
 
 	// Every file the merge wrote belongs to the bucket spec, which is spec
 	// 1 after the unpartitioned spec 0 the table was created with.
-	querier := mat.compute.(rowQuerier)
+	var querier = mat.compute.(rowQuerier)
 	_, files, err := querier.queryRows(ctx, fmt.Sprintf("SELECT spec_id, partition.id_bucket_%d FROM %s.files", partitionBuckets, fqn(partitionedPath)))
 	require.NoError(t, err)
 	require.NotEmpty(t, files)
-	bucketsSeen := map[string]struct{}{}
+	var bucketsSeen = map[string]struct{}{}
 	for _, f := range files {
 		require.JSONEq(t, "1", string(f[0].(json.RawMessage)), "data file written under the unpartitioned spec")
 		require.NotNil(t, f[1], "data file without a bucket partition value")
@@ -279,11 +279,11 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	require.Len(t, bucketsSeen, partitionBuckets, "fifty keys should populate every bucket")
 
 	// A load of three keys returns exactly those documents.
-	wantIDs := []string{"k03", "k17", "k42"}
-	query, lb := loadQuery(partitioned, wantIDs)
+	var wantIDs = []string{"k03", "k17", "k42"}
+	var query, lb = loadQuery(partitioned, wantIDs)
 	var gotIDs []string
 	for _, line := range runLoad(query, lb) {
-		idx, doc, found := strings.Cut(line, "\x00")
+		var idx, doc, found = strings.Cut(line, "\x00")
 		require.True(t, found, "load output line without a binding separator: %q", line)
 		require.Equal(t, "0", idx)
 		var parsed struct {
@@ -298,8 +298,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 	// partitioned table only. A filter Spark later decides not to plan
 	// prints as dynamicpruningexpression(true), so the assertion requires
 	// the IN form that carries the keys.
-	pruned := regexp.MustCompile(`dynamicpruningexpression\([^)]*\bIN\b`)
-	plan := strings.Join(runLoad("EXPLAIN "+query, lb), "\n")
+	var pruned = regexp.MustCompile(`dynamicpruningexpression\([^)]*\bIN\b`)
+	var plan = strings.Join(runLoad("EXPLAIN "+query, lb), "\n")
 	require.Regexp(t, pruned, plan, "no runtime filter on the partitioned table's load:\n%s", plan)
 	for _, line := range strings.Split(plan, "\n") {
 		if pruned.MatchString(line) {
@@ -307,8 +307,8 @@ func runPartitionedTable(t *testing.T, cfg config) {
 		}
 	}
 
-	controlQuery, controlLB := loadQuery(control, wantIDs)
-	controlPlan := strings.Join(runLoad("EXPLAIN "+controlQuery, controlLB), "\n")
+	var controlQuery, controlLB = loadQuery(control, wantIDs)
+	var controlPlan = strings.Join(runLoad("EXPLAIN "+controlQuery, controlLB), "\n")
 	require.NotContains(t, controlPlan, "dynamicpruningexpression(", "unexpected runtime filter on the unpartitioned table's load:\n%s", controlPlan)
 
 	// A second merge updates every row, which is the copy-on-write rewrite

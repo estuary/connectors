@@ -64,7 +64,7 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 	}
 
 	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
-		testParameter := e.cfg.SystemsManagerPrefix + "test"
+		var testParameter = e.cfg.SystemsManagerPrefix + "test"
 		if err := ssmPutParameterWithRetry(ctx, e.ssmClient, testParameter, "test"); err != nil {
 			errs.Err(fmt.Errorf("failed to put secure string parameter to %s: %w", testParameter, err))
 			return
@@ -91,7 +91,7 @@ type applicationGetter interface {
 // permission is logged and tolerated, as with `TagResource`, since a
 // read-only permission gap should not block the task.
 func checkVariantReleaseLabel(ctx context.Context, c applicationGetter, applicationID string) error {
-	out, err := c.GetApplication(ctx, &emr.GetApplicationInput{ApplicationId: aws.String(applicationID)})
+	var out, err = c.GetApplication(ctx, &emr.GetApplicationInput{ApplicationId: aws.String(applicationID)})
 	if err != nil {
 		if isAccessDeniedErr(err) {
 			log.WithError(err).Warn("could not check the EMR release of the application for variant column support; grant 'emr-serverless:GetApplication' to the execution role to enable this check. Variant columns need release emr-spark-8.0.0 or later.")
@@ -100,8 +100,8 @@ func checkVariantReleaseLabel(ctx context.Context, c applicationGetter, applicat
 		return fmt.Errorf("getting EMR application %q: %w", applicationID, err)
 	}
 
-	label := aws.ToString(out.Application.ReleaseLabel)
-	major, ok := emrReleaseMajor(label)
+	var label = aws.ToString(out.Application.ReleaseLabel)
+	var major, ok = emrReleaseMajor(label)
 	if !ok {
 		log.WithField("releaseLabel", label).Warn("could not parse the EMR release label to check for variant column support, which needs release emr-spark-8.0.0 or later")
 		return nil
@@ -117,12 +117,12 @@ func checkVariantReleaseLabel(ctx context.Context, c applicationGetter, applicat
 // as "emr-7.9.0", "emr-spark-8.0.0", or "emr-7.0.0-preview": the first
 // dash-separated segment that starts with a digit.
 func emrReleaseMajor(label string) (int, bool) {
-	rest, ok := strings.CutPrefix(label, "emr-")
+	var rest, ok = strings.CutPrefix(label, "emr-")
 	if !ok {
 		return 0, false
 	}
 	for _, segment := range strings.Split(rest, "-") {
-		majorStr, _, _ := strings.Cut(segment, ".")
+		var majorStr, _, _ = strings.Cut(segment, ".")
 		if major, err := strconv.Atoi(majorStr); err == nil {
 			return major, true
 		}
@@ -131,7 +131,7 @@ func emrReleaseMajor(label string) (int, bool) {
 }
 
 func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
-	res, err := e.ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
+	var res, err = e.ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
 		Name:           aws.String(e.clientCredSecretName()),
 		WithDecryption: aws.Bool(true),
 	})
@@ -156,7 +156,7 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 }
 
 func (e *emrClient) startJobRun(ctx context.Context, startInput *emr.StartJobRunInput) (*emr.StartJobRunOutput, error) {
-	start, err := e.c.StartJobRun(ctx, startInput)
+	var start, err = e.c.StartJobRun(ctx, startInput)
 	if err == nil {
 		return start, nil
 	}
@@ -199,9 +199,9 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	| --signing-name           | Signing name to use when authenticating with AWS SigV4. Either 'glue' or 's3tables'. | Optional |
 	| --oauth2-server-uri      | OAuth2 token endpoint URI.                                                           | Optional |
 	***/
-	getStatus := func() (*python.StatusOutput, error) {
+	var getStatus = func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
-		statusKey := path.Join(job.WorkingPrefix, statusFile)
+		var statusKey = path.Join(job.WorkingPrefix, statusFile)
 		if statusObj, err := e.bucket.NewReader(ctx, statusKey); err != nil {
 			return nil, fmt.Errorf("reading status object %q: %w", statusKey, err)
 		} else if err := json.NewDecoder(statusObj).Decode(&status); err != nil {
@@ -212,14 +212,14 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 		return &status, nil
 	}
 
-	inputKey := path.Join(job.WorkingPrefix, "input.json")
+	var inputKey = path.Join(job.WorkingPrefix, "input.json")
 	if inputBytes, err := encodeInput(job.Input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
 	} else if err := e.bucket.Upload(ctx, inputKey, bytes.NewReader(inputBytes)); err != nil {
 		return fmt.Errorf("putting input file object: %w", err)
 	}
 
-	args := []string{
+	var args = []string{
 		"--input-uri", "s3://" + path.Join(e.cfg.Bucket, inputKey),
 		"--status-output", "s3://" + path.Join(e.cfg.Bucket, job.WorkingPrefix, statusFile),
 		"--catalog-url", e.catalogURL,
@@ -237,19 +237,19 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 			args = append(args, "--scope", s)
 		}
 	} else if e.catalogAuth.AuthType == catalogAuthTypeSigV4 || e.catalogAuth.AuthType == catalogAuthTypeAWSIAM {
-		signingName, err := SigningName(e.catalogURL)
+		var signingName, err = SigningName(e.catalogURL)
 		if err != nil {
 			return err
 		}
 		args = append(args, "--signing-name", signingName)
 	}
 
-	clientToken := job.IdempotencyToken
+	var clientToken = job.IdempotencyToken
 	if clientToken == "" {
 		clientToken = uuid.NewString()
 	}
 
-	sparkParameters := []string{
+	var sparkParameters = []string{
 		"--py-files", job.PyFilesCommonURI,
 		"--conf", "spark.driver.maxResultSize=0",
 		"--conf", "spark.sql.iceberg.vectorization.enabled=false",
@@ -258,7 +258,7 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 		sparkParameters = append(sparkParameters, "--conf", fmt.Sprintf("%s=%s", property.Key, property.Value))
 	}
 
-	startInput := &emr.StartJobRunInput{
+	var startInput = &emr.StartJobRunInput{
 		ApplicationId:    aws.String(e.cfg.ApplicationId),
 		ClientToken:      aws.String(clientToken),
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
@@ -276,7 +276,7 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	}
 
 	// Start the Job or adopt a existing run with the clientToken.
-	start, err := e.startJobRun(ctx, startInput)
+	var start, err = e.startJobRun(ctx, startInput)
 	if err != nil {
 		return err
 	}
@@ -305,12 +305,12 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 		}
 	}
 
-	jobCtx, cancelJobCtx := context.WithTimeout(ctx, maxJobRunDuration)
+	var jobCtx, cancelJobCtx = context.WithTimeout(ctx, maxJobRunDuration)
 	defer cancelJobCtx()
 
 	var runDetails string
 	for {
-		gotRun, err := e.c.GetJobRun(ctx, &emr.GetJobRunInput{
+		var gotRun, err = e.c.GetJobRun(ctx, &emr.GetJobRunInput{
 			ApplicationId: aws.String(e.cfg.ApplicationId),
 			JobRunId:      start.JobRunId,
 		})
@@ -338,7 +338,7 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 		default:
 			select {
 			case <-jobCtx.Done():
-				cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
+				var cancelCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
 				defer cancel()
 
 				if _, err := e.c.CancelJobRun(cancelCtx, &emr.CancelJobRunInput{
@@ -408,7 +408,7 @@ func isConflictErr(err error) bool {
 
 func encodeInput(in any) ([]byte, error) {
 	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
+	var enc = json.NewEncoder(&buf)
 	enc.SetAppendNewline(false)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(in); err != nil {

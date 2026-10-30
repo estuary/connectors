@@ -85,7 +85,7 @@ type Driver struct{}
 var _ boilerplate.Connector = &Driver{}
 
 func (Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("configSchema", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("configSchema", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -129,7 +129,7 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
-	catalog, err := cfg.toCatalog(ctx)
+	var catalog, err = cfg.toCatalog(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating catalog: %w", err)
 	}
@@ -147,7 +147,7 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	var compute computeRunner
 	switch cfg.Compute.ComputeType {
 	case computeTypeEmrServerless:
-		ssmClient, err := cfg.toSsmClient(ctx)
+		var ssmClient, err = cfg.toSsmClient(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("creating SSM client: %w", err)
 		}
@@ -178,7 +178,7 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 		return nil, fmt.Errorf("unsupported compute type %q", cfg.Compute.ComputeType)
 	}
 
-	locationStyle := FlatLocationStyle
+	var locationStyle = FlatLocationStyle
 	if featureFlags["nested_dot_hash_location_style"] {
 		locationStyle = NestedDotHashLocationStyle
 	}
@@ -214,12 +214,12 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 }
 
 func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	relevantPaths := make(map[string][]string)
+	var relevantPaths = make(map[string][]string)
 	for _, path := range resourcePaths {
 		relevantPaths[path[0]] = append(relevantPaths[path[0]], path[1])
 	}
 
-	existingNamespaces, err := d.catalog.ListNamespaces(ctx)
+	var existingNamespaces, err = d.catalog.ListNamespaces(ctx)
 	if err != nil {
 		return fmt.Errorf("listing namespaces: %w", err)
 	}
@@ -229,12 +229,12 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 	}
 
 	var workerLimit = 5
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(workerLimit)
 	var mu sync.Mutex
 
-	processTableMetadata := func(ctx context.Context, ns string, t string) error {
-		table, err := d.catalog.GetTable(ctx, ns, t)
+	var processTableMetadata = func(ctx context.Context, ns string, t string) error {
+		var table, err = d.catalog.GetTable(ctx, ns, t)
 		if err != nil {
 			if errors.Is(err, catalog.ErrTableNotFound) {
 				// Most likely cause is this is not an Iceberg table, or it has
@@ -247,7 +247,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 		mu.Lock()
 		defer mu.Unlock()
 
-		res := is.PushResource(ns, t)
+		var res = is.PushResource(ns, t)
 		res.Meta = table.Metadata
 
 		for _, f := range table.Metadata.CurrentSchema().Fields() {
@@ -263,12 +263,12 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 	}
 
 	for _, ns := range existingNamespaces {
-		relevantTables, ok := relevantPaths[ns]
+		var relevantTables, ok = relevantPaths[ns]
 		if !ok {
 			continue
 		}
 
-		existingTables, err := d.catalog.ListTables(ctx, ns)
+		var existingTables, err = d.catalog.ListTables(ctx, ns)
 		if err != nil {
 			return fmt.Errorf("listing tables: %w", err)
 		}
@@ -288,7 +288,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 }
 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
 	d.compute.checkPrereqs(ctx, errs)
 
@@ -303,7 +303,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 }
 
 func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
-	_, isNumeric := m.AsFormattedNumeric(&p)
+	var _, isNumeric = m.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
@@ -344,13 +344,13 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mapped, boilerplate.ElementConverter) {
-	m, converter := mapProjection(p, d.cfg.Advanced.translateFieldName, d.variantColumns)
+	var m, converter = mapProjection(p, d.cfg.Advanced.translateFieldName, d.variantColumns)
 	m.Nullable = fc.Nullable
 	return m, converter
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
-	catalogAuth, err := d.cfg.CatalogAuthConfig()
+	var catalogAuth, err = d.cfg.CatalogAuthConfig()
 	if err != nil {
 		return "", err
 	}
@@ -379,22 +379,22 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mapped]) (string, boilerplate.ActionApplyFn, error) {
-	ns := res.ResourcePath[0]
-	name := res.ResourcePath[1]
-	schema := computeSchemaForNewTable(res)
+	var ns = res.ResourcePath[0]
+	var name = res.ResourcePath[1]
+	var schema = computeSchemaForNewTable(res)
 
 	var location *string
 	if d.cfg.BaseLocation != "" {
-		base := strings.TrimSuffix(d.cfg.BaseLocation, "/") + "/" + createLocationSuffix(ns, name, d.locationStyle)
+		var base = strings.TrimSuffix(d.cfg.BaseLocation, "/") + "/" + createLocationSuffix(ns, name, d.locationStyle)
 		location = &base
 	}
 
-	properties := defaultTableProperties()
+	var properties = defaultTableProperties()
 	for k, v := range res.Config.AdditionalTableProperties {
 		properties[k] = v
 	}
 
-	hasVariant := schemaHasVariant(schema)
+	var hasVariant = schemaHasVariant(schema)
 	if hasVariant {
 		if err := checkFormatVersionProperty(res.Config.AdditionalTableProperties); err != nil {
 			return "", nil, err
@@ -412,12 +412,12 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		}
 
 		if d.cfg.GlueOptimizers.anyEnabled() {
-			signingName, err := SigningName(d.cfg.URL)
+			var signingName, err = SigningName(d.cfg.URL)
 			if err != nil {
 				return fmt.Errorf("determining signing name: %w", err)
 			}
 			if signingName == "glue" {
-				glueClient, err := d.cfg.toGlueClient(ctx)
+				var glueClient, err = d.cfg.toGlueClient(ctx)
 				if err != nil {
 					return fmt.Errorf("creating Glue client: %w", err)
 				}
@@ -458,7 +458,7 @@ func errorWithVariantHint(err error, hasVariant bool) error {
 	if err == nil || !hasVariant {
 		return err
 	}
-	msg := strings.ToLower(err.Error())
+	var msg = strings.ToLower(err.Error())
 	for _, marker := range []string{"variant", "format-version", "format version"} {
 		if strings.Contains(msg, marker) {
 			return fmt.Errorf("%w (%s)", err, variantRemedyHint)
@@ -499,8 +499,8 @@ func defaultTableProperties() map[string]string {
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
-	ns := resourcePath[0]
-	name := resourcePath[1]
+	var ns = resourcePath[0]
+	var name = resourcePath[1]
 
 	return fmt.Sprintf("deleted table %q.%q", ns, name), func(ctx context.Context) error {
 		return d.catalog.DeleteTable(ctx, ns, name)
@@ -521,12 +521,12 @@ func (d *materialization) UpdateResource(
 	existing boilerplate.ExistingResource,
 	update boilerplate.BindingUpdate[config, resource, mapped],
 ) (string, boilerplate.ActionApplyFn, error) {
-	ns := resourcePath[0]
-	name := resourcePath[1]
+	var ns = resourcePath[0]
+	var name = resourcePath[1]
 
-	needsGlueOptimizers := false
+	var needsGlueOptimizers = false
 	if d.cfg.GlueOptimizers.anyEnabled() {
-		signingName, err := SigningName(d.cfg.URL)
+		var signingName, err = SigningName(d.cfg.URL)
 		if err != nil {
 			return "", nil, fmt.Errorf("determining signing name: %w", err)
 		}
@@ -538,7 +538,7 @@ func (d *materialization) UpdateResource(
 			return "", nil, nil
 		}
 		return fmt.Sprintf("configured Glue table optimizers for %q.%q", ns, name), func(ctx context.Context) error {
-			glueClient, err := d.cfg.toGlueClient(ctx)
+			var glueClient, err = d.cfg.toGlueClient(ctx)
 			if err != nil {
 				return fmt.Errorf("creating Glue client: %w", err)
 			}
@@ -546,14 +546,14 @@ func (d *materialization) UpdateResource(
 		}, nil
 	}
 
-	table := existing.Meta.(table.Metadata)
-	current := table.CurrentSchema()
-	next := computeSchemaForUpdatedTable(table.LastColumnID(), current, update)
-	reqs := []catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)}
+	var table = existing.Meta.(table.Metadata)
+	var current = table.CurrentSchema()
+	var next = computeSchemaForUpdatedTable(table.LastColumnID(), current, update)
+	var reqs = []catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)}
 	var upds []catalog.TableUpdate
 	// A variant column is only valid in format v3. Upgrading in the same
 	// request as the schema change keeps the table valid throughout.
-	introducesVariant := schemaHasVariant(next) && !schemaHasVariant(current)
+	var introducesVariant = schemaHasVariant(next) && !schemaHasVariant(current)
 	if introducesVariant {
 		if err := checkFormatVersionProperty(update.Binding.Config.AdditionalTableProperties); err != nil {
 			return "", nil, err
@@ -563,7 +563,7 @@ func (d *materialization) UpdateResource(
 		}
 	}
 	upds = append(upds, catalog.AddSchemaUpdate(next), catalog.SetCurrentSchemaUpdate(next.ID))
-	action := fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), next.String())
+	var action = fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), next.String())
 
 	var afterMigrateReqs []catalog.TableRequirement
 	var afterMigrateUpds []catalog.TableUpdate
@@ -580,7 +580,7 @@ func (d *materialization) UpdateResource(
 		// ensure that no other process comes in and modifies the table schema
 		// while this is happening. If the schema IDs aren't as expected, the
 		// connector will crash and start over, which should work fine.
-		afterMigrate := computeSchemaForCompletedMigrations(next, update.FieldsToMigrate)
+		var afterMigrate = computeSchemaForCompletedMigrations(next, update.FieldsToMigrate)
 		afterMigrateReqs = []catalog.TableRequirement{catalog.AssertCurrentSchemaID(next.ID)}
 		afterMigrateUpds = []catalog.TableUpdate{catalog.AddSchemaUpdate(afterMigrate), catalog.SetCurrentSchemaUpdate(afterMigrate.ID)}
 		action = fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), afterMigrate.String())
@@ -592,7 +592,7 @@ func (d *materialization) UpdateResource(
 		}
 
 		if len(update.FieldsToMigrate) > 0 {
-			input := migrateInput{
+			var input = migrateInput{
 				ResourcePath: resourcePath,
 				Migrations:   make([]migrateColumn, 0, len(update.FieldsToMigrate)),
 			}
@@ -609,19 +609,19 @@ func (d *materialization) UpdateResource(
 				return err
 			}
 
-			outputPrefix := path.Join(d.cfg.Compute.BucketPath, uuid.NewString())
+			var outputPrefix = path.Join(d.cfg.Compute.BucketPath, uuid.NewString())
 			defer func() {
 				if err := cleanPrefixOnceFn(ctx, d.bucket, outputPrefix)(); err != nil {
 					log.WithError(err).Warn("failed to clean up status file after running a column migration job")
 				}
 			}()
 
-			ll := log.WithFields(log.Fields{
+			var ll = log.WithFields(log.Fields{
 				"table":      fmt.Sprintf("%s.%s", ns, name),
 				"numColumns": len(update.FieldsToMigrate),
 			})
 			ll.Info("running column migration job")
-			ts := time.Now()
+			var ts = time.Now()
 			if err := d.compute.runJob(ctx, computeJob{
 				Input:            python.ExecInput{Query: q.String()},
 				EntryPointURI:    d.pyFiles.exec,
@@ -640,7 +640,7 @@ func (d *materialization) UpdateResource(
 		}
 
 		if needsGlueOptimizers {
-			glueClient, err := d.cfg.toGlueClient(ctx)
+			var glueClient, err = d.cfg.toGlueClient(ctx)
 			if err != nil {
 				return fmt.Errorf("creating Glue client: %w", err)
 			}
@@ -660,12 +660,12 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mapped],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	pyFiles, err := d.putPyFiles(ctx)
+	var pyFiles, err = d.putPyFiles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("putting PySpark scripts: %w", err)
 	}
 
-	t := &transactor{
+	var t = &transactor{
 		materializationName: d.materializationName,
 		be:                  be,
 		cfg:                 d.cfg,
@@ -682,13 +682,13 @@ func (d *materialization) NewTransactor(
 		t.loadFiles.AddBinding(idx, nil)
 		t.storeFiles.AddBinding(idx, nil)
 
-		b := binding{
+		var b = binding{
 			Idx:    idx,
 			Mapped: &mapped,
 		}
 
 		for _, p := range mapped.SelectedProjections() {
-			pyField := python.NestedField{
+			var pyField = python.NestedField{
 				Name: p.Field,
 				Type: p.Mapped.type_.Type(),
 			}
@@ -723,21 +723,21 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 // which is the only compute backend that returns query results. Variant
 // columns are rendered as JSON text so their contents can be compared.
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	querier, ok := d.compute.(rowQuerier)
+	var querier, ok = d.compute.(rowQuerier)
 	if !ok {
 		return nil, nil, nil
 	}
 
-	ns, name := path[0], path[1]
-	tbl, err := d.catalog.GetTable(ctx, ns, name)
+	var ns, name = path[0], path[1]
+	var tbl, err = d.catalog.GetTable(ctx, ns, name)
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting table %s.%s: %w", ns, name, err)
 	}
-	schema := tbl.Metadata.CurrentSchema()
+	var schema = tbl.Metadata.CurrentSchema()
 
 	var selects, idents, orderBy []string
 	for _, f := range schema.Fields() {
-		ident := quoteIdentifier(f.Name)
+		var ident = quoteIdentifier(f.Name)
 		idents = append(idents, ident)
 		if f.Type.Equals(iceberg.VariantType{}) {
 			selects = append(selects, fmt.Sprintf("TO_JSON(%s) AS %s", ident, ident))
@@ -756,8 +756,8 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 		orderBy = idents[:1]
 	}
 
-	fqn := fmt.Sprintf("`estuary`.%s.%s", quoteIdentifier(ns), quoteIdentifier(name))
-	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", strings.Join(selects, ", "), fqn, strings.Join(orderBy, ", "))
+	var fqn = fmt.Sprintf("`estuary`.%s.%s", quoteIdentifier(ns), quoteIdentifier(name))
+	var query = fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", strings.Join(selects, ", "), fqn, strings.Join(orderBy, ", "))
 
 	return querier.queryRows(ctx, query)
 }
@@ -784,7 +784,7 @@ func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
 		// In Spark Standalone mode the compose stack bind-mounts the python/
 		// directory of this package into the master and worker containers, so
 		// the scripts are already present at known local:// paths.
-		out := pyFileURIs{
+		var out = pyFileURIs{
 			common: "local:///opt/jobs/common.py",
 			exec:   "local:///opt/jobs/exec.py",
 			load:   "local:///opt/jobs/load.py",
@@ -796,7 +796,7 @@ func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
 
 	var out pyFileURIs
 
-	pyFiles := []struct {
+	var pyFiles = []struct {
 		name string
 		prop *string
 	}{
@@ -805,11 +805,11 @@ func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
 		{name: "load", prop: &out.load},
 		{name: "merge", prop: &out.merge},
 	}
-	pyBytes := make([][]byte, 0, len(pyFiles))
-	hasher := sha256.New()
+	var pyBytes = make([][]byte, 0, len(pyFiles))
+	var hasher = sha256.New()
 
 	for _, pf := range pyFiles {
-		bs, err := pyFilesFS.ReadFile(fmt.Sprintf("python/%s.py", pf.name))
+		var bs, err = pyFilesFS.ReadFile(fmt.Sprintf("python/%s.py", pf.name))
 		if err != nil {
 			return nil, fmt.Errorf("reading embedded python script %s: %w", pf.name, err)
 		}
@@ -819,9 +819,9 @@ func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
 		pyBytes = append(pyBytes, bs)
 	}
 
-	fullMetaPrefix := path.Join(d.cfg.Compute.emrConfig.BucketPath, metadataPrefix, "pySparkFiles", fmt.Sprintf("%x", hasher.Sum(nil)))
+	var fullMetaPrefix = path.Join(d.cfg.Compute.emrConfig.BucketPath, metadataPrefix, "pySparkFiles", fmt.Sprintf("%x", hasher.Sum(nil)))
 	for idx, pf := range pyFiles {
-		key := path.Join(fullMetaPrefix, fmt.Sprintf("%s.py", pf.name))
+		var key = path.Join(fullMetaPrefix, fmt.Sprintf("%s.py", pf.name))
 		if err := d.bucket.Upload(ctx, key, bytes.NewReader(pyBytes[idx])); err != nil {
 			return nil, fmt.Errorf("uploading %s: %w", pf.name, err)
 		}

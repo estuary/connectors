@@ -21,7 +21,7 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 	}
 
 	var specs []optimizerSpec
-	roleArn := aws.String(cfg.ExecutionRoleArn)
+	var roleArn = aws.String(cfg.ExecutionRoleArn)
 
 	if cfg.EnableCompaction {
 		specs = append(specs, optimizerSpec{
@@ -34,13 +34,13 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 	}
 
 	if cfg.EnableRetention {
-		icebergRetention := &glueTypes.IcebergRetentionConfiguration{}
+		var icebergRetention = &glueTypes.IcebergRetentionConfiguration{}
 		if cfg.SnapshotRetentionDays > 0 {
-			v := int32(cfg.SnapshotRetentionDays)
+			var v = int32(cfg.SnapshotRetentionDays)
 			icebergRetention.SnapshotRetentionPeriodInDays = &v
 		}
 		if cfg.NumberOfSnapshotsToRetain > 0 {
-			v := int32(cfg.NumberOfSnapshotsToRetain)
+			var v = int32(cfg.NumberOfSnapshotsToRetain)
 			icebergRetention.NumberOfSnapshotsToRetain = &v
 		}
 		specs = append(specs, optimizerSpec{
@@ -56,9 +56,9 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 	}
 
 	if cfg.EnableOrphanFileDeletion {
-		icebergOrphan := &glueTypes.IcebergOrphanFileDeletionConfiguration{}
+		var icebergOrphan = &glueTypes.IcebergOrphanFileDeletionConfiguration{}
 		if cfg.OrphanFileRetentionDays > 0 {
-			v := int32(cfg.OrphanFileRetentionDays)
+			var v = int32(cfg.OrphanFileRetentionDays)
 			icebergOrphan.OrphanFileRetentionPeriodInDays = &v
 		}
 		specs = append(specs, optimizerSpec{
@@ -74,12 +74,12 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 	}
 
 	for _, spec := range specs {
-		ll := log.WithFields(log.Fields{
+		var ll = log.WithFields(log.Fields{
 			"table":     fmt.Sprintf("%s.%s", ns, tableName),
 			"optimizer": spec.optType,
 		})
 
-		_, err := client.GetTableOptimizer(ctx, &glue.GetTableOptimizerInput{
+		var _, err = client.GetTableOptimizer(ctx, &glue.GetTableOptimizerInput{
 			CatalogId:    &catalogID,
 			DatabaseName: &ns,
 			TableName:    &tableName,

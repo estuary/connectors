@@ -38,7 +38,7 @@ func TestAllowedMigrations(t *testing.T) {
 }
 
 func TestComputeSchemas(t *testing.T) {
-	mappedProjection := func(field string, mustExist bool, type_ iceberg.Type) boilerplate.MappedProjection[mapped] {
+	var mappedProjection = func(field string, mustExist bool, type_ iceberg.Type) boilerplate.MappedProjection[mapped] {
 		return boilerplate.MappedProjection[mapped]{
 			Projection: boilerplate.Projection{
 				Projection: pf.Projection{
@@ -50,7 +50,7 @@ func TestComputeSchemas(t *testing.T) {
 		}
 	}
 
-	originalFields := []iceberg.NestedField{
+	var originalFields = []iceberg.NestedField{
 		{ID: 1, Name: "firstKey", Required: true, Type: iceberg.Int64Type{}},
 		{ID: 2, Name: "secondKey", Required: true, Type: iceberg.StringType{}},
 		{ID: 3, Name: "val1", Required: true, Type: iceberg.StringType{}},
@@ -64,7 +64,7 @@ func TestComputeSchemas(t *testing.T) {
 		{ID: 10, Name: "dateToStr" + migrateFieldSuffix, Required: true, Type: &iceberg.Float64Type{}},
 	}
 
-	update := boilerplate.BindingUpdate[config, resource, mapped]{
+	var update = boilerplate.BindingUpdate[config, resource, mapped]{
 		NewProjections: []boilerplate.MappedProjection[mapped]{
 			mappedProjection("new", false, iceberg.StringType{}),
 			mappedProjection("newRequired", true, iceberg.StringType{}),
@@ -90,9 +90,9 @@ func TestComputeSchemas(t *testing.T) {
 		},
 	}
 
-	originalSchema := iceberg.NewSchemaWithIdentifiers(1, []int{1, 2}, originalFields...)
-	nextSchema := computeSchemaForUpdatedTable(12, originalSchema, update)
-	afterMigrateSchema := computeSchemaForCompletedMigrations(nextSchema, update.FieldsToMigrate)
+	var originalSchema = iceberg.NewSchemaWithIdentifiers(1, []int{1, 2}, originalFields...)
+	var nextSchema = computeSchemaForUpdatedTable(12, originalSchema, update)
+	var afterMigrateSchema = computeSchemaForCompletedMigrations(nextSchema, update.FieldsToMigrate)
 
 	var snap strings.Builder
 
@@ -113,8 +113,8 @@ func TestComputeSchemas(t *testing.T) {
 func TestMapProjectionVariant(t *testing.T) {
 	// Builds a boilerplate.Projection the way the validator does, from the
 	// projection's inference and field config.
-	proj := func(field string, types []string, isKey bool, str *pf.Inference_String, castToString bool) boilerplate.Projection {
-		p := pf.Projection{
+	var proj = func(field string, types []string, isKey bool, str *pf.Inference_String, castToString bool) boilerplate.Projection {
+		var p = pf.Projection{
 			Field:        field,
 			IsPrimaryKey: isKey,
 			Inference: pf.Inference{
@@ -128,7 +128,7 @@ func TestMapProjectionVariant(t *testing.T) {
 		}
 		return boilerplate.MapProjection(p, fieldConfig{CastToString_: castToString})
 	}
-	identity := func(f string) string { return f }
+	var identity = func(f string) string { return f }
 
 	for _, tt := range []struct {
 		name     string
@@ -159,7 +159,7 @@ func TestMapProjectionVariant(t *testing.T) {
 		{"on/integer", proj("f", []string{"integer"}, false, nil, false), true, iceberg.Int64Type{}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			m, _ := mapProjection(tt.p, identity, tt.variants)
+			var m, _ = mapProjection(tt.p, identity, tt.variants)
 			require.True(t, tt.wantType.Equals(m.type_), "got %s, want %s", m.type_, tt.wantType)
 		})
 	}
@@ -177,7 +177,7 @@ func TestVariantConverter(t *testing.T) {
 		{true, true},
 		{nil, nil},
 	} {
-		got, err := variantConverter(tt.in)
+		var got, err = variantConverter(tt.in)
 		require.NoError(t, err)
 		require.Equal(t, tt.want, got)
 	}

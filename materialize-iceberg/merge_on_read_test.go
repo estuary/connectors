@@ -46,7 +46,7 @@ func TestMergeOnRead(t *testing.T) {
 
 	ensureDockerUp(t)
 
-	raw, err := boilerplate.ReadConfigFile(localConfigTemplates["testdata/config.rest-local-spark4.yaml"])
+	var raw, err = boilerplate.ReadConfigFile(localConfigTemplates["testdata/config.rest-local-spark4.yaml"])
 	require.NoError(t, err)
 	var cfg config
 	require.NoError(t, json.Unmarshal(raw, &cfg))
@@ -54,32 +54,32 @@ func TestMergeOnRead(t *testing.T) {
 
 	t.Run("v3", func(t *testing.T) { runMergeOnRead(t, cfg, 3) })
 
-	v2 := cfg
+	var v2 = cfg
 	v2.Advanced.FeatureFlags = strings.Replace(cfg.Advanced.FeatureFlags, "variant_columns", "no_variant_columns", 1)
 	t.Run("v2", func(t *testing.T) { runMergeOnRead(t, v2, 2) })
 }
 
 func runMergeOnRead(t *testing.T, cfg config, wantFormatVersion int) {
-	h := newMORHarness(t, cfg)
-	mb, tablePath := h.createTable(fmt.Sprintf("mor_flow_test_%d", time.Now().UnixNano()))
-	table := morFQN(tablePath)
+	var h = newMORHarness(t, cfg)
+	var mb, tablePath = h.createTable(fmt.Sprintf("mor_flow_test_%d", time.Now().UnixNano()))
+	var table = morFQN(tablePath)
 
 	h.exec(fmt.Sprintf("ALTER TABLE %s SET TBLPROPERTIES ('write.merge.mode'='merge-on-read', 'write.update.mode'='merge-on-read', 'write.delete.mode'='merge-on-read')", table))
 
-	formatVersion := h.formatVersion(tablePath)
+	var formatVersion = h.formatVersion(tablePath)
 	require.Equal(t, wantFormatVersion, formatVersion)
 
 	// want is the live table contents by id, kept in step with each merge.
-	want := map[string]int64{}
+	var want = map[string]int64{}
 	var allIDs []string
 	for i := range 60 {
 		allIDs = append(allIDs, fmt.Sprintf("k%02d", i))
 	}
 
-	check := func(round string) {
+	var check = func(round string) {
 		require.Equal(t, want, h.load(mb, allIDs), "load after %s", round)
 
-		scanned := map[string]int64{}
+		var scanned = map[string]int64{}
 		for _, r := range h.query(fmt.Sprintf("SELECT `id`, `n` FROM %s", table)) {
 			var id string
 			var n int64
@@ -94,18 +94,18 @@ func runMergeOnRead(t *testing.T, cfg config, wantFormatVersion int) {
 	// Round 1 inserts k00..k49 into the empty table.
 	var round []morRow
 	for i := range 50 {
-		id := fmt.Sprintf("k%02d", i)
+		var id = fmt.Sprintf("k%02d", i)
 		round = append(round, morRow{id: id, n: int64(i)})
 		want[id] = int64(i)
 	}
 	h.merge(mb, round)
 	check("inserts")
-	dataFilesBefore := h.liveDataFiles(tablePath)
+	var dataFilesBefore = h.liveDataFiles(tablePath)
 
 	// Round 2 updates ten keys, deletes five, and inserts two new ones.
 	round = nil
 	for i := range 50 {
-		id := fmt.Sprintf("k%02d", i)
+		var id = fmt.Sprintf("k%02d", i)
 		switch {
 		case i%5 == 0:
 			round = append(round, morRow{id: id, n: int64(i) + 1000})
@@ -130,7 +130,7 @@ func runMergeOnRead(t *testing.T, cfg config, wantFormatVersion int) {
 	round = nil
 	for i := range 50 {
 		if i%5 == 0 || i%5 == 1 {
-			id := fmt.Sprintf("k%02d", i)
+			var id = fmt.Sprintf("k%02d", i)
 			round = append(round, morRow{id: id, n: int64(i) + 2000})
 			want[id] = int64(i) + 2000
 		}
@@ -165,12 +165,12 @@ type morHarness struct {
 }
 
 func newMORHarness(t *testing.T, cfg config) *morHarness {
-	ctx := context.Background()
-	flags := common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
-	matIface, err := NewMaterializer(ctx, "acmeCo/tests/merge-on-read", cfg, flags)
+	var ctx = context.Background()
+	var flags = common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
+	var matIface, err = NewMaterializer(ctx, "acmeCo/tests/merge-on-read", cfg, flags)
 	require.NoError(t, err)
-	mat := matIface.(*materialization)
-	_, ok := mat.compute.(*sparkClient)
+	var mat = matIface.(*materialization)
+	var _, ok = mat.compute.(*sparkClient)
 	require.True(t, ok, "this test drives the local spark daemon")
 
 	// Setup stages the PySpark scripts and records their locations, which
@@ -182,24 +182,24 @@ func newMORHarness(t *testing.T, cfg config) *morHarness {
 }
 
 func (h *morHarness) project(field, ptr string, types []string, isKey bool) realBoilerplate.MappedProjection[mapped] {
-	p := realBoilerplate.MapProjection(pf.Projection{
+	var p = realBoilerplate.MapProjection(pf.Projection{
 		Field:        field,
 		Ptr:          ptr,
 		IsPrimaryKey: isKey,
 		Inference:    pf.Inference{Types: types, Exists: pf.Inference_MUST},
 	}, fieldConfig{})
-	mt, _ := h.mat.MapType(p, fieldConfig{})
+	var mt, _ = h.mat.MapType(p, fieldConfig{})
 	return realBoilerplate.MappedProjection[mapped]{Projection: p, Mapped: mt}
 }
 
 // createTable creates a table keyed on a string id with an integer n, and
 // drops it when the test ends.
 func (h *morHarness) createTable(table string) (morBinding, []string) {
-	res := resource{Table: table}.WithDefaults(h.cfg)
-	path, _, err := res.Parameters()
+	var res = resource{Table: table}.WithDefaults(h.cfg)
+	var path, _, err = res.Parameters()
 	require.NoError(h.t, err)
-	doc := h.project("flow_document", "", []string{"object"}, false)
-	mb := morBinding{
+	var doc = h.project("flow_document", "", []string{"object"}, false)
+	var mb = morBinding{
 		MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: path},
 		Config:                      res,
 		Keys:                        []realBoilerplate.MappedProjection[mapped]{h.project("id", "/id", []string{"string"}, true)},
@@ -213,7 +213,7 @@ func (h *morHarness) createTable(table string) (morBinding, []string) {
 	require.NoError(h.t, err)
 	require.NoError(h.t, apply(h.ctx))
 	h.t.Cleanup(func() {
-		_, del, err := h.mat.DeleteResource(context.Background(), path)
+		var _, del, err = h.mat.DeleteResource(context.Background(), path)
 		require.NoError(h.t, err)
 		_ = del(context.Background())
 	})
@@ -229,14 +229,14 @@ func (h *morHarness) exec(query string) {
 }
 
 func (h *morHarness) query(query string) [][]any {
-	_, rows, err := h.mat.compute.(rowQuerier).queryRows(h.ctx, query)
+	var _, rows, err = h.mat.compute.(rowQuerier).queryRows(h.ctx, query)
 	require.NoError(h.t, err, query)
 	return rows
 }
 
 func (h *morHarness) stage(fields []string, values [][]any) string {
-	key := stagedFileClient{}.NewKey([]string{h.cfg.Compute.BucketPath, "mor-" + uuid.NewString(), "staged"})
-	w := stagedFileClient{}.NewWriter(h.mat.bucket.NewWriter(h.ctx, key), fields)
+	var key = stagedFileClient{}.NewKey([]string{h.cfg.Compute.BucketPath, "mor-" + uuid.NewString(), "staged"})
+	var w = stagedFileClient{}.NewWriter(h.mat.bucket.NewWriter(h.ctx, key), fields)
 	for _, v := range values {
 		require.NoError(h.t, w.Write(v))
 	}
@@ -246,7 +246,7 @@ func (h *morHarness) stage(fields []string, values [][]any) string {
 
 func morColumns(mb morBinding) (cols, keys []python.NestedField) {
 	for _, p := range mb.SelectedProjections() {
-		f := python.NestedField{Name: p.Field, Type: p.Mapped.type_.Type()}
+		var f = python.NestedField{Name: p.Field, Type: p.Mapped.type_.Type()}
 		if p.IsPrimaryKey {
 			keys = append(keys, f)
 		}
@@ -256,7 +256,7 @@ func morColumns(mb morBinding) (cols, keys []python.NestedField) {
 }
 
 func morBounds(mb morBinding, ids []string) []mergeBound {
-	b := newMergeBoundsBuilder(mb.Keys)
+	var b = newMergeBoundsBuilder(mb.Keys)
 	for _, id := range ids {
 		b.nextKey([]any{id})
 	}
@@ -266,7 +266,7 @@ func morBounds(mb morBinding, ids []string) []mergeBound {
 // merge runs the connector's merge query exactly as Acknowledge would.
 // Rows must be sorted by id, as the connector sends them.
 func (h *morHarness) merge(mb morBinding, rows []morRow) {
-	cols, _ := morColumns(mb)
+	var cols, _ = morColumns(mb)
 	var values [][]any
 	var ids []string
 	for _, r := range rows {
@@ -300,7 +300,7 @@ func (h *morHarness) merge(mb morBinding, rows []morRow) {
 // load runs the connector's load query for the keys and returns n by id,
 // failing the test if any id comes back twice.
 func (h *morHarness) load(mb morBinding, ids []string) map[string]int64 {
-	_, keys := morColumns(mb)
+	var _, keys = morColumns(mb)
 	var values [][]any
 	for _, id := range ids {
 		values = append(values, []any{id})
@@ -311,7 +311,7 @@ func (h *morHarness) load(mb morBinding, ids []string) map[string]int64 {
 		Bounds:  morBounds(mb, ids),
 	}))
 
-	outputPrefix := path.Join(h.cfg.Compute.BucketPath, uuid.NewString())
+	var outputPrefix = path.Join(h.cfg.Compute.BucketPath, uuid.NewString())
 	require.NoError(h.t, h.mat.compute.runJob(h.ctx, computeJob{
 		Input: python.LoadInput{
 			Query:          q.String(),
@@ -324,19 +324,19 @@ func (h *morHarness) load(mb morBinding, ids []string) map[string]int64 {
 		WorkingPrefix:    outputPrefix,
 	}), q.String())
 
-	got := map[string]int64{}
+	var got = map[string]int64{}
 	for obj := range h.mat.bucket.List(h.ctx, blob.Query{Prefix: outputPrefix}) {
 		if !strings.HasPrefix(path.Base(obj.Key), "part-") {
 			continue
 		}
-		r, err := h.mat.bucket.NewReader(h.ctx, obj.Key)
+		var r, err = h.mat.bucket.NewReader(h.ctx, obj.Key)
 		require.NoError(h.t, err)
 		gzr, err := gzip.NewReader(r)
 		require.NoError(h.t, err)
-		scanner := bufio.NewScanner(gzr)
+		var scanner = bufio.NewScanner(gzr)
 		scanner.Buffer(make([]byte, 0, 64*1024), math.MaxInt64)
 		for scanner.Scan() {
-			idx, doc, found := strings.Cut(scanner.Text(), "\x00")
+			var idx, doc, found = strings.Cut(scanner.Text(), "\x00")
 			require.True(h.t, found, "load output line without a binding separator: %q", scanner.Text())
 			require.Equal(h.t, "0", idx)
 			var parsed struct {
@@ -354,14 +354,14 @@ func (h *morHarness) load(mb morBinding, ids []string) map[string]int64 {
 }
 
 func (h *morHarness) formatVersion(path []string) int {
-	tbl, err := h.mat.catalog.GetTable(h.ctx, path[0], path[1])
+	var tbl, err = h.mat.catalog.GetTable(h.ctx, path[0], path[1])
 	require.NoError(h.t, err)
 	return tbl.Metadata.Version()
 }
 
 // liveDataFiles returns the paths of the table's live data files.
 func (h *morHarness) liveDataFiles(path []string) map[string]struct{} {
-	out := map[string]struct{}{}
+	var out = map[string]struct{}{}
 	for _, r := range h.query(fmt.Sprintf("SELECT file_path FROM %s.data_files", morFQN(path))) {
 		out[string(r[0].(json.RawMessage))] = struct{}{}
 	}
@@ -372,9 +372,9 @@ func (h *morHarness) liveDataFiles(path []string) map[string]struct{} {
 // and left every previously live data file in place, and that on a v3 table
 // the live delete files are deletion vectors, at most one per data file.
 func (h *morHarness) requireMergeOnReadCommit(path []string, dataFilesBefore map[string]struct{}, formatVersion int) {
-	table := morFQN(path)
+	var table = morFQN(path)
 
-	rows := h.query(fmt.Sprintf("SELECT operation, summary FROM %s.snapshots ORDER BY committed_at DESC LIMIT 1", table))
+	var rows = h.query(fmt.Sprintf("SELECT operation, summary FROM %s.snapshots ORDER BY committed_at DESC LIMIT 1", table))
 	require.Len(h.t, rows, 1)
 	var summary map[string]string
 	require.NoError(h.t, json.Unmarshal(rows[0][1].(json.RawMessage), &summary))
@@ -382,7 +382,7 @@ func (h *morHarness) requireMergeOnReadCommit(path []string, dataFilesBefore map
 	require.NotEmpty(h.t, summary["added-delete-files"], "the merge committed no delete files")
 	require.Empty(h.t, summary["deleted-data-files"], "the merge removed data files, which is copy-on-write")
 
-	after := h.liveDataFiles(path)
+	var after = h.liveDataFiles(path)
 	for f := range dataFilesBefore {
 		require.Contains(h.t, after, f, "a data file live before the merge is gone")
 	}
@@ -391,11 +391,11 @@ func (h *morHarness) requireMergeOnReadCommit(path []string, dataFilesBefore map
 	if formatVersion < 3 {
 		return
 	}
-	referenced := map[string]struct{}{}
+	var referenced = map[string]struct{}{}
 	for _, d := range h.query(fmt.Sprintf("SELECT content, file_format, referenced_data_file FROM %s.delete_files", table)) {
 		require.JSONEq(h.t, "1", string(d[0].(json.RawMessage)), "delete file is not a position delete")
 		require.JSONEq(h.t, `"PUFFIN"`, string(d[1].(json.RawMessage)), "v3 delete file is not a deletion vector")
-		ref := string(d[2].(json.RawMessage))
+		var ref = string(d[2].(json.RawMessage))
 		require.NotContains(h.t, referenced, ref, "data file has more than one deletion vector")
 		referenced[ref] = struct{}{}
 	}

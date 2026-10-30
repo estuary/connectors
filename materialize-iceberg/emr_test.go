@@ -25,7 +25,7 @@ func (f fakeApplicationGetter) GetApplication(context.Context, *emr.GetApplicati
 }
 
 func TestCheckVariantReleaseLabel(t *testing.T) {
-	accessDenied := &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not allowed"}
+	var accessDenied = &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "not allowed"}
 
 	for _, tt := range []struct {
 		name    string
@@ -44,7 +44,7 @@ func TestCheckVariantReleaseLabel(t *testing.T) {
 		{"other errors fail", fakeApplicationGetter{err: errors.New("boom")}, "getting EMR application"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkVariantReleaseLabel(context.Background(), tt.getter, "app-1")
+			var err = checkVariantReleaseLabel(context.Background(), tt.getter, "app-1")
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 			} else {

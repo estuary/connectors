@@ -27,8 +27,8 @@ type sparkClient struct {
 }
 
 func (s *sparkClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
-	url := strings.TrimSuffix(s.cfg.DaemonURL, "/") + "/health"
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	var url = strings.TrimSuffix(s.cfg.DaemonURL, "/") + "/health"
+	var req, err = http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		errs.Err(fmt.Errorf("building daemon health request: %w", err))
 		return
@@ -40,7 +40,7 @@ func (s *sparkClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		var body, _ = io.ReadAll(resp.Body)
 		errs.Err(fmt.Errorf("spark daemon at %s returned %d: %s", s.cfg.DaemonURL, resp.StatusCode, string(body)))
 	}
 }
@@ -59,7 +59,7 @@ func (s *sparkClient) ensureSecret(ctx context.Context, wantCred string) error {
 // of the EMR contract but unused here — the daemon imports the python modules
 // directly and returns status in the HTTP response body.
 func (s *sparkClient) runJob(ctx context.Context, job computeJob) error {
-	action, err := actionFromEntryPoint(job.EntryPointURI)
+	var action, err = actionFromEntryPoint(job.EntryPointURI)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ type daemonResponse interface {
 // postDaemon submits an action to the daemon and decodes its response into
 // result, returning the daemon's error when the action did not succeed.
 func (s *sparkClient) postDaemon(ctx context.Context, action string, input any, result daemonResponse) error {
-	body, err := json.Marshal(struct {
+	var body, err = json.Marshal(struct {
 		Action string `json:"action"`
 		Input  any    `json:"input"`
 	}{Action: action, Input: input})
@@ -97,7 +97,7 @@ func (s *sparkClient) postDaemon(ctx context.Context, action string, input any, 
 		return fmt.Errorf("encoding daemon %s request: %w", action, err)
 	}
 
-	url := strings.TrimSuffix(s.cfg.DaemonURL, "/") + "/run"
+	var url = strings.TrimSuffix(s.cfg.DaemonURL, "/") + "/run"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("building daemon %s request: %w", action, err)
@@ -143,16 +143,16 @@ func (s *sparkClient) queryRows(ctx context.Context, query string) ([]string, []
 		Columns []string                     `json:"columns"`
 		Rows    []map[string]json.RawMessage `json:"rows"`
 	}
-	input := struct {
+	var input = struct {
 		Query string `json:"query"`
 	}{Query: query}
 	if err := s.postDaemon(ctx, "query", input, &result); err != nil {
 		return nil, nil, err
 	}
 
-	rows := make([][]any, 0, len(result.Rows))
+	var rows = make([][]any, 0, len(result.Rows))
 	for _, r := range result.Rows {
-		row := make([]any, len(result.Columns))
+		var row = make([]any, len(result.Columns))
 		for i, c := range result.Columns {
 			if v, ok := r[c]; ok {
 				row[i] = v

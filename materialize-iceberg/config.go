@@ -174,7 +174,7 @@ func (c config) Validate() error {
 		return fmt.Errorf("field_name_case %q conflicts with the deprecated lowercase_column_names option: unset lowercase_column_names to use field_name_case %q", c.Advanced.FieldNameCase, c.Advanced.FieldNameCase)
 	}
 
-	catalogAuth, err := c.CatalogAuthConfig()
+	var catalogAuth, err = c.CatalogAuthConfig()
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (c config) Validate() error {
 		if c.GlueOptimizers.ExecutionRoleArn == "" {
 			return fmt.Errorf("glue_optimizers.execution_role_arn is required when any Glue table optimizer is enabled")
 		}
-		signingName, err := SigningName(c.URL)
+		var signingName, err = SigningName(c.URL)
 		if err != nil {
 			return fmt.Errorf("Glue table optimizers are only supported when using AWS Glue as the catalog: %w", err)
 		}
@@ -242,12 +242,12 @@ func (c config) FeatureFlags() (raw string, defaults map[string]common.FlagDefau
 // Returns the signing name for a catalog URL.  Only AWS glue and s3tables URLs
 // have a signing name.
 func SigningName(catalogURL string) (string, error) {
-	u, err := url.Parse(catalogURL)
+	var u, err = url.Parse(catalogURL)
 	if err != nil {
 		return "", err
 	}
 
-	hostname := u.Hostname()
+	var hostname = u.Hostname()
 	if strings.HasPrefix(hostname, "glue.") {
 		return "glue", nil
 	}
@@ -551,7 +551,7 @@ type sparkJobProperty struct {
 }
 
 func (sparkJobProperty) JSONSchema() *jsonschema.Schema {
-	properties := make([]any, 0, len(validSparkJobPropertyKeys))
+	var properties = make([]any, 0, len(validSparkJobPropertyKeys))
 	for _, key := range validSparkJobPropertyKeys {
 		properties = append(properties, key)
 	}
@@ -654,14 +654,14 @@ func (c emrConfig) Validate() error {
 }
 
 func (c config) toCatalog(ctx context.Context) (*catalog.Catalog, error) {
-	catalogAuth, err := c.CatalogAuthConfig()
+	var catalogAuth, err = c.CatalogAuthConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	var opts []catalog.CatalogOption
 	if catalogAuth.AuthType == catalogAuthTypeClientCredential {
-		cfg := catalogAuth.catalogAuthClientCredentialConfig
+		var cfg = catalogAuth.catalogAuthClientCredentialConfig
 
 		var scope *string
 		if cfg.Scope != "" {
@@ -669,8 +669,8 @@ func (c config) toCatalog(ctx context.Context) (*catalog.Catalog, error) {
 		}
 		opts = append(opts, catalog.WithClientCredential(cfg.Credential, cfg.Oauth2ServerURI, scope))
 	} else if catalogAuth.AuthType == catalogAuthTypeSigV4 {
-		cfg := catalogAuth.catalogAuthSigV4Config
-		signingName, err := SigningName(c.URL)
+		var cfg = catalogAuth.catalogAuthSigV4Config
+		var signingName, err = SigningName(c.URL)
 		if err != nil {
 			return nil, err
 		}
@@ -682,8 +682,8 @@ func (c config) toCatalog(ctx context.Context) (*catalog.Catalog, error) {
 			"",
 		))
 	} else if catalogAuth.AuthType == catalogAuthTypeAWSIAM {
-		cfg := catalogAuth.IAMConfig
-		signingName, err := SigningName(c.URL)
+		var cfg = catalogAuth.IAMConfig
+		var signingName, err = SigningName(c.URL)
 		if err != nil {
 			return nil, err
 		}
@@ -727,7 +727,7 @@ func (c config) toAwsConfig(ctx context.Context) (*aws.Config, error) {
 		}
 	}
 
-	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
+	var awsCfg, err = awsConfig.LoadDefaultConfig(ctx,
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(c.Compute.Region),
 	)
@@ -738,7 +738,7 @@ func (c config) toAwsConfig(ctx context.Context) (*aws.Config, error) {
 }
 
 func (c config) toBucket(ctx context.Context) (blob.Bucket, error) {
-	awsCfg, err := c.toAwsConfig(ctx)
+	var awsCfg, err = c.toAwsConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -749,8 +749,8 @@ func (c config) toBucket(ctx context.Context) (blob.Bucket, error) {
 		// fixed endpoint with path-style addressing. Setting Region here also
 		// short-circuits the region probe in blob.NewS3Bucket which would
 		// otherwise try to reach s3.amazonaws.com.
-		endpoint := c.Compute.S3Endpoint
-		region := c.Compute.Region
+		var endpoint = c.Compute.S3Endpoint
+		var region = c.Compute.Region
 		clientOpts = append(clientOpts, func(o *s3.Options) {
 			o.BaseEndpoint = &endpoint
 			o.UsePathStyle = c.Compute.S3PathStyle
@@ -762,7 +762,7 @@ func (c config) toBucket(ctx context.Context) (blob.Bucket, error) {
 }
 
 func (c config) toEmrClient(ctx context.Context) (*emr.Client, error) {
-	awsCfg, err := c.toAwsConfig(ctx)
+	var awsCfg, err = c.toAwsConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -771,7 +771,7 @@ func (c config) toEmrClient(ctx context.Context) (*emr.Client, error) {
 }
 
 func (c config) toSsmClient(ctx context.Context) (*ssm.Client, error) {
-	awsCfg, err := c.toAwsConfig(ctx)
+	var awsCfg, err = c.toAwsConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +780,7 @@ func (c config) toSsmClient(ctx context.Context) (*ssm.Client, error) {
 }
 
 func (c config) toGlueClient(ctx context.Context) (*glue.Client, error) {
-	catalogAuth, err := c.CatalogAuthConfig()
+	var catalogAuth, err = c.CatalogAuthConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -790,7 +790,7 @@ func (c config) toGlueClient(ctx context.Context) (*glue.Client, error) {
 
 	switch catalogAuth.AuthType {
 	case catalogAuthTypeSigV4:
-		cfg := catalogAuth.catalogAuthSigV4Config
+		var cfg = catalogAuth.catalogAuthSigV4Config
 		credProvider = credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, "")
 		region = cfg.AWSRegion
 	case catalogAuthTypeAWSIAM:

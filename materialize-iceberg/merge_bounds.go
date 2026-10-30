@@ -82,7 +82,7 @@ func maxKey(k1 any, k2 any) any {
 }
 
 func (b *mergeBoundsBuilder) build() []mergeBound {
-	conditions := make([]mergeBound, len(b.lower))
+	var conditions = make([]mergeBound, len(b.lower))
 
 	for idx, p := range b.keys {
 		conditions[idx] = mergeBound{MappedProjection: p}

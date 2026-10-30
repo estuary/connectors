@@ -27,7 +27,7 @@ import (
 // Polaris stack after a Spark data commit; the offending fields are injected
 // per test case.
 func TestGetTableToleratesVersionScopedFields(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/v2-metadata.json")
+	var fixture, err = os.ReadFile("testdata/v2-metadata.json")
 	require.NoError(t, err)
 
 	for _, tt := range []struct {
@@ -50,10 +50,10 @@ func TestGetTableToleratesVersionScopedFields(t *testing.T) {
 			for k, v := range tt.inject {
 				meta[k] = v
 			}
-			metaBytes, err := json.Marshal(meta)
+			var metaBytes, err = json.Marshal(meta)
 			require.NoError(t, err)
 
-			mux := http.NewServeMux()
+			var mux = http.NewServeMux()
 			mux.HandleFunc("GET /v1/config", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]any{
@@ -69,10 +69,10 @@ func TestGetTableToleratesVersionScopedFields(t *testing.T) {
 				})
 			})
 
-			ts := httptest.NewServer(mux)
+			var ts = httptest.NewServer(mux)
 			defer ts.Close()
 
-			scope := "my-scope"
+			var scope = "my-scope"
 			cat, err := New(t.Context(), ts.URL, "my-warehouse", WithClientCredential("my-creds", "my-uri", &scope))
 			require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func TestDropFieldsBeyondFormatVersion(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, dropped, _, err := dropFieldsBeyondFormatVersion(json.RawMessage(tt.in))
+			var got, dropped, _, err = dropFieldsBeyondFormatVersion(json.RawMessage(tt.in))
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return

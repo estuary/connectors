@@ -95,12 +95,12 @@ func (t *transactor) UnmarshalState(raw json.RawMessage) error {
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	hadLoads := false
+	var hadLoads = false
 	for it.Next() {
 		hadLoads = true
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
 		if converted, err := b.Mapped.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -127,7 +127,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 			continue
 		}
 
-		files, err := t.loadFiles.Flush(b.Idx)
+		var files, err = t.loadFiles.Flush(b.Idx)
 		if err != nil {
 			return fmt.Errorf("flushing load files: %w", err)
 		}
@@ -148,8 +148,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 		unionQueries = append(unionQueries, subQuery.String())
 	}
 
-	outputPrefix := path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
-	loadInput := python.LoadInput{
+	var outputPrefix = path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
+	var loadInput = python.LoadInput{
 		Query:          strings.Join(unionQueries, "\nUNION ALL\n"),
 		Bindings:       pyBindings,
 		OutputLocation: "s3://" + path.Join(t.cfg.Compute.Bucket, outputPrefix),
@@ -157,7 +157,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 
 	// In addition to removing the staged load keys, the loaded document result
 	// files that are written to the staging location must also be removed.
-	cleanupResults := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
+	var cleanupResults = cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 	defer cleanupResults()
 
 	t.be.StartedEvaluatingLoads()
@@ -185,17 +185,17 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	rows := make(map[int]int64)
+	var rows = make(map[int]int64)
 
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 		rows[it.Binding]++
 
-		flowDocument := it.RawJSON
+		var flowDocument = it.RawJSON
 		if t.cfg.HardDelete && it.Delete {
 			flowDocument = json.RawMessage(`"delete"`)
 		}
@@ -211,16 +211,16 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
-	round := it.Round
+	var round = it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		pyBindings := make(map[string]*pendingMerge)
+		var pyBindings = make(map[string]*pendingMerge)
 		for idx, b := range t.bindings {
 			if !t.storeFiles.Started(idx) {
 				continue
 			}
 
-			files, err := t.storeFiles.Flush(idx)
+			var files, err = t.storeFiles.Flush(idx)
 			if err != nil {
 				return nil, m.FinishedOperation(fmt.Errorf("flushing store files: %w", err))
 			}
@@ -246,7 +246,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		cpUpdate, err := json.Marshal(pyBindings)
+		var cpUpdate, err = json.Marshal(pyBindings)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("encoding checkpoint update: %w", err))
 		}
@@ -264,7 +264,7 @@ func (t *transactor) Flush(context.Context, map[int]time.Time) error {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	checkpointClear := make(map[string]*pendingMerge)
+	var checkpointClear = make(map[string]*pendingMerge)
 	var mergeInput python.MergeInput
 	var allFileUris []string
 	var merged []struct {
@@ -272,10 +272,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		*pendingMerge
 	}
 
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 
 	for _, b := range t.bindings {
-		sk := b.Mapped.StateKey
+		var sk = b.Mapped.StateKey
 		if !shouldProcess(sk) {
 			// This state key's pending work was not requested to be processed,
 			// so it remains staged in the persisted state.
@@ -286,7 +286,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			checkpointClear[sk] = nil
 
 			if t.recovery {
-				extantFiles, err := t.extantFiles(ctx, pyMergeBinding.Files)
+				var extantFiles, err = t.extantFiles(ctx, pyMergeBinding.Files)
 				if err != nil {
 					return nil, fmt.Errorf("listing previously staged files for recovery transaction: %w", err)
 				}
@@ -323,11 +323,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	var stateUpdate *pf.ConnectorState
 	if len(mergeInput.Bindings) > 0 {
-		token := mergeIdempotencyTokens(mergeInput.Bindings)
+		var token = mergeIdempotencyTokens(mergeInput.Bindings)
 
 		// Make sure the job status output file gets cleaned up.
-		outputPrefix := path.Join(t.cfg.Compute.BucketPath, token)
-		cleanupStatus := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
+		var outputPrefix = path.Join(t.cfg.Compute.BucketPath, token)
+		var cleanupStatus = cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 		defer cleanupStatus()
 
 		if err := t.compute.runJob(ctx, computeJob{
@@ -373,15 +373,15 @@ func (t *transactor) Destroy() {}
 
 func (t *transactor) readLoadResults(ctx context.Context, prefix string, loaded func(binding int, doc json.RawMessage) error) error {
 	var mu sync.Mutex
-	lockedAndLoaded := func(binding int, doc json.RawMessage) error {
+	var lockedAndLoaded = func(binding int, doc json.RawMessage) error {
 		mu.Lock()
 		defer mu.Unlock()
 
 		return loaded(binding, doc)
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
-	readFileKeys := make(chan string)
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var readFileKeys = make(chan string)
 
 	for idx := 0; idx < loadFileWorkers; idx++ {
 		group.Go(func() error { return t.loadWorker(groupCtx, lockedAndLoaded, readFileKeys) })
@@ -389,7 +389,7 @@ func (t *transactor) readLoadResults(ctx context.Context, prefix string, loaded 
 
 	var sawSuccess bool
 	for obj := range t.bucket.List(groupCtx, blob.Query{Prefix: prefix}) {
-		base := path.Base(obj.Key)
+		var base = path.Base(obj.Key)
 
 		// Sanity checks for the general layout of files we expect. This
 		// shouldn't strictly be necessary, although we do need to not try
@@ -422,7 +422,7 @@ func (t *transactor) readLoadResults(ctx context.Context, prefix string, loaded 
 
 func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, doc json.RawMessage) error, fileKeys <-chan string) error {
 	for fileKey := range fileKeys {
-		r, err := t.bucket.NewReader(ctx, fileKey)
+		var r, err = t.bucket.NewReader(ctx, fileKey)
 		if err != nil {
 			return err
 		}
@@ -444,10 +444,10 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 			return fmt.Errorf("get gzip reader for load results: %w", err)
 		}
 
-		scanner := bufio.NewScanner(gzr)
+		var scanner = bufio.NewScanner(gzr)
 		scanner.Buffer(make([]byte, 0, 64*1024), math.MaxInt64)
 		for scanner.Scan() {
-			line := scanner.Bytes()
+			var line = scanner.Bytes()
 			if commaIdx := bytes.IndexByte(line, '\u0000'); commaIdx == -1 {
 				return fmt.Errorf("could not find comma in load binding line: %s", line)
 			} else if binding, err := strconv.Atoi(string(line[:commaIdx])); err != nil {
@@ -472,8 +472,8 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 func (t *transactor) extantFiles(ctx context.Context, originalFileUris []string) (map[string]struct{}, error) {
 	var prefix string
 	for _, uri := range originalFileUris {
-		_, key := s3UriToParts(uri)
-		this := path.Dir(key)
+		var _, key = s3UriToParts(uri)
+		var this = path.Dir(key)
 		if prefix == "" {
 			prefix = this
 		} else if prefix != this {
@@ -481,7 +481,7 @@ func (t *transactor) extantFiles(ctx context.Context, originalFileUris []string)
 		}
 	}
 
-	out := make(map[string]struct{})
+	var out = make(map[string]struct{})
 	for obj := range t.bucket.List(ctx, blob.Query{Prefix: prefix}) {
 		out[t.bucket.URI(obj.Key)] = struct{}{}
 	}
@@ -490,7 +490,7 @@ func (t *transactor) extantFiles(ctx context.Context, originalFileUris []string)
 }
 
 func cleanPrefixOnceFn(ctx context.Context, bucket blob.Bucket, prefix string) func() error {
-	didClean := false
+	var didClean = false
 	return func() error {
 		if didClean {
 			return nil

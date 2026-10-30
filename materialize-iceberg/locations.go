@@ -27,7 +27,7 @@ func sanitize(name string) string {
 }
 
 func sanitizePath(path ...string) []string {
-	out := []string{}
+	var out = []string{}
 	for _, p := range path {
 		out = append(out, strings.ToLower(sanitize(p)))
 	}
@@ -40,13 +40,13 @@ func sanitizePath(path ...string) []string {
 // "original" value to guarantee a unique (with respect to the input) and
 // deterministic output.
 func sanitizeAndAppendHash(in ...any) string {
-	strs := make([]string, 0, len(in))
+	var strs = make([]string, 0, len(in))
 	for _, i := range in {
 		strs = append(strs, fmt.Sprintf("%v", i))
 	}
 
-	joined := strings.Join(strs, "_")
-	sanitized := sanitize(joined)
+	var joined = strings.Join(strs, "_")
+	var sanitized = sanitize(joined)
 	if len(sanitized) > 64 {
 		// Limit the length of the "human readable" part of the table name to
 		// something reasonable.
@@ -57,7 +57,7 @@ func sanitizeAndAppendHash(in ...any) string {
 }
 
 func createNestedDotHashLocation(namespace, table string) string {
-	sanitized := path.Join(sanitize(namespace), sanitize(table))
+	var sanitized = path.Join(sanitize(namespace), sanitize(table))
 	return fmt.Sprintf("%s.%016X", sanitized, xxhash.Sum64String(sanitized))
 }
 

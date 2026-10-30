@@ -12,32 +12,32 @@ import (
 )
 
 func TestTemplates(t *testing.T) {
-	templates := parseTemplates()
+	var templates = parseTemplates()
 
 	var snap strings.Builder
 
-	makeProjection := func(field string) boilerplate.Projection {
+	var makeProjection = func(field string) boilerplate.Projection {
 		return boilerplate.Projection{
 			Projection: pf.Projection{Field: field},
 		}
 	}
 
-	keys := []boilerplate.MappedProjection[mapped]{
+	var keys = []boilerplate.MappedProjection[mapped]{
 		{Projection: makeProjection("first-key"), Mapped: mapped{type_: iceberg.StringType{}, Name: "first-key"}},
 		{Projection: makeProjection("second-key"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "second-key"}},
 		{Projection: makeProjection("third-key"), Mapped: mapped{type_: iceberg.Int64Type{}, Name: "third-key"}},
 	}
 
-	values := []boilerplate.MappedProjection[mapped]{
+	var values = []boilerplate.MappedProjection[mapped]{
 		{Projection: makeProjection("first-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "first-val"}},
 		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "second-val"}},
 		{Projection: makeProjection("third-val"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "third-val"}},
 		{Projection: makeProjection("fourth-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "fourth-val"}},
 	}
 
-	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.StringType{}, Name: "flow_document"}}
+	var doc = &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.StringType{}, Name: "flow_document"}}
 
-	input := templateInput{
+	var input = templateInput{
 		binding: binding{
 			Idx: 0,
 			Mapped: &boilerplate.MappedBinding[config, resource, mapped]{
@@ -66,7 +66,7 @@ func TestTemplates(t *testing.T) {
 		},
 	}
 
-	mInput := migrateInput{
+	var mInput = migrateInput{
 		ResourcePath: []string{"some", "table"},
 		Migrations: []migrateColumn{
 			{
@@ -105,13 +105,13 @@ func TestTemplates(t *testing.T) {
 	// The same binding with variant columns: the merge view already yields
 	// variant values for them, so only the document column's sentinel
 	// comparison and the load's document output change.
-	variantValues := []boilerplate.MappedProjection[mapped]{
+	var variantValues = []boilerplate.MappedProjection[mapped]{
 		{Projection: makeProjection("first-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "first-val"}},
 		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "second-val"}},
 		{Projection: makeProjection("third-val"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "third-val"}},
 	}
-	variantDoc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "flow_document"}}
-	variantInput := templateInput{
+	var variantDoc = &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "flow_document"}}
+	var variantInput = templateInput{
 		binding: binding{
 			Idx: 1,
 			Mapped: &boilerplate.MappedBinding[config, resource, mapped]{

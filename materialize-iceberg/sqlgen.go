@@ -33,10 +33,10 @@ type migrateInput struct {
 func quoteIdentifier(in string) string { return "`" + strings.ReplaceAll(in, "`", "``") + "`" }
 
 func parseTemplates() templates {
-	tpl := template.New("root").Funcs(template.FuncMap{
+	var tpl = template.New("root").Funcs(template.FuncMap{
 		"QuoteIdentifier": quoteIdentifier,
 		"TableFQN": func(in []string) string {
-			quotedParts := make([]string, 0, 3)
+			var quotedParts = make([]string, 0, 3)
 			// This is the catalog name used by the python scripts, we use a
 			// fully qualified 3-part path: `spark_catalog`.`database`.`table`
 			// in queries to prevent abiguity in case the database has the same
@@ -53,7 +53,7 @@ func parseTemplates() templates {
 		// documents and the delete sentinel comparison see the same text a
 		// string column holds.
 		"DocumentAsJSON": func(alias string, m mapped) string {
-			ident := alias + "." + quoteIdentifier(m.Name)
+			var ident = alias + "." + quoteIdentifier(m.Name)
 			if m.isVariant() {
 				return fmt.Sprintf("TO_JSON(%s)", ident)
 			}
@@ -61,7 +61,7 @@ func parseTemplates() templates {
 		},
 		"MigrateColumnName": func(f string) string { return f + migrateFieldSuffix },
 		"CastSQL": func(m migrateColumn) string {
-			ident := quoteIdentifier(m.Name)
+			var ident = quoteIdentifier(m.Name)
 			if m.TargetType.Equals(iceberg.VariantType{}) {
 				if m.FromType == "string" {
 					// A string column that held an object, array, or the
@@ -95,7 +95,7 @@ func parseTemplates() templates {
 		},
 	})
 
-	parsed := template.Must(tpl.Parse(`
+	var parsed = template.Must(tpl.Parse(`
 {{ define "maybe_unbase64_rhs" -}}
 {{- if IsBinary $.Mapped -}}UNBASE64(r.{{ QuoteIdentifier $.Mapped.Name }}){{ else }}r.{{ QuoteIdentifier $.Mapped.Name }}{{ end }}
 {{- end }}
