@@ -33,10 +33,10 @@ request:
         const clientId = pick(creds, 'client_id');
         const clientSecret = pick(creds, 'client_secret');
         const refreshToken = pick(creds, 'refresh_token');
-        const developerToken = pick(config, 'developer_token');
+        const developerToken = pick(creds, 'developer_token');
         if (!clientId || !clientSecret || !refreshToken || !developerToken) {
           throw new Error(
-            'config is missing credentials.{client_id,client_secret,refresh_token} or developer_token',
+            'config is missing credentials.{client_id,client_secret,refresh_token,developer_token}',
           );
         }
 

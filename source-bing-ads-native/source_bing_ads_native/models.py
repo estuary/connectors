@@ -75,10 +75,22 @@ OAUTH2_SPEC = OAuth2Spec(
 # one: Airbyte's connector and source-onedrive refresh this way too.
 # RotatingOAuth2Credentials would refresh only at startup, crashing the task
 # each time an access token expired.
+class BingAdsOAuth2Credentials(BaseOAuth2Credentials):
+    # Estuary's developer token, like the OAuth app's client ID and secret,
+    # is Estuary's rather than the user's, so Flow adds it to the credentials
+    # from the connector's `oauth2_injected_values` instead of asking for it.
+    developer_token: str = Field(
+        min_length=1,
+        title="Developer Token",
+        description="Injected by Flow.",
+        json_schema_extra={"secret": True},
+    )
+
+
 if TYPE_CHECKING:
-    OAuth2Credentials = BaseOAuth2Credentials
+    OAuth2Credentials = BingAdsOAuth2Credentials
 else:
-    OAuth2Credentials = BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+    OAuth2Credentials = BingAdsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
 
 DEFAULT_START_DATE_DAYS_AGO = 30
@@ -104,12 +116,6 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials = Field(
         discriminator="credentials_title",
         title="Authentication",
-    )
-    developer_token: str = Field(
-        min_length=1,
-        title="Developer Token",
-        description="The Microsoft Advertising developer token sent with every API request.",
-        json_schema_extra={"secret": True},
     )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
