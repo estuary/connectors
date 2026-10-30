@@ -74,7 +74,7 @@ var driver = filesink.FileDriver[*filesink.SinglePhase, filesink.Resource]{
 		return "https://go.estuary.dev/materialize-azure-blob-parquet"
 	},
 	ConfigSchema: func() ([]byte, error) {
-		endpointSchema, err := schemagen.GenerateSchema("EndpointConfig", config{}).MarshalJSON()
+		var endpointSchema, err = schemagen.GenerateSchema("EndpointConfig", config{}).MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
