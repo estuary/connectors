@@ -108,6 +108,7 @@
             "Text": "Visit the Example domain to understand its intended use online.",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -118,6 +119,7 @@
             "Text": "The Example site explains its role for web reference purposes.",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -128,6 +130,7 @@
             "Text": "Learn about the Example domain and its informational function.",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -138,6 +141,7 @@
             "Text": "Example offers a clear statement of its purpose for education.",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -148,6 +152,7 @@
             "Text": "Review the Example domain to see how it is meant to be applied.",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         }
@@ -167,6 +172,7 @@
             "Text": "Example Official Site",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -177,6 +183,7 @@
             "Text": "Learn About Example",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -187,6 +194,7 @@
             "Text": "Example Domain Info",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -197,6 +205,7 @@
             "Text": "Visit Example Online",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -207,6 +216,7 @@
             "Text": "Example Reference Page",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -217,6 +227,7 @@
             "Text": "About Example Domain",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -227,6 +238,7 @@
             "Text": "Example Resource Hub",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -237,6 +249,7 @@
             "Text": "Example Information Page",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -247,6 +260,7 @@
             "Text": "Example Internet Domain",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -257,6 +271,7 @@
             "Text": "Official Example Resource",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         }
@@ -274,6 +289,7 @@
             "SubType": "LandscapeImageMedia",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         },
@@ -288,6 +304,7 @@
             "SubType": "ImageMedia4X1",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         },
@@ -302,6 +319,7 @@
             "SubType": "SquareImageMedia",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         },
@@ -316,6 +334,7 @@
             "SubType": "ImageMedia201X100",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         },
@@ -330,6 +349,7 @@
             "SubType": "ImageMedia169X100",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         },
@@ -344,6 +364,7 @@
             "SubType": "ImageMedia153X100",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         },
@@ -358,6 +379,7 @@
             "SubType": "ImageMedia124X100",
             "Type": "ImageAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Inactive",
           "PinnedField": null
         }
@@ -370,6 +392,7 @@
             "Text": "Example Domain Provides Clear Information on Its Purpose",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -380,6 +403,7 @@
             "Text": "Learn What the Example Domain Represents and How It Is Used",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -390,6 +414,7 @@
             "Text": "Example Website Offers Details for Educational and Reference Use",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -400,6 +425,7 @@
             "Text": "Find Out About the Role of the Example Domain in Online Contexts",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         },
@@ -410,6 +436,7 @@
             "Text": "Example Domain Contains Factual Content for Informational Needs",
             "Type": "TextAsset"
           },
+          "AssetPerformanceLabel": "Unrated",
           "EditorialStatus": "Active",
           "PinnedField": null
         }

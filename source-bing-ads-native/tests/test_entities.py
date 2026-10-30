@@ -291,7 +291,7 @@ async def test_ad_groups_and_ads_carry_parent_ids_in_order():
     ]
     assert all(a.AccountId == "1" for a in ads)
     headline = ads[0].model_dump()["Headlines"][0]
-    assert "AssetPerformanceLabel" not in headline and headline["Asset"]["Text"] == "hi"
+    assert headline == {"Asset": {"Id": "5", "Text": "hi"}, "AssetPerformanceLabel": "Good"}
     ads_calls = [(b, h) for s, b, h in http.calls if s == "/Ads/QueryByAdGroupId"]
     assert all(h == {"CustomerId": "900", "CustomerAccountId": "1"} for _, h in ads_calls)
     assert all("ResponsiveSearch" in b["AdTypes"] for b, _ in ads_calls)
@@ -335,7 +335,7 @@ async def test_asset_groups_come_only_from_performance_max_campaigns():
     asked = [b["CampaignId"] for s, b, _ in http.calls if s == "/AssetGroups/QueryByCampaignId"]
     assert sorted(asked) == ["10", "8"]
     headline = groups[0].model_dump()["Headlines"][0]
-    assert "AssetPerformanceLabel" not in headline and headline["Asset"]["Text"] == "hi"
+    assert headline == {"Asset": {"Id": "5", "Text": "hi"}, "AssetPerformanceLabel": "Good"}
 
 
 @pytest.mark.parametrize(
