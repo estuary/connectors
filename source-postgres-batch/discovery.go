@@ -71,7 +71,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 }
 
 func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *Config) (map[string]*discoveredTable, error) {
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	var tables, err = discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -184,7 +184,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	}
 
 	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
 	}
@@ -246,7 +246,7 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	}
 	fmt.Fprintf(query, "  AND NOT c.relispartition;") // Exclude subpartitions of a partitioned table from discovery
 
-	rows, err := db.QueryContext(ctx, query.String(), args...)
+	var rows, err = db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
@@ -351,7 +351,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 	}
 	fmt.Fprintf(query, "  ORDER BY nc.nspname, c.relname, a.attnum;")
 
-	rows, err := db.QueryContext(ctx, query.String(), args...)
+	var rows, err = db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
@@ -460,7 +460,7 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	fmt.Fprintf(query, " WHERE result.A_ATTNUM = (result.KEYS).x")
 	fmt.Fprintf(query, " ORDER BY result.table_name, result.pk_name, result.key_seq;")
 
-	rows, err := db.QueryContext(ctx, query.String(), args...)
+	var rows, err = db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}

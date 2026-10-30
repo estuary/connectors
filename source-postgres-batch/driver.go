@@ -154,7 +154,7 @@ type documentSourceMetadata struct {
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
+	var resourceSchema, err = schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -261,7 +261,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 }
 
 func (drv *BatchSQLDriver) buildQuery(res *Resource, state *streamState) (string, error) {
-	templateString, err := drv.SelectQueryTemplate(res)
+	var templateString, err = drv.SelectQueryTemplate(res)
 	if err != nil {
 		return "", fmt.Errorf("error selecting query template: %w", err)
 	}
@@ -590,7 +590,7 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 	var isFullRefresh = len(cursorNames) == 0
 	var isInitialBackfill = len(cursorValues) == 0
 
-	query, err := c.Driver.buildQuery(res, state)
+	var query, err = c.Driver.buildQuery(res, state)
 	if err != nil {
 		return fmt.Errorf("error building query: %w", err)
 	}
@@ -978,7 +978,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 	defer watchdog.Stop()
 
 	// Issue the query
-	rows, err := c.DB.QueryContext(ctx, query, args...)
+	var rows, err = c.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return 0, fmt.Errorf("error executing query: %w", err)
 	}

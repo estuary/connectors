@@ -39,7 +39,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -164,7 +164,7 @@ func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string 
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
-		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		var bs, err = json.MarshalIndent(binding, "  ", "  ")
 		require.NoError(t, err)
 		io.Copy(summary, bytes.NewReader(bs))
 		fmt.Fprintf(summary, "\n")
@@ -200,7 +200,7 @@ func setResourceCursor(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...
 
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
 func TestSpec(t *testing.T) {
-	response, err := postgresDriver.Spec(context.Background(), &pc.Request_Spec{})
+	var response, err = postgresDriver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -1215,7 +1215,7 @@ func TestCaptureWithUpdatedAtCursor(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		for i := 0; i < 10; i++ {
 			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3)", tableName),
@@ -1342,7 +1342,7 @@ func TestCaptureFromView(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// First batch: Insert rows into base table, some visible in view
 		for i := 0; i < 10; i++ {
