@@ -22,7 +22,7 @@ func (s *FakeStream) Send(*pm.Response) error {
 func (s *FakeStream) RecvMsg(request *pm.Request) error {
 	request.Reset()
 	if s.index < len(s.items) {
-		item := s.items[s.index]
+		var item = s.items[s.index]
 		_ = item
 
 		request.Store = &pm.Request_Store{
@@ -50,21 +50,21 @@ type StoreIteratorItem struct {
 
 func NewStoreIterator(t *testing.T, data []StoreIteratorItem) *materialize.StoreIterator {
 	t.Helper()
-	stream := &FakeStream{
+	var stream = &FakeStream{
 		index: 0,
 		items: data,
 	}
 
-	request := pm.Request{
+	var request = pm.Request{
 		Store: &pm.Request_Store{},
 	}
 
-	it := materialize.NewStoreIterator(t.Context(), stream, &request)
+	var it = materialize.NewStoreIterator(t.Context(), stream, &request)
 	return it
 }
 
 func TestStoreBatches(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		bindings []*binding
 		items    []StoreIteratorItem
@@ -495,16 +495,16 @@ func TestStoreBatches(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			it := NewStoreIterator(t, tt.items)
-			client, err := NewClient(Credentials{}, nil, nil)
+			var it = NewStoreIterator(t, tt.items)
+			var client, err = NewClient(Credentials{}, nil, nil)
 			require.NoError(t, err)
 
-			transactor := &transactor{
+			var transactor = &transactor{
 				client:   client,
 				bindings: tt.bindings,
 			}
 
-			i := 0
+			var i = 0
 			for batch, err := range transactor.storeBatches(it, tt.size) {
 				require.NoError(t, err)
 				require.Equal(t, tt.expected[i], batch)

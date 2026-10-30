@@ -33,16 +33,16 @@ func (b binding) convertKey(ts tuple.Tuple) (string, error) {
 		return "", fmt.Errorf("unexpected key tuple length: %v", len(ts))
 	}
 
-	mapped := b.fields[0]
+	var mapped = b.fields[0]
 	return mapped.ConvertString(ts[0], mapped.Property)
 }
 
 func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]any, error) {
-	values := make(map[string]any, len(ts)+1)
+	var values = make(map[string]any, len(ts)+1)
 	for idx, elem := range ts {
-		mapped := b.fields[idx]
+		var mapped = b.fields[idx]
 
-		value, err := mapped.Convert(elem, mapped.Property)
+		var value, err = mapped.Convert(elem, mapped.Property)
 		if err != nil {
 			return nil, err
 		}
@@ -53,8 +53,8 @@ func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]any, e
 	}
 
 	if doc != nil && b.docField != nil {
-		property := b.properties[b.docField.Property.Name]
-		value, err := b.docField.Convert(doc, property)
+		var property = b.properties[b.docField.Property.Name]
+		var value, err = b.docField.Convert(doc, property)
 		if err != nil {
 			return nil, err
 		}
@@ -99,9 +99,9 @@ func (t *transactor) Load(it *materialize.LoadIterator, loaded func(int, json.Ra
 }
 
 func (t *transactor) storeUniqueProperty(ctx context.Context, b *binding, batch *Batch) error {
-	inputs := make([]*BatchUpsertInput, 0, len(batch.Items))
+	var inputs = make([]*BatchUpsertInput, 0, len(batch.Items))
 	for _, item := range batch.Items {
-		input := &BatchUpsertInput{
+		var input = &BatchUpsertInput{
 			IDProperty: b.idProperty.Name,
 			ID:         item.ID,
 			Properties: item.Properties,
@@ -113,10 +113,10 @@ func (t *transactor) storeUniqueProperty(ctx context.Context, b *binding, batch 
 }
 
 func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, batch *Batch) error {
-	creates := []*BatchCreateInput{}
-	updates := []*BatchUpdateInput{}
+	var creates = []*BatchCreateInput{}
+	var updates = []*BatchUpdateInput{}
 
-	ids := make([]any, 0, len(batch.Items))
+	var ids = make([]any, 0, len(batch.Items))
 	for _, item := range batch.Items {
 		ids = append(ids, item.ID)
 	}
@@ -128,12 +128,12 @@ func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, bat
 		panic("search limit too large")
 	}
 
-	searchRequest := &SearchRequest{
+	var searchRequest = &SearchRequest{
 		FilterGroups: NewFilterGroupsIn(b.idProperty.Name, ids),
 		Properties:   []string{"id", b.idProperty.Name},
 		Limit:        101, // One more than the largest batch; for duplicate detection below.
 	}
-	response, err := t.client.Search(ctx, b.object, searchRequest)
+	var response, err = t.client.Search(ctx, b.object, searchRequest)
 	if err != nil {
 		return err
 	}
@@ -150,9 +150,9 @@ func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, bat
 
 	// Save the record ID for matches, all records not in the result set
 	// are new.
-	recordIDs := make(map[string]string, len(batch.Items))
+	var recordIDs = make(map[string]string, len(batch.Items))
 	for _, record := range response.Results {
-		idPropertyValue, ok := record.Properties[b.idProperty.Name]
+		var idPropertyValue, ok = record.Properties[b.idProperty.Name]
 		if !ok {
 			return fmt.Errorf("idProperty not set")
 		}
@@ -182,14 +182,14 @@ func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, bat
 	}
 
 	if len(creates) != 0 {
-		err := t.client.BatchCreate(ctx, b.object, creates)
+		var err = t.client.BatchCreate(ctx, b.object, creates)
 		if err != nil {
 			return err
 		}
 	}
 
 	if len(updates) != 0 {
-		err := t.client.BatchUpdate(ctx, b.object, updates)
+		var err = t.client.BatchUpdate(ctx, b.object, updates)
 		if err != nil {
 			return err
 		}
@@ -199,27 +199,27 @@ func (t *transactor) storeNonUniqueProperty(ctx context.Context, b *binding, bat
 }
 
 func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	batches := make(chan *Batch)
-	group, groupCtx := errgroup.WithContext(ctx)
-	round := it.Round
+	var batches = make(chan *Batch)
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var round = it.Round
 	// stored counts the records HubSpot accepted per binding, for the
 	// transaction health report.
-	stored := make([]atomic.Int64, len(t.bindings))
+	var stored = make([]atomic.Int64, len(t.bindings))
 
 	for range MaxConcurrentRequests {
 		group.Go(func() error {
 			for batch := range batches {
-				b := t.bindings[batch.BindingIdx]
+				var b = t.bindings[batch.BindingIdx]
 
 				if b.idProperty.HasUniqueValue {
-					err := t.storeUniqueProperty(groupCtx, b, batch)
+					var err = t.storeUniqueProperty(groupCtx, b, batch)
 					if err != nil {
 						return err
 					}
 				} else {
-					err := t.storeNonUniqueProperty(groupCtx, b, batch)
+					var err = t.storeNonUniqueProperty(groupCtx, b, batch)
 					if err != nil {
 						return err
 					}
@@ -279,9 +279,9 @@ func (t *transactor) storeBatches(it *materialize.StoreIterator, size int) iter.
 	return func(yield func(*Batch, error) bool) {
 		var activeKey string
 		var haveActive bool
-		activeBinding := -1
-		activeProperties := make(map[string]any)
-		items := make([]BatchItem, 0, MaxBatchRecords)
+		var activeBinding = -1
+		var activeProperties = make(map[string]any)
+		var items = make([]BatchItem, 0, MaxBatchRecords)
 
 		for it.Next(true) {
 			if it.Err() != nil {
@@ -289,9 +289,9 @@ func (t *transactor) storeBatches(it *materialize.StoreIterator, size int) iter.
 				return
 			}
 
-			b := t.bindings[it.Binding]
+			var b = t.bindings[it.Binding]
 
-			key, err := b.convertKey(it.Key)
+			var key, err = b.convertKey(it.Key)
 			if err != nil {
 				yield(nil, fmt.Errorf("unable to convert key for object %q: %w", b.object, err))
 				return
@@ -303,7 +303,7 @@ func (t *transactor) storeBatches(it *materialize.StoreIterator, size int) iter.
 				return
 			}
 
-			changedBinding := activeBinding != it.Binding
+			var changedBinding = activeBinding != it.Binding
 
 			// Flush items whenever the binding changes.
 			if changedBinding {
@@ -324,7 +324,7 @@ func (t *transactor) storeBatches(it *materialize.StoreIterator, size int) iter.
 				}
 			}
 
-			changedKey := !haveActive || activeKey != key
+			var changedKey = !haveActive || activeKey != key
 
 			// Merge changes.
 			if !changedKey {

@@ -37,12 +37,12 @@ func (v *Validator) ValidateBinding(
 	binding *pm.Request_Validate_Binding,
 	lastSpec *pf.MaterializationSpec,
 ) (map[string][]*pm.Response_Validated_Constraint, error) {
-	path, err := resource.Path()
+	var path, err = resource.Path()
 	if err != nil {
 		return nil, err
 	}
 
-	lastBinding := boilerplate.FindLastBinding(path, lastSpec)
+	var lastBinding = boilerplate.FindLastBinding(path, lastSpec)
 
 	for _, p := range binding.Collection.Projections {
 		// Don't allow collection keys to be nullable unless they have a default value set. If a
@@ -52,8 +52,8 @@ func (v *Validator) ValidateBinding(
 			continue
 		}
 
-		mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
-		hasDefault := p.Inference.DefaultJson != nil
+		var mustExist = p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
+		var hasDefault = p.Inference.DefaultJson != nil
 
 		if !mustExist && !hasDefault {
 			return nil, fmt.Errorf(
@@ -68,10 +68,10 @@ func (v *Validator) ValidateBinding(
 		return nil, err
 	}
 
-	constraints := make(map[string][]*pm.Response_Validated_Constraint)
-	keys := []string{}
+	var constraints = make(map[string][]*pm.Response_Validated_Constraint)
+	var keys = []string{}
 	for _, projection := range binding.Collection.Projections {
-		constraint, err := v.NewConstraint(projection, objectName, binding, lastBinding, keys)
+		var constraint, err = v.NewConstraint(projection, objectName, binding, lastBinding, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -92,12 +92,12 @@ func (v *Validator) NewConstraint(
 	lastBinding *pf.MaterializationSpec_Binding,
 	keys []string,
 ) (*pm.Response_Validated_Constraint, error) {
-	objectSchema, ok := v.schema.CRM.Objects[objectName]
+	var objectSchema, ok = v.schema.CRM.Objects[objectName]
 	if !ok {
 		return nil, fmt.Errorf("no properties loaded for object: %q", objectName)
 	}
 
-	name, err := PropertyName(projection.Field)
+	var name, err = PropertyName(projection.Field)
 	if err != nil {
 		return nil, err
 	}

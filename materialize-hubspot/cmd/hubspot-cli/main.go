@@ -30,7 +30,7 @@ func parseConfig(filename string) (*hubspot.Config, error) {
 		}
 		defer f.Close()
 	}
-	input, err := io.ReadAll(f)
+	var input, err = io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +50,9 @@ func parseConfig(filename string) (*hubspot.Config, error) {
 }
 
 func ResolveObjectTypeID(ctx context.Context, client *hubspot.Client, object hubspot.CRMObject, customObjectName string) (hubspot.ObjectTypeID, error) {
-	objectTypeID := hubspot.ObjectTypeID(object.String())
+	var objectTypeID = hubspot.ObjectTypeID(object.String())
 	if object == hubspot.CustomObjectObject {
-		objectTypeIDs, err := client.GetCustomObjectTypeIDs(ctx)
+		var objectTypeIDs, err = client.GetCustomObjectTypeIDs(ctx)
 		if err != nil {
 			return hubspot.ObjectTypeID(""), err
 		}
@@ -80,22 +80,22 @@ type AuthCmd struct {
 }
 
 func (c *AuthCmd) Run(ctx context.Context, client *hubspot.Client, creds hubspot.Credentials) error {
-	redirectBaseURL := &url.URL{
+	var redirectBaseURL = &url.URL{
 		Scheme: "http",
 		Host:   c.RedirectHost,
 		Path:   "oauth",
 	}
 
-	server, err := client.StartOAuth2CallbackServer(ctx, redirectBaseURL)
+	var server, err = client.StartOAuth2CallbackServer(ctx, redirectBaseURL)
 	if err != nil {
 		return fmt.Errorf("unable to start server: %w", err)
 	}
 
-	params := url.Values{}
+	var params = url.Values{}
 	params.Set("client_id", creds.ClientID)
 	params.Set("scope", strings.Join(hubspot.Oauth2Scopes, " "))
 	params.Set("redirect_uri", redirectBaseURL.String())
-	uri := *hubspot.AuthURL
+	var uri = *hubspot.AuthURL
 	uri.RawQuery = params.Encode()
 
 	fmt.Printf("Authorize URL: %s\n", uri.String())
@@ -117,7 +117,7 @@ func (c *AuthCmd) Run(ctx context.Context, client *hubspot.Client, creds hubspot
 		return fmt.Errorf("server error: %w", err)
 	}
 
-	tokens := map[string]string{
+	var tokens = map[string]string{
 		"refresh_token":           tokenUpdate.RefreshToken.Expose(),
 		"access_token":            tokenUpdate.AccessToken.Expose(),
 		"access_token_expires_at": tokenUpdate.AccessTokenExpiresAt.Format(time.RFC3339),
@@ -134,13 +134,13 @@ func (c *AuthCmd) Run(ctx context.Context, client *hubspot.Client, creds hubspot
 type RefreshTokensCmd struct{}
 
 func (*RefreshTokensCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	now := time.Now()
-	tokenUpdate, err := client.RefreshTokens(ctx, now)
+	var now = time.Now()
+	var tokenUpdate, err = client.RefreshTokens(ctx, now)
 	if err != nil {
 		return err
 	}
 
-	tokens := map[string]string{
+	var tokens = map[string]string{
 		"refresh_token":           tokenUpdate.RefreshToken.Expose(),
 		"access_token":            tokenUpdate.AccessToken.Expose(),
 		"access_token_expires_at": tokenUpdate.AccessTokenExpiresAt.Format(time.RFC3339),
@@ -158,7 +158,7 @@ func (*RefreshTokensCmd) Run(ctx context.Context, client *hubspot.Client) error 
 type InspectTokensCmd struct{}
 
 func (*InspectTokensCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	tokens, err := client.InspectTokens(ctx)
+	var tokens, err = client.InspectTokens(ctx)
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ type GetPropertyCmd struct {
 }
 
 func (c *GetPropertyCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
+	var object, err = hubspot.NewCRMObject(c.Object)
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ type ListPropertiesCmd struct {
 }
 
 func (c *ListPropertiesCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
+	var object, err = hubspot.NewCRMObject(c.Object)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ type ListPropertyGroupsCmd struct {
 }
 
 func (c *ListPropertyGroupsCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
+	var object, err = hubspot.NewCRMObject(c.Object)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ type BatchReadCmd struct {
 }
 
 func (c *BatchReadCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
+	var object, err = hubspot.NewCRMObject(c.Object)
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func (c *BatchReadCmd) Run(ctx context.Context, client *hubspot.Client) error {
 		return err
 	}
 
-	read := &hubspot.BatchReadRequest{
+	var read = &hubspot.BatchReadRequest{
 		IDProperty: c.IDProperty,
 		Inputs:     hubspot.NewBatchReadInputs(c.Inputs),
 		Properties: c.Properties,
@@ -312,7 +312,7 @@ type SearchEqualCmd struct {
 }
 
 func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error {
-	object, err := hubspot.NewCRMObject(c.Object)
+	var object, err = hubspot.NewCRMObject(c.Object)
 	if err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error 
 		return err
 	}
 
-	request := &hubspot.SearchRequest{
+	var request = &hubspot.SearchRequest{
 		FilterGroups: hubspot.NewFilterGroupsEquals(c.IDProperty, c.Values),
 	}
 	if len(c.Properties) > 0 {
@@ -358,8 +358,8 @@ type Args struct {
 }
 
 func main() {
-	args := Args{}
-	argParser, err := arg.NewParser(arg.Config{}, &args)
+	var args = Args{}
+	var argParser, err = arg.NewParser(arg.Config{}, &args)
 	if err != nil {
 		log.WithError(err).Error("unable to create parser")
 		os.Exit(1)
@@ -386,7 +386,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	var ctx, cancel = signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
 	client, err := hubspot.NewClient(config.Credentials, config.Limiter(), config.SearchLimiter())

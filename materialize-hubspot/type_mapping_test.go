@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewMappedFieldConvert(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		projection  pf.Projection
 		fc          FieldConfig
@@ -69,7 +69,7 @@ func TestNewMappedFieldConvert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			field, err := NewMappedField(tt.projection, tt.fc)
+			var field, err = NewMappedField(tt.projection, tt.fc)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {
@@ -81,7 +81,7 @@ func TestNewMappedFieldConvert(t *testing.T) {
 }
 
 func TestMappedFieldConvert(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		field       MappedField
 		elem        tuple.TupleElement
@@ -114,7 +114,7 @@ func TestMappedFieldConvert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := tt.field.Convert(tt.elem, tt.property)
+			var actual, err = tt.field.Convert(tt.elem, tt.property)
 			require.Equal(t, tt.expected, actual)
 			if tt.expectedErr {
 				require.Error(t, err)
@@ -128,7 +128,7 @@ func TestMappedFieldConvert(t *testing.T) {
 }
 
 func TestPropertyName(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		field       string
 		expected    string
@@ -187,7 +187,7 @@ func TestPropertyName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := PropertyName(tt.field)
+			var actual, err = PropertyName(tt.field)
 			require.Equal(t, tt.expected, actual)
 			if tt.expectedErr {
 				require.Error(t, err)
@@ -197,7 +197,7 @@ func TestPropertyName(t *testing.T) {
 }
 
 func TestCustomObjectName(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		objectName  string
 		expected    string
@@ -241,7 +241,7 @@ func TestCustomObjectName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := CustomObjectName(tt.objectName)
+			var actual, err = CustomObjectName(tt.objectName)
 			if tt.expectedErr {
 				require.Error(t, err)
 			} else {

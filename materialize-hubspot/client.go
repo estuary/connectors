@@ -30,7 +30,7 @@ var (
 )
 
 func productVersion() string {
-	matches := versionRegex.FindStringSubmatch(rawVersion)
+	var matches = versionRegex.FindStringSubmatch(rawVersion)
 	if len(matches) != 2 {
 		panic("unable to parse version")
 	}
@@ -169,7 +169,7 @@ type FilterGroup struct {
 // filter group could contain 6 filters but for this one they always have a
 // single filter.
 func NewFilterGroupsEquals[T any](name string, values []T) []*FilterGroup {
-	groups := make([]*FilterGroup, 0, len(values))
+	var groups = make([]*FilterGroup, 0, len(values))
 	for _, value := range values {
 		groups = append(groups, &FilterGroup{
 			Filters: []Filter{
@@ -185,7 +185,7 @@ func NewFilterGroupsEquals[T any](name string, values []T) []*FilterGroup {
 }
 
 func NewFilterGroupsIn[T any](name string, values []T) []*FilterGroup {
-	items := make([]any, 0, len(values))
+	var items = make([]any, 0, len(values))
 	for _, v := range values {
 		items = append(items, v)
 	}
@@ -256,7 +256,7 @@ type BatchReadRequest struct {
 }
 
 func NewBatchReadInputs(ids []string) []map[string]string {
-	inputs := make([]map[string]string, 0, len(ids))
+	var inputs = make([]map[string]string, 0, len(ids))
 	for _, id := range ids {
 		inputs = append(inputs, map[string]string{
 			"id": id,
@@ -425,7 +425,7 @@ func (c *Client) BatchRead(
 		return nil, fmt.Errorf("unable to get batch with more than 100 records")
 	}
 
-	data, err := json.Marshal(&read)
+	var data, err = json.Marshal(&read)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal batch load body: %w", err)
 	}
@@ -435,18 +435,18 @@ func (c *Client) BatchRead(
 	}
 	var value Response
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		uri := baseURL.JoinPath(objectPath, object.String(), "batch", "read")
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
+		var uri = baseURL.JoinPath(objectPath, object.String(), "batch", "read")
+		var req, err = c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -457,7 +457,7 @@ func (c *Client) BatchRead(
 
 		// Returns 207 if one or more records were not matched.
 		if resp.StatusCode != 200 && resp.StatusCode != 207 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -483,29 +483,29 @@ func (c *Client) BatchUpsert(
 		return fmt.Errorf("exceeded request record limit: %d", MaxBatchRecords)
 	}
 
-	upsert := struct {
+	var upsert = struct {
 		Inputs []*BatchUpsertInput `json:"inputs"`
 	}{
 		Inputs: inputs,
 	}
-	data, err := json.Marshal(&upsert)
+	var data, err = json.Marshal(&upsert)
 	if err != nil {
 		return fmt.Errorf("unable to marshal request: %w", err)
 	}
 
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		uri := baseURL.JoinPath(objectPath, object.String(), "batch/upsert")
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
+		var uri = baseURL.JoinPath(objectPath, object.String(), "batch/upsert")
+		var req, err = c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -515,7 +515,7 @@ func (c *Client) BatchUpsert(
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -537,29 +537,29 @@ func (c *Client) BatchUpdate(
 		return fmt.Errorf("exceeded request record limit: %d", MaxBatchRecords)
 	}
 
-	update := struct {
+	var update = struct {
 		Inputs []*BatchUpdateInput `json:"inputs"`
 	}{
 		Inputs: inputs,
 	}
-	data, err := json.Marshal(&update)
+	var data, err = json.Marshal(&update)
 	if err != nil {
 		return fmt.Errorf("unable to marshal request: %w", err)
 	}
 
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		uri := baseURL.JoinPath(objectPath, object.String(), "batch/update")
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
+		var uri = baseURL.JoinPath(objectPath, object.String(), "batch/update")
+		var req, err = c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -569,7 +569,7 @@ func (c *Client) BatchUpdate(
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -591,29 +591,29 @@ func (c *Client) BatchCreate(
 		return fmt.Errorf("exceeded request record limit: %d", MaxBatchRecords)
 	}
 
-	create := struct {
+	var create = struct {
 		Inputs []*BatchCreateInput `json:"inputs"`
 	}{
 		Inputs: inputs,
 	}
-	data, err := json.Marshal(&create)
+	var data, err = json.Marshal(&create)
 	if err != nil {
 		return fmt.Errorf("unable to marshal request: %w", err)
 	}
 
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		uri := baseURL.JoinPath(objectPath, object.String(), "batch/create")
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
+		var uri = baseURL.JoinPath(objectPath, object.String(), "batch/create")
+		var req, err = c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -623,7 +623,7 @@ func (c *Client) BatchCreate(
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 201 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -645,7 +645,7 @@ func (c *Client) Search(
 		return nil, fmt.Errorf("unable to search more than %d filter groups", MaxSearchFilterGroups)
 	}
 
-	data, err := json.Marshal(search)
+	var data, err = json.Marshal(search)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal search request: %w", err)
 	}
@@ -653,18 +653,18 @@ func (c *Client) Search(
 	var searchResponse SearchResponse
 
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		uri := baseURL.JoinPath(objectPath, object.String(), "search")
-		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
+		var uri = baseURL.JoinPath(objectPath, object.String(), "search")
+		var req, err = c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.searchLimiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -674,7 +674,7 @@ func (c *Client) Search(
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -711,7 +711,7 @@ func (c *Client) Get(
 	object ObjectTypeID,
 	get *GetRequest,
 ) (*GetResponse, error) {
-	params := url.Values{}
+	var params = url.Values{}
 	if get.Limit != 0 {
 		params.Set("limit", fmt.Sprintf("%d", get.Limit))
 	}
@@ -719,22 +719,22 @@ func (c *Client) Get(
 		params.Set("after", get.After)
 	}
 	params.Set("properties", strings.Join(get.Properties, ","))
-	uri := baseURL.JoinPath(objectPath, object.String())
+	var uri = baseURL.JoinPath(objectPath, object.String())
 	uri.RawQuery = params.Encode()
 
 	var getResponse GetResponse
 
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "GET", uri, nil)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var req, err = c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
 		}
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -744,7 +744,7 @@ func (c *Client) Get(
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -761,24 +761,24 @@ func (c *Client) Get(
 }
 
 func (c *Client) GetCustomObjectTypeIDs(ctx context.Context) (map[ObjectName]ObjectTypeID, error) {
-	uri := baseURL.JoinPath(customObjectSchemasPath)
+	var uri = baseURL.JoinPath(customObjectSchemasPath)
 
 	type Response struct {
 		Results []CustomObjectSchema `json:"results"`
 	}
 
 	var value Response
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "GET", uri, nil)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var req, err = c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
 		}
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -788,7 +788,7 @@ func (c *Client) GetCustomObjectTypeIDs(ctx context.Context) (map[ObjectName]Obj
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -803,7 +803,7 @@ func (c *Client) GetCustomObjectTypeIDs(ctx context.Context) (map[ObjectName]Obj
 		return nil, err
 	}
 
-	res := make(map[ObjectName]ObjectTypeID, len(value.Results))
+	var res = make(map[ObjectName]ObjectTypeID, len(value.Results))
 	for _, result := range value.Results {
 		res[ObjectName(result.Name)] = ObjectTypeID(result.ObjectTypeID)
 	}
@@ -811,24 +811,24 @@ func (c *Client) GetCustomObjectTypeIDs(ctx context.Context) (map[ObjectName]Obj
 }
 
 func (c *Client) ListPropertyGroups(ctx context.Context, object ObjectTypeID) ([]*PropertyGroup, error) {
-	uri := baseURL.JoinPath(propertyPath, object.String(), "groups")
+	var uri = baseURL.JoinPath(propertyPath, object.String(), "groups")
 
 	type Response struct {
 		Results []*PropertyGroup `json:"results"`
 	}
 
 	var value Response
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "GET", uri, nil)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var req, err = c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
 		}
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -838,7 +838,7 @@ func (c *Client) ListPropertyGroups(ctx context.Context, object ObjectTypeID) ([
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -857,24 +857,24 @@ func (c *Client) ListPropertyGroups(ctx context.Context, object ObjectTypeID) ([
 }
 
 func (c *Client) ListProperties(ctx context.Context, object ObjectTypeID) ([]*Property, error) {
-	uri := baseURL.JoinPath(propertyPath, object.String())
+	var uri = baseURL.JoinPath(propertyPath, object.String())
 
 	type Response struct {
 		Results []*Property `json:"results"`
 	}
 
 	var value Response
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "GET", uri, nil)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var req, err = c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
 		}
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -884,7 +884,7 @@ func (c *Client) ListProperties(ctx context.Context, object ObjectTypeID) ([]*Pr
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -903,20 +903,20 @@ func (c *Client) ListProperties(ctx context.Context, object ObjectTypeID) ([]*Pr
 
 // GetProperty returns property by name.
 func (c *Client) GetProperty(ctx context.Context, object ObjectTypeID, name string) (*Property, error) {
-	uri := baseURL.JoinPath(propertyPath, object.String(), name)
+	var uri = baseURL.JoinPath(propertyPath, object.String(), name)
 
 	var property Property
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := c.newRequest(ctx, "GET", uri, nil)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var req, err = c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
 		}
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -926,7 +926,7 @@ func (c *Client) GetProperty(ctx context.Context, object ObjectTypeID, name stri
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -953,7 +953,7 @@ func (c *Client) AccessToken(ctx context.Context, now time.Time) (Secret, error)
 	switch c.credentials.AuthType {
 	case OAuth2AuthType:
 		c.RLock()
-		refreshTime := c.credentials.AccessTokenExpiresAt.Add(-refreshLeadTime)
+		var refreshTime = c.credentials.AccessTokenExpiresAt.Add(-refreshLeadTime)
 		if now.Before(refreshTime) {
 			c.RUnlock()
 			return c.credentials.AccessToken, nil
@@ -970,12 +970,12 @@ func (c *Client) AccessToken(ctx context.Context, now time.Time) (Secret, error)
 
 	// Since the read lock was released, we recheck the condition in case
 	// another thread already refreshed the token.
-	refreshTime := c.credentials.AccessTokenExpiresAt.Add(-refreshLeadTime)
+	var refreshTime = c.credentials.AccessTokenExpiresAt.Add(-refreshLeadTime)
 	if now.Before(refreshTime) {
 		return c.credentials.AccessToken, nil
 	}
 
-	update, err := c.RefreshTokens(ctx, now)
+	var update, err = c.RefreshTokens(ctx, now)
 	if err != nil {
 		return "", err
 	}
@@ -989,29 +989,29 @@ func (c *Client) AccessToken(ctx context.Context, now time.Time) (Secret, error)
 
 // RefreshTokens retrieves new auth tokens.
 func (c *Client) RefreshTokens(ctx context.Context, now time.Time) (*TokenUpdate, error) {
-	params := url.Values{}
+	var params = url.Values{}
 	params.Set("refresh_token", c.credentials.RefreshToken.Expose())
 	params.Set("client_id", c.credentials.ClientID)
 	params.Set("client_secret", c.credentials.ClientSecret.Expose())
 	params.Set("grant_type", "refresh_token")
 
-	uri := baseURL.JoinPath(tokenPath)
+	var uri = baseURL.JoinPath(tokenPath)
 
 	var tokens TokenResponse
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		reqBody := strings.NewReader(params.Encode())
-		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var reqBody = strings.NewReader(params.Encode())
+		var req, err = http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
 		if err != nil {
 			return err
 		}
 		req.Header.Set("User-Agent", c.productToken)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -1021,7 +1021,7 @@ func (c *Client) RefreshTokens(ctx context.Context, now time.Time) (*TokenUpdate
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -1043,30 +1043,30 @@ func (c *Client) RefreshTokens(ctx context.Context, now time.Time) (*TokenUpdate
 // This is used for debugging/development, during normal connector use this is
 // handled by the webapp during connector setup.
 func (c *Client) AuthCode(ctx context.Context, now time.Time, code string, redirectURI string) (*TokenUpdate, error) {
-	params := url.Values{}
+	var params = url.Values{}
 	params.Set("client_id", c.credentials.ClientID)
 	params.Set("client_secret", c.credentials.ClientSecret.Expose())
 	params.Set("code", code)
 	params.Set("grant_type", "authorization_code")
 	params.Set("redirect_uri", redirectURI)
 
-	uri := baseURL.JoinPath(tokenPath)
+	var uri = baseURL.JoinPath(tokenPath)
 
 	var tokens TokenResponse
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		reqBody := strings.NewReader(params.Encode())
-		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var reqBody = strings.NewReader(params.Encode())
+		var req, err = http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
 		if err != nil {
 			return err
 		}
 		req.Header.Set("User-Agent", c.productToken)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -1076,7 +1076,7 @@ func (c *Client) AuthCode(ctx context.Context, now time.Time, code string, redir
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -1130,23 +1130,23 @@ func (s *OAuth2CallbackServer) WaitTokens() (*TokenUpdate, error) {
 // This is used for testing/development, during normal connector use this is
 // handled by the webapp during connector setup.
 func (c *Client) StartOAuth2CallbackServer(ctx context.Context, appRedirectURL *url.URL) (*OAuth2CallbackServer, error) {
-	ln, err := net.Listen("tcp", appRedirectURL.Host)
+	var ln, err = net.Listen("tcp", appRedirectURL.Host)
 	if err != nil {
 		return nil, fmt.Errorf("listen: %w", err)
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
-	complete := make(chan struct{})
+	var complete = make(chan struct{})
 
-	s := &OAuth2CallbackServer{}
+	var s = &OAuth2CallbackServer{}
 
-	mux := http.NewServeMux()
+	var mux = http.NewServeMux()
 	mux.HandleFunc("/oauth", func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
+		var code = r.URL.Query().Get("code")
 
-		now := time.Now()
-		update, err := c.AuthCode(groupCtx, now, code, appRedirectURL.String())
+		var now = time.Now()
+		var update, err = c.AuthCode(groupCtx, now, code, appRedirectURL.String())
 		if err != nil {
 			log.Errorf("refresh: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -1160,7 +1160,7 @@ func (c *Client) StartOAuth2CallbackServer(ctx context.Context, appRedirectURL *
 
 		complete <- struct{}{}
 	})
-	server := &http.Server{Handler: mux}
+	var server = &http.Server{Handler: mux}
 
 	group.Go(func() error {
 		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
@@ -1177,7 +1177,7 @@ func (c *Client) StartOAuth2CallbackServer(ctx context.Context, appRedirectURL *
 			break
 		}
 
-		ctx := context.Background()
+		var ctx = context.Background()
 		if shutdownErr := server.Shutdown(ctx); shutdownErr != nil {
 			log.WithError(shutdownErr).Error("error during shutdown")
 		}
@@ -1193,30 +1193,30 @@ func (c *Client) StartOAuth2CallbackServer(ctx context.Context, appRedirectURL *
 //
 // This is used for testing/development.
 func (c *Client) InspectTokens(ctx context.Context) (map[string]any, error) {
-	params := url.Values{}
+	var params = url.Values{}
 	params.Set("refresh_token", c.credentials.RefreshToken.Expose())
 	params.Set("client_id", c.credentials.ClientID)
 	params.Set("client_secret", c.credentials.ClientSecret.Expose())
 	params.Set("token_type_hint", "refresh_token")
 	params.Set("token", c.credentials.RefreshToken.Expose())
 
-	uri := baseURL.JoinPath(tokenPath, "introspect")
+	var uri = baseURL.JoinPath(tokenPath, "introspect")
 
 	var responseBody map[string]any
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		reqBody := strings.NewReader(params.Encode())
-		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var reqBody = strings.NewReader(params.Encode())
+		var req, err = http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
 		if err != nil {
 			return err
 		}
 		req.Header.Set("User-Agent", c.productToken)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		start := time.Now()
+		var start = time.Now()
 		if err := c.limiter.Wait(ctx); err != nil {
 			return err
 		}
-		delay := time.Since(start)
+		var delay = time.Since(start)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
@@ -1226,7 +1226,7 @@ func (c *Client) InspectTokens(ctx context.Context) (map[string]any, error) {
 		defer logExchange(resp, start, delay)
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -1244,7 +1244,7 @@ func (c *Client) InspectTokens(ctx context.Context) (map[string]any, error) {
 }
 
 func (c *Client) newRequest(ctx context.Context, method string, u *url.URL, body io.Reader) (*http.Request, error) {
-	token, err := c.AccessToken(ctx, time.Now())
+	var token, err = c.AccessToken(ctx, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -1264,8 +1264,8 @@ func parseBody[T any](resp *http.Response, value *T, maxBytes int) error {
 		return fmt.Errorf("response body too large: %d", resp.ContentLength)
 	}
 
-	body := io.LimitReader(resp.Body, int64(maxBytes)+1)
-	data, err := io.ReadAll(body)
+	var body = io.LimitReader(resp.Body, int64(maxBytes)+1)
+	var data, err = io.ReadAll(body)
 	if err != nil {
 		return fmt.Errorf("unable to read body: %w", err)
 	}
@@ -1283,10 +1283,10 @@ func parseBody[T any](resp *http.Response, value *T, maxBytes int) error {
 }
 
 func parseAPIError(resp *http.Response) error {
-	apiError := &APIError{StatusCode: resp.StatusCode}
+	var apiError = &APIError{StatusCode: resp.StatusCode}
 
 	// Try to read error information on a best effort basis.
-	err := parseBody(resp, apiError, MaxResponseBytes)
+	var err = parseBody(resp, apiError, MaxResponseBytes)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"status": resp.StatusCode,
@@ -1304,7 +1304,7 @@ func parseAPIError(resp *http.Response) error {
 }
 
 func logExchange(resp *http.Response, startTime time.Time, delay time.Duration) {
-	elapsed := time.Since(startTime)
+	var elapsed = time.Since(startTime)
 	log.WithFields(log.Fields{
 		"method":        resp.Request.Method,
 		"authority":     resp.Request.URL.Host,
@@ -1316,7 +1316,7 @@ func logExchange(resp *http.Response, startTime time.Time, delay time.Duration) 
 }
 
 func MustParseURL(rawURL string) *url.URL {
-	u, err := url.Parse(rawURL)
+	var u, err = url.Parse(rawURL)
 	if err != nil {
 		panic(err)
 	}

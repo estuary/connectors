@@ -49,16 +49,16 @@ var (
 )
 
 func OAuth2Spec() *pf.OAuth2 {
-	authParams := "" +
+	var authParams = "" +
 		"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}" +
 		"&scope=" + url.QueryEscape(strings.Join(Oauth2Scopes, " ")) +
 		"&optional_scope=" + url.QueryEscape(strings.Join(Oauth2OptionalScopes, " ")) +
 		"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}" +
 		"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
-	authURLTemplate := *AuthURL
+	var authURLTemplate = *AuthURL
 	authURLTemplate.RawQuery = authParams
 
-	accessParams := "" +
+	var accessParams = "" +
 		"grant_type=authorization_code" +
 		"&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}" +
 		"&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}" +

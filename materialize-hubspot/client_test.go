@@ -11,7 +11,7 @@ import (
 )
 
 func TestSearchRequest(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name          string
 		searchRequest *SearchRequest
 		expected      json.RawMessage
@@ -54,7 +54,7 @@ func TestSearchRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual, err := json.Marshal(tt.searchRequest)
+			var actual, err = json.Marshal(tt.searchRequest)
 			require.NoError(t, err)
 
 			expected, err := json.Marshal(tt.expected)
@@ -67,7 +67,7 @@ func TestSearchRequest(t *testing.T) {
 }
 
 func TestParseAPIError(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name           string
 		resp           *http.Response
 		expected       error
@@ -76,7 +76,7 @@ func TestParseAPIError(t *testing.T) {
 		{
 			name: "no parse response",
 			resp: func() *http.Response {
-				w := httptest.NewRecorder()
+				var w = httptest.NewRecorder()
 				w.WriteHeader(http.StatusInternalServerError)
 				return w.Result()
 			}(),
@@ -90,7 +90,7 @@ func TestParseAPIError(t *testing.T) {
 		{
 			name: "bad request",
 			resp: func() *http.Response {
-				w := httptest.NewRecorder()
+				var w = httptest.NewRecorder()
 				w.WriteHeader(http.StatusBadRequest)
 				return w.Result()
 			}(),
@@ -102,7 +102,7 @@ func TestParseAPIError(t *testing.T) {
 		{
 			name: "429 rate limit",
 			resp: func() *http.Response {
-				w := httptest.NewRecorder()
+				var w = httptest.NewRecorder()
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusTooManyRequests)
 				w.Body.WriteString(`
@@ -130,7 +130,7 @@ func TestParseAPIError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := parseAPIError(tt.resp)
+			var actual = parseAPIError(tt.resp)
 			require.Equal(t, tt.expected, actual)
 			require.Equal(t, tt.expectedString, actual.Error())
 		})

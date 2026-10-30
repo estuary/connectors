@@ -57,7 +57,7 @@ func Retry[E error](ctx context.Context, backoffSeconds []float64, fn func(attem
 
 			var retryError E
 			if errors.As(err, &retryError) {
-				delay := time.Duration(backoff*float64(time.Second)) + extraDelay
+				var delay = time.Duration(backoff*float64(time.Second)) + extraDelay
 
 				log.WithFields(log.Fields{
 					"attempt":       attempt,

@@ -15,7 +15,7 @@ func NewTemporaryError(format string, a ...any) *TemporaryError {
 }
 
 func TestRetry(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name           string
 		backoffSeconds []float64
 		results        []error
@@ -75,10 +75,10 @@ func TestRetry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				start := time.Now().UTC()
+				var start = time.Now().UTC()
 
-				try := 0
-				err := Retry[*TemporaryError](t.Context(), tt.backoffSeconds, func(attempt int) error {
+				var try = 0
+				var err = Retry[*TemporaryError](t.Context(), tt.backoffSeconds, func(attempt int) error {
 					try += 1
 					return tt.results[attempt-1]
 				})
@@ -90,7 +90,7 @@ func TestRetry(t *testing.T) {
 				}
 				require.Equal(t, tt.attempts, try)
 
-				delay := time.Now().UTC().Sub(start)
+				var delay = time.Now().UTC().Sub(start)
 				require.Equal(t, tt.totalDelay, delay)
 			})
 		})

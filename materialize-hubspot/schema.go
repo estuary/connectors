@@ -25,13 +25,13 @@ type Schema struct {
 }
 
 func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Schema, error) {
-	schema := &Schema{
+	var schema = &Schema{
 		CRM: NewCRMSchema(),
 	}
 
 	var objectTypeIDs map[ObjectName]ObjectTypeID
 	for _, resource := range resources {
-		object, err := resource.CRMObject()
+		var object, err = resource.CRMObject()
 		if err != nil {
 			return nil, err
 		}
@@ -40,7 +40,7 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 			return nil, err
 		}
 
-		objectTypeID := ObjectTypeID(objectName)
+		var objectTypeID = ObjectTypeID(objectName)
 		if object == CustomObjectObject {
 			if objectTypeIDs == nil {
 				objectTypeIDs, err = client.GetCustomObjectTypeIDs(ctx)
@@ -60,7 +60,7 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 		if err != nil {
 			return nil, err
 		}
-		groupMap := make(map[string]*PropertyGroup, len(groups))
+		var groupMap = make(map[string]*PropertyGroup, len(groups))
 		for _, group := range groups {
 			groupMap[group.Name] = group
 		}
@@ -69,7 +69,7 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 		if err != nil {
 			return nil, err
 		}
-		propMap := make(map[string]*Property, len(properties))
+		var propMap = make(map[string]*Property, len(properties))
 		for _, prop := range properties {
 			propMap[prop.Name] = prop
 		}
@@ -86,7 +86,7 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 }
 
 func (s *Schema) GetProperty(objectName ObjectName, propName string) (*Property, bool) {
-	objectSchema, ok := s.CRM.Objects[objectName]
+	var objectSchema, ok = s.CRM.Objects[objectName]
 	if !ok {
 		return nil, false
 	}

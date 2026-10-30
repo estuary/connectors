@@ -85,7 +85,7 @@ func (c *Credentials) Validate() error {
 }
 
 func (Credentials) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("OAuth2", OAuth2Credentials{}, string(OAuth2AuthType)).WithOAuth2Provider(Oauth2Provider),
 		schemagen.OneOfSubSchema("Service Key", ServiceKeyCredentials{}, string(ServiceKeyAuthType)),
 	}
@@ -147,7 +147,7 @@ type Resource struct {
 // This method is used instead of struct tags so that the object type enum can
 // be generated.
 func (Resource) JSONSchema() *jsonschema.Schema {
-	objectEnum := []any{}
+	var objectEnum = []any{}
 	for _, object := range allCRMObjects {
 		objectEnum = append(objectEnum, object.ToTitle())
 	}
@@ -214,12 +214,12 @@ func (r Resource) CRMObject() (CRMObject, error) {
 }
 
 func (r Resource) Validate() error {
-	_, err := r.ObjectName()
+	var _, err = r.ObjectName()
 	return err
 }
 
 func (r Resource) ObjectName() (ObjectName, error) {
-	object, err := r.CRMObject()
+	var object, err = r.CRMObject()
 	if err != nil {
 		return "", err
 	}
@@ -230,7 +230,7 @@ func (r Resource) ObjectName() (ObjectName, error) {
 }
 
 func (r Resource) Path() ([]string, error) {
-	object, err := r.ObjectName()
+	var object, err = r.ObjectName()
 	if err != nil {
 		return nil, err
 	}

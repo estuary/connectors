@@ -10,7 +10,7 @@ import (
 )
 
 func TestValidateBinding(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		schema      *Schema
 		resource    Resource
@@ -291,8 +291,8 @@ func TestValidateBinding(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator := NewValidator(tt.schema)
-			constraints, err := validator.ValidateBinding(tt.resource, tt.binding, tt.lastSpec)
+			var validator = NewValidator(tt.schema)
+			var constraints, err = validator.ValidateBinding(tt.resource, tt.binding, tt.lastSpec)
 			if tt.expectedErr != "" {
 				require.Error(t, err)
 				require.Equal(t, tt.expectedErr, err.Error())

@@ -26,7 +26,7 @@ type MappedField struct {
 }
 
 func NewMappedField(projection pf.Projection, fc FieldConfig) (*MappedField, error) {
-	types := append([]string(nil), projection.Inference.Types...)
+	var types = append([]string(nil), projection.Inference.Types...)
 
 	// All properties can be set to null but doing so is a no-op; the property
 	// will not be modified.
@@ -36,11 +36,11 @@ func NewMappedField(projection pf.Projection, fc FieldConfig) (*MappedField, err
 	types = slices.DeleteFunc(types, func(s string) bool { return s == "null" })
 	slices.Sort(types)
 
-	propertyName, err := PropertyName(projection.Field)
+	var propertyName, err = PropertyName(projection.Field)
 	if err != nil {
 		return nil, err
 	}
-	property := &Property{
+	var property = &Property{
 		Name:           propertyName,
 		Label:          projection.Inference.Title,
 		Description:    projection.Inference.Description,
@@ -209,7 +209,7 @@ func (m *MappedField) Convert(elem tuple.TupleElement, property *Property) (any,
 // ConvertString produces a string version of the field.  This is used for
 // comparing the match property to the value returned from the API.
 func (m *MappedField) ConvertString(elem tuple.TupleElement, property *Property) (string, error) {
-	v, err := m.Convert(elem, property)
+	var v, err = m.Convert(elem, property)
 	if err != nil {
 		return "", err
 	}
@@ -247,7 +247,7 @@ var (
 // Based on the conversion that is made in the HubSpot webapp from the label
 // name to the property name.
 func PropertyName(fieldName string) (string, error) {
-	name := strings.TrimPrefix(fieldName, "properties/")
+	var name = strings.TrimPrefix(fieldName, "properties/")
 	name = strings.ToLower(name)
 	// Underscore is allowed but not as a leading character.
 	name = strings.TrimLeft(name, "_")
@@ -266,7 +266,7 @@ func PropertyName(fieldName string) (string, error) {
 
 // CustomObjectName is the objectName for a CustomObject.
 func CustomObjectName(objectName string) (ObjectName, error) {
-	name := strings.ToLower(objectName)
+	var name = strings.ToLower(objectName)
 	// Underscore is allowed but not as a leading character.
 	name = strings.TrimLeft(name, "_")
 	name = validPropertyChars.ReplaceAllString(name, "")

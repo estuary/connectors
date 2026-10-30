@@ -82,7 +82,7 @@ type Portal struct {
 }
 
 func NewPortal(filename string) (*Portal, error) {
-	data, err := ioutil.ReadFile(filename)
+	var data, err = ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func NewPortal(filename string) (*Portal, error) {
 }
 
 func (p *Portal) RefreshToken(ctx context.Context, client *LocalDevClient) error {
-	accessToken, err := client.RefreshToken(ctx, p.PersonalAccessKey)
+	var accessToken, err = client.RefreshToken(ctx, p.PersonalAccessKey)
 	if err != nil {
 		return err
 	}
@@ -119,11 +119,11 @@ func (p *Portal) Token() *Secret {
 
 // decryptYAMLConfig decrypts yaml bytes with sops and returns it.
 func decryptYAMLConfig(data []byte) (json.RawMessage, error) {
-	sopsCmd := exec.Command("sops", "--decrypt", "--input-type=yaml", "--output-type=json", "/dev/stdin")
+	var sopsCmd = exec.Command("sops", "--decrypt", "--input-type=yaml", "--output-type=json", "/dev/stdin")
 	sopsCmd.Stdin = bytes.NewReader(data)
 
 	// Remove "_sops" encrypted suffix.
-	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	var jqCmd = exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
 	var err error
 	jqCmd.Stdin, err = sopsCmd.StdoutPipe()
 	if err != nil {
@@ -150,10 +150,10 @@ func decryptYAMLConfig(data []byte) (json.RawMessage, error) {
 }
 
 func encryptConfig(data []byte) ([]byte, error) {
-	sopsCmd := exec.Command("sops", "--encrypt", "--input-type=json", "--output-type=json", "/dev/stdin")
+	var sopsCmd = exec.Command("sops", "--encrypt", "--input-type=json", "--output-type=json", "/dev/stdin")
 	sopsCmd.Stdin = bytes.NewReader(data)
 
-	stdoutStderr, err := sopsCmd.CombinedOutput()
+	var stdoutStderr, err = sopsCmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("error running sops: %w", err)
 	}
@@ -186,18 +186,18 @@ func NewLocalDevClient() *LocalDevClient {
 //
 // https://developers.hubspot.com/docs/developer-tooling/local-development/configurable-test-accounts
 func (c *LocalDevClient) CreateTestAccount(ctx context.Context, portal *Portal, config TestAccountConfig) (*TestAccount, error) {
-	uri := baseURL.JoinPath("/integrators/test-portals/v3")
-	params := url.Values{}
+	var uri = baseURL.JoinPath("/integrators/test-portals/v3")
+	var params = url.Values{}
 	params.Set("portalId", portal.ID)
 	uri.RawQuery = params.Encode()
 
-	data, err := json.Marshal(&config)
+	var data, err = json.Marshal(&config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal config: %w", err)
 	}
 	var testAccount TestAccount
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), bytes.NewBuffer(data))
+		var req, err = http.NewRequestWithContext(ctx, "POST", uri.String(), bytes.NewBuffer(data))
 		if err != nil {
 			return err
 		}
@@ -211,7 +211,7 @@ func (c *LocalDevClient) CreateTestAccount(ctx context.Context, portal *Portal, 
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -227,7 +227,7 @@ func (c *LocalDevClient) CreateTestAccount(ctx context.Context, portal *Portal, 
 
 	// Poll test-account status until we receive a sucess response
 	for range 10 {
-		status, err := c.AccountStatus(ctx, portal, &testAccount)
+		var status, err = c.AccountStatus(ctx, portal, &testAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -249,21 +249,21 @@ func (c *LocalDevClient) CreateTestAccount(ctx context.Context, portal *Portal, 
 }
 
 func (c *LocalDevClient) RefreshToken(ctx context.Context, personalAccessKey Secret) (*AccessToken, error) {
-	uri := baseURL.JoinPath("/localdevauth/v1/auth/refresh")
+	var uri = baseURL.JoinPath("/localdevauth/v1/auth/refresh")
 
-	request := struct {
+	var request = struct {
 		EncodedOAuthRefreshToken string `json:"encodedOAuthRefreshToken"`
 	}{
 		EncodedOAuthRefreshToken: personalAccessKey.Expose(),
 	}
-	data, err := json.Marshal(&request)
+	var data, err = json.Marshal(&request)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal refresh request: %w", err)
 	}
 
 	var response AccessToken
 	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), bytes.NewBuffer(data))
+		var req, err = http.NewRequestWithContext(ctx, "POST", uri.String(), bytes.NewBuffer(data))
 		if err != nil {
 			return err
 		}
@@ -276,7 +276,7 @@ func (c *LocalDevClient) RefreshToken(ctx context.Context, personalAccessKey Sec
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -294,16 +294,16 @@ func (c *LocalDevClient) RefreshToken(ctx context.Context, personalAccessKey Sec
 }
 
 func (c *LocalDevClient) AccountStatus(ctx context.Context, portal *Portal, testAccount *TestAccount) (string, error) {
-	uri := baseURL.JoinPath(fmt.Sprintf("/integrators/test-portals/v3/gate-sync-status/%d", testAccount.ID))
-	params := url.Values{}
+	var uri = baseURL.JoinPath(fmt.Sprintf("/integrators/test-portals/v3/gate-sync-status/%d", testAccount.ID))
+	var params = url.Values{}
 	params.Set("portalId", portal.ID)
 	uri.RawQuery = params.Encode()
 
 	var response struct {
 		Status string `json:"status"`
 	}
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := http.NewRequestWithContext(ctx, "GET", uri.String(), nil)
+	var err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		var req, err = http.NewRequestWithContext(ctx, "GET", uri.String(), nil)
 		if err != nil {
 			return err
 		}
@@ -316,7 +316,7 @@ func (c *LocalDevClient) AccountStatus(ctx context.Context, portal *Portal, test
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 
@@ -340,13 +340,13 @@ func (c *LocalDevClient) AccountStatus(ctx context.Context, portal *Portal, test
 //
 //	Development -> Testing -> Test Accounts
 func (c *LocalDevClient) DeleteTestAccount(ctx context.Context, portal *Portal, account *TestAccount) error {
-	uri := baseURL.JoinPath(fmt.Sprintf("/integrators/test-portals/v3/%d", account.ID))
-	params := url.Values{}
+	var uri = baseURL.JoinPath(fmt.Sprintf("/integrators/test-portals/v3/%d", account.ID))
+	var params = url.Values{}
 	params.Set("portalId", portal.ID)
 	uri.RawQuery = params.Encode()
 
 	return Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
-		req, err := http.NewRequestWithContext(ctx, "DELETE", uri.String(), nil)
+		var req, err = http.NewRequestWithContext(ctx, "DELETE", uri.String(), nil)
 		if err != nil {
 			return err
 		}
@@ -359,7 +359,7 @@ func (c *LocalDevClient) DeleteTestAccount(ctx context.Context, portal *Portal, 
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 204 {
-			apiError := parseAPIError(resp)
+			var apiError = parseAPIError(resp)
 			return fmt.Errorf("unexpected response: %w", apiError)
 		}
 		return nil
@@ -398,13 +398,13 @@ type TestBinding struct {
 // getTokens starts the callback server, displays the authorization URL, and
 // waits for it to be called.  This is an interactive step.
 func getTokens(ctx context.Context, creds Credentials) (*TokenUpdate, error) {
-	redirectBaseURL := &url.URL{
+	var redirectBaseURL = &url.URL{
 		Scheme: "http",
 		Host:   "localhost:3000",
 		Path:   "oauth",
 	}
 
-	client, err := NewClient(creds, nil, nil)
+	var client, err = NewClient(creds, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -413,11 +413,11 @@ func getTokens(ctx context.Context, creds Credentials) (*TokenUpdate, error) {
 		return nil, fmt.Errorf("unable to start server: %w", err)
 	}
 
-	params := url.Values{}
+	var params = url.Values{}
 	params.Set("client_id", creds.ClientID)
 	params.Set("scope", strings.Join(Oauth2Scopes, " "))
 	params.Set("redirect_uri", redirectBaseURL.String())
-	uri := *AuthURL
+	var uri = *AuthURL
 	uri.RawQuery = params.Encode()
 
 	fmt.Printf("Authorization URL: %s\n", uri.String())
@@ -433,7 +433,7 @@ func getTokens(ctx context.Context, creds Credentials) (*TokenUpdate, error) {
 // createConfig creates a new encrypted config file in the tempDir.  It is
 // based on template but has the tokens updated to match tokens.
 func createConfig(ctx context.Context, template string, tempDir string) (*Config, string, error) {
-	configBytes, err := os.ReadFile(template)
+	var configBytes, err = os.ReadFile(template)
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to read template config: %w", err)
 	}
@@ -451,7 +451,7 @@ func createConfig(ctx context.Context, template string, tempDir string) (*Config
 
 	// Timeout 1 minute before the test timeout, this will hopefully give us a
 	// chance to cleanup the test account.
-	timeoutFlag := flag.Lookup("test.timeout")
+	var timeoutFlag = flag.Lookup("test.timeout")
 	timeout, err := time.ParseDuration(timeoutFlag.Value.String())
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to parse test.timeout: %q", timeoutFlag)
@@ -468,7 +468,7 @@ func createConfig(ctx context.Context, template string, tempDir string) (*Config
 	config.Credentials.AccessToken = tokens.AccessToken
 	config.Credentials.AccessTokenExpiresAt = tokens.AccessTokenExpiresAt
 
-	updates := map[string]any{
+	var updates = map[string]any{
 		"credentials.refresh_token":           tokens.RefreshToken.Expose(),
 		"credentials.access_token":            tokens.AccessToken.Expose(),
 		"credentials.access_token_expires_at": tokens.AccessTokenExpiresAt,
@@ -484,7 +484,7 @@ func createConfig(ctx context.Context, template string, tempDir string) (*Config
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to encrypt temp config: %w", err)
 	}
-	tempConfigFile := filepath.Join(tempDir, "materialize-hubspot.config.yaml")
+	var tempConfigFile = filepath.Join(tempDir, "materialize-hubspot.config.yaml")
 	err = os.WriteFile(tempConfigFile, tempConfigBytes, 0o600)
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to write temp config: %w", err)
@@ -496,9 +496,9 @@ func createConfig(ctx context.Context, template string, tempDir string) (*Config
 // projectionFields returns the projection.Field values for the collection.
 func projectionFields(schema gjson.Result, prefix string) []string {
 	var ptrs []string
-	props := schema.Get("properties")
+	var props = schema.Get("properties")
 	props.ForEach(func(key, value gjson.Result) bool {
-		ptr := key.String()
+		var ptr = key.String()
 		if prefix != "" {
 			ptr = prefix + "/" + ptr
 		}
@@ -520,12 +520,12 @@ func tasks(
 	configFile string,
 ) iter.Seq2[Task, error] {
 	return func(yield func(Task, error) bool) {
-		tempDir := t.TempDir()
+		var tempDir = t.TempDir()
 
-		bundle := testutil.RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+		var bundle = testutil.RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
 
 		for _, taskName := range taskNames(bundle) {
-			bundle, err := sjson.SetBytes(bundle, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), configFile)
+			var bundle, err = sjson.SetBytes(bundle, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), configFile)
 			if err != nil {
 				yield(Task{}, fmt.Errorf("unable to update task config for %s: %w", taskName, err))
 				return
@@ -534,17 +534,17 @@ func tasks(
 			var bindings []TestBinding
 			gjson.GetBytes(bundle, fmt.Sprintf("materializations.%s.bindings", taskName)).ForEach(func(_, binding gjson.Result) bool {
 				var resource Resource
-				err := boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &resource)
+				var err = boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &resource)
 				if err != nil {
 					log.WithError(err).Error("unable to unmarshal resource")
 					return false
 				}
 
-				collectionName := gjson.Get(binding.Raw, "source").Str
-				collectionSchema := gjson.GetBytes(bundle, fmt.Sprintf("collections.%s.schema", collectionName))
+				var collectionName = gjson.Get(binding.Raw, "source").Str
+				var collectionSchema = gjson.GetBytes(bundle, fmt.Sprintf("collections.%s.schema", collectionName))
 				var properties []string
 				for _, ptr := range projectionFields(collectionSchema, "") {
-					propertyName, err := PropertyName(ptr)
+					var propertyName, err = PropertyName(ptr)
 					if err != nil {
 						log.WithError(err).Error("unable convert schema property")
 						return false
@@ -568,14 +568,14 @@ func tasks(
 				return true
 			})
 
-			source := filepath.Join(tempDir, "test.flow.yaml")
+			var source = filepath.Join(tempDir, "test.flow.yaml")
 			err = os.WriteFile(source, bundle, 0o600)
 			if err != nil {
 				yield(Task{}, fmt.Errorf("unable to write source: %w", err))
 				return
 			}
 
-			task := Task{
+			var task = Task{
 				Name:     taskName,
 				Source:   source,
 				Bundle:   bundle,
@@ -590,8 +590,8 @@ func tasks(
 }
 
 func snapshotBinding(ctx context.Context, task Task, binding TestBinding, actionDesc []byte) (string, error) {
-	resource := binding.Resource
-	object, err := resource.CRMObject()
+	var resource = binding.Resource
+	var object, err = resource.CRMObject()
 	if err != nil {
 		return "", err
 	}
@@ -605,13 +605,13 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 		return "", err
 	}
 
-	objectTypeID := ObjectTypeID(objectName)
+	var objectTypeID = ObjectTypeID(objectName)
 	if object == CustomObjectObject {
-		objectTypeIDs, err := client.GetCustomObjectTypeIDs(ctx)
+		var objectTypeIDs, err = client.GetCustomObjectTypeIDs(ctx)
 		if err != nil {
 			return "", err
 		}
-		id, ok := objectTypeIDs[objectName]
+		var id, ok = objectTypeIDs[objectName]
 		if !ok {
 			return "", fmt.Errorf("definition not found for Custom Object: %q", objectName)
 		}
@@ -624,7 +624,7 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 	builder.Write(actionDesc)
 	builder.WriteString("\n")
 
-	request := &GetRequest{
+	var request = &GetRequest{
 		Properties: binding.Properties,
 		Limit:      100,
 	}
@@ -639,11 +639,11 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 		return "", err
 	}
 	sort.Slice(resp.Results, func(i, j int) bool {
-		lhs := resp.Results[i].Properties[keyPropertyName]
+		var lhs = resp.Results[i].Properties[keyPropertyName]
 		if _, ok := lhs.(string); !ok {
 			lhs = ""
 		}
-		rhs := resp.Results[j].Properties[keyPropertyName]
+		var rhs = resp.Results[j].Properties[keyPropertyName]
 		if _, ok := rhs.(string); !ok {
 			rhs = ""
 		}
@@ -664,14 +664,14 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 		// have dynamic values so we remove them.
 		switch binding.Resource.Object {
 		case "Meetings":
-			title := result.Properties["hs_meeting_title"]
+			var title = result.Properties["hs_meeting_title"]
 			if s, ok := title.(string); ok {
 				if strings.HasPrefix(s, "(Sample meeting)") {
 					continue
 				}
 			}
 		case "Calls":
-			body := result.Properties["hs_call_body"]
+			var body = result.Properties["hs_call_body"]
 			if s, ok := body.(string); ok {
 				if strings.HasPrefix(s, "(Sample call)") {
 					continue
@@ -679,7 +679,7 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 			}
 		}
 
-		record, err := json.Marshal(result.Properties)
+		var record, err = json.Marshal(result.Properties)
 		if err != nil {
 			return "", err
 		}
@@ -699,7 +699,7 @@ func runMaterializationTestForTask(
 ) (string, error) {
 	var snap strings.Builder
 
-	actionDescription := testutil.RunFlowctl(
+	var actionDescription = testutil.RunFlowctl(
 		t,
 		"raw", "preview-next",
 		"--name", task.Name,
@@ -717,7 +717,7 @@ func runMaterializationTestForTask(
 		if idx != 0 {
 			snap.WriteString("\n\n")
 		}
-		snapshot, err := snapshotBinding(ctx, task, binding, actionDescription)
+		var snapshot, err = snapshotBinding(ctx, task, binding, actionDescription)
 		if err != nil {
 			return "", err
 		}
@@ -739,13 +739,13 @@ func RunMaterializationTest(
 ) {
 	var snap strings.Builder
 
-	ctx := t.Context()
+	var ctx = t.Context()
 
 	for task, err := range tasks(t, ctx, sourcePath, config, configFile) {
 		require.NoError(t, err)
 
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", task.Name))
-		results, err := runMaterializationTestForTask(t, ctx, newMaterializer, task, actionDescSanitizers)
+		var results, err = runMaterializationTestForTask(t, ctx, newMaterializer, task, actionDescSanitizers)
 		require.NoError(t, err)
 		snap.WriteString(results)
 	}
@@ -757,7 +757,7 @@ func RunMaterializationTest(
 func Cleanup(t *testing.T, f func()) {
 	t.Cleanup(f)
 
-	c := make(chan os.Signal, 1)
+	var c = make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		<-c
@@ -770,27 +770,27 @@ func TestIntegration(t *testing.T) {
 	if !*integration {
 		t.Skip("skipping integration test; add -interactive to enable")
 	}
-	ctx := t.Context()
+	var ctx = t.Context()
 
-	client := NewLocalDevClient()
+	var client = NewLocalDevClient()
 	t.Cleanup(client.Close)
 
-	portal, err := NewPortal("testdata/portal.yaml")
+	var portal, err = NewPortal("testdata/portal.yaml")
 	require.NoError(t, err)
 	err = portal.RefreshToken(ctx, client)
 	require.NoError(t, err)
 
-	accountName := fmt.Sprintf("driver_test_%d_%s", time.Now().Unix(), uuid.NewString()[:4])
-	accountConfig := NewTestAccountConfig(accountName)
+	var accountName = fmt.Sprintf("driver_test_%d_%s", time.Now().Unix(), uuid.NewString()[:4])
+	var accountConfig = NewTestAccountConfig(accountName)
 
 	testAccount, err := client.CreateTestAccount(ctx, portal, accountConfig)
 	require.NoError(t, err)
 
 	Cleanup(t, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		var ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
-		err := client.DeleteTestAccount(ctx, portal, testAccount)
+		var err = client.DeleteTestAccount(ctx, portal, testAccount)
 		if err != nil {
 			t.Logf("unable to delete test account: %v", err)
 		} else {

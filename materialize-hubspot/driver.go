@@ -22,7 +22,7 @@ type Driver struct{}
 var _ boilerplate.Connector = (*Driver)(nil)
 
 func (*Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("HubSpot", &Config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("HubSpot", &Config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -55,7 +55,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, err
 	}
 
-	parsedFlags, err := boilerplate.ResolveFlags(cfg, req.LastMaterialization)
+	var parsedFlags, err = boilerplate.ResolveFlags(cfg, req.LastMaterialization)
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +66,12 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 	defer materializer.Close(ctx)
 
-	prereqErrs := materializer.CheckPrerequisites(ctx)
+	var prereqErrs = materializer.CheckPrerequisites(ctx)
 	if prereqErrs != nil && prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	}
 
-	resources := make([]Resource, 0, len(req.Bindings))
+	var resources = make([]Resource, 0, len(req.Bindings))
 	for _, b := range req.Bindings {
 		var resource Resource
 		if err := boilerplate.UnmarshalStrict(b.ResourceConfigJson, &resource); err != nil {
@@ -85,12 +85,12 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("unable to load schema: %w", err)
 	}
 
-	validator := NewValidator(schema)
+	var validator = NewValidator(schema)
 	var out []*pm.Response_Validated_Binding
 	for idx, b := range req.Bindings {
-		resource := resources[idx]
+		var resource = resources[idx]
 
-		path, err := resource.Path()
+		var path, err = resource.Path()
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +121,7 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 		return nil, err
 	}
 
-	parsedFlags, err := boilerplate.ResolveFlags(cfg, req.Materialization)
+	var parsedFlags, err = boilerplate.ResolveFlags(cfg, req.Materialization)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 	}
 	defer materializer.Close(ctx)
 
-	resources := make([]Resource, 0, len(req.Materialization.Bindings))
+	var resources = make([]Resource, 0, len(req.Materialization.Bindings))
 	for _, b := range req.Materialization.Bindings {
 		var resource Resource
 		if err := boilerplate.UnmarshalStrict(b.ResourceConfigJson, &resource); err != nil {
@@ -147,9 +147,9 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 		return nil, fmt.Errorf("unable to load schema: %w", err)
 	}
 
-	mapped := make([]*mappedBinding, 0, len(req.Materialization.Bindings))
+	var mapped = make([]*mappedBinding, 0, len(req.Materialization.Bindings))
 	for idx, b := range req.Materialization.Bindings {
-		mappedBinding, err := buildMappedBinding(resources[idx], b)
+		var mappedBinding, err = buildMappedBinding(resources[idx], b)
 		if err != nil {
 			return nil, err
 		}
@@ -157,7 +157,7 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 		mapped = append(mapped, mappedBinding)
 	}
 
-	actions := []string{}
+	var actions = []string{}
 	for _, b := range mapped {
 		for _, field := range b.fields {
 			if _, ok := schema.GetProperty(b.objectName, field.Property.Name); !ok {
@@ -193,10 +193,10 @@ func (m *materialization) LoadSchema(ctx context.Context, resources []Resource) 
 }
 
 func (m *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	now := time.Now()
-	_, err := m.client.AccessToken(ctx, now)
+	var now = time.Now()
+	var _, err = m.client.AccessToken(ctx, now)
 	if err != nil {
 		errs.Err(err)
 	}
@@ -213,13 +213,13 @@ func (m *materialization) NewTransactor(
 ) (m.Transactor, error) {
 	var bindings []*binding
 	for _, mapped := range mappedBindings {
-		idProperty, ok := schema.GetProperty(mapped.objectName, mapped.Key().Property.Name)
+		var idProperty, ok = schema.GetProperty(mapped.objectName, mapped.Key().Property.Name)
 		if !ok {
 			return nil, fmt.Errorf("property not found: %q", mapped.Key().Property.Name)
 		}
 
-		objectSchema := schema.CRM.Objects[mapped.objectName]
-		properties := objectSchema.Properties
+		var objectSchema = schema.CRM.Objects[mapped.objectName]
+		var properties = objectSchema.Properties
 
 		log.WithFields(log.Fields{
 			"object":          mapped.objectName,
@@ -254,7 +254,7 @@ func NewMaterializer(
 	config *Config,
 	featureFlags map[string]bool,
 ) (*materialization, error) {
-	client, err := NewClient(config.Credentials, config.Limiter(), config.SearchLimiter())
+	var client, err = NewClient(config.Credentials, config.Limiter(), config.SearchLimiter())
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (*Driver) NewTransactor(
 		return nil, nil, nil, err
 	}
 
-	featureFlags, err := boilerplate.ResolveFlags(cfg, req.Materialization)
+	var featureFlags, err = boilerplate.ResolveFlags(cfg, req.Materialization)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -289,7 +289,7 @@ func (*Driver) NewTransactor(
 		return nil, nil, nil, err
 	}
 
-	resources := make([]Resource, 0, len(req.Materialization.Bindings))
+	var resources = make([]Resource, 0, len(req.Materialization.Bindings))
 	for _, b := range req.Materialization.Bindings {
 		var resource Resource
 		if err := boilerplate.UnmarshalStrict(b.ResourceConfigJson, &resource); err != nil {
@@ -304,9 +304,9 @@ func (*Driver) NewTransactor(
 		return nil, nil, nil, fmt.Errorf("unable to load schema: %w", err)
 	}
 
-	mapped := make([]*mappedBinding, 0, len(req.Materialization.Bindings))
+	var mapped = make([]*mappedBinding, 0, len(req.Materialization.Bindings))
 	for idx, b := range req.Materialization.Bindings {
-		mappedBinding, err := buildMappedBinding(resources[idx], b)
+		var mappedBinding, err = buildMappedBinding(resources[idx], b)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -346,43 +346,43 @@ func (*Driver) NewTransactor(
 // A Request_Validate_Binding is similar but doesn't have the field selection
 // and some other pieces of information.
 func buildMappedBinding(resource Resource, b *pf.MaterializationSpec_Binding) (*mappedBinding, error) {
-	objectName, err := resource.ObjectName()
+	var objectName, err = resource.ObjectName()
 	if err != nil {
 		return nil, err
 	}
 
-	projections := make(map[string]pf.Projection, len(b.Collection.Projections))
+	var projections = make(map[string]pf.Projection, len(b.Collection.Projections))
 	for _, proj := range b.Collection.Projections {
 		projections[proj.Field] = proj
 	}
 
-	fields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
+	var fields = append(b.FieldSelection.Keys, b.FieldSelection.Values...)
 
-	mappedBinding := &mappedBinding{
+	var mappedBinding = &mappedBinding{
 		objectName: objectName,
 		fields:     make([]*MappedField, 0, len(fields)),
 	}
 
-	mapField := func(field string) (*MappedField, error) {
+	var mapField = func(field string) (*MappedField, error) {
 		var fieldConfig FieldConfig
 		if raw := b.FieldSelection.FieldConfigJsonMap[field]; raw != nil {
 			if err := boilerplate.UnmarshalStrict(raw, &fieldConfig); err != nil {
 				return nil, fmt.Errorf("parsing field config json: %w", err)
 			}
 		}
-		projection := projections[field]
+		var projection = projections[field]
 		return NewMappedField(projection, fieldConfig)
 	}
 
 	for _, field := range fields {
-		mapped, err := mapField(field)
+		var mapped, err = mapField(field)
 		if err != nil {
 			return nil, err
 		}
 		mappedBinding.fields = append(mappedBinding.fields, mapped)
 	}
 	if doc := b.FieldSelection.Document; doc != "" {
-		mapped, err := mapField(b.FieldSelection.Document)
+		var mapped, err = mapField(b.FieldSelection.Document)
 		if err != nil {
 			return nil, err
 		}
