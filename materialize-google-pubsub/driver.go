@@ -43,7 +43,7 @@ func (c *config) Validate() error {
 }
 
 func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
-	creds, err := c.Credentials.GoogleCredentials(ctx, pubsub.ScopePubSub)
+	var creds, err = c.Credentials.GoogleCredentials(ctx, pubsub.ScopePubSub)
 	if err != nil {
 		return nil, fmt.Errorf("creating pubsub client: %w", err)
 	}
@@ -100,8 +100,8 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	es := schemagen.GenerateSchema("Materialize Google PubSub Spec", &config{})
-	endpointSchema, err := es.MarshalJSON()
+	var es = schemagen.GenerateSchema("Materialize Google PubSub Spec", &config{})
+	var endpointSchema, err = es.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -122,7 +122,7 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 // Validate verifies that the provided credentials are valid for authentication and specifies the
 // constraints for the connector.
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	cfg, err := resolveEndpointConfig(req.ConfigJson)
+	var cfg, err = resolveEndpointConfig(req.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -134,10 +134,10 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 	// Bindings are uniquely identified by their topic & identifier, but may have duplicated topic
 	// names among bindings. Topic names are collected here in a set to be later verified.
-	topicNames := make(map[string]struct{})
+	var topicNames = make(map[string]struct{})
 	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +164,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		}
 
 		// Include identifier in the resource path if configured.
-		resourcePath := []string{res.TopicName}
+		var resourcePath = []string{res.TopicName}
 		if res.Identifier != "" {
 			resourcePath = append(resourcePath, res.Identifier)
 		}
@@ -196,7 +196,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
+	var cfg, err = resolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -206,10 +206,10 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		return nil, err
 	}
 
-	checkedTopics := make(map[string]struct{})
+	var checkedTopics = make(map[string]struct{})
 	var newTopics []resource
 	for _, b := range req.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
@@ -230,7 +230,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		}
 	}
 
-	actions := []string{}
+	var actions = []string{}
 	for _, topic := range newTopics {
 		var t *pubsub.Topic
 		var s *pubsub.Subscription
@@ -268,11 +268,11 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.B
 
 	var topicBindings []*topicBinding
 	for _, b := range open.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		t := client.Topic(res.TopicName)
+		var t = client.Topic(res.TopicName)
 
 		// Have calls to publish block when the number of queued messages exceeds the default limit
 		// of 1000, per topic. This bounds the connector memory usage when the store iterator is

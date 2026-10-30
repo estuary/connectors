@@ -43,15 +43,15 @@ func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	errGroup, ctx := errgroup.WithContext(it.Context())
-	round := it.Round
-	published := make([]atomic.Int64, len(t.bindings))
+	var errGroup, ctx = errgroup.WithContext(it.Context())
+	var round = it.Round
+	var published = make([]atomic.Int64, len(t.bindings))
 
 	for it.Next(false) {
-		binding := t.bindings[it.Binding]
-		bindingIdx := it.Binding
+		var binding = t.bindings[it.Binding]
+		var bindingIdx = it.Binding
 
-		msg := &pubsub.Message{
+		var msg = &pubsub.Message{
 			Data:        it.RawJSON,
 			OrderingKey: fmt.Sprintf("%08x", keyhash.PackedKeyHash_HH64(it.PackedKey)),
 		}
@@ -62,7 +62,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		// Blocks if the maximum number of messages are queue'd, since
 		// topic.PublishSettings.FlowControlSettings.LimitExceededBehavior = pubsub.FlowControlBlock
-		res := binding.topic.Publish(ctx, msg)
+		var res = binding.topic.Publish(ctx, msg)
 
 		errGroup.Go(func() error {
 			// This will block until the individual publish call is complete.
