@@ -50,11 +50,7 @@ async def _fetch_paginated(
         await http.request(log, url, params=params)
     )
 
-    has_more = False
-    if response.navigation and response.navigation.nextPage:
-        has_more = True
-
-    return FetchResult(response.records, has_more)
+    return FetchResult(response.records, response.has_more)
 
 
 async def fetch_snapshot(
@@ -78,7 +74,7 @@ async def fetch_snapshot(
             url=url,
             params=params,
             rate_group=model.RATE_GROUP,
-            response_model=PaginatedResponse[model],
+            response_model=model.response_model(),
         )
 
         for record in result.records:
@@ -137,7 +133,7 @@ async def fetch_incremental_changes(
             url=url,
             params=params,
             rate_group=model.RATE_GROUP,
-            response_model=PaginatedResponse[model],
+            response_model=model.response_model(),
         )
 
         for record in result.records:
@@ -192,7 +188,7 @@ async def fetch_incremental_page(
         url=url,
         params=params,
         rate_group=model.RATE_GROUP,
-        response_model=PaginatedResponse[model],
+        response_model=model.response_model(),
     )
 
     for record in result.records:
