@@ -1,5 +1,10 @@
 # source-mysql
 
+## 2026-10-30
+
+### Changed
+- Captures now report that they have started before connecting to the database or running prerequisite checks.
+
 ## 2026-10-28
 
 ### Changed
