@@ -291,7 +291,7 @@ func TestMonotonicChanges(t *testing.T) {
 	s.startSweep(*ts(30))
 
 	// Doesn't re-process files, because the state records the "highest" seen path.
-	skip, reason := s.shouldSkip("bbb", *ts(5))
+	var skip, reason = s.shouldSkip("bbb", *ts(5))
 	require.True(t, skip)
 	require.Equal(t, "state.Path > obj.Path", reason)
 	skip, reason = s.shouldSkip("ccc", *ts(13))

@@ -443,7 +443,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 	}
 	// Report errors from deferred closing of the reader.
 	defer func() {
-		closeErr := rr.Close()
+		var closeErr = rr.Close()
 		if err == nil {
 			err = fmt.Errorf("processObject closing file: %w", closeErr)
 		}
