@@ -1,0 +1,5 @@
+# All 24 TPC-DS tables at scale 10 (~191M documents), from the source-tpc-ds
+# capture, committed every 1 GB of documents.
+tpcds:
+  scale: 10
+  transaction_size: 1GB
