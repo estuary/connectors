@@ -69,11 +69,11 @@ func (c GCSStoreConfig) Validate() error {
 }
 
 func NewGCSStore(ctx context.Context, cfg GCSStoreConfig) (*GCSStore, error) {
-	opts := []option.ClientOption{
+	var opts = []option.ClientOption{
 		option.WithCredentialsJSON([]byte(cfg.CredentialsJSON)),
 	}
 
-	client, err := storage.NewClient(ctx, opts...)
+	var client, err = storage.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +85,10 @@ func NewGCSStore(ctx context.Context, cfg GCSStoreConfig) (*GCSStore, error) {
 }
 
 func (s *GCSStore) PutStream(ctx context.Context, r io.Reader, key string) error {
-	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	var uploadCtx, cancel = context.WithTimeout(ctx, uploadTimeout)
 	defer cancel()
 
-	w := s.client.Bucket(s.bucket).Object(key).NewWriter(uploadCtx)
+	var w = s.client.Bucket(s.bucket).Object(key).NewWriter(uploadCtx)
 
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("copying r to w: %w", err)
@@ -104,7 +104,7 @@ func (s *GCSStore) SupportsPathPatternExpansion() bool {
 }
 
 func (s *GCSStore) StageObject(ctx context.Context, r io.Reader, key string) (*SinglePhase, error) {
-	err := s.PutStream(ctx, r, key)
+	var err = s.PutStream(ctx, r, key)
 	return &SinglePhase{Key: key}, err
 }
 
@@ -152,7 +152,7 @@ func (c AzureBlobConfig) Validate() error {
 }
 
 func NewAzureBlob(ctx context.Context, cfg AzureBlobConfig) (*AzureBlob, error) {
-	bucket, err := blob.NewAzureBlobBucket(ctx, cfg.ContainerName, cfg.StorageAccountName, blob.WithAzureStorageAccountKey(cfg.StorageAccountKey))
+	var bucket, err = blob.NewAzureBlobBucket(ctx, cfg.ContainerName, cfg.StorageAccountName, blob.WithAzureStorageAccountKey(cfg.StorageAccountKey))
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func NewAzureBlob(ctx context.Context, cfg AzureBlobConfig) (*AzureBlob, error) 
 }
 
 func (s *AzureBlob) PutStream(ctx context.Context, r io.Reader, key string) error {
-	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	var uploadCtx, cancel = context.WithTimeout(ctx, uploadTimeout)
 	defer cancel()
 
 	return s.bucket.Upload(uploadCtx, key, r)
@@ -174,7 +174,7 @@ func (s *AzureBlob) SupportsPathPatternExpansion() bool {
 }
 
 func (s *AzureBlob) StageObject(ctx context.Context, r io.Reader, key string) (*SinglePhase, error) {
-	err := s.PutStream(ctx, r, key)
+	var err = s.PutStream(ctx, r, key)
 	return &SinglePhase{Key: key}, err
 }
 

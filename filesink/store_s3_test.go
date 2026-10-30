@@ -53,7 +53,7 @@ type FakeUpload struct {
 }
 
 func (u FakeUpload) Size() int {
-	size := 0
+	var size = 0
 	for _, part := range u.Parts {
 		size += part.Size
 	}
@@ -70,7 +70,7 @@ type FakeS3 struct {
 }
 
 func NewFakeS3() *FakeS3 {
-	server := &FakeS3{
+	var server = &FakeS3{
 		Uploads: make(map[string]*FakeUpload),
 	}
 	server.HandleCreateMultipartUpload = server.defaultHandleCreateMultipartUpload
@@ -80,17 +80,17 @@ func NewFakeS3() *FakeS3 {
 }
 
 func (s *FakeS3) GenerateUploadId() string {
-	buf := make([]byte, 24)
+	var buf = make([]byte, 24)
 	rand.Read(buf)
 	return base64.StdEncoding.EncodeToString(buf)
 }
 
 func (s *FakeS3) defaultHandleCreateMultipartUpload(w http.ResponseWriter, r *http.Request) {
-	bucket, key := filepath.Split(r.URL.Path)
+	var bucket, key = filepath.Split(r.URL.Path)
 	bucket = strings.Trim(bucket, "/")
 
 	w.WriteHeader(http.StatusOK)
-	resp := InitiateMultipartUploadResult{
+	var resp = InitiateMultipartUploadResult{
 		Bucket:   bucket,
 		Key:      key,
 		UploadID: s.GenerateUploadId(),
@@ -98,7 +98,7 @@ func (s *FakeS3) defaultHandleCreateMultipartUpload(w http.ResponseWriter, r *ht
 
 	s.Uploads[key] = &FakeUpload{}
 
-	respBody, err := xml.Marshal(&resp)
+	var respBody, err = xml.Marshal(&resp)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -107,32 +107,32 @@ func (s *FakeS3) defaultHandleCreateMultipartUpload(w http.ResponseWriter, r *ht
 }
 
 func (s *FakeS3) defaultHandleCompleteMultipartUpload(w http.ResponseWriter, r *http.Request) {
-	bucket, key := filepath.Split(r.URL.Path)
+	var bucket, key = filepath.Split(r.URL.Path)
 	bucket = strings.Trim(bucket, "/")
 
-	buf, err := io.ReadAll(r.Body)
+	var buf, err = io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	req := CompleteMultipartUpload{}
+	var req = CompleteMultipartUpload{}
 	err = xml.Unmarshal(buf, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	hash := md5.New()
+	var hash = md5.New()
 	for _, part := range req.Parts {
 		io.WriteString(hash, part.ETag)
 	}
-	etag := fmt.Sprintf("%x-%d", hash.Sum(nil), len(req.Parts))
+	var etag = fmt.Sprintf("%x-%d", hash.Sum(nil), len(req.Parts))
 
 	s.Uploads[key].Complete = true
 
 	w.WriteHeader(http.StatusOK)
-	resp := CompleteMultipartUploadResult{
+	var resp = CompleteMultipartUploadResult{
 		Location: "",
 		Bucket:   bucket,
 		Key:      key,
@@ -147,16 +147,16 @@ func (s *FakeS3) defaultHandleCompleteMultipartUpload(w http.ResponseWriter, r *
 }
 
 func (s *FakeS3) defaultHandleUploadPart(w http.ResponseWriter, r *http.Request) {
-	bucket, key := filepath.Split(r.URL.Path)
+	var bucket, key = filepath.Split(r.URL.Path)
 	bucket = strings.Trim(bucket, "/")
 
-	body, err := io.ReadAll(r.Body)
+	var body, err = io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	partNumberStr, ok := r.URL.Query()["partNumber"]
+	var partNumberStr, ok = r.URL.Query()["partNumber"]
 	if !ok || len(partNumberStr) != 1 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -168,9 +168,9 @@ func (s *FakeS3) defaultHandleUploadPart(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	hash := md5.New()
+	var hash = md5.New()
 	hash.Write(body)
-	etag := fmt.Sprintf("%x", hash.Sum(nil))
+	var etag = fmt.Sprintf("%x", hash.Sum(nil))
 
 	upload, ok := s.Uploads[key]
 	if !ok {
@@ -189,7 +189,7 @@ func (s *FakeS3) defaultHandleUploadPart(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *FakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
+	var query = r.URL.Query()
 	switch r.Method {
 	case "POST":
 		if _, ok := query["uploads"]; ok {
@@ -203,8 +203,8 @@ func (s *FakeS3) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestS3StoreMultipart(t *testing.T) {
-	key := "my-key"
-	tests := []struct {
+	var key = "my-key"
+	var tests = []struct {
 		name                          string
 		handleCreateMultipartUpload   func(w http.ResponseWriter, r *http.Request)
 		handleCompleteMultipartUpload func(w http.ResponseWriter, r *http.Request)
@@ -216,7 +216,7 @@ func TestS3StoreMultipart(t *testing.T) {
 			name:   "single part",
 			reader: bytes.NewReader(make([]byte, 64)),
 			check: func(t *testing.T, server *FakeS3) {
-				upload, ok := server.Uploads[key]
+				var upload, ok = server.Uploads[key]
 				require.True(t, ok)
 				require.Len(t, upload.Parts, 1)
 				require.True(t, upload.Complete)
@@ -227,7 +227,7 @@ func TestS3StoreMultipart(t *testing.T) {
 			name:   "multi part",
 			reader: bytes.NewReader(make([]byte, 16*1024*1024)),
 			check: func(t *testing.T, server *FakeS3) {
-				upload, ok := server.Uploads[key]
+				var upload, ok = server.Uploads[key]
 				require.True(t, ok)
 				require.Len(t, upload.Parts, 2)
 				require.True(t, upload.Complete)
@@ -238,13 +238,13 @@ func TestS3StoreMultipart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := NewFakeS3()
-			ts := httptest.NewServer(server)
+			var server = NewFakeS3()
+			var ts = httptest.NewServer(server)
 			defer ts.Close()
 
-			ctx := context.Background()
+			var ctx = context.Background()
 
-			config := S3StoreConfig{
+			var config = S3StoreConfig{
 				Bucket: "test-bucket",
 				Region: "us-west-2",
 				Credentials: &CredentialsConfig{
@@ -257,7 +257,7 @@ func TestS3StoreMultipart(t *testing.T) {
 				Endpoint:     ts.URL,
 				UsePathStyle: true,
 			}
-			store, err := NewS3Store(ctx, config)
+			var store, err = NewS3Store(ctx, config)
 			require.NoError(t, err)
 
 			upload, err := store.StageObject(ctx, tt.reader, key)

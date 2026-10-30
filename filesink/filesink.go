@@ -112,7 +112,7 @@ func (d FileDriver[T, R]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.R
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	endpointSchema, err := d.ConfigSchema()
+	var endpointSchema, err = d.ConfigSchema()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -163,13 +163,13 @@ func (d FileDriver[T, R]) Validate(ctx context.Context, req *pm.Request_Validate
 }
 
 func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
+	var driverCfg, err = d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	rawFlags, defaultFlags := driverCfg.FeatureFlags()
-	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+	var rawFlags, defaultFlags = driverCfg.FeatureFlags()
+	var parsedFlags = common.ParseFeatureFlags(rawFlags, defaultFlags)
 	if rawFlags != "" {
 		log.WithField("flags", parsedFlags).Info("parsed feature flags")
 	}
@@ -179,7 +179,7 @@ func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Ope
 		return nil, nil, nil, err
 	}
 
-	bindings := make([]binding, 0, len(open.Materialization.Bindings))
+	var bindings = make([]binding, 0, len(open.Materialization.Bindings))
 
 	for _, b := range open.Materialization.Bindings {
 		var res Resource
@@ -200,7 +200,7 @@ func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Ope
 		})
 	}
 
-	opts := &m.MaterializeOptions{
+	var opts = &m.MaterializeOptions{
 		AckSchedule: &m.AckScheduleOption{
 			Config: m.ScheduleConfig{
 				SyncFrequency: driverCfg.CommonConfig().UploadInterval,
@@ -242,11 +242,11 @@ type binding struct {
 }
 
 func (t *transactor[T]) keyReplacer(tm time.Time) *strings.Replacer {
-	zoneName, zoneOffset := tm.Zone()
-	zoneHour := zoneOffset / 3600
-	zoneMin := int(math.Abs(float64(zoneOffset % 3600 / 60)))
+	var zoneName, zoneOffset = tm.Zone()
+	var zoneHour = zoneOffset / 3600
+	var zoneMin = int(math.Abs(float64(zoneOffset % 3600 / 60)))
 
-	replacer := strings.NewReplacer(
+	var replacer = strings.NewReplacer(
 		"%Y", fmt.Sprintf("%04d", tm.Year()),
 		"%m", fmt.Sprintf("%02d", tm.Month()),
 		"%d", fmt.Sprintf("%02d", tm.Day()),
@@ -274,21 +274,21 @@ func (t *transactor[T]) keyReplacer(tm time.Time) *strings.Replacer {
 // are idempotent, since the re-uploaded files will at least have the same data.
 // 5) The file extension from the specific driver implementation.
 func (t *transactor[T]) nextFileKey(b binding, tm time.Time) string {
-	sk := b.stateKey
+	var sk = b.stateKey
 
 	// If we haven't generated any file keys yet for this state key, start at 0. Otherwise use one
 	// greater than the prior key.
-	next := uint64(0)
+	var next = uint64(0)
 	if _, ok := t.state.FileCounts[sk]; ok {
 		next = t.state.FileCounts[sk] + 1
 	}
 	t.state.FileCounts[sk] = next
 
-	prefix := t.common.Prefix
-	path := b.path
+	var prefix = t.common.Prefix
+	var path = b.path
 
 	if t.store.SupportsPathPatternExpansion() {
-		replacer := t.keyReplacer(tm)
+		var replacer = t.keyReplacer(tm)
 		if strings.ContainsAny(prefix, "%") {
 			prefix = replacer.Replace(prefix)
 		}
@@ -333,20 +333,20 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var writer StreamWriter
 	var group errgroup.Group
 
-	txnTime := time.Now().UTC()
+	var txnTime = time.Now().UTC()
 
-	startFile := func(b binding) error {
+	var startFile = func(b binding) error {
 		// Start a new file upload. This may be called multiple times in a single transaction if
 		// there is more data than can fit in a single file.
-		r, w := io.Pipe()
+		var r, w = io.Pipe()
 
 		group.Go(func() error {
 			t.stateLock.Lock()
-			k := t.nextFileKey(b, txnTime)
+			var k = t.nextFileKey(b, txnTime)
 			t.stateLock.Unlock()
 
 			log.WithField("key", k).Info("started uploading file")
-			info, err := t.store.StageObject(ctx, r, k)
+			var info, err = t.store.StageObject(ctx, r, k)
 			if err != nil {
 				r.CloseWithError(err)
 				return fmt.Errorf("uploading file: %w", err)
@@ -365,7 +365,7 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return err
 	}
 
-	finishFile := func() error {
+	var finishFile = func() error {
 		// Close out the current file and wait for its upload to complete.
 		if writer == nil {
 			return nil
@@ -379,10 +379,10 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
-	rows := make(map[int]int64)
-	lastBinding := -1
+	var rows = make(map[int]int64)
+	var lastBinding = -1
 	for it.Next(false) {
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 		rows[it.Binding]++
 
 		if lastBinding != -1 && lastBinding != it.Binding {
@@ -398,7 +398,7 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		row := make([]any, 0, len(it.Key)+len(it.Values)+1)
+		var row = make([]any, 0, len(it.Key)+len(it.Values)+1)
 		row = append(row, it.Key.ToInterface()...)
 		row = append(row, it.Values.ToInterface()...)
 		if b.includeDoc {
@@ -423,10 +423,10 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := finishFile(); err != nil {
 		return nil, fmt.Errorf("final finishFile: %w", err)
 	}
-	round := it.Round
+	var round = it.Round
 
 	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		checkpointJSON, err := json.Marshal(t.state)
+		var checkpointJSON, err = json.Marshal(t.state)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
@@ -447,7 +447,7 @@ func (t *transactor[T]) Flush(context.Context, map[int]time.Time) error {
 // Acknowledge completes all staged uploads and removes them from the
 // checkpoint, so that the checkpoint contains only the list of file counts.
 func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 
 	var processed bool
 	for _, b := range t.bindings {
@@ -457,7 +457,7 @@ func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.Raw
 			continue
 		}
 
-		uploads, ok := t.state.Uploads[b.stateKey]
+		var uploads, ok = t.state.Uploads[b.stateKey]
 		if !ok {
 			continue
 		}
@@ -477,7 +477,7 @@ func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.Raw
 		return nil, nil
 	}
 
-	checkpointJSON, err := json.Marshal(t.state)
+	var checkpointJSON, err = json.Marshal(t.state)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
@@ -493,7 +493,7 @@ func (t *transactor[T]) RecoverCheckpoint(ctx context.Context, spec pf.Materiali
 // StdConstraints represents standard constraints for a projection when materializing columns of
 // data to files.
 func StdConstraints(p *pf.Projection) *pm.Response_Validated_Constraint {
-	_, isNumeric := m.AsFormattedNumeric(p)
+	var _, isNumeric = m.AsFormattedNumeric(p)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {

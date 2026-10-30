@@ -25,9 +25,9 @@ func (*nullStore) CompleteObject(ctx context.Context, info *SinglePhase) error {
 }
 
 func TestNextFilekey(t *testing.T) {
-	sk := "val"
+	var sk = "val"
 
-	tests := []struct {
+	var tests = []struct {
 		name      string
 		prefix    string
 		path      string
@@ -126,13 +126,13 @@ func TestNextFilekey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			b := binding{
+			var b = binding{
 				stateKey: sk,
 				backfill: tt.backfill,
 				path:     tt.path,
 			}
 
-			ta := transactor[*SinglePhase]{
+			var ta = transactor[*SinglePhase]{
 				state: connectorState[*SinglePhase]{
 					FileCounts: make(map[string]uint64),
 				},
@@ -148,9 +148,9 @@ func TestNextFilekey(t *testing.T) {
 				ta.common.Prefix = tt.prefix
 			}
 
-			tm := time.Date(2026, time.February, 11, 10, 2, 3, 4, time.UTC)
+			var tm = time.Date(2026, time.February, 11, 10, 2, 3, 4, time.UTC)
 			if tt.locString != "" {
-				loc, err := time.LoadLocation(tt.locString)
+				var loc, err = time.LoadLocation(tt.locString)
 				require.NoError(t, err)
 				tm = tm.In(loc)
 			}

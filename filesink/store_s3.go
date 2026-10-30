@@ -45,7 +45,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
 	}
 	subSchemas = append(subSchemas,
@@ -151,19 +151,19 @@ type S3Store struct {
 }
 
 func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
-	credProvider, err := cfg.CredentialsProvider(ctx)
+	var credProvider, err = cfg.CredentialsProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(cfg.Region),
 		awsConfig.WithHTTPClient(awsHttp.NewBuildableClient().WithTimeout(uploadTimeout)),
 	}
 
 	if cfg.Endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		var customResolver = aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: cfg.Endpoint}, nil
 		})
 
@@ -175,11 +175,11 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+	var s3Client = s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = cfg.UsePathStyle
 	})
 
-	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) {
+	var uploader = manager.NewUploader(s3Client, func(u *manager.Uploader) {
 		u.Concurrency = 1
 		u.PartSize = manager.MinUploadPartSize
 	})
@@ -192,10 +192,10 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 }
 
 func (s *S3Store) PutStream(ctx context.Context, r io.Reader, key string) error {
-	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	var uploadCtx, cancel = context.WithTimeout(ctx, uploadTimeout)
 	defer cancel()
 
-	_, err := s.uploader.Upload(uploadCtx, &s3.PutObjectInput{
+	var _, err = s.uploader.Upload(uploadCtx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 		Body:   r,
@@ -231,7 +231,7 @@ func (s *S3Store) SupportsPathPatternExpansion() bool {
 // upload.  This prevents it from being visible to normal operations until it
 // is completed.
 func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3MultipartUpload, error) {
-	createResp, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+	var createResp, err = s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 	})
@@ -247,12 +247,12 @@ func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3
 	// PutObject which can use Transfer-Encoding: chunked.  To avoid using too
 	// much memory we write multiple parts.
 	for partNumber := int32(1); ; partNumber++ {
-		n, ioErr := io.ReadFull(r, buf)
+		var n, ioErr = io.ReadFull(r, buf)
 		if ioErr != nil && ioErr != io.ErrUnexpectedEOF {
 			return nil, ioErr
 		}
 
-		uploadPartResp, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
+		var uploadPartResp, err = s.client.UploadPart(ctx, &s3.UploadPartInput{
 			Bucket:     aws.String(s.bucket),
 			Key:        aws.String(key),
 			Body:       bytes.NewReader(buf[:n]),
@@ -273,7 +273,7 @@ func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3
 		}
 	}
 
-	info := S3MultipartUpload{
+	var info = S3MultipartUpload{
 		Key:      key,
 		UploadID: uploadID,
 		Parts:    parts,
@@ -286,14 +286,14 @@ func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3
 func (s *S3Store) CompleteObject(ctx context.Context, info *S3MultipartUpload) error {
 	var parts []types.CompletedPart
 	for _, part := range info.Parts {
-		completed := types.CompletedPart{
+		var completed = types.CompletedPart{
 			ETag:       aws.String(part.ETag),
 			PartNumber: aws.Int32(part.PartNumber),
 		}
 		parts = append(parts, completed)
 	}
 
-	_, err := s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+	var _, err = s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(info.Key),
 		MultipartUpload: &types.CompletedMultipartUpload{

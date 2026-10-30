@@ -34,9 +34,9 @@ func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io
 		schemaOpts = append(schemaOpts, writer.WithParquetUUIDAsString())
 	}
 
-	sch := make(writer.ParquetSchema, 0, len(b.FieldSelection.AllFields()))
+	var sch = make(writer.ParquetSchema, 0, len(b.FieldSelection.AllFields()))
 	for _, f := range b.FieldSelection.AllFields() {
-		p := b.Collection.GetProjection(f)
+		var p = b.Collection.GetProjection(f)
 
 		var fc fieldConfig
 		if raw, ok := b.FieldSelection.FieldConfigJsonMap[f]; ok {
