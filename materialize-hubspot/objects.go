@@ -5,22 +5,33 @@ import (
 	"strings"
 )
 
+// CRMObject are the object types the connector supports.
 type CRMObject string
 
+// ObjectName is the name of the type.  This is the same as CRMObject except in
+// the case of Custom Objects.  A user will know this value for a Custom Object.
+type ObjectName string
+
+// ObjectTypeID is a unique identifier that can be used in API calls.  This can
+// be a string like most of the CRMObjects for built-in types, or an ID like
+// `2-270964404`.  This value is typically unknown by the user.
+type ObjectTypeID string
+
 const (
-	CallsObject      CRMObject = "calls"
-	CompaniesObject  CRMObject = "companies"
-	ContactsObject   CRMObject = "contacts"
-	DealsObject      CRMObject = "deals"
-	EmailsObject     CRMObject = "emails"
-	LineItemsObject  CRMObject = "line_items"
-	MeetingsObject   CRMObject = "meetings"
-	PostalMailObject CRMObject = "postal_mail"
-	ProductsObject   CRMObject = "products"
-	QuotesObject     CRMObject = "quotes"
-	TasksObject      CRMObject = "tasks"
-	TicketsObject    CRMObject = "tickets"
-	UnknownObject    CRMObject = "unknown"
+	CallsObject        CRMObject = "calls"
+	CompaniesObject    CRMObject = "companies"
+	ContactsObject     CRMObject = "contacts"
+	DealsObject        CRMObject = "deals"
+	EmailsObject       CRMObject = "emails"
+	LineItemsObject    CRMObject = "line_items"
+	MeetingsObject     CRMObject = "meetings"
+	PostalMailObject   CRMObject = "postal_mail"
+	ProductsObject     CRMObject = "products"
+	QuotesObject       CRMObject = "quotes"
+	TasksObject        CRMObject = "tasks"
+	TicketsObject      CRMObject = "tickets"
+	CustomObjectObject CRMObject = "custom_object"
+	UnknownObject      CRMObject = "unknown"
 )
 
 var (
@@ -37,6 +48,7 @@ var (
 		QuotesObject,
 		TasksObject,
 		TicketsObject,
+		CustomObjectObject,
 	}
 )
 
@@ -67,6 +79,8 @@ func NewCRMObject(s string) (CRMObject, error) {
 		return TasksObject, nil
 	case "tickets":
 		return TicketsObject, nil
+	case "custom_object":
+		return CustomObjectObject, nil
 	default:
 		return UnknownObject, fmt.Errorf("unknown object type: %q", s)
 	}
@@ -85,6 +99,8 @@ func (o CRMObject) ToTitle() string {
 		return "Line Items"
 	case PostalMailObject:
 		return "Postal Mail"
+	case CustomObjectObject:
+		return "Custom Object"
 	default:
 		return strings.Title(o.String())
 	}
@@ -97,7 +113,19 @@ func CRMObjectFromTitle(s string) (CRMObject, error) {
 		return LineItemsObject, nil
 	case "Postal Mail":
 		return PostalMailObject, nil
+	case "Custom Object":
+		return CustomObjectObject, nil
 	default:
 		return NewCRMObject(strings.ToLower(s))
 	}
+}
+
+// String is the underlying string value.
+func (o ObjectName) String() string {
+	return string(o)
+}
+
+// String is the value to use for API calls.
+func (o ObjectTypeID) String() string {
+	return string(o)
 }

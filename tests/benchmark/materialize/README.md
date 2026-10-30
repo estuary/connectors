@@ -3,9 +3,14 @@
 Drive any `materialize-*` connector with a configured-size workload and
 record throughput. Built on `flowctl raw preview-next --fixture`,
 mirroring the integration-test framework under `tests/materialize/` but
-designed for many-GB workloads with fine-grained control over transaction
-sizes, document sizes, and overlap (updates / deletes against earlier
-transactions).
+designed for many-GB workloads.
+
+The default workload is the TPC-DS dataset, streamed from the
+`source-tpc-ds` capture: 24 related tables with realistic column types and
+document sizes, at a scale factor that fixes the volume. Use it unless the
+question is about updates and deletes, which the synthetic scenarios model
+with fine-grained control over transaction sizes, document sizes, and overlap
+against earlier transactions.
 
 ## Quick start
 
@@ -13,16 +18,16 @@ transactions).
 # One-time:
 pip3 install pyyaml
 
-# Run the smoke scenario against materialize-clickhouse:
+# Load TPC-DS at scale 0.01 into materialize-clickhouse:
 ./tests/benchmark/materialize/run.sh \
     --connector materialize-clickhouse \
-    --scenario  tests/benchmark/materialize/scenarios/small-smoke.yaml
+    --scenario  tests/benchmark/materialize/scenarios/tpcds-smoke.yaml
 ```
 
 This brings up the connector's existing
 `tests/materialize/<connector>/docker-compose.yaml`, generates a
 materialization spec from the connector's existing
-`<connector>/testdata/config.local.yaml`, streams a synthetic fixture
+`<connector>/testdata/config.local.yaml`, streams the fixture
 through a FIFO into `flowctl raw preview-next`, and writes per-run artifacts
 (spec, generator state, preview log, `results.json`) to
 `tests/benchmark/materialize/runs/<timestamp>-<connector>/`.
@@ -46,7 +51,80 @@ cp materialize-redshift/testdata/config.local.yaml /tmp/config.bench.yaml
 sops set /tmp/config.bench.yaml '["advanced"]["feature_flags"]' '""'
 ```
 
-## Scenario file
+## TPC-DS scenarios
+
+```yaml
+tpcds:
+  scale: 1                 # source-tpc-ds scale factor, 0.01 and up
+  transaction_size: 1GB    # commit after this many bytes of documents
+  tables: [store_sales, store_returns]   # optional; default all 24
+  resource: { delta_updates: true }      # optional; merged into every binding
+```
+
+| Scenario | Scale | Documents | Size |
+|---|---|---|---|
+| `tpcds-smoke.yaml`     | 0.01 | 278K  | 0.11 GB |
+| `tpcds-scale-1.yaml`   | 1    | 19.6M | 5.9 GB |
+| `tpcds-scale-10.yaml`  | 10   | 191M  | 56 GB |
+| `tpcds-scale-100.yaml` | 100  | 959M  | 432 GB |
+
+Sizes are the documents' JSON bytes. Scale 100's is from Flow's stats for a
+production load rather than a fixture.
+
+The collections are `bench/tpcds/<table>`, with the schemas and keys that
+`source-tpc-ds` discovers, and each binding's table is the TPC-DS table name.
+During the run `tpcds.py relay` drives the capture with
+`flowctl raw preview-next` and copies its documents into the fixture,
+closing a transaction once it holds `transaction_size` bytes of documents.
+All tables generate concurrently, so a transaction holds a mix of them, and
+the run ends when the capture has emitted every table in full. Documents are
+inserts only and every key is unique.
+
+The capture runs `$TPCDS_IMAGE` (default `ghcr.io/estuary/source-tpc-ds:dev`).
+To use local changes to the connector, build it and point the variable at it:
+
+```bash
+docker build --platform linux/amd64 -t ghcr.io/estuary/source-tpc-ds:local -f source-tpc-ds/Dockerfile .
+TPCDS_IMAGE=ghcr.io/estuary/source-tpc-ds:local ./tests/benchmark/materialize/run.sh ...
+```
+
+A live capture produces about 45 MB/s, bounded by the capture preview's
+single busy flowctl thread on an M-series Mac and a c3-standard-22 VM alike,
+and shares the machine with the materialization, so a fast connector can end
+up measuring the capture. Pass `--tpcds-cache DIR` to
+generate the fixture into `DIR` before the preview starts and replay it from
+disk; later runs of the same workload and image reuse the file, so every
+connector sees the same transactions. It needs the dataset's size in free disk.
+The cache is keyed on the image reference, so delete it after rebuilding a
+`:local` image.
+
+`state.json` and `results.json` record per-table document and byte totals and
+whether the capture finished (`tpcds.complete`). A run whose capture fails
+before finishing exits non-zero.
+
+## Baselines
+
+`runs/baselines/<connector>/<scenario>.json` holds each connector's reference
+result. The TPC-DS ones (`tpcds-scale-1.json`) come from `baselines.sh`, which runs
+every tabular materialization serially on one machine and one cached fixture:
+
+```bash
+FLOW_COMMIT=<flow master commit> \
+  ./tests/benchmark/materialize/baselines.sh --tpcds-cache /mnt/localssd/tpcds-cache
+```
+
+It starts from each connector's test config, without the feature flags that
+disable the runtime's load optimization, and records the machine type, the
+flowctl build and both commits under `environment` in each file. Compare a
+connector change against its baseline on the same machine type and flowctl
+build; anything else measures the environment. The current baselines ran on a
+c3-standard-22-lssd.
+
+`materialize-null` on the same machine and flowctl (172K docs/s at scale 1)
+is the ceiling those numbers sit under. Delta-update connectors, which never
+Load, run close to it.
+
+## Synthetic scenarios
 
 ```yaml
 collections:
@@ -147,6 +225,21 @@ Overlap rules:
 --seed      N          fixture RNG seed; default: 0 (runs are byte-reproducible)
 --keep                 don't tear docker-compose down on exit
 --out-dir   DIR        output directory; default: runs/<ts>-<connector>
+--tpcds-cache DIR      TPC-DS only: generate the fixture into DIR once and replay it
+--preview-arg ARG      extra argument to the materialization's preview-next, repeatable
+```
+
+## Measuring the harness
+
+`materialize-null` reads every Load and Store and discards them, with the
+field selection a SQL materialization makes. A run against it measures what
+`flowctl raw preview-next` and the materialize protocol can deliver; a
+connector run at that rate is bound by the harness, not the destination.
+
+```bash
+echo '{}' > /tmp/null.yaml
+./tests/benchmark/materialize/run.sh --connector materialize-null --config /tmp/null.yaml \
+    --scenario tests/benchmark/materialize/scenarios/tpcds-scale-1.yaml --tpcds-cache ~/.cache/tpcds
 ```
 
 ## Output
@@ -156,8 +249,9 @@ Each run produces:
 | File | Contents |
 |---|---|
 | `flow.yaml`        | The materialization spec rendered from the scenario. |
-| `state.json`       | Per-tx fresh-key range and overlap counts (from the generator). |
+| `state.json`       | Per-tx fresh-key range and overlap counts (from the generator), or per-tx and per-table counts for TPC-DS. |
 | `generator.stderr` | Generator stderr / errors. |
+| `capture.flow.yaml`, `capture.log` | TPC-DS only: the `source-tpc-ds` capture spec and its preview log. |
 | `preview.stdout`   | Preview stdout. |
 | `preview.log`      | Preview stderr (the per-tx timings are derived from here). |
 | `results.json`     | Aggregate `{ wall_seconds, total_docs, total_bytes, mb_per_sec, transactions: [...] }`. |
@@ -210,7 +304,7 @@ Different seeds produce different fixtures.
 ## Unit tests
 
 ```bash
-python3 -m unittest tests.benchmark.materialize.test_generate -v
+cd tests/benchmark/materialize && python3 -m unittest test_generate test_results test_tpcds -v
 ```
 
 ## Comparing two connector configurations

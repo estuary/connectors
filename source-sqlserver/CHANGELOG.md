@@ -1,5 +1,24 @@
 # source-sqlserver
 
+## 2026-10-30
+
+### Changed
+- Captures now report that they have started before waiting out `max_startup_delay`, connecting to the database, or running prerequisite checks.
+
+## 2026-10-29
+
+### Changed
+- Starting a capture now checks whether CDC is enabled on the database once instead of twice.
+- Starting a capture now checks whether the database is a read-only replica once instead of twice.
+
+## 2026-10-28
+
+### Added
+- New `max_startup_delay` advanced option makes a capture wait a random time before connecting to the database on startup.
+
+### Changed
+- Starting a capture now reads table schemas from the source database once instead of twice.
+
 ## 2026-10-21
 
 ### Changed

@@ -111,6 +111,14 @@ func DropResource(ctx context.Context, m ResourceDeleter, path []string) (string
 		}
 	}
 
+	// A connector which batches DDL, such as materialize-spanner, runs it only
+	// when flushed, as Apply does.
+	if flusher, ok := m.(boilerplate.DDLFlusher); ok {
+		if err := flusher.FlushDDL(ctx); err != nil {
+			return "", fmt.Errorf("deleting %s: flushing DDL: %w", strings.Join(path, "."), err)
+		}
+	}
+
 	return desc, nil
 }
 

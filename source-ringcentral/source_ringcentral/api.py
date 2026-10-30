@@ -11,7 +11,6 @@ from .constants import (
     API_BASE_URL,
     DETAILED_VIEW,
     PAGE_SIZE,
-    CursorField,
     QueryParam,
     RateGroup,
     Scope,
@@ -50,11 +49,7 @@ async def _fetch_paginated(
         await http.request(log, url, params=params)
     )
 
-    has_more = False
-    if response.navigation and response.navigation.nextPage:
-        has_more = True
-
-    return FetchResult(response.records, has_more)
+    return FetchResult(response.records, response.has_more)
 
 
 async def fetch_snapshot(
@@ -78,7 +73,7 @@ async def fetch_snapshot(
             url=url,
             params=params,
             rate_group=model.RATE_GROUP,
-            response_model=PaginatedResponse[model],
+            response_model=model.response_model(),
         )
 
         for record in result.records:
@@ -137,12 +132,14 @@ async def fetch_incremental_changes(
             url=url,
             params=params,
             rate_group=model.RATE_GROUP,
-            response_model=PaginatedResponse[model],
+            response_model=model.response_model(),
         )
 
         for record in result.records:
+            # Overlapping windows re-fetch records. Comparing lastModifiedTime
+            # skips unchanged copies but lets updated ones through.
             if cache.should_yield(
-                model.NAME, CursorField.LAST_MODIFIED_TIME, record.cursor_value
+                model.NAME, record.id, record.lastModifiedTime or record.cursor_value
             ):
                 yield record
                 if record.cursor_value > max_cursor:
@@ -192,7 +189,7 @@ async def fetch_incremental_page(
         url=url,
         params=params,
         rate_group=model.RATE_GROUP,
-        response_model=PaginatedResponse[model],
+        response_model=model.response_model(),
     )
 
     for record in result.records:

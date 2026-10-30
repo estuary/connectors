@@ -431,6 +431,9 @@ class FacebookResource(BaseDocument, extra="allow"):
     cursor_field: ClassVar[str] = "updated_time"
     enable_deleted_filter: ClassVar[bool] = False
     entity_prefix: ClassVar[str] = ""  # Used for API filtering (e.g., "campaign", "ad")
+    # Edges without an entity_prefix do not support `filtering`. Time-paginated
+    # edges accept a `since` Unix timestamp.
+    supports_since_param: ClassVar[bool] = False
     fields: ClassVar[list[str]] = []
 
     @classmethod
@@ -956,6 +959,7 @@ class Activities(FacebookResource):
     name: ClassVar[str] = ResourceName.ACTIVITIES
     endpoint: ClassVar[str] = "activities"
     cursor_field: ClassVar[str] = CursorField.EVENT_TIME
+    supports_since_param: ClassVar[bool] = True
     primary_keys: ClassVar[list[str]] = [
         "/object_id",
         "/actor_id",

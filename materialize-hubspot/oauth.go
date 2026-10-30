@@ -39,6 +39,10 @@ var (
 		"crm.schemas.quotes.read",
 
 		"tickets",
+
+		"crm.objects.custom.read",
+		"crm.objects.custom.write",
+		"crm.schemas.custom.read",
 	}
 
 	Oauth2OptionalScopes = []string{}

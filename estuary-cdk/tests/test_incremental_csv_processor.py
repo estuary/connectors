@@ -200,6 +200,79 @@ newline",15.50
                 pass
 
     @pytest.mark.asyncio
+    async def test_truncated_multibyte_character_at_end_raises(self):
+        """A multi-byte character cut off by the end of the stream raises
+        rather than being dropped, even when it arrives in its own chunk."""
+        async def truncated_iterator():
+            yield b"name,age\nJohn,"
+            yield b"\xe2\x82"
+
+        processor = IncrementalCSVProcessor(truncated_iterator(), BasicRecord)
+
+        with pytest.raises(UnicodeDecodeError):
+            async for _ in processor:
+                pass
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "chunks",
+        [
+            pytest.param(
+                [b"\xef\xbb\xbf", b"name,age,city\nJohn,25,\xe2\x82\xac\nJane,30,LA"],
+                id="byte-order mark alone",
+            ),
+            pytest.param(
+                [b"\xef", b"\xbb", b"\xbf", b"name,age,city\nJohn,25,\xe2\x82\xac\nJane,30,LA"],
+                id="byte-order mark split",
+            ),
+            pytest.param(
+                [b"name,age,city\nJohn,25,\xe2", b"\x82", b"\xac\nJane,30,LA"],
+                id="multi-byte character split",
+            ),
+            pytest.param(
+                [b"name,age,city\nJohn,25,\xe2\x82\xac\n", b"", b"Jane,30,LA"],
+                id="empty chunk",
+            ),
+        ],
+    )
+    async def test_chunk_decoding_to_no_text_does_not_end_the_file(self, chunks: list[bytes]):
+        """aiocsv takes an empty read as the end of the file, so a chunk that
+        decodes to no text must not end the stream early."""
+        async def chunk_iterator():
+            for chunk in chunks:
+                yield chunk
+
+        processor = IncrementalCSVProcessor(
+            chunk_iterator(), BasicRecord, CSVConfig(encoding="utf-8-sig")
+        )
+
+        rows: list[BasicRecord] = []
+        async for row in processor:
+            rows.append(row)
+
+        assert len(rows) == 2
+        assert rows[0].name == "John" and rows[0].city == "€"
+        assert rows[1].name == "Jane" and rows[1].city == "LA"
+
+    @pytest.mark.asyncio
+    async def test_one_byte_chunks_with_byte_order_mark(self):
+        """Every byte in its own chunk, so the byte-order mark and each
+        multi-byte character decode to no text for several reads."""
+        csv_data = "﻿name,age,city\nJosé,25,São Paulo\n张三,30,北京"
+        chunk_iterator = self.create_byte_chunk_iterator(csv_data, chunk_size=1)
+        processor = IncrementalCSVProcessor(
+            chunk_iterator, BasicRecord, CSVConfig(encoding="utf-8-sig")
+        )
+
+        rows: list[BasicRecord] = []
+        async for row in processor:
+            rows.append(row)
+
+        assert len(rows) == 2
+        assert rows[0].name == "José" and rows[0].city == "São Paulo"
+        assert rows[1].name == "张三" and rows[1].city == "北京"
+
+    @pytest.mark.asyncio
     async def test_malformed_csv_with_unmatched_quotes(self):
         """Test that malformed CSV with unmatched quotes raises an error."""
         # Use CSV with unmatched quotes which should fail.
@@ -572,6 +645,19 @@ class TestIncrementalCSVRowProcessor:
     async def test_multibyte_characters_split_across_chunks(self):
         """A chunk size that splits multi-byte characters still decodes."""
         rows = await self.collect("café,naïve\n日本語,Ünïcödé", chunk_size=3)
+
+        assert rows == [["café", "naïve"], ["日本語", "Ünïcödé"]]
+
+    @pytest.mark.asyncio
+    async def test_chunks_decoding_to_no_text_do_not_end_the_file(self):
+        """One-byte chunks leave the byte-order mark and every multi-byte
+        character decoding to no text for several reads. None of them may be
+        taken as the end of the file."""
+        rows = await self.collect(
+            "﻿café,naïve\n日本語,Ünïcödé",
+            chunk_size=1,
+            config=CSVConfig(encoding="utf-8-sig"),
+        )
 
         assert rows == [["café", "naïve"], ["日本語", "Ünïcödé"]]
 

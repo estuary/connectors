@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-29
+### Fixed
+- Load, staging and commit queries now carry the `materialization_name` query
+  tag, so Databricks query history attributes them to the Estuary task.
+  Previously only the queries that create and alter tables carried it.
+
+## 2026-10-28
+### Fixed
+- A load no longer fails, restarting the task, when Databricks rate-limits
+  the download of its results (`cloud fetch batch loader failed to download
+  results: HTTP error 429`). Downloads that fail with a transient error are
+  now retried with backoff, honoring the `Retry-After` header.
+
+### Changed
+- With `two_phase_loads`, a load restricts its read of documents to the files
+  holding its matching rows for up to 10,000 matched files, instead of 5,000.
+  Loads matching more files read every file within their key bounds.
+
 ## 2026-10-27
 ### Added
 - Load, staging and commit queries that run for at least five seconds are
@@ -8,6 +26,12 @@
   files and bytes they read and pruned. Load and merge queries also log the
   key bounds they were restricted to. The metrics are fetched in the
   background, without holding up the transaction.
+- A `two_phase_loads` feature flag, off by default. With it, each table's
+  load first finds the files holding rows that match its keys, reading only
+  the key columns, then reads documents from those files alone. Both queries
+  read the same version of the table. Loads whose matching rows are
+  concentrated in a few of the files they would otherwise read get faster,
+  and a load that matches no rows skips reading documents altogether.
 
 ## 2026-10-26
 ### Changed

@@ -1,5 +1,18 @@
 # source-mysql
 
+## 2026-10-30
+
+### Changed
+- Captures now report that they have started before connecting to the database or running prerequisite checks.
+
+## 2026-10-28
+
+### Changed
+- Starting a capture now reads table schemas from the source database once instead of twice.
+
+### Fixed
+- A replication connection drop in the middle of a transaction no longer leaves the capture in a state where every restart fails.
+
 ## 2026-10-21
 
 ### Changed

@@ -226,18 +226,24 @@ async def fetch_contact_list_memberships(
     # and we don't want to paginate through all items twice
     start_date = log_cursor - DELAYED_LAG
     now = datetime.now(tz=UTC)
+    # The next run resumes from `now`, so this is its lower bound. Only
+    # memberships after it can be fetched again; caching older ones would
+    # hold the entire window in memory for nothing.
+    next_start_date = now - DELAYED_LAG
 
     async for item in _request_all_contact_list_memberships(http, log, start_date):
         key = f"{item.listId}:{item.recordId}"
+        ts = item.membershipTimestamp
 
-        if cache.should_yield(
-            Names.contact_list_memberships, key, item.membershipTimestamp
-        ):
-            yield item
+        if cache.has_as_recent_as(Names.contact_list_memberships, key, ts):
+            continue
 
-    # Entries older than this run's lower bound can never be looked up again,
-    # since later runs start no earlier.
-    evicted = cache.cleanup(Names.contact_list_memberships, start_date)
+        if ts > next_start_date:
+            cache.add_recent(Names.contact_list_memberships, key, ts)
+
+        yield item
+
+    evicted = cache.cleanup(Names.contact_list_memberships, next_start_date)
     log.info("evicted contact list memberships from cache", extra={"evicted": evicted})
 
     yield now

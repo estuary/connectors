@@ -1,4 +1,3 @@
-from datetime import date
 from logging import Logger
 from typing import (
     Any,
@@ -11,7 +10,7 @@ from typing import (
     TypeVar,
 )
 
-from estuary_cdk.http import HTTPError, HTTPMixin
+from estuary_cdk.http import HTTPMixin
 from estuary_cdk.incremental_csv_processor import (
     CSVConfig,
     IncrementalCSVProcessor,
@@ -162,20 +161,6 @@ class AppleAppStoreClient:
             url, AnalyticsReportRequest, params
         )
 
-    async def get_analytics_report_request_details(
-        self, request_id: str
-    ) -> AnalyticsReportRequest:
-        url = f"{API_BASE}/analyticsReportRequests/{request_id}"
-
-        response = ApiResponse[AnalyticsReportRequest].model_validate_json(
-            await self.http.request(
-                self.log,
-                url,
-            )
-        )
-
-        return response.data
-
     async def list_analytics_reports(
         self,
         request_id: str,
@@ -190,25 +175,10 @@ class AppleAppStoreClient:
 
         return await self._paginated_request(url, AnalyticsReport, params)
 
-    async def get_analytics_report_details(
-        self, report_id: str
-    ) -> AnalyticsReport:
-        url = f"{API_BASE}/analyticsReports/{report_id}"
-
-        response = ApiResponse[AnalyticsReport].model_validate_json(
-            await self.http.request(
-                self.log,
-                url,
-            )
-        )
-
-        return response.data
-
     async def list_analytic_report_instances(
         self,
         report_id: str,
         granularity: AnalyticsReportGranularity,
-        processing_date: Optional[date] = None,
         limit: int = MAX_PAGE_SIZE,
     ) -> List[AnalyticsReportInstance]:
         assert limit > 0 and limit <= MAX_PAGE_SIZE, (
@@ -221,8 +191,6 @@ class AppleAppStoreClient:
             "limit": limit,
         }
 
-        if processing_date:
-            params["filter[processingDate]"] = processing_date.isoformat()
         if granularity:
             params["filter[granularity]"] = granularity.value
 
@@ -244,45 +212,6 @@ class AppleAppStoreClient:
         return await self._paginated_request(
             url, AnalyticsReportSegment, params
         )
-
-    async def get_analytics_report_segment_details(
-        self,
-        segment_id: str,
-    ) -> AnalyticsReportSegment:
-        url = f"{API_BASE}/analyticsReportSegments/{segment_id}"
-
-        response = ApiResponse[AnalyticsReportSegment].model_validate_json(
-            await self.http.request(
-                self.log,
-                url,
-            )
-        )
-
-        return response.data
-
-    async def get_or_create_report_request(
-        self,
-        app_id: str,
-        report_type: AnalyticsReportAccessType,
-    ) -> str:
-        try:
-            created_report_request = await self.create_analytics_report_request(
-                app_id,
-                report_type,
-            )
-            self.log.debug(f"Created report request {created_report_request.id} for app {app_id}")
-            return created_report_request.id
-        except HTTPError as e:
-            if e.code == 409:
-                report_requests = await self.list_analytics_report_requests(
-                    app_id,
-                    report_type,
-                )
-                for request in report_requests:
-                    self.log.debug(f"Checking request {request.id} for app {app_id}")
-                    # assuming there is only one request
-                    return request.id
-            raise
 
     async def stream_tsv_data(
         self,
