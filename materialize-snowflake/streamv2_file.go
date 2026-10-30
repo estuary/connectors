@@ -19,7 +19,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -43,6 +45,8 @@ type streamV2StageLocation struct {
 	StorageEndpoint string            `json:"storage_endpoint"`
 	Creds           map[string]string `json:"creds"`
 	ExpiryTimeMs    int64             `json:"expiry_time_ms"`
+	// UseFIPS asks for an S3 stage to be reached through its FIPS endpoint.
+	UseFIPS bool `json:"use_fips"`
 }
 
 // streamV2PipeInfo is what a pipe lends a client for file appends: a stage to
@@ -81,12 +85,22 @@ func newStreamV2Uploader(ctx context.Context, stage streamV2StageLocation) (stre
 		return blob.NewGCSSingleRequestBucket(ctx, stage.BucketName, option.WithTokenSource(oauth2.StaticTokenSource(token)))
 	case "S3":
 		var creds = credentials.NewStaticCredentialsProvider(stage.Creds["AWS_KEY_ID"], stage.Creds["AWS_SECRET_KEY"], stage.Creds["AWS_TOKEN"])
-		return blob.NewS3SingleRequestBucket(stage.BucketName, strings.ToLower(stage.Region), creds), nil
+		return blob.NewS3SingleRequestBucket(stage.BucketName, strings.ToLower(stage.Region), creds, streamV2S3Options(stage)...), nil
 	case "AZURE":
 		return blob.NewAzureSingleRequestBucket(ctx, stage.BucketName, stage.StorageAccount, blob.WithAzureSasToken(stage.Creds["AZURE_SAS_TOKEN"]), blob.WithAzureEndpoint(stage.StorageEndpoint))
 	default:
 		return nil, fmt.Errorf("Snowflake lent a stage of location type %q, which this connector cannot upload to", stage.LocationType)
 	}
+}
+
+// streamV2S3Options are the client options an S3 stage asks for.
+func streamV2S3Options(stage streamV2StageLocation) []func(*s3.Options) {
+	if !stage.UseFIPS {
+		return nil
+	}
+	return []func(*s3.Options){func(o *s3.Options) {
+		o.EndpointOptions.UseFIPSEndpoint = aws.FIPSEndpointStateEnabled
+	}}
 }
 
 // pipeInfo returns the pipe's stage and key material, fetching them when none are

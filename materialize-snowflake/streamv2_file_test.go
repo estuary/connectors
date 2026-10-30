@@ -9,6 +9,7 @@ import (
 	stdsql "database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -20,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -73,6 +77,30 @@ func TestStreamV2UploaderRejectsAnUnknownLocationType(t *testing.T) {
 	var _, err = newStreamV2Uploader(context.Background(), streamV2StageLocation{LocationType: "FAKE"})
 	require.ErrorContains(t, err, `location type "FAKE"`)
 }
+
+// TestStreamV2S3OptionsFollowUseFIPS covers an S3 stage that asks for FIPS: its
+// client sends requests to the bucket's FIPS endpoint.
+func TestStreamV2S3OptionsFollowUseFIPS(t *testing.T) {
+	for _, useFIPS := range []bool{false, true} {
+		var host string
+		var client = s3.New(s3.Options{
+			Region:      "us-gov-west-1",
+			Credentials: credentials.NewStaticCredentialsProvider("id", "secret", ""),
+			HTTPClient: streamV2DoerFunc(func(r *http.Request) (*http.Response, error) {
+				host = r.URL.Host
+				return nil, errors.New("not sent")
+			}),
+			RetryMaxAttempts: 1,
+		}, streamV2S3Options(streamV2StageLocation{LocationType: "S3", UseFIPS: useFIPS})...)
+		var _, err = client.PutObject(context.Background(), &s3.PutObjectInput{Bucket: aws.String("stage"), Key: aws.String("k")})
+		require.ErrorContains(t, err, "not sent")
+		require.Equal(t, useFIPS, strings.Contains(host, "s3-fips."), host)
+	}
+}
+
+type streamV2DoerFunc func(*http.Request) (*http.Response, error)
+
+func (f streamV2DoerFunc) Do(r *http.Request) (*http.Response, error) { return f(r) }
 
 // TestStreamV2FileModeLive drives file mode against live Snowflake: a document
 // whose compressed size exceeds a rows request is stored through the pipe's stage,
