@@ -40,7 +40,7 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursorJ
 			return nil, fmt.Errorf("error parsing cursor: %w", err)
 		}
 		for k, v := range stringKeyVersions {
-			streamID, err := sqlcapture.ParseStreamIDKey(k)
+			var streamID, err = sqlcapture.ParseStreamIDKey(k)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing cursor key %q: %w", k, err)
 			}
@@ -52,7 +52,7 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursorJ
 	// The forceResetCursor flag overrides the entire cursor, resetting all tables to the specified version.
 	// The initialBackfillCursor flag sets the version used when initializing newly-added tables.
 	if db.forceResetCursor != "" {
-		version, err := strconv.ParseInt(db.forceResetCursor, 10, 64)
+		var version, err = strconv.ParseInt(db.forceResetCursor, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid force_reset_cursor value %q: %w", db.forceResetCursor, err)
 		}
@@ -62,7 +62,7 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursorJ
 		}
 		stream.initialVersion = version // Also use for any newly-added tables
 	} else if db.initialBackfillCursor != "" {
-		version, err := strconv.ParseInt(db.initialBackfillCursor, 10, 64)
+		var version, err = strconv.ParseInt(db.initialBackfillCursor, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid initial_backfill_cursor value %q: %w", db.initialBackfillCursor, err)
 		}
@@ -166,7 +166,7 @@ func (rs *sqlserverCTReplicationStream) StartReplication(ctx context.Context, di
 
 func (rs *sqlserverCTReplicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Parse polling interval for sleep between polls
-	pollingInterval, err := time.ParseDuration(rs.cfg.Advanced.PollingInterval)
+	var pollingInterval, err = time.ParseDuration(rs.cfg.Advanced.PollingInterval)
 	if err != nil {
 		return fmt.Errorf("invalid polling interval %q: %w", rs.cfg.Advanced.PollingInterval, err)
 	}
@@ -185,7 +185,7 @@ func (rs *sqlserverCTReplicationStream) StreamToFence(ctx context.Context, fence
 		log.WithField("versions", rs.tableVersions).Debug("beginning timed streaming phase")
 		var deadline = time.Now().Add(fenceAfter)
 		for time.Now().Before(deadline) {
-			toVersion, err := ctGetCurrentVersion(ctx, rs.conn)
+			var toVersion, err = ctGetCurrentVersion(ctx, rs.conn)
 			if err != nil {
 				return fmt.Errorf("error getting current CT version: %w", err)
 			}
@@ -242,7 +242,7 @@ func (rs *sqlserverCTReplicationStream) Close(ctx context.Context) error {
 
 func (rs *sqlserverCTReplicationStream) pollChanges(ctx context.Context, toVersion int64, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Batch fetch min valid versions for all CT-enabled tables
-	minValidVersions, err := ctGetMinValidVersions(ctx, rs.conn)
+	var minValidVersions, err = ctGetMinValidVersions(ctx, rs.conn)
 	if err != nil {
 		return fmt.Errorf("error getting min valid CT versions: %w", err)
 	}
@@ -250,8 +250,8 @@ func (rs *sqlserverCTReplicationStream) pollChanges(ctx context.Context, toVersi
 	// Build the list of candidate tables to poll, checking that the CT versions are valid
 	var candidates []*ctTablePollInfo
 	for streamID, info := range rs.tables {
-		fromVersion := rs.tableVersions[streamID]
-		minValid, ctEnabled := minValidVersions[streamID]
+		var fromVersion = rs.tableVersions[streamID]
+		var minValid, ctEnabled = minValidVersions[streamID]
 
 		// Sanity check that the table's minValid < toVersion. This should always hold on a
 		// healthy primary since changes cannot be cleaned up before they exist and toVersion
@@ -391,7 +391,7 @@ func (rs *sqlserverCTReplicationStream) pollTable(ctx context.Context, info *ctT
 		strings.Join(pkJoinConditions, " AND "),
 	)
 
-	rows, err := rs.conn.QueryContext(ctx, query, info.FromVersion, info.ToVersion)
+	var rows, err = rs.conn.QueryContext(ctx, query, info.FromVersion, info.ToVersion)
 	if err != nil {
 		return fmt.Errorf("error querying changes: %w", err)
 	}
@@ -454,7 +454,7 @@ func (rs *sqlserverCTReplicationStream) pollTable(ctx context.Context, info *ctT
 		}
 
 		// Extract version and operation
-		changeVersion, ok := scanVals[0].(int64)
+		var changeVersion, ok = scanVals[0].(int64)
 		if !ok {
 			return fmt.Errorf("invalid SYS_CHANGE_VERSION value: %v", scanVals[0])
 		}
@@ -532,7 +532,7 @@ func ctGetMinValidVersions(ctx context.Context, conn *sql.DB) (map[sqlcapture.St
 		JOIN sys.tables t ON ct.object_id = t.object_id
 		JOIN sys.schemas s ON t.schema_id = s.schema_id;`
 
-	rows, err := conn.QueryContext(ctx, query)
+	var rows, err = conn.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error querying min valid CT versions: %w", err)
 	}
@@ -584,7 +584,7 @@ func ctGetChangedTables(ctx context.Context, conn *sql.DB, candidates []*ctTable
 	}
 	var query = strings.Join(subqueries, " UNION ALL ")
 
-	rows, err := conn.QueryContext(ctx, query, args...)
+	var rows, err = conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing batched change detection query: %w", err)
 	}
@@ -614,7 +614,7 @@ func (db *sqlserverDatabase) ctEnabledTables(ctx context.Context) (map[sqlcaptur
 		JOIN sys.tables t ON ctt.object_id = t.object_id
 		JOIN sys.schemas s ON t.schema_id = s.schema_id;
 	`
-	rows, err := db.conn.QueryContext(ctx, query)
+	var rows, err = db.conn.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error listing CT-enabled tables: %w", err)
 	}

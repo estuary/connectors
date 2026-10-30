@@ -261,7 +261,7 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
+		var host, port, err = net.SplitHostPort(config.Address)
 		if err != nil {
 			return nil, fmt.Errorf("splitting address to host and port: %w", err)
 		}
@@ -321,7 +321,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		"user":    db.config.User,
 	}).Info("connecting to database")
 
-	connector, err := mssqldb.NewConnector(db.config.ToURI())
+	var connector, err = mssqldb.NewConnector(db.config.ToURI())
 	if err != nil {
 		return fmt.Errorf("error creating connector: %w", err)
 	}

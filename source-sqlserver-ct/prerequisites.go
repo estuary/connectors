@@ -34,7 +34,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 }
 
 func (db *sqlserverDatabase) prerequisiteVersion(ctx context.Context) error {
-	info, err := version.Query(ctx, db.conn)
+	var info, err = version.Query(ctx, db.conn)
 	if err != nil {
 		log.WithField("err", err).Warn("unable to query server version")
 		return nil
@@ -121,7 +121,7 @@ func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, tables
 	var errs = make(map[sqlcapture.TableID]error)
 
 	// Query CT-enabled tables once upfront for efficiency
-	ctEnabledTables, err := db.ctEnabledTables(ctx)
+	var ctEnabledTables, err = db.ctEnabledTables(ctx)
 	if err != nil {
 		for _, table := range tables {
 			errs[table] = fmt.Errorf("unable to query CT-enabled tables: %w", err)

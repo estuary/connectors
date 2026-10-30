@@ -63,7 +63,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	// Compute backfill query and arguments list
-	query, args, err := backfill.BuildBackfillQuery(state, schema, table, columnTypes, db.config.Advanced.BackfillChunkSize, backfillFilter)
+	var query, args, err = backfill.BuildBackfillQuery(state, schema, table, columnTypes, db.config.Advanced.BackfillChunkSize, backfillFilter)
 	if err != nil {
 		return false, nil, err
 	}
