@@ -11,7 +11,6 @@ from .constants import (
     API_BASE_URL,
     DETAILED_VIEW,
     PAGE_SIZE,
-    CursorField,
     QueryParam,
     RateGroup,
     Scope,
@@ -137,8 +136,10 @@ async def fetch_incremental_changes(
         )
 
         for record in result.records:
+            # Overlapping windows re-fetch records. Comparing lastModifiedTime
+            # skips unchanged copies but lets updated ones through.
             if cache.should_yield(
-                model.NAME, CursorField.LAST_MODIFIED_TIME, record.cursor_value
+                model.NAME, record.id, record.lastModifiedTime or record.cursor_value
             ):
                 yield record
                 if record.cursor_value > max_cursor:
