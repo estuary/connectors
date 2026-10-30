@@ -15,7 +15,7 @@ func TestDecodeUnistr(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		out, err := decodeUnistr(c[0])
+		var out, err = decodeUnistr(c[0])
 		require.NoError(t, err)
 		require.Equal(t, c[1], out)
 	}

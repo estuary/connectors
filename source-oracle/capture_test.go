@@ -403,7 +403,7 @@ func TestCaptureCapitalization(t *testing.T) {
 	var tableA = tablePrefix + "_AaAaA_" + uniqueA                  // Name containing capital letters
 	var tableB = strings.ToUpper(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all uppercase (like all our other test table names)
 
-	cleanup := func() {
+	var cleanup = func() {
 		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableA))
 		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableB))
 	}
@@ -471,7 +471,7 @@ func TestSchemaChangesSmartMultiple(t *testing.T) {
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if !strings.Contains(string(data), "bindingStateV1") {
 			var d doc
-			err := json.Unmarshal(data, &d)
+			var err = json.Unmarshal(data, &d)
 			require.NoError(t, err)
 
 			if d.Year == "1910" && step == 0 {
@@ -553,7 +553,7 @@ func TestCrossSCNTransactions(t *testing.T) {
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if !strings.Contains(string(data), "bindingStateV1") {
 			var d doc
-			err := json.Unmarshal(data, &d)
+			var err = json.Unmarshal(data, &d)
 			require.NoError(t, err)
 
 			if d.Year == "1930" {
@@ -639,7 +639,7 @@ func TestPrimaryKeyUpdateOfOnlyChangesBinding(t *testing.T) {
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Mode = sqlcapture.BackfillModeOnlyChanges
-	resJSON, err := json.Marshal(res)
+	var resJSON, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resJSON
 
@@ -681,7 +681,7 @@ func TestPrimaryKeyUpdateFromNull(t *testing.T) {
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.PrimaryKey = []string{"REGION", "CODE"}
-	resJSON, err := json.Marshal(res)
+	var resJSON, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resJSON
 	cs.Bindings[0].Collection.Key = res.PrimaryKey

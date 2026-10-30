@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}

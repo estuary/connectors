@@ -78,7 +78,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 	// Execute the backfill query to fetch rows from the database
 	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
-	rows, err := db.conn.QueryContext(ctx, query, args...)
+	var rows, err = db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -380,7 +380,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 }
 
 func base64cmp(a, b string) int {
-	decodedA, err := base64.RawStdEncoding.DecodeString(a)
+	var decodedA, err = base64.RawStdEncoding.DecodeString(a)
 	if err != nil {
 		panic(err)
 	}
@@ -447,13 +447,13 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
-		quotedName := quoteColumnName(colName)
-		arg := fmt.Sprintf(":p%d", idx+1)
+		var quotedName = quoteColumnName(colName)
+		var arg = fmt.Sprintf(":p%d", idx+1)
 		// If a precise backfill is requested *and* the column type requires binary ordering for precise
 		// backfill comparisons to work, use NLSSORT with binary sorting so that comparisons
 		// and ordering are consistent regardless of database NLS settings. NLSSORT is used
 		// instead of the COLLATE operator for compatibility with Oracle 11g.
-		colType := strings.ToLower(columnTypes[colName].Original)
+		var colType = strings.ToLower(columnTypes[colName].Original)
 		if columnTypes[colName].JsonType == "string" && columnBinaryKeyComparison[colType] {
 			pkey = append(pkey, fmt.Sprintf("NLSSORT(%s, 'NLS_SORT=BINARY')", quotedName))
 			arg = fmt.Sprintf("NLSSORT(%s, 'NLS_SORT=BINARY')", arg)
@@ -466,7 +466,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	// Construct the query itself. A ROWNUM wrapper is used instead of FETCH NEXT
 	// for compatibility with Oracle 11g. The subquery is important: ROWNUM is applied
 	// on the outer query so that the inner query's ORDER BY executes first.
-	query := new(strings.Builder)
+	var query = new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
@@ -519,7 +519,7 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID sqlcapture.
 		"id":    streamID,
 		"query": explainQuery,
 	}).Info("explain backfill query")
-	_, err := db.conn.ExecContext(ctx, explainQuery, args...)
+	var _, err = db.conn.ExecContext(ctx, explainQuery, args...)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
 		return

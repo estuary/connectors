@@ -256,7 +256,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, conn *sql.Conn, sta
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
 	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles
-	rows, err := conn.QueryContext(ctx, fullQuery, minArchiveSCN)
+	var rows, err = conn.QueryContext(ctx, fullQuery, minArchiveSCN)
 	if err != nil {
 		return 0, fmt.Errorf("fetching log file list: %w", err)
 	}
@@ -739,7 +739,7 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	s.cancel = streamCancel
 
 	go func() {
-		err := s.run(streamCtx)
+		var err = s.run(streamCtx)
 		if errors.Is(err, context.Canceled) {
 			err = nil
 		}
@@ -1078,7 +1078,7 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, conn *sql
 
 	logrus.Debug("generated logminer query")
 
-	stmt, err := conn.PrepareContext(ctx, query)
+	var stmt, err = conn.PrepareContext(ctx, query)
 
 	return stmt, query, err
 }
@@ -1088,7 +1088,7 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 	var excludeXIDs = make(map[XID]struct{})
 	var pendingTXs = make(map[XID]SCN)
 
-	rows, err := s.transactionsStmt.QueryContext(ctx, startSCN, endSCN)
+	var rows, err = s.transactionsStmt.QueryContext(ctx, startSCN, endSCN)
 	if err != nil {
 		return nil, nil, fmt.Errorf("querying transactions: %w", err)
 	}
@@ -1142,7 +1142,7 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
 func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN SCN, stmt *sql.Stmt, excludeXIDs map[XID]struct{}) error {
-	rows, err := stmt.QueryContext(ctx, startSCN, endSCN)
+	var rows, err = stmt.QueryContext(ctx, startSCN, endSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
 	}
@@ -1367,7 +1367,7 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context, conn *sql.Con
 		return 0, err
 	}
 
-	row := conn.QueryRowContext(ctx, query)
+	var row = conn.QueryRowContext(ctx, query)
 
 	var maximumDDLSCN SCN
 	if err := row.Scan(&maximumDDLSCN); err != nil {

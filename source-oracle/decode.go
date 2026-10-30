@@ -51,7 +51,7 @@ func decodeValue(expr sqlparser.Expr) (any, error) {
 		// Used for DATE values
 		case "TO_DATE":
 			var val = v.Exprs[0].(*sqlparser.Literal).Val
-			t, err := time.Parse(PARSE_DATE_FORMAT, val)
+			var t, err = time.Parse(PARSE_DATE_FORMAT, val)
 			if err != nil {
 				return nil, fmt.Errorf("invalid date %q: %w", val, err)
 			}
@@ -180,7 +180,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 	case opInsert:
 		after = make(map[string]any)
 		op = sqlcapture.InsertOp
-		insert, ok := ast.(*sqlparser.Insert)
+		var insert, ok = ast.(*sqlparser.Insert)
 		if !ok {
 			return nil, fmt.Errorf("expected INSERT sql statement, instead got: %v", ast)
 		}
@@ -195,7 +195,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 		for i, col := range insert.Columns {
 			var key = col.String()
 
-			value, err := decodeValue(vs[i])
+			var value, err = decodeValue(vs[i])
 			if err != nil {
 				return nil, fmt.Errorf("insert sql statement %q, key %q: %w", msg.SQL, key, err)
 			}
@@ -209,7 +209,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 			return nil, fmt.Errorf("expected DELETE undo sql statement, instead got: %v", undoAST)
 		}
 
-		err := sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
+		var err = sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var col = n.Left.(*sqlparser.ColName)
@@ -231,17 +231,17 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 		after = make(map[string]any)
 		op = sqlcapture.UpdateOp
 		// construct `after` from the redo sql
-		update, ok := ast.(*sqlparser.Update)
+		var update, ok = ast.(*sqlparser.Update)
 		if !ok {
 			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
 		}
 
-		err := sqlparser.VisitExpr(update.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
+		var err = sqlparser.VisitExpr(update.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var col = n.Left.(*sqlparser.ColName)
 				var key = unquote(sqlparser.String(col.Name))
-				value, err := decodeValue(n.Right)
+				var value, err = decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("update sql statement where clause %q, key %q: %w", msg.SQL, key, err)
 				}
@@ -256,7 +256,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 
 		for _, expr := range update.Exprs {
 			var key = unquote(sqlparser.String(expr.Name.Name))
-			value, err := decodeValue(expr.Expr)
+			var value, err = decodeValue(expr.Expr)
 			if err != nil {
 				return nil, fmt.Errorf("update sql statement %q, key %q: %w", msg.SQL, key, err)
 			}
@@ -266,7 +266,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 		if undoAST != nil {
 			before = make(map[string]any)
 			// construct `before` from the undo sql
-			undo, ok := undoAST.(*sqlparser.Update)
+			var undo, ok = undoAST.(*sqlparser.Update)
 			if !ok {
 				return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
 			}
@@ -275,7 +275,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 				case *sqlparser.ComparisonExpr:
 					var col = n.Left.(*sqlparser.ColName)
 					var key = unquote(sqlparser.String(col.Name))
-					value, err := decodeValue(n.Right)
+					var value, err = decodeValue(n.Right)
 					if err != nil {
 						return false, fmt.Errorf("update sql undo statement where clause %q, key %q: %w", msg.UndoSQL, key, err)
 					}
@@ -295,7 +295,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 
 			for _, expr := range undo.Exprs {
 				var key = unquote(sqlparser.String(expr.Name.Name))
-				value, err := decodeValue(expr.Expr)
+				var value, err = decodeValue(expr.Expr)
 				if err != nil {
 					return nil, fmt.Errorf("update sql undo statement %q, key %q: %w", msg.UndoSQL, key, err)
 				}
@@ -312,16 +312,16 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 	case opDelete:
 		before = make(map[string]any)
 		op = sqlcapture.DeleteOp
-		del, ok := ast.(*sqlparser.Delete)
+		var del, ok = ast.(*sqlparser.Delete)
 		if !ok {
 			return nil, fmt.Errorf("expected DELETE sql statement, instead got: %v", ast)
 		}
-		err := sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
+		var err = sqlparser.VisitExpr(del.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
 			switch n := node.(type) {
 			case *sqlparser.ComparisonExpr:
 				var col = n.Left.(*sqlparser.ColName)
 				var key = unquote(sqlparser.String(col.Name))
-				value, err := decodeValue(n.Right)
+				var value, err = decodeValue(n.Right)
 				if err != nil {
 					return false, fmt.Errorf("delete sql statement %q, key %q: %w", msg.SQL, key, err)
 				}
@@ -337,7 +337,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) ([]sqlcapture.Dat
 		return nil, fmt.Errorf("unexpected operation code %d", msg.Op)
 	}
 
-	discovery, ok := s.tables.discovery[streamID]
+	var discovery, ok = s.tables.discovery[streamID]
 	if !ok {
 		return nil, fmt.Errorf("unknown discovery info for stream %q", streamID)
 	}

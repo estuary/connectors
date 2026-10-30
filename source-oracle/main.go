@@ -86,7 +86,7 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
+		var host, port, err = net.SplitHostPort(config.Address)
 		if err != nil {
 			return nil, fmt.Errorf("splitting address to host and port: %w", err)
 		}
@@ -98,7 +98,7 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 			ForwardPort: port,
 			LocalPort:   "1521",
 		}
-		tunnel := sshConfig.CreateTunnel()
+		var tunnel = sshConfig.CreateTunnel()
 
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
@@ -118,11 +118,11 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 	}
 	log.WithField("version", version).Info("detected Oracle database version")
 
-	parts := strings.SplitN(version, ".", 2)
+	var parts = strings.SplitN(version, ".", 2)
 	if len(parts) == 0 || parts[0] == "" {
 		return nil, fmt.Errorf("unexpected empty version string from V$INSTANCE")
 	}
-	majorVersion, err := strconv.Atoi(parts[0])
+	var majorVersion, err = strconv.Atoi(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("parsing major version from %q: %w", version, err)
 	}
