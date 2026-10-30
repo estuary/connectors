@@ -285,12 +285,9 @@ type badRequestResponseBody struct {
 
 // connectError maps a connection failure to a readable error.
 func connectError(err error, cfg config) error {
-	var authErr *azidentity.AuthenticationFailedError
-	var netOpErr *net.OpError
-
-	if errors.As(err, &netOpErr) {
+	if _, ok := errors.AsType[*net.OpError](err); ok {
 		err = fmt.Errorf("could not connect to endpoint: ensure the connection string '%s' is correct", cfg.ConnectionString)
-	} else if errors.As(err, &authErr) && authErr.RawResponse != nil {
+	} else if authErr, ok := errors.AsType[*azidentity.AuthenticationFailedError](err); ok && authErr.RawResponse != nil {
 		var res badRequestResponseBody
 		if decodeErr := json.NewDecoder(authErr.RawResponse.Body).Decode(&res); decodeErr != nil {
 			return err
