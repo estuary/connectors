@@ -16,6 +16,7 @@ from .api import (
     snapshot_ad_groups,
     snapshot_ads,
     snapshot_campaigns,
+    token_exchange_scope,
 )
 from .errors import INVALID_CREDENTIALS, fault_of
 from .http import BingAdsHTTPMixin
@@ -38,7 +39,10 @@ SANDBOX_DEVELOPER_TOKEN = "BBD37VB98"
 
 
 def _configure_http(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig) -> None:
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    oauth_spec = OAUTH2_SPEC.model_copy(
+        update={"additionalTokenExchangeBody": {"scope": token_exchange_scope()}}
+    )
+    http.token_source = TokenSource(oauth_spec=oauth_spec, credentials=config.credentials)
     http.developer_token = config.developer_token
     # Never log the token itself.
     log.info(

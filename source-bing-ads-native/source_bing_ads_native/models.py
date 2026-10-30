@@ -27,6 +27,12 @@ MICROSOFT_IDENTITY_URL = "https://login.microsoftonline.com/common/oauth2/v2.0"
 # https://learn.microsoft.com/en-us/advertising/guides/authentication-oauth-consent?view=bingads-13
 SCOPE = "https://ads.microsoft.com/msads.manage offline_access"
 
+# The sandbox rejects tokens for SCOPE with code 105 and only accepts tokens for
+# its own resource. Microsoft's sandbox guide doesn't say so; Microsoft's Python
+# SDK requests this scope for the sandbox (`MSA_PROD`).
+# https://github.com/BingAds/BingAds-Python-SDK/blob/main/bingads/authorization.py
+SANDBOX_SCOPE = "https://si.ads.microsoft.com/msads.manage offline_access"
+
 
 def urlencode_field(field: str):
     return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
