@@ -62,7 +62,7 @@ func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Respon
 	t.Helper()
 	RedirectTestLogs(t)
 
-	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
+	var endpointSpecJSON, err = json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
 	var bindings []*pc.Request_Validate_Binding
@@ -95,7 +95,7 @@ func SummarizeBindings(t testing.TB, bindings []*pc.Response_Discovered_Binding)
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
-		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		var bs, err = json.MarshalIndent(binding, "  ", "  ")
 		require.NoError(t, err)
 		io.Copy(summary, bytes.NewReader(bs))
 		fmt.Fprintf(summary, "\n")
@@ -116,7 +116,7 @@ func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*
 	}
 	RedirectTestLogs(t)
 
-	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
+	var endpointSpecJSON, err = json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
 	discovery, err := cs.Driver.Discover(ctx, &pc.Request_Discover{
@@ -161,7 +161,7 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 	t.Logf("running test capture with checkpoint: %s", string(cs.Checkpoint))
 	RedirectTestLogs(t)
 
-	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
+	var endpointSpecJSON, err = json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
 	var open = &pc.Request{
@@ -189,7 +189,7 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		callback:   callback,
 	}
 
-	stream := &boilerplate.PullOutput{
+	var stream = &boilerplate.PullOutput{
 		Connector_CaptureServer: adapter,
 		NumBindings:             len(cs.Bindings),
 	}
@@ -491,7 +491,7 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 			}
 			for _, doc := range sortedDocs {
 				if v.NormalizeJSON {
-					normalized, err := normalizeJSON(json.RawMessage(doc))
+					var normalized, err = normalizeJSON(json.RawMessage(doc))
 					if err != nil {
 						return err
 					}
@@ -507,7 +507,7 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 			}
 			for _, doc := range sortedDocs {
 				if v.NormalizeJSON {
-					normalized, err := normalizeJSON(json.RawMessage(doc))
+					var normalized, err = normalizeJSON(json.RawMessage(doc))
 					if err != nil {
 						return err
 					}
@@ -581,7 +581,7 @@ func (v *OrderedCaptureValidator) Summarize(w io.Writer) error {
 			enc.SetIndent("", "  ")
 			for _, doc := range v.documents[collection] {
 				if v.NormalizeJSON {
-					normalized, err := normalizeJSON(json.RawMessage(doc))
+					var normalized, err = normalizeJSON(json.RawMessage(doc))
 					if err != nil {
 						return err
 					}
@@ -594,7 +594,7 @@ func (v *OrderedCaptureValidator) Summarize(w io.Writer) error {
 		} else {
 			for _, doc := range v.documents[collection] {
 				if v.NormalizeJSON {
-					normalized, err := normalizeJSON(json.RawMessage(doc))
+					var normalized, err = normalizeJSON(json.RawMessage(doc))
 					if err != nil {
 						return err
 					}
@@ -634,7 +634,7 @@ func (v *ChecksumValidator) Output(collection string, data json.RawMessage) {
 	if v.collections == nil {
 		v.collections = make(map[string]*checksumValidatorState)
 	}
-	state, ok := v.collections[collection]
+	var state, ok = v.collections[collection]
 	if !ok {
 		state = &checksumValidatorState{}
 		v.collections[collection] = state
