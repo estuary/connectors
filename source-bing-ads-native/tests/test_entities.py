@@ -12,12 +12,15 @@ from typing import Any, Callable, cast
 import pytest
 from estuary_cdk.http import HTTPError, HTTPSession
 from source_bing_ads_native.api import (
+    ENVIRONMENT_VAR,
     AccountAccessError,
     AccountDirectory,
+    customer_management_url,
     snapshot_accounts,
     snapshot_ad_groups,
     snapshot_ads,
     snapshot_campaigns,
+    token_exchange_scope,
 )
 from source_bing_ads_native.errors import should_retry
 from source_bing_ads_native.http import with_developer_token
@@ -312,3 +315,29 @@ def test_authenticated_request_needs_developer_token():
         "CustomerId": "1",
         "DeveloperToken": "token",
     }
+
+
+@pytest.mark.parametrize(
+    "environment, host, scope",
+    [
+        (None, "clientcenter.api.bingads.microsoft.com", "https://ads.microsoft.com/"),
+        ("sandbox", "clientcenter.api.sandbox.bingads.microsoft.com", "https://si.ads.microsoft.com/"),
+    ],
+)
+def test_environment_picks_hosts_and_token_scope(
+    monkeypatch: pytest.MonkeyPatch, environment: str | None, host: str, scope: str
+):
+    # The sandbox rejects production-scoped tokens, so the refresh scope has to
+    # follow the hosts.
+    if environment is None:
+        monkeypatch.delenv(ENVIRONMENT_VAR, raising=False)
+    else:
+        monkeypatch.setenv(ENVIRONMENT_VAR, environment)
+    assert customer_management_url().startswith(f"https://{host}/")
+    assert token_exchange_scope().startswith(scope)
+
+
+def test_unknown_environment_fails(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv(ENVIRONMENT_VAR, "staging")
+    with pytest.raises(RuntimeError, match=ENVIRONMENT_VAR):
+        token_exchange_scope()

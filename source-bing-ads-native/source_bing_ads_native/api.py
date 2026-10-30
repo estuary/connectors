@@ -11,7 +11,7 @@ from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.http import HTTPError, HTTPSession
 
 from .errors import ACCESS_DENIED_CODES, fault_of
-from .models import Account, Ad, AdGroup, Campaign, ParentIds
+from .models import SANDBOX_SCOPE, SCOPE, Account, Ad, AdGroup, Campaign, ParentIds
 
 # Microsoft sunsets Bing Ads API versions; bump this when migrating.
 # See https://learn.microsoft.com/en-us/advertising/guides/migration-guide?view=bingads-13
@@ -60,17 +60,27 @@ ALL_AD_TYPES = [
 MAX_CONCURRENT_ENTITY_REQUESTS = 10
 
 
-def _host(service: str) -> str:
+def _environment() -> str:
     environment = os.environ.get(ENVIRONMENT_VAR, "production").lower()
-    match environment:
-        case "production":
-            return f"https://{service}.api.bingads.microsoft.com"
+    if environment not in ("production", "sandbox"):
+        raise RuntimeError(
+            f"{ENVIRONMENT_VAR} must be 'production' or 'sandbox', got {environment!r}"
+        )
+    return environment
+
+
+def _host(service: str) -> str:
+    match _environment():
         case "sandbox":
             return f"https://{service}.api.sandbox.bingads.microsoft.com"
         case _:
-            raise RuntimeError(
-                f"{ENVIRONMENT_VAR} must be 'production' or 'sandbox', got {environment!r}"
-            )
+            return f"https://{service}.api.bingads.microsoft.com"
+
+
+def token_exchange_scope() -> str:
+    """The scope the connector's own refresh-token exchanges request. The
+    dashboard's sign-in always uses the production scope."""
+    return SANDBOX_SCOPE if _environment() == "sandbox" else SCOPE
 
 
 # The API is split across per-service hosts.
