@@ -9,7 +9,7 @@ import (
 )
 
 var sqliteDialect = func() sql.Dialect {
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:          sql.MapStatic("TEXT"),
 			sql.BINARY:         sql.MapStatic("BLOB", sql.UsingConverter(sql.Base64Decoder)),

@@ -44,7 +44,7 @@ func TestIntegration(t *testing.T) {
 			"--timeout", "5m",
 		)
 
-		db, err := stdsql.Open("sqlite3", databasePath)
+		var db, err = stdsql.Open("sqlite3", databasePath)
 		require.NoError(t, err)
 		defer db.Close()
 
@@ -72,17 +72,17 @@ func TestIntegration(t *testing.T) {
 
 func TestStoreInsertThenUpdate(t *testing.T) {
 	var ctx = context.Background()
-	table, db := setupTestTable(t)
+	var table, db = setupTestTable(t)
 
-	insertSQL := mustRender(t, table, tplStoreInsert)
-	updateSQL := mustRender(t, table, tplStoreUpdate)
+	var insertSQL = mustRender(t, table, tplStoreInsert)
+	var updateSQL = mustRender(t, table, tplStoreUpdate)
 
 	// Insert two rows so the update must discriminate between keys.
 	insertRow(t, ctx, db, table, insertSQL, 1, "orig", `{"id":1}`)
 	insertRow(t, ctx, db, table, insertSQL, 2, "orig2", `{"id":2}`)
 
 	// Both rows land as inserted.
-	byID := readTableByID(t, ctx, db, table.Identifier)
+	var byID = readTableByID(t, ctx, db, table.Identifier)
 	require.Len(t, byID, 2)
 	require.Equal(t, "orig", byID[1]["canary"])
 	require.Equal(t, "orig2", byID[2]["canary"])
@@ -91,7 +91,7 @@ func TestStoreInsertThenUpdate(t *testing.T) {
 	// transactor.Store passes for an existing key. The update's WHERE key is
 	// textually last but must bind the leading key parameter; a regression
 	// there matches zero rows and silently drops the update.
-	updParams, err := table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{"changed"}, json.RawMessage(`{"id":1,"v":2}`))
+	var updParams, err = table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{"changed"}, json.RawMessage(`{"id":1,"v":2}`))
 	require.NoError(t, err)
 	res, err := db.ExecContext(ctx, updateSQL, updParams...)
 	require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestTruncateBoundaryPrecision(t *testing.T) {
 			String_: &pf.Inference_String{Format: "date-time", ContentEncoding: "uuid"},
 		},
 	}})
-	table, err := sql.ResolveTable(shape, sqliteDialect)
+	var table, err = sql.ResolveTable(shape, sqliteDialect)
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
@@ -169,12 +169,12 @@ func TestStoreUpdateWithoutValues(t *testing.T) {
 
 	var shape = testTableShape("key_only")
 	shape.Values = nil
-	table, db := setupTestTableShape(t, shape)
+	var table, db = setupTestTableShape(t, shape)
 
-	insertSQL := mustRender(t, table, tplStoreInsert)
-	updateSQL := mustRender(t, table, tplStoreUpdate)
+	var insertSQL = mustRender(t, table, tplStoreInsert)
+	var updateSQL = mustRender(t, table, tplStoreUpdate)
 
-	params, err := table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{}, json.RawMessage(`{"id":1}`))
+	var params, err = table.ConvertAll(tuple.Tuple{int64(1)}, tuple.Tuple{}, json.RawMessage(`{"id":1}`))
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, insertSQL, params...)
 	require.NoError(t, err)
@@ -187,21 +187,21 @@ func TestStoreUpdateWithoutValues(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, int64(1), affected)
 
-	byID := readTableByID(t, ctx, db, table.Identifier)
+	var byID = readTableByID(t, ctx, db, table.Identifier)
 	require.JSONEq(t, `{"id":1,"v":2}`, documentJSON(t, byID[1]["flow_document"]))
 }
 
 func TestLoad(t *testing.T) {
 	var ctx = context.Background()
-	table, db := setupTestTable(t)
+	var table, db = setupTestTable(t)
 
-	insertSQL := mustRender(t, table, tplStoreInsert)
+	var insertSQL = mustRender(t, table, tplStoreInsert)
 	insertRow(t, ctx, db, table, insertSQL, 1, "one", `{"id":1,"v":1}`)
 	insertRow(t, ctx, db, table, insertSQL, 2, "two", `{"id":2,"v":2}`)
 
 	// Mirror transactor.Load: stage keys into the per-binding temp table, then
 	// join it against the target table to fetch the stored documents.
-	_, err := db.ExecContext(ctx, mustRender(t, table, tplCreateLoadTable))
+	var _, err = db.ExecContext(ctx, mustRender(t, table, tplCreateLoadTable))
 	require.NoError(t, err)
 	var (
 		loadInsertSQL   = mustRender(t, table, tplLoadInsert)
@@ -209,20 +209,20 @@ func TestLoad(t *testing.T) {
 		loadTruncateSQL = mustRender(t, table, tplLoadTruncate)
 	)
 
-	stageKeys := func(ids ...int64) {
+	var stageKeys = func(ids ...int64) {
 		for _, id := range ids {
-			conv, err := table.ConvertKey(tuple.Tuple{id})
+			var conv, err = table.ConvertKey(tuple.Tuple{id})
 			require.NoError(t, err)
 			_, err = db.ExecContext(ctx, loadInsertSQL, conv...)
 			require.NoError(t, err)
 		}
 	}
-	loadDocs := func() map[int64]string {
-		rows, err := db.QueryContext(ctx, loadQuerySQL)
+	var loadDocs = func() map[int64]string {
+		var rows, err = db.QueryContext(ctx, loadQuerySQL)
 		require.NoError(t, err)
 		defer rows.Close()
 
-		out := map[int64]string{}
+		var out = map[int64]string{}
 		for rows.Next() {
 			var binding int
 			var doc string
@@ -242,7 +242,7 @@ func TestLoad(t *testing.T) {
 	// Staging a present and an absent key returns only the present document,
 	// exactly as it was stored.
 	stageKeys(1, 99)
-	got := loadDocs()
+	var got = loadDocs()
 	require.Len(t, got, 1)
 	require.JSONEq(t, `{"id":1,"v":1}`, got[1])
 
@@ -259,15 +259,15 @@ func TestLoad(t *testing.T) {
 func TestCreateLoadTableAfterRestart(t *testing.T) {
 	var ctx = context.Background()
 
-	table, err := sql.ResolveTable(testTableShape("test_results"), sqliteDialect)
+	var table, err = sql.ResolveTable(testTableShape("test_results"), sqliteDialect)
 	require.NoError(t, err)
 	var path = filepath.Join(t.TempDir(), "test.db")
 	var createSQL = mustRender(t, table, tplCreateLoadTable)
 
 	// Each iteration is one connector run against the same database file.
 	for range 2 {
-		conn := openLoadConn(t, ctx, path)
-		_, err := conn.ExecContext(ctx, createSQL)
+		var conn = openLoadConn(t, ctx, path)
+		var _, err = conn.ExecContext(ctx, createSQL)
 		require.NoError(t, err)
 		require.NoError(t, conn.Close())
 	}
@@ -287,7 +287,7 @@ func TestCreateLoadTableAfterRestart(t *testing.T) {
 func openLoadConn(t *testing.T, ctx context.Context, path string) *stdsql.Conn {
 	t.Helper()
 
-	db, err := stdsql.Open("sqlite3", path)
+	var db, err = stdsql.Open("sqlite3", path)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 
@@ -328,7 +328,7 @@ func setupTestTable(t *testing.T) (sql.Table, *stdsql.DB) {
 func setupTestTableShape(t *testing.T, shape sql.TableShape) (sql.Table, *stdsql.DB) {
 	t.Helper()
 
-	table, err := sql.ResolveTable(shape, sqliteDialect)
+	var table, err = sql.ResolveTable(shape, sqliteDialect)
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
@@ -348,14 +348,14 @@ func setupTestTableShape(t *testing.T, shape sql.TableShape) (sql.Table, *stdsql
 
 func mustRender(t *testing.T, table sql.Table, tpl *template.Template) string {
 	t.Helper()
-	out, err := sql.RenderTableTemplate(table, tpl)
+	var out, err = sql.RenderTableTemplate(table, tpl)
 	require.NoError(t, err)
 	return out
 }
 
 func insertRow(t *testing.T, ctx context.Context, db *stdsql.DB, table sql.Table, insertSQL string, id int64, canary, doc string) {
 	t.Helper()
-	params, err := table.ConvertAll(tuple.Tuple{id}, tuple.Tuple{canary}, json.RawMessage(doc))
+	var params, err = table.ConvertAll(tuple.Tuple{id}, tuple.Tuple{canary}, json.RawMessage(doc))
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, insertSQL, params...)
 	require.NoError(t, err)
@@ -366,16 +366,16 @@ func insertRow(t *testing.T, ctx context.Context, db *stdsql.DB, table sql.Table
 func readTableByID(t *testing.T, ctx context.Context, db *stdsql.DB, identifier string) map[int64]map[string]any {
 	t.Helper()
 
-	cols, rows, err := sql.SnapshotTestTable(ctx, db, identifier)
+	var cols, rows, err = sql.SnapshotTestTable(ctx, db, identifier)
 	require.NoError(t, err)
 
-	out := make(map[int64]map[string]any, len(rows))
+	var out = make(map[int64]map[string]any, len(rows))
 	for _, row := range rows {
-		rec := make(map[string]any, len(cols))
+		var rec = make(map[string]any, len(cols))
 		for i, col := range cols {
 			rec[col] = row[i]
 		}
-		id, ok := rec["id"].(int64)
+		var id, ok = rec["id"].(int64)
 		require.Truef(t, ok, "id column should be int64, got %T", rec["id"])
 		out[id] = rec
 	}

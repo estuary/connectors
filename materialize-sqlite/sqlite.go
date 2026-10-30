@@ -89,7 +89,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 			// often returning "database is locked" errors. We can resolve by ensuring one sql.Open
 			// completes before the next starts. This is only required for SQLite, not other drivers.
 			sqliteOpenMu.Lock()
-			db, err := stdsql.Open("sqlite3", path)
+			var db, err = stdsql.Open("sqlite3", path)
 			if err == nil {
 				err = db.PingContext(ctx)
 			}
@@ -119,7 +119,7 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	db, err := stdsql.Open("sqlite3", databasePath)
+	var db, err = stdsql.Open("sqlite3", databasePath)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	var _, err = c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
@@ -390,7 +390,7 @@ func (d *transactor) Load(
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	rows, err := d.load.conn.QueryContext(ctx, d.unionSQL)
+	var rows, err = d.load.conn.QueryContext(ctx, d.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
