@@ -83,7 +83,7 @@ func parseDatabasePath(path string) (projectID, databaseID string, err error) {
 func resolveDatabasePath(ctx context.Context, configPath string, credsOpt option.ClientOption) (databasePath, projectID, databaseID string, err error) {
 	databasePath = configPath
 	if databasePath == "" {
-		creds, credsErr := transport.Creds(ctx, credsOpt)
+		var creds, credsErr = transport.Creds(ctx, credsOpt)
 		if credsErr != nil {
 			return "", "", "", fmt.Errorf("unable to get credentials: %w", credsErr)
 		}

@@ -69,8 +69,8 @@ func TestMain(m *testing.M) {
 }
 
 func TestSpec(t *testing.T) {
-	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pc.Request_Spec{})
+	var driver = driver{}
+	var response, err = driver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -354,7 +354,7 @@ func simpleCapture(t testing.TB, names ...string) *st.CaptureSpec {
 
 	// Load credentials from disk and construct an endpoint spec
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
+	var credentialsJSON, err = ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	var endpointSpec = &config{
@@ -418,7 +418,7 @@ func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 	}
 
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
+	var credentialsJSON, err = ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	client, err := firestore.NewClientWithDatabase(ctx, *testProjectID, *testDatabaseName, option.WithCredentialsJSON(credentialsJSON))
@@ -448,11 +448,11 @@ func (c *firestoreClient) DeleteCollection(ctx context.Context, t testing.TB, co
 
 func (c *firestoreClient) deleteCollectionRecursive(ctx context.Context, t testing.TB, ref *firestore.CollectionRef) {
 	t.Helper()
-	docs, err := ref.DocumentRefs(ctx).GetAll()
+	var docs, err = ref.DocumentRefs(ctx).GetAll()
 	require.NoError(t, err)
 	for _, doc := range docs {
 		log.WithField("path", doc.Path).Trace("deleting doc")
-		subcolls, err := doc.Collections(ctx).GetAll()
+		var subcolls, err = doc.Collections(ctx).GetAll()
 		require.NoError(t, err)
 		for _, subcoll := range subcolls {
 			c.deleteCollectionRecursive(ctx, t, subcoll)
@@ -532,12 +532,12 @@ func TestInitResourceStates(t *testing.T) {
 
 	// Helper to construct a binding with specific path and backfill mode.
 	var createBinding = func(path string, mode backfillMode, restartCursorPath string) *pf.CaptureSpec_Binding {
-		resourceConfig := resource{
+		var resourceConfig = resource{
 			Path:              path,
 			BackfillMode:      mode,
 			RestartCursorPath: restartCursorPath,
 		}
-		configJSON, _ := json.Marshal(resourceConfig)
+		var configJSON, _ = json.Marshal(resourceConfig)
 		return &pf.CaptureSpec_Binding{
 			StateKey:           url.QueryEscape(path),
 			ResourceConfigJson: configJSON,

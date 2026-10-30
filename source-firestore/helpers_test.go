@@ -9,7 +9,7 @@ import (
 )
 
 func TestParseDatabasePath(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name          string
 		input         string
 		wantProjectID string
@@ -76,7 +76,7 @@ func TestParseDatabasePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			projectID, databaseID, err := parseDatabasePath(tt.input)
+			var projectID, databaseID, err = parseDatabasePath(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "invalid database path")
@@ -90,11 +90,11 @@ func TestParseDatabasePath(t *testing.T) {
 }
 
 func TestResolveDatabasePath(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	t.Run("explicit path is used directly", func(t *testing.T) {
-		configPath := "projects/my-project/databases/my-db"
-		databasePath, projectID, databaseID, err := resolveDatabasePath(ctx, configPath, nil)
+		var configPath = "projects/my-project/databases/my-db"
+		var databasePath, projectID, databaseID, err = resolveDatabasePath(ctx, configPath, nil)
 		require.NoError(t, err)
 		require.Equal(t, configPath, databasePath)
 		require.Equal(t, "my-project", projectID)
@@ -102,8 +102,8 @@ func TestResolveDatabasePath(t *testing.T) {
 	})
 
 	t.Run("explicit default database path", func(t *testing.T) {
-		configPath := "projects/another-project/databases/(default)"
-		databasePath, projectID, databaseID, err := resolveDatabasePath(ctx, configPath, nil)
+		var configPath = "projects/another-project/databases/(default)"
+		var databasePath, projectID, databaseID, err = resolveDatabasePath(ctx, configPath, nil)
 		require.NoError(t, err)
 		require.Equal(t, configPath, databasePath)
 		require.Equal(t, "another-project", projectID)
@@ -111,25 +111,25 @@ func TestResolveDatabasePath(t *testing.T) {
 	})
 
 	t.Run("invalid explicit path returns parse error", func(t *testing.T) {
-		configPath := "invalid/path"
-		_, _, _, err := resolveDatabasePath(ctx, configPath, nil)
+		var configPath = "invalid/path"
+		var _, _, _, err = resolveDatabasePath(ctx, configPath, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "invalid database path")
 	})
 
 	t.Run("empty path with invalid credentials returns error", func(t *testing.T) {
-		invalidCreds := option.WithCredentialsJSON([]byte("not valid json"))
-		_, _, _, err := resolveDatabasePath(ctx, "", invalidCreds)
+		var invalidCreds = option.WithCredentialsJSON([]byte("not valid json"))
+		var _, _, _, err = resolveDatabasePath(ctx, "", invalidCreds)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "unable to get credentials")
 	})
 
 	t.Run("empty path auto-detects from credentials", func(t *testing.T) {
-		dummyCreds := []byte(`{
+		var dummyCreds = []byte(`{
 			"type": "service_account",
 			"project_id": "auto-detected-project"
 		}`)
-		databasePath, projectID, databaseID, err := resolveDatabasePath(ctx, "", option.WithCredentialsJSON(dummyCreds))
+		var databasePath, projectID, databaseID, err = resolveDatabasePath(ctx, "", option.WithCredentialsJSON(dummyCreds))
 		require.NoError(t, err)
 		require.Equal(t, "projects/auto-detected-project/databases/(default)", databasePath)
 		require.Equal(t, "auto-detected-project", projectID)

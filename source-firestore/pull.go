@@ -80,14 +80,14 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	}
 
-	updatedResourceStates, err := initResourceStates(&cfg, prevState.Resources, open.Capture.Bindings, time.Now())
+	var updatedResourceStates, err = initResourceStates(&cfg, prevState.Resources, open.Capture.Bindings, time.Now())
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
 	}
 
 	// Build a mapping of document paths to state keys, to allow efficient lookups of state keys
 	// from the path of retrieved documents.
-	stateKeys := make(map[string]boilerplate.StateKey)
+	var stateKeys = make(map[string]boilerplate.StateKey)
 	for sk, res := range updatedResourceStates {
 		stateKeys[res.path] = sk
 	}
@@ -441,7 +441,7 @@ func (c *capture) Run(ctx context.Context) error {
 		Time:                5 * time.Minute, // Ping the server after 5 minutes of inactivity
 		PermitWithoutStream: true,            // Send keepalives even if there are no active RPCs (this shouldn't be the case, but won't hurt)
 	}))
-	rpcClient, err := firestore_v1.NewClient(ctx, credsOpt, scopesOpt, keepaliveOpt)
+	var rpcClient, err = firestore_v1.NewClient(ctx, credsOpt, scopesOpt, keepaliveOpt)
 	if err != nil {
 		return err
 	}
@@ -669,7 +669,7 @@ func (c *capture) backfillChunk(
 
 	var chunkSize int
 	for {
-		doc, err := iter.Next()
+		var doc, err = iter.Next()
 		if err == iterator.Done {
 			break
 		}
@@ -811,7 +811,7 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 			}
 		}
 
-		resp, err := listenClient.Recv()
+		var resp, err = listenClient.Recv()
 		if err == io.EOF {
 			logEntry.Debug("listen stream closed, shutting down")
 			return fmt.Errorf("listen stream was closed unexpectedly: %w", err)

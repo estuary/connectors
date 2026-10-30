@@ -66,7 +66,7 @@ func TestSyntheticData(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
+	var credentialsJSON, err = ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	client, err := firestore.NewClientWithDatabase(ctx, *testProjectID, *testDatabaseName, option.WithCredentialsJSON(credentialsJSON))
@@ -150,7 +150,7 @@ func TestSyntheticClutter(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
+	var credentialsJSON, err = ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	client, err := firestore.NewClientWithDatabase(ctx, *testProjectID, *testDatabaseName, option.WithCredentialsJSON(credentialsJSON))
@@ -159,7 +159,7 @@ func TestSyntheticClutter(t *testing.T) {
 	var eg = new(errgroup.Group)
 	eg.SetLimit(4)
 	for group := 0; group < numGroups; group++ {
-		group := group
+		var group = group
 		log.WithField("group", group).Info("spawning worker")
 		eg.Go(func() error {
 			var batcher = &datasynthBatcher{inner: client}

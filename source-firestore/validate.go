@@ -17,9 +17,9 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 	}
 
 	// Validate connection to Firestore
-	credsOpt := option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
+	var credsOpt = option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
 
-	_, projectID, databaseID, err := resolveDatabasePath(ctx, cfg.DatabasePath, credsOpt)
+	var _, projectID, databaseID, err = resolveDatabasePath(ctx, cfg.DatabasePath, credsOpt)
 	if err != nil {
 		return nil, err
 	}

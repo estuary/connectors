@@ -104,7 +104,7 @@ func generateMinimalSchema() json.RawMessage {
 	}
 
 	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		panic(fmt.Errorf("error generating schema: %v", err))
 	}
@@ -118,9 +118,9 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	credsOpt := option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
+	var credsOpt = option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
 
-	_, projectID, databaseID, err := resolveDatabasePath(ctx, cfg.DatabasePath, credsOpt)
+	var _, projectID, databaseID, err = resolveDatabasePath(ctx, cfg.DatabasePath, credsOpt)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func discoverCollections(ctx context.Context, client *firestore.Client, extraCol
 	// Convert the set of resources which exist into bindings and return them.
 	var bindings []*pc.Response_Discovered_Binding
 	for resourcePath := range state.shared.resources {
-		resourceJSON, err := json.Marshal(resource{
+		var resourceJSON, err = json.Marshal(resource{
 			Path:         resourcePath,
 			BackfillMode: backfillModeAsync,
 		})
@@ -285,7 +285,7 @@ func (ds *discoveryState) handleDocument(ctx context.Context, doc *firestore.Doc
 	// according to an "Always check the first K and then randomly check P% of the rest"
 	// heuristic.
 	if count < discoverSubresourceMinimum || rand.Float64() < discoverSubresourceProbability {
-		subcolls, err := doc.Ref.Collections(ctx).GetAll()
+		var subcolls, err = doc.Ref.Collections(ctx).GetAll()
 		if err != nil {
 			log.WithFields(log.Fields{
 				"doc": doc.Ref.Path,
