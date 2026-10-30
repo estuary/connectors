@@ -77,7 +77,7 @@ func fixSchemaOrderingStrings(t *jsonschema.Schema) {
 	for key, val := range t.Extras {
 		if key == "order" {
 			if str, ok := val.(string); ok {
-				converted, err := strconv.Atoi(str)
+				var converted, err = strconv.Atoi(str)
 				if err != nil {
 					// Don't try to convert strings that don't look like integers.
 					continue

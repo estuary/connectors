@@ -121,7 +121,7 @@ type statusTracker struct {
 }
 
 func newStatusTracker(open *pm.Request_Open) *statusTracker {
-	t := &statusTracker{
+	var t = &statusTracker{
 		now: time.Now,
 		emit: func(lvl log.Level, msg string) {
 			log.WithField("eventType", "connectorStatus").Log(lvl, msg)
@@ -134,9 +134,9 @@ func newStatusTracker(open *pm.Request_Open) *statusTracker {
 		warningKeys:     make(map[string]struct{}),
 	}
 	if open.Materialization != nil {
-		index := make(map[string]int)
+		var index = make(map[string]int)
 		for _, b := range open.Materialization.Bindings {
-			name := b.Collection.Name.String()
+			var name = b.Collection.Name.String()
 			if _, ok := index[name]; !ok {
 				index[name] = len(index)
 			}
@@ -152,7 +152,7 @@ func newStatusTracker(open *pm.Request_Open) *statusTracker {
 // returned function is called.
 func (t *statusTracker) start() (stop func()) {
 	t.tick()
-	stopRepeat := repeatAsync(t.tick, statusTick)
+	var stopRepeat = repeatAsync(t.tick, statusTick)
 	return func() { stopRepeat(func() {}) }
 }
 
@@ -263,7 +263,7 @@ func (t *statusTracker) collectionOf(binding int) int {
 }
 
 func (t *statusTracker) updateCurrent() {
-	current := t.commitStage
+	var current = t.commitStage
 	if current.stage == stageIdle {
 		current = t.readStage
 	}
@@ -368,7 +368,7 @@ func formatCount(n int) string {
 	case n >= 1_000_000:
 		return trimZero(float64(n)/1e6) + "M"
 	}
-	s := strconv.Itoa(n)
+	var s = strconv.Itoa(n)
 	for i := len(s) - 3; i > 0; i -= 3 {
 		s = s[:i] + "," + s[i:]
 	}
@@ -382,7 +382,7 @@ func trimZero(f float64) string {
 // formatDuration formats d like "2m30s" or "1h", without zero units.
 func formatDuration(d time.Duration) string {
 	d = d.Round(time.Second)
-	h, m, s := int(d/time.Hour), int(d%time.Hour/time.Minute), int(d%time.Minute/time.Second)
+	var h, m, s = int(d / time.Hour), int(d % time.Hour / time.Minute), int(d % time.Minute / time.Second)
 	var out string
 	if h > 0 {
 		out += strconv.Itoa(h) + "h"

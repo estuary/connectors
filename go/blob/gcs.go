@@ -28,7 +28,7 @@ type GCSBucket struct {
 // NewGCSBucket creates a GCS object storage bucket. At least one ClientOption
 // must be provided to specify authentication.
 func NewGCSBucket(ctx context.Context, bucket string, authOpt option.ClientOption, otherOpts ...option.ClientOption) (*GCSBucket, error) {
-	client, err := storage.NewClient(ctx, append(otherOpts, authOpt)...)
+	var client, err = storage.NewClient(ctx, append(otherOpts, authOpt)...)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func NewGCSBucket(ctx context.Context, bucket string, authOpt option.ClientOptio
 // are each a single request, so an object's MD5 attribute is the MD5 of its
 // bytes. At least one ClientOption must be provided to specify authentication.
 func NewGCSSingleRequestBucket(ctx context.Context, bucket string, authOpt option.ClientOption, otherOpts ...option.ClientOption) (*GCSBucket, error) {
-	b, err := NewGCSBucket(ctx, bucket, authOpt, otherOpts...)
+	var b, err = NewGCSBucket(ctx, bucket, authOpt, otherOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func NewGCSSingleRequestBucket(ctx context.Context, bucket string, authOpt optio
 }
 
 func (b *GCSBucket) newObjectWriter(ctx context.Context, key string) *storage.Writer {
-	w := b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
+	var w = b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
 	if b.singleRequest {
 		// A ChunkSize of 0 buffers nothing and sends the object in one request.
 		w.ChunkSize = 0
@@ -61,7 +61,7 @@ func (b *GCSBucket) newObjectWriter(ctx context.Context, key string) *storage.Wr
 }
 
 func (b *GCSBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
-	r, err := b.client.Bucket(b.bucket).Object(key).NewReader(ctx)
+	var r, err = b.client.Bucket(b.bucket).Object(key).NewReader(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +74,8 @@ func (b *GCSBucket) NewWriter(ctx context.Context, key string, opts ...WriterOpt
 }
 
 func (b *GCSBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-	cfg := getWriterConfig(opts)
-	w := b.newObjectWriter(ctx, key)
+	var cfg = getWriterConfig(opts)
+	var w = b.newObjectWriter(ctx, key)
 	w.Metadata = cfg.metadata
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("copying r to w: %w", err)
@@ -92,12 +92,12 @@ func (b *GCSBucket) URI(key string) string {
 }
 
 func (b *GCSBucket) Delete(ctx context.Context, uris []string) error {
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(5)
 
 	for _, uri := range uris {
-		trimmed := strings.TrimPrefix(uri, "gs://")
-		bucket, key, ok := strings.Cut(trimmed, "/")
+		var trimmed = strings.TrimPrefix(uri, "gs://")
+		var bucket, key, ok = strings.Cut(trimmed, "/")
 		if !ok {
 			return fmt.Errorf("invalid uri %q", uri)
 		}
@@ -118,12 +118,12 @@ func (b *GCSBucket) Delete(ctx context.Context, uris []string) error {
 }
 
 func (b *GCSBucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, error] {
-	input := &storage.Query{Prefix: query.Prefix}
-	iter := b.client.Bucket(b.bucket).Objects(ctx, input)
+	var input = &storage.Query{Prefix: query.Prefix}
+	var iter = b.client.Bucket(b.bucket).Objects(ctx, input)
 
 	return func(yield func(ObjectInfo, error) bool) {
 		for {
-			obj, err := iter.Next()
+			var obj, err = iter.Next()
 			if err == iterator.Done {
 				return
 			} else if err != nil {
@@ -146,11 +146,11 @@ func (b *GCSBucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo,
 }
 
 func (b *GCSBucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsConfig) error {
-	bucketHandle := b.client.Bucket(b.bucket)
+	var bucketHandle = b.client.Bucket(b.bucket)
 
-	checkReadOnlyFn := func(key string) error {
+	var checkReadOnlyFn = func(key string) error {
 		var apiErr *googleapi.Error
-		_, err := bucketHandle.Object(key).Attrs(ctx)
+		var _, err = bucketHandle.Object(key).Attrs(ctx)
 		if !errors.As(err, &apiErr) || apiErr.Code != 404 {
 			return err
 		}
@@ -158,7 +158,7 @@ func (b *GCSBucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsCo
 		return nil
 	}
 
-	handleErr := func(err *googleapi.Error) error {
+	var handleErr = func(err *googleapi.Error) error {
 		if err.Code == http.StatusNotFound {
 			return permissionsErrorNoSuchBucket
 		} else if err.Code == http.StatusForbidden {

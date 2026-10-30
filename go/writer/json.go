@@ -65,13 +65,13 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 		o(&cfg)
 	}
 
-	jw := &JsonWriter{
+	var jw = &JsonWriter{
 		cwc:    &countingWriteCloser{w: w},
 		fields: fields,
 	}
 
 	if !cfg.disableCompression {
-		gz, err := pgzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
+		var gz, err = pgzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
@@ -138,7 +138,7 @@ func (w *JsonWriter) Write(vals []any) (err error) {
 func (w *JsonWriter) compactLineBreaks(vals []any) ([]any, error) {
 	var out, copied = vals, false
 	for i, v := range vals {
-		raw, ok := v.(stdjson.RawMessage)
+		var raw, ok = v.(stdjson.RawMessage)
 		if !ok || raw == nil {
 			continue
 		} else if len(raw) == 0 {

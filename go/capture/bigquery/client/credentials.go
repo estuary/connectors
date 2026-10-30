@@ -31,7 +31,7 @@ type Credentials struct {
 }
 
 func (Credentials) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Credentials JSON", CredentialsJSONConfig{}, string(CredentialsJSON)),
 	}
 	subSchemas = append(subSchemas,

@@ -64,7 +64,7 @@ func (t *SshTunnel) Start() error {
 		"local-port":   t.Config.LocalPort,
 	}).Info("starting network-tunnel")
 
-	logLevel := log.GetLevel().String()
+	var logLevel = log.GetLevel().String()
 	if logLevel == "warning" {
 		// Adapt the logrus level to a compatible `env_filter` level of the
 		// network-tunnel `tracing_subscriber`.

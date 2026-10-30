@@ -50,8 +50,8 @@ func New(baseYAML string) (*Capture, error) {
 	// Find the run root directory, either from environment variable or via git
 	var runRoot = os.Getenv("BLACKBOX_RUN_ROOT")
 	if runRoot == "" {
-		cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-		output, err := cmd.Output()
+		var cmd = exec.Command("git", "rev-parse", "--show-toplevel")
+		var output, err = cmd.Output()
 		if err != nil {
 			return nil, fmt.Errorf("finding repository root (set BLACKBOX_RUN_ROOT to override): %w", err)
 		}
@@ -61,7 +61,7 @@ func New(baseYAML string) (*Capture, error) {
 	// Read the base YAML file. Since YAML is a superset of JSON it should be possible to
 	// use a `flow.json` here as well, but we translate the file to JSON so that it's a
 	// tiny bit simpler to do programmatic manipulations of the catalog later on.
-	yamlCatalog, err := os.ReadFile(baseYAML)
+	var yamlCatalog, err = os.ReadFile(baseYAML)
 	if err != nil {
 		return nil, fmt.Errorf("reading base YAML %q: %w", baseYAML, err)
 	}
@@ -102,14 +102,14 @@ func (fc *flowctlCmd) Wait() error {
 // Returns a flowctlCmd whose Stdout must be consumed before calling Wait().
 // When the context is cancelled, the command process will be killed.
 func (c *Capture) startFlowctl(ctx context.Context, args ...string) (*flowctlCmd, error) {
-	cmd := exec.CommandContext(ctx, "flowctl", append([]string{"--profile=testing"}, args...)...)
+	var cmd = exec.CommandContext(ctx, "flowctl", append([]string{"--profile=testing"}, args...)...)
 	cmd.Dir = c.runRoot
 	cmd.Env = append(os.Environ(), "NO_COLOR=1", "LOG_FORMAT=json")
 	for name, value := range c.Env {
 		cmd.Env = append(cmd.Env, name+"="+value)
 	}
 
-	stdout, err := cmd.StdoutPipe()
+	var stdout, err = cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("creating stdout pipe: %w", err)
 	}
@@ -200,12 +200,12 @@ func withLockstepTransactions(catalog json.RawMessage) (json.RawMessage, error) 
 	if err := json.Unmarshal(catalog, &parsed); err != nil {
 		return nil, fmt.Errorf("parsing catalog: %w", err)
 	}
-	captures, ok := parsed["captures"].(map[string]any)
+	var captures, ok = parsed["captures"].(map[string]any)
 	if !ok {
 		return catalog, nil // No captures to pin, so nothing to do.
 	}
 	for name, spec := range captures {
-		capture, ok := spec.(map[string]any)
+		var capture, ok = spec.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -218,7 +218,7 @@ func withLockstepTransactions(catalog json.RawMessage) (json.RawMessage, error) 
 		shards["maxTxnDuration"] = "1ns"
 		captures[name] = capture
 	}
-	result, err := json.Marshal(parsed)
+	var result, err = json.Marshal(parsed)
 	if err != nil {
 		return nil, fmt.Errorf("encoding catalog: %w", err)
 	}
@@ -226,7 +226,7 @@ func withLockstepTransactions(catalog json.RawMessage) (json.RawMessage, error) 
 }
 
 func (c *Capture) Spec() (json.RawMessage, error) {
-	path, tempdir, err := c.writeCatalog()
+	var path, tempdir, err = c.writeCatalog()
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (c *Capture) Spec() (json.RawMessage, error) {
 // DiscoverRaw performs discovery with the `--emit-raw` flag for snapshotting the results.
 // It does not modify the catalog bindings, use `Discover()` for that.
 func (c *Capture) DiscoverRaw() ([]json.RawMessage, error) {
-	path, tempdir, err := c.writeCatalog()
+	var path, tempdir, err = c.writeCatalog()
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func (c *Capture) DiscoverRaw() ([]json.RawMessage, error) {
 
 // Discover performs discovery and updates c.Catalog with the resulting bindings.
 func (c *Capture) Discover() (json.RawMessage, error) {
-	path, tempdir, err := c.writeCatalog()
+	var path, tempdir, err = c.writeCatalog()
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +395,7 @@ func (c *Capture) Run(sessions int) ([]byte, error) {
 // the capture process will be killed. This is useful for tests that need to run a
 // capture indefinitely and then stop it programmatically.
 func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, error) {
-	path, tempdir, err := c.writeCatalog()
+	var path, tempdir, err = c.writeCatalog()
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +404,7 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 	// The run is bounded here rather than with preview-next's --timeout, which
 	// stops the capture gracefully: flowctl would exit zero having dropped
 	// whatever it hadn't reached.
-	runCtx, cancelRun := context.WithTimeout(ctx, c.timeout())
+	var runCtx, cancelRun = context.WithTimeout(ctx, c.timeout())
 	defer cancelRun()
 
 	fc, err := c.startFlowctl(runCtx, "raw", "preview-next",
@@ -593,7 +593,7 @@ func (c *Capture) DeleteCollection(filter string) error {
 // EditCheckpoint modifies a property of the checkpoint state.
 // The path is specified in sjson dot notation, e.g. "bindingStateV1.test%2Ffoobar.scanned"
 func (c *Capture) EditCheckpoint(path string, val any) error {
-	result, err := sjson.SetBytes(c.Checkpoint, path, val)
+	var result, err = sjson.SetBytes(c.Checkpoint, path, val)
 	if err != nil {
 		return err
 	}
@@ -618,7 +618,7 @@ type TranscriptCapture struct {
 
 // NewWithTranscript creates a new TranscriptCapture from a base YAML catalog file.
 func NewWithTranscript(baseYAML string) (*TranscriptCapture, error) {
-	capture, err := New(baseYAML)
+	var capture, err = New(baseYAML)
 	if err != nil {
 		return nil, err
 	}
@@ -649,7 +649,7 @@ func (tc *TranscriptCapture) prettyPrintJSON(data json.RawMessage) {
 
 func (tc *TranscriptCapture) Spec(description string) json.RawMessage {
 	fmt.Fprintf(tc.Transcript, "=== Spec: %s ===\n", description)
-	result, err := tc.Capture.Spec()
+	var result, err = tc.Capture.Spec()
 	if err != nil {
 		fmt.Fprintf(tc.Transcript, "error: %v\n\n", err)
 		return nil
@@ -662,7 +662,7 @@ func (tc *TranscriptCapture) Spec(description string) json.RawMessage {
 // discovered collections to the transcript.
 func (tc *TranscriptCapture) Discover(description string) json.RawMessage {
 	fmt.Fprintf(tc.Transcript, "=== Discover: %s ===\n", description)
-	result, err := tc.Capture.Discover()
+	var result, err = tc.Capture.Discover()
 	if err != nil {
 		fmt.Fprintf(tc.Transcript, "error: %v\n\n", err)
 		return nil
@@ -689,7 +689,7 @@ func (tc *TranscriptCapture) Discover(description string) json.RawMessage {
 // It also performs discovery for its side-effects on the catalog.
 func (tc *TranscriptCapture) DiscoverFull(description string) []json.RawMessage {
 	fmt.Fprintf(tc.Transcript, "=== Discover: %s ===\n", description)
-	bindings, err := tc.Capture.DiscoverRaw()
+	var bindings, err = tc.Capture.DiscoverRaw()
 	if err != nil {
 		fmt.Fprintf(tc.Transcript, "error: %v\n\n", err)
 		return nil
@@ -714,7 +714,7 @@ func (tc *TranscriptCapture) DiscoverFull(description string) []json.RawMessage 
 
 func (tc *TranscriptCapture) Run(description string, sessions int) []byte {
 	fmt.Fprintf(tc.Transcript, "=== Run: %s ===\n", description)
-	result, err := tc.Capture.Run(sessions)
+	var result, err = tc.Capture.Run(sessions)
 	if err != nil {
 		fmt.Fprintf(tc.Transcript, "error: %v\n\n", err)
 		return nil
@@ -732,8 +732,8 @@ func (tc *TranscriptCapture) Run(description string, sessions int) []byte {
 	// Sort lines by table name (the prefix before the first comma).
 	// Use stable sort to preserve document ordering within each table.
 	sort.SliceStable(lines, func(i, j int) bool {
-		iPre, _, _ := bytes.Cut(lines[i], []byte(","))
-		jPre, _, _ := bytes.Cut(lines[j], []byte(","))
+		var iPre, _, _ = bytes.Cut(lines[i], []byte(","))
+		var jPre, _, _ = bytes.Cut(lines[j], []byte(","))
 		return bytes.Compare(iPre, jPre) < 0
 	})
 

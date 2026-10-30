@@ -34,7 +34,7 @@ type S3Bucket struct {
 // s3.amazonaws.com, set the region in one of the clientOpts if it is required
 // by the alternate endpoint.
 func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvider, clientOpts ...func(*s3.Options)) (*S3Bucket, error) {
-	configOpts := []func(*config.LoadOptions) error{
+	var configOpts = []func(*config.LoadOptions) error{
 		config.WithCredentialsProvider(creds),
 	}
 
@@ -47,7 +47,7 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 		opt(&tmp)
 	}
 	if tmp.Region == "" {
-		region, err := getBucketRegion(bucket)
+		var region, err = getBucketRegion(bucket)
 		if err != nil {
 			return nil, fmt.Errorf("could not determine bucket region: %w", err)
 		}
@@ -56,12 +56,12 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 		})
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx, configOpts...)
+	var cfg, err = config.LoadDefaultConfig(ctx, configOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(cfg, clientOpts...)
+	var s3Client = s3.NewFromConfig(cfg, clientOpts...)
 
 	return &S3Bucket{
 		client:   s3Client,
@@ -93,7 +93,7 @@ func newS3HTTPClient() *awshttp.BuildableClient {
 }
 
 func (b *S3Bucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
-	r, err := b.client.GetObject(ctx, &s3.GetObjectInput{
+	var r, err = b.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(b.bucket),
 		Key:    aws.String(key),
 	})
@@ -109,8 +109,8 @@ func (b *S3Bucket) NewWriter(ctx context.Context, key string, opts ...WriterOpti
 }
 
 func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-	cfg := getWriterConfig(opts)
-	input := &s3.PutObjectInput{
+	var cfg = getWriterConfig(opts)
+	var input = &s3.PutObjectInput{
 		Bucket:   aws.String(b.bucket),
 		Key:      aws.String(key),
 		Body:     r,
@@ -118,7 +118,7 @@ func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...
 	}
 
 	if !b.singleRequest {
-		out, err := b.uploader.Upload(ctx, input)
+		var out, err = b.uploader.Upload(ctx, input)
 		if err != nil {
 			return err
 		}
@@ -126,7 +126,7 @@ func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...
 		return nil
 	}
 
-	body, err := readSeeker(r)
+	var body, err = readSeeker(r)
 	if err != nil {
 		return err
 	}
@@ -144,12 +144,12 @@ func (b *S3Bucket) URI(key string) string {
 }
 
 func (b *S3Bucket) Delete(ctx context.Context, uris []string) error {
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(5)
 
 	for _, uri := range uris {
-		trimmed := strings.TrimPrefix(uri, "s3://")
-		bucket, key, ok := strings.Cut(trimmed, "/")
+		var trimmed = strings.TrimPrefix(uri, "s3://")
+		var bucket, key, ok = strings.Cut(trimmed, "/")
 		if !ok {
 			return fmt.Errorf("invalid uri %q", uri)
 		}
@@ -169,17 +169,17 @@ func (b *S3Bucket) Delete(ctx context.Context, uris []string) error {
 }
 
 func (b *S3Bucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, error] {
-	input := &s3.ListObjectsV2Input{
+	var input = &s3.ListObjectsV2Input{
 		Bucket: aws.String(b.bucket),
 	}
 	if query.Prefix != "" {
 		input.Prefix = aws.String(query.Prefix)
 	}
-	paginator := s3.NewListObjectsV2Paginator(b.client, input)
+	var paginator = s3.NewListObjectsV2Paginator(b.client, input)
 
 	return func(yield func(ObjectInfo, error) bool) {
 		for paginator.HasMorePages() {
-			page, err := paginator.NextPage(ctx)
+			var page, err = paginator.NextPage(ctx)
 			if err != nil {
 				yield(ObjectInfo{}, err)
 				return
@@ -197,7 +197,7 @@ func (b *S3Bucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, 
 }
 
 func (b *S3Bucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsConfig) error {
-	checkReadOnlyFn := func(key string) error {
+	var checkReadOnlyFn = func(key string) error {
 		var awsErr *smithyhttp.ResponseError
 		if _, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &b.bucket, Key: aws.String(key)}); err != nil {
 			if !errors.As(err, &awsErr) || awsErr.Response.Response.StatusCode != http.StatusNotFound {
@@ -208,7 +208,7 @@ func (b *S3Bucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsCon
 		return nil
 	}
 
-	handleErr := func(err *smithyhttp.ResponseError) error {
+	var handleErr = func(err *smithyhttp.ResponseError) error {
 		if err.Response.Response.StatusCode == http.StatusNotFound {
 			return permissionsErrorNoSuchBucket
 		} else if err.Response.Response.StatusCode == http.StatusForbidden {
@@ -225,7 +225,7 @@ func getBucketRegion(bucket string) (string, error) {
 	// It's apparently impossible to get the region of a bucket if you don't
 	// already know it using the AWS Go SDKs, but this silly mechanism actually
 	// seems to work 100% of the time.
-	resp, err := http.DefaultClient.Head(fmt.Sprintf("https://%s.s3.amazonaws.com", bucket))
+	var resp, err = http.DefaultClient.Head(fmt.Sprintf("https://%s.s3.amazonaws.com", bucket))
 	if resp != nil && resp.Header != nil {
 		if bucketRegion := resp.Header.Get("x-amz-bucket-region"); bucketRegion != "" {
 			return bucketRegion, nil

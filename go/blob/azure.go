@@ -58,7 +58,7 @@ type AzureBlobBucket struct {
 // AzureConfigOption must be provided to specify authentication; either storage
 // account key or SAS token.
 func NewAzureBlobBucket(ctx context.Context, container string, accountName string, authOpt AzureConfigOption, otherOpts ...AzureConfigOption) (*AzureBlobBucket, error) {
-	cfg := azureBlobConfig{endpoint: defaultAzureEndpoint}
+	var cfg = azureBlobConfig{endpoint: defaultAzureEndpoint}
 	for _, opt := range append(otherOpts, authOpt) {
 		opt(&cfg)
 	}
@@ -66,7 +66,7 @@ func NewAzureBlobBucket(ctx context.Context, container string, accountName strin
 		return nil, fmt.Errorf("cannot specify both sas token and storage account key")
 	}
 
-	serviceUrl, err := url.Parse(fmt.Sprintf("https://%s.%s/", accountName, cfg.endpoint))
+	var serviceUrl, err = url.Parse(fmt.Sprintf("https://%s.%s/", accountName, cfg.endpoint))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse service url: %w", err)
 	}
@@ -100,7 +100,7 @@ func NewAzureBlobBucket(ctx context.Context, container string, accountName strin
 // MD5 of its bytes. At least one AzureConfigOption must be provided to specify
 // authentication; either storage account key or SAS token.
 func NewAzureSingleRequestBucket(ctx context.Context, container string, accountName string, authOpt AzureConfigOption, otherOpts ...AzureConfigOption) (*AzureBlobBucket, error) {
-	b, err := NewAzureBlobBucket(ctx, container, accountName, authOpt, otherOpts...)
+	var b, err = NewAzureBlobBucket(ctx, container, accountName, authOpt, otherOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func NewAzureSingleRequestBucket(ctx context.Context, container string, accountN
 }
 
 func (b *AzureBlobBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
-	r, err := b.client.DownloadStream(ctx, b.container, key, nil)
+	var r, err = b.client.DownloadStream(ctx, b.container, key, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (b *AzureBlobBucket) NewWriter(ctx context.Context, key string, opts ...Wri
 }
 
 func (b *AzureBlobBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-	cfg := getWriterConfig(opts)
+	var cfg = getWriterConfig(opts)
 
 	var meta map[string]*string
 	if cfg.metadata != nil {
@@ -133,7 +133,7 @@ func (b *AzureBlobBucket) Upload(ctx context.Context, key string, r io.Reader, o
 	}
 
 	if !b.singleRequest {
-		resp, err := b.client.UploadStream(ctx, b.container, key, r, &azblob.UploadStreamOptions{Metadata: meta})
+		var resp, err = b.client.UploadStream(ctx, b.container, key, r, &azblob.UploadStreamOptions{Metadata: meta})
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (b *AzureBlobBucket) Upload(ctx context.Context, key string, r io.Reader, o
 		return nil
 	}
 
-	body, err := readSeeker(r)
+	var body, err = readSeeker(r)
 	if err != nil {
 		return err
 	}
@@ -166,12 +166,12 @@ func (b *AzureBlobBucket) URI(key string) string {
 }
 
 func (b *AzureBlobBucket) Delete(ctx context.Context, uris []string) error {
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(5)
 
 	for _, uri := range uris {
-		trimmed := strings.TrimPrefix(strings.TrimPrefix(uri, b.client.URL()), "/")
-		container, blobName, ok := strings.Cut(trimmed, "/")
+		var trimmed = strings.TrimPrefix(strings.TrimPrefix(uri, b.client.URL()), "/")
+		var container, blobName, ok = strings.Cut(trimmed, "/")
 		if !ok {
 			return fmt.Errorf("invalid uri %q", uri)
 		}
@@ -187,17 +187,17 @@ func (b *AzureBlobBucket) Delete(ctx context.Context, uris []string) error {
 }
 
 func (b *AzureBlobBucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, error] {
-	input := &azblob.ListBlobsFlatOptions{
+	var input = &azblob.ListBlobsFlatOptions{
 		Include: azblob.ListBlobsInclude{Metadata: true},
 	}
 	if query.Prefix != "" {
 		input.Prefix = &query.Prefix
 	}
-	pager := b.client.NewListBlobsFlatPager(b.container, input)
+	var pager = b.client.NewListBlobsFlatPager(b.container, input)
 
 	return func(yield func(ObjectInfo, error) bool) {
 		for pager.More() {
-			page, err := pager.NextPage(ctx)
+			var page, err = pager.NextPage(ctx)
 			if err != nil {
 				yield(ObjectInfo{}, err)
 				return
@@ -221,8 +221,8 @@ func (b *AzureBlobBucket) List(ctx context.Context, query Query) iter.Seq2[Objec
 }
 
 func (b *AzureBlobBucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsConfig) error {
-	checkReadOnlyFn := func(key string) error {
-		_, err := b.client.DownloadBuffer(ctx, b.container, key, []byte{}, nil)
+	var checkReadOnlyFn = func(key string) error {
+		var _, err = b.client.DownloadBuffer(ctx, b.container, key, []byte{}, nil)
 		if !bloberror.HasCode(err, bloberror.BlobNotFound) {
 			return err
 		}
@@ -230,7 +230,7 @@ func (b *AzureBlobBucket) CheckPermissions(ctx context.Context, cfg CheckPermiss
 		return nil
 	}
 
-	handleErr := func(err error) error {
+	var handleErr = func(err error) error {
 		if bloberror.HasCode(err, bloberror.ContainerNotFound) {
 			return errors.New("no such container") // azure calls them containers, not buckets
 		} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {

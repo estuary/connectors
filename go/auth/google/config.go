@@ -64,18 +64,18 @@ func (c *CredentialConfig) GoogleCredentials(ctx context.Context, scopes ...stri
 		return google.CredentialsFromJSON(ctx, []byte(c.CredentialsJSON), scopes...)
 	}
 
-	oauthConfig := &oauth2.Config{
+	var oauthConfig = &oauth2.Config{
 		ClientID:     c.ClientID,
 		ClientSecret: c.ClientSecret,
 		Endpoint:     google.Endpoint,
 		Scopes:       scopes,
 	}
 
-	token := &oauth2.Token{
+	var token = &oauth2.Token{
 		RefreshToken: c.RefreshToken,
 		Expiry:       time.Now(), // Require a new access token to be obtained.
 	}
-	tokenSource := oauthConfig.TokenSource(ctx, token)
+	var tokenSource = oauthConfig.TokenSource(ctx, token)
 
 	return &google.Credentials{
 		TokenSource: tokenSource,
@@ -86,7 +86,7 @@ func (c *CredentialConfig) GoogleCredentials(ctx context.Context, scopes ...stri
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth connectors.
 func (CredentialConfig) JSONSchema() *jsonschema.Schema {
-	serviceAccountProps := orderedmap.New[string, *jsonschema.Schema]()
+	var serviceAccountProps = orderedmap.New[string, *jsonschema.Schema]()
 	serviceAccountProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: SERVICE_AUTH_TYPE,
@@ -105,7 +105,7 @@ func (CredentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
-	oauthProps := orderedmap.New[string, *jsonschema.Schema]()
+	var oauthProps = orderedmap.New[string, *jsonschema.Schema]()
 	oauthProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: CLIENT_AUTH_TYPE,

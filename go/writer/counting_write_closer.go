@@ -14,7 +14,7 @@ type countingWriteCloser struct {
 }
 
 func (c *countingWriteCloser) Write(p []byte) (int, error) {
-	n, err := c.w.Write(p)
+	var n, err = c.w.Write(p)
 	if err != nil {
 		return 0, fmt.Errorf("countingWriteCloser writing to w: %w", err)
 	}

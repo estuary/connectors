@@ -16,7 +16,7 @@ func ptrTo[T any](v T) *T { return &v }
 func TestMakeNode(t *testing.T) {
 	const fid = int32(42)
 
-	tests := []struct {
+	var tests = []struct {
 		name         string
 		elem         ParquetSchemaElement
 		wantPhysical parquet.Type
@@ -54,7 +54,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.ByteArray,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				_, ok := lt.(schema.StringLogicalType)
+				var _, ok = lt.(schema.StringLogicalType)
 				require.True(t, ok, "expected StringLogicalType, got %T", lt)
 			},
 		},
@@ -64,7 +64,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.ByteArray,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				_, ok := lt.(schema.JSONLogicalType)
+				var _, ok = lt.(schema.JSONLogicalType)
 				require.True(t, ok, "expected JSONLogicalType, got %T", lt)
 			},
 		},
@@ -74,7 +74,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.Int32,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				_, ok := lt.(schema.DateLogicalType)
+				var _, ok = lt.(schema.DateLogicalType)
 				require.True(t, ok, "expected DateLogicalType, got %T", lt)
 			},
 		},
@@ -84,7 +84,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.Int64,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				tl, ok := lt.(schema.TimeLogicalType)
+				var tl, ok = lt.(schema.TimeLogicalType)
 				require.True(t, ok, "expected TimeLogicalType, got %T", lt)
 				require.True(t, tl.IsAdjustedToUTC())
 				require.Equal(t, schema.TimeUnitMicros, tl.TimeUnit())
@@ -96,7 +96,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.Int64,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				tl, ok := lt.(schema.TimestampLogicalType)
+				var tl, ok = lt.(schema.TimestampLogicalType)
 				require.True(t, ok, "expected TimestampLogicalType, got %T", lt)
 				require.True(t, tl.IsAdjustedToUTC())
 				require.Equal(t, schema.TimeUnitMicros, tl.TimeUnit())
@@ -108,7 +108,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.Int64,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				tl, ok := lt.(schema.TimestampLogicalType)
+				var tl, ok = lt.(schema.TimestampLogicalType)
 				require.True(t, ok, "expected TimestampLogicalType, got %T", lt)
 				require.True(t, tl.IsAdjustedToUTC())
 				require.Equal(t, schema.TimeUnitNanos, tl.TimeUnit())
@@ -120,7 +120,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.FixedLenByteArray,
 			wantTypeLen:  16,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				_, ok := lt.(schema.UUIDLogicalType)
+				var _, ok = lt.(schema.UUIDLogicalType)
 				require.True(t, ok, "expected UUIDLogicalType, got %T", lt)
 			},
 		},
@@ -130,7 +130,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.FixedLenByteArray,
 			wantTypeLen:  16,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				dl, ok := lt.(schema.DecimalLogicalType)
+				var dl, ok = lt.(schema.DecimalLogicalType)
 				require.True(t, ok, "expected DecimalLogicalType, got %T", lt)
 				require.EqualValues(t, 38, dl.Precision())
 				require.EqualValues(t, 5, dl.Scale())
@@ -142,7 +142,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.FixedLenByteArray,
 			wantTypeLen:  12,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				_, ok := lt.(schema.IntervalLogicalType)
+				var _, ok = lt.(schema.IntervalLogicalType)
 				require.True(t, ok, "expected IntervalLogicalType, got %T", lt)
 			},
 		},
@@ -152,7 +152,7 @@ func TestMakeNode(t *testing.T) {
 			wantPhysical: parquet.Types.Undefined,
 			wantTypeLen:  -1,
 			checkLogical: func(t *testing.T, lt schema.LogicalType) {
-				_, ok := lt.(schema.UnknownLogicalType)
+				var _, ok = lt.(schema.UnknownLogicalType)
 				require.True(t, ok, "expected UnknownLogicalType, got %T", lt)
 			},
 		},
@@ -160,18 +160,18 @@ func TestMakeNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			node := makeNode(tt.elem)
+			var node = makeNode(tt.elem)
 
 			require.Equal(t, tt.elem.Name, node.Name())
 			require.Equal(t, fid, node.FieldID(), "FieldId must be propagated to the parquet node")
 
-			wantRep := parquet.Repetitions.Optional
+			var wantRep = parquet.Repetitions.Optional
 			if tt.elem.Required {
 				wantRep = parquet.Repetitions.Required
 			}
 			require.Equal(t, wantRep, node.RepetitionType())
 
-			pn, ok := node.(*schema.PrimitiveNode)
+			var pn, ok = node.(*schema.PrimitiveNode)
 			require.True(t, ok, "expected *schema.PrimitiveNode, got %T", node)
 			require.Equal(t, tt.wantPhysical, pn.PhysicalType())
 
@@ -191,25 +191,25 @@ func TestMakeNodeVariant(t *testing.T) {
 
 	for _, required := range []bool{true, false} {
 		t.Run(fmt.Sprintf("required=%v", required), func(t *testing.T) {
-			node := makeNode(ParquetSchemaElement{Name: "variantField", DataType: LogicalTypeVariant, Required: required, FieldId: ptrTo(fid)})
+			var node = makeNode(ParquetSchemaElement{Name: "variantField", DataType: LogicalTypeVariant, Required: required, FieldId: ptrTo(fid)})
 
 			require.Equal(t, "variantField", node.Name())
 			require.Equal(t, fid, node.FieldID(), "FieldId must be propagated to the variant group node")
 
-			wantRep := parquet.Repetitions.Optional
+			var wantRep = parquet.Repetitions.Optional
 			if required {
 				wantRep = parquet.Repetitions.Required
 			}
 			require.Equal(t, wantRep, node.RepetitionType())
 
-			gn, ok := node.(*schema.GroupNode)
+			var gn, ok = node.(*schema.GroupNode)
 			require.True(t, ok, "expected *schema.GroupNode, got %T", node)
 			_, ok = gn.LogicalType().(schema.VariantLogicalType)
 			require.True(t, ok, "expected VariantLogicalType, got %T", gn.LogicalType())
 
 			require.Equal(t, 2, gn.NumFields())
 			for idx, name := range []string{"metadata", "value"} {
-				leaf, ok := gn.Field(idx).(*schema.PrimitiveNode)
+				var leaf, ok = gn.Field(idx).(*schema.PrimitiveNode)
 				require.True(t, ok, "expected *schema.PrimitiveNode for %q, got %T", name, gn.Field(idx))
 				require.Equal(t, name, leaf.Name())
 				require.Equal(t, parquet.Repetitions.Required, leaf.RepetitionType())
@@ -223,7 +223,7 @@ func TestMakeNodeVariant(t *testing.T) {
 func TestMakeNodeNilFieldId(t *testing.T) {
 	// Every supported data type must produce a node with FieldID() == -1
 	// when the schema element does not specify a FieldId.
-	dataTypes := []ParquetDataType{
+	var dataTypes = []ParquetDataType{
 		PrimitiveTypeInteger,
 		PrimitiveTypeNumber,
 		PrimitiveTypeBoolean,
@@ -242,7 +242,7 @@ func TestMakeNodeNilFieldId(t *testing.T) {
 	}
 	for _, dt := range dataTypes {
 		t.Run(fmt.Sprintf("dataType=%d", dt), func(t *testing.T) {
-			node := makeNode(ParquetSchemaElement{Name: "f", DataType: dt, Required: true, Scale: 0})
+			var node = makeNode(ParquetSchemaElement{Name: "f", DataType: dt, Required: true, Scale: 0})
 			require.EqualValues(t, -1, node.FieldID())
 		})
 	}
@@ -255,7 +255,7 @@ func TestMakeNodeUnknownDataTypePanics(t *testing.T) {
 }
 
 func TestProjectionToParquetSchemaElement(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name         string
 		projection   pf.Projection
 		castToString bool
@@ -814,7 +814,7 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ProjectionToParquetSchemaElement(tt.projection, tt.castToString, tt.opts...)
+			var got = ProjectionToParquetSchemaElement(tt.projection, tt.castToString, tt.opts...)
 			require.Equal(t, tt.projection.Field, got.Name)
 			require.Equal(t, tt.wantType, got.DataType)
 			require.Equal(t, tt.wantRequired, got.Required)

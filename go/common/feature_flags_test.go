@@ -15,7 +15,7 @@ var futureFlag = FlagEnabledForTasksCreatedAfter("2099-01-01")
 // mustCreatedAt is a test helper for dates known to be well-formed.
 func mustCreatedAt(t *testing.T, date string) CreatedAt {
 	t.Helper()
-	createdAt, err := ParseCreatedAt(date)
+	var createdAt, err = ParseCreatedAt(date)
 	require.NoError(t, err)
 	return createdAt
 }
@@ -54,14 +54,14 @@ func TestFlagDefaultResolve(t *testing.T) {
 
 func TestParseCreatedAt(t *testing.T) {
 	t.Run("a well-formed date is carried through", func(t *testing.T) {
-		createdAt, err := ParseCreatedAt("2026-06-10")
+		var createdAt, err = ParseCreatedAt("2026-06-10")
 		require.NoError(t, err)
 		require.False(t, createdAt.IsBrandNew())
 		require.Equal(t, "2026-06-10", createdAt.String())
 	})
 
 	t.Run("an empty date is a brand new task, not an error", func(t *testing.T) {
-		createdAt, err := ParseCreatedAt("")
+		var createdAt, err = ParseCreatedAt("")
 		require.NoError(t, err)
 		require.True(t, createdAt.IsBrandNew())
 		require.Equal(t, CreatedAt{}, createdAt)
@@ -78,7 +78,7 @@ func TestParseCreatedAt(t *testing.T) {
 			"2026-06-10T00:00:00Z", // a timestamp: specs record only a date
 			"2026-13-01",           // no such month
 		} {
-			_, err := ParseCreatedAt(date)
+			var _, err = ParseCreatedAt(date)
 			require.ErrorContains(t, err, date)
 			require.ErrorContains(t, err, "task creation date")
 		}
@@ -104,7 +104,7 @@ var resolveDefaults = map[string]FlagDefault{
 }
 
 func TestPendingFlagPins(t *testing.T) {
-	defaults := map[string]FlagDefault{
+	var defaults = map[string]FlagDefault{
 		"always_on":   FlagEnabled,
 		"always_off":  FlagDisabled,
 		"gated":       gatedFlag,
@@ -137,12 +137,12 @@ func TestPendingFlagPins(t *testing.T) {
 
 	t.Run("pinned value always matches what Resolve produces", func(t *testing.T) {
 		for _, createdAt := range []string{"", "2026-01-01", "2026-06-09", "2026-06-10", "2026-07-01", "2026-09-01"} {
-			pins := PendingFlagPins("", defaults, mustCreatedAt(t, createdAt))
-			resolved := ResolveFlags("", defaults, mustCreatedAt(t, createdAt))
+			var pins = PendingFlagPins("", defaults, mustCreatedAt(t, createdAt))
+			var resolved = ResolveFlags("", defaults, mustCreatedAt(t, createdAt))
 			for flag, pinned := range pins {
 				require.Equal(t, resolved[flag], pinned, "flag %s at %q", flag, createdAt)
 				// And re-resolving with the pin applied is a no-op.
-				withPin := ResolveFlags(PinnedFlagsString("", pins), defaults, mustCreatedAt(t, createdAt))
+				var withPin = ResolveFlags(PinnedFlagsString("", pins), defaults, mustCreatedAt(t, createdAt))
 				require.Equal(t, resolved[flag], withPin[flag], "flag %s at %q after pinning", flag, createdAt)
 			}
 		}
@@ -172,7 +172,7 @@ func TestResolveFlags(t *testing.T) {
 		{"unrelated user flags don't disturb the cutoff", "other_flag", "2026-01-01", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			flags := ResolveFlags(tt.raw, resolveDefaults, mustCreatedAt(t, tt.createdAt))
+			var flags = ResolveFlags(tt.raw, resolveDefaults, mustCreatedAt(t, tt.createdAt))
 			require.Equal(t, tt.wantGated, flags["gated"])
 			require.True(t, flags["always_on"])
 			require.False(t, flags["always_off"])

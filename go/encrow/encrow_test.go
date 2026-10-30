@@ -124,7 +124,7 @@ func TestOmitField(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := shape.Encode(nil, tc.values)
+			var got, err = shape.Encode(nil, tc.values)
 			require.NoError(t, err)
 			require.Equal(t, tc.want, string(got))
 		})
@@ -139,7 +139,7 @@ func checkEquivalence(t *testing.T, names []string, values [][]any) {
 		for idx, val := range row {
 			fields[names[idx]] = val
 		}
-		standardBytes, err := stdjson.Marshal(fields)
+		var standardBytes, err = stdjson.Marshal(fields)
 		require.NoError(t, err)
 
 		shapeBytes, err = shape.Encode(shapeBytes[:0], row)

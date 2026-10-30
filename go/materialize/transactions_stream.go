@@ -105,22 +105,22 @@ func newTransactionsStream(
 	options MaterializeOptions,
 	be *BindingEvents,
 ) (*transactionsStream, error) {
-	s := &transactionsStream{stream: stream, ctx: ctx, be: be, dbtJobTriggerCh: make(chan struct{})}
+	var s = &transactionsStream{stream: stream, ctx: ctx, be: be, dbtJobTriggerCh: make(chan struct{})}
 
 	var loggingHandler func(transactionsEvent)
 	if options.ExtendedLogging {
-		l := newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
+		var l = newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
 		loggingHandler = l.handler()
 	} else if lvl >= log.DebugLevel {
-		l := newExtendedLogger(loggerAtLevel{lvl: log.DebugLevel}, be)
+		var l = newExtendedLogger(loggerAtLevel{lvl: log.DebugLevel}, be)
 		loggingHandler = l.handler()
 	} else {
-		l := newBasicLogger()
+		var l = newBasicLogger()
 		loggingHandler = l.handler()
 	}
 
 	if options.AckSchedule != nil {
-		sched, err := createSchedule(options.AckSchedule.Config, options.AckSchedule.Jitter)
+		var sched, err = createSchedule(options.AckSchedule.Config, options.AckSchedule.Jitter)
 		if err != nil {
 			return nil, fmt.Errorf("creating ack schedule: %w", err)
 		}
@@ -139,7 +139,7 @@ func newTransactionsStream(
 		s.handler = loggingHandler
 	}
 
-	delay := time.Duration(30 * time.Minute)
+	var delay = time.Duration(30 * time.Minute)
 	if s.dbtJobTriggerConfig != nil && s.dbtJobTriggerConfig.Interval != "" {
 		var err error
 		delay, err = time.ParseDuration(s.dbtJobTriggerConfig.Interval)
@@ -156,7 +156,7 @@ func (l *transactionsStream) dbtJobTriggerHandler(ctx context.Context, dbtRunInt
 	var lastRun time.Time
 	var nextRunScheduled atomic.Bool
 
-	runJob := func() {
+	var runJob = func() {
 		lastRun = time.Now()
 		if err := l.triggerDBTJob(); err != nil {
 			log.WithField("err", err).Error("dbt job trigger failed")
@@ -178,7 +178,7 @@ func (l *transactionsStream) dbtJobTriggerHandler(ctx context.Context, dbtRunInt
 				// away, but make sure one does eventually get run.
 				nextRunScheduled.Store(true)
 
-				nextRunTime := lastRun.Add(dbtRunInterval)
+				var nextRunTime = lastRun.Add(dbtRunInterval)
 				go func() {
 					select {
 					case <-time.After(time.Until(nextRunTime)):
@@ -283,10 +283,10 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 	// lastAckTime at a zero value means this is the recovery commit, and we
 	// never delay on the recovery commit.
 	if l.ackSchedule != nil && !l.lastAckTime.IsZero() {
-		nextAckAt := l.ackSchedule.Next(l.lastAckTime)
-		d := time.Until(nextAckAt)
+		var nextAckAt = l.ackSchedule.Next(l.lastAckTime)
+		var d = time.Until(nextAckAt)
 
-		ll := log.WithFields(log.Fields{
+		var ll = log.WithFields(log.Fields{
 			"lastAckTime":      l.lastAckTime.UTC().Truncate(time.Second).String(),
 			"nextScheduledAck": nextAckAt.UTC().Truncate(time.Second).String(),
 			"storedHistory":    l.storedHistory,
@@ -296,7 +296,7 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 		// completed and none of the transactions were large enough to suggest
 		// we are still in the midst of a backfill, the acknowledgement delay
 		// may be applicable.
-		delayBasedOnStoredHistory := len(l.storedHistory) >= storedHistorySize && !slices.ContainsFunc(l.storedHistory, isBackfillSize)
+		var delayBasedOnStoredHistory = len(l.storedHistory) >= storedHistorySize && !slices.ContainsFunc(l.storedHistory, isBackfillSize)
 
 		if !delayBasedOnStoredHistory {
 			ll.Info("not delaying commit acknowledgement based on stored history")

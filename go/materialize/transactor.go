@@ -117,12 +117,12 @@ func StateKeyFilter(stateKeys []string) func(string) bool {
 		return func(string) bool { return true }
 	}
 
-	set := make(map[string]struct{}, len(stateKeys))
+	var set = make(map[string]struct{}, len(stateKeys))
 	for _, sk := range stateKeys {
 		set[sk] = struct{}{}
 	}
 	return func(sk string) bool {
-		_, ok := set[sk]
+		var _, ok = set[sk]
 		return ok
 	}
 }
@@ -197,16 +197,16 @@ func RunTransactions(
 	open *pm.Request_Open,
 	lvl log.Level,
 ) (_err error) {
-	be := NewBindingEvents()
-	health := newHealthTracker(open)
+	var be = NewBindingEvents()
+	var health = newHealthTracker(open)
 	be.health = health
 	be.status = newStatusTracker(open)
-	stopStatus := be.status.start()
+	var stopStatus = be.status.start()
 	defer stopStatus()
 
-	openStart := time.Now()
+	var openStart = time.Now()
 	log.Info("requesting materialization Open")
-	stop := repeatAsync(func() { log.Info("materialization Open in progress") }, loggingFrequency)
+	var stop = repeatAsync(func() { log.Info("materialization Open in progress") }, loggingFrequency)
 	var transactor, opened, options, err = connector.NewTransactor(ctx, *open, be)
 	if err != nil {
 		return err
@@ -285,7 +285,7 @@ func RunTransactions(
 			return nil
 		}
 
-		ackState, err := transactor.Acknowledge(ctx, statePatches, nil)
+		var ackState, err = transactor.Acknowledge(ctx, statePatches, nil)
 		if err != nil {
 			return err
 		}

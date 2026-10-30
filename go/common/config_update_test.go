@@ -62,7 +62,7 @@ func TestSetJSONProperty(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SetJSONProperty(json.RawMessage(tt.doc), tt.path, tt.value)
+			var got, err = SetJSONProperty(json.RawMessage(tt.doc), tt.path, tt.value)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return
@@ -74,14 +74,14 @@ func TestSetJSONProperty(t *testing.T) {
 }
 
 func TestEmitConfigUpdate(t *testing.T) {
-	hook := logtest.NewGlobal()
+	var hook = logtest.NewGlobal()
 	defer hook.Reset()
 
-	config := json.RawMessage(`{"address":"db:5432","sops":{"mac":"ENC[AES256_GCM,data:yy]"}}`)
+	var config = json.RawMessage(`{"address":"db:5432","sops":{"mac":"ENC[AES256_GCM,data:yy]"}}`)
 	EmitConfigUpdate("updating config", config)
 
 	require.Len(t, hook.Entries, 1)
-	entry := hook.LastEntry()
+	var entry = hook.LastEntry()
 	require.Equal(t, log.InfoLevel, entry.Level)
 	require.Equal(t, "updating config", entry.Message)
 	require.Equal(t, "configUpdate", entry.Data["eventType"])
@@ -140,7 +140,7 @@ func TestSetSealedConfigProperty(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SetSealedConfigProperty(json.RawMessage(tt.doc), tt.path, tt.value)
+			var got, err = SetSealedConfigProperty(json.RawMessage(tt.doc), tt.path, tt.value)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return

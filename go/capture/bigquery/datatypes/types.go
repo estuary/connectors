@@ -58,7 +58,7 @@ func (ct *BasicColumnType) JSONSchema() *jsonschema.Schema {
 // name (e.g. "INT64", "STRING", "STRUCT"), or false if the type is unknown.
 // The returned value is a copy; mutating it does not affect subsequent lookups.
 func LookupType(typeName string) (BasicColumnType, bool) {
-	t, ok := databaseTypeToJSON[typeName]
+	var t, ok = databaseTypeToJSON[typeName]
 	return t, ok
 }
 

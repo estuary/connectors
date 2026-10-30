@@ -20,7 +20,7 @@ func (cfg *TunnelConfig) InUse() bool {
 }
 
 func (cfg *TunnelConfig) Start(ctx context.Context, address string, localPort string) (*SshTunnel, error) {
-	host, port, err := net.SplitHostPort(address)
+	var host, port, err = net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("error splitting address %q into host and port: %w", address, err)
 	}

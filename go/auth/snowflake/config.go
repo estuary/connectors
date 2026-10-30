@@ -82,7 +82,7 @@ func (c *CredentialConfig) ParsePrivateKey() (*rsa.PrivateKey, error) {
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth
 func (CredentialConfig) JSONSchema() *jsonschema.Schema {
-	uProps := orderedmap.New[string, *jsonschema.Schema]()
+	var uProps = orderedmap.New[string, *jsonschema.Schema]()
 	uProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: UserPass,
@@ -106,7 +106,7 @@ func (CredentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
-	jwtProps := orderedmap.New[string, *jsonschema.Schema]()
+	var jwtProps = orderedmap.New[string, *jsonschema.Schema]()
 	jwtProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: JWT,

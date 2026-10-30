@@ -49,7 +49,7 @@ func (c ScheduleConfig) Validate() error {
 }
 
 func createSchedule(cfg ScheduleConfig, jitter []byte) (schedule.Schedule, error) {
-	alternatingSchedule := false
+	var alternatingSchedule = false
 	if cfg.FastSyncStartTime != "" || cfg.FastSyncStopTime != "" || cfg.FastSyncEnabledDays != "" || cfg.Timezone != "" {
 		if cfg.SyncFrequency == "" || cfg.Timezone == "" || cfg.FastSyncStartTime == "" || cfg.FastSyncStopTime == "" {
 			return nil, fmt.Errorf("must provide 'timezone', 'syncFrequency', 'fastSyncStartTime', and 'fastSyncStopTime' when configuring sync frequency active times")
@@ -57,13 +57,13 @@ func createSchedule(cfg ScheduleConfig, jitter []byte) (schedule.Schedule, error
 		alternatingSchedule = true
 	}
 
-	freq := cfg.SyncFrequency
+	var freq = cfg.SyncFrequency
 	if freq == "" {
 		freq = defaultSyncFrequency
 	}
 
 	if !alternatingSchedule {
-		parsedInterval, err := time.ParseDuration(freq)
+		var parsedInterval, err = time.ParseDuration(freq)
 		if err != nil {
 			return nil, fmt.Errorf("parsing interval in CreateSchedule: %w", err)
 		}
@@ -88,7 +88,7 @@ func createSchedule(cfg ScheduleConfig, jitter []byte) (schedule.Schedule, error
 		return sched, nil
 	}
 
-	sched, err := schedule.NewAlternatingSchedule(
+	var sched, err = schedule.NewAlternatingSchedule(
 		slowInterval,
 		cfg.SyncFrequency,
 		cfg.FastSyncStartTime,

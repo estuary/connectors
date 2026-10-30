@@ -13,8 +13,8 @@ import (
 func TestConfigSchema(t *testing.T) {
 	t.Parallel()
 
-	schema := schemagen.GenerateSchema("Test Config Schema", CredentialConfig{})
-	formatted, err := json.MarshalIndent(schema, "", "  ")
+	var schema = schemagen.GenerateSchema("Test Config Schema", CredentialConfig{})
+	var formatted, err = json.MarshalIndent(schema, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, formatted)
 }
@@ -22,7 +22,7 @@ func TestConfigSchema(t *testing.T) {
 func TestConfigValidate(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		conf CredentialConfig
 		want error
@@ -71,7 +71,7 @@ func TestConfigValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.conf.Validate()
+			var got = tt.conf.Validate()
 			require.Equal(t, tt.want, got)
 		})
 	}

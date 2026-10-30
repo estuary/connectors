@@ -26,7 +26,7 @@ var memoryLimit = defaultMemoryLimit
 //
 // This should be called once, early in process startup.
 func ConfigureMemoryLimit() {
-	data, err := os.ReadFile("/sys/fs/cgroup/memory.max")
+	var data, err = os.ReadFile("/sys/fs/cgroup/memory.max")
 	if err != nil {
 		log.WithField("err", err).Debug("unable to read cgroup memory limit, using default")
 		return

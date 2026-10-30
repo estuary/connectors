@@ -20,7 +20,7 @@ func Connect(ctx context.Context, projectID string, credOption option.ClientOpti
 		credOption,
 		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
 	}
-	bq, err := bigquery.NewClient(ctx, projectID, clientOpts...)
+	var bq, err = bigquery.NewClient(ctx, projectID, clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}

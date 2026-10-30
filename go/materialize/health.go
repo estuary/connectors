@@ -146,7 +146,7 @@ func addOptional(a, b *int64) *int64 {
 	} else if b == nil {
 		return a
 	}
-	sum := *a + *b
+	var sum = *a + *b
 	return &sum
 }
 
@@ -361,7 +361,7 @@ func connectorIdentity() (name, version string) {
 }
 
 func newHealthTracker(open *pm.Request_Open) *healthTracker {
-	h := &healthTracker{
+	var h = &healthTracker{
 		log: func(fields log.Fields, msg string) {
 			log.WithFields(fields).Info(msg)
 		},
@@ -379,7 +379,7 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 	if open.Materialization != nil {
 		h.taskName = open.Materialization.Name.String()
 		for _, b := range open.Materialization.Bindings {
-			key := bindingKey(b.ResourcePath)
+			var key = bindingKey(b.ResourcePath)
 			h.keys = append(h.keys, key)
 			h.paths[key] = b.ResourcePath
 		}
@@ -394,7 +394,7 @@ func newHealthTracker(open *pm.Request_Open) *healthTracker {
 func (h *healthTracker) start() {
 	h.stopFlusher = repeatAsync(func() {
 		h.mu.Lock()
-		due := h.intervalElapsed()
+		var due = h.intervalElapsed()
 		h.mu.Unlock()
 		if due {
 			h.flush(false)
@@ -458,9 +458,9 @@ func (h *healthTracker) observeStore(round, binding int, exists, deleted, hardDe
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	r := h.openRound(round)
-	key := h.keyOf(binding)
-	e := r.expected[key]
+	var r = h.openRound(round)
+	var key = h.keyOf(binding)
+	var e = r.expected[key]
 	e.observe(exists, deleted, hardDelete)
 	r.expected[key] = e
 }
@@ -471,9 +471,9 @@ func (h *healthTracker) observeTruncation(round, binding int) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	r := h.openRound(round)
-	key := h.keyOf(binding)
-	e := r.expected[key]
+	var r = h.openRound(round)
+	var key = h.keyOf(binding)
+	var e = r.expected[key]
 	e.truncate++
 	r.expected[key] = e
 }
@@ -486,9 +486,9 @@ func (h *healthTracker) recordExpected(round int, loadRequests, loaded int64) {
 	defer h.mu.Unlock()
 
 	if h.sharded {
-		r := h.openRound(round)
+		var r = h.openRound(round)
 		delete(h.rounds, round)
-		w := h.shardedWindow
+		var w = h.shardedWindow
 		w.addRound(round)
 		w.loadRequests += loadRequests
 		w.loaded += loaded
@@ -499,7 +499,7 @@ func (h *healthTracker) recordExpected(round int, loadRequests, loaded int64) {
 		return
 	}
 
-	r := h.openRound(round)
+	var r = h.openRound(round)
 	r.expectedRecorded = true
 	r.loadRequests = loadRequests
 	r.loaded = loaded
@@ -515,13 +515,13 @@ func (h *healthTracker) report(round int, path []string, stats RowStats) {
 	if h.closed {
 		return
 	}
-	key := bindingKey(path)
+	var key = bindingKey(path)
 	if _, known := h.paths[key]; !known {
 		h.paths[key] = path
 	}
 
 	if h.recovery {
-		w := h.recoveryWindow
+		var w = h.recoveryWindow
 		w.addRound(round)
 		w.addActual(key, stats)
 		return
@@ -531,11 +531,11 @@ func (h *healthTracker) report(round int, path []string, stats RowStats) {
 		return
 	}
 
-	r, open := h.rounds[round]
+	var r, open = h.rounds[round]
 	if !open && round <= h.maxAcked {
 		// The round was already judged (and logged as pending); the late
 		// result is still worth logging, as unchecked.
-		w := newHealthWindow()
+		var w = newHealthWindow()
 		w.addRound(round)
 		w.addActual(key, stats)
 		h.mergeWindow(h.uncheckedWindow, w)
@@ -581,7 +581,7 @@ func (h *healthTracker) acknowledged(round int) {
 		return
 	}
 	h.maxAcked = max(h.maxAcked, round)
-	r := h.openRound(round)
+	var r = h.openRound(round)
 	r.acknowledged = true
 	if r.complete() {
 		h.evaluate(r)
@@ -589,7 +589,7 @@ func (h *healthTracker) acknowledged(round int) {
 }
 
 func (h *healthTracker) openRound(round int) *healthRound {
-	r, ok := h.rounds[round]
+	var r, ok = h.rounds[round]
 	if !ok {
 		r = newHealthRound(round)
 		h.rounds[round] = r
@@ -603,27 +603,27 @@ func (h *healthTracker) openRound(round int) *healthRound {
 func (h *healthTracker) evaluate(r *healthRound) {
 	delete(h.rounds, r.round)
 
-	w := newHealthWindow()
+	var w = newHealthWindow()
 	w.addRound(r.round)
 	w.loadRequests, w.loaded = r.loadRequests, r.loaded
 
-	keys := make(map[string]struct{})
+	var keys = make(map[string]struct{})
 	for key := range r.expected {
 		keys[key] = struct{}{}
 	}
 	for key := range r.actual {
 		keys[key] = struct{}{}
 	}
-	sorted := make([]string, 0, len(keys))
+	var sorted = make([]string, 0, len(keys))
 	for key := range keys {
 		sorted = append(sorted, key)
 	}
 	sort.Strings(sorted)
 
 	for _, key := range sorted {
-		e := r.expected[key]
-		a, reported := r.actual[key]
-		path := h.paths[key]
+		var e = r.expected[key]
+		var a, reported = r.actual[key]
+		var path = h.paths[key]
 
 		if e.stores() > 0 || e.skipped > 0 || e.truncate > 0 {
 			w.addExpected(key, e)
@@ -636,7 +636,7 @@ func (h *healthTracker) evaluate(r *healthRound) {
 		}
 		w.addActual(key, a)
 
-		check := func(name string, expected, actual int64) {
+		var check = func(name string, expected, actual int64) {
 			if expected != actual {
 				w.addMismatch(healthMismatch{
 					Check: name, ResourcePath: path, Expected: expected, Actual: actual,
@@ -713,13 +713,13 @@ func (h *healthTracker) flush(final bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	rounds := make([]int, 0, len(h.rounds))
+	var rounds = make([]int, 0, len(h.rounds))
 	for round := range h.rounds {
 		rounds = append(rounds, round)
 	}
 	sort.Ints(rounds)
 	for _, round := range rounds {
-		r := h.rounds[round]
+		var r = h.rounds[round]
 		if r.acknowledged {
 			h.evaluate(r)
 		} else if final {
@@ -750,7 +750,7 @@ func (h *healthTracker) flushWindows() {
 }
 
 func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) {
-	actual := log.Fields{
+	var actual = log.Fields{
 		"inserted": w.actual.Inserted,
 		"updated":  w.actual.Updated,
 		"deleted":  w.actual.Deleted,
@@ -765,7 +765,7 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 	if w.actual.Truncated != nil {
 		actual["truncated"] = *w.actual.Truncated
 	}
-	expected := log.Fields{
+	var expected = log.Fields{
 		"insert":      w.expected.insert,
 		"update":      w.expected.update,
 		"delete":      w.expected.delete,
@@ -776,7 +776,7 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 		expected["truncate"] = w.expected.truncate
 	}
 
-	fields := log.Fields{
+	var fields = log.Fields{
 		// observable promotes the line into the data-plane's Grafana stream,
 		// where operators alert on commit-path regressions; see the ops
 		// protocol README. The line is low-volume and high-signal by design.

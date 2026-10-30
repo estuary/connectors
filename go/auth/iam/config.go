@@ -139,7 +139,7 @@ func (IAMConfig) OneOfSubSchemas() []schemagen.OneOfSubSchemaT {
 }
 
 func (c IAMConfig) JSONSchema() *jsonschema.Schema {
-	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(AWSIAM),
+	var schema = schemagen.OneOfSchema("Authentication", "", "auth_type", string(AWSIAM),
 		c.OneOfSubSchemas()...,
 	)
 

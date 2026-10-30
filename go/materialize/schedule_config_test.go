@@ -10,8 +10,8 @@ import (
 )
 
 func TestScheduleConfigSchema(t *testing.T) {
-	schema := schemagen.GenerateSchema("ScheduleConfig", ScheduleConfig{})
-	formatted, err := json.MarshalIndent(schema, "", "  ")
+	var schema = schemagen.GenerateSchema("ScheduleConfig", ScheduleConfig{})
+	var formatted, err = json.MarshalIndent(schema, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, formatted)
 }

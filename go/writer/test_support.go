@@ -19,21 +19,21 @@ import (
 )
 
 func duckdbReadFile(t *testing.T, f string, outFormat string) string {
-	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	var db, err = sql.Open("duckdb", "") // opens an in-memory database
 	require.NoError(t, err)
 	defer db.Close()
 
-	bootQueries := []string{
+	var bootQueries = []string{
 		"INSTALL 'json'",
 		"LOAD 'json'",
 		"SET TimeZone = 'UTC';",
 	}
 	for _, q := range bootQueries {
-		_, err := db.Exec(q)
+		var _, err = db.Exec(q)
 		require.NoError(t, err)
 	}
 
-	outFile := path.Join(t.TempDir(), "out")
+	var outFile = path.Join(t.TempDir(), "out")
 
 	_, err = db.Exec(fmt.Sprintf("COPY (SELECT * FROM '%s') TO '%s' (FORMAT %s)", f, outFile, outFormat))
 	require.NoError(t, err)
@@ -69,13 +69,13 @@ func makeTestRow(t testing.TB, seed int) []any {
 		boolVal = true
 	}
 
-	genString := fmt.Sprintf("str_%d", seed)
+	var genString = fmt.Sprintf("str_%d", seed)
 
-	tm, err := time.Parse(time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z")
+	var tm, err = time.Parse(time.RFC3339Nano, "2006-01-02T15:04:05.999999999Z")
 	require.NoError(t, err)
 	tm = tm.AddDate(seed, seed, seed).Add(time.Duration(seed) * 1500 * time.Millisecond)
 
-	interval := iso8601.Duration{
+	var interval = iso8601.Duration{
 		Y:  seed,
 		M:  seed % 12,
 		W:  seed % 4,
@@ -92,9 +92,9 @@ func makeTestRow(t testing.TB, seed int) []any {
 	})
 	require.NoError(t, err)
 
-	md5hash := md5.New()
+	var md5hash = md5.New()
 	md5hash.Write([]byte(genString))
-	md5string := hex.EncodeToString(md5hash.Sum(nil))
+	var md5string = hex.EncodeToString(md5hash.Sum(nil))
 	genUuid, err := uuid.FromBytes([]byte(md5string[0:16]))
 	require.NoError(t, err)
 

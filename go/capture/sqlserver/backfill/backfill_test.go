@@ -49,7 +49,7 @@ func TestResumeKeyBinding(t *testing.T) {
 		{"numeric binds unchanged", "numeric", "12345.12059", "12345.12059"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			encoded, err := datatypes.EncodeKeyFDB(tc.key, tc.columnType)
+			var encoded, err = datatypes.EncodeKeyFDB(tc.key, tc.columnType)
 			require.NoError(t, err)
 			packed, err := sqlcapture.PackTuple([]tuple.TupleElement{encoded, 7})
 			require.NoError(t, err)
@@ -104,7 +104,7 @@ func TestBackfillFilter(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			query, _, err := BuildBackfillQuery(tc.state, "dbo", "events", columnTypes, 1000, tc.filter)
+			var query, _, err = BuildBackfillQuery(tc.state, "dbo", "events", columnTypes, 1000, tc.filter)
 			require.NoError(t, err)
 			require.Equal(t, tc.wantQuery, query)
 		})

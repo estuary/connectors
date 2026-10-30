@@ -124,7 +124,7 @@ func readSeeker(r io.Reader) (io.ReadSeeker, error) {
 		return rs, nil
 	}
 
-	data, err := io.ReadAll(r)
+	var data, err = io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("reading body: %w", err)
 	}
@@ -140,10 +140,10 @@ type blobWriteCloser struct {
 }
 
 func newBlobWriteCloser(ctx context.Context, u uploadFn, key string, opts ...WriterOption) *blobWriteCloser {
-	pr, pw := io.Pipe()
-	errCh := make(chan error, 1)
+	var pr, pw = io.Pipe()
+	var errCh = make(chan error, 1)
 	go func() {
-		err := u(ctx, key, pr, opts...)
+		var err = u(ctx, key, pr, opts...)
 		if err != nil {
 			pr.CloseWithError(err)
 		}
@@ -190,7 +190,7 @@ func checkPermissions[T error](
 	// handleErr adapts the error of type T into a more user-friendly error.
 	handleErr func(err T) error,
 ) error {
-	adaptErr := func(err error) error {
+	var adaptErr = func(err error) error {
 		var asErr T
 		if errors.As(err, &asErr) {
 			// Log the original error message, since it can sometimes contain
@@ -201,7 +201,7 @@ func checkPermissions[T error](
 		return err
 	}
 
-	bucketAndPrefixURI := bucket.URI(cfg.Prefix)
+	var bucketAndPrefixURI = bucket.URI(cfg.Prefix)
 
 	if cfg.ReadOnly || cfg.Lister {
 		for _, err := range bucket.List(ctx, Query{Prefix: cfg.Prefix}) {
@@ -220,10 +220,10 @@ func checkPermissions[T error](
 		return nil
 	}
 
-	testData := []byte("test")
-	testKey := path.Join(cfg.Prefix, uuid.NewString())
-	testWriter := bucket.NewWriter(ctx, testKey)
-	got := make([]byte, len(testData))
+	var testData = []byte("test")
+	var testKey = path.Join(cfg.Prefix, uuid.NewString())
+	var testWriter = bucket.NewWriter(ctx, testKey)
+	var got = make([]byte, len(testData))
 
 	if n, err := testWriter.Write(testData); err != nil {
 		return fmt.Errorf("unable to write to %q: %w", bucketAndPrefixURI, adaptErr(err))

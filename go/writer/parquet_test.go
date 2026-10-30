@@ -22,16 +22,16 @@ import (
 // duckdbQueryFile runs query against the file f, substituting f's path for %s
 // in query, and returns the result rows as JSON.
 func duckdbQueryFile(t *testing.T, f string, query string) string {
-	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	var db, err = sql.Open("duckdb", "") // opens an in-memory database
 	require.NoError(t, err)
 	defer db.Close()
 
 	for _, q := range []string{"INSTALL 'json'", "LOAD 'json'", "SET TimeZone = 'UTC'"} {
-		_, err := db.Exec(q)
+		var _, err = db.Exec(q)
 		require.NoError(t, err)
 	}
 
-	outFile := path.Join(t.TempDir(), "out")
+	var outFile = path.Join(t.TempDir(), "out")
 	_, err = db.Exec(fmt.Sprintf("COPY (%s) TO '%s' (FORMAT JSON)", fmt.Sprintf(query, f), outFile))
 	require.NoError(t, err)
 
@@ -42,7 +42,7 @@ func duckdbQueryFile(t *testing.T, f string, query string) string {
 }
 
 func TestParquetWriter(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name  string
 		nulls bool
 		opts  []ParquetOption
@@ -71,14 +71,14 @@ func TestParquetWriter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			sink, err := os.CreateTemp(dir, "*.parquet")
+			var dir = t.TempDir()
+			var sink, err = os.CreateTemp(dir, "*.parquet")
 			require.NoError(t, err)
 
 			w, err := NewParquetWriter(sink, makeTestParquetSchema(!tt.nulls), tt.opts...)
 			require.NoError(t, err)
 			for i := range 10 {
-				row := makeTestRow(t, i)
+				var row = makeTestRow(t, i)
 				if tt.nulls {
 					row[i] = nil
 				}
@@ -113,25 +113,25 @@ func (w *errOnFirstWriteCloser) Close() error { return nil }
 // a normal, retryable failure. Regression test for the "failed to write magic
 // number" panic.
 func TestParquetWriterSinkWriteErrorReturnsError(t *testing.T) {
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "field", DataType: LogicalTypeString, Required: false},
 	}
 
-	w, err := NewParquetWriter(&errOnFirstWriteCloser{}, sch)
+	var w, err = NewParquetWriter(&errOnFirstWriteCloser{}, sch)
 	require.Error(t, err)
 	require.Nil(t, w)
 }
 
 func TestParquetWriterTimestampNanos(t *testing.T) {
-	dir := t.TempDir()
-	sink, err := os.CreateTemp(dir, "*.parquet")
+	var dir = t.TempDir()
+	var sink, err = os.CreateTemp(dir, "*.parquet")
 	require.NoError(t, err)
 
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "tsField", DataType: LogicalTypeTimestampNanos, Required: false},
 	}
 
-	rows := []string{"2024-01-02T03:04:05.123456789Z", "1970-01-01T00:00:00.000000001Z", ""}
+	var rows = []string{"2024-01-02T03:04:05.123456789Z", "1970-01-01T00:00:00.000000001Z", ""}
 
 	w, err := NewParquetWriter(sink, sch)
 	require.NoError(t, err)
@@ -150,19 +150,19 @@ func TestParquetWriterTimestampNanos(t *testing.T) {
 
 	require.Equal(t, 1, f.MetaData().Schema.NumColumns())
 
-	col := f.MetaData().Schema.Column(0)
+	var col = f.MetaData().Schema.Column(0)
 	require.Equal(t, parquet.Types.Int64, col.PhysicalType())
-	tsLogical, ok := col.LogicalType().(schema.TimestampLogicalType)
+	var tsLogical, ok = col.LogicalType().(schema.TimestampLogicalType)
 	require.True(t, ok)
 	require.Equal(t, schema.TimeUnitNanos, tsLogical.TimeUnit())
 
-	rg := f.RowGroup(0)
+	var rg = f.RowGroup(0)
 	require.EqualValues(t, len(rows), rg.NumRows())
 
 	cr, err := rg.Column(0)
 	require.NoError(t, err)
-	vals := make([]int64, len(rows))
-	def := make([]int16, len(rows))
+	var vals = make([]int64, len(rows))
+	var def = make([]int16, len(rows))
 	_, _, err = cr.(*file.Int64ColumnChunkReader).ReadBatch(int64(len(rows)), vals, def, nil)
 	require.NoError(t, err)
 
@@ -180,11 +180,11 @@ func TestParquetWriterTimestampNanos(t *testing.T) {
 }
 
 func TestParquetWriterVariant(t *testing.T) {
-	dir := t.TempDir()
-	sink, err := os.CreateTemp(dir, "*.parquet")
+	var dir = t.TempDir()
+	var sink, err = os.CreateTemp(dir, "*.parquet")
 	require.NoError(t, err)
 
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "idField", DataType: PrimitiveTypeInteger, Required: true, FieldId: ptrTo(int32(1))},
 		{Name: "variantField", DataType: LogicalTypeVariant, Required: false, FieldId: ptrTo(int32(2))},
 		{Name: "reqVariantField", DataType: LogicalTypeVariant, Required: true, FieldId: ptrTo(int32(3))},
@@ -193,7 +193,7 @@ func TestParquetWriterVariant(t *testing.T) {
 		{Name: "tsNanosVariantField", DataType: LogicalTypeVariant, Required: false, FieldId: ptrTo(int32(6)), VariantStringType: LogicalTypeTimestampNanos},
 	}
 
-	variantVals := []any{
+	var variantVals = []any{
 		[]byte(`{"a": 1, "b": {"c": [1, 2, "three"], "d": null}}`),
 		[]byte(`[1, "two", 3.5, false, null, {"nested": true}]`),
 		[]byte(`"just a string"`),
@@ -218,7 +218,7 @@ func TestParquetWriterVariant(t *testing.T) {
 	w, err := NewParquetWriter(sink, sch, WithParquetRowGroupRowLimit(4))
 	require.NoError(t, err)
 	for i, v := range variantVals {
-		row := []any{i, v, fmt.Appendf(nil, `{"seq": %d}`, i), fmt.Sprintf("str_%d", i), fmt.Sprintf("2023-01-15T10:30:%02dZ", i), fmt.Sprintf("2023-01-15T10:30:%02d.123456789Z", i)}
+		var row = []any{i, v, fmt.Appendf(nil, `{"seq": %d}`, i), fmt.Sprintf("str_%d", i), fmt.Sprintf("2023-01-15T10:30:%02dZ", i), fmt.Sprintf("2023-01-15T10:30:%02d.123456789Z", i)}
 		require.NoError(t, w.Write(row))
 	}
 	require.NoError(t, w.Close())
@@ -227,7 +227,7 @@ func TestParquetWriterVariant(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	fileSchema := f.MetaData().Schema
+	var fileSchema = f.MetaData().Schema
 	require.Equal(t, 6, fileSchema.Root().NumFields())
 	require.Equal(t, 10, fileSchema.NumColumns())
 
@@ -239,8 +239,8 @@ func TestParquetWriterVariant(t *testing.T) {
 		{name: "variantField", rep: parquet.Repetitions.Optional, fieldId: 2},
 		{name: "reqVariantField", rep: parquet.Repetitions.Required, fieldId: 3},
 	} {
-		node := fileSchema.Root().Field(idx + 1)
-		gn, ok := node.(*schema.GroupNode)
+		var node = fileSchema.Root().Field(idx + 1)
+		var gn, ok = node.(*schema.GroupNode)
 		require.True(t, ok, "expected *schema.GroupNode for %q, got %T", want.name, node)
 		require.Equal(t, want.name, gn.Name())
 		require.Equal(t, want.rep, gn.RepetitionType())
@@ -255,16 +255,16 @@ func TestParquetWriterVariant(t *testing.T) {
 	require.Equal(t, "reqVariantField.value", fileSchema.Column(4).Path())
 
 	for rgIdx := 0; rgIdx < f.NumRowGroups(); rgIdx++ {
-		rgMeta := f.MetaData().RowGroup(rgIdx)
+		var rgMeta = f.MetaData().RowGroup(rgIdx)
 		for _, colIdx := range []int{1, 2, 3, 4} {
-			cc, err := rgMeta.ColumnChunk(colIdx)
+			var cc, err = rgMeta.ColumnChunk(colIdx)
 			require.NoError(t, err)
 			statsSet, err := cc.StatsSet()
 			require.NoError(t, err)
 			require.False(t, statsSet, "variant leaf column %d must not embed binary column statistics", colIdx)
 		}
 
-		cc, err := rgMeta.ColumnChunk(5)
+		var cc, err = rgMeta.ColumnChunk(5)
 		require.NoError(t, err)
 		statsSet, err := cc.StatsSet()
 		require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestParquetWriterVariant(t *testing.T) {
 // its own. Strings that don't parse as that type are stored as variant strings,
 // and values that aren't strings are unaffected.
 func TestParquetWriterVariantStringTypes(t *testing.T) {
-	cols := []struct {
+	var cols = []struct {
 		name       string
 		stringType ParquetDataType
 		vals       []any
@@ -340,7 +340,7 @@ func TestParquetWriterVariantStringTypes(t *testing.T) {
 		},
 	}
 
-	sch := make(ParquetSchema, 0, len(cols))
+	var sch = make(ParquetSchema, 0, len(cols))
 	for _, c := range cols {
 		sch = append(sch, ParquetSchemaElement{
 			Name:              c.name,
@@ -349,14 +349,14 @@ func TestParquetWriterVariantStringTypes(t *testing.T) {
 		})
 	}
 
-	dir := t.TempDir()
-	sink, err := os.CreateTemp(dir, "*.parquet")
+	var dir = t.TempDir()
+	var sink, err = os.CreateTemp(dir, "*.parquet")
 	require.NoError(t, err)
 
 	w, err := NewParquetWriter(sink, sch)
 	require.NoError(t, err)
 	for rowIdx := range cols[0].vals {
-		row := make([]any, 0, len(cols))
+		var row = make([]any, 0, len(cols))
 		for _, c := range cols {
 			row = append(row, c.vals[rowIdx])
 		}
@@ -383,12 +383,12 @@ func TestParquetWriterVariantStringTypes(t *testing.T) {
 func TestParquetWriterVariantNestedStringsUntyped(t *testing.T) {
 	const ts = "2023-01-15T10:30:45Z"
 
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "variantField", DataType: LogicalTypeVariant, VariantStringType: LogicalTypeTimestamp},
 	}
 
-	dir := t.TempDir()
-	sink, err := os.CreateTemp(dir, "*.parquet")
+	var dir = t.TempDir()
+	var sink, err = os.CreateTemp(dir, "*.parquet")
 	require.NoError(t, err)
 
 	w, err := NewParquetWriter(sink, sch)
@@ -412,7 +412,7 @@ func TestParquetWriterVariantNestedStringsUntyped(t *testing.T) {
 	require.Equal(t, variant.TimestampMicros, got[0].Type(), "a top-level string is typed")
 
 	require.Equal(t, variant.Object, got[1].Type())
-	obj, ok := got[1].Value().(variant.ObjectValue)
+	var obj, ok = got[1].Value().(variant.ObjectValue)
 	require.True(t, ok, "expected variant.ObjectValue, got %T", got[1].Value())
 	field, err := obj.ValueByKey("nested")
 	require.NoError(t, err)
@@ -431,18 +431,18 @@ func TestParquetWriterVariantNestedStringsUntyped(t *testing.T) {
 func readVariantValues(t *testing.T, f *file.Reader, metaColIdx int) []variant.Value {
 	t.Helper()
 
-	readLeaf := func(colIdx int) [][]byte {
+	var readLeaf = func(colIdx int) [][]byte {
 		var out [][]byte
 		for rgIdx := 0; rgIdx < f.NumRowGroups(); rgIdx++ {
-			cr, err := f.RowGroup(rgIdx).Column(colIdx)
+			var cr, err = f.RowGroup(rgIdx).Column(colIdx)
 			require.NoError(t, err)
 
-			r, ok := cr.(*file.ByteArrayColumnChunkReader)
+			var r, ok = cr.(*file.ByteArrayColumnChunkReader)
 			require.True(t, ok, "expected *file.ByteArrayColumnChunkReader, got %T", cr)
 
 			for r.HasNext() {
 				var vals = make([]parquet.ByteArray, 64)
-				_, read, err := r.ReadBatch(int64(len(vals)), vals, nil, nil)
+				var _, read, err = r.ReadBatch(int64(len(vals)), vals, nil, nil)
 				require.NoError(t, err)
 				for _, v := range vals[:read] {
 					out = append(out, []byte(v))
@@ -457,7 +457,7 @@ func readVariantValues(t *testing.T, f *file.Reader, metaColIdx int) []variant.V
 
 	var out []variant.Value
 	for idx := range meta {
-		v, err := variant.New(meta[idx], vals[idx])
+		var v, err = variant.New(meta[idx], vals[idx])
 		require.NoError(t, err)
 		out = append(out, v)
 	}
@@ -466,11 +466,11 @@ func readVariantValues(t *testing.T, f *file.Reader, metaColIdx int) []variant.V
 }
 
 func TestParquetWriterVariantInvalidJSON(t *testing.T) {
-	dir := t.TempDir()
-	sink, err := os.CreateTemp(dir, "*.parquet")
+	var dir = t.TempDir()
+	var sink, err = os.CreateTemp(dir, "*.parquet")
 	require.NoError(t, err)
 
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "variantField", DataType: LogicalTypeVariant, Required: false},
 	}
 
@@ -489,24 +489,24 @@ func TestParquetWriterVariantInvalidJSON(t *testing.T) {
 // don't accidentally reintroduce it.  It appears to be fixed in
 // 3ad38d03dbc85283f61d60ba2bd8ae8492f0972a.
 func TestParquetEOFReadingByteArrayRegression(t *testing.T) {
-	field := schema.NewByteArrayNode("binaryField", parquet.Repetitions.Optional, -1)
-	root, err := schema.NewGroupNode("schema", parquet.Repetitions.Required, schema.FieldList{field}, -1)
+	var field = schema.NewByteArrayNode("binaryField", parquet.Repetitions.Optional, -1)
+	var root, err = schema.NewGroupNode("schema", parquet.Repetitions.Required, schema.FieldList{field}, -1)
 	require.NoError(t, err)
-	sc := schema.NewSchema(root)
+	var sc = schema.NewSchema(root)
 
-	writer := &bytes.Buffer{}
+	var writer = &bytes.Buffer{}
 
-	scratchOpts := []parquet.WriterProperty{
+	var scratchOpts = []parquet.WriterProperty{
 		parquet.WithDictionaryDefault(false),
 		parquet.WithStats(false),
 	}
-	w := file.NewParquetWriter(writer, sc.Root(), file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
-	rg := w.AppendRowGroup()
+	var w = file.NewParquetWriter(writer, sc.Root(), file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
+	var rg = w.AppendRowGroup()
 
 	col, err := rg.NextColumn()
 	require.NoError(t, err)
 
-	cw := col.(*file.ByteArrayColumnChunkWriter)
+	var cw = col.(*file.ByteArrayColumnChunkWriter)
 
 	_, err = cw.WriteBatch(
 		[]parquet.ByteArray{
@@ -521,23 +521,23 @@ func TestParquetEOFReadingByteArrayRegression(t *testing.T) {
 	err = w.Close()
 	require.NoError(t, err)
 
-	reader := bytes.NewReader(writer.Bytes())
+	var reader = bytes.NewReader(writer.Bytes())
 	r, err := file.NewParquetReader(reader)
 	require.NoError(t, err)
-	rgReader := r.RowGroup(0)
+	var rgReader = r.RowGroup(0)
 	cr, err := rgReader.Column(0)
 	require.NoError(t, err)
 
-	numRows := 2
-	vals := make([]parquet.ByteArray, numRows)
-	defLvls := make([]int16, numRows)
+	var numRows = 2
+	var vals = make([]parquet.ByteArray, numRows)
+	var defLvls = make([]int16, numRows)
 	_, _, err = cr.(*file.ByteArrayColumnChunkReader).ReadBatch(int64(numRows), vals, defLvls, nil)
 	require.NoError(t, err)
 }
 
 func TestGetNumberVal(t *testing.T) {
-	bigVal, _ := new(big.Int).SetString("184467440737095516160", 10)
-	tooBig, _ := new(big.Int).SetString("1"+strings.Repeat("0", 400), 10)
+	var bigVal, _ = new(big.Int).SetString("184467440737095516160", 10)
+	var tooBig, _ = new(big.Int).SetString("1"+strings.Repeat("0", 400), 10)
 
 	for _, tt := range []struct {
 		name  string
@@ -552,12 +552,12 @@ func TestGetNumberVal(t *testing.T) {
 		{name: "string", input: "1.5", want: 1.5},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getNumberVal(tt.input)
+			var got, err = getNumberVal(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
 	}
 
-	_, err := getNumberVal(tooBig)
+	var _, err = getNumberVal(tooBig)
 	require.Error(t, err)
 }

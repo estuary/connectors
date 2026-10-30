@@ -21,11 +21,11 @@ import (
 )
 
 func TestBlobWriteCloser(t *testing.T) {
-	ctx := context.Background()
-	data := []byte("hello world")
+	var ctx = context.Background()
+	var data = []byte("hello world")
 
 	t.Run("success", func(t *testing.T) {
-		fn := func(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+		var fn = func(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
 			var got bytes.Buffer
 			if _, err := io.Copy(&got, r); err != nil {
 				return err
@@ -36,15 +36,15 @@ func TestBlobWriteCloser(t *testing.T) {
 			return nil
 		}
 
-		bwc := newBlobWriteCloser(ctx, fn, "foo")
-		_, err := bwc.Write(data)
+		var bwc = newBlobWriteCloser(ctx, fn, "foo")
+		var _, err = bwc.Write(data)
 		require.NoError(t, err)
 		require.NoError(t, bwc.Close())
 	})
 
 	t.Run("error while writing", func(t *testing.T) {
-		fn := func(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-			buf := make([]byte, 1)
+		var fn = func(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+			var buf = make([]byte, 1)
 			if _, err := r.Read(buf); err != nil {
 				return err
 			}
@@ -52,13 +52,13 @@ func TestBlobWriteCloser(t *testing.T) {
 			return errors.New("some error")
 		}
 
-		bwc := newBlobWriteCloser(ctx, fn, "foo")
-		_, err := bwc.Write(data)
+		var bwc = newBlobWriteCloser(ctx, fn, "foo")
+		var _, err = bwc.Write(data)
 		require.Error(t, err)
 	})
 
 	t.Run("error after writing", func(t *testing.T) {
-		fn := func(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+		var fn = func(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
 			var got bytes.Buffer
 			if _, err := io.Copy(&got, r); err != nil {
 				return err
@@ -69,8 +69,8 @@ func TestBlobWriteCloser(t *testing.T) {
 			return errors.New("some error")
 		}
 
-		bwc := newBlobWriteCloser(ctx, fn, "foo")
-		_, err := bwc.Write(data)
+		var bwc = newBlobWriteCloser(ctx, fn, "foo")
+		var _, err = bwc.Write(data)
 		require.NoError(t, err)
 		require.Error(t, bwc.Close())
 	})
@@ -80,7 +80,7 @@ func TestBlobWriteCloser(t *testing.T) {
 func loadSopsConfig[T any](t *testing.T, path string) T {
 	t.Helper()
 
-	out, err := exec.Command("sops", "--decrypt", "--output-type", "json", path).Output()
+	var out, err = exec.Command("sops", "--decrypt", "--output-type", "json", path).Output()
 	require.NoError(t, err, "decrypting %s", path)
 
 	var cfg T
@@ -107,7 +107,7 @@ func testBucket(t *testing.T, bucket Bucket) {
 
 	var readKey = func(t *testing.T, key string) string {
 		t.Helper()
-		r, err := bucket.NewReader(ctx, key)
+		var r, err = bucket.NewReader(ctx, key)
 		require.NoError(t, err)
 		defer r.Close()
 		got, err := io.ReadAll(r)
@@ -153,7 +153,7 @@ func testBucket(t *testing.T, bucket Bucket) {
 
 	t.Run("writer and read", func(t *testing.T) {
 		var w = bucket.NewWriter(ctx, written, WithObjectMetadata(map[string]string{"testkey": "testvalue"}))
-		_, err := w.Write([]byte("written "))
+		var _, err = w.Write([]byte("written "))
 		require.NoError(t, err)
 		_, err = w.Write([]byte("content"))
 		require.NoError(t, err)
@@ -164,7 +164,7 @@ func testBucket(t *testing.T, bucket Bucket) {
 	})
 
 	t.Run("read missing key", func(t *testing.T) {
-		_, err := bucket.NewReader(ctx, path.Join(prefix, "does-not-exist"))
+		var _, err = bucket.NewReader(ctx, path.Join(prefix, "does-not-exist"))
 		require.Error(t, err)
 	})
 
@@ -196,7 +196,7 @@ func testStoredMD5(t *testing.T, bucket Bucket, storedMD5 func(t *testing.T, key
 	})
 
 	var data = make([]byte, 40<<20)
-	_, err := rand.Read(data)
+	var _, err = rand.Read(data)
 	require.NoError(t, err)
 	var want = md5.Sum(data)
 

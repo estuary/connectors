@@ -14,7 +14,7 @@ const (
 )
 
 func AsFormattedNumeric(projection *pf.Projection) (StringWithNumericFormat, bool) {
-	typesMatch := func(actual, allowed []string) bool {
+	var typesMatch = func(actual, allowed []string) bool {
 		for _, t := range actual {
 			if !slices.Contains(allowed, t) {
 				return false

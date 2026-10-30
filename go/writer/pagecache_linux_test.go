@@ -19,7 +19,7 @@ import (
 // the page cache, via mincore on a PROT_NONE mapping. It returns 0 for files
 // that vanish mid-measurement, since the scratch file is removed when flushed.
 func residentBytes(path string) int64 {
-	f, err := os.Open(path)
+	var f, err = os.Open(path)
 	if err != nil {
 		return 0
 	}
@@ -37,8 +37,8 @@ func residentBytes(path string) int64 {
 	defer unix.Munmap(data)
 
 	// x/sys/unix has no Mincore wrapper; invoke the raw syscall.
-	pageSize := int64(os.Getpagesize())
-	vec := make([]byte, (fi.Size()+pageSize-1)/pageSize)
+	var pageSize = int64(os.Getpagesize())
+	var vec = make([]byte, (fi.Size()+pageSize-1)/pageSize)
 	if _, _, errno := unix.Syscall(unix.SYS_MINCORE,
 		uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)), uintptr(unsafe.Pointer(&vec[0]))); errno != 0 {
 		return 0
@@ -64,7 +64,7 @@ func (discardCloser) Close() error                { return nil }
 // the peak observed scratch file size for reference. Run with -benchtime=1x
 // (or a small fixed count); one op is a full write-and-close cycle.
 func BenchmarkScratchPageCache(b *testing.B) {
-	scratchDir, err := os.MkdirTemp("", "pagecache-bench-")
+	var scratchDir, err = os.MkdirTemp("", "pagecache-bench-")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func BenchmarkScratchPageCache(b *testing.B) {
 	// scratch files land somewhere this benchmark can find them.
 	b.Setenv("TMPDIR", scratchDir)
 
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "id", DataType: PrimitiveTypeInteger, Required: true},
 		{Name: "payload", DataType: LogicalTypeString, Required: true},
 	}
@@ -90,17 +90,17 @@ func BenchmarkScratchPageCache(b *testing.B) {
 	// op, flushed from the in-memory buffer in ~25 MiB row groups, without
 	// reaching the 512 MiB rowGroupByteLimit until Close.
 	const numRows = 200_000
-	payload := strings.Repeat("x", 1024)
+	var payload = strings.Repeat("x", 1024)
 
 	// The write phase (Write calls) and the close phase (flushScratchFile's read-back of the
 	// scratch file) stress the page cache differently, so their peaks are tracked separately.
 	var inClose atomic.Bool
 	var peakWrite, peakClose, peakSize atomic.Int64
 
-	sample := func() {
-		matches, _ := filepath.Glob(filepath.Join(scratchDir, "parquet-scratch-*"))
+	var sample = func() {
+		var matches, _ = filepath.Glob(filepath.Join(scratchDir, "parquet-scratch-*"))
 		for _, m := range matches {
-			peak := &peakWrite
+			var peak = &peakWrite
 			if inClose.Load() {
 				peak = &peakClose
 			}
@@ -113,7 +113,7 @@ func BenchmarkScratchPageCache(b *testing.B) {
 		}
 	}
 
-	done := make(chan struct{})
+	var done = make(chan struct{})
 	go func() {
 		for {
 			select {
@@ -130,7 +130,7 @@ func BenchmarkScratchPageCache(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		w, err := NewParquetWriter(discardCloser{}, sch)
+		var w, err = NewParquetWriter(discardCloser{}, sch)
 		if err != nil {
 			b.Fatal(err)
 		}

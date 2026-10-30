@@ -87,7 +87,7 @@ func NewFixedSchedule(duration string, seed []byte) (Schedule, error) {
 // Internal constructor used by alternatingSchedule to directly get a typed
 // fixedSchedule rather than a Schedule interface.
 func newFixedSchedule(duration string, seed []byte) (*fixedSchedule, error) {
-	period, err := time.ParseDuration(duration)
+	var period, err = time.ParseDuration(duration)
 	if err != nil {
 		return nil, fmt.Errorf("parsing interval %q: %w", duration, err)
 	}
@@ -95,7 +95,7 @@ func newFixedSchedule(duration string, seed []byte) (*fixedSchedule, error) {
 	// Hash the seed bytes and scale the result to a positive 64-bit integer.
 	// This is used to come up with an offset within the range of a 24 hour day,
 	// which should work for just about any reasonable duration.
-	jitter := time.Duration(int64(xxhash.Sum64(seed)>>1)) % (time.Hour * 24)
+	var jitter = time.Duration(int64(xxhash.Sum64(seed)>>1)) % (time.Hour * 24)
 	if seed == nil {
 		// Convenience for no jitter - useful for tests.
 		jitter = 0
@@ -110,11 +110,11 @@ func (s *fixedSchedule) Next(after time.Time) time.Time {
 	}
 
 	// How many periods have fully elapsed since the epoch, offset by the jitter?
-	elapsedPeriods := (after.UnixNano() - s.jitter.Nanoseconds()) / s.period.Nanoseconds()
+	var elapsedPeriods = (after.UnixNano() - s.jitter.Nanoseconds()) / s.period.Nanoseconds()
 
 	// The next time should happen after one additional period, again taking into
 	// account the jitter.
-	nextTime := (elapsedPeriods+1)*s.period.Nanoseconds() + s.jitter.Nanoseconds()
+	var nextTime = (elapsedPeriods+1)*s.period.Nanoseconds() + s.jitter.Nanoseconds()
 
 	return time.Unix(0, nextTime)
 }
@@ -128,7 +128,7 @@ type clockTime struct {
 }
 
 func newClockTime(ts string, loc *time.Location) (clockTime, error) {
-	t, err := time.ParseInLocation("15:04", ts, loc)
+	var t, err = time.ParseInLocation("15:04", ts, loc)
 	if err != nil {
 		return clockTime{}, fmt.Errorf("could not parse %q as clock time: %w", ts, err)
 	}
@@ -143,14 +143,14 @@ func newClockTime(ts string, loc *time.Location) (clockTime, error) {
 // Produces a time.Time on the same date as `dt`, but at the hour and minute of
 // the clockTime.
 func (ct clockTime) on(dt time.Time) time.Time {
-	yyyy, mm, dd := dt.In(ct.loc).Date()
+	var yyyy, mm, dd = dt.In(ct.loc).Date()
 	return time.Date(yyyy, mm, dd, ct.h, ct.m, 0, 0, ct.loc)
 }
 
 // Produces a time.Time representing the next instant after dt having the
 // clockTime of `ct`.
 func (ct clockTime) next(dt time.Time) time.Time {
-	t := ct.on(dt)
+	var t = ct.on(dt)
 	if t.After(dt) {
 		return t
 	}
@@ -160,8 +160,8 @@ func (ct clockTime) next(dt time.Time) time.Time {
 // Determine if the instant represented by datetime `dt` falls between the
 // clockTimes `ct` and `end`, inclusive of `ct` and exclusive of `end`.
 func (ct clockTime) between(dt time.Time, end clockTime) bool {
-	clockStart := ct.on(dt)
-	clockEnd := end.on(dt)
+	var clockStart = ct.on(dt)
+	var clockEnd = end.on(dt)
 
 	if clockStart.After(clockEnd) {
 		// Start and end times straddle midnight. Example: `ct` is 22:00 and
@@ -204,7 +204,7 @@ func NewAlternatingSchedule(
 		return nil, fmt.Errorf("alternateStart and alternateEnd must be different: got %q and %q", alternateStart, alternateEnd)
 	}
 
-	defSched, err := newFixedSchedule(defaultInterval, jitter)
+	var defSched, err = newFixedSchedule(defaultInterval, jitter)
 	if err != nil {
 		return nil, fmt.Errorf("building default schedule: %w", err)
 	}
@@ -256,9 +256,9 @@ func NewAlternatingSchedule(
 // a different scheduling period with a longer period, the next scheduled time
 // is used as-is.
 func (s *alternatingSchedule) Next(after time.Time) time.Time {
-	this := s.def
-	other := s.alt
-	bound := s.nextStartOfAlt(after)
+	var this = s.def
+	var other = s.alt
+	var bound = s.nextStartOfAlt(after)
 
 	if s.altActive(after) {
 		this = s.alt
@@ -266,7 +266,7 @@ func (s *alternatingSchedule) Next(after time.Time) time.Time {
 		bound = s.nextEndOfAlt(after)
 	}
 
-	n := this.Next(after)
+	var n = this.Next(after)
 
 	if !n.Before(bound) && other.period < this.period {
 		n = bound
@@ -307,10 +307,10 @@ func (s *alternatingSchedule) altActive(dt time.Time) bool {
 // period.
 func (s *alternatingSchedule) nextStartOfAlt(dt time.Time) time.Time {
 	for i := 0; i < 7; i++ {
-		today := dt.AddDate(0, 0, i)
-		tomorrow := today.AddDate(0, 0, 1)
+		var today = dt.AddDate(0, 0, i)
+		var tomorrow = today.AddDate(0, 0, 1)
 
-		windowStart := s.altStart.on(today)
+		var windowStart = s.altStart.on(today)
 		if windowStart.Before(today) {
 			// Already past the start time for the alternate period today, so
 			// the normal window for it could start tomorrow at this time.
@@ -319,7 +319,7 @@ func (s *alternatingSchedule) nextStartOfAlt(dt time.Time) time.Time {
 
 		// The alternate window may become active if the alternate period
 		// straddles midnight and today was not an active day, but tomorrow is.
-		midnightTomorrow := atMidnight(tomorrow)
+		var midnightTomorrow = atMidnight(tomorrow)
 
 		if s.altActive(midnightTomorrow) && (midnightTomorrow.Before(windowStart) || !s.altActive(windowStart)) {
 			return midnightTomorrow
@@ -335,8 +335,8 @@ func (s *alternatingSchedule) nextStartOfAlt(dt time.Time) time.Time {
 // relative to `dt`. It's a little simpler than finding the start of the
 // alternate scheduling period since the default schedule is active on all days.
 func (s *alternatingSchedule) nextEndOfAlt(dt time.Time) time.Time {
-	windowEnd := s.altEnd.next(dt)
-	midnightTomorrow := atMidnight(dt.AddDate(0, 0, 1))
+	var windowEnd = s.altEnd.next(dt)
+	var midnightTomorrow = atMidnight(dt.AddDate(0, 0, 1))
 
 	if !s.altActive(midnightTomorrow) && midnightTomorrow.Before(windowEnd) {
 		// Tomorrow might not be an active day for the alternate schedule, so
@@ -348,7 +348,7 @@ func (s *alternatingSchedule) nextEndOfAlt(dt time.Time) time.Time {
 }
 
 func atMidnight(dt time.Time) time.Time {
-	yyyy, mm, dd := dt.UTC().Date()
+	var yyyy, mm, dd = dt.UTC().Date()
 	return time.Date(yyyy, mm, dd, 0, 0, 0, 0, time.UTC)
 }
 
@@ -365,8 +365,8 @@ var (
 )
 
 func parseActiveDays(in string) ([7]bool, error) {
-	out := [7]bool{}
-	lastSeen := time.Weekday(-1)
+	var out = [7]bool{}
+	var lastSeen = time.Weekday(-1)
 
 	if in == "" {
 		// Special case of no days set, which means all days are active.
@@ -376,7 +376,7 @@ func parseActiveDays(in string) ([7]bool, error) {
 		return out, nil
 	}
 
-	getDayCode := func(day string) (time.Weekday, error) {
+	var getDayCode = func(day string) (time.Weekday, error) {
 		if code, ok := days[day]; ok {
 			return code, nil
 		}
@@ -384,7 +384,7 @@ func parseActiveDays(in string) ([7]bool, error) {
 	}
 
 	for _, parts := range strings.Split(in, ",") {
-		dayRange := strings.Split(parts, "-")
+		var dayRange = strings.Split(parts, "-")
 		switch len(dayRange) {
 		case 1:
 			// Just a single day.

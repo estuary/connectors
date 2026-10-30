@@ -50,14 +50,14 @@ func NewCsvWriter(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvWrit
 		o(&cfg)
 	}
 
-	cwc := &countingWriteCloser{w: w}
-	gz, err := pgzip.NewWriterLevel(cwc, csvCompressionlevel)
+	var cwc = &countingWriteCloser{w: w}
+	var gz, err = pgzip.NewWriterLevel(cwc, csvCompressionlevel)
 	if err != nil {
 		// Only possible if compressionLevel is not valid.
 		panic("invalid compression level for gzip.NewWriterLevel")
 	}
 
-	quoteChar := '"'
+	var quoteChar = '"'
 	if cfg.quoteChar != 0 {
 		quoteChar = cfg.quoteChar
 	}
@@ -73,7 +73,7 @@ func NewCsvWriter(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvWrit
 
 func (w *CsvWriter) Write(row []any) error {
 	if !w.cfg.skipHeaders {
-		headerRow := make([]any, len(w.fields))
+		var headerRow = make([]any, len(w.fields))
 		for i, f := range w.fields {
 			headerRow[i] = f
 		}
@@ -167,7 +167,7 @@ func (w *csvWriter) appendString(buf []byte, field []byte) []byte {
 		for len(field) > 0 {
 			// Escape quote characters present in the string by replacing them
 			// with double quotes.
-			i := bytes.IndexByte(field, w.quoteChar)
+			var i = bytes.IndexByte(field, w.quoteChar)
 			if i < 0 {
 				i = len(field)
 			}
@@ -191,12 +191,12 @@ func (w *csvWriter) stringNeedsQuotes(field []byte) bool {
 	}
 
 	for i := 0; i < len(field); i++ {
-		c := field[i]
+		var c = field[i]
 		if c == w.quoteChar || c == '\n' || c == '\r' || c == ',' {
 			return true
 		}
 	}
 
-	r1, _ := utf8.DecodeRune(field)
+	var r1, _ = utf8.DecodeRune(field)
 	return unicode.IsSpace(r1)
 }

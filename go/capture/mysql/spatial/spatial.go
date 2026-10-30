@@ -156,10 +156,10 @@ func ParseToWKT(data []byte) (string, error) {
 	}
 
 	// Read SRID to determine if axis swap is needed
-	srid := binary.LittleEndian.Uint32(data[0:4])
+	var srid = binary.LittleEndian.Uint32(data[0:4])
 
 	// Start parsing WKB after SRID prefix
-	r := &wkbReader{
+	var r = &wkbReader{
 		data:     data,
 		pos:      sridSize,
 		swapAxes: isGeographicSRID(srid),
@@ -199,7 +199,7 @@ func (r *wkbReader) readByte() (byte, error) {
 	if r.remaining() < 1 {
 		return 0, fmt.Errorf("unexpected end of data reading byte at position %d", r.pos)
 	}
-	b := r.data[r.pos]
+	var b = r.data[r.pos]
 	r.pos++
 	return b, nil
 }
@@ -209,7 +209,7 @@ func (r *wkbReader) readUint32() (uint32, error) {
 	if r.remaining() < 4 {
 		return 0, fmt.Errorf("unexpected end of data reading uint32 at position %d", r.pos)
 	}
-	v := binary.LittleEndian.Uint32(r.data[r.pos:])
+	var v = binary.LittleEndian.Uint32(r.data[r.pos:])
 	r.pos += 4
 	return v, nil
 }
@@ -219,7 +219,7 @@ func (r *wkbReader) readFloat64() (float64, error) {
 	if r.remaining() < 8 {
 		return 0, fmt.Errorf("unexpected end of data reading float64 at position %d", r.pos)
 	}
-	bits := binary.LittleEndian.Uint64(r.data[r.pos:])
+	var bits = binary.LittleEndian.Uint64(r.data[r.pos:])
 	r.pos += 8
 	return math.Float64frombits(bits), nil
 }
@@ -227,7 +227,7 @@ func (r *wkbReader) readFloat64() (float64, error) {
 // readGeometry reads a complete geometry (header + data) and returns WKT.
 func (r *wkbReader) readGeometry() (string, error) {
 	// Read WKB header
-	byteOrder, err := r.readByte()
+	var byteOrder, err = r.readByte()
 	if err != nil {
 		return "", fmt.Errorf("reading byte order: %w", err)
 	}
@@ -272,14 +272,14 @@ func (r *wkbReader) readGeometry() (string, error) {
 // would produce excessively long strings, we fall back to scientific notation.
 func formatCoord(v float64) string {
 	// For extreme values, use scientific notation
-	abs := v
+	var abs = v
 	if abs < 0 {
 		abs = -abs
 	}
 	// Use scientific notation for values >= 1e15 or < 1e-14 (but not zero)
 	// These thresholds match MySQL's behavior of preferring fixed-point
 	if abs != 0 && (abs >= 1e15 || abs < 1e-14) {
-		s := strconv.FormatFloat(v, 'g', -1, 64)
+		var s = strconv.FormatFloat(v, 'g', -1, 64)
 		// Remove '+' from exponents: "1e+308" -> "1e308"
 		return strings.ReplaceAll(s, "e+", "e")
 	}
@@ -289,7 +289,7 @@ func formatCoord(v float64) string {
 
 // readPoint reads Point data and returns WKT.
 func (r *wkbReader) readPoint() (string, error) {
-	coords, err := r.readPointCoords()
+	var coords, err = r.readPointCoords()
 	if err != nil {
 		return "", fmt.Errorf("reading point: %w", err)
 	}
@@ -300,7 +300,7 @@ func (r *wkbReader) readPoint() (string, error) {
 // For geographic SRIDs with swapAxes=true, outputs "Y X" to match MySQL's
 // ST_AsText() which respects the SRS axis order (lat/lon for WGS 84).
 func (r *wkbReader) readPointCoords() (string, error) {
-	x, err := r.readFloat64()
+	var x, err = r.readFloat64()
 	if err != nil {
 		return "", fmt.Errorf("reading X: %w", err)
 	}
@@ -316,9 +316,9 @@ func (r *wkbReader) readPointCoords() (string, error) {
 
 // readPointList reads a sequence of points and returns comma-separated coords.
 func (r *wkbReader) readPointList(numPoints uint32) (string, error) {
-	points := make([]string, numPoints)
+	var points = make([]string, numPoints)
 	for i := uint32(0); i < numPoints; i++ {
-		coords, err := r.readPointCoords()
+		var coords, err = r.readPointCoords()
 		if err != nil {
 			return "", fmt.Errorf("reading point %d: %w", i, err)
 		}
@@ -329,7 +329,7 @@ func (r *wkbReader) readPointList(numPoints uint32) (string, error) {
 
 // readLineString reads LineString data and returns WKT.
 func (r *wkbReader) readLineString() (string, error) {
-	numPoints, err := r.readUint32()
+	var numPoints, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading linestring point count: %w", err)
 	}
@@ -342,7 +342,7 @@ func (r *wkbReader) readLineString() (string, error) {
 
 // readRing reads a polygon ring (point count + points) and returns coords string.
 func (r *wkbReader) readRing() (string, error) {
-	numPoints, err := r.readUint32()
+	var numPoints, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading ring point count: %w", err)
 	}
@@ -351,13 +351,13 @@ func (r *wkbReader) readRing() (string, error) {
 
 // readPolygon reads Polygon data and returns WKT.
 func (r *wkbReader) readPolygon() (string, error) {
-	numRings, err := r.readUint32()
+	var numRings, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading polygon ring count: %w", err)
 	}
-	rings := make([]string, numRings)
+	var rings = make([]string, numRings)
 	for i := uint32(0); i < numRings; i++ {
-		coords, err := r.readRing()
+		var coords, err = r.readRing()
 		if err != nil {
 			return "", fmt.Errorf("reading ring %d: %w", i, err)
 		}
@@ -368,14 +368,14 @@ func (r *wkbReader) readPolygon() (string, error) {
 
 // readMultiPoint reads MultiPoint data and returns WKT.
 func (r *wkbReader) readMultiPoint() (string, error) {
-	numPoints, err := r.readUint32()
+	var numPoints, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading multipoint count: %w", err)
 	}
-	points := make([]string, numPoints)
+	var points = make([]string, numPoints)
 	for i := uint32(0); i < numPoints; i++ {
 		// Each point has its own WKB header
-		byteOrder, err := r.readByte()
+		var byteOrder, err = r.readByte()
 		if err != nil {
 			return "", fmt.Errorf("reading point %d byte order: %w", i, err)
 		}
@@ -401,7 +401,7 @@ func (r *wkbReader) readMultiPoint() (string, error) {
 
 // readLineStringData reads LineString data (without type prefix) and returns coords.
 func (r *wkbReader) readLineStringData() (string, error) {
-	numPoints, err := r.readUint32()
+	var numPoints, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading point count: %w", err)
 	}
@@ -410,14 +410,14 @@ func (r *wkbReader) readLineStringData() (string, error) {
 
 // readMultiLineString reads MultiLineString data and returns WKT.
 func (r *wkbReader) readMultiLineString() (string, error) {
-	numLineStrings, err := r.readUint32()
+	var numLineStrings, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading multilinestring count: %w", err)
 	}
-	linestrings := make([]string, numLineStrings)
+	var linestrings = make([]string, numLineStrings)
 	for i := uint32(0); i < numLineStrings; i++ {
 		// Each linestring has its own WKB header
-		byteOrder, err := r.readByte()
+		var byteOrder, err = r.readByte()
 		if err != nil {
 			return "", fmt.Errorf("reading linestring %d byte order: %w", i, err)
 		}
@@ -442,13 +442,13 @@ func (r *wkbReader) readMultiLineString() (string, error) {
 
 // readPolygonData reads Polygon data (without type prefix) and returns rings string.
 func (r *wkbReader) readPolygonData() (string, error) {
-	numRings, err := r.readUint32()
+	var numRings, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading ring count: %w", err)
 	}
-	rings := make([]string, numRings)
+	var rings = make([]string, numRings)
 	for i := uint32(0); i < numRings; i++ {
-		coords, err := r.readRing()
+		var coords, err = r.readRing()
 		if err != nil {
 			return "", fmt.Errorf("reading ring %d: %w", i, err)
 		}
@@ -459,14 +459,14 @@ func (r *wkbReader) readPolygonData() (string, error) {
 
 // readMultiPolygon reads MultiPolygon data and returns WKT.
 func (r *wkbReader) readMultiPolygon() (string, error) {
-	numPolygons, err := r.readUint32()
+	var numPolygons, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading multipolygon count: %w", err)
 	}
-	polygons := make([]string, numPolygons)
+	var polygons = make([]string, numPolygons)
 	for i := uint32(0); i < numPolygons; i++ {
 		// Each polygon has its own WKB header
-		byteOrder, err := r.readByte()
+		var byteOrder, err = r.readByte()
 		if err != nil {
 			return "", fmt.Errorf("reading polygon %d byte order: %w", i, err)
 		}
@@ -491,7 +491,7 @@ func (r *wkbReader) readMultiPolygon() (string, error) {
 
 // readGeometryCollection reads GeometryCollection data and returns WKT.
 func (r *wkbReader) readGeometryCollection() (string, error) {
-	numGeometries, err := r.readUint32()
+	var numGeometries, err = r.readUint32()
 	if err != nil {
 		return "", fmt.Errorf("reading geometrycollection count: %w", err)
 	}
@@ -501,9 +501,9 @@ func (r *wkbReader) readGeometryCollection() (string, error) {
 		return "GEOMETRYCOLLECTION EMPTY", nil
 	}
 
-	geometries := make([]string, numGeometries)
+	var geometries = make([]string, numGeometries)
 	for i := uint32(0); i < numGeometries; i++ {
-		geom, err := r.readGeometry()
+		var geom, err = r.readGeometry()
 		if err != nil {
 			return "", fmt.Errorf("reading geometry %d: %w", i, err)
 		}

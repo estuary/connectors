@@ -19,7 +19,7 @@ type statusHarness struct {
 // newStatusHarness tracks a materialization of three bindings, the first two
 // sourced from the same collection.
 func newStatusHarness(t *testing.T, rng *pf.RangeSpec) *statusHarness {
-	open := openRequest([]testBinding{
+	var open = openRequest([]testBinding{
 		{path: []string{"schema", "alpha"}},
 		{path: []string{"schema", "beta"}},
 		{path: []string{"schema", "gamma"}},
@@ -28,7 +28,7 @@ func newStatusHarness(t *testing.T, rng *pf.RangeSpec) *statusHarness {
 	open.Materialization.Bindings[1].Collection.Name = "acme/one"
 	open.Materialization.Bindings[2].Collection.Name = "acme/two"
 
-	h := &statusHarness{t: t, now: time.Date(2026, 10, 22, 11, 0, 0, 0, time.UTC)}
+	var h = &statusHarness{t: t, now: time.Date(2026, 10, 22, 11, 0, 0, 0, time.UTC)}
 	h.st = newStatusTracker(open)
 	h.st.now = func() time.Time { return h.now }
 	h.st.currentSince = h.now
@@ -91,7 +91,7 @@ func (h *statusHarness) round(stage time.Duration) {
 }
 
 func TestStatusSlowStages(t *testing.T) {
-	h := newStatusHarness(t, nil)
+	var h = newStatusHarness(t, nil)
 	h.expect("info: Starting up: connecting to the destination")
 
 	h.recover(2 * time.Second)
@@ -136,7 +136,7 @@ func TestStatusSlowStages(t *testing.T) {
 }
 
 func TestStatusFastTask(t *testing.T) {
-	h := newStatusHarness(t, nil)
+	var h = newStatusHarness(t, nil)
 	h.recover(time.Second)
 	h.got = nil
 
@@ -158,7 +158,7 @@ func TestStatusFastTask(t *testing.T) {
 }
 
 func TestStatusSyncSchedule(t *testing.T) {
-	h := newStatusHarness(t, nil)
+	var h = newStatusHarness(t, nil)
 	h.recover(time.Second)
 	h.got = nil
 
@@ -184,7 +184,7 @@ func TestStatusSyncSchedule(t *testing.T) {
 }
 
 func TestStatusWarnings(t *testing.T) {
-	h := newStatusHarness(t, nil)
+	var h = newStatusHarness(t, nil)
 	h.recover(time.Second)
 	h.got = nil
 
@@ -204,7 +204,7 @@ func TestStatusWarnings(t *testing.T) {
 }
 
 func TestStatusOtherShards(t *testing.T) {
-	h := newStatusHarness(t, &pf.RangeSpec{KeyBegin: 1 << 31, KeyEnd: 1<<32 - 1, RClockEnd: 1<<32 - 1})
+	var h = newStatusHarness(t, &pf.RangeSpec{KeyBegin: 1 << 31, KeyEnd: 1<<32 - 1, RClockEnd: 1<<32 - 1})
 	h.recover(time.Minute)
 	h.round(2 * time.Minute)
 	h.advance(10 * time.Minute)
@@ -216,7 +216,7 @@ func TestStatusOtherShards(t *testing.T) {
 }
 
 func TestStatusUnknownBinding(t *testing.T) {
-	h := newStatusHarness(t, nil)
+	var h = newStatusHarness(t, nil)
 	require.PanicsWithValue(t, "request for binding 3, but the materialization has 3 bindings", func() { h.st.event(readStore, 3) })
 	require.Panics(t, func() { h.st.event(readLoad, -1) })
 }

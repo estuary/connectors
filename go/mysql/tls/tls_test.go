@@ -27,7 +27,7 @@ type testCA struct {
 }
 
 func newTestCA(t *testing.T, name string) *testCA {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	var tmpl = &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
@@ -48,7 +48,7 @@ func newTestCA(t *testing.T, name string) *testCA {
 // issueWith produces a server certificate for the named host, signed by the CA,
 // with the certificate template adjusted by edit before signing.
 func (ca *testCA) issueWith(t *testing.T, host string, edit func(*x509.Certificate)) tls.Certificate {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	var tmpl = &x509.Certificate{
 		SerialNumber: big.NewInt(2),
@@ -80,7 +80,7 @@ func (ca *testCA) withChain(cert tls.Certificate) tls.Certificate {
 // selfSignedCert produces a self-signed server certificate with the given
 // Common Name and SANs, as a server without a CA presents.
 func selfSignedCert(t *testing.T, cn string, names ...string) (tls.Certificate, string) {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	var tmpl = &x509.Certificate{
 		SerialNumber: big.NewInt(3),
@@ -100,18 +100,18 @@ func selfSignedCert(t *testing.T, cn string, names ...string) (tls.Certificate, 
 // mariadbEphemeralCert mimics the certificate MariaDB 11.4+ generates in
 // memory at startup: self-signed, CN "MariaDB Server", no names.
 func mariadbEphemeralCert(t *testing.T) tls.Certificate {
-	cert, _ := selfSignedCert(t, mariadbEphemeralCN)
+	var cert, _ = selfSignedCert(t, mariadbEphemeralCN)
 	return cert
 }
 
 // serve runs a TLS listener presenting cert and returns its address.
 func serve(t *testing.T, cert tls.Certificate) string {
-	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{cert}})
+	var ln, err = tls.Listen("tcp", "127.0.0.1:0", &tls.Config{Certificates: []tls.Certificate{cert}})
 	require.NoError(t, err)
 	t.Cleanup(func() { ln.Close() })
 	go func() {
 		for {
-			conn, err := ln.Accept()
+			var conn, err = ln.Accept()
 			if err != nil {
 				return
 			}
@@ -125,7 +125,7 @@ func serve(t *testing.T, cert tls.Certificate) string {
 }
 
 func dial(t *testing.T, settings Settings, serverHost, addr string) error {
-	cfg, err := settings.Config(serverHost)
+	var cfg, err = settings.Config(serverHost)
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, cfg)
@@ -171,7 +171,7 @@ func TestVerification(t *testing.T) {
 // what guarantees that every one of them is trusted.
 func TestDefaultRootsTrustCloudCAs(t *testing.T) {
 	var pool = defaultRoots()
-	names, err := fs.Glob(cloudCAs, "cloudcas/*.pem")
+	var names, err = fs.Glob(cloudCAs, "cloudcas/*.pem")
 	require.NoError(t, err)
 	require.NotEmpty(t, names)
 
@@ -185,7 +185,7 @@ func TestDefaultRootsTrustCloudCAs(t *testing.T) {
 				if block, rest = pem.Decode(rest); block == nil {
 					break
 				}
-				cert, err := x509.ParseCertificate(block.Bytes)
+				var cert, err = x509.ParseCertificate(block.Bytes)
 				require.NoError(t, err)
 				// Every bundled certificate is itself a trust anchor in the pool.
 				_, err = cert.Verify(x509.VerifyOptions{
@@ -276,7 +276,7 @@ func TestVerificationRemediation(t *testing.T) {
 	})
 
 	t.Run("offers a self-signed server certificate", func(t *testing.T) {
-		selfSigned, selfSignedPEM := selfSignedCert(t, host)
+		var selfSigned, selfSignedPEM = selfSignedCert(t, host)
 		var addr = serve(t, selfSigned)
 
 		var remediation = Settings{Mode: ModeVerifyIdentity}.verificationRemediation(dial(t, Settings{Mode: ModeVerifyIdentity}, host, addr), host)
@@ -288,7 +288,7 @@ func TestVerificationRemediation(t *testing.T) {
 		// Following the advice must work, and a self-signed certificate that
 		// does name the host is also acceptable to verify_identity.
 		require.NoError(t, dial(t, Settings{Mode: ModeVerifyCA, ServerCA: selfSignedPEM}, host, addr))
-		namedSelfSigned, namedSelfSignedPEM := selfSignedCert(t, host, host)
+		var namedSelfSigned, namedSelfSignedPEM = selfSignedCert(t, host, host)
 		require.NoError(t, dial(t, Settings{Mode: ModeVerifyIdentity, ServerCA: namedSelfSignedPEM}, host, serve(t, namedSelfSigned)))
 	})
 
@@ -296,7 +296,7 @@ func TestVerificationRemediation(t *testing.T) {
 		var addr = serve(t, mariadbEphemeralCert(t))
 		// The certificate a previous incarnation of the server presented,
 		// as a user who pinned it would have configured before a restart.
-		_, previousPEM := selfSignedCert(t, mariadbEphemeralCN)
+		var _, previousPEM = selfSignedCert(t, mariadbEphemeralCN)
 
 		for _, tc := range []struct {
 			name     string
@@ -322,7 +322,7 @@ func TestVerificationRemediation(t *testing.T) {
 		// A self-signed certificate that merely names itself like MariaDB's
 		// but is issued for the host is somebody's deliberate choice and
 		// remains pinnable.
-		named, _ := selfSignedCert(t, mariadbEphemeralCN, host)
+		var named, _ = selfSignedCert(t, mariadbEphemeralCN, host)
 		var remediation = Settings{Mode: ModeVerifyIdentity}.verificationRemediation(dial(t, Settings{Mode: ModeVerifyIdentity}, host, serve(t, named)), host)
 		require.NotContains(t, remediation, "MariaDB generates")
 		require.Contains(t, remediation, "self-signed certificate below")
@@ -398,7 +398,7 @@ func TestValidate(t *testing.T) {
 	// Client certificates are usable in every mode which negotiates TLS at all.
 	require.ErrorContains(t, Settings{Mode: ModeDisabled, ClientCert: "x", ClientKey: "y"}.Validate(), "never uses TLS")
 
-	cfg, err := Settings{Mode: ModeDisabled}.Config("host")
+	var cfg, err = Settings{Mode: ModeDisabled}.Config("host")
 	require.NoError(t, err)
 	require.Nil(t, cfg)
 	require.True(t, Settings{Mode: ModePreferred}.AllowsPlaintextFallback())
@@ -409,7 +409,7 @@ func TestValidate(t *testing.T) {
 func TestConfigPresentsClientCertificate(t *testing.T) {
 	var ca = newTestCA(t, "ca")
 	var client = ca.issue(t, "client")
-	keyDER, err := x509.MarshalECPrivateKey(client.PrivateKey.(*ecdsa.PrivateKey))
+	var keyDER, err = x509.MarshalECPrivateKey(client.PrivateKey.(*ecdsa.PrivateKey))
 	require.NoError(t, err)
 	var certPEM = string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: client.Certificate[0]}))
 	var keyPEM = string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}))
@@ -421,7 +421,7 @@ func TestConfigPresentsClientCertificate(t *testing.T) {
 		{Mode: ModeVerifyIdentity},
 	} {
 		s.ClientCert, s.ClientKey = certPEM, keyPEM
-		cfg, err := s.Config("host")
+		var cfg, err = s.Config("host")
 		require.NoError(t, err)
 		require.Len(t, cfg.Certificates, 1, s.Mode)
 		require.Equal(t, client.Certificate, cfg.Certificates[0].Certificate, s.Mode)

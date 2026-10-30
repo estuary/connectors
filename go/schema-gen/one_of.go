@@ -13,9 +13,9 @@ func OneOfSchema(title, description, discriminator, default_ string, inputs ...O
 	var oneOfs []*jsonschema.Schema
 
 	for _, input := range inputs {
-		config := GenerateSchema(input.title, input.configObj)
+		var config = GenerateSchema(input.title, input.configObj)
 
-		extras := map[string]any{"order": 0}
+		var extras = map[string]any{"order": 0}
 		if discriminator != "auth_type" {
 			extras["nonsensitive"] = true
 		}

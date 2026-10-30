@@ -17,11 +17,11 @@ import (
 )
 
 func TestJsonWriter(t *testing.T) {
-	dir := t.TempDir()
-	sink, err := os.CreateTemp(dir, "*.json.gz")
+	var dir = t.TempDir()
+	var sink, err = os.CreateTemp(dir, "*.json.gz")
 	require.NoError(t, err)
 
-	w := NewJsonWriter(sink, makeTestFields())
+	var w = NewJsonWriter(sink, makeTestFields())
 
 	for i := range 10 {
 		require.NoError(t, w.Write(makeTestRow(t, i)))
@@ -78,7 +78,7 @@ func TestJsonWriterInputs(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var wantGzipBytes bytes.Buffer
-			gzw, err := gzip.NewWriterLevel(&wantGzipBytes, jsonCompressionlevel)
+			var gzw, err = gzip.NewWriterLevel(&wantGzipBytes, jsonCompressionlevel)
 			require.NoError(t, err)
 
 			_, err = gzw.Write(tt.wantBytes)
@@ -87,11 +87,11 @@ func TestJsonWriterInputs(t *testing.T) {
 
 			for _, compress := range []bool{true, false} {
 				var buf bytes.Buffer
-				tw := &testWriter{
+				var tw = &testWriter{
 					w: &buf,
 				}
 
-				w := NewJsonWriter(tw, tt.fields)
+				var w = NewJsonWriter(tw, tt.fields)
 				if !compress {
 					w = NewJsonWriter(tw, tt.fields, WithJsonDisableCompression())
 				}
@@ -103,7 +103,7 @@ func TestJsonWriterInputs(t *testing.T) {
 
 				if compress {
 					// The written bytes can be unzip'd correctly.
-					r, err := gzip.NewReader(&buf)
+					var r, err = gzip.NewReader(&buf)
 					require.NoError(t, err)
 					gotBytes, err := io.ReadAll(r)
 					require.NoError(t, err)
@@ -130,7 +130,7 @@ func TestJsonWriterWrittenUncompressed(t *testing.T) {
 	require.NoError(t, pw.Close())
 	require.NoError(t, zw.Close())
 
-	r, err := gzip.NewReader(&compressed)
+	var r, err = gzip.NewReader(&compressed)
 	require.NoError(t, err)
 	got, err := io.ReadAll(r)
 	require.NoError(t, err)
@@ -195,7 +195,7 @@ func BenchmarkEncodingObjects(b *testing.B) {
 		var names, values = benchmarkDataset(b, benchmarkDatasetSize)
 		b.StartTimer()
 
-		w := NewJsonWriter(&nopWriteCloser{w: io.Discard}, names)
+		var w = NewJsonWriter(&nopWriteCloser{w: io.Discard}, names)
 		for _, row := range values {
 			require.NoError(b, w.Write(row))
 		}
@@ -209,7 +209,7 @@ func BenchmarkEncodingArrays(b *testing.B) {
 		var _, values = benchmarkDataset(b, benchmarkDatasetSize)
 		b.StartTimer()
 
-		w := NewJsonWriter(&nopWriteCloser{w: io.Discard}, nil)
+		var w = NewJsonWriter(&nopWriteCloser{w: io.Discard}, nil)
 		for _, row := range values {
 			require.NoError(b, w.Write(row))
 		}
@@ -249,11 +249,11 @@ func benchmarkDataset(b *testing.B, size int) ([]string, [][]any) {
 			rand.Intn(1000000000),
 		}
 
-		doc := make(map[string]any)
+		var doc = make(map[string]any)
 		for idx, n := range names[:len(names)-1] {
 			doc[n] = row[idx]
 		}
-		docJson, err := json.Marshal(doc)
+		var docJson, err = json.Marshal(doc)
 		require.NoError(b, err)
 		row = append(row, json.RawMessage(docJson))
 

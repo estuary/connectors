@@ -55,12 +55,12 @@ func TestOOMRepro(t *testing.T) {
 	common.ConfigureMemoryLimit()
 	fmt.Printf("effective GOMEMLIMIT = %d MiB\n", debug.SetMemoryLimit(-1)/1024/1024)
 
-	sch := ParquetSchema{
+	var sch = ParquetSchema{
 		{Name: "id", DataType: PrimitiveTypeInteger, Required: true},
 		{Name: "payload", DataType: LogicalTypeString, Required: true},
 	}
 
-	variableSize := *oomReproRowBytesMin != 0 && *oomReproRowBytesAvg != 0 && *oomReproRowBytesMax != 0
+	var variableSize = *oomReproRowBytesMin != 0 && *oomReproRowBytesAvg != 0 && *oomReproRowBytesMax != 0
 
 	// nextSize and fixedPayload are mutually exclusive, chosen by variableSize below.
 	var nextSize func() int
@@ -71,19 +71,19 @@ func TestOOMRepro(t *testing.T) {
 	} else {
 		// High-entropy payload, matching the base64-gzipped-XML column that triggers the OOM:
 		// incompressible, so parquet dictionary encoding falls back immediately for every row.
-		raw := make([]byte, *oomReproRowBytes)
+		var raw = make([]byte, *oomReproRowBytes)
 		if _, err := rand.Read(raw); err != nil {
 			t.Fatal(err)
 		}
 		fixedPayload = base64.StdEncoding.EncodeToString(raw)
 	}
 
-	logStats := func(i int) {
+	var logStats = func(i int) {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		cur, _ := os.ReadFile("/sys/fs/cgroup/memory.current")
-		peak, _ := os.ReadFile("/sys/fs/cgroup/memory.peak")
-		stat := readOOMReproMemoryStat()
+		var cur, _ = os.ReadFile("/sys/fs/cgroup/memory.current")
+		var peak, _ = os.ReadFile("/sys/fs/cgroup/memory.peak")
+		var stat = readOOMReproMemoryStat()
 		fmt.Printf("rows=%d heapAlloc=%dMiB heapSys=%dMiB cgroupCurrent=%sMiB cgroupPeak=%sMiB anon=%dMiB file=%dMiB activeFile=%dMiB inactiveFile=%dMiB\n",
 			i, m.HeapAlloc/1024/1024, m.HeapSys/1024/1024,
 			oomReproMiB(cur), oomReproMiB(peak),
@@ -91,7 +91,7 @@ func TestOOMRepro(t *testing.T) {
 			stat["active_file"]/1024/1024, stat["inactive_file"]/1024/1024)
 	}
 
-	w, err := NewParquetWriter(oomReproDiscardCloser{}, sch,
+	var w, err = NewParquetWriter(oomReproDiscardCloser{}, sch,
 		WithParquetRowGroupByteLimit(*oomReproRowGroupByteLimitMiB*1024*1024),
 		WithParquetRowGroupRowLimit(*oomReproRowGroupRowLimit),
 		WithParquetBufferSize(*oomReproBufferSizeMiB*1024*1024),
@@ -101,11 +101,11 @@ func TestOOMRepro(t *testing.T) {
 	}
 
 	var totalBytes, maxRowsSeen int64
-	start := time.Now()
+	var start = time.Now()
 	for i := 0; *oomReproRows == 0 || i < *oomReproRows; i++ {
-		payload := fixedPayload
+		var payload = fixedPayload
 		if variableSize {
-			size := nextSize()
+			var size = nextSize()
 			totalBytes += int64(size)
 			if size == *oomReproRowBytesMax {
 				maxRowsSeen++
@@ -140,8 +140,8 @@ func TestOOMRepro(t *testing.T) {
 // max-sized row. The small bucket's own mean is (min+avg)/2, so a small fraction p of max-sized
 // rows is enough to pull the overall mean up to avg: p = (avg - smallAvg) / (max - smallAvg).
 func newOOMReproRowSizer(min, avg, max int) func() int {
-	smallAvg := float64(min+avg) / 2
-	p := (float64(avg) - smallAvg) / (float64(max) - smallAvg)
+	var smallAvg = float64(min+avg) / 2
+	var p = (float64(avg) - smallAvg) / (float64(max) - smallAvg)
 
 	return func() int {
 		if mrand.Float64() < p {
@@ -156,9 +156,9 @@ func newOOMReproRowSizer(min, avg, max int) func() int {
 // incompressible-looking data to defeat parquet dictionary/RLE encoding, not cryptographic
 // randomness.
 func oomReproRandomPayload(n int) string {
-	raw := make([]byte, n)
+	var raw = make([]byte, n)
 	for i := 0; i < n; i += 8 {
-		v := mrand.Uint64()
+		var v = mrand.Uint64()
 		for j := 0; j < 8 && i+j < n; j++ {
 			raw[i+j] = byte(v >> (8 * j))
 		}
@@ -168,7 +168,7 @@ func oomReproRandomPayload(n int) string {
 
 // oomReproMiB converts a cgroup stat file's raw byte count to a MiB string for logging.
 func oomReproMiB(b []byte) string {
-	s := strings.TrimSpace(string(b))
+	var s = strings.TrimSpace(string(b))
 	if s == "" {
 		return "?"
 	}
@@ -183,13 +183,13 @@ func oomReproMiB(b []byte) string {
 // keyed by field name (e.g. "anon", "file", "active_file", "inactive_file"). Used to distinguish
 // Go heap (anon) growth from page-cache (file) growth charged against the same cgroup memory.max.
 func readOOMReproMemoryStat() map[string]int64 {
-	out := make(map[string]int64)
-	data, err := os.ReadFile("/sys/fs/cgroup/memory.stat")
+	var out = make(map[string]int64)
+	var data, err = os.ReadFile("/sys/fs/cgroup/memory.stat")
 	if err != nil {
 		return out
 	}
 	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
+		var fields = strings.Fields(line)
 		if len(fields) != 2 {
 			continue
 		}

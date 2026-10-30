@@ -10,7 +10,7 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	tc, err := NewWithTranscript("testdata/flow.yaml")
+	var tc, err = NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Spec("Get Connector Spec")
@@ -18,7 +18,7 @@ func TestSpec(t *testing.T) {
 }
 
 func TestDiscoverNoFilter(t *testing.T) {
-	tc, err := NewWithTranscript("testdata/flow.yaml")
+	var tc, err = NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.DiscoverFull("All Bindings")
@@ -26,7 +26,7 @@ func TestDiscoverNoFilter(t *testing.T) {
 }
 
 func TestDiscoverFilterEvents(t *testing.T) {
-	tc, err := NewWithTranscript("testdata/flow.yaml")
+	var tc, err = NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(`events`)
@@ -35,7 +35,7 @@ func TestDiscoverFilterEvents(t *testing.T) {
 }
 
 func TestDiscoverFilterUnmatched(t *testing.T) {
-	tc, err := NewWithTranscript("testdata/flow.yaml")
+	var tc, err = NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(`unmatched`)
@@ -44,7 +44,7 @@ func TestDiscoverFilterUnmatched(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
-	tc, err := NewWithTranscript("testdata/flow.yaml")
+	var tc, err = NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(`events`)
@@ -59,7 +59,7 @@ func TestRun(t *testing.T) {
 
 func TestInvalidConfig(t *testing.T) {
 	t.Skip("TODO: needs sanitization for timestamps and temp file paths in stderr output")
-	tc, err := NewWithTranscript("testdata/flow.yaml")
+	var tc, err = NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 
@@ -102,7 +102,7 @@ func TestLockstepTransactions(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := withLockstepTransactions([]byte(tc.catalog))
+			var result, err = withLockstepTransactions([]byte(tc.catalog))
 			require.NoError(t, err)
 			require.JSONEq(t, tc.expect, string(result))
 		})

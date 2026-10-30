@@ -16,7 +16,7 @@ type testCase struct {
 
 func TestParseToWKT(t *testing.T) {
 	// Load test corpus
-	corpusData, err := os.ReadFile("testdata/wkt_corpus.json")
+	var corpusData, err = os.ReadFile("testdata/wkt_corpus.json")
 	if err != nil {
 		t.Fatalf("failed to load test corpus: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestParseToWKT(t *testing.T) {
 	var failures []testCase
 	for _, tc := range corpus {
 		// Decode hex to bytes
-		data, err := hex.DecodeString(tc.InternalHex)
+		var data, err = hex.DecodeString(tc.InternalHex)
 		if err != nil {
 			t.Errorf("failed to decode hex for %q (SRID %d): %v", tc.InputWKT, tc.SRID, err)
 			continue
@@ -58,7 +58,7 @@ func TestParseToWKT(t *testing.T) {
 		t.Errorf("%d/%d test cases failing", len(failures), len(corpus))
 
 		// Count failures by SRID
-		sridCounts := make(map[int]int)
+		var sridCounts = make(map[int]int)
 		for _, tc := range failures {
 			sridCounts[tc.SRID]++
 		}
@@ -66,14 +66,14 @@ func TestParseToWKT(t *testing.T) {
 
 		// Show first 5 failing cases
 		t.Errorf("First failing cases:")
-		count := 0
+		var count = 0
 		for _, tc := range failures {
 			if count >= 5 {
 				break
 			}
 			count++
-			data, _ := hex.DecodeString(tc.InternalHex)
-			got, err := ParseToWKT(data)
+			var data, _ = hex.DecodeString(tc.InternalHex)
+			var got, err = ParseToWKT(data)
 			if err != nil {
 				t.Errorf("  %d (SRID %d): error: %v", count, tc.SRID, err)
 				t.Errorf("      expected: %q", tc.OutputWKT)

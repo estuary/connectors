@@ -18,8 +18,8 @@ type testConfig struct {
 }
 
 func TestGenerateSchema(t *testing.T) {
-	got := GenerateSchema("Test Schema", testConfig{})
-	formatted, err := json.MarshalIndent(got, "", "  ")
+	var got = GenerateSchema("Test Schema", testConfig{})
+	var formatted, err = json.MarshalIndent(got, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, formatted)
 }

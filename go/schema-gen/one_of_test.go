@@ -10,8 +10,8 @@ import (
 )
 
 func TestOneOfSchema(t *testing.T) {
-	got := GenerateSchema("Test Schema", endpointConfig{})
-	formatted, err := json.MarshalIndent(got, "", "  ")
+	var got = GenerateSchema("Test Schema", endpointConfig{})
+	var formatted, err = json.MarshalIndent(got, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, formatted)
 }

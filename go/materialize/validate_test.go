@@ -8,7 +8,7 @@ import (
 )
 
 func TestAsFormattedNumeric(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name         string
 		inference    pf.Inference
 		isPrimaryKey bool
@@ -159,7 +159,7 @@ func TestAsFormattedNumeric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			formatted, ok := AsFormattedNumeric(&pf.Projection{
+			var formatted, ok = AsFormattedNumeric(&pf.Projection{
 				Inference:    tt.inference,
 				IsPrimaryKey: tt.isPrimaryKey,
 			})

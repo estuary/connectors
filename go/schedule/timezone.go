@@ -14,7 +14,7 @@ var errInvalidTimezone = errors.New("timezone must be a valid IANA timezone name
 // ParseTimezone parses a timezone name or numeric offset into a time.Location.
 func ParseTimezone(tzName string) (*time.Location, error) {
 	// If the time zone setting is a valid IANA zone name then return that.
-	loc, err := time.LoadLocation(tzName)
+	var loc, err = time.LoadLocation(tzName)
 	if err == nil {
 		return loc, nil
 	}

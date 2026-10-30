@@ -62,7 +62,7 @@ func TranslateValue(val any, fieldSchema *bigquery.FieldSchema) (any, error) {
 
 	switch val := val.(type) {
 	case *big.Rat:
-		n, exact := val.FloatPrec()
+		var n, exact = val.FloatPrec()
 		if !exact {
 			// Add three additional digits of precision to inexact representations.
 			// The amount is arbitrary but was chosen so 1/3 becomes "0.333" instead of "0"

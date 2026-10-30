@@ -92,7 +92,7 @@ func (s Settings) parse() (serverCA *x509.CertPool, clientCerts []tls.Certificat
 		return nil, nil, errors.New("'ssl_client_cert' and 'ssl_client_key' must be provided together")
 	}
 	if s.ClientCert != "" {
-		cert, err := tls.X509KeyPair([]byte(s.ClientCert), []byte(s.ClientKey))
+		var cert, err = tls.X509KeyPair([]byte(s.ClientCert), []byte(s.ClientKey))
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid 'ssl_client_cert' / 'ssl_client_key': %w", err)
 		}
@@ -125,7 +125,7 @@ func (s Settings) GuaranteesEncryption() bool {
 // be the hostname the user configured, not the local end of any tunnel, since
 // that is the name the certificate is checked against under verify_identity.
 func (s Settings) Config(serverHost string) (*tls.Config, error) {
-	serverCA, clientCerts, err := s.parse()
+	var serverCA, clientCerts, err = s.parse()
 	if err != nil {
 		return nil, err
 	}

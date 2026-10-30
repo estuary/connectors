@@ -172,7 +172,7 @@ func typeNameToColumnSchema(cfg *Config, typeName string) (columnSchema, bool) {
 		return columnSchema{}, false
 	}
 
-	schema, ok := columnSchemaMap[typeName]
+	var schema, ok = columnSchemaMap[typeName]
 	return schema, ok
 }
 
@@ -248,7 +248,7 @@ func TranslateColumnValue(columnType any, val any, cfg *Config) (any, error) {
 			val[0], val[1], val[2], val[3] = val[3], val[2], val[1], val[0]
 			val[4], val[5] = val[5], val[4]
 			val[6], val[7] = val[7], val[6]
-			u, err := uuid.FromBytes(val)
+			var u, err = uuid.FromBytes(val)
 			if err != nil {
 				return nil, err
 			}

@@ -64,7 +64,7 @@ func (l *basicLogger) doLog() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	ll := log.WithFields(log.Fields{
+	var ll = log.WithFields(log.Fields{
 		"readLoads":   l.readLoads,
 		"sentLoadeds": l.sentLoaded,
 		"readStores":  l.readStores,
@@ -249,7 +249,7 @@ func (l *extendedLogger) readingLoadsLogFn(round int) func() {
 	var lastLoadCount int32
 
 	return func() {
-		thisLoadCount := l.readLoads.Load()
+		var thisLoadCount = l.readLoads.Load()
 		if thisLoadCount == lastLoadCount {
 			l.log(log.Fields{"round": round, "count": thisLoadCount}, "waiting for more load requests")
 		} else {
@@ -416,7 +416,7 @@ func (l *BindingEvents) StartedEvaluatingLoads() {
 		l.stopLogger = make(chan struct{})
 		l.wg.Add(1)
 		go func() {
-			ticker := time.NewTicker(loggingFrequency)
+			var ticker = time.NewTicker(loggingFrequency)
 			defer func() {
 				l.wg.Done()
 				ticker.Stop()
@@ -461,7 +461,7 @@ func (l *BindingEvents) StartedResourceCommit(path []string) {
 func (l *BindingEvents) FinishedResourceCommit(path []string) {
 	l.do(func() {
 		l.mu.Lock()
-		took := time.Since(l.activeStores[strings.Join(path, ".")])
+		var took = time.Since(l.activeStores[strings.Join(path, ".")])
 		l.mu.Unlock()
 
 		l.log(log.Fields{
@@ -500,7 +500,7 @@ func repeatAsync(repeat func(), every time.Duration) (stop func(onStop func())) 
 
 	wg.Add(1)
 	go func() {
-		ticker := time.NewTicker(every)
+		var ticker = time.NewTicker(every)
 		defer func() {
 			wg.Done()
 			ticker.Stop()

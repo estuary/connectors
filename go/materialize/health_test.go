@@ -57,7 +57,7 @@ func decodeHealthLines(t *testing.T, hook *logtest.Hook) []healthLine {
 			continue
 		}
 		require.Equal(t, log.InfoLevel, e.Level)
-		raw, err := json.Marshal(e.Data)
+		var raw, err = json.Marshal(e.Data)
 		require.NoError(t, err)
 		var line healthLine
 		require.NoError(t, json.Unmarshal(raw, &line))
@@ -90,7 +90,7 @@ func (s *scriptedStream) Send(m *pm.Response) error {
 func (s *scriptedStream) RecvMsg(m *pm.Request) error {
 	s.mu.Lock()
 	if len(s.requests) == 0 {
-		hold := s.hold
+		var hold = s.hold
 		s.mu.Unlock()
 		if hold != nil {
 			<-hold
@@ -157,7 +157,7 @@ type testBinding struct {
 // openRequest builds an Open around a real generated specification, with one
 // binding per testBinding.
 func openRequest(bindings []testBinding, rng *pf.RangeSpec) *pm.Request_Open {
-	raw, err := os.ReadFile("../../materialize-boilerplate/testdata/validate_apply_test_cases/generated_specs/base.flow.proto")
+	var raw, err = os.ReadFile("../../materialize-boilerplate/testdata/validate_apply_test_cases/generated_specs/base.flow.proto")
 	if err != nil {
 		panic(err)
 	}
@@ -166,10 +166,10 @@ func openRequest(bindings []testBinding, rng *pf.RangeSpec) *pm.Request_Open {
 		panic(err)
 	}
 	spec.Name = pf.Materialization("test/materialization")
-	template := *spec.Bindings[0]
+	var template = *spec.Bindings[0]
 	spec.Bindings = nil
 	for _, b := range bindings {
-		binding := template
+		var binding = template
 		binding.ResourcePath = b.path
 		binding.DeltaUpdates = b.delta
 		spec.Bindings = append(spec.Bindings, &binding)
@@ -232,17 +232,17 @@ func (t *scriptedTransactor) Load(it *LoadIterator, loaded func(int, json.RawMes
 }
 
 func (t *scriptedTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
-	stored := make(storedCounts)
+	var stored = make(storedCounts)
 	for it.Next(t.hardDelete) {
 		stored[it.Binding]++
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
-	round := it.Round
-	completes := t.completes
+	var round = it.Round
+	var completes = t.completes
 
-	doReport := func() {
+	var doReport = func() {
 		if t.report == nil {
 			return
 		}
@@ -296,11 +296,11 @@ func (t *scriptedTransactor) Acknowledge(context.Context, []json.RawMessage, []s
 // the health lines it logged.
 func runHealthScenario(t *testing.T, tr *scriptedTransactor, open *pm.Request_Open, txns []txn, hold chan struct{}, beforeEOF func(hook *logtest.Hook)) []healthLine {
 	t.Helper()
-	hook := logtest.NewGlobal()
+	var hook = logtest.NewGlobal()
 	defer hook.Reset()
 
-	stream := &scriptedStream{requests: scriptRequests(txns), hold: hold}
-	done := make(chan error, 1)
+	var stream = &scriptedStream{requests: scriptRequests(txns), hold: hold}
+	var done = make(chan error, 1)
 	go func() {
 		done <- RunTransactions(context.Background(), tr, stream, open, log.InfoLevel)
 	}()
@@ -341,14 +341,14 @@ var twoBindings = []testBinding{{path: []string{"schema", "alpha"}}, {path: []st
 
 func exactReport(inserted, updated, deleted int64) func(int, int, int64) *RowStats {
 	return func(int, int, int64) *RowStats {
-		s := ExactRowStats(inserted, updated, deleted)
+		var s = ExactRowStats(inserted, updated, deleted)
 		return &s
 	}
 }
 
 func TestHealthClassification(t *testing.T) {
 	// One document of every (Exists, Delete) combination.
-	stores := []pm.Request{
+	var stores = []pm.Request{
 		storeReq(0, "new", false, false),
 		storeReq(0, "existing", true, false),
 		storeReq(0, "deleted-existing", true, true),
@@ -356,14 +356,14 @@ func TestHealthClassification(t *testing.T) {
 	}
 
 	t.Run("hard deletes on", func(t *testing.T) {
-		tr := &scriptedTransactor{
+		var tr = &scriptedTransactor{
 			bindings:   twoBindings,
 			hardDelete: true,
 			report:     exactReport(1, 1, 1),
 		}
-		lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), []txn{{stores: stores}}, nil, nil)
+		var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), []txn{{stores: stores}}, nil, nil)
 		require.Len(t, lines, 1)
-		l := lines[0]
+		var l = lines[0]
 		require.Equal(t, "ok", l.Verdict)
 		require.Equal(t, "exact", l.Fidelity)
 		require.Equal(t, int64(1), l.Expected.Insert)
@@ -376,13 +376,13 @@ func TestHealthClassification(t *testing.T) {
 	})
 
 	t.Run("hard deletes off", func(t *testing.T) {
-		tr := &scriptedTransactor{
+		var tr = &scriptedTransactor{
 			bindings: twoBindings,
 			report:   exactReport(2, 2, 0),
 		}
-		lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), []txn{{stores: stores}}, nil, nil)
+		var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), []txn{{stores: stores}}, nil, nil)
 		require.Len(t, lines, 1)
-		l := lines[0]
+		var l = lines[0]
 		require.Equal(t, "ok", l.Verdict)
 		require.Equal(t, int64(2), l.Expected.Insert)
 		require.Equal(t, int64(2), l.Expected.Update)
@@ -393,26 +393,26 @@ func TestHealthClassification(t *testing.T) {
 }
 
 func TestHealthWindowAggregation(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings:      twoBindings,
 		loadedPerLoad: 1,
 		report: func(round, binding int, stored int64) *RowStats {
-			s := ExactRowStats(stored, 0, 0)
+			var s = ExactRowStats(stored, 0, 0)
 			return &s
 		},
 	}
-	txns := []txn{
+	var txns = []txn{
 		{loads: []pm.Request{loadReq(0, "a")}, stores: []pm.Request{storeReq(0, "a", false, false), storeReq(1, "b", false, false)}},
 		{stores: []pm.Request{storeReq(0, "c", false, false)}},
 		{}, // An empty round is healthy and doesn't dilute fidelity.
 		{loads: []pm.Request{loadReq(1, "d"), loadReq(1, "e")}, stores: []pm.Request{storeReq(1, "d", false, false)}},
 	}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 2)
 
 	// The first judged round with stores is logged at once; those that follow
 	// within the interval roll up into one line, flushed here by EOF.
-	first := lines[0]
+	var first = lines[0]
 	require.Equal(t, "ok", first.Verdict)
 	require.Equal(t, "exact", first.Fidelity)
 	require.Equal(t, 1, first.Rounds)
@@ -424,7 +424,7 @@ func TestHealthWindowAggregation(t *testing.T) {
 	require.Equal(t, int64(2), first.Expected.Insert)
 	require.Equal(t, int64(2), first.Actual.Inserted)
 
-	rest := lines[1]
+	var rest = lines[1]
 	require.Equal(t, "ok", rest.Verdict)
 	require.Equal(t, "exact", rest.Fidelity)
 	require.Equal(t, 3, rest.Rounds)
@@ -444,31 +444,31 @@ func TestHealthWindowAggregation(t *testing.T) {
 }
 
 func TestHealthMismatchFastPath(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report: func(round, binding int, stored int64) *RowStats {
 			if round == 2 && binding == 1 {
 				// A merge that appended instead of updating.
-				s := ExactRowStats(stored, 0, 0)
+				var s = ExactRowStats(stored, 0, 0)
 				return &s
 			}
-			s := ExactRowStats(0, stored, 0)
+			var s = ExactRowStats(0, stored, 0)
 			return &s
 		},
 	}
-	updates := func(binding int, keys ...string) (out []pm.Request) {
+	var updates = func(binding int, keys ...string) (out []pm.Request) {
 		for _, k := range keys {
 			out = append(out, storeReq(binding, k, true, false))
 		}
 		return out
 	}
-	txns := []txn{
+	var txns = []txn{
 		{stores: updates(0, "a")},
 		{stores: updates(0, "b")},
 		{stores: append(updates(0, "c"), updates(1, "d", "e")...)},
 		{stores: updates(0, "f")},
 	}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 4)
 
 	// Round 0 is logged at once, round 1 accumulates and is flushed ahead of
@@ -480,7 +480,7 @@ func TestHealthMismatchFastPath(t *testing.T) {
 	require.Equal(t, 1, lines[1].Rounds)
 	require.Equal(t, 1, lines[1].FirstRound)
 
-	m := lines[2]
+	var m = lines[2]
 	require.Equal(t, "mismatch", m.Verdict)
 	require.Equal(t, 1, m.Rounds)
 	require.Equal(t, 2, m.FirstRound)
@@ -504,11 +504,11 @@ func TestHealthMismatchFastPath(t *testing.T) {
 // that follow within the interval roll up into a single mismatch line whose
 // entries sum expected and actual per check and binding.
 func TestHealthMismatchRollup(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report: func(round, binding int, stored int64) *RowStats {
 			// Every round appends instead of updating.
-			s := ExactRowStats(stored, 0, 0)
+			var s = ExactRowStats(stored, 0, 0)
 			return &s
 		},
 	}
@@ -519,16 +519,16 @@ func TestHealthMismatchRollup(t *testing.T) {
 			storeReq(1, k, true, false),
 		}})
 	}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 2)
 
-	first := lines[0]
+	var first = lines[0]
 	require.Equal(t, "mismatch", first.Verdict)
 	require.Equal(t, 1, first.Rounds)
 	require.Equal(t, 0, first.FirstRound)
 	require.Len(t, first.Mismatches, 4)
 
-	rest := lines[1]
+	var rest = lines[1]
 	require.Equal(t, "mismatch", rest.Verdict)
 	require.Equal(t, 3, rest.Rounds)
 	require.Equal(t, 1, rest.FirstRound)
@@ -547,18 +547,18 @@ func TestHealthMismatchRollup(t *testing.T) {
 func TestConnectorIdentityFromEnv(t *testing.T) {
 	t.Setenv("CONNECTOR_NAME", "materialize-variant")
 	t.Setenv("CONNECTOR_VERSION", "v1-abc1234")
-	name, version := connectorIdentity()
+	var name, version = connectorIdentity()
 	require.Equal(t, "materialize-variant", name)
 	require.Equal(t, "v1-abc1234", version)
 }
 
 func TestHealthChecks(t *testing.T) {
-	stores := []pm.Request{
+	var stores = []pm.Request{
 		storeReq(0, "a", false, false),
 		storeReq(0, "b", true, false),
 		storeReq(0, "c", true, true),
 	}
-	deltaBindings := []testBinding{{path: []string{"schema", "alpha"}, delta: true}}
+	var deltaBindings = []testBinding{{path: []string{"schema", "alpha"}, delta: true}}
 
 	for _, tt := range []struct {
 		name       string
@@ -614,11 +614,11 @@ func TestHealthChecks(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			bindings := tt.bindings
+			var bindings = tt.bindings
 			if bindings == nil {
 				bindings = twoBindings
 			}
-			txStores := stores
+			var txStores = stores
 			if tt.bindings != nil {
 				// Delta bindings never see Exists.
 				txStores = []pm.Request{
@@ -627,12 +627,12 @@ func TestHealthChecks(t *testing.T) {
 					storeReq(0, "c", false, false),
 				}
 			}
-			tr := &scriptedTransactor{
+			var tr = &scriptedTransactor{
 				bindings:   bindings,
 				hardDelete: tt.hardDelete,
-				report:     func(int, int, int64) *RowStats { s := tt.stats; return &s },
+				report:     func(int, int, int64) *RowStats { var s = tt.stats; return &s },
 			}
-			lines := runHealthScenario(t, tr, openRequest(bindings, nil), []txn{{stores: txStores}}, nil, nil)
+			var lines = runHealthScenario(t, tr, openRequest(bindings, nil), []txn{{stores: txStores}}, nil, nil)
 			require.Len(t, lines, 1)
 			if tt.want == nil {
 				require.Equal(t, "ok", lines[0].Verdict)
@@ -646,16 +646,16 @@ func TestHealthChecks(t *testing.T) {
 }
 
 func TestHealthLoadResponses(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings:      twoBindings,
 		loadedPerLoad: 2, // A load query returning more documents than keys.
 		report:        exactReport(1, 0, 0),
 	}
-	txns := []txn{{
+	var txns = []txn{{
 		loads:  []pm.Request{loadReq(0, "a")},
 		stores: []pm.Request{storeReq(0, "a", false, false)},
 	}}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 1)
 	require.Equal(t, "mismatch", lines[0].Verdict)
 	require.Equal(t, int64(1), lines[0].LoadRequests)
@@ -664,22 +664,22 @@ func TestHealthLoadResponses(t *testing.T) {
 }
 
 func TestHealthFidelityNone(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report:   func(int, int, int64) *RowStats { return &RowStats{} },
 	}
-	txns := []txn{
+	var txns = []txn{
 		{stores: []pm.Request{storeReq(0, "a", false, false)}},
 		{stores: []pm.Request{storeReq(1, "b", true, false)}},
 	}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 2)
 	for _, l := range lines {
 		require.Equal(t, "unchecked", l.Verdict)
 		require.Equal(t, "none", l.Fidelity)
 		require.Equal(t, 0, l.Pending)
 	}
-	sum := sumLines(lines)
+	var sum = sumLines(lines)
 	require.Equal(t, 2, sum.Rounds)
 	require.Equal(t, int64(1), sum.Expected.Insert)
 	require.Equal(t, int64(1), sum.Expected.Update)
@@ -688,18 +688,18 @@ func TestHealthFidelityNone(t *testing.T) {
 func TestHealthNeverReports(t *testing.T) {
 	// A connector that reports nothing still gets its expected counts logged,
 	// with every stored binding pending.
-	tr := &scriptedTransactor{bindings: twoBindings}
-	txns := []txn{
+	var tr = &scriptedTransactor{bindings: twoBindings}
+	var txns = []txn{
 		{stores: []pm.Request{storeReq(0, "a", false, false), storeReq(1, "b", false, false)}},
 		{stores: []pm.Request{storeReq(0, "c", false, false)}},
 	}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 2)
 	for _, l := range lines {
 		require.Equal(t, "unchecked", l.Verdict)
 		require.Equal(t, "none", l.Fidelity)
 	}
-	sum := sumLines(lines)
+	var sum = sumLines(lines)
 	require.Equal(t, 2, sum.Rounds)
 	require.Equal(t, 3, sum.Pending)
 	require.Equal(t, int64(3), sum.Expected.Insert)
@@ -707,31 +707,31 @@ func TestHealthNeverReports(t *testing.T) {
 }
 
 func TestHealthPendingBindingAtWindowFlush(t *testing.T) {
-	prior := healthFlushInterval
+	var prior = healthFlushInterval
 	healthFlushInterval = 20 * time.Millisecond
 	t.Cleanup(func() { healthFlushInterval = prior })
 
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report: func(round, binding int, stored int64) *RowStats {
 			if binding == 1 {
 				return nil // Never reports.
 			}
-			s := ExactRowStats(stored, 0, 0)
+			var s = ExactRowStats(stored, 0, 0)
 			return &s
 		},
 	}
-	txns := []txn{
+	var txns = []txn{
 		{stores: []pm.Request{storeReq(0, "a", false, false), storeReq(1, "b", false, false)}},
 		{stores: []pm.Request{storeReq(0, "c", false, false)}},
 	}
 
 	// Hold the stream open past a window flush, so the flush (not EOF)
 	// judges the round with the unreported binding.
-	hold := make(chan struct{})
+	var hold = make(chan struct{})
 	var atFlush []healthLine
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, hold, func(hook *logtest.Hook) {
-		deadline := time.Now().Add(5 * time.Second)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, hold, func(hook *logtest.Hook) {
+		var deadline = time.Now().Add(5 * time.Second)
 		for time.Now().Before(deadline) {
 			if atFlush = decodeHealthLines(t, hook); len(atFlush) >= 2 {
 				// A late report for the round just judged as pending.
@@ -758,7 +758,7 @@ func TestHealthPendingBindingAtWindowFlush(t *testing.T) {
 	// The report that finally arrived for the judged round is logged as an
 	// actual-only unchecked round rather than lost.
 	require.Len(t, lines, 3)
-	late := lines[2]
+	var late = lines[2]
 	require.Equal(t, "unchecked", late.Verdict)
 	require.Equal(t, 1, late.Rounds)
 	require.Equal(t, 0, late.FirstRound)
@@ -770,31 +770,31 @@ func TestHealthPendingBindingAtWindowFlush(t *testing.T) {
 func TestHealthDeferredReports(t *testing.T) {
 	// Reports made from Acknowledge, while the next round's stores are being
 	// read, attribute to the round given.
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings:     twoBindings,
 		deferReports: true,
 		report: func(round, binding int, stored int64) *RowStats {
-			s := ExactRowStats(stored, 0, 0)
+			var s = ExactRowStats(stored, 0, 0)
 			return &s
 		},
 	}
-	txns := []txn{
+	var txns = []txn{
 		{stores: []pm.Request{storeReq(0, "a", false, false)}},
 		{stores: []pm.Request{storeReq(0, "b", false, false), storeReq(0, "c", false, false)}},
 		{stores: []pm.Request{storeReq(1, "d", false, false)}},
 	}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 2)
 	for _, l := range lines {
 		require.Equal(t, "ok", l.Verdict)
 	}
-	sum := sumLines(lines)
+	var sum = sumLines(lines)
 	require.Equal(t, 3, sum.Rounds)
 	require.Equal(t, int64(4), sum.Actual.Inserted)
 }
 
 func TestHealthRecovery(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report:   exactReport(1, 0, 0),
 		recoveryReports: func(be *BindingEvents) {
@@ -803,11 +803,11 @@ func TestHealthRecovery(t *testing.T) {
 			be.ReportRowStats(7, []string{"schema", "beta"}, ExactRowStats(1, 0, 0))
 		},
 	}
-	txns := []txn{{stores: []pm.Request{storeReq(0, "a", false, false)}}}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+	var txns = []txn{{stores: []pm.Request{storeReq(0, "a", false, false)}}}
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 	require.Len(t, lines, 2)
 
-	r := lines[0]
+	var r = lines[0]
 	require.True(t, r.Recovery)
 	require.Equal(t, "unchecked", r.Verdict)
 	require.Equal(t, "exact", r.Fidelity)
@@ -825,21 +825,21 @@ func TestHealthRecovery(t *testing.T) {
 }
 
 func TestHealthSharded(t *testing.T) {
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report: func(round, binding int, stored int64) *RowStats {
 			// The primary merges its peers' work too, so its actuals exceed
 			// its own expected counts.
-			s := ExactRowStats(stored+1, 0, 0)
+			var s = ExactRowStats(stored+1, 0, 0)
 			return &s
 		},
 	}
-	txns := []txn{
+	var txns = []txn{
 		{stores: []pm.Request{storeReq(0, "a", false, false)}},
 		{stores: []pm.Request{storeReq(1, "b", false, false)}},
 	}
-	rng := &pf.RangeSpec{KeyBegin: 0, KeyEnd: math.MaxUint32 / 2, RClockEnd: math.MaxUint32}
-	lines := runHealthScenario(t, tr, openRequest(twoBindings, rng), txns, nil, nil)
+	var rng = &pf.RangeSpec{KeyBegin: 0, KeyEnd: math.MaxUint32 / 2, RClockEnd: math.MaxUint32}
+	var lines = runHealthScenario(t, tr, openRequest(twoBindings, rng), txns, nil, nil)
 	require.Len(t, lines, 2)
 	for _, l := range lines {
 		require.True(t, l.Sharded)
@@ -850,26 +850,26 @@ func TestHealthSharded(t *testing.T) {
 	// actuals are reported; everything else rolls up to EOF.
 	require.Equal(t, "none", lines[0].Fidelity)
 	require.Equal(t, "exact", lines[1].Fidelity)
-	sum := sumLines(lines)
+	var sum = sumLines(lines)
 	require.Equal(t, 2, sum.Rounds)
 	require.Equal(t, int64(2), sum.Expected.Insert)
 	require.Equal(t, int64(4), sum.Actual.Inserted)
 }
 
 func TestHealthTruncation(t *testing.T) {
-	txns := []txn{{
+	var txns = []txn{{
 		stores:    []pm.Request{storeReq(0, "a", false, false)},
 		completes: []int{0, 1},
 	}}
-	totalReport := func(_, _ int, stored int64) *RowStats {
-		s := TotalRowStats(stored)
+	var totalReport = func(_, _ int, stored int64) *RowStats {
+		var s = TotalRowStats(stored)
 		return &s
 	}
 
 	t.Run("reported", func(t *testing.T) {
-		truncated := int64(3)
-		tr := &scriptedTransactor{bindings: twoBindings, report: totalReport, truncated: &truncated}
-		lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+		var truncated = int64(3)
+		var tr = &scriptedTransactor{bindings: twoBindings, report: totalReport, truncated: &truncated}
+		var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 		require.Len(t, lines, 1)
 		require.Equal(t, "ok", lines[0].Verdict)
 		require.Equal(t, 2, lines[0].Bindings)
@@ -880,8 +880,8 @@ func TestHealthTruncation(t *testing.T) {
 	})
 
 	t.Run("never reported", func(t *testing.T) {
-		tr := &scriptedTransactor{bindings: twoBindings, report: totalReport}
-		lines := runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
+		var tr = &scriptedTransactor{bindings: twoBindings, report: totalReport}
+		var lines = runHealthScenario(t, tr, openRequest(twoBindings, nil), txns, nil, nil)
 		require.Len(t, lines, 1)
 		require.Equal(t, "ok", lines[0].Verdict)
 		require.Equal(t, int64(2), lines[0].Expected.Truncate)
@@ -891,24 +891,24 @@ func TestHealthTruncation(t *testing.T) {
 
 func TestHealthUnknownBinding(t *testing.T) {
 	// A report for a path the spec doesn't have is surfaced, not dropped.
-	tr := &scriptedTransactor{
+	var tr = &scriptedTransactor{
 		bindings: twoBindings,
 		report: func(round, binding int, stored int64) *RowStats {
-			s := ExactRowStats(stored, 0, 0)
+			var s = ExactRowStats(stored, 0, 0)
 			return &s
 		},
 	}
 	tr.recoveryReports = nil
-	txns := []txn{{stores: []pm.Request{storeReq(0, "a", false, false)}}}
+	var txns = []txn{{stores: []pm.Request{storeReq(0, "a", false, false)}}}
 
-	hook := logtest.NewGlobal()
+	var hook = logtest.NewGlobal()
 	defer hook.Reset()
-	stream := &scriptedStream{requests: scriptRequests(txns)}
-	wrapped := &reportingTransactor{scriptedTransactor: tr, extra: func(be *BindingEvents, round int) {
+	var stream = &scriptedStream{requests: scriptRequests(txns)}
+	var wrapped = &reportingTransactor{scriptedTransactor: tr, extra: func(be *BindingEvents, round int) {
 		be.ReportRowStats(round, []string{"schema", "gamma"}, TotalRowStats(3))
 	}}
 	require.NoError(t, RunTransactions(context.Background(), wrapped, stream, openRequest(twoBindings, nil), log.InfoLevel))
-	lines := decodeHealthLines(t, hook)
+	var lines = decodeHealthLines(t, hook)
 	require.Len(t, lines, 1)
 	require.Equal(t, "mismatch", lines[0].Verdict)
 	require.Equal(t, 2, lines[0].Bindings)
@@ -923,13 +923,13 @@ type reportingTransactor struct {
 }
 
 func (t *reportingTransactor) NewTransactor(ctx context.Context, open pm.Request_Open, be *BindingEvents) (Transactor, *pm.Response_Opened, *MaterializeOptions, error) {
-	_, opened, opts, err := t.scriptedTransactor.NewTransactor(ctx, open, be)
+	var _, opened, opts, err = t.scriptedTransactor.NewTransactor(ctx, open, be)
 	return t, opened, opts, err
 }
 
 func (t *reportingTransactor) Store(it *StoreIterator) (StartCommitFunc, error) {
-	round := it.Round
-	inner, err := t.scriptedTransactor.Store(it)
+	var round = it.Round
+	var inner, err = t.scriptedTransactor.Store(it)
 	if err != nil {
 		return nil, err
 	}
@@ -942,12 +942,12 @@ func (t *reportingTransactor) Store(it *StoreIterator) (StartCommitFunc, error) 
 func TestHealthReportWithoutTransactions(t *testing.T) {
 	// BindingEvents outside a transactions session, as in an Apply drain,
 	// accept reports and do nothing.
-	be := NewBindingEvents()
+	var be = NewBindingEvents()
 	be.ReportRowStats(0, []string{"a"}, TotalRowStats(1))
 }
 
 func TestHealthTrackerPanicSafety(t *testing.T) {
-	h := newHealthTracker(openRequest(twoBindings, nil))
+	var h = newHealthTracker(openRequest(twoBindings, nil))
 	h.log = func(log.Fields, string) { panic(fmt.Errorf("sink is broken")) }
 	h.recordExpected(0, 0, 0)
 	h.report(0, []string{"schema", "alpha"}, TotalRowStats(0))

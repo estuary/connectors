@@ -102,7 +102,7 @@ func (d FlagDefault) Resolve(createdAt CreatedAt) bool {
 		return d.value
 	}
 
-	date := createdAt.date
+	var date = createdAt.date
 	if createdAt.IsBrandNew() {
 		date = time.Now().UTC().Format(CreatedAtLayout)
 	}
@@ -140,8 +140,8 @@ func ResolveFlags(raw string, defaults map[string]FlagDefault, createdAt Created
 // record. That is what makes it safe to apply it lazily, out of band: a task
 // behaves identically before and after its config catches up.
 func PendingFlagPins(raw string, defaults map[string]FlagDefault, createdAt CreatedAt) map[string]bool {
-	mentioned := mentionedFlags(raw)
-	pins := map[string]bool{}
+	var mentioned = mentionedFlags(raw)
+	var pins = map[string]bool{}
 	for flag, d := range defaults {
 		if d.enabledFrom == "" || mentioned[flag] {
 			continue
@@ -178,7 +178,7 @@ func PinnedFlagsString(raw string, toPin map[string]bool) string {
 // mentionedFlags returns the set of flag names mentioned in a raw feature flags
 // string, with any 'no_' prefix stripped.
 func mentionedFlags(raw string) map[string]bool {
-	mentioned := make(map[string]bool)
+	var mentioned = make(map[string]bool)
 	for _, flagName := range strings.Split(raw, ",") {
 		flagName = strings.TrimPrefix(strings.TrimSpace(flagName), "no_")
 		if flagName != "" {

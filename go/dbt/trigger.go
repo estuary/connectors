@@ -176,7 +176,7 @@ func CancelRun(config JobConfig, runId int) error {
 }
 
 func req(config JobConfig, method, url string, body io.Reader) (*Response, error) {
-	req, err := http.NewRequest(method, url, body)
+	var req, err = http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

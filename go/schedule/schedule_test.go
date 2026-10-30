@@ -25,7 +25,7 @@ func TestPeriodicSchedule(t *testing.T) {
 		{"10s", "2024-02-15T19:34:56Z", "2024-02-15T19:35:06Z"},
 		{"1s", "2024-02-15T19:34:56Z", "2024-02-15T19:34:57Z"},
 	} {
-		sched, err := Parse(tc.Schedule)
+		var sched, err = Parse(tc.Schedule)
 		require.NoError(t, err)
 		after, err := time.Parse(time.RFC3339, tc.After)
 		require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestDailySchedule(t *testing.T) {
 		{"daily at 13:55Z", "2024-02-15T13:56:00Z", "2024-02-16T13:55:00Z"},
 		{"daily at 13:55Z", "2024-02-15T23:00:00Z", "2024-02-16T13:55:00Z"},
 	} {
-		sched, err := Parse(tc.Schedule)
+		var sched, err = Parse(tc.Schedule)
 		require.NoError(t, err)
 		after, err := time.Parse(time.RFC3339, tc.After)
 		require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestFixedSchedule(t *testing.T) {
 		{"30s", []byte("jitterbytes"), "2024-02-15T02:03:22Z", "2024-02-15T02:03:23Z"},
 		{"30s", []byte("jitterbytes"), "2024-02-15T02:03:24Z", "2024-02-15T02:03:53Z"},
 	} {
-		sched, err := newFixedSchedule(tc.Schedule, tc.Seed)
+		var sched, err = newFixedSchedule(tc.Schedule, tc.Seed)
 		require.NoError(t, err)
 		after, err := time.Parse(time.RFC3339Nano, tc.After)
 		require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestAlternatingSchedule(t *testing.T) {
 			{"72h", "5m", "08:00", "17:00", "2024-02-15T09:00:00Z", "2024-02-15T09:05:00Z"},
 			{"5m", "72h", "08:00", "17:00", "2024-02-15T09:00:00Z", "2024-02-15T17:00:00Z"},
 		} {
-			sched, err := NewAlternatingSchedule(tc.DefaultInterval, tc.AlternateInterval, tc.AlternateStart, tc.AlternateEnd, "", "UTC", nil)
+			var sched, err = NewAlternatingSchedule(tc.DefaultInterval, tc.AlternateInterval, tc.AlternateStart, tc.AlternateEnd, "", "UTC", nil)
 			require.NoError(t, err)
 			after, err := time.Parse(time.RFC3339, tc.After)
 			require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestAlternatingSchedule(t *testing.T) {
 			// Friday is enabled.
 			{"336h", "5m", "3:00", "05:00", "F", "2024-06-21T6:00:00Z", "2024-06-28T03:00:00Z"},
 		} {
-			sched, err := NewAlternatingSchedule(tc.DefaultInterval, tc.AlternateInterval, tc.AlternateStart, tc.AlternateEnd, tc.AlternateActiveDays, "UTC", nil)
+			var sched, err = NewAlternatingSchedule(tc.DefaultInterval, tc.AlternateInterval, tc.AlternateStart, tc.AlternateEnd, tc.AlternateActiveDays, "UTC", nil)
 			require.NoError(t, err)
 			after, err := time.Parse(time.RFC3339, tc.After)
 			require.NoError(t, err)
@@ -251,7 +251,7 @@ func TestClockTimeBetween(t *testing.T) {
 		{"09:00", "17:00", "America/St_Johns", "2024-05-15T19:29:59Z", true},
 		{"09:00", "17:00", "America/St_Johns", "2024-05-15T19:30:00Z", false},
 	} {
-		loc, err := time.LoadLocation(tc.loc)
+		var loc, err = time.LoadLocation(tc.loc)
 		require.NoError(t, err)
 		start, err := newClockTime(tc.start, loc)
 		require.NoError(t, err)
@@ -275,20 +275,20 @@ func TestParseActiveDays(t *testing.T) {
 		{"Su,T-Th", [7]bool{true, false, true, true, true, false, false}},
 		{"Su-M,Th-S", [7]bool{true, true, false, false, true, true, true}},
 	} {
-		got, err := parseActiveDays(tc.in)
+		var got, err = parseActiveDays(tc.in)
 		require.NoError(t, err)
 		require.Equal(t, tc.want, got)
 	}
 }
 
 func TestIntervalAt(t *testing.T) {
-	at := func(ts string) time.Time {
-		parsed, err := time.Parse(time.RFC3339, ts)
+	var at = func(ts string) time.Time {
+		var parsed, err = time.Parse(time.RFC3339, ts)
 		require.NoError(t, err)
 		return parsed
 	}
 
-	fixed, err := NewFixedSchedule("30m", nil)
+	var fixed, err = NewFixedSchedule("30m", nil)
 	require.NoError(t, err)
 	require.Equal(t, 30*time.Minute, IntervalAt(fixed, at("2024-02-15T01:00:00Z")))
 	require.Equal(t, time.Hour, IntervalAt(NewPeriodicSchedule(time.Hour), at("2024-02-15T01:00:00Z")))

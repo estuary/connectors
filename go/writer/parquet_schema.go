@@ -87,11 +87,11 @@ const (
 
 // makeNode translates a ParquetSchemaElement into an actual parquet schema node.
 func makeNode(e ParquetSchemaElement) schema.Node {
-	repetition := parquet.Repetitions.Required
+	var repetition = parquet.Repetitions.Required
 	if !e.Required {
 		repetition = parquet.Repetitions.Optional
 	}
-	fieldId := int32(-1)
+	var fieldId = int32(-1)
 	if e.FieldId != nil {
 		fieldId = *e.FieldId
 	}
@@ -281,12 +281,12 @@ func WithParquetSchemaJSONAsVariant() ParquetSchemaOption {
 }
 
 func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts ...ParquetSchemaOption) ParquetSchemaElement {
-	cfg := parquetSchemaConfig{}
+	var cfg = parquetSchemaConfig{}
 	for _, o := range opts {
 		o(&cfg)
 	}
 
-	out := ParquetSchemaElement{
+	var out = ParquetSchemaElement{
 		Name:     p.Field,
 		Required: !slices.Contains(p.Inference.Types, "null") && (p.Inference.Exists == pf.Inference_MUST || p.Inference.DefaultJson != nil),
 	}
@@ -306,7 +306,7 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 		return out
 	}
 
-	hadType := false
+	var hadType = false
 	for _, t := range p.Inference.Types {
 		if t == "null" {
 			continue

@@ -13,9 +13,9 @@ func TestExtendedLoggerWaitingForDocsRace(t *testing.T) {
 	// sequence ~100 times or so will reliably produce a panic unless sufficient
 	// synchronization is provided in the extended logger event handler.
 	for idx := 0; idx < 100; idx++ {
-		be := NewBindingEvents()
-		logger := newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
-		handler := logger.handler()
+		var be = NewBindingEvents()
+		var logger = newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
+		var handler = logger.handler()
 
 		handler(sentStartedCommit)
 
@@ -77,9 +77,9 @@ func TestLoads(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			be := NewBindingEvents()
-			logger := newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
-			handler := logger.handler()
+			var be = NewBindingEvents()
+			var logger = newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
+			var handler = logger.handler()
 			tt.do(handler)
 		})
 

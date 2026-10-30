@@ -18,13 +18,13 @@ import (
 func TestStateKeyFilter(t *testing.T) {
 	// nil processes everything, including keys that can't be enumerated from
 	// the active bindings.
-	all := StateKeyFilter(nil)
+	var all = StateKeyFilter(nil)
 	require.True(t, all("a_table.v1"))
 	require.True(t, all("removed_table.v1"))
 
 	// A non-nil list processes exactly those keys; an empty list processes
 	// nothing.
-	some := StateKeyFilter([]string{"a_table.v1"})
+	var some = StateKeyFilter([]string{"a_table.v1"})
 	require.True(t, some("a_table.v1"))
 	require.False(t, some("b_table.v1"))
 	require.False(t, StateKeyFilter([]string{})("a_table.v1"))
@@ -62,7 +62,7 @@ func TestSplitStatePatches(t *testing.T) {
 		{name: "malformed", payload: "[{\"a\":1}", wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SplitStatePatches(json.RawMessage(tt.payload))
+			var got, err = SplitStatePatches(json.RawMessage(tt.payload))
 			if tt.wantErr {
 				require.Error(t, err)
 				return

@@ -75,7 +75,7 @@ func SetJSONProperty(doc json.RawMessage, path []string, value any) (json.RawMes
 
 	var current = root
 	for _, p := range path[:len(path)-1] {
-		next, ok := current[p].(map[string]any)
+		var next, ok = current[p].(map[string]any)
 		if !ok {
 			if existing, present := current[p]; present && existing != nil {
 				return nil, fmt.Errorf("property %q is not an object", p)
