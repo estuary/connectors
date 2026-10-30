@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -18,6 +19,13 @@ import (
 // The limit is not checkpoint state. Recovery resumes from the offset that Snowflake
 // reports as committed, whatever batch boundaries the interrupted attempt cut.
 var streamV2BatchSizeLimit = 256 * 1024 * 1024
+
+// streamV2BatchFileSlots is the number of batch files that may exist on local disk
+// at once. A batch file stays under 512 MiB, so the slots bound disk use to 16 GiB.
+//
+// It must be at least streamV2ChannelsPerShard, because every channel of the binding
+// being written can hold an open batch file while a row waits for a slot.
+const streamV2BatchFileSlots = 32
 
 // streamV2PaceBytesPerSecond is the uncompressed byte rate this write path allows
 // itself on one channel.
@@ -65,10 +73,14 @@ type streamV2Channel struct {
 	// limiter meters the uncompressed bytes this channel hands to Snowflake. One limiter
 	// per channel, because Snowflake meters each channel independently.
 	limiter *rate.Limiter
+
+	// batchFiles holds a slot for each batch file of this channel, from the file's
+	// creation until its removal.
+	batchFiles *semaphore.Weighted
 }
 
 // newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, batchFiles *semaphore.Weighted, channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
 	var c = &streamV2Channel{
 		binding:     b,
 		client:      client,
@@ -76,6 +88,7 @@ func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, channelName 
 		keyRange:    keyRange,
 		batch:       streamV2Batch{columns: b.columns},
 		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
+		batchFiles:  batchFiles,
 		progress: struct {
 			routed       int64
 			checkpointed int64
@@ -126,11 +139,13 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 		c.appends.SetLimit(1)
 	} else if c.appendsCtx.Err() != nil {
 		os.Remove(file.path)
+		c.batchFiles.Release(1)
 		return fmt.Errorf("appending to channel %q of %s: %w", c.channelName, c.binding.table, c.appends.Wait())
 	}
 
 	var appendsCtx = c.appendsCtx
 	c.appends.Go(func() error {
+		defer c.batchFiles.Release(1)
 		defer os.Remove(file.path)
 		if err := streamV2Pace(appendsCtx, c.limiter, file.uncompressedBytes); err != nil {
 			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
@@ -169,6 +184,9 @@ func (c *streamV2Channel) writeRow(ctx context.Context, converted []any) error {
 	}
 
 	if c.batch.empty() {
+		if err := c.batchFiles.Acquire(ctx, 1); err != nil {
+			return err
+		}
 		c.batch.firstOffset = offset
 	}
 	if err := c.batch.writeRow(converted); err != nil {

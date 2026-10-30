@@ -186,4 +186,44 @@ func TestStreamV2SendFailsOnceAnAppendHasFailed(t *testing.T) {
 	c.batch.columns = m.bindings[0].columns
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"b", 2}))
 	require.ErrorContains(t, c.sendBatch(ctx), "row is not a JSON object")
+	require.True(t, m.batchFiles.TryAcquire(streamV2BatchFileSlots), "a removed batch file kept its slot")
+}
+
+// TestStreamV2BatchFileSlotsCoverAChannelLayout covers the deadlock the batch file
+// slots could cause: a row of the binding being written waits for a slot, and only
+// that binding's open batches, which wait on the writer, hold the rest.
+func TestStreamV2BatchFileSlotsCoverAChannelLayout(t *testing.T) {
+	require.GreaterOrEqual(t, streamV2BatchFileSlots, streamV2ChannelsPerShard)
+}
+
+// TestStreamV2BatchFileSlotsReturned covers the slot accounting: every batch file
+// returns its slot once its append completes, across bindings and batch cuts.
+func TestStreamV2BatchFileSlotsReturned(t *testing.T) {
+	var ctx = context.Background()
+	defer func(n int) { streamV2BatchSizeLimit = n }(streamV2BatchSizeLimit)
+	streamV2BatchSizeLimit = 1000
+
+	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/slots",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	for binding, table := range []string{"ONE", "TWO"} {
+		m.addBinding("DB", "SCH", table, sql.Table{
+			TableShape: sql.TableShape{Binding: binding, DeltaUpdates: true},
+			Identifier: table,
+			Keys:       []sql.Column{{Identifier: `KEY`}},
+			Values:     []sql.Column{{Identifier: `VAL`}},
+			StateKey:   strings.ToLower(table) + ".v1",
+		}, nil)
+	}
+
+	// Each binding cuts several batches on every channel, more in total than
+	// there are slots.
+	var val = strings.Repeat("a", 300)
+	for binding := range 2 {
+		for i := range 200 {
+			require.NoError(t, testWriteRow(ctx, m, binding, []any{fmt.Sprintf("k%d", i), val}))
+		}
+	}
+	var _, err = m.flush(ctx)
+	require.NoError(t, err)
+	require.True(t, m.batchFiles.TryAcquire(streamV2BatchFileSlots), "a removed batch file kept its slot")
 }

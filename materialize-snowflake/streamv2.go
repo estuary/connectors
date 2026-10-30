@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 // streamV2ChannelCheckpointItem represents one channel of a binding, and the
@@ -284,6 +285,9 @@ type streamV2Manager struct {
 
 	client *streamV2Client
 
+	// batchFiles holds one slot per batch file on local disk, across every channel.
+	batchFiles *semaphore.Weighted
+
 	bindings map[int]*streamV2Binding
 	// lastBinding is the binding of the most recently written document, or -1
 	// before the first.
@@ -312,6 +316,7 @@ func newStreamV2Manager(
 		dialect:         dialect,
 		streaming:       streaming,
 		client:          client,
+		batchFiles:      semaphore.NewWeighted(streamV2BatchFileSlots),
 		bindings:        make(map[int]*streamV2Binding),
 		lastBinding:     -1,
 	}, nil
@@ -517,7 +522,7 @@ func (m *streamV2Manager) openChannel(
 	if err != nil {
 		return nil, err
 	}
-	return newStreamV2Channel(b, m.client, channelName, keyRange, routed, committedOffset), nil
+	return newStreamV2Channel(b, m.client, m.batchFiles, channelName, keyRange, routed, committedOffset), nil
 }
 
 // sweep drops the channels this task derived for the binding's table that it no
