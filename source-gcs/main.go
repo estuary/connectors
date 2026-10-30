@@ -121,9 +121,8 @@ func validateBucket(ctx context.Context, cfg config, client *storage.Client) err
 	// (bucket exists & correct access) via the list operation, so we can interpret a "not found" as
 	// a successful outcome.
 	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
-	var apiErr *googleapi.Error
 	_, err := client.Bucket(cfg.Bucket).Object(objectKey).Attrs(ctx)
-	if !errors.As(err, &apiErr) || apiErr.Code != 404 {
+	if apiErr, ok := errors.AsType[*googleapi.Error](err); !ok || apiErr.Code != 404 {
 		return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
 	}
 
