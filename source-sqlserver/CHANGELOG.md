@@ -1,5 +1,10 @@
 # source-sqlserver
 
+## 2026-10-30
+
+### Changed
+- Captures now report that they have started before waiting out `max_startup_delay`, connecting to the database, or running prerequisite checks.
+
 ## 2026-10-29
 
 ### Changed
