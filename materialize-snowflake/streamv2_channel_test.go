@@ -16,9 +16,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// TestStreamV2BatchCutAtTheFileSizeLimit covers the size cap: a batch is sent once
-// its file holds streamV2BatchFileSizeLimit compressed bytes, checked after each row.
-func TestStreamV2BatchCutAtTheFileSizeLimit(t *testing.T) {
+// TestStreamV2BatchCutAtTheSizeLimit covers the size cap: a batch is sent once
+// its rows hold streamV2BatchFileSizeLimit bytes before compression, checked after
+// each row. The rows compress well, so their compressed size stays far below the
+// limit.
+func TestStreamV2BatchCutAtTheSizeLimit(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
 	defer func(n int) { streamV2BatchFileSizeLimit = n }(streamV2BatchFileSizeLimit)
@@ -34,19 +36,17 @@ func TestStreamV2BatchCutAtTheFileSizeLimit(t *testing.T) {
 		StateKey:   "cap.v1",
 	}, nil)
 
-	// The compressor writes its output a block at a time, in the background, so the
-	// file grows some rows behind the batch. Rows are written until one of them
-	// finds the file over the limit and sends the batch.
-	var val = make([]byte, 256*1024)
-	for i := range val {
-		val[i] = 'a' + byte(rand.IntN(26))
+	// Each row is the same number of bytes, so the batch is cut by the row that
+	// brings it to the limit.
+	var val = strings.Repeat("a", 300)
+	var rowBytes = len(fmt.Sprintf(`{"KEY":"k0","VAL":"%s"}`+"\n", val))
+	var cutRow = (streamV2BatchFileSizeLimit + rowBytes - 1) / rowBytes
+
+	for i := 1; i <= cutRow; i++ {
+		require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("k%d", i%10), val}))
+		var sent = m.bindings[0].activeChannels[0].batch.empty()
+		require.Equal(t, i == cutRow, sent, "after row %d of a batch cut at row %d", i, cutRow)
 	}
-	var sent = false
-	for i := 0; i < 256 && !sent; i++ {
-		require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("k%d", i), string(val)}))
-		sent = m.bindings[0].activeChannels[0].batch.empty()
-	}
-	require.True(t, sent, "no batch was sent at the file size limit")
 
 	var _, err = m.flush(ctx)
 	require.NoError(t, err)
