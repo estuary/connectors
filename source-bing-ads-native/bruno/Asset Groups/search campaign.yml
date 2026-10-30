@@ -1,0 +1,41 @@
+info:
+  name: search campaign
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/AssetGroups/QueryByCampaignId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"CampaignId": "{{search_campaign_id}}"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("search_campaign_id")) bru.setVar("search_campaign_id", "PIN_SEARCH_CAMPAIGN_ID");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getassetgroupsbycampaignid?view=bingads-13
+
+  **WHY:** the docs say `CampaignId` is "the ID of the performance max
+  campaign". This checks what happens for any other campaign, which decides
+  whether the connector must skip non-Performance Max campaigns.
+
+  **PENDING:** needs a Search campaign in the sandbox (checklist 3.2); then
+  pin its ID as `search_campaign_id`. Until then the connector only asks for
+  asset groups of Performance Max campaigns, which is what the docs allow.

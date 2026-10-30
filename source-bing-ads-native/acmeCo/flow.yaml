@@ -54,6 +54,10 @@ collections:
     schema: ads.schema.yaml
     key:
     - /_meta/row_id
+  acmeCo/asset_groups:
+    schema: asset_groups.schema.yaml
+    key:
+    - /_meta/row_id
   acmeCo/budget_summary_report:
     schema: budget_summary_report.schema.yaml
     key:

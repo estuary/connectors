@@ -31,6 +31,10 @@ captures:
         interval: PT1H
       target: acmeCo/ads
     - resource:
+        name: asset_groups
+        interval: PT1H
+      target: acmeCo/asset_groups
+    - resource:
         name: account_performance_report_daily
         interval: PT1H
       target: acmeCo/account_performance_report_daily

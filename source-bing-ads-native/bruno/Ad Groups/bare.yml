@@ -43,7 +43,8 @@ docs: |-
 
   **VERIFIED (2026-10-29):** a PerformanceMax campaign returns
   `{"AdGroups": []}`. Performance Max campaigns are built from asset groups,
-  not ad groups, so the `ad_groups` and `ads` streams never cover them.
+  not ad groups, so the `asset_groups` stream covers them instead (see
+  `Asset Groups / bare`).
 
   **PENDING:** an ad group's shape. Needs a Search campaign with an ad group
   in the sandbox (checklist 3.2); then re-run with its `campaign_id`.

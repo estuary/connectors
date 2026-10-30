@@ -15,6 +15,7 @@ from .api import (
     snapshot_accounts,
     snapshot_ad_groups,
     snapshot_ads,
+    snapshot_asset_groups,
     snapshot_campaigns,
     token_exchange_scope,
 )
@@ -102,6 +103,7 @@ def entity_resources(directory: AccountDirectory, http: BingAdsHTTPMixin) -> lis
         "campaigns": functools.partial(snapshot_campaigns, http, directory),
         "ad_groups": functools.partial(snapshot_ad_groups, http, directory),
         "ads": functools.partial(snapshot_ads, http, directory),
+        "asset_groups": functools.partial(snapshot_asset_groups, http, directory),
     }
 
     return [
