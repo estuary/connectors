@@ -689,11 +689,16 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 // appends to be accepted. It reports whether any channel routed a document since
 // the last checkpoint.
 func (m *streamV2Manager) settle(ctx context.Context, b *streamV2Binding) (bool, error) {
-	var advanced = false
+	// Every channel's batch is sent before any is waited on, so that the channels
+	// append concurrently.
 	for _, c := range b.activeChannels {
 		if err := c.sendBatch(ctx); err != nil {
 			return false, err
 		}
+	}
+
+	var advanced = false
+	for _, c := range b.activeChannels {
 		if err := c.wait(); err != nil {
 			return false, fmt.Errorf("appending to channel %q of %s: %w", c.channelName, b.table, err)
 		}
