@@ -202,8 +202,7 @@ const (
 // manipulate change tracking metadata catch a deadlock hit during their own work and
 // re-raise it under their own error number, quoting the original 1205 in the message.
 func isDeadlockError(err error) bool {
-	var mssqlErr mssqldb.Error
-	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverDeadlockVictim {
+	if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok && mssqlErr.Number == sqlserverDeadlockVictim {
 		return true
 	}
 	return strings.Contains(err.Error(), "was deadlocked on lock resources")
