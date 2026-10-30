@@ -617,8 +617,7 @@ func probeChangeStreamSupport(ctx context.Context, client *mongo.Client, databas
 	// startAfter requires a resume token, so test it with the one just obtained.
 	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{}, options.ChangeStream().SetStartAfter(token))
 	if err != nil {
-		var cmdErr mongo.CommandError
-		if errors.As(err, &cmdErr) && strings.Contains(cmdErr.Message, "startAfter") {
+		if cmdErr, ok := errors.AsType[mongo.CommandError](err); ok && strings.Contains(cmdErr.Message, "startAfter") {
 			log.WithField("error", err).Debug("server does not support the change stream 'startAfter' option. 'resumeAfter' will be used instead")
 			return out, nil
 		}
@@ -670,8 +669,7 @@ func supportsPreImages(ctx context.Context, client *mongo.Client, database strin
 		// Servers reject the stage with varying wording. Treat any command
 		// error naming the stage as meaning the server won't run it, and
 		// capture without pre-images.
-		var commandError mongo.CommandError
-		if errors.As(err, &commandError) && strings.Contains(commandError.Message, "$changeStreamSplitLargeEvent") {
+		if commandError, ok := errors.AsType[mongo.CommandError](err); ok && strings.Contains(commandError.Message, "$changeStreamSplitLargeEvent") {
 			ll.WithField("error", err).Info("not requesting pre-images because this server does not support the $changeStreamSplitLargeEvent stage")
 			return false, nil
 		}

@@ -586,8 +586,7 @@ func (c *capture) isShardedCollection(ctx context.Context, database, collection 
 
 	cursor, err := c.client.Database(database).Collection(collection).Aggregate(ctx, pipeline)
 	if err != nil {
-		var cmdErr mongo.CommandError
-		if errors.As(err, &cmdErr) {
+		if cmdErr, ok := errors.AsType[mongo.CommandError](err); ok {
 			// Check if this is a NamespaceNotFound error (code 26). This can occur for new/empty
 			// collections that haven't been physically created yet. Treat these as non-sharded.
 			if cmdErr.Code == 26 {
