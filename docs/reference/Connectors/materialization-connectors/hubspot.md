@@ -49,6 +49,12 @@ characters, and if the field begins with a number it will be prefixed with
 To view the property name for a field in the UI, refresh the field selection
 and hover over the Outcome column.
 
+## Custom Objects
+
+To write to a Custom Object, first define the object and its properties in the
+HubSpot webapp.  Then select *Custom Object* and enter the name of the custom
+object.
+
 ## Deletions
 
 Hard deletes are not supported. To track deletions, ensure your collection
@@ -105,10 +111,11 @@ For production tasks, use the `OAuth2` authentication method.
 
 #### Bindings
 
-| Property             | Title        | Description                                              | Type                         | Required/Default  |
-| -------------------- | ------------ | -------------------------------------------------------- | ---------------------------- | ----------------- |
-| **`/object`**        | Object type  | The HubSpot CRM object type to materialize into.         | [CRM Object](#crm-objects)   | Required          |
-| `/delta_updates`     | Delta Update | Always `true` — this connector uses delta updates.       | boolean | `true` (read-only) |
+| Property             | Title              | Description                                                           | Type                         | Required/Default   |
+| -------------------- | ------------------ | --------------------------------------------------------------------- | ---------------------------- | ------------------ |
+| **`/object`**        | Object type        | The HubSpot CRM object type to materialize into.                      | [CRM Object](#crm-objects)   | Required           |
+| `/delta_updates`     | Delta Update       | Always `true` — this connector uses delta updates.                    | boolean                      | `true` (read-only) |
+| `/custom_object_name`| Custom Object Name | If Custom Object is selected, the plural internal name of the object. | string                       |                    |
 
 
 #### CRM Objects
@@ -125,6 +132,7 @@ For production tasks, use the `OAuth2` authentication method.
 - Quotes
 - Tasks
 - Tickets
+- Custom Objects
 
 ### Sample
 

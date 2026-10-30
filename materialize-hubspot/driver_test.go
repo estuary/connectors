@@ -595,10 +595,27 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 	if err != nil {
 		return "", err
 	}
+	objectName, err := resource.ObjectName()
+	if err != nil {
+		return "", err
+	}
 
 	client, err := NewClient(task.Config.Credentials, nil, nil)
 	if err != nil {
 		return "", err
+	}
+
+	objectTypeID := ObjectTypeID(objectName)
+	if object == CustomObjectObject {
+		objectTypeIDs, err := client.GetCustomObjectTypeIDs(ctx)
+		if err != nil {
+			return "", err
+		}
+		id, ok := objectTypeIDs[objectName]
+		if !ok {
+			return "", fmt.Errorf("definition not found for Custom Object: %q", objectName)
+		}
+		objectTypeID = id
 	}
 
 	var builder strings.Builder
@@ -611,7 +628,7 @@ func snapshotBinding(ctx context.Context, task Task, binding TestBinding, action
 		Properties: binding.Properties,
 		Limit:      100,
 	}
-	resp, err := client.Get(ctx, object, request)
+	resp, err := client.Get(ctx, objectTypeID, request)
 	if err != nil {
 		return "", err
 	}
