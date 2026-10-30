@@ -37,7 +37,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -55,14 +55,14 @@ func TestMain(m *testing.M) {
 func stripEncryptedSuffix(v interface{}, suffix string) interface{} {
 	switch x := v.(type) {
 	case map[string]interface{}:
-		result := make(map[string]interface{})
+		var result = make(map[string]interface{})
 		for k, v := range x {
-			newKey := strings.TrimSuffix(k, suffix)
+			var newKey = strings.TrimSuffix(k, suffix)
 			result[newKey] = stripEncryptedSuffix(v, suffix)
 		}
 		return result
 	case []interface{}:
-		result := make([]interface{}, len(x))
+		var result = make([]interface{}, len(x))
 		for i, v := range x {
 			result[i] = stripEncryptedSuffix(v, suffix)
 		}
@@ -186,7 +186,7 @@ func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string 
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
-		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		var bs, err = json.MarshalIndent(binding, "  ", "  ")
 		require.NoError(t, err)
 		io.Copy(summary, bytes.NewReader(bs))
 		fmt.Fprintf(summary, "\n")
@@ -222,7 +222,7 @@ func setResourceCursor(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...
 }
 
 func TestSpec(t *testing.T) {
-	response, err := redshiftDriver.Spec(context.Background(), &pc.Request_Spec{})
+	var response, err = redshiftDriver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -233,7 +233,7 @@ func TestSpec(t *testing.T) {
 func TestQueryTemplate(t *testing.T) {
 	var res = &Resource{Name: "foobar", SchemaName: "testdata", TableName: "foobar"}
 
-	tmplString, err := redshiftDriver.SelectQueryTemplate(res)
+	var tmplString, err = redshiftDriver.SelectQueryTemplate(res)
 	require.NoError(t, err)
 
 	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tmplString)
@@ -287,7 +287,7 @@ func TestBasicCapture(t *testing.T) {
 	var res Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Cursor = []string{"id"}
-	resourceConfigBytes, err := json.Marshal(res)
+	var resourceConfigBytes, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceConfigBytes
 
@@ -520,7 +520,7 @@ func TestQueryTemplateOverride(t *testing.T) {
 		Template: fmt.Sprintf(`SELECT * FROM %[1]s {{if not .IsFirstQuery}} WHERE updated_at > $1 {{end}} ORDER BY updated_at`, tableName),
 		Cursor:   []string{"updated_at"},
 	}
-	bs, err := json.Marshal(res)
+	var bs, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 	cs.Bindings[0].ResourceConfigJson = bs
@@ -529,7 +529,7 @@ func TestQueryTemplateOverride(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial rows
 		for i := 0; i < 5; i++ {
@@ -561,7 +561,7 @@ func TestKeylessCapture(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial batch of data
 		for i := 0; i < 5; i++ {
@@ -748,7 +748,7 @@ func TestCaptureFromView(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// First batch: Insert rows into base table, some visible in view
 		for i := 0; i < 10; i++ {

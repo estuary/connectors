@@ -83,7 +83,7 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *
 	var keysCh = make(chan []*discoveredPrimaryKey, 1)
 	var workerGroup, workerCtx = errgroup.WithContext(ctx)
 	workerGroup.Go(func() error {
-		tables, err := discoverTables(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		var tables, err = discoverTables(workerCtx, db, cfg.Advanced.DiscoverSchemas)
 		if err != nil {
 			return fmt.Errorf("error listing tables: %w", err)
 		}
@@ -91,7 +91,7 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *
 		return nil
 	})
 	workerGroup.Go(func() error {
-		columns, err := discoverColumns(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		var columns, err = discoverColumns(workerCtx, db, cfg.Advanced.DiscoverSchemas)
 		if err != nil {
 			return fmt.Errorf("error listing columns: %w", err)
 		}
@@ -99,7 +99,7 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *
 		return nil
 	})
 	workerGroup.Go(func() error {
-		keys, err := discoverPrimaryKeys(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		var keys, err = discoverPrimaryKeys(workerCtx, db, cfg.Advanced.DiscoverSchemas)
 		if err != nil {
 			return fmt.Errorf("error listing primary keys: %w", err)
 		}
@@ -222,7 +222,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	}
 
 	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
 	}
@@ -286,7 +286,7 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	}
 	fmt.Fprintf(query, ";")
 
-	rows, err := db.QueryContext(ctx, query.String(), args...)
+	var rows, err = db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
@@ -391,7 +391,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 	}
 	fmt.Fprintf(query, "  ORDER BY nc.nspname, c.relname, a.attnum;")
 
-	rows, err := db.QueryContext(ctx, query.String(), args...)
+	var rows, err = db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
@@ -508,7 +508,7 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	}
 	fmt.Fprintf(query, "  ORDER BY r.relname, pos.n;")
 
-	rows, err := db.QueryContext(ctx, query.String(), args...)
+	var rows, err = db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
