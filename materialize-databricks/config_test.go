@@ -76,14 +76,14 @@ func TestDatabricksConfig(t *testing.T) {
 	noClientSecret.Credentials.ClientSecret = ""
 	require.Error(t, noClientSecret.Validate(), "expected validation error for missing client_secret")
 
-	patWs := validConfig.workspaceConfig()
+	var patWs = validConfig.workspaceConfig()
 	require.Equal(t, "db-something.cloud.databricks.com:400//sql/1.0/warehouses/someid", patWs.Host)
 	require.Equal(t, "secret", patWs.Token)
 	require.Empty(t, patWs.ClientID)
 	require.Empty(t, patWs.ClientSecret)
 	require.IsType(t, dbConfig.PatCredentials{}, patWs.Credentials)
 
-	oauthWs := validOAuthConfig.workspaceConfig()
+	var oauthWs = validOAuthConfig.workspaceConfig()
 	require.Equal(t, "db-something.cloud.databricks.com:400//sql/1.0/warehouses/someid", oauthWs.Host)
 	require.Equal(t, "my-client-id", oauthWs.ClientID)
 	require.Equal(t, "my-client-secret", oauthWs.ClientSecret)

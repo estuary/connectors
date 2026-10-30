@@ -20,14 +20,14 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 			Delta: delta,
 		}
 	}
 
-	sanitizers := []func(string) string{
+	var sanitizers = []func(string) string{
 		func(s string) string {
 			return regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`).
 				ReplaceAllString(s, "<uuid>")
@@ -45,15 +45,15 @@ func TestIntegration(t *testing.T) {
 	})
 	t.Run("apply-drain", func(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
-			tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
-			res := makeResourceFn(tableName, false).WithDefaults(cfg)
+			var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 
-			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			var seedPending = func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				// A staged transaction is a set of queries persisted in the
 				// connector state under the binding's state key and the
 				// staging shard's key range.
-				query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "'{}'")
-				state, err := json.Marshal(map[string]any{
+				var query = sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "'{}'")
+				var state, err = json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
 						"00000000-ffffffff": map[string]any{
 							"Queries":  []string{query},
@@ -65,7 +65,7 @@ func TestIntegration(t *testing.T) {
 				return state
 			}
 
-			verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+			var verifyDrained = func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 

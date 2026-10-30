@@ -30,9 +30,9 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 	var jsonMapper = sql.MapStatic("STRING", sql.UsingConverter(sql.ToJsonString))
 
 	// Define base date/time mappings without primary key wrapper
-	primaryKeyTextType := sql.MapStatic("STRING")
-	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.NormalizeDatetimeString))
+	var primaryKeyTextType = sql.MapStatic("STRING")
+	var dateMapping = sql.MapStatic("DATE")
+	var datetimeMapping = sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.NormalizeDatetimeString))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -41,7 +41,7 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 	}
 
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:   jsonMapper,
 			sql.BINARY:  sql.MapStatic("BINARY"),
@@ -101,13 +101,13 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 			// name will always be a single element, whereas a table name will be a resource path
 			// consisting of both the schema and table that is two elements long.
 
-			notQuoted := func(s string) bool {
+			var notQuoted = func(s string) bool {
 				return sql.IsSimpleIdentifier(s) && !slices.Contains(DATABRICKS_RESERVED_WORDS, strings.ToLower(s))
 			}
-			quoteTf := sql.QuoteTransform("`", "``")
+			var quoteTf = sql.QuoteTransform("`", "``")
 
 			if len(path) == 1 {
-				translated := translateFlowField(path[0])
+				var translated = translateFlowField(path[0])
 				if notQuoted(translated) {
 					return translated
 				} else {
@@ -158,7 +158,7 @@ type templates struct {
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
-	tplAll := sql.MustParseTemplate(dialect, "root", `
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
 -- Templated creation of a materialized table definition and comments:
 -- delta.columnMapping.mode enables column renaming in Databricks. Column renaming was introduced in Databricks Runtime 10.4 LTS which was released in March 2022.
 -- See https://docs.databricks.com/en/release-notes/runtime/10.4lts.html

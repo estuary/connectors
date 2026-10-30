@@ -64,7 +64,7 @@ func TestStagedFileCompression(t *testing.T) {
 	require.NoError(t, f.writer.Write([]any{"hello", 42}))
 	require.NoError(t, f.writer.Close())
 
-	local, err := os.ReadDir(f.dir)
+	var local, err = os.ReadDir(f.dir)
 	require.NoError(t, err)
 	require.Len(t, local, 1)
 	require.True(t, strings.HasSuffix(local[0].Name(), ".json.gz"), "got %q", local[0].Name())

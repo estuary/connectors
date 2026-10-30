@@ -140,7 +140,7 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	registerRecordingDriver()
 
 	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts = nil, failWith, 0, "", 0
-	db, err := stdsql.Open("recording", "")
+	var db, err = stdsql.Open("recording", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	return db
@@ -242,7 +242,7 @@ func TestStartCommitState(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1")
 		d.cp.add("a_table.v1", fullRangeKey, item("Q1", "f1"))
 
-		state, err := d.startCommitState()
+		var state, err = d.startCommitState()
 		require.NoError(t, err)
 		require.True(t, state.MergePatch)
 		require.JSONEq(t, `{"a_table.v1": {"00000000-ffffffff": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
@@ -253,7 +253,7 @@ func TestStartCommitState(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, item("Q1", "f1"))
 		d.cp.add("a_table.v1", upperRangeKey, item("PEER"))
 
-		state, err := d.startCommitState()
+		var state, err = d.startCommitState()
 		require.NoError(t, err)
 		require.True(t, state.MergePatch)
 		require.JSONEq(t, `{"a_table.v1": {"00000000-7fffffff": {"Queries": ["Q1"], "ToDelete": ["f1"]}}}`, string(state.UpdatedJson))
@@ -262,7 +262,7 @@ func TestStartCommitState(t *testing.T) {
 	t.Run("nothing staged emits an empty patch", func(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
 
-		state, err := d.startCommitState()
+		var state, err = d.startCommitState()
 		require.NoError(t, err)
 		require.JSONEq(t, `{}`, string(state.UpdatedJson))
 	})
@@ -364,7 +364,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", fullRangeKey, item("Q1"))
 		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"b_table.v1": item("Q2")}
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.ElementsMatch(t, []string{"Q1", "Q2"}, recording.executed)
 		require.True(t, state.MergePatch)
@@ -385,7 +385,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", upperRangeKey, item("PEER"))
 		d.peerShardsCheckpoints[upperRangeKey] = checkpoint{"a_table.v1": item("OLD-PEER")}
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"OWN", "PEER", "OLD-PEER"}, recording.executed)
 		require.True(t, state.MergePatch)
@@ -411,7 +411,7 @@ func TestAcknowledge(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(json.RawMessage(recovered)))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"OWN", "FLAT", "OLD-PEER"}, recording.executed)
 		require.JSONEq(t, `{
@@ -438,7 +438,7 @@ func TestAcknowledge(t *testing.T) {
 		var d = testTransactor(lowerRangeKey, "a_table.v1")
 		d.peerShardsCheckpoints[legacyRangeKey] = checkpoint{"a_table.v1": item("FLAT")}
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.JSONEq(t, `{
 			"a_table.v1": {"80000000-ffffffff": {"Queries": ["PEER"], "ToDelete": []}}
@@ -455,7 +455,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", upperRangeKey, item("PEER"))
 		d.cp.add("removed_table.v1", upperRangeKey, item("REMOVED"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Equal(t, []string{"PEER"}, recording.executed)
 		require.JSONEq(t, `{
@@ -469,7 +469,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", fullRangeKey, item("QA"))
 		d.cp.add("b_table.v1", fullRangeKey, item("QB"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
 		require.Equal(t, []string{"QA"}, recording.executed)
 		require.JSONEq(t, `{"a_table.v1": {"00000000-ffffffff": null}}`, string(state.UpdatedJson))
@@ -483,7 +483,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", upperRangeKey, item("PEER-A"))
 		d.cp.add("b_table.v1", upperRangeKey, item("PEER-B"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
 		require.Equal(t, []string{"OWN-A", "PEER-A", "LEGACY-A"}, recording.executed)
 		require.JSONEq(t, `{
@@ -501,7 +501,7 @@ func TestAcknowledge(t *testing.T) {
 		var d = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
 		d.cp.add("b_table.v1", fullRangeKey, item("QB"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), keys("a_table.v1"))
 		require.NoError(t, err)
 		require.Nil(t, state)
 		require.NotNil(t, d.cp["b_table.v1"][fullRangeKey]) // untouched, still pending
@@ -514,7 +514,7 @@ func TestAcknowledge(t *testing.T) {
 
 		// Acknowledge itself is callable here since the non-primary path
 		// never opens a database connection.
-		state, err := d.Acknowledge(context.Background(), nil, nil)
+		var state, err = d.Acknowledge(context.Background(), nil, nil)
 		require.NoError(t, err)
 		require.Nil(t, state)
 		require.Empty(t, d.cp)
@@ -526,7 +526,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
 		d.cpRecovery = true
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.NoError(t, err)
 		require.False(t, d.cpRecovery)
 
@@ -540,7 +540,7 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
 		d.cpRecovery = true
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("[DELTA_MISSING_TRANSACTION_LOG] Incompatible format detected")), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("[DELTA_MISSING_TRANSACTION_LOG] Incompatible format detected")), allKeys)
 		require.NoError(t, err)
 		require.False(t, d.cpRecovery)
 	})
@@ -615,7 +615,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 			[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
 			"peer.json"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 
 		require.Len(t, recording.executed, 1)
@@ -639,7 +639,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(false, nil, "own.json"))
 		d.cp.add("a_table.v1", upperRangeKey, structuredItem(true, nil, "peer.json"))
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Len(t, recording.executed, 1)
 		require.Contains(t, recording.executed[0], "MERGE INTO `schema`.`a_table`")
@@ -650,7 +650,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(false, nil, "own.json"))
 		d.cp.add("a_table.v1", upperRangeKey, structuredItem(false, nil, "peer.json"))
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Len(t, recording.executed, 1)
 		var query = recording.executed[0]
@@ -664,7 +664,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		d.cp.add("a_table.v1", upperRangeKey, structuredItem(true, nil, "peer.json"))
 		d.cpRecovery = true
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Len(t, recording.executed, 1)
 		require.Contains(t, recording.executed[0], "MERGE INTO `schema`.`a_table`")
@@ -682,7 +682,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		// The coalesced query fails on deleted staged files, which during
 		// recovery means the whole group was applied by a previous session
 		// whose state clearing didn't commit: it is skipped and cleared.
-		state, err := d.acknowledgeApply(context.Background(),
+		var state, err = d.acknowledgeApply(context.Background(),
 			recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.NoError(t, err)
 		require.Empty(t, recording.executed)
@@ -696,7 +696,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		var d = renderingTransactor(lowerRangeKey)
 		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, "own.json"))
 
-		_, err := d.acknowledgeApply(context.Background(),
+		var _, err = d.acknowledgeApply(context.Background(),
 			recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.Error(t, err)
 	})
@@ -706,7 +706,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, "own.json"))
 		d.cp.add("a_table.v1", upperRangeKey, item("OLD-PEER"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Len(t, recording.executed, 2)
 		require.Equal(t, "OLD-PEER", recording.executed[0])
@@ -722,7 +722,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 			[]mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")},
 			"own.json"))
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Len(t, recording.executed, 1)
 		require.Contains(t, recording.executed[0], "l.id >= 1 AND l.id <= 10")
@@ -737,7 +737,7 @@ func TestAcknowledgeCoalescesShardEntries(t *testing.T) {
 		}
 		d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true, nil, files...))
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 		require.Len(t, recording.executed, 2)
 	})
@@ -775,7 +775,7 @@ func TestFormatMigrationCrashRecovery(t *testing.T) {
 			require.NoError(t, d1.UnmarshalState(json.RawMessage(doc)))
 			require.True(t, d1.cpRecovery)
 
-			state1, err := d1.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+			var state1, err = d1.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 			require.NoError(t, err)
 			require.Len(t, recording.executed, 1) // the one real side effect
 			require.Contains(t, recording.executed[0], "MERGE INTO `schema`.`a_table`")
@@ -896,7 +896,7 @@ func TestAcknowledgeMergesWithRecoveredRanges(t *testing.T) {
 		]
 	}}}`)))
 
-	_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 	require.NoError(t, err)
 	require.Len(t, recording.executed, 1)
 	require.Contains(t, recording.executed[0], "l.id = r.id AND l.id >= 1 AND l.id <= 10")
@@ -914,7 +914,7 @@ func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 		[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
 		"txn-2"))
 
-	state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 	require.NoError(t, err)
 
 	require.Len(t, recording.executed, 2)
@@ -943,7 +943,7 @@ func TestAcknowledgeCommitsDirectoriesOfAllShards(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, dirItem(true, []mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")}, "txn-1"))
 		d.cp.add("a_table.v1", upperRangeKey, dirItem(false, []mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")}, "txn-2"))
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 
 		require.Len(t, recording.executed, 1)
@@ -963,7 +963,7 @@ func TestAcknowledgeCommitsDirectoriesOfAllShards(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, dirItem(false, nil, "txn-1"))
 		d.cp.add("a_table.v1", upperRangeKey, dirItem(false, nil, "txn-2"))
 
-		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 
 		require.Len(t, recording.executed, 2)
@@ -984,7 +984,7 @@ func TestAcknowledgeMergesStagingTables(t *testing.T) {
 		[]mergeBoundLiterals{bound("5", "50"), bound("'2024-01-01T12:00:00Z'", "'2024-01-03T00:00:00Z'")},
 		"txn-2"))
 
-	_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	var _, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 	require.NoError(t, err)
 
 	require.Len(t, recording.executed, 1)
@@ -1114,7 +1114,7 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, dirItem(true, []mergeBoundLiterals{bound("1", "10"), bound("'2024-01-01T00:00:00Z'", "'2024-01-02T00:00:00Z'")}, "txn-a"))
 		d.cp.add("b_table.v1", lowerRangeKey, dirItem(false, nil, "txn-b"))
 
-		state, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+		var state, err = d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
 		require.NoError(t, err)
 
 		require.Len(t, recording.executed, 2)
@@ -1136,7 +1136,7 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 
 		var db = recordingDB(t, fmt.Errorf("b_table is locked"))
 		recording.failMatching = "`b_table`"
-		_, err := d.acknowledgeApply(context.Background(), db, allKeys)
+		var _, err = d.acknowledgeApply(context.Background(), db, allKeys)
 		require.ErrorContains(t, err, "b_table is locked")
 
 		// The other binding may or may not have committed before the failure

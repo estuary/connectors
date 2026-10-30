@@ -89,7 +89,7 @@ func (c *credentialConfig) validateOAuthM2MCreds() error {
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
-	patProps := orderedmap.New[string, *jsonschema.Schema]()
+	var patProps = orderedmap.New[string, *jsonschema.Schema]()
 	patProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: PAT_AUTH_TYPE,
@@ -104,7 +104,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
-	oauthProps := orderedmap.New[string, *jsonschema.Schema]()
+	var oauthProps = orderedmap.New[string, *jsonschema.Schema]()
 	oauthProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: OAUTH_M2M_AUTH_TYPE,
@@ -231,7 +231,7 @@ func (c config) ToURI(materializationName string) string {
 // workspaceConfig is the Databricks SDK configuration for this endpoint,
 // carrying the credentials selected by the configured auth type.
 func (c config) workspaceConfig() *databricks.Config {
-	host := fmt.Sprintf("%s/%s", c.Address, c.HTTPPath)
+	var host = fmt.Sprintf("%s/%s", c.Address, c.HTTPPath)
 	switch c.Credentials.AuthType {
 	case OAUTH_M2M_AUTH_TYPE:
 		return &databricks.Config{

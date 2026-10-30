@@ -125,7 +125,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 			var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 
-			dialect := createDatabricksDialect(featureFlags)
+			var dialect = createDatabricksDialect(featureFlags)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -310,9 +310,9 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	wsConfig := cfg.workspaceConfig()
+	var wsConfig = cfg.workspaceConfig()
 	wsConfig.HTTPTimeoutSeconds = 5 * 60 // This is necessary for file uploads as they can sometimes take longer than the default 60s
-	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
+	var wsClient, err = databricks.NewWorkspaceClient(wsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
@@ -344,7 +344,7 @@ func newTransactor(
 	}
 	defer db.Close()
 
-	schemas := map[string]struct{}{cfg.SchemaName: {}}
+	var schemas = map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
 		if err = d.addBinding(binding); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
@@ -433,8 +433,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
 
-	translatedFieldNames := func(in []string) []string {
-		out := make([]string, 0, len(in))
+	var translatedFieldNames = func(in []string) []string {
+		var out = make([]string, 0, len(in))
 		for _, f := range in {
 			out = append(out, translateFlowField(f))
 		}
@@ -455,7 +455,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
-	db, err := d.openDB()
+	var db, err = d.openDB()
 	if err != nil {
 		return err
 	}
@@ -622,7 +622,7 @@ const maxMatchedFiles = 10000
 // restricts it to the files holding rows that match its keys, found by reading
 // only the key columns. It reports whether any rows matched.
 func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, load bindingLoad) (bool, error) {
-	version, err := tableVersion(ctx, db, load.data.Table.Identifier)
+	var version, err = tableVersion(ctx, db, load.data.Table.Identifier)
 	if err != nil {
 		return false, err
 	}
@@ -660,7 +660,7 @@ func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64,
 
 // queryStrings runs a query and returns the values of its first column.
 func queryStrings(ctx context.Context, db *stdsql.DB, query string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, query)
+	var rows, err = db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -826,7 +826,7 @@ func (d *transactor) deleteDirectory(ctx context.Context, dir string) error {
 		stack = stack[:len(stack)-1]
 		dirs = append(dirs, cur)
 
-		entries, err := d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: cur})
+		var entries, err = d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: cur})
 		if err != nil {
 			log.WithFields(log.Fields{"dir": cur, "err": err}).Debug("listing staging directory failed")
 			return err
@@ -903,7 +903,7 @@ func (d *transactor) sweepStaging(ctx context.Context) {
 	ctx = context.WithoutCancel(ctx)
 	go func() {
 		for root := range roots {
-			entries, err := d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: root})
+			var entries, err = d.files.ListDirectoryContentsAll(ctx, files.ListDirectoryContentsRequest{DirectoryPath: root})
 			if err != nil {
 				log.WithFields(log.Fields{"dir": root, "err": err}).Debug("listing staging root failed")
 				continue
@@ -929,7 +929,7 @@ func stagedBefore(prefix, name string, cutoff time.Time) bool {
 	if !ok || len(rest) < 36 {
 		return false
 	}
-	id, err := uuid.Parse(rest[:36])
+	var id, err = uuid.Parse(rest[:36])
 	if err != nil || id.Version() != 7 {
 		return false
 	}
@@ -958,7 +958,7 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 const queryBatchSize = 128
 
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 	db, err := d.openDB()
 	if err != nil {
 		return nil, err
@@ -987,7 +987,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		lastBinding = it.Binding
 
-		flowDelete := d.cfg.HardDelete && it.Delete
+		var flowDelete = d.cfg.HardDelete && it.Delete
 		if err := b.storeFile.start(ctx, db); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
@@ -1058,7 +1058,7 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b 
 	var name = b.storeFile.txnDir + "_delta"
 	var data = &stagingCopy{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
 	for _, tpl := range []*template.Template{d.templates.createStagingTable, d.templates.copyIntoStaging} {
-		query, err := renderTemplate(tpl, data)
+		var query, err = renderTemplate(tpl, data)
 		if err != nil {
 			return fmt.Errorf("%s template: %w", tpl.Name(), err)
 		}
@@ -1107,7 +1107,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, err
 	}
 
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 
 	if !d.primary {
 		// Non-primary shards only stage files: their committed entries are
@@ -1125,7 +1125,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 	// Opening is lazy (no connection is dialed until a query runs), so an
 	// Acknowledge with nothing to execute costs nothing here.
-	db, err := d.openDB()
+	var db, err = d.openDB()
 	if err != nil {
 		return nil, err
 	}
@@ -1227,7 +1227,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 		return nil, nil
 	}
 
-	checkpointJSON, err := json.Marshal(clear)
+	var checkpointJSON, err = json.Marshal(clear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
@@ -1275,7 +1275,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 		}
 
 		var bounds = combineBounds(b.target.Keys, coalesce)
-		queries, err := d.renderCommitQueries(b, coalesce, bounds, needsMerge)
+		var queries, err = d.renderCommitQueries(b, coalesce, bounds, needsMerge)
 		if err != nil {
 			return err
 		}
@@ -1410,7 +1410,7 @@ func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile log.F
 func scanRowStats(rows *stdsql.Rows) m.RowStats {
 	defer rows.Close()
 
-	cols, err := rows.Columns()
+	var cols, err = rows.Columns()
 	if err != nil || !slices.Contains(cols, "num_affected_rows") || !rows.Next() {
 		return m.RowStats{}
 	}

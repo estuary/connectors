@@ -128,7 +128,7 @@ type stagedFile struct {
 // newStagedFile stages under root in transaction directories named
 // "<prefix>_<UUIDv7>", so the startup sweep can tell their owner and age.
 func newStagedFile(cfg config, root, prefix string, fields []string, filesAPI files.FilesInterface) *stagedFile {
-	uuid := uuid.NewString()
+	var uuid = uuid.NewString()
 	var tempdir = os.TempDir()
 
 	return &stagedFile{
@@ -272,9 +272,9 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 
 func (f *stagedFile) newFile() error {
 	// Databricks infers the codec of a staged file from its extension when reading it back.
-	filePath := filepath.Join(f.dir, uuid.NewString()+".json.gz")
+	var filePath = filepath.Join(f.dir, uuid.NewString()+".json.gz")
 
-	file, err := os.Create(filePath)
+	var file, err = os.Create(filePath)
 	if err != nil {
 		return err
 	}

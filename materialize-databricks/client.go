@@ -36,9 +36,9 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	cfg := ep.Config
+	var cfg = ep.Config
 
-	db, err := stdsql.Open("databricks", cfg.ToURI(materializationName))
+	var db, err = stdsql.Open("databricks", cfg.ToURI(materializationName))
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
@@ -58,7 +58,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	rpSchemas := make(map[string]struct{})
+	var rpSchemas = make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpSchemas[c.ep.Dialect.TableLocator(p).TableSchema] = struct{}{}
 	}
@@ -73,7 +73,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	// The table listing will fail if the schema doesn't already exist, so only attempt to list
 	// tables in schemas that do exist.
-	existingSchemas, err := c.ListSchemas(ctx)
+	var existingSchemas, err = c.ListSchemas(ctx)
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)
 	}
@@ -84,18 +84,18 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			continue
 		}
 
-		tableIter := c.wsClient.Tables.List(ctx, catalog.ListTablesRequest{
+		var tableIter = c.wsClient.Tables.List(ctx, catalog.ListTablesRequest{
 			CatalogName: c.cfg.CatalogName,
 			SchemaName:  sc,
 		})
 
 		for tableIter.HasNext(ctx) {
-			t, err := tableIter.Next(ctx)
+			var t, err = tableIter.Next(ctx)
 			if err != nil {
 				return fmt.Errorf("iterating tables: %w", err)
 			}
 
-			res := is.PushResource(t.SchemaName, t.Name)
+			var res = is.PushResource(t.SchemaName, t.Name)
 			for _, c := range t.Columns {
 				var colMeta columnMeta
 				if err := json.Unmarshal([]byte(c.TypeJson), &colMeta); err != nil {
@@ -117,7 +117,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	var _, err = c.db.ExecContext(ctx, tc.TableCreateSql)
 	if err != nil {
 		return err
 	}
@@ -138,19 +138,19 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -195,14 +195,14 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
-	listed, err := c.wsClient.Schemas.ListAll(ctx, catalog.ListSchemasRequest{
+	var listed, err = c.wsClient.Schemas.ListAll(ctx, catalog.ListSchemasRequest{
 		CatalogName: c.cfg.CatalogName,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	schemaNames := make([]string, 0, len(listed))
+	var schemaNames = make([]string, 0, len(listed))
 	for _, ls := range listed {
 		schemaNames = append(schemaNames, ls.Name)
 	}
@@ -211,7 +211,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
-	_, err := c.wsClient.Schemas.Create(ctx, catalog.CreateSchema{
+	var _, err = c.wsClient.Schemas.Create(ctx, catalog.CreateSchema{
 		CatalogName: c.cfg.CatalogName,
 		Name:        schemaName,
 	})
@@ -220,9 +220,9 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	wsClient, err := databricks.NewWorkspaceClient(cfg.workspaceConfig())
+	var wsClient, err = databricks.NewWorkspaceClient(cfg.workspaceConfig())
 	if err != nil {
 		errs.Err(fmt.Errorf("creating workspace client: %w", err))
 		return errs

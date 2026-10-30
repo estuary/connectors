@@ -16,7 +16,7 @@ var testDialect = createDatabricksDialect(common.ResolveFlagDefaults(featureFlag
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -35,11 +35,11 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.loadQueryNoFlowDocument,
 		testTemplates.mergeInto,
 	} {
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		bounds := []sql.MergeBound{
+		var bounds = []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
 				LiteralLower: testDialect.Literal(int64(10)),
@@ -81,7 +81,7 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		testTemplates.copyIntoDirect,
 	} {
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
@@ -105,7 +105,7 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		testTemplates.copyIntoDirect,
 	} {
-		tbl := tables[1]
+		var tbl = tables[1]
 		require.True(t, tbl.DeltaUpdates)
 		require.Nil(t, tbl.Document)
 
@@ -128,7 +128,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	{
-		tbl := tables[0]
+		var tbl = tables[0]
 		var staging = "delta.`test-staging-path/txn-1_delta`"
 		var staged = &stagingCopy{Target: &tbl, Identifier: staging, Directory: "test-staging-path/txn-1"}
 		for _, tc := range []struct {
@@ -154,7 +154,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	{
-		tbl := tables[0]
+		var tbl = tables[0]
 		var load = func(files ...string) *tableWithFiles {
 			return &tableWithFiles{
 				Table:        &tbl,
@@ -184,7 +184,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	{
-		tbl := tables[0]
+		var tbl = tables[0]
 		var bounds = []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
@@ -235,7 +235,7 @@ func TestDatetimeKeyRanges(t *testing.T) {
 			projection("id", pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}),
 		},
 		Document: func() *sql.Projection {
-			p := projection("flow_document", pf.Inference{Types: []string{"object"}})
+			var p = projection("flow_document", pf.Inference{Types: []string{"object"}})
 			return &p
 		}(),
 	}
@@ -260,12 +260,12 @@ func TestDatetimeKeyRanges(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var dialect = createDatabricksDialect(tc.flags)
-			table, err := sql.ResolveTable(shape, dialect)
+			var table, err = sql.ResolveTable(shape, dialect)
 			require.NoError(t, err)
 
 			var builder = sql.NewMergeBoundsBuilder(table.Keys, dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
 			for _, k := range keys {
-				converted, err := table.ConvertKey(k)
+				var converted, err = table.ConvertKey(k)
 				require.NoError(t, err)
 				builder.NextKey(converted)
 			}
@@ -293,7 +293,7 @@ func TestDatetimeKeyBounds(t *testing.T) {
 		},
 		Values: []sql.Projection{projection("val", pf.Inference{Types: []string{"integer"}})},
 		Document: func() *sql.Projection {
-			p := projection("flow_document", pf.Inference{Types: []string{"object"}})
+			var p = projection("flow_document", pf.Inference{Types: []string{"object"}})
 			return &p
 		}(),
 	}
@@ -318,13 +318,13 @@ func TestDatetimeKeyBounds(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var dialect = createDatabricksDialect(tc.flags)
-			table, err := sql.ResolveTable(shape, dialect)
+			var table, err = sql.ResolveTable(shape, dialect)
 			require.NoError(t, err)
 			require.Equal(t, tc.wantDDL, table.Keys[0].BareDDL)
 
 			var builder = sql.NewMergeBoundsBuilder(table.Keys, dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn))
 			for _, k := range keys {
-				converted, err := table.ConvertKey(k)
+				var converted, err = table.ConvertKey(k)
 				require.NoError(t, err)
 				builder.NextKey(converted)
 			}

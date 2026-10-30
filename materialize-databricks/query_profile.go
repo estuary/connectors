@@ -144,7 +144,7 @@ func (p *queryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 		for i, q := range batch {
 			ids[i] = q.id
 		}
-		resp, err := p.history.List(ctx, dbsql.ListQueryHistoryRequest{
+		var resp, err = p.history.List(ctx, dbsql.ListQueryHistoryRequest{
 			FilterBy:       &dbsql.QueryFilter{StatementIds: ids},
 			IncludeMetrics: true,
 			MaxResults:     len(ids),
@@ -255,7 +255,7 @@ func profileBounds(bounds []sql.MergeBound) map[string]any {
 			var covered time.Duration
 			for i, r := range b.Ranges {
 				ranges[i] = [2]string{r.LiteralLower, r.LiteralUpper}
-				span, _ := literalSpan(r.LiteralLower, r.LiteralUpper)
+				var span, _ = literalSpan(r.LiteralLower, r.LiteralUpper)
 				covered += span
 			}
 			bound["ranges"] = ranges
@@ -268,8 +268,8 @@ func profileBounds(bounds []sql.MergeBound) map[string]any {
 
 // literalSpan is the time from one date-time literal to another.
 func literalSpan(lower, upper string) (time.Duration, bool) {
-	lo, okLower := literalTime(lower)
-	hi, okUpper := literalTime(upper)
+	var lo, okLower = literalTime(lower)
+	var hi, okUpper = literalTime(upper)
 	return hi.Sub(lo), okLower && okUpper
 }
 
