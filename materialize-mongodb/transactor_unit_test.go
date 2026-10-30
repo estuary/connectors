@@ -358,8 +358,8 @@ func TestStoreBulkRetryFailsFastOnDuplicateKey(t *testing.T) {
 	_, err := storeBulkWithRetry(context.Background(), models, maxStoreRetries, send, noDelay)
 	require.Error(t, err)
 	require.Equal(t, 1, sends, "a duplicate-key error must not be retried")
-	var bwe mongo.BulkWriteException
-	require.True(t, errors.As(err, &bwe), "terminal error should be the BulkWriteException")
+	var bwe, ok = errors.AsType[mongo.BulkWriteException](err)
+	require.True(t, ok, "terminal error should be the BulkWriteException")
 	require.Equal(t, 11000, bwe.WriteErrors[0].Code)
 }
 
