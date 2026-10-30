@@ -142,7 +142,7 @@ func TestTimestampCursorRoundTrip(t *testing.T) {
 			setResourceCursor(t, cs.Bindings[0], "UPDATED_AT")
 
 			setShutdownAfterQuery(t, true)
-			baseTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+			var baseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 			// Clear the table before each timezone test
 			control.Exec(fmt.Sprintf("DELETE FROM %s", tableName))
@@ -244,7 +244,7 @@ func TestStringCursorRoundTrip(t *testing.T) {
 	setShutdownAfterQuery(t, true)
 
 	// Use lexicographically ordered version strings
-	versions := []string{"v1.0.0", "v1.0.1", "v1.0.2", "v1.1.0", "v1.1.1", "v2.0.0", "v2.0.1", "v2.1.0", "v2.1.1", "v3.0.0"}
+	var versions = []string{"v1.0.0", "v1.0.1", "v1.0.2", "v1.1.0", "v1.1.1", "v2.0.0", "v2.0.1", "v2.1.0", "v2.1.1", "v3.0.0"}
 
 	for i := range 5 {
 		executeControlQuery(t, control, fmt.Sprintf(

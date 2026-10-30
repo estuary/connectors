@@ -27,7 +27,7 @@ func TestSimpleCapture(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 		for i := 0; i < 10; i++ {
 			executeControlQuery(t, control, fmt.Sprintf(
@@ -121,7 +121,7 @@ func TestModificationsAndDeletions(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial inserts
 		for i := 0; i < 5; i++ {
@@ -180,7 +180,7 @@ func TestCaptureWithEmptyPoll(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// First batch of rows
 		for i := 0; i < 5; i++ {
@@ -269,7 +269,7 @@ func TestCaptureFromView(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// First batch: Insert rows into base table, some visible in view
 		for i := 0; i < 10; i++ {
@@ -315,7 +315,7 @@ func TestKeylessCapture(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial batch of data
 		for i := 0; i < 5; i++ {
@@ -469,7 +469,7 @@ func TestTypedTable(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
 
 		// Insert rows into the typed table.
 		// With USER GENERATED OID, we provide the OID using the type constructor.
