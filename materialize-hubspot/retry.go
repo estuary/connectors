@@ -30,6 +30,7 @@ func (e *TemporaryError) ExtraDelay() time.Duration {
 // If additional delay needs to be applied on top of the backoff, perhaps due
 // to rate limiting.
 type DelayError interface {
+	error
 	ExtraDelay() time.Duration
 }
 
@@ -50,13 +51,11 @@ func Retry[E error](ctx context.Context, backoffSeconds []float64, fn func(attem
 		if i != len(backoffSeconds) {
 			var extraDelay time.Duration
 
-			var delayError DelayError
-			if errors.As(err, &delayError) {
+			if delayError, ok := errors.AsType[DelayError](err); ok {
 				extraDelay = delayError.ExtraDelay()
 			}
 
-			var retryError E
-			if errors.As(err, &retryError) {
+			if retryError, ok := errors.AsType[E](err); ok {
 				delay := time.Duration(backoff*float64(time.Second)) + extraDelay
 
 				log.WithFields(log.Fields{
