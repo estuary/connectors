@@ -134,8 +134,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	if err != nil {
 		return nil, err
 	} else if _, err = loadSheetIDMapping(svc, cfg.spreadsheetID()); err != nil {
-		var googleErr *googleapi.Error
-		if errors.As(err, &googleErr) {
+		if googleErr, ok := errors.AsType[*googleapi.Error](err); ok {
 			if googleErr.Code == http.StatusNotFound {
 				return nil, cerrors.NewUserError(err, "configured sheet doesn't exist")
 			} else if googleErr.Code == http.StatusForbidden {
