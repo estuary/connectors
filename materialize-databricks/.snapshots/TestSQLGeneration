@@ -52,7 +52,25 @@ ALTER TABLE `a-schema`.key_value ADD COLUMN
 	second_new_column BOOL;
 --- End alter table add columns ---
 
---- Begin `a-schema`.key_value loadQuery directory ---
+--- Begin `a-schema`.key_value loadScript directory ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0, l.flow_document
 	FROM `a-schema`.key_value AS l
 	JOIN (
@@ -65,9 +83,35 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQuery ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScript ---
 
---- Begin `a-schema`.key_value loadQuery directories ---
+--- Begin `a-schema`.key_value loadScript directories ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+		 UNION ALL (
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-2', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0, l.flow_document
 	FROM `a-schema`.key_value AS l
 	JOIN (
@@ -85,9 +129,35 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQuery ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScript ---
 
---- Begin `a-schema`.key_value loadQuery root files ---
+--- Begin `a-schema`.key_value loadScript root files ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM json.`test-staging-path/file1.json.gz`
+		)
+		 UNION ALL (
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM json.`test-staging-path/file2.json.gz`
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0, l.flow_document
 	FROM `a-schema`.key_value AS l
 	JOIN (
@@ -105,9 +175,35 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQuery ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScript ---
 
---- Begin `a-schema`.key_value loadQuery directory and root files ---
+--- Begin `a-schema`.key_value loadScript directory and root files ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+		 UNION ALL (
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM json.`test-staging-path/file1.json.gz`
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0, l.flow_document
 	FROM `a-schema`.key_value AS l
 	JOIN (
@@ -125,9 +221,30 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQuery ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScript ---
 
---- Begin `a-schema`.key_value loadQueryNoFlowDocument directory ---
+--- Begin `a-schema`.key_value loadScriptNoFlowDocument directory ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0,
 to_json(struct(
 	l.key1 AS key1,
@@ -167,9 +284,35 @@ FROM `a-schema`.key_value AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQueryNoFlowDocument ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
---- Begin `a-schema`.key_value loadQueryNoFlowDocument directories ---
+--- Begin `a-schema`.key_value loadScriptNoFlowDocument directories ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+		 UNION ALL (
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-2', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0,
 to_json(struct(
 	l.key1 AS key1,
@@ -214,9 +357,35 @@ FROM `a-schema`.key_value AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQueryNoFlowDocument ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
---- Begin `a-schema`.key_value loadQueryNoFlowDocument root files ---
+--- Begin `a-schema`.key_value loadScriptNoFlowDocument root files ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM json.`test-staging-path/file1.json.gz`
+		)
+		 UNION ALL (
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM json.`test-staging-path/file2.json.gz`
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0,
 to_json(struct(
 	l.key1 AS key1,
@@ -261,9 +430,35 @@ FROM `a-schema`.key_value AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQueryNoFlowDocument ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
---- Begin `a-schema`.key_value loadQueryNoFlowDocument directory and root files ---
+--- Begin `a-schema`.key_value loadScriptNoFlowDocument directory and root files ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+		 UNION ALL (
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM json.`test-staging-path/file1.json.gz`
+		)
+) AS r
+	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0,
 to_json(struct(
 	l.key1 AS key1,
@@ -308,7 +503,10 @@ FROM `a-schema`.key_value AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
---- End `a-schema`.key_value loadQueryNoFlowDocument ---
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
+--- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
 --- Begin `a-schema`.key_value mergeInto directory ---
 	MERGE INTO `a-schema`.key_value AS l
@@ -635,7 +833,25 @@ UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value ---
 
---- Begin `a-schema`.key_value loadQuery ranges ---
+--- Begin `a-schema`.key_value loadScript ranges ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+) AS r
+	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0, l.flow_document
 	FROM `a-schema`.key_value AS l
 	JOIN (
@@ -648,9 +864,30 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
 --- End `a-schema`.key_value ---
 
---- Begin `a-schema`.key_value loadQueryNoFlowDocument ranges ---
+--- Begin `a-schema`.key_value loadScriptNoFlowDocument ranges ---
+BEGIN
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	FROM `a-schema`.key_value AS l
+	JOIN (
+		(
+			SELECT
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+) AS r
+	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
+	AND l.key2 = r.key2
+	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+);
+
 SELECT 0,
 to_json(struct(
 	l.key1 AS key1,
@@ -690,6 +927,9 @@ FROM `a-schema`.key_value AS l
 	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
+	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+END
 --- End `a-schema`.key_value ---
 
 --- Begin `a-schema`.key_value mergeInto ranges ---

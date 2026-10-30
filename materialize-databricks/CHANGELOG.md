@@ -7,10 +7,8 @@
   reading only the key columns, then reads documents from those files alone.
   Loads of large tables whose rows are updated get much faster: Databricks
   otherwise reads every document of each file an update left a deletion
-  vector on. A load whose script fails, such as on a warehouse that can't
-  run SQL scripts, runs as a single query instead, as do that table's loads
-  for the next hour. A load fails, and its transaction is retried, if the
-  table's files were rewritten between finding and reading them.
+  vector on. A load fails, and its transaction is retried, if the table's
+  files were rewritten between finding and reading them.
 - A MERGE of fewer than 100,000 rows reads them straight from the staged
   files, instead of first copying them into a staging table. This saves a
   query of a few seconds from each commit of small batches.

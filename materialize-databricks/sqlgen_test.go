@@ -31,8 +31,8 @@ func TestSQLGeneration(t *testing.T) {
 	)
 
 	for _, tpl := range []*template.Template{
-		testTemplates.loadQuery,
-		testTemplates.loadQueryNoFlowDocument,
+		testTemplates.loadScript,
+		testTemplates.loadScriptNoFlowDocument,
 		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]
@@ -196,8 +196,8 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		}
 		for _, tpl := range []*template.Template{
-			testTemplates.loadQuery,
-			testTemplates.loadQueryNoFlowDocument,
+			testTemplates.loadScript,
+			testTemplates.loadScriptNoFlowDocument,
 			testTemplates.mergeInto,
 		} {
 			var schema = stagedSchemaDDL(tbl.KeyPtrs(), false)
@@ -263,7 +263,7 @@ func TestDatetimeKeyRanges(t *testing.T) {
 				builder.NextKey(converted)
 			}
 
-			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadQuery, builder.Build())
+			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadScript, builder.Build())
 			require.NoError(t, err)
 			require.Contains(t, query, tc.wantBounds)
 			require.Contains(t, query, "l.id = r.id AND l.id >= 'a' AND l.id <= 'd'")
@@ -323,7 +323,7 @@ func TestDatetimeKeyBounds(t *testing.T) {
 			}
 			var bounds = builder.Build()
 
-			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadQuery, bounds)
+			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadScript, bounds)
 			require.NoError(t, err)
 			require.Contains(t, query, "l.created_at = r.created_at")
 			require.Contains(t, query, "l.id = r.id AND l.id >= 'a' AND l.id <= 'd'")

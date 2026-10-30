@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -20,7 +19,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1155,32 +1153,4 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 		require.NotNil(t, d.cp["a_table.v1"])
 		require.NotNil(t, d.cp["b_table.v1"])
 	})
-}
-
-func TestQueryLoadFallsBackToSingleQuery(t *testing.T) {
-	var ctx = context.Background()
-	var d = renderingTransactor(lowerRangeKey)
-	var b = d.bindings[0]
-	var script = template.Must(template.New("loadScript").Parse("BEGIN SELECT doc FROM t; END"))
-	var single = template.Must(template.New("loadQuery").Parse("SELECT doc FROM t"))
-	var load = bindingLoad{binding: b, data: &tableWithFiles{Table: &b.target}, fields: log.Fields{}}
-
-	// The script fails once, such as on a warehouse that can't run scripts.
-	var db = recordingDB(t, fmt.Errorf("syntax error"))
-	recording.failMatching, recording.failFirst = "BEGIN", 1
-	var queryLoad = func() []string {
-		recording.executed = nil
-		rows, _, err := d.queryLoad(ctx, db, script, single, load)
-		require.NoError(t, err)
-		rows.Close()
-		return recording.executed
-	}
-
-	require.Equal(t, []string{"SELECT doc FROM t"}, queryLoad())
-	require.Greater(t, time.Until(b.noScriptUntil), 59*time.Minute)
-
-	// Loads run as single queries for a while, then as scripts again.
-	require.Equal(t, []string{"SELECT doc FROM t"}, queryLoad())
-	b.noScriptUntil = time.Now()
-	require.Equal(t, []string{"BEGIN SELECT doc FROM t; END"}, queryLoad())
 }

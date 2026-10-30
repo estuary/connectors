@@ -148,8 +148,6 @@ func binaryToStringCast(migration sql.ColumnTypeMigration) string {
 type templates struct {
 	createTargetTable        *template.Template
 	alterTableColumns        *template.Template
-	loadQuery                *template.Template
-	loadQueryNoFlowDocument  *template.Template
 	loadScript               *template.Template
 	loadScriptNoFlowDocument *template.Template
 	copyIntoDirect           *template.Template
@@ -461,8 +459,6 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 	return templates{
 		createTargetTable:        tplAll.Lookup("createTargetTable"),
 		alterTableColumns:        tplAll.Lookup("alterTableColumns"),
-		loadQuery:                tplAll.Lookup("loadQuery"),
-		loadQueryNoFlowDocument:  tplAll.Lookup("loadQueryNoFlowDocument"),
 		loadScript:               tplAll.Lookup("loadScript"),
 		loadScriptNoFlowDocument: tplAll.Lookup("loadScriptNoFlowDocument"),
 		copyIntoDirect:           tplAll.Lookup("copyIntoDirect"),

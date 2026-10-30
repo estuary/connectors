@@ -400,9 +400,6 @@ type binding struct {
 	stagingTable string
 	storeRows    int
 
-	// noScriptUntil is when loads may run as scripts again after one failed.
-	noScriptUntil time.Time
-
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
 	// into the target table. Note that in case of delta updates, "needsMerge"
@@ -476,9 +473,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var script, single = d.templates.loadScript, d.templates.loadQuery
+	var script = d.templates.loadScript
 	if d.cfg.Advanced.NoFlowDocument {
-		script, single = d.templates.loadScriptNoFlowDocument, d.templates.loadQueryNoFlowDocument
+		script = d.templates.loadScriptNoFlowDocument
 	}
 
 	var loads []bindingLoad
@@ -544,7 +541,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			rows, trace, err := d.queryLoad(groupCtx, db, script, single, load)
+			rows, trace, err := d.queryLoad(groupCtx, db, script, load)
 			if err != nil {
 				return err
 			}
@@ -610,27 +607,9 @@ type bindingLoad struct {
 // about 2.5 to 10 TB of table.
 const maxMatchedFiles = 10000
 
-// scriptFailedFor is how long a binding's loads run as single queries after
-// its load script fails, which may be transient or recur on every load.
-const scriptFailedFor = time.Hour
-
 // queryLoad runs a binding's load script, and returns its rows with the trace
-// to finish once they're read. A script that fails, such as on a warehouse
-// that can't run scripts, is rerun as a single query, as are the binding's
-// loads for the next scriptFailedFor.
-func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, script, single *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
-	if time.Now().After(load.binding.noScriptUntil) {
-		rows, trace, err := d.runLoad(ctx, db, script, load)
-		if err == nil || ctx.Err() != nil {
-			return rows, trace, err
-		}
-		log.WithError(err).WithField("resourcePath", load.binding.target.Path).Warn("load script failed, loading with a single query instead")
-		load.binding.noScriptUntil = time.Now().Add(scriptFailedFor)
-	}
-	return d.runLoad(ctx, db, single, load)
-}
-
-func (d *transactor) runLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
+// to finish once they're read.
+func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
 	query, err := renderTemplate(tpl, load.data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s template: %w", tpl.Name(), err)
