@@ -125,7 +125,7 @@ type connector struct{}
 var _ boilerplate.Connector = &connector{}
 
 func (connector) Spec(context.Context, *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("Test Resource Spec", &ResourceConfig{}).MarshalJSON()
+	var resourceSchema, err = schemagen.GenerateSchema("Test Resource Spec", &ResourceConfig{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -148,7 +148,7 @@ func (connector) Spec(context.Context, *pc.Request_Spec) (*pc.Response_Spec, err
 }
 
 func (connector) Discover(context.Context, *pc.Request_Discover) (*pc.Response_Discovered, error) {
-	greetingSchema, err := schemagen.GenerateSchema("Greeting", &Greeting{}).MarshalJSON()
+	var greetingSchema, err = schemagen.GenerateSchema("Greeting", &Greeting{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating greeting schema: %w", err)
 	}
