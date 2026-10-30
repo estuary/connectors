@@ -61,17 +61,17 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 func bqDialect(featureFlags map[string]bool) sql.Dialect {
-	objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
-	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	var objAndArrayAsJson = featureFlags["objects_and_arrays_as_json"]
+	var objAndArrayCol = sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
 	if !objAndArrayAsJson {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
 	}
 
-	primaryKeyTextType := sql.MapStatic("STRING")
+	var primaryKeyTextType = sql.MapStatic("STRING")
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
-	datetimeMapping := sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))
+	var dateMapping = sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	var datetimeMapping = sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -79,12 +79,12 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
-	binaryMapping := sql.MapStatic("STRING")
+	var binaryMapping = sql.MapStatic("STRING")
 	if featureFlags["native_binary_column_type"] {
 		binaryMapping = sql.MapStatic("BYTES")
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:   objAndArrayCol,
 			sql.BINARY:  binaryMapping,
@@ -474,7 +474,7 @@ type queryParams struct {
 }
 
 func renderQueryTemplate(table sql.Table, tpl *template.Template, bounds []sql.MergeBound, objAndArrayAsJson bool) (string, error) {
-	objectType := "STRING"
+	var objectType = "STRING"
 	if objAndArrayAsJson {
 		objectType = "JSON"
 	}

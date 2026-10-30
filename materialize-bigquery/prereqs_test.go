@@ -21,7 +21,7 @@ func TestValidateRejectsEndpointDatasetInAnotherLocation(t *testing.T) {
 	testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, _ []byte, _ string, cfg config) {
 		var ctx = t.Context()
 
-		credOption, err := cfg.CredentialsClientOption()
+		var credOption, err = cfg.CredentialsClientOption()
 		require.NoError(t, err)
 		bq, err := bigquery.NewClient(ctx, cfg.ProjectID, credOption)
 		require.NoError(t, err)

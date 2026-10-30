@@ -18,7 +18,7 @@ import (
 func loadBaseSpec(t *testing.T) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := os.ReadFile("../materialize-boilerplate/testdata/validate_apply_test_cases/generated_specs/base.flow.proto")
+	var specBytes, err = os.ReadFile("../materialize-boilerplate/testdata/validate_apply_test_cases/generated_specs/base.flow.proto")
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -27,7 +27,7 @@ func loadBaseSpec(t *testing.T) *pf.MaterializationSpec {
 
 func mustMarshal(t *testing.T, v any) json.RawMessage {
 	t.Helper()
-	raw, err := json.Marshal(v)
+	var raw, err = json.Marshal(v)
 	require.NoError(t, err)
 	return raw
 }
@@ -101,12 +101,12 @@ func applyReq(spec, last *pf.MaterializationSpec) *pm.Request_Apply {
 func bqTestClient(t *testing.T, cfg config, tables ...string) *bigquery.Client {
 	t.Helper()
 
-	credOption, err := cfg.CredentialsClientOption()
+	var credOption, err = cfg.CredentialsClientOption()
 	require.NoError(t, err)
 	bq, err := bigquery.NewClient(t.Context(), cfg.ProjectID, credOption)
 	require.NoError(t, err)
 
-	drop := func(ctx context.Context) {
+	var drop = func(ctx context.Context) {
 		for _, table := range tables {
 			_ = bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Table(table).Delete(ctx)
 		}
@@ -121,7 +121,7 @@ func bqTestClient(t *testing.T, cfg config, tables ...string) *bigquery.Client {
 
 func tableMetadata(t *testing.T, bq *bigquery.Client, cfg config, table string) *bigquery.TableMetadata {
 	t.Helper()
-	md, err := tableMetadataWithRetry(t.Context(), bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Table(table))
+	var md, err = tableMetadataWithRetry(t.Context(), bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Table(table))
 	require.NoError(t, err)
 	return md
 }
@@ -143,28 +143,28 @@ func TestValidatePartitionBy(t *testing.T) {
 		var tableName = "partition_by_test_validate"
 
 		t.Run("dry-run accepts a valid expression", func(t *testing.T) {
-			resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 0, nil))
+			var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 0, nil))
 			require.NoError(t, err)
 			requireNoIncompatible(t, resp)
 		})
 
 		t.Run("dry-run accepts ingestion-time and range expressions", func(t *testing.T) {
 			for _, expr := range []string{"_PARTITIONDATE", "RANGE_BUCKET(requiredInteger, GENERATE_ARRAY(0, 1000, 10))"} {
-				resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 0, nil))
+				var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 0, nil))
 				require.NoError(t, err, expr)
 				requireNoIncompatible(t, resp)
 			}
 		})
 
 		t.Run("dry-run rejects a bad expression", func(t *testing.T) {
-			_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(no_such_column)", 0, nil))
+			var _, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(no_such_column)", 0, nil))
 			require.ErrorContains(t, err, "no_such_column")
 			require.ErrorContains(t, err, "partition_by")
 		})
 
 		t.Run("change without backfill is INCOMPATIBLE", func(t *testing.T) {
 			var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
-			resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 0, lastSpec))
+			var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 0, lastSpec))
 			require.NoError(t, err)
 
 			// Every projection carries the constraint, so that at least one
@@ -179,7 +179,7 @@ func TestValidatePartitionBy(t *testing.T) {
 		t.Run("change without backfill is INCOMPATIBLE for a delta-updates binding", func(t *testing.T) {
 			var lastRC = tableConfig{Table: tableName, Delta: true}
 			var newRC = tableConfig{Table: tableName, Delta: true, PartitionBy: "DATE(flow_published_at)"}
-			resp, err := NewDriver().Validate(ctx, validateResourceReq(t, cfg, newRC, 0, specWithResource(t, cfg, lastRC, 0)))
+			var resp, err = NewDriver().Validate(ctx, validateResourceReq(t, cfg, newRC, 0, specWithResource(t, cfg, lastRC, 0)))
 			require.NoError(t, err)
 			var incompatible = incompatibleFields(t, resp)
 			require.Contains(t, incompatible, "key")
@@ -189,7 +189,7 @@ func TestValidatePartitionBy(t *testing.T) {
 
 		t.Run("change with a backfill bump is allowed", func(t *testing.T) {
 			var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
-			resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 1, lastSpec))
+			var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 1, lastSpec))
 			require.NoError(t, err)
 			requireNoIncompatible(t, resp)
 		})
@@ -201,7 +201,7 @@ func TestValidatePartitionBy(t *testing.T) {
 			// the dry-run (which would fail on the missing column) for an
 			// expression identical to the last applied spec's.
 			var lastSpec = specWithPartitionBy(t, cfg, tableName, "DATE(no_such_column)", 0)
-			resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, " DATE(no_such_column) ", 0, lastSpec))
+			var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, " DATE(no_such_column) ", 0, lastSpec))
 			require.NoError(t, err)
 			requireNoIncompatible(t, resp)
 		})
@@ -221,10 +221,10 @@ func TestApplyPartitionBy(t *testing.T) {
 			var bq = bqTestClient(t, cfg, tableName)
 
 			var specA = specWithPartitionBy(t, cfg, tableName, "DATE(flow_published_at)", 0)
-			resp, err := NewDriver().Apply(ctx, applyReq(specA, nil))
+			var resp, err = NewDriver().Apply(ctx, applyReq(specA, nil))
 			require.NoError(t, err)
 			require.Contains(t, resp.ActionDescription, "PARTITION BY DATE(flow_published_at)")
-			md := tableMetadata(t, bq, cfg, tableName)
+			var md = tableMetadata(t, bq, cfg, tableName)
 			require.NotNil(t, md.TimePartitioning)
 			require.Equal(t, bigquery.DayPartitioningType, md.TimePartitioning.Type)
 			require.Equal(t, "flow_published_at", md.TimePartitioning.Field)
@@ -254,10 +254,10 @@ func TestApplyPartitionBy(t *testing.T) {
 			var bq = bqTestClient(t, cfg, tableName)
 
 			var spec = specWithResource(t, cfg, tableConfig{Table: tableName, Delta: true, PartitionBy: "DATE(flow_published_at)"}, 0)
-			resp, err := NewDriver().Apply(ctx, applyReq(spec, nil))
+			var resp, err = NewDriver().Apply(ctx, applyReq(spec, nil))
 			require.NoError(t, err)
 			require.Contains(t, resp.ActionDescription, "PARTITION BY DATE(flow_published_at)")
-			md := tableMetadata(t, bq, cfg, tableName)
+			var md = tableMetadata(t, bq, cfg, tableName)
 			require.NotNil(t, md.TimePartitioning)
 			require.Equal(t, "flow_published_at", md.TimePartitioning.Field)
 		})

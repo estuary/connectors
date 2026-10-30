@@ -29,13 +29,13 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 		}
 	}
 
-	actionDescSanitizers := []func(string) string{
+	var actionDescSanitizers = []func(string) string{
 		func(s string) string {
 			return regexp.MustCompile(`"JobPrefix":\s*"[^"]*"`).ReplaceAllString(s, `"JobPrefix": "<uuid>"`)
 		},
@@ -45,7 +45,7 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		started := time.Now()
+		var started = time.Now()
 		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
 
@@ -53,19 +53,19 @@ func TestIntegration(t *testing.T) {
 		// read-back. Tables older than this run belong to another run and are
 		// ignored.
 		testutil.RunTestAllTasks(t, "testdata/materialize.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
-			credOption, err := cfg.CredentialsClientOption()
+			var credOption, err = cfg.CredentialsClientOption()
 			require.NoError(t, err)
 			bq, err := bigquery.NewClient(t.Context(), cfg.ProjectID, credOption)
 			require.NoError(t, err)
 			t.Cleanup(func() { bq.Close() })
 
-			prefix := loadResultsTablePrefix + translateFlowIdentifier(taskName)
-			cutoff := started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
-			listLeaked := func() []string {
+			var prefix = loadResultsTablePrefix + translateFlowIdentifier(taskName)
+			var cutoff = started.Add(-time.Minute) // Tolerates skew between this clock and BigQuery's.
+			var listLeaked = func() []string {
 				var leaked []string
-				it := bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
+				var it = bq.DatasetInProject(cfg.ProjectID, cfg.Dataset).Tables(t.Context())
 				for {
-					tbl, err := it.Next()
+					var tbl, err = it.Next()
 					if err == iterator.Done {
 						break
 					}
@@ -90,7 +90,7 @@ func TestIntegration(t *testing.T) {
 			// A table listing can lag a delete by several seconds, so a
 			// table is only leaked if it is still listed after the lag has
 			// had time to clear.
-			leaked := listLeaked()
+			var leaked = listLeaked()
 			for deadline := time.Now().Add(time.Minute); len(leaked) > 0 && time.Now().Before(deadline); {
 				time.Sleep(5 * time.Second)
 				leaked = listLeaked()
@@ -108,7 +108,7 @@ func TestIntegration(t *testing.T) {
 			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
 			var bq = bqTestClient(t, cfg, tables...)
 
-			flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+			var flags, err = boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
 			require.NoError(t, err)
 			materializer, err := NewMaterializer(ctx, taskName, cfg, flags)
 			require.NoError(t, err)
@@ -137,7 +137,7 @@ func TestIntegration(t *testing.T) {
 			} {
 				var query = bq.Query(fmt.Sprintf("SELECT id FROM `%s.%s.%s` ORDER BY id;", cfg.ProjectID, cfg.Dataset, table))
 				query.Location = cfg.Region
-				it, err := query.Read(ctx)
+				var it, err = query.Read(ctx)
 				require.NoError(t, err)
 				var ids []int64
 				for {
@@ -159,25 +159,25 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("apply-drain", func(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
-			ctx := context.Background()
-			tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
-			res := makeResourceFn(tableName, false).WithDefaults(cfg)
+			var ctx = context.Background()
+			var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 
-			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			var seedPending = func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				// A staged transaction is a query persisted in the connector
 				// state, keyed by the binding's state key, along with the GCS
 				// files it consumes as an external table and the job prefix
 				// making its execution idempotent. The staged file must exist
 				// since Acknowledge deletes it after the query succeeds.
-				credOption, err := cfg.CredentialsClientOption()
+				var credOption, err = cfg.CredentialsClientOption()
 				require.NoError(t, err)
 				bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, credOption)
 				require.NoError(t, err)
 
-				fileKey := path.Join(cfg.effectiveBucketPath(), fmt.Sprintf("applydrain-%s.json", uuid.NewString()))
+				var fileKey = path.Join(cfg.effectiveBucketPath(), fmt.Sprintf("applydrain-%s.json", uuid.NewString()))
 				require.NoError(t, bucket.Upload(ctx, fileKey, strings.NewReader("")))
 
-				query := sql.DrainSeedInsertQuery(t, NewDriver().sqlDriver, cfg, appliedSpec, "JSON '{}'")
+				var query = sql.DrainSeedInsertQuery(t, NewDriver().sqlDriver, cfg, appliedSpec, "JSON '{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
 						"Query":         query,
@@ -190,7 +190,7 @@ func TestIntegration(t *testing.T) {
 				return state
 			}
 
-			verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+			var verifyDrained = func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 

@@ -36,7 +36,7 @@ func (d *driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.B
 }
 
 func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	resp, err := d.sqlDriver.Validate(ctx, req)
+	var resp, err = d.sqlDriver.Validate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		rc = rc.WithDefaults(cfg)
-		path, _, err := rc.Parameters()
+		var path, _, err = rc.Parameters()
 		if err != nil {
 			return nil, err
 		}

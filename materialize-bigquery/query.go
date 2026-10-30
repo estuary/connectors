@@ -37,7 +37,7 @@ func (c client) queryIdempotent(
 	sourceURIs []string,
 	tempTableName string,
 ) (*bigquery.JobStatus, error) {
-	q := c.bigqueryClient.Query(query)
+	var q = c.bigqueryClient.Query(query)
 	q.Location = c.cfg.Region
 	if tempTableName != "" {
 		q.TableDefinitions = map[string]bigquery.ExternalData{
@@ -47,10 +47,10 @@ func (c client) queryIdempotent(
 
 	var attempt uint32 = 1
 	for ; ; attempt++ {
-		jobID := nextJobID(jobPrefix, attempt)
+		var jobID = nextJobID(jobPrefix, attempt)
 		q.JobID = jobID
 
-		job, err := q.Run(ctx)
+		var job, err = q.Run(ctx)
 		if err != nil {
 			var e *googleapi.Error
 			if errors.As(err, &e) && e.Code == 409 {
@@ -58,7 +58,7 @@ func (c client) queryIdempotent(
 				// exists. If a prior job with the same ID failed, we must try
 				// again with a new job ID that is 1 higher than the last one.
 				// If it is still running, we can wait for it to finish.
-				j, err := c.bigqueryClient.JobFromIDLocation(ctx, jobID, c.cfg.Region)
+				var j, err = c.bigqueryClient.JobFromIDLocation(ctx, jobID, c.cfg.Region)
 				if err != nil {
 					return nil, fmt.Errorf("getting job metadata for %q: %w", jobID, err)
 				}
@@ -134,7 +134,7 @@ func dmlRowStats(stat *bigquery.JobStatus) m.RowStats {
 	if stat == nil || stat.Statistics == nil {
 		return m.RowStats{}
 	}
-	qs, ok := stat.Statistics.Details.(*bigquery.QueryStatistics)
+	var qs, ok = stat.Statistics.Details.(*bigquery.QueryStatistics)
 	if !ok || qs.DMLStats == nil {
 		return m.RowStats{}
 	}
@@ -154,7 +154,7 @@ func (c client) query(ctx context.Context, queryString string, parameters ...int
 func (c client) newQuery(queryString string, parameters ...interface{}) *bigquery.Query {
 
 	// Create the query
-	query := c.bigqueryClient.Query(queryString)
+	var query = c.bigqueryClient.Query(queryString)
 	query.Location = c.cfg.Region
 	// Add parameters
 	for _, p := range parameters {
@@ -180,7 +180,7 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 		if backoff > maxBackoff {
 			backoff = maxBackoff
 		}
-		retryDelay := time.Duration(backoff * float64(time.Millisecond))
+		var retryDelay = time.Duration(backoff * float64(time.Millisecond))
 
 		job, err = query.Run(ctx)
 		if err != nil {
@@ -233,8 +233,8 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 // maybeRetry will return a `nil` error after a period of time if the provided
 // `err` is retryable. Otherwise it will return the provided error immediately.
 func maybeRetry(ctx context.Context, err error, attempt int, delay time.Duration, status *bigquery.JobStatus) error {
-	doDelay := func() error {
-		ll := log.WithFields(log.Fields{
+	var doDelay = func() error {
+		var ll = log.WithFields(log.Fields{
 			"attempt":   attempt,
 			"jobStatus": status,
 			"error":     err,

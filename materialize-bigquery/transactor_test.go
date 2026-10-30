@@ -43,14 +43,14 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 }
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
-	tr := testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
+	var tr = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
 	tr.cp["a_table.v1"] = &checkpointItem{Query: "MERGE INTO a", JobPrefix: "jp"}
 	tr.cp["b_table.v1"] = &checkpointItem{Query: "MERGE INTO b", JobPrefix: "jp"}
 
 	// No staged entry's state key is requested: nothing may execute (the nil
 	// client would panic if a query ran) and no state update is returned, so
 	// the entries remain pending in the persisted state.
-	state, err := tr.Acknowledge(context.Background(), nil, []string{"c_table.v1"})
+	var state, err = tr.Acknowledge(context.Background(), nil, []string{"c_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
 	require.NotNil(t, tr.cp["a_table.v1"])
@@ -147,11 +147,11 @@ func TestMergePeerStatePatches(t *testing.T) {
 }
 
 func TestSchemaForColsStripsPolicyTags(t *testing.T) {
-	makeCol := func(field string) *sql.Column {
+	var makeCol = func(field string) *sql.Column {
 		return &sql.Column{Projection: sql.Projection{Projection: pf.Projection{Field: field}}}
 	}
 
-	fieldSchemas := map[string]*bigquery.FieldSchema{
+	var fieldSchemas = map[string]*bigquery.FieldSchema{
 		"id": {Name: "id", Type: bigquery.StringFieldType, Required: true},
 		"birthday": {
 			Name: "birthday",
@@ -162,7 +162,7 @@ func TestSchemaForColsStripsPolicyTags(t *testing.T) {
 		},
 	}
 
-	got, err := schemaForCols([]*sql.Column{makeCol("id"), makeCol("birthday")}, fieldSchemas)
+	var got, err = schemaForCols([]*sql.Column{makeCol("id"), makeCol("birthday")}, fieldSchemas)
 	require.NoError(t, err)
 
 	require.Len(t, got, 2)

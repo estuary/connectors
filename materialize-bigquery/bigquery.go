@@ -53,7 +53,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Credentials JSON", CredentialsJSONConfig{}, string(CredentialsJSON)),
 	}
 	subSchemas = append(subSchemas,
@@ -171,7 +171,7 @@ func (c config) CredentialsClientOption() (option.ClientOption, error) {
 func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
 	var clientOpts []option.ClientOption
 
-	credOption, err := c.CredentialsClientOption()
+	var credOption, err = c.CredentialsClientOption()
 	if err != nil {
 		return nil, err
 	}
@@ -254,12 +254,12 @@ func newSQLDriver() *sql.Driver[config, tableConfig] {
 				"bucket_path": cfg.effectiveBucketPath(),
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags)
-			templates := renderTemplates(dialect)
+			var dialect = bqDialect(featureFlags)
+			var templates = renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500
 			// for truncation, rather than the more common 1000.
-			serPolicy := &pf.SerPolicy{
+			var serPolicy = &pf.SerPolicy{
 				StrTruncateAfter:       1 << 16, // 64 KiB
 				NestedObjTruncateAfter: 1500,
 				ArrayTruncateAfter:     1500,

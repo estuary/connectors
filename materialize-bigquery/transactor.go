@@ -156,7 +156,7 @@ func prepareNewTransactor(
 	) (m.Transactor, error) {
 		var cfg = ep.Config
 
-		client, err := cfg.client(ctx, ep)
+		var client, err = cfg.client(ctx, ep)
 		if err != nil {
 			return nil, err
 		}
@@ -176,12 +176,12 @@ func prepareNewTransactor(
 			keyBegin, keyEnd = open.Range.KeyBegin, open.Range.KeyEnd
 		}
 
-		primaryShard := true
+		var primaryShard = true
 		if boilerplate.IsMaterializationSpecRuntimeV2(open.Materialization) {
 			primaryShard = keyBegin == 0
 		}
 
-		t := &transactor{
+		var t = &transactor{
 			runtimeCheckpoint:     fence.Checkpoint,
 			materializationName:   materializationName,
 			cfg:                   cfg,
@@ -207,12 +207,12 @@ func prepareNewTransactor(
 			// flexibility in changing the dialect and having it still work for existing tables. As long
 			// as the JSON encoding of the values is the same they may be used for columns that would
 			// have been created differently due to evolution of the dialect's column types.
-			res := is.GetResource(binding.Path)
+			var res = is.GetResource(binding.Path)
 			if res == nil {
 				return nil, fmt.Errorf("could not get metadata for table %s: verify that the table exists and that the connector service account user is authorized for it", binding.Identifier)
 			}
 
-			schema := res.Meta.(bigquery.Schema)
+			var schema = res.Meta.(bigquery.Schema)
 
 			log.WithFields(log.Fields{
 				"table":      binding.Path,
@@ -220,7 +220,7 @@ func prepareNewTransactor(
 				"schemaJson": schema,
 			}).Debug("bigquery schema for table")
 
-			fieldSchemas := make(map[string]*bigquery.FieldSchema)
+			var fieldSchemas = make(map[string]*bigquery.FieldSchema)
 			for _, f := range schema {
 				fieldSchemas[f.Name] = f
 			}
@@ -235,7 +235,7 @@ func prepareNewTransactor(
 }
 
 func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema, dialect *sql.Dialect) error {
-	loadSchema, err := schemaForCols(target.KeyPtrs(), fieldSchemas)
+	var loadSchema, err = schemaForCols(target.KeyPtrs(), fieldSchemas)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		Type: bigquery.BooleanFieldType,
 	})
 
-	b := &binding{
+	var b = &binding{
 		target:           target,
 		loadSchema:       loadSchema,
 		storeSchema:      storeSchema,
@@ -278,8 +278,8 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		}
 	}
 
-	loadFields := make([]string, 0, len(loadSchema))
-	storeFields := make([]string, 0, len(storeSchema))
+	var loadFields = make([]string, 0, len(loadSchema))
+	var storeFields = make([]string, 0, len(storeSchema))
 	for _, field := range loadSchema {
 		loadFields = append(loadFields, field.Name)
 	}
@@ -294,10 +294,10 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 }
 
 func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSchema) ([]*bigquery.FieldSchema, error) {
-	s := make([]*bigquery.FieldSchema, 0, len(cols))
+	var s = make([]*bigquery.FieldSchema, 0, len(cols))
 
 	for idx, col := range cols {
-		schema, ok := fieldSchemas[translateFlowIdentifier(col.Field)]
+		var schema, ok = fieldSchemas[translateFlowIdentifier(col.Field)]
 		if !ok {
 			return nil, fmt.Errorf("could not find metadata for field '%s'", col.Field)
 		}
@@ -305,7 +305,7 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 		// Copy the field schema rather than reusing the destination table's, both to avoid
 		// mutating the caller's view of the destination schema and so that modifications made
 		// here never leak back to BigQuery via the temp/external table definition.
-		tempSchema := *schema
+		var tempSchema = *schema
 
 		// Use a placeholder value instead of the actual field name for the external table schema.
 		// This allows for materialized tables to use "Flexible column names", which is not yet
@@ -429,14 +429,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the query across all tables.
-	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
-	query := t.client.newQuery(queryStr)
+	var queryStr = strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	var query = t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
 
 	// A query with no destination table caps its response at 10 GB, so the
 	// results are written to a table created for this transaction.
-	dst := t.client.bigqueryClient.DatasetInProject(t.cfg.ProjectID, t.cfg.Dataset).Table(loadResultsTableName(t.materializationName, t.rangeKey))
-	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData, "results_table": dst.TableID})
+	var dst = t.client.bigqueryClient.DatasetInProject(t.cfg.ProjectID, t.cfg.Dataset).Table(loadResultsTableName(t.materializationName, t.rangeKey))
+	var ll = log.WithFields(log.Fields{"query": queryStr, "external_data": externalData, "results_table": dst.TableID})
 	if err := dst.Create(ctx, &bigquery.TableMetadata{ExpirationTime: time.Now().Add(loadResultsTableTTL)}); err != nil {
 		return fmt.Errorf("creating load results table: %w", err)
 	}
@@ -445,7 +445,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	query.WriteDisposition = bigquery.WriteTruncate
 
 	t.be.StartedEvaluatingLoads()
-	job, err := t.client.runQuery(ctx, query)
+	var job, err = t.client.runQuery(ctx, query)
 	if err != nil {
 		ll.WithError(err).Error("client runQuery failed")
 		return fmt.Errorf("load query: %w", err)
@@ -474,7 +474,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("load row read: %w", err)
 		}
 
-		doc := bd.Document
+		var doc = bd.Document
 		if b := t.bindings[bd.Binding]; len(b.nullFieldsToStrip) > 0 {
 			var err error
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
@@ -502,7 +502,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for it.Next(t.cfg.HardDelete) {
 		var b = t.bindings[it.Binding]
 
-		flowDelete := t.cfg.HardDelete && it.Delete
+		var flowDelete = t.cfg.HardDelete && it.Delete
 		if flowDelete && !it.Exists {
 			// Ignore documents which do not exist and are being deleted.
 			continue
@@ -529,7 +529,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			continue
 		}
 
-		uris, err := t.storeFiles.Flush(idx)
+		var uris, err = t.storeFiles.Flush(idx)
 		if err != nil {
 			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
@@ -650,7 +650,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, err
 	}
 
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 
 	if !t.primaryShard {
 		for _, b := range t.bindings {
@@ -674,7 +674,7 @@ type pendingItem struct {
 }
 
 func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely
 	// unlimited just to maintain some sense of decorum.
@@ -684,7 +684,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	var drained []pendingItem
 
 	for _, b := range t.bindings {
-		sk := b.target.StateKey
+		var sk = b.target.StateKey
 		if !shouldProcess(sk) {
 			// This state key's pending work was not requested to be
 			// processed, so it remains staged in the persisted state.
@@ -715,8 +715,8 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			// coalesce into a single query over their combined bounds and
 			// source files.
 			// items[0] is this shard's own entry when it has one.
-			round := items[0].item.round
-			needsMerge := false
+			var round = items[0].item.round
+			var needsMerge = false
 			var coalesce []*checkpointItem
 			var coalescedURIs []string
 			var sourceURIs []string
@@ -735,7 +735,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 					}
 					continue
 				}
-				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName)
+				var stat, err = t.client.queryIdempotent(groupCtx, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
@@ -749,16 +749,16 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			// A truncation-only entry stages no files.
 			var stats = m.TotalRowStats(0)
 			if len(coalescedURIs) > 0 {
-				query := b.storeInsertSQL
+				var query = b.storeInsertSQL
 				if needsMerge {
 					var err error
-					bounds := combineBounds(b.target.Keys, coalesce)
+					var bounds = combineBounds(b.target.Keys, coalesce)
 					query, err = renderQueryTemplate(b.target, t.templates.storeUpdate, bounds, t.objAndArrayAsJson)
 					if err != nil {
 						return fmt.Errorf("rendering merge query template: %w", err)
 					}
 				}
-				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
+				var stat, err = t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
@@ -838,7 +838,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 		}
 	}
 
-	checkpointJSON, err := json.Marshal(clear)
+	var checkpointJSON, err = json.Marshal(clear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}

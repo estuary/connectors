@@ -27,7 +27,7 @@ func TestPartitionExpr(t *testing.T) {
 		{name: "invalid json", raw: `{`, wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := partitionExpr(json.RawMessage(tt.raw))
+			var got, err = partitionExpr(json.RawMessage(tt.raw))
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -59,7 +59,7 @@ func TestMustRecreateResourcePartitionBy(t *testing.T) {
 		{name: "expression removed", last: binding(`{"table":"t","partition_by":"DATE(ts)"}`), next: binding(`{"table":"t"}`), want: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := c.MustRecreateResource(nil, tt.last, tt.next)
+			var got, err = c.MustRecreateResource(nil, tt.last, tt.next)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -70,7 +70,7 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 	// The standard (index 0) and delta-updates (index 1) tables of the shared
 	// SQL generation fixture, with a partition_by attached to their resource
 	// config.
-	_, tables := sql.RunSqlGenTests(t, testDialect, func(table string) []string {
+	var _, tables = sql.RunSqlGenTests(t, testDialect, func(table string) []string {
 		return []string{"projectID", "dataset", table}
 	}, sql.TestTemplates{})
 
@@ -87,7 +87,7 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 	} {
 		var table = tc.table
 		table.ResourceConfigJson = json.RawMessage(`{"table":"target_table","partition_by":"` + tc.partitionBy + `"}`)
-		rendered, err := sql.RenderTableTemplate(table, testTemplates.createTargetTable)
+		var rendered, err = sql.RenderTableTemplate(table, testTemplates.createTargetTable)
 		require.NoError(t, err)
 		snap.WriteString("--- Begin " + tc.name + " ---\n")
 		snap.WriteString(rendered)

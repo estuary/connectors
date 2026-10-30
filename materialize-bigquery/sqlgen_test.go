@@ -15,7 +15,7 @@ var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
 
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -39,11 +39,11 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.loadQuery,
 		testTemplates.loadQueryNoFlowDocument,
 	} {
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		bounds := []sql.MergeBound{
+		var bounds = []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
 				LiteralLower: testDialect.Literal(int64(10)),
@@ -61,7 +61,7 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		}
 
-		tf := queryParams{
+		var tf = queryParams{
 			Table:  tbl,
 			Bounds: bounds,
 		}

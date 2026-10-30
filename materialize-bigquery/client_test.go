@@ -21,7 +21,7 @@ func TestPushTableMetadataSkipsDroppedTable(t *testing.T) {
 	}
 
 	testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, _ []byte, _ string, cfg config) {
-		credOption, err := cfg.CredentialsClientOption()
+		var credOption, err = cfg.CredentialsClientOption()
 		require.NoError(t, err)
 		bq, err := bigquery.NewClient(t.Context(), cfg.ProjectID, credOption)
 		require.NoError(t, err)

@@ -36,7 +36,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	rpDatasets := make(map[string]struct{})
+	var rpDatasets = make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpDatasets[c.ep.TableLocator(p).TableSchema] = struct{}{}
 	}
@@ -45,11 +45,11 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	// high rate limits. Running a job to query the INFORMATION_SCHEMA view costs a minimum of 10MB
 	// per query, so this is a little more cost effective and efficient.
 	var mu sync.Mutex
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	// The table listing will fail if the dataset doesn't already exist, so only attempt to list
 	// tables in datasets that do exist.
-	existingDatasets, err := c.ListSchemas(ctx)
+	var existingDatasets, err = c.ListSchemas(ctx)
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)
 	}
@@ -60,10 +60,10 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			continue
 		}
 
-		tableIter := c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, ds).Tables(ctx)
+		var tableIter = c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, ds).Tables(ctx)
 
 		for {
-			table, err := tableIter.Next()
+			var table, err = tableIter.Next()
 			if err != nil {
 				if err == iterator.Done {
 					break
@@ -84,7 +84,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 // pushTableMetadata records a listed table and its fields in is.
 func pushTableMetadata(ctx context.Context, is *boilerplate.InfoSchema, mu *sync.Mutex, table *bigquery.Table) error {
-	md, err := tableMetadataWithRetry(ctx, table)
+	var md, err = tableMetadataWithRetry(ctx, table)
 	var gErr *googleapi.Error
 	if errors.As(err, &gErr) && gErr.Code == 404 {
 		// The table was dropped after the listing returned it, so it is
@@ -98,7 +98,7 @@ func pushTableMetadata(ctx context.Context, is *boilerplate.InfoSchema, mu *sync
 	mu.Lock()
 	defer mu.Unlock()
 
-	res := is.PushResource(table.DatasetID, table.TableID)
+	var res = is.PushResource(table.DatasetID, table.TableID)
 	res.Meta = md.Schema
 	for _, f := range md.Schema {
 		res.PushField(boilerplate.ExistingField{
@@ -147,24 +147,24 @@ func tableMetadataWithRetry(ctx context.Context, table *bigquery.Table) (*bigque
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.query(ctx, tc.TableCreateSql)
+	var _, err = c.query(ctx, tc.TableCreateSql)
 	return err
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.query(ctx, stmt)
+		var _, err = c.query(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.query(ctx, stmt)
+		var _, err = c.query(ctx, stmt)
 		return err
 	}, nil
 }
@@ -230,12 +230,12 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	// BigQuery represents the concept of a "schema" with datasets.
-	iter := c.bigqueryClient.Datasets(ctx)
+	var iter = c.bigqueryClient.Datasets(ctx)
 	iter.ProjectID = c.cfg.ProjectID
 
-	dsNames := []string{}
+	var dsNames = []string{}
 	for {
-		ds, err := iter.Next()
+		var ds, err = iter.Next()
 		if err != nil {
 			if err == iterator.Done {
 				break
@@ -260,9 +260,9 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	credOption, err := cfg.CredentialsClientOption()
+	var credOption, err = cfg.CredentialsClientOption()
 	if err != nil {
 		errs.Err(err)
 	}
@@ -283,7 +283,7 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 // exists, is located in the configured region. A dataset that does not exist
 // yet passes, since it will be created in the configured region.
 func checkDatasetLocation(ctx context.Context, cfg config) error {
-	bq, err := cfg.client(ctx, nil)
+	var bq, err = cfg.client(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("creating bigquery client: %w", err)
 	}
@@ -319,7 +319,7 @@ func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBindi
 	if lastBinding == nil || newBinding == nil {
 		return false, nil
 	}
-	lastExpr, err := partitionExpr(lastBinding.ResourceConfigJson)
+	var lastExpr, err = partitionExpr(lastBinding.ResourceConfigJson)
 	if err != nil {
 		return false, fmt.Errorf("parsing last binding resource config: %w", err)
 	}
@@ -339,9 +339,9 @@ func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) er
 }
 
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
-	query := fmt.Sprintf("SELECT * FROM %s", c.ep.Dialect.Identifier(path...))
+	var query = fmt.Sprintf("SELECT * FROM %s", c.ep.Dialect.Identifier(path...))
 
-	job, err := c.query(ctx, query)
+	var job, err = c.query(ctx, query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("querying table: %w", err)
 	}
@@ -365,7 +365,7 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 			return nil, nil, fmt.Errorf("reading row: %w", err)
 		}
 
-		row := make([]any, len(values))
+		var row = make([]any, len(values))
 		for i, v := range values {
 			if s, ok := v.(string); ok && json.Valid([]byte(s)) {
 				v = json.RawMessage(s)

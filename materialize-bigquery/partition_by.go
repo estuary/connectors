@@ -48,7 +48,7 @@ func dryRunPartitionBy(ctx context.Context, bq *client, dialect sql.Dialect, tpl
 	var scratch = fmt.Sprintf("flow_partition_dryrun_%x", nonce)
 
 	var shape = sql.BuildTableShape(materializationName, synth, bindingIdx, []string{rc.projectID, rc.Dataset, scratch}, rc.Delta)
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	if err != nil {
 		return fmt.Errorf("resolving dry-run table: %w", err)
 	}
