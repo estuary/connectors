@@ -52,7 +52,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Credentials JSON", CredentialsJSONConfig{}, string(CredentialsJSON)),
 		schemagen.OneOfSubSchema("GCP IAM", iam.GCPConfig{}, string(GCPIAM)),
 	}
@@ -139,7 +139,7 @@ func (c config) buildClientOptions() ([]option.ClientOption, error) {
 			option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 		)
 	} else {
-		credOption, err := c.CredentialsClientOption()
+		var credOption, err = c.CredentialsClientOption()
 		if err != nil {
 			return nil, err
 		}
@@ -150,14 +150,14 @@ func (c config) buildClientOptions() ([]option.ClientOption, error) {
 }
 
 func (c config) dataClient(ctx context.Context) (*bigtable.Client, error) {
-	opts, err := c.buildClientOptions()
+	var opts, err = c.buildClientOptions()
 	if err != nil {
 		return nil, err
 	}
 
 	// AppProfile applies only to data operations; the admin client has no
 	// equivalent concept and routes through the instance directly.
-	cfg := bigtable.ClientConfig{
+	var cfg = bigtable.ClientConfig{
 		AppProfile:      c.AppProfile,
 		MetricsProvider: bigtable.NoopMetricsProvider{},
 	}
@@ -170,7 +170,7 @@ func (c config) dataClient(ctx context.Context) (*bigtable.Client, error) {
 }
 
 func (c config) adminClient(ctx context.Context) (*bigtable.AdminClient, error) {
-	opts, err := c.buildClientOptions()
+	var opts, err = c.buildClientOptions()
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ const maxTableNameLength = 50
 var tableNameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_\-\.]`)
 
 func normalizeTableName(t string) string {
-	cleaned := tableNameSanitizer.ReplaceAllString(t, "_")
+	var cleaned = tableNameSanitizer.ReplaceAllString(t, "_")
 	cleaned = strings.TrimLeft(cleaned, "-.")
 	if len(cleaned) > maxTableNameLength {
 		cleaned = cleaned[:maxTableNameLength]
@@ -227,7 +227,7 @@ var _ boilerplate.Connector = &driver{}
 func NewDriver() boilerplate.Connector { return driver{} }
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Materialize Bigtable Spec", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Materialize Bigtable Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -261,7 +261,7 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	admin, err := cfg.adminClient(ctx)
+	var admin, err = cfg.adminClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 
 func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	for _, p := range resourcePaths {
-		tableName := p[0]
+		var tableName = p[0]
 		if _, err := d.adminClient.TableInfo(ctx, tableName); err != nil {
 			if status.Code(err) == codes.NotFound {
 				continue
@@ -304,7 +304,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 }
 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	prereq := &cerrors.PrereqErr{}
+	var prereq = &cerrors.PrereqErr{}
 
 	// Tables() proves three things: the instance/project IDs resolve, the
 	// credentials authenticate, and the role has at least bigtable.tables.list
@@ -361,12 +361,12 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
-	tableName := res.ResourcePath[0]
+	var tableName = res.ResourcePath[0]
 	return fmt.Sprintf("create table %q", tableName), func(ctx context.Context) error {
 		// MaxVersions(2) keeps the last committed cell plus an in-flight cell
 		// from a crashed attempt, so the dirty-read detection in Load can fall
 		// back to the safe version.
-		conf := &bigtable.TableConf{
+		var conf = &bigtable.TableConf{
 			TableID: tableName,
 			ColumnFamilies: map[string]bigtable.Family{
 				columnFamily: {GCPolicy: bigtable.MaxVersionsGCPolicy(2)},
@@ -381,7 +381,7 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
-	tableName := resourcePath[0]
+	var tableName = resourcePath[0]
 	return fmt.Sprintf("delete table %q", tableName), func(ctx context.Context) error {
 		if err := d.adminClient.DeleteTable(ctx, tableName); err != nil {
 			return fmt.Errorf("delete table %s: %w", tableName, err)
@@ -415,9 +415,9 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	bindings := make([]binding, 0, len(mappedBindings))
+	var bindings = make([]binding, 0, len(mappedBindings))
 	for _, mb := range mappedBindings {
-		b := binding{
+		var b = binding{
 			tableName: mb.ResourcePath[0],
 			path:      mb.ResourcePath,
 			table:     d.dataClient.Open(mb.ResourcePath[0]),
@@ -438,8 +438,8 @@ func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error)  
 func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) error { return nil }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	tableName := path[0]
-	tbl := d.dataClient.Open(tableName)
+	var tableName = path[0]
+	var tbl = d.dataClient.Open(tableName)
 
 	// Read latest 1 version of every cell — snapshots reflect committed state.
 	var rows []bigtable.Row
@@ -452,7 +452,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 	// columnQualifier strips the column-family prefix from a "family:qualifier"
 	// string returned by Bigtable.
-	columnQualifier := func(c string) string {
+	var columnQualifier = func(c string) string {
 		if i := strings.IndexByte(c, ':'); i >= 0 {
 			return c[i+1:]
 		}
@@ -471,7 +471,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	//   - cells that are valid printable UTF-8 render as a string.
 	//   - everything else (8-byte BE ints, packed FDB tuples, etc.) renders as
 	//     `0x...` hex — deterministic and easier to eyeball than base64.
-	renderBytes := func(value []byte) any {
+	var renderBytes = func(value []byte) any {
 		if len(value) == 0 {
 			return nil
 		}
@@ -479,7 +479,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 			return json.RawMessage(value)
 		}
 		if utf8.Valid(value) {
-			printable := true
+			var printable = true
 			for _, r := range string(value) {
 				if !unicode.IsPrint(r) && !unicode.IsSpace(r) {
 					printable = false
@@ -494,7 +494,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 		return "0x" + hex.EncodeToString(value)
 	}
 
-	colSet := map[string]struct{}{"_row_key": {}, "_timestamp": {}}
+	var colSet = map[string]struct{}{"_row_key": {}, "_timestamp": {}}
 	for _, r := range rows {
 		for _, items := range r {
 			for _, it := range items {
@@ -502,15 +502,15 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 			}
 		}
 	}
-	columns := make([]string, 0, len(colSet))
+	var columns = make([]string, 0, len(colSet))
 	for c := range colSet {
 		columns = append(columns, c)
 	}
 	sort.Strings(columns)
 
-	out := make([][]any, 0, len(rows))
+	var out = make([][]any, 0, len(rows))
 	for _, r := range rows {
-		row := make([]any, len(columns))
+		var row = make([]any, len(columns))
 		for i, c := range columns {
 			if c == "_row_key" {
 				row[i] = renderBytes([]byte(r.Key()))
@@ -545,8 +545,8 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 	sort.Slice(out, func(i, j int) bool {
 		for c := range columns {
-			vi := fmt.Sprint(out[i][c])
-			vj := fmt.Sprint(out[j][c])
+			var vi = fmt.Sprint(out[i][c])
+			var vj = fmt.Sprint(out[j][c])
 			if vi != vj {
 				return vi < vj
 			}

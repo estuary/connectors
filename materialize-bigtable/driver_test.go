@@ -35,7 +35,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) resource {
+	var makeResourceFn = func(table string, delta bool) resource {
 		return resource{Table: table}
 	}
 
@@ -44,10 +44,10 @@ func TestIntegration(t *testing.T) {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
-	all := *testAll || os.Getenv("BIGTABLE_TEST_ALL") != ""
+	var all = *testAll || os.Getenv("BIGTABLE_TEST_ALL") != ""
 
-	materializeSpec := "testdata/materialize-local.flow.yaml"
-	applySpec := "testdata/apply-local.flow.yaml"
+	var materializeSpec = "testdata/materialize-local.flow.yaml"
+	var applySpec = "testdata/apply-local.flow.yaml"
 	if all {
 		materializeSpec = "testdata/materialize.flow.yaml"
 		applySpec = "testdata/apply.flow.yaml"

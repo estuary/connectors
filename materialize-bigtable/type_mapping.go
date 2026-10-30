@@ -57,9 +57,9 @@ func (fieldConfig) Validate() error    { return nil }
 func (fieldConfig) CastToString() bool { return false }
 
 func mapType(p boilerplate.Projection) mappedType {
-	out := mappedType{field: p.Field, flatType: p.FlatType}
+	var out = mappedType{field: p.Field, flatType: p.FlatType}
 
-	numericExceedsInt64 := func(n pf.Inference_Numeric) bool {
+	var numericExceedsInt64 = func(n pf.Inference_Numeric) bool {
 		return n.Maximum > math.MaxInt64 || n.Minimum < math.MinInt64
 	}
 
@@ -122,7 +122,7 @@ func encodeBool(te tuple.TupleElement) ([]byte, error) {
 }
 
 func encodeInteger(te tuple.TupleElement) ([]byte, error) {
-	out := make([]byte, 8)
+	var out = make([]byte, 8)
 	switch v := te.(type) {
 	case int:
 		binary.BigEndian.PutUint64(out, uint64(int64(v)))
@@ -185,7 +185,7 @@ func encodeNumber(te tuple.TupleElement) ([]byte, error) {
 		return nil, fmt.Errorf("number field expected numeric, got %T", te)
 	}
 
-	out := make([]byte, 8)
+	var out = make([]byte, 8)
 	binary.BigEndian.PutUint64(out, math.Float64bits(f))
 
 	return out, nil
@@ -234,7 +234,7 @@ func encodeBinary(te tuple.TupleElement) ([]byte, error) {
 }
 
 func encodeStringFormatInt(te tuple.TupleElement) ([]byte, error) {
-	s, ok := te.(string)
+	var s, ok = te.(string)
 	if !ok {
 		return encodeInteger(te)
 	}
@@ -265,7 +265,7 @@ func encodeStringFormatNum(te tuple.TupleElement) ([]byte, error) {
 		case "-Infinity":
 			f = math.Inf(-1)
 		default:
-			parsed, err := strconv.ParseFloat(v, 64)
+			var parsed, err = strconv.ParseFloat(v, 64)
 			if err != nil {
 				return nil, fmt.Errorf("parsing number-formatted string %q: %w", v, err)
 			}
@@ -283,7 +283,7 @@ func encodeStringFormatNum(te tuple.TupleElement) ([]byte, error) {
 		return nil, fmt.Errorf("string-format-number field expected string, got %T", te)
 	}
 
-	out := make([]byte, 8)
+	var out = make([]byte, 8)
 	binary.BigEndian.PutUint64(out, math.Float64bits(f))
 
 	return out, nil

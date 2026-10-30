@@ -83,19 +83,19 @@ type loadBatch struct {
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	ctx := it.Context()
+	var ctx = it.Context()
 	it.WaitForAcknowledged()
 
 	var mu sync.Mutex
-	lockedAndLoaded := func(binding int, doc json.RawMessage) error {
+	var lockedAndLoaded = func(binding int, doc json.RawMessage) error {
 		mu.Lock()
 		defer mu.Unlock()
 		return loaded(binding, doc)
 	}
 
-	batches := make(chan loadBatch)
-	group, groupCtx := errgroup.WithContext(ctx)
-	txTS := bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
+	var batches = make(chan loadBatch)
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var txTS = bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
 
 	for range concurrentWorkers {
 		group.Go(func() error {
@@ -112,7 +112,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		lastBinding  int
 	)
 
-	sendBatch := func() error {
+	var sendBatch = func() error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -173,16 +173,16 @@ func (t *transactor) loadWorker(
 				return nil
 			}
 
-			b := &t.bindings[batch.binding]
+			var b = &t.bindings[batch.binding]
 
-			filter := bigtable.ChainFilters(
+			var filter = bigtable.ChainFilters(
 				bigtable.FamilyFilter(columnFamily),
 				bigtable.ColumnFilter(regexp.QuoteMeta(b.docField)),
 				bigtable.LatestNFilter(2),
 			)
 
 			var loadErr error
-			err := b.table.ReadRows(ctx, batch.keys, func(r bigtable.Row) bool {
+			var err = b.table.ReadRows(ctx, batch.keys, func(r bigtable.Row) bool {
 				// The filter restricts items to document-cell versions, newest first.
 				// Walk forward to the first non-dirty cell and surface it as the
 				// committed value.
@@ -216,14 +216,14 @@ type storeBatch struct {
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	batches := make(chan storeBatch)
-	group, groupCtx := errgroup.WithContext(ctx)
-	round := it.Round
+	var batches = make(chan storeBatch)
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var round = it.Round
 	// stored counts the rows Bigtable acknowledged per binding, for the
 	// transaction health report.
-	stored := make([]atomic.Int64, len(t.bindings))
+	var stored = make([]atomic.Int64, len(t.bindings))
 
 	for range concurrentWorkers {
 		group.Go(func() error {
@@ -237,7 +237,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		ts           = bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
 	)
 
-	sendBatch := func() error {
+	var sendBatch = func() error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -255,16 +255,16 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		b := &t.bindings[it.Binding]
+		var b = &t.bindings[it.Binding]
 
-		mut := bigtable.NewMutation()
+		var mut = bigtable.NewMutation()
 		if it.Delete && t.hardDelete {
 			mut.DeleteRow()
 		} else {
-			allFields := append(it.Key, it.Values...)
+			var allFields = append(it.Key, it.Values...)
 			for i, te := range allFields {
-				f := b.fields[i]
-				val, err := f.encode(te)
+				var f = b.fields[i]
+				var val, err = f.encode(te)
 				if err != nil {
 					return nil, fmt.Errorf("encoding field %q on table %q: %w", f.field, b.tableName, err)
 				}
@@ -296,7 +296,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	close(batches)
 
 	t.state.CommittedTimestamp = int64(ts)
-	newState, err := json.Marshal(t.state)
+	var newState, err = json.Marshal(t.state)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling state: %w", err)
 	}
@@ -325,8 +325,8 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan storeBatch,
 				return nil
 			}
 
-			b := &t.bindings[batch.binding]
-			errs, err := b.table.ApplyBulk(ctx, batch.rowKeys, batch.mutations)
+			var b = &t.bindings[batch.binding]
+			var errs, err = b.table.ApplyBulk(ctx, batch.rowKeys, batch.mutations)
 			if err != nil {
 				return fmt.Errorf("ApplyBulk on table %q: %w", b.tableName, err)
 			}

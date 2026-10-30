@@ -18,21 +18,21 @@ func TestMapType(t *testing.T) {
 		wantErr bool
 	}
 
-	float64BE := func(f float64) []byte {
-		out := make([]byte, 8)
+	var float64BE = func(f float64) []byte {
+		var out = make([]byte, 8)
 		binary.BigEndian.PutUint64(out, math.Float64bits(f))
 		return out
 	}
 
-	uint64BE := func(n uint64) []byte {
-		out := make([]byte, 8)
+	var uint64BE = func(n uint64) []byte {
+		var out = make([]byte, 8)
 		binary.BigEndian.PutUint64(out, n)
 		return out
 	}
 
-	nan := float64BE(math.NaN())
-	posInf := float64BE(math.Inf(1))
-	negInf := float64BE(math.Inf(-1))
+	var nan = float64BE(math.NaN())
+	var posInf = float64BE(math.Inf(1))
+	var negInf = float64BE(math.Inf(-1))
 
 	for _, tc := range []struct {
 		name     string
@@ -220,7 +220,7 @@ func TestMapType(t *testing.T) {
 		{name: "never", flatType: boilerplate.FlatTypeNever{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mt := mapType(boilerplate.Projection{
+			var mt = mapType(boilerplate.Projection{
 				Projection: pf.Projection{Field: "f"},
 				FlatType:   tc.flatType,
 			})
@@ -228,7 +228,7 @@ func TestMapType(t *testing.T) {
 
 			for _, ec := range tc.encodes {
 				t.Run(ec.name, func(t *testing.T) {
-					got, err := mt.encode(ec.in)
+					var got, err = mt.encode(ec.in)
 					if ec.wantErr {
 						require.Error(t, err)
 						return
