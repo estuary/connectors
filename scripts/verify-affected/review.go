@@ -77,15 +77,15 @@ func sampleRowsText(rows []affectedRow, limit int) string {
 // runReview invokes the local Claude CLI in non-interactive print mode and
 // parses its verdict.
 func runReview(ctx context.Context, model, prompt string) (aiVerdict, error) {
-	cmd := exec.CommandContext(ctx, "claude", "-p", prompt, "--model", model)
-	out, err := cmd.Output()
+	var cmd = exec.CommandContext(ctx, "claude", "-p", prompt, "--model", model)
+	var out, err = cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return aiVerdict{}, fmt.Errorf("claude review failed: %w: %s", err, string(ee.Stderr))
 		}
 		return aiVerdict{}, fmt.Errorf("claude review failed (is the `claude` CLI installed and authenticated?): %w", err)
 	}
-	v, perr := parseVerdict(string(out))
+	var v, perr = parseVerdict(string(out))
 	if perr != nil {
 		return aiVerdict{Raw: string(out)}, perr
 	}
@@ -105,7 +105,7 @@ var (
 func parseVerdict(out string) (aiVerdict, error) {
 	out = strings.TrimSpace(out)
 
-	tryObject := func(s string) (aiVerdict, bool) {
+	var tryObject = func(s string) (aiVerdict, bool) {
 		var v aiVerdict
 		if err := json.Unmarshal([]byte(s), &v); err != nil {
 			return aiVerdict{}, false

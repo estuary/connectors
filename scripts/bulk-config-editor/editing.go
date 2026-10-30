@@ -25,7 +25,7 @@ func (e *configEdit) String() string {
 
 func editPlaintextTaskConfig(cfg any, edits []configEdit) (any, error) {
 	for _, edit := range edits {
-		modified, err := setAtPath(cfg, edit.Path, edit.Value)
+		var modified, err = setAtPath(cfg, edit.Path, edit.Value)
 		if err != nil {
 			return nil, fmt.Errorf("error applying edit [%s]: %w", edit.String(), err)
 		}
@@ -87,7 +87,7 @@ func setAtPath(x any, p []string, v any) (any, error) {
 		x = make(map[string]any)
 	}
 	if obj, ok := x.(map[string]any); ok {
-		modified, err := setAtPath(obj[p[0]], p[1:], v)
+		var modified, err = setAtPath(obj[p[0]], p[1:], v)
 		if err != nil {
 			return nil, err
 		}

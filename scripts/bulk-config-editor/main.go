@@ -153,7 +153,7 @@ func editInlineConfigFile(flowFile string) error {
 
 	var editedAny bool
 	for _, taskType := range []string{"materializations", "captures"} {
-		tasks, ok := indexPath(modifiedDoc, taskType)
+		var tasks, ok = indexPath(modifiedDoc, taskType)
 		if !ok {
 			continue
 		}
@@ -162,7 +162,7 @@ func editInlineConfigFile(flowFile string) error {
 			continue
 		}
 		for taskName, task := range tasksMap {
-			cfg, ok := indexPath(task, "endpoint", "connector", "config")
+			var cfg, ok = indexPath(task, "endpoint", "connector", "config")
 			if !ok {
 				continue
 			}
@@ -174,7 +174,7 @@ func editInlineConfigFile(flowFile string) error {
 			if _, ok := cfgMap["sops"]; ok {
 				return fmt.Errorf("inline config for task %q is SOPS-encrypted, which is not supported", taskName)
 			}
-			edits, err := computeEdits(cfgMap)
+			var edits, err = computeEdits(cfgMap)
 			if err != nil {
 				return fmt.Errorf("error computing edits for task %q: %w", taskName, err)
 			}
@@ -236,7 +236,7 @@ func editConfigFile(ctx context.Context, configFile string) error {
 		}
 
 		// Read in the modified config for diffing against the original
-		modifiedConfigBytes, err := os.ReadFile(configFile)
+		var modifiedConfigBytes, err = os.ReadFile(configFile)
 		if err != nil {
 			return fmt.Errorf("error reading modified config: %w", err)
 		}
@@ -259,7 +259,7 @@ func editConfigFile(ctx context.Context, configFile string) error {
 		}
 
 		// Serialize and write out the modified config
-		bs, err := yaml.Marshal(modifiedConfig)
+		var bs, err = yaml.Marshal(modifiedConfig)
 		if err != nil {
 			return fmt.Errorf("error marshalling modified config: %w", err)
 		}
@@ -283,7 +283,7 @@ func editConfigFile(ctx context.Context, configFile string) error {
 
 func listConfigFiles(dir string) ([]string, error) {
 	var filePaths []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	var err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -352,7 +352,7 @@ func checkForImports(file string) (hasImports bool, hasOnlyImports bool, err err
 }
 
 func printYAMLDiff(old, new any, description string, colorize bool) error {
-	oldBytes, err := yaml.Marshal(old)
+	var oldBytes, err = yaml.Marshal(old)
 	if err != nil {
 		return fmt.Errorf("error serializing old value: %w", err)
 	}

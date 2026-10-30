@@ -9,7 +9,7 @@ import (
 // column, and a predicate that actually references the {{COL}} placeholder so the
 // column setting is meaningful and the rendered SQL targets the intended column.
 func TestRegistryValid(t *testing.T) {
-	seen := map[string]bool{}
+	var seen = map[string]bool{}
 	for _, c := range registry {
 		if c.Name == "" {
 			t.Errorf("check has empty name")
@@ -37,7 +37,7 @@ func TestRegistryValid(t *testing.T) {
 }
 
 func TestParseVerdict(t *testing.T) {
-	cases := []struct {
+	var cases = []struct {
 		name    string
 		out     string
 		want    string
@@ -83,7 +83,7 @@ func TestParseVerdict(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			v, err := parseVerdict(tc.out)
+			var v, err = parseVerdict(tc.out)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got verdict %q", v.Verdict)

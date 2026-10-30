@@ -114,13 +114,13 @@ func performPublishing(ctx context.Context) error {
 	})
 
 	// Select files in the specified percentile range.
-	totalFiles := len(leafFiles)
-	startIdx := (totalFiles * *fromPct) / 100
-	endIdx := (totalFiles * *toPct) / 100
+	var totalFiles = len(leafFiles)
+	var startIdx = (totalFiles * *fromPct) / 100
+	var endIdx = (totalFiles * *toPct) / 100
 	if endIdx > totalFiles {
 		endIdx = totalFiles
 	}
-	selectedFiles := leafFiles[startIdx:endIdx]
+	var selectedFiles = leafFiles[startIdx:endIdx]
 
 	if len(selectedFiles) == 0 {
 		log.WithFields(log.Fields{
@@ -226,10 +226,10 @@ func flowctl(ctx context.Context, args ...string) error {
 // For a path like "./specs/tenantTaskName/flow.yaml", the catalog name is "tenantTaskName".
 func catalogNameHash(filePath string) uint64 {
 	// Get the parent directory name (catalog name)
-	catalogName := filepath.Base(filepath.Dir(filePath))
+	var catalogName = filepath.Base(filepath.Dir(filePath))
 
 	// Hash the catalog name using FNV-1a
-	h := fnv.New64a()
+	var h = fnv.New64a()
 	h.Write([]byte(catalogName))
 	return h.Sum64()
 }

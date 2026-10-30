@@ -70,7 +70,7 @@ func registryListing() string {
 // filter -- is constant and snapshot-tested. The connector image names are NOT
 // interpolated here; they are bound as the $1 query parameter.
 func renderQuery(predicate, column string) string {
-	pred := strings.ReplaceAll(predicate, "{{COL}}", "c."+column)
+	var pred = strings.ReplaceAll(predicate, "{{COL}}", "c."+column)
 	return fmt.Sprintf(`SELECT
     m.catalog_name        AS task,
     m.connector_image_name AS image,
@@ -94,7 +94,7 @@ func listVariants(connectorName string) ([]string, error) {
 	var variantsURL = fmt.Sprintf("https://raw.githubusercontent.com/estuary/connectors/refs/heads/main/%s/VARIANTS", connectorName)
 	var variants = []string{fmt.Sprintf("ghcr.io/estuary/%s", connectorName)}
 
-	resp, err := http.Get(variantsURL)
+	var resp, err = http.Get(variantsURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching variants list: %w", err)
 	}
@@ -132,7 +132,7 @@ func resolveImages(connector string) ([]string, error) {
 }
 
 func sortedStrings(in []string) []string {
-	out := append([]string(nil), in...)
+	var out = append([]string(nil), in...)
 	sort.Strings(out)
 	return out
 }

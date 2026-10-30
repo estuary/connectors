@@ -11,7 +11,7 @@ import (
 // spec_type filters, or the parameter binding must be reviewed as a snapshot
 // diff.
 func TestRenderQuery(t *testing.T) {
-	cases := []struct {
+	var cases = []struct {
 		name      string
 		predicate string
 		column    string
@@ -30,7 +30,7 @@ func TestRenderQuery(t *testing.T) {
 // TestReportRender pins the audit-report format using a fixed fixture so format
 // changes are reviewed deliberately.
 func TestReportRender(t *testing.T) {
-	r := reportData{
+	var r = reportData{
 		Timestamp:  "2026-06-02T00:00:00Z",
 		Connector:  "materialize-postgres",
 		Images:     []string{"ghcr.io/estuary/materialize-postgres"},
@@ -67,7 +67,7 @@ func TestReportRenderTruncated(t *testing.T) {
 			Collection: "tenant/" + n,
 		})
 	}
-	r := reportData{
+	var r = reportData{
 		Timestamp: "2026-06-02T00:00:00Z",
 		Connector: "materialize-postgres",
 		Images:    []string{"ghcr.io/estuary/materialize-postgres"},

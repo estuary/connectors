@@ -113,7 +113,7 @@ type summary struct {
 }
 
 func run(ctx context.Context) error {
-	check, err := resolveCheck()
+	var check, err = resolveCheck()
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func run(ctx context.Context) error {
 	images = sortedStrings(images)
 	log.WithField("images", images).Info("resolved connector images")
 
-	sql := renderQuery(check.Predicate, check.Column)
+	var sql = renderQuery(check.Predicate, check.Column)
 
 	// Print the exact query (and its $1 binding) before running it, so the
 	// developer can see precisely what is being executed against the control plane.
@@ -136,18 +136,18 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	sum := summarize(rows)
+	var sum = summarize(rows)
 	log.WithFields(log.Fields{"tasks": sum.TaskCount, "collections": sum.CollectionCount}).Info("query complete")
 
 	// First pair of eyes: the AI review, a hard gate.
-	prompt := buildReviewPrompt(check, images, sql, sum)
+	var prompt = buildReviewPrompt(check, images, sql, sum)
 	log.WithField("model", *claudeModel).Info("running AI review (this calls the local claude CLI)")
 	verdict, err := runReview(ctx, *claudeModel, prompt)
 	if err != nil {
 		return fmt.Errorf("AI review error: %w", err)
 	}
 
-	report := reportData{
+	var report = reportData{
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),
 		Connector:  *connector,
 		Images:     images,
@@ -159,7 +159,7 @@ func run(ctx context.Context) error {
 		Summary:    sum,
 	}
 
-	blocked := verdict.Verdict == verdictConcerns && !*overrideAI
+	var blocked = verdict.Verdict == verdictConcerns && !*overrideAI
 	if blocked {
 		report.Status = "BLOCKED (AI CONCERNS)"
 		if path, werr := writeReport(report); werr == nil {
@@ -178,7 +178,7 @@ func run(ctx context.Context) error {
 	fmt.Println(renderReport(report, terminalRowSample))
 
 	// Second pair of eyes: the human sign-off.
-	status, name := confirmHuman(*approver, len(rows))
+	var status, name = confirmHuman(*approver, len(rows))
 	report.Status = status
 	report.Approver = name
 
@@ -202,11 +202,11 @@ func resolveCheck() (resolvedCheck, error) {
 	}
 
 	if *checkName != "" {
-		c, ok := lookupCheck(*checkName)
+		var c, ok = lookupCheck(*checkName)
 		if !ok {
 			return resolvedCheck{}, fmt.Errorf("unknown check %q; see --list-checks", *checkName)
 		}
-		col := c.Column
+		var col = c.Column
 		if *column != "" {
 			col = *column
 		}
@@ -216,7 +216,7 @@ func resolveCheck() (resolvedCheck, error) {
 		return resolvedCheck{Name: c.Name, Description: c.Description, Predicate: c.Predicate, Column: col}, nil
 	}
 
-	col := "built_spec"
+	var col = "built_spec"
 	if *column != "" {
 		col = *column
 	}
@@ -245,12 +245,12 @@ func validateColumn(col string) error {
 var requiredColumns = []string{"catalog_name", "spec_type", "spec", "built_spec", "connector_image_name", "reads_from"}
 
 func queryAffected(ctx context.Context, images []string, sql string) ([]affectedRow, error) {
-	dburl := os.Getenv("DATABASE_URL")
+	var dburl = os.Getenv("DATABASE_URL")
 	if dburl == "" {
 		return nil, fmt.Errorf("DATABASE_URL is not set; it must be a postgresql://... connection string for the control plane")
 	}
 
-	conn, err := pgx.Connect(ctx, dburl)
+	var conn, err = pgx.Connect(ctx, dburl)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to DATABASE_URL: %w", err)
 	}
@@ -309,14 +309,14 @@ func annotatePredicateError(err error) error {
 }
 
 func verifySchema(ctx context.Context, conn *pgx.Conn) error {
-	rows, err := conn.Query(ctx,
+	var rows, err = conn.Query(ctx,
 		`SELECT column_name FROM information_schema.columns WHERE table_name = 'live_specs'`)
 	if err != nil {
 		return fmt.Errorf("introspecting live_specs schema: %w", err)
 	}
 	defer rows.Close()
 
-	present := map[string]bool{}
+	var present = map[string]bool{}
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
@@ -343,9 +343,9 @@ func verifySchema(ctx context.Context, conn *pgx.Conn) error {
 }
 
 func writeReport(r reportData) (string, error) {
-	path := *output
+	var path = *output
 	if path == "" {
-		stamp := strings.ReplaceAll(r.Timestamp, ":", "")
+		var stamp = strings.ReplaceAll(r.Timestamp, ":", "")
 		path = fmt.Sprintf("./verify-affected-%s-%s.md", sanitize(*connector), stamp)
 	}
 	return path, os.WriteFile(path, []byte(renderReport(r, 0)), 0644)

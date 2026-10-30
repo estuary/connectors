@@ -164,7 +164,7 @@ func listVariants(connectorName string) ([]string, error) {
 	var variantsURL = fmt.Sprintf("https://raw.githubusercontent.com/estuary/connectors/refs/heads/main/%s/VARIANTS", connectorName)
 	var variants = []string{fmt.Sprintf("ghcr.io/estuary/%s", connectorName)}
 
-	resp, err := http.Get(variantsURL)
+	var resp, err = http.Get(variantsURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching variants list: %w", err)
 	}

@@ -70,7 +70,7 @@ func main() {
 
 func performEdits() error {
 	// List all leaf flow.yaml files under the directory
-	flowFiles, err := listLeafFlowFiles(*specsDir)
+	var flowFiles, err = listLeafFlowFiles(*specsDir)
 	if err != nil {
 		return fmt.Errorf("error listing flow.yaml files: %w", err)
 	}
@@ -82,7 +82,7 @@ func performEdits() error {
 	var errs []error
 	var updatedCount int
 	for _, file := range flowFiles {
-		updated, err := editFlowYaml(file, *newTag)
+		var updated, err = editFlowYaml(file, *newTag)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("error editing %q: %w", file, err))
 		} else if updated {
@@ -102,13 +102,13 @@ func performEdits() error {
 
 // listLeafFlowFiles returns all flow.yaml files that are not import-only files.
 func listLeafFlowFiles(dir string) ([]string, error) {
-	allFiles, err := listFilesNamed(dir, "flow.yaml")
+	var allFiles, err = listFilesNamed(dir, "flow.yaml")
 	if err != nil {
 		return nil, fmt.Errorf("error listing flow.yaml files: %w", err)
 	}
 	var leafFiles []string
 	for _, file := range allFiles {
-		hasImports, hasOnlyImports, err := checkForImports(file)
+		var hasImports, hasOnlyImports, err = checkForImports(file)
 		if err != nil {
 			return nil, fmt.Errorf("error checking for imports in %q: %w", file, err)
 		}
@@ -127,7 +127,7 @@ func listLeafFlowFiles(dir string) ([]string, error) {
 // listFilesNamed returns a list of all files under the given directory (recursively) with the given name.
 func listFilesNamed(dir, filename string) ([]string, error) {
 	var files []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	var err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -160,7 +160,7 @@ func checkForImports(file string) (hasImports bool, hasOnlyImports bool, err err
 // editFlowYaml updates all connector image tags in a flow.yaml file.
 // Returns true if the file was modified.
 func editFlowYaml(filePath string, tag string) (bool, error) {
-	bs, err := os.ReadFile(filePath)
+	var bs, err = os.ReadFile(filePath)
 	if err != nil {
 		return false, fmt.Errorf("error reading file: %w", err)
 	}
@@ -179,7 +179,7 @@ func editFlowYaml(filePath string, tag string) (bool, error) {
 	// Try both captures and materializations
 	var modified bool
 	for _, taskType := range []string{"captures", "materializations"} {
-		tasks, ok := indexPath(modifiedDoc, taskType)
+		var tasks, ok = indexPath(modifiedDoc, taskType)
 		if !ok {
 			continue
 		}
@@ -188,7 +188,7 @@ func editFlowYaml(filePath string, tag string) (bool, error) {
 			continue
 		}
 		for taskName, taskSpec := range tasksMap {
-			imageVal, ok := indexPath(taskSpec, "endpoint", "connector", "image")
+			var imageVal, ok = indexPath(taskSpec, "endpoint", "connector", "image")
 			if !ok {
 				log.WithFields(log.Fields{"task": taskName, "file": filePath}).Debug("no image property found")
 				continue
@@ -199,7 +199,7 @@ func editFlowYaml(filePath string, tag string) (bool, error) {
 				continue
 			}
 
-			newImage, err := updateImageTag(imageStr, tag)
+			var newImage, err = updateImageTag(imageStr, tag)
 			if err != nil {
 				return false, fmt.Errorf("error updating image for task %q: %w", taskName, err)
 			}
@@ -249,14 +249,14 @@ func updateImageTag(currentImage, newTag string) (string, error) {
 		return "", fmt.Errorf("empty image value")
 	}
 
-	lastColon := strings.LastIndex(currentImage, ":")
+	var lastColon = strings.LastIndex(currentImage, ":")
 	if lastColon == -1 {
 		// No tag - append
 		return currentImage + ":" + newTag, nil
 	}
 
-	imageWithoutTag := currentImage[:lastColon]
-	currentTag := currentImage[lastColon+1:]
+	var imageWithoutTag = currentImage[:lastColon]
+	var currentTag = currentImage[lastColon+1:]
 
 	// Check for digest (sha256:...)
 	if strings.HasPrefix(currentTag, "sha256") {
@@ -273,7 +273,7 @@ func updateImageTag(currentImage, newTag string) (string, error) {
 // indexPath navigates through nested maps to find a value at the given path.
 func indexPath(x any, path ...string) (any, bool) {
 	for _, p := range path {
-		m, ok := x.(map[string]any)
+		var m, ok = x.(map[string]any)
 		if !ok {
 			return nil, false
 		}
@@ -295,11 +295,11 @@ func setAtPath(x any, p []string, v any) (any, error) {
 	if x == nil {
 		x = make(map[string]any)
 	}
-	obj, ok := x.(map[string]any)
+	var obj, ok = x.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("unable to modify %v at pointer %s", x, strings.Join(p, "."))
 	}
-	modified, err := setAtPath(obj[p[0]], p[1:], v)
+	var modified, err = setAtPath(obj[p[0]], p[1:], v)
 	if err != nil {
 		return nil, err
 	}
@@ -308,7 +308,7 @@ func setAtPath(x any, p []string, v any) (any, error) {
 }
 
 func printYAMLDiff(old, new any, description string, colorize bool) error {
-	oldBytes, err := yaml.Marshal(old)
+	var oldBytes, err = yaml.Marshal(old)
 	if err != nil {
 		return fmt.Errorf("error serializing old value: %w", err)
 	}
@@ -328,12 +328,12 @@ func printYAMLDiff(old, new any, description string, colorize bool) error {
 		return fmt.Errorf("error diffing YAML: %w", err)
 	}
 
-	diffLines := strings.Split(configDiff, "\n")
+	var diffLines = strings.Split(configDiff, "\n")
 	if len(diffLines) == 1 && diffLines[0] == "" {
 		diffLines = nil
 	}
 	for _, diffLine := range diffLines {
-		colorCode := ""
+		var colorCode = ""
 		if colorize {
 			colorCode = "\033[0m"
 			if strings.HasPrefix(diffLine, "-") {

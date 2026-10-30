@@ -79,12 +79,12 @@ func renderReport(r reportData, rowLimit int) string {
 	fmt.Fprintf(&b, "## Result summary\n\n```\n%s```\n\n", r.Summary.text())
 
 	fmt.Fprintf(&b, "## Affected tasks and collections\n\n")
-	rows := r.Summary.Rows
+	var rows = r.Summary.Rows
 	if len(rows) == 0 {
 		b.WriteString("_No affected tasks found._\n")
 		return b.String()
 	}
-	shown := rows
+	var shown = rows
 	if rowLimit > 0 && len(rows) > rowLimit {
 		shown = rows[:rowLimit]
 	}
@@ -110,11 +110,11 @@ func confirmHuman(approver string, rowCount int) (status, name string) {
 		return "PENDING", ""
 	}
 	fmt.Printf("\nReviewed the %d affected task(s) above? Approve this verification? [y/N]: ", rowCount)
-	reader := bufio.NewReader(os.Stdin)
-	line, _ := reader.ReadString('\n')
+	var reader = bufio.NewReader(os.Stdin)
+	var line, _ = reader.ReadString('\n')
 	if strings.EqualFold(strings.TrimSpace(line), "y") || strings.EqualFold(strings.TrimSpace(line), "yes") {
 		fmt.Print("Your name (for the audit record): ")
-		nameLine, _ := reader.ReadString('\n')
+		var nameLine, _ = reader.ReadString('\n')
 		if n := strings.TrimSpace(nameLine); n != "" {
 			return "APPROVED", n
 		}
@@ -124,7 +124,7 @@ func confirmHuman(approver string, rowCount int) (status, name string) {
 }
 
 func stdinIsTerminal() bool {
-	fi, err := os.Stdin.Stat()
+	var fi, err = os.Stdin.Stat()
 	if err != nil {
 		return false
 	}
@@ -134,15 +134,15 @@ func stdinIsTerminal() bool {
 // summarize collapses the raw rows into counts and a per-tenant breakdown,
 // where the tenant is the first path segment of the catalog name.
 func summarize(rows []affectedRow) summary {
-	tasks := map[string]bool{}
-	collections := map[string]bool{}
-	tenantTasks := map[string]map[string]bool{}
-	tenantColls := map[string]map[string]bool{}
+	var tasks = map[string]bool{}
+	var collections = map[string]bool{}
+	var tenantTasks = map[string]map[string]bool{}
+	var tenantColls = map[string]map[string]bool{}
 
 	for _, r := range rows {
 		tasks[r.Task] = true
 		collections[r.Collection] = true
-		tt := tenantOf(r.Task)
+		var tt = tenantOf(r.Task)
 		if tenantTasks[tt] == nil {
 			tenantTasks[tt] = map[string]bool{}
 			tenantColls[tt] = map[string]bool{}
