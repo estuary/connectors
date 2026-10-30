@@ -237,8 +237,8 @@ func parseCursor(cursor string) (mysql.Position, error) {
 // wrapMySQLReplicationError checks if an error is a known MySQL replication error and returns
 // a user-friendly error message if so. Returns nil if the error is not a known replication error.
 func wrapMySQLReplicationError(err error) error {
-	var mysqlErr *mysql.MyError
-	if !errors.As(err, &mysqlErr) {
+	var mysqlErr, ok = errors.AsType[*mysql.MyError](err)
+	if !ok {
 		return nil
 	}
 	if mysqlErr.Code == 1236 {
@@ -456,8 +456,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				BinlogOffset: binlogEstimatedOffset,
 			}
 			if err := rs.handleRowsEvent(ctx, event, eventCursor); err != nil {
-				var metadataErr = &InconsistentMetadataError{}
-				if errors.As(err, &metadataErr) {
+				if metadataErr, ok := errors.AsType[*InconsistentMetadataError](err); ok {
 					logrus.WithField("stream", metadataErr.StreamID).Warn("detected inconsistent metadata for stream, will backfill")
 					if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
 						StreamID: metadataErr.StreamID,
