@@ -992,8 +992,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 // minStagingTableRows is the fewest store rows that are copied into a staging
-// table before their MERGE. Below it, the copy takes longer than it saves the
-// MERGE: at 100k rows of 1 KB, copying took 5s and saved the MERGE 0.5s.
+// table before their MERGE. Below it, the copies take longer than they save
+// the MERGEs, even with many bindings: their copies queue on the warehouse.
 const minStagingTableRows = 100_000
 
 // copyIntoStagingTable waits for the binding's store files to upload and, if
