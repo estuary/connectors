@@ -5,10 +5,37 @@ import pytest
 from pytest_insta import SnapshotFixture
 
 
-# There's no capture test yet: Estuary's Microsoft OAuth app credentials aren't
-# available, so config.yaml holds placeholders and can't authenticate. Add
-# test_capture (copied from source-front) once a sops-encrypted config.yaml with
-# real sandbox credentials exists.
+# Copied from source-front. config.yaml holds sandbox credentials, and
+# test.flow.yaml points the connector at the sandbox (BING_ADS_ENVIRONMENT).
+def test_capture(request: pytest.FixtureRequest, snapshot: SnapshotFixture):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "raw",
+            "preview-next",
+            "--source",
+            str(request.path.parent.parent / "test.flow.yaml"),
+            "--sessions",
+            "1",
+            "--delay",
+            "10s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    assert snapshot("capture.stdout.json") == unique_stream_lines
 
 
 def test_discover(request: pytest.FixtureRequest, snapshot: SnapshotFixture):

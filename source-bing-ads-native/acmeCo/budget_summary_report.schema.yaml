@@ -1,0 +1,98 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  AccountId:
+    title: Accountid
+    type: integer
+  Date:
+    title: Date
+    type: string
+  AccountName:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Accountname
+  AccountNumber:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Accountnumber
+  CampaignName:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Campaignname
+  CampaignId:
+    anyOf:
+    - type: integer
+    - type: 'null'
+    default: null
+    title: Campaignid
+  CurrencyCode:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Currencycode
+  MonthlyBudget:
+    anyOf:
+    - type: number
+    - type: 'null'
+    default: null
+    title: Monthlybudget
+  DailySpend:
+    anyOf:
+    - type: number
+    - type: 'null'
+    default: null
+    title: Dailyspend
+  MonthToDateSpend:
+    anyOf:
+    - type: number
+    - type: 'null'
+    default: null
+    title: Monthtodatespend
+required:
+- AccountId
+- Date
+title: BudgetSummaryReportRequestRow
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true
