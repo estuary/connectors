@@ -1,0 +1,116 @@
+info:
+  name: refresh token rotation
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://login.microsoftonline.com/common/oauth2/v2.0/token
+  headers:
+    - name: Content-Type
+      value: application/x-www-form-urlencoded
+  body:
+    type: text
+    data: REPLACED_BY_SCRIPT
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // The same refresh the collection script does, sent as this request so
+        // its response can be inspected. The collection script's API headers
+        // don't belong on the token endpoint.
+        req.deleteHeader('Authorization');
+        req.deleteHeader('DeveloperToken');
+        const { execFileSync } = require('child_process');
+        const crypto = require('crypto');
+        const path = require('path');
+        const configPath = path.resolve(bru.cwd(), bru.getEnvVar('config_path'));
+        const creds = JSON.parse(execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        )).credentials;
+        const pick = (key) => creds[key] ?? creds[`${key}_sops`];
+        // Only a hash of the configured token is kept, to compare against.
+        bru.setVar('configured_refresh_token_sha256',
+          crypto.createHash('sha256').update(pick('refresh_token')).digest('hex'));
+        req.setBody(
+          'grant_type=refresh_token' +
+          `&client_id=${encodeURIComponent(pick('client_id'))}` +
+          `&client_secret=${encodeURIComponent(pick('client_secret'))}` +
+          `&refresh_token=${encodeURIComponent(pick('refresh_token'))}` +
+          `&scope=${encodeURIComponent(bru.getEnvVar('oauth_scope'))}`,
+        );
+    - type: after-response
+      code: |-
+        // Replace the body with facts about it, so no token is ever shown or
+        // saved in an example.
+        const crypto = require('crypto');
+        const body = res.getBody() ?? {};
+        const rt = body.refresh_token;
+        res.setBody({
+          token_type: body.token_type,
+          scope: body.scope,
+          expires_in: body.expires_in,
+          has_access_token: Boolean(body.access_token),
+          has_refresh_token: Boolean(rt),
+          refresh_token_changed: rt
+            ? crypto.createHash('sha256').update(rt).digest('hex') !== bru.getVar('configured_refresh_token_sha256')
+            : null,
+          error: body.error,
+          error_codes: body.error_codes,
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/guides/authentication-oauth-get-tokens?view=bingads-13
+
+  **WHY:** P6. The connector reuses the configured refresh token on every
+  refresh (`BaseOAuth2Credentials`), which is only safe if Microsoft keeps an
+  old refresh token valid after issuing a new one. This shows whether a refresh
+  returns a new refresh token and how long access tokens last. The response is
+  replaced with booleans and hashes compared in the script; no token is shown.
+
+  **DOCUMENTED (2026-10-29):** "Although refresh tokens are not revoked when
+  used to acquire new access tokens, you are expected to discard the old
+  refresh token." Refresh tokens "do not have specified lifetimes".
+
+  **VERIFIED (2026-10-29):** every refresh returns a new refresh token
+  (`refresh_token_changed: true`), and access tokens last 3599 s. The
+  configured refresh token kept working after dozens of refreshes that day,
+  each of which issued a new one, so using a token doesn't revoke it.
+
+  **UNOBSERVABLE:** whether the configured token outlives 90 days of reuse
+  without rotation (P6, explainer 5.7). It can't be observed in a session. The
+  connector relies on Microsoft's "refresh tokens are not revoked when used";
+  if a long-running task starts failing with `invalid_grant`, the fallback is
+  `RotatingOAuth2Credentials` plus a CDK change for mid-run rotation (design
+  doc D8).
+
+examples:
+  - name: 200 - new refresh token every refresh (redacted to facts)
+    request:
+      url: https://login.microsoftonline.com/common/oauth2/v2.0/token
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "token_type": "Bearer",
+            "scope": "https://si.ads.microsoft.com/msads.manage",
+            "expires_in": 3599,
+            "has_access_token": true,
+            "has_refresh_token": true,
+            "refresh_token_changed": true
+          }

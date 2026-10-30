@@ -1,0 +1,460 @@
+[
+  [
+    "acmeCo/accounts",
+    {
+      "AccountFinancialStatus": "ClearFinancialStatus",
+      "AccountLifeCycleStatus": "Pending",
+      "AutoTagType": "Inactive",
+      "BackUpPaymentInstrumentId": null,
+      "BillToCustomerId": "387145414",
+      "BillingThresholdAmount": null,
+      "BusinessAddress": {
+        "BusinessName": "Example Domain",
+        "City": "New York",
+        "CountryCode": "US",
+        "Id": "641005255",
+        "Line1": "123 Main Street",
+        "Line2": null,
+        "Line3": null,
+        "Line4": null,
+        "PostalCode": "10001",
+        "StateOrProvince": "NY",
+        "TimeStamp": null
+      },
+      "CurrencyCode": "USD",
+      "ForwardCompatibilityMap": [
+        {
+          "Key": "AccountMode",
+          "Value": "0"
+        }
+      ],
+      "Id": "555638908",
+      "Language": "English",
+      "LastModifiedByUserId": "202544887",
+      "LastModifiedTime": "2026-10-29T16:25:43.157",
+      "LinkedAgencies": [],
+      "Name": "Example Domain",
+      "Number": "L104EQKR",
+      "ParentCustomerId": "387145414",
+      "PauseReason": null,
+      "PaymentMethodId": null,
+      "PaymentMethodType": null,
+      "PrimaryUserId": "202544887",
+      "SalesHouseCustomerId": null,
+      "SoldToPaymentInstrumentId": null,
+      "TaxInformation": [],
+      "TimeStamp": "AAAAABSiv8Q=",
+      "TimeZone": "PacificTimeUSCanadaTijuana",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/campaigns",
+    {
+      "AccountId": "555638908",
+      "AudienceAdsBidAdjustment": 0,
+      "BiddingScheme": {
+        "MaxCpc": {
+          "Amount": null
+        },
+        "Type": "MaxConversions"
+      },
+      "BudgetId": null,
+      "BudgetType": "DailyBudgetStandard",
+      "CampaignType": "PerformanceMax",
+      "DailyBudget": 26.95,
+      "ExperimentId": null,
+      "FinalUrlSuffix": null,
+      "ForwardCompatibilityMap": [],
+      "Id": "1150430564",
+      "Languages": [
+        "English"
+      ],
+      "Name": "PMax Example",
+      "Settings": [
+        {
+          "FinalUrlExpansionOptOut": false,
+          "Type": "PerformanceMaxSetting"
+        }
+      ],
+      "Status": "Active",
+      "SubType": null,
+      "TimeZone": "PacificTimeUSCanadaTijuana",
+      "TrackingUrlTemplate": null,
+      "UrlCustomParameters": null,
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/asset_groups",
+    {
+      "AccountId": "555638908",
+      "BusinessName": "Example",
+      "CallToAction": "Automated",
+      "CampaignId": "1150430564",
+      "Descriptions": [
+        {
+          "Asset": {
+            "Id": "1209462859154015",
+            "Name": null,
+            "Text": "Visit the Example domain to understand its intended use online.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1205064829002555",
+            "Name": null,
+            "Text": "The Example site explains its role for web reference purposes.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1199567280239894",
+            "Name": null,
+            "Text": "Learn about the Example domain and its informational function.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1199567280239910",
+            "Name": null,
+            "Text": "Example offers a clear statement of its purpose for education.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1206164335978572",
+            "Name": null,
+            "Text": "Review the Example domain to see how it is meant to be applied.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        }
+      ],
+      "EditorialStatus": "Active",
+      "EndDate": null,
+      "FinalMobileUrls": null,
+      "FinalUrls": [
+        "https://example.com"
+      ],
+      "ForwardCompatibilityMap": [],
+      "Headlines": [
+        {
+          "Asset": {
+            "Id": "1194069716953409",
+            "Name": null,
+            "Text": "Example Official Site",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1209462859153999",
+            "Name": null,
+            "Text": "Learn About Example",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1207263837725229",
+            "Name": null,
+            "Text": "Example Domain Info",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1201766280127320",
+            "Name": null,
+            "Text": "Visit Example Online",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1200666765797863",
+            "Name": null,
+            "Text": "Example Reference Page",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1202865794509913",
+            "Name": null,
+            "Text": "About Example Domain",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1206164335978556",
+            "Name": null,
+            "Text": "Example Resource Hub",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1194069716953393",
+            "Name": null,
+            "Text": "Example Information Page",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1203965298956826",
+            "Name": null,
+            "Text": "Example Internet Domain",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1200666765797847",
+            "Name": null,
+            "Text": "Official Example Resource",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        }
+      ],
+      "Id": "1192970443031472",
+      "Images": [
+        {
+          "Asset": {
+            "CropHeight": 522,
+            "CropWidth": 1000,
+            "CropX": 0,
+            "CropY": 0,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "LandscapeImageMedia",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "CropHeight": 250,
+            "CropWidth": 1000,
+            "CropX": 0,
+            "CropY": 209,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "ImageMedia4X1",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "CropHeight": 667,
+            "CropWidth": 667,
+            "CropX": 167,
+            "CropY": 0,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "SquareImageMedia",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "CropHeight": 497,
+            "CropWidth": 1000,
+            "CropX": 0,
+            "CropY": 0,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "ImageMedia201X100",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "CropHeight": 590,
+            "CropWidth": 1000,
+            "CropX": 0,
+            "CropY": 0,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "ImageMedia169X100",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "CropHeight": 652,
+            "CropWidth": 1000,
+            "CropX": 0,
+            "CropY": 0,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "ImageMedia153X100",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "CropHeight": 667,
+            "CropWidth": 827,
+            "CropX": 87,
+            "CropY": 0,
+            "Id": "1195169208744418",
+            "Name": null,
+            "SubType": "ImageMedia124X100",
+            "Type": "ImageAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Inactive",
+          "PinnedField": null
+        }
+      ],
+      "LongHeadlines": [
+        {
+          "Asset": {
+            "Id": "1200666765797879",
+            "Name": null,
+            "Text": "Example Domain Provides Clear Information on Its Purpose",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1203965298956810",
+            "Name": null,
+            "Text": "Learn What the Example Domain Represents and How It Is Used",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1192970312710544",
+            "Name": null,
+            "Text": "Example Website Offers Details for Educational and Reference Use",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1207263837725245",
+            "Name": null,
+            "Text": "Find Out About the Role of the Example Domain in Online Contexts",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1197368239667540",
+            "Name": null,
+            "Text": "Example Domain Contains Factual Content for Informational Needs",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        }
+      ],
+      "Name": "Example_102926_162253",
+      "Path1": null,
+      "Path2": null,
+      "StartDate": {
+        "Day": 29,
+        "Month": 10,
+        "Year": 2026
+      },
+      "Status": "Active",
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ]
+]

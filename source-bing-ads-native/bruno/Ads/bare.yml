@@ -1,0 +1,40 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Ads/QueryByAdGroupId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AdGroupId": "{{ad_group_id}}", "AdTypes": ["Text", "Image", "Product", "AppInstall", "ExpandedText", "DynamicSearch", "ResponsiveAd", "ResponsiveSearch", "Hotel"]}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("ad_group_id")) throw new Error("run `Ad Groups / bare` first to set ad_group_id");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getadsbyadgroupid?view=bingads-13
+
+  **WHY:** the connector's `_ads` in `api.py` sends exactly this body,
+  every ad type in `ALL_AD_TYPES`. It checks that every listed type is
+  accepted and the ad shape. Run `Ad Groups / bare` first.
+
+  **PENDING:** every `ALL_AD_TYPES` value accepted, and an ad's shape. Needs
+  an ad group with a responsive search ad in the sandbox (checklist 3.2).

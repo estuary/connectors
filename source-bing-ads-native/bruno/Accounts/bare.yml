@@ -1,0 +1,120 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{customer_management_url}}/Accounts/Search"
+  body:
+    type: json
+    data: |-
+      {
+        "Predicates": [{"Field": "UserId", "Operator": "Equals", "Value": "{{user_id}}"}],
+        "Ordering": [{"Field": "Id", "Order": "Ascending"}],
+        "PageInfo": {"Index": 0, "Size": 1000}
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `Customer Management / user query` sets user_id; fall back to the
+        // sandbox user's id when this runs on its own.
+        if (!bru.getVar('user_id')) bru.setVar('user_id', '202544887');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/customer-management-service/searchaccounts?view=bingads-13
+
+  **WHY:** the connector's account discovery (`search_accounts` in `api.py`)
+  sends exactly this body. It checks the response shape the `Account` model
+  parses, the account IDs to put in `config.yaml`'s `account_ids`, and that a
+  short page ends paging (the response has no total or has-more flag).
+
+  **DOCUMENTED (2026-10-29):** exactly one predicate is allowed (plus
+  `AccountLifeCycleStatus` alongside another); `UserId` takes `Equals`. With no
+  `AccountLifeCycleStatus` predicate, the docs give no default status filter.
+  https://learn.microsoft.com/en-us/advertising/customer-management-service/predicate?view=bingads-13
+
+  **VERIFIED (2026-10-29):** one account, `555638908` ("Example Domain",
+  `PacificTimeUSCanadaTijuana`, customer `387145414`), the only one on the
+  sandbox customer. It's `AccountLifeCycleStatus: Pending`, since sign-up
+  skipped payment, and still comes back without a status predicate, so
+  discovery includes Pending accounts. One account is under a page, so a short
+  page ended paging. `ForwardCompatibilityMap` entries are `Key`/`Value`, not
+  the docs' `key`/`value`; the connector's `Account` model doesn't read them.
+
+  **PENDING:** whether `Inactive`, `Pause` or `Suspended` accounts also come
+  back. The sandbox customer has none; a second account, paused in the UI
+  (checklist 3.2), would show it.
+
+examples:
+  - name: 200 - one pending sandbox account
+    request:
+      url: "{{customer_management_url}}/Accounts/Search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "Accounts": [
+              {
+                "BillToCustomerId": "387145414",
+                "CurrencyCode": "USD",
+                "AccountFinancialStatus": "ClearFinancialStatus",
+                "Id": "555638908",
+                "Language": "English",
+                "LastModifiedByUserId": "202544887",
+                "LastModifiedTime": "2026-10-29T16:25:43.157",
+                "Name": "Example Domain",
+                "Number": "L104EQKR",
+                "ParentCustomerId": "387145414",
+                "PaymentMethodId": null,
+                "PaymentMethodType": null,
+                "PrimaryUserId": "202544887",
+                "AccountLifeCycleStatus": "Pending",
+                "TimeStamp": "AAAAABSiv8Q=",
+                "TimeZone": "PacificTimeUSCanadaTijuana",
+                "PauseReason": null,
+                "ForwardCompatibilityMap": [
+                  {
+                    "Key": "AccountMode",
+                    "Value": "0"
+                  }
+                ],
+                "LinkedAgencies": [],
+                "SalesHouseCustomerId": null,
+                "TaxInformation": [],
+                "BackUpPaymentInstrumentId": null,
+                "BillingThresholdAmount": null,
+                "BusinessAddress": {
+                  "City": "New York",
+                  "CountryCode": "US",
+                  "Id": "641005255",
+                  "Line1": "123 Main Street",
+                  "Line2": null,
+                  "Line3": null,
+                  "Line4": null,
+                  "PostalCode": "10001",
+                  "StateOrProvince": "NY",
+                  "TimeStamp": null,
+                  "BusinessName": "Example Domain"
+                },
+                "AutoTagType": "Inactive",
+                "SoldToPaymentInstrumentId": null
+              }
+            ]
+          }

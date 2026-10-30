@@ -1,0 +1,98 @@
+info:
+  name: all types comma
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AccountId": "{{account_id}}", "CampaignType": "Search,Shopping,DynamicSearchAds,Audience,Hotel,PerformanceMax,App,ObjectiveBased"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the first campaign into `Ad Groups / bare`.
+        const id = res.getBody()?.Campaigns?.[0]?.Id;
+        if (id) bru.setVar("campaign_id", String(id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13
+
+  **WHY:** the connector sends every campaign type comma-joined
+  (`ALL_CAMPAIGN_TYPES` in `api.py`). The docs only show SOAP's
+  space-delimited form, and omitting the type returns only Search campaigns,
+  so this checks the REST service reads the comma form as every type.
+  Compare with `Campaigns / all types space` and `Campaigns / default type`.
+
+  **VERIFIED (2026-10-29):** the comma-joined list is read as every type: it
+  returns the account's one campaign, `1150430564` ("PMax Example",
+  `PerformanceMax`, Active), which `Campaigns / default type` (Search only)
+  doesn't. The space-delimited SOAP form is rejected over REST
+  (`Campaigns / all types space`), so comma-joined is the REST format.
+
+examples:
+  - name: 200 - every type, one PerformanceMax campaign
+    request:
+      url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "Campaigns": [
+              {
+                "Id": "1150430564",
+                "Name": "PMax Example",
+                "Status": "Active",
+                "DailyBudget": 26.95,
+                "BudgetType": "DailyBudgetStandard",
+                "TimeZone": "PacificTimeUSCanadaTijuana",
+                "Settings": [
+                  {
+                    "FinalUrlExpansionOptOut": false,
+                    "Type": "PerformanceMaxSetting"
+                  }
+                ],
+                "CampaignType": "PerformanceMax",
+                "SubType": null,
+                "AudienceAdsBidAdjustment": 0,
+                "TrackingUrlTemplate": null,
+                "FinalUrlSuffix": null,
+                "UrlCustomParameters": null,
+                "BiddingScheme": {
+                  "Type": "MaxConversions",
+                  "MaxCpc": {
+                    "Amount": null
+                  }
+                },
+                "BudgetId": null,
+                "Languages": [
+                  "English"
+                ],
+                "ExperimentId": null,
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }

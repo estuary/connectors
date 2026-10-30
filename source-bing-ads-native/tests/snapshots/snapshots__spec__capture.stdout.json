@@ -1,0 +1,174 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "lookback_window_days": {
+              "default": 30,
+              "description": "Number of days of report data to re-fetch on each sync, to pick up late conversions and invalid-traffic credits.",
+              "maximum": 90,
+              "minimum": 0,
+              "title": "Lookback Window Days",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "BingAdsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "secret": true,
+              "title": "Refresh Token",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            },
+            "access_token_expires_at": {
+              "format": "date-time",
+              "title": "Access token expiration time.",
+              "type": "string"
+            },
+            "developer_token": {
+              "description": "Injected by Flow.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Developer Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "refresh_token",
+            "access_token",
+            "access_token_expires_at",
+            "developer_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "microsoft"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/BingAdsOAuth2Credentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/BingAdsOAuth2Credentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "account_ids": {
+          "default": [],
+          "description": "The numeric Account IDs to capture, not the 8-character account numbers. If left blank, every account the authenticated user can access is captured.",
+          "items": {
+            "pattern": "^[0-9]+$",
+            "type": "string"
+          },
+          "title": "Account IDs",
+          "type": "array"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-bing-ads-native",
+    "oauth2": {
+      "provider": "microsoft",
+      "authUrlTemplate": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&response_type=code&response_mode=query&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=https%3A//ads.microsoft.com/msads.manage%20offline_access&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&scope=https%3A//ads.microsoft.com/msads.manage%20offline_access",
+      "accessTokenHeaders": {
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token",
+        "access_token_expires_at": "{{#now_plus}}{{ expires_in }}{{/now_plus}}",
+        "refresh_token": "/refresh_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

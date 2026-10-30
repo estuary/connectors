@@ -1,0 +1,240 @@
+import functools
+from datetime import timedelta
+from logging import Logger
+from typing import Any
+
+from estuary_cdk.capture import Task, common
+from estuary_cdk.capture.common import ResourceConfig, ResourceState
+from estuary_cdk.flow import CaptureBinding, ValidationError
+from estuary_cdk.http import HTTPError, TokenSource
+
+from .api import (
+    AccountAccessError,
+    AccountDirectory,
+    query_user,
+    snapshot_accounts,
+    snapshot_ad_groups,
+    snapshot_ads,
+    snapshot_asset_groups,
+    snapshot_campaigns,
+    token_exchange_scope,
+)
+from .builtin_reports import REPORTS
+from .errors import INVALID_CREDENTIALS, fault_of
+from .http import BingAdsHTTPMixin
+from .models import ConnectorState, EndpointConfig, OAUTH2_SPEC, utc_now
+from .reports import (
+    ReportDefinition,
+    TICK,
+    backfill_report,
+    day_cursor,
+    fetch_report,
+)
+
+ENTITY_INTERVAL = timedelta(hours=1)
+
+
+# Microsoft's public developer token, which works only against the sandbox.
+# https://learn.microsoft.com/en-us/advertising/guides/get-started?view=bingads-13
+SANDBOX_DEVELOPER_TOKEN = "BBD37VB98"
+
+
+def _configure_http(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig) -> None:
+    oauth_spec = OAUTH2_SPEC.model_copy(
+        update={"additionalTokenExchangeBody": {"scope": token_exchange_scope()}}
+    )
+    http.token_source = TokenSource(oauth_spec=oauth_spec, credentials=config.credentials)
+    developer_token = config.credentials.developer_token
+    http.developer_token = developer_token
+    # Never log the token itself.
+    log.info(
+        "developer token configured",
+        {"is_sandbox_token": developer_token == SANDBOX_DEVELOPER_TOKEN},
+    )
+
+
+async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig):
+    """Confirm the credentials authenticate and every account the capture
+    will read can be read with the headers the capture uses."""
+    _configure_http(log, http, config)
+
+    # The stored access token may have expired, and the CDK only rotates
+    # tokens when a capture starts. Exchange for a fresh one just for this
+    # probe; Microsoft keeps the old refresh token working, so nothing is
+    # lost by not saving the new one here.
+    credentials = config.credentials
+    if credentials.access_token_expires_at < utc_now() + timedelta(minutes=5):
+        assert isinstance(http.token_source, TokenSource)
+        try:
+            token = await http.token_source.initialize_oauth2_tokens(log, http)
+        except HTTPError as err:
+            raise ValidationError(
+                [f"Invalid credentials. Please re-authenticate with Microsoft.\n\n{err.message}"]
+            )
+        credentials.access_token = token.access_token
+        credentials.access_token_expires_at = utc_now() + timedelta(seconds=token.expires_in)
+
+    try:
+        await query_user(http, log)
+    except HTTPError as err:
+        if err.code == 401:
+            raise ValidationError(
+                [f"Invalid credentials. Please re-authenticate with Microsoft.\n\n{err.message}"]
+            )
+        fault = fault_of(err)
+        if fault is not None and INVALID_CREDENTIALS in fault.codes():
+            raise ValidationError(
+                [
+                    "Microsoft rejected the credentials. Please re-authenticate "
+                    f"with Microsoft.\n\n{fault.describe()}"
+                ]
+            )
+        raise
+
+    try:
+        await AccountDirectory(http, config.account_ids).accounts(log)
+    except AccountAccessError as err:
+        raise ValidationError(err.errors)
+
+
+def entity_resources(directory: AccountDirectory, http: BingAdsHTTPMixin) -> list[common.Resource]:
+    def open(
+        fetch_snapshot: common.FetchSnapshotFn[Any],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings: Any,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=fetch_snapshot,
+        )
+
+    snapshots = {
+        "accounts": functools.partial(snapshot_accounts, directory),
+        "campaigns": functools.partial(snapshot_campaigns, http, directory),
+        "ad_groups": functools.partial(snapshot_ad_groups, http, directory),
+        "ads": functools.partial(snapshot_ads, http, directory),
+        "asset_groups": functools.partial(snapshot_asset_groups, http, directory),
+    }
+
+    return [
+        common.SnapshotResource(
+            name=name,
+            open=functools.partial(open, fetch_snapshot),
+            initial_config=ResourceConfig(name=name, interval=ENTITY_INTERVAL),
+        )
+        for name, fetch_snapshot in snapshots.items()
+    ]
+
+
+async def _reconcile_account_state(
+    account_ids: list[str],
+    binding: CaptureBinding[ResourceConfig],
+    state: ResourceState,
+    task: Task,
+) -> None:
+    """Give each newly discovered account its own report cursor and backfill.
+
+    The backfill covers every day before today, and incremental capture
+    starts with today, so the two meet without a gap. State for accounts no
+    longer captured is left in place, unused, so an account that reappears
+    resumes where it was.
+    """
+    assert isinstance(state.inc, dict) and isinstance(state.backfill, dict)
+
+    now = utc_now()
+    cutoff = day_cursor(now.date() - TICK)
+    added = [a for a in account_ids if a not in state.inc and a not in state.backfill]
+    for account_id in added:
+        state.inc[account_id] = ResourceState.Incremental(cursor=now)
+        state.backfill[account_id] = ResourceState.Backfill(cutoff=cutoff, next_page=None)
+
+    if added:
+        task.log.info(
+            "initializing report state for new accounts",
+            {"binding": binding.stateKey, "account_ids": added},
+        )
+        await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
+
+
+def report_resources(
+    directory: AccountDirectory, http: BingAdsHTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+    """One collection per built-in report, with an incremental cursor and a
+    backfill per account."""
+
+    async def open(
+        definition: ReportDefinition,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings: Any,
+    ):
+        contexts = await directory.accounts(task.log)
+        await _reconcile_account_state([c.id for c in contexts], binding, state, task)
+
+        row_model = definition.row_model()
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                c.id: functools.partial(
+                    fetch_report,
+                    http,
+                    c,
+                    definition,
+                    row_model,
+                    config.start_date,
+                    config.advanced.lookback_window_days,
+                )
+                for c in contexts
+            },
+            fetch_page={
+                c.id: functools.partial(
+                    backfill_report,
+                    http,
+                    c,
+                    definition,
+                    row_model,
+                    config.start_date,
+                )
+                for c in contexts
+            },
+        )
+
+    return [
+        common.Resource(
+            name=definition.name,
+            key=definition.key(),
+            model=definition.row_model(),
+            open=functools.partial(open, definition),
+            # Filled in per account when the binding opens, since accounts
+            # are only known once the API is called.
+            initial_state=ResourceState(inc={}, backfill={}),
+            initial_config=ResourceConfig(name=definition.name, interval=timedelta(hours=1)),
+            schema_inference=True,
+        )
+        for definition in REPORTS
+    ]
+
+
+async def all_resources(
+    log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+    """Enumerate every stream the connector exposes. Makes no API calls:
+    accounts are discovered once, lazily, when a stream first needs them."""
+    _configure_http(log, http, config)
+    directory = AccountDirectory(http, config.account_ids)
+
+    return [
+        *entity_resources(directory, http),
+        *report_resources(directory, http, config),
+    ]
