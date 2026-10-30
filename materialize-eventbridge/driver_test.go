@@ -75,7 +75,7 @@ const (
 func TestSpec(t *testing.T) {
 	t.Parallel()
 
-	resp, err := driver{}.Spec(context.Background(), &pm.Request_Spec{})
+	var resp, err = driver{}.Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(resp, "", "  ")
@@ -98,14 +98,14 @@ func TestIntegration(t *testing.T) {
 
 	provisionLocalStackInfra(t)
 
-	makeResourceFn := func(s string, delta bool) resource {
+	var makeResourceFn = func(s string, delta bool) resource {
 		return resource{Source: "flow.test", DetailType: s}
 	}
 
-	all := *testAll || os.Getenv("EVENTBRIDGE_TEST_ALL") != ""
+	var all = *testAll || os.Getenv("EVENTBRIDGE_TEST_ALL") != ""
 
-	materializeSpec := "testdata/materialize-local.flow.yaml"
-	applySpec := "testdata/apply-local.flow.yaml"
+	var materializeSpec = "testdata/materialize-local.flow.yaml"
+	var applySpec = "testdata/apply-local.flow.yaml"
 	if all {
 		materializeSpec = "testdata/materialize.flow.yaml"
 		applySpec = "testdata/apply.flow.yaml"
@@ -147,7 +147,7 @@ type materializationUnderTest struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materializationUnderTest{}
 
 func newMaterializerUnderTest(ctx context.Context, name string, cfg config, flags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	base, err := NewMaterializer(ctx, name, cfg, flags)
+	var base, err = NewMaterializer(ctx, name, cfg, flags)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func newMaterializerUnderTest(ctx context.Context, name string, cfg config, flag
 		return nil, err
 	}
 
-	queueName := awsTestQueueName
+	var queueName = awsTestQueueName
 	if cfg.Advanced.Endpoint != "" {
 		queueName = testQueueName
 	}
@@ -174,7 +174,7 @@ func newMaterializerUnderTest(ctx context.Context, name string, cfg config, flag
 // events whose source + detail-type match the requested resource path.
 func (m *materializationUnderTest) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
 	if m.queueURL == "" {
-		out, err := m.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
+		var out, err = m.sqsClient.GetQueueUrl(ctx, &sqs.GetQueueUrlInput{
 			QueueName: aws.String(m.queueName),
 		})
 		if err != nil {
@@ -193,7 +193,7 @@ func (m *materializationUnderTest) SnapshotTestResource(ctx context.Context, pat
 	if len(path) != 3 {
 		return nil, nil, fmt.Errorf("unexpected resource path length %d (want 3)", len(path))
 	}
-	wantSource, wantDetailType := path[1], path[2]
+	var wantSource, wantDetailType = path[1], path[2]
 
 	var rows [][]any
 	for _, ev := range m.drainedMsgs {
@@ -220,7 +220,7 @@ func (m *materializationUnderTest) SnapshotTestResource(ctx context.Context, pat
 func provisionLocalStackInfra(t *testing.T) {
 	t.Helper()
 
-	cfg := config{
+	var cfg = config{
 		Region:       "us-east-1",
 		EventBusName: testBusName,
 		Credentials: &CredentialsConfig{
@@ -233,14 +233,14 @@ func provisionLocalStackInfra(t *testing.T) {
 		Advanced: advancedConfig{Endpoint: "http://localhost:4566"},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	var ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	awsCfg, err := awsConfigFor(ctx, cfg)
+	var awsCfg, err = awsConfigFor(ctx, cfg)
 	require.NoError(t, err)
 
-	eb := eventbridge.NewFromConfig(awsCfg)
-	sq := sqs.NewFromConfig(awsCfg)
+	var eb = eventbridge.NewFromConfig(awsCfg)
+	var sq = sqs.NewFromConfig(awsCfg)
 
 	if _, err := eb.CreateEventBus(ctx, &eventbridge.CreateEventBusInput{
 		Name: aws.String(testBusName),
@@ -252,14 +252,14 @@ func provisionLocalStackInfra(t *testing.T) {
 		QueueName: aws.String(testQueueName),
 	})
 	require.NoError(t, err, "CreateQueue")
-	queueURL := aws.ToString(qOut.QueueUrl)
+	var queueURL = aws.ToString(qOut.QueueUrl)
 
 	attrOut, err := sq.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 		QueueUrl:       aws.String(queueURL),
 		AttributeNames: []sqstypes.QueueAttributeName{sqstypes.QueueAttributeNameQueueArn},
 	})
 	require.NoError(t, err, "GetQueueAttributes")
-	queueArn := attrOut.Attributes[string(sqstypes.QueueAttributeNameQueueArn)]
+	var queueArn = attrOut.Attributes[string(sqstypes.QueueAttributeNameQueueArn)]
 
 	if _, err := eb.PutRule(ctx, &eventbridge.PutRuleInput{
 		Name:         aws.String(testRuleName),
@@ -302,9 +302,9 @@ type receivedEvent struct {
 // deleting each message it observes so a re-run starts clean.
 func drainAllMessages(ctx context.Context, sq *sqs.Client, queueURL string) ([]receivedEvent, error) {
 	var out []receivedEvent
-	emptyPolls := 0
+	var emptyPolls = 0
 	for emptyPolls < 2 {
-		resp, err := sq.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		var resp, err = sq.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl:            aws.String(queueURL),
 			MaxNumberOfMessages: 10,
 			WaitTimeSeconds:     1,
@@ -389,7 +389,7 @@ func TestCheckPutEventsPermission(t *testing.T) {
 		testBusARN = "arn:aws:events:us-east-1:123456789012:event-bus/test-bus"
 	)
 
-	makeServer := func(failGetCallerIdentity, failSimulate bool, decision string) *httptest.Server {
+	var makeServer = func(failGetCallerIdentity, failSimulate bool, decision string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if err := r.ParseForm(); err != nil {
 				http.Error(w, "bad form", http.StatusBadRequest)
@@ -419,7 +419,7 @@ func TestCheckPutEventsPermission(t *testing.T) {
 		}))
 	}
 
-	makeCfg := func(endpoint string) config {
+	var makeCfg = func(endpoint string) config {
 		return config{
 			Region:       "us-east-1",
 			EventBusName: "test-bus",
@@ -436,36 +436,36 @@ func TestCheckPutEventsPermission(t *testing.T) {
 
 	t.Run("allowed", func(t *testing.T) {
 		t.Parallel()
-		srv := makeServer(false, false, "allowed")
+		var srv = makeServer(false, false, "allowed")
 		defer srv.Close()
-		prereqs := &cerrors.PrereqErr{}
+		var prereqs = &cerrors.PrereqErr{}
 		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
 		require.Equal(t, 0, prereqs.Len())
 	})
 
 	t.Run("denied", func(t *testing.T) {
 		t.Parallel()
-		srv := makeServer(false, false, "implicitDeny")
+		var srv = makeServer(false, false, "implicitDeny")
 		defer srv.Close()
-		prereqs := &cerrors.PrereqErr{}
+		var prereqs = &cerrors.PrereqErr{}
 		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
 		require.Equal(t, 1, prereqs.Len())
 	})
 
 	t.Run("GetCallerIdentity_forbidden", func(t *testing.T) {
 		t.Parallel()
-		srv := makeServer(true, false, "")
+		var srv = makeServer(true, false, "")
 		defer srv.Close()
-		prereqs := &cerrors.PrereqErr{}
+		var prereqs = &cerrors.PrereqErr{}
 		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
 		require.Equal(t, 0, prereqs.Len())
 	})
 
 	t.Run("SimulatePrincipalPolicy_forbidden", func(t *testing.T) {
 		t.Parallel()
-		srv := makeServer(false, true, "")
+		var srv = makeServer(false, true, "")
 		defer srv.Close()
-		prereqs := &cerrors.PrereqErr{}
+		var prereqs = &cerrors.PrereqErr{}
 		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
 		require.Equal(t, 0, prereqs.Len())
 	})

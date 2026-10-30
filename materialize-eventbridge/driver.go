@@ -191,7 +191,7 @@ var _ boilerplate.Connector = &driver{}
 func NewDriver() boilerplate.Connector { return driver{} }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Materialize EventBridge Spec", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Materialize EventBridge Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -220,18 +220,18 @@ func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bind
 // config (static keys or assumed-role STS tokens) and region, applying the
 // optional endpoint override (used by tests against LocalStack).
 func awsConfigFor(ctx context.Context, cfg config) (aws.Config, error) {
-	credProvider, err := cfg.credentialsProvider()
+	var credProvider, err = cfg.credentialsProvider()
 	if err != nil {
 		return aws.Config{}, err
 	}
 
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(cfg.Region),
 	}
 
 	if cfg.Advanced.Endpoint != "" {
-		resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		var resolver = aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: cfg.Advanced.Endpoint, SigningRegion: region}, nil
 		})
 		opts = append(opts, awsConfig.WithEndpointResolverWithOptions(resolver))
@@ -252,7 +252,7 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	awsCfg, err := awsConfigFor(ctx, cfg)
+	var awsCfg, err = awsConfigFor(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -278,8 +278,8 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 }
 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	prereqs := &cerrors.PrereqErr{}
-	busARN, err := describeBus(ctx, d.client, d.cfg.EventBusName)
+	var prereqs = &cerrors.PrereqErr{}
+	var busARN, err = describeBus(ctx, d.client, d.cfg.EventBusName)
 	if err != nil {
 		prereqs.Err(err)
 		return prereqs
@@ -366,7 +366,7 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	bindings := make([]bindingState, 0, len(mappedBindings))
+	var bindings = make([]bindingState, 0, len(mappedBindings))
 	for _, b := range mappedBindings {
 		bindings = append(bindings, bindingState{
 			path:       b.ResourcePath,
@@ -403,7 +403,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 func (d *materialization) Close(ctx context.Context) {}
 
 func describeBus(ctx context.Context, client *eventbridge.Client, name string) (string, error) {
-	out, err := client.DescribeEventBus(ctx, &eventbridge.DescribeEventBusInput{Name: &name})
+	var out, err = client.DescribeEventBus(ctx, &eventbridge.DescribeEventBusInput{Name: &name})
 	if err != nil {
 		return "", fmt.Errorf("describing event bus %q: %w", name, err)
 	}
@@ -411,7 +411,7 @@ func describeBus(ctx context.Context, client *eventbridge.Client, name string) (
 }
 
 func checkPutEventsPermission(ctx context.Context, cfg config, busARN string, prereqs *cerrors.PrereqErr) {
-	awsCfg, err := awsConfigFor(ctx, cfg)
+	var awsCfg, err = awsConfigFor(ctx, cfg)
 	if err != nil {
 		log.WithField("error", err).Warn("could not build AWS config for permission check; skipping")
 		return
@@ -423,7 +423,7 @@ func checkPutEventsPermission(ctx context.Context, cfg config, busARN string, pr
 		return
 	}
 
-	principalARN := iamPrincipalARN(aws.ToString(callerOut.Arn))
+	var principalARN = iamPrincipalARN(aws.ToString(callerOut.Arn))
 	simOut, err := awsiam.NewFromConfig(awsCfg).SimulatePrincipalPolicy(ctx, &awsiam.SimulatePrincipalPolicyInput{
 		PolicySourceArn: &principalARN,
 		ActionNames:     []string{"events:PutEvents"},
@@ -451,16 +451,16 @@ func checkPutEventsPermission(ctx context.Context, cfg config, busARN string, pr
 //	→ arn:aws:iam::123456789012:role/MyRole
 func iamPrincipalARN(arnStr string) string {
 	// ARN structure: arn:partition:service:region:account:resource
-	parts := strings.SplitN(arnStr, ":", 6)
+	var parts = strings.SplitN(arnStr, ":", 6)
 	if len(parts) != 6 {
 		return arnStr
 	}
-	resource := parts[5]
+	var resource = parts[5]
 	if !strings.HasPrefix(resource, "assumed-role/") {
 		return arnStr
 	}
 	// resource is "assumed-role/RoleName/SessionName"
-	roleParts := strings.SplitN(resource, "/", 3)
+	var roleParts = strings.SplitN(resource, "/", 3)
 	if len(roleParts) < 2 {
 		return arnStr
 	}

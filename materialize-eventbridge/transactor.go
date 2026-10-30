@@ -104,25 +104,25 @@ func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	errGroup, ctx := errgroup.WithContext(it.Context())
+	var errGroup, ctx = errgroup.WithContext(it.Context())
 	errGroup.SetLimit(storeConcurrency)
 
-	round := it.Round
+	var round = it.Round
 	// published counts the entries EventBridge accepted per binding, for the
 	// transaction health report. A batch mixes bindings, so each entry's
 	// binding rides alongside it.
-	published := make([]atomic.Int64, len(t.bindings))
+	var published = make([]atomic.Int64, len(t.bindings))
 
 	var (
 		batch         []types.PutEventsRequestEntry
 		batchBindings []int
 		batchBytes    int
 	)
-	flush := func() {
+	var flush = func() {
 		if len(batch) == 0 {
 			return
 		}
-		entries, bindings := batch, batchBindings
+		var entries, bindings = batch, batchBindings
 		batch, batchBindings = nil, nil
 		batchBytes = 0
 		errGroup.Go(func() error {
@@ -137,9 +137,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	for it.Next(false) {
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
-		entrySize := len(b.source) + len(b.detailType) + len(it.RawJSON)
+		var entrySize = len(b.source) + len(b.detailType) + len(it.RawJSON)
 		if entrySize > putEventsMaxEntrySize {
 			return nil, fmt.Errorf(
 				"document for binding %d is %d bytes (source+detail-type+detail), exceeding the EventBridge PutEvents per-entry limit of %d bytes",
@@ -184,7 +184,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (t *transactor) putEvents(ctx context.Context, entries []types.PutEventsRequestEntry) error {
 	for attempt := range putEventsRetryAttempts {
 		if attempt > 0 {
-			wait := putEventsRetryBaseWait << (attempt - 1)
+			var wait = putEventsRetryBaseWait << (attempt - 1)
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -192,7 +192,7 @@ func (t *transactor) putEvents(ctx context.Context, entries []types.PutEventsReq
 			}
 		}
 
-		out, err := t.client.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})
+		var out, err = t.client.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})
 		if err != nil {
 			return fmt.Errorf("PutEvents: %w", err)
 		}
@@ -214,7 +214,7 @@ func (t *transactor) putEvents(ctx context.Context, entries []types.PutEventsReq
 			if r.ErrorCode == nil && r.ErrorMessage == nil {
 				continue
 			}
-			code := aws.ToString(r.ErrorCode)
+			var code = aws.ToString(r.ErrorCode)
 			if !retryableCode(code) {
 				if permIdx == -1 {
 					permIdx, permCode, permMsg = i, code, aws.ToString(r.ErrorMessage)
