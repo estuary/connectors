@@ -18,7 +18,7 @@ var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
 
-	snap, _ := sql.RunSqlGenTests(
+	var snap, _ = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -94,7 +94,7 @@ func TestStringToVarbinaryCast_QuotedField(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := stringToVarbinaryCast(sql.ColumnTypeMigration{
+			var got = stringToVarbinaryCast(sql.ColumnTypeMigration{
 				Column: sql.Column{Projection: sql.Projection{Projection: pf.Projection{Field: tc.field}}},
 			})
 			require.Equal(t, tc.want, got)
@@ -130,7 +130,7 @@ func TestVarbinaryToStringCast_QuotedField(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := varbinaryToStringCast(sql.ColumnTypeMigration{
+			var got = varbinaryToStringCast(sql.ColumnTypeMigration{
 				Column: sql.Column{Projection: sql.Projection{Projection: pf.Projection{Field: tc.field}}},
 			})
 			require.Equal(t, tc.want, got)
@@ -151,7 +151,7 @@ func TestDateTimeColumn(t *testing.T) {
 	}, sql.FieldConfig{})
 	require.Equal(t, "DATETIME2 NOT NULL", mapped.DDL)
 
-	expected, err := time.Parse(time.RFC3339Nano, "2022-04-04T10:09:08.234567Z")
+	var expected, err = time.Parse(time.RFC3339Nano, "2022-04-04T10:09:08.234567Z")
 	require.NoError(t, err)
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, expected, parsed)
@@ -186,7 +186,7 @@ func TestTimeColumn(t *testing.T) {
 	}, sql.FieldConfig{})
 	require.Equal(t, "TIME NOT NULL", mapped.DDL)
 
-	expected, err := time.Parse("15:04:05Z07:00", "10:09:08.234567Z")
+	var expected, err = time.Parse("15:04:05Z07:00", "10:09:08.234567Z")
 	require.NoError(t, err)
 	parsed, err := mapped.Converter("10:09:08.234567Z")
 	require.Equal(t, expected, parsed)
@@ -228,7 +228,7 @@ func TestCompatibleTextType(t *testing.T) {
 		existing   boilerplate.ExistingField
 		compatible bool
 	}
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		projection  *sql.Projection
 		expectedDDL string
@@ -401,7 +401,7 @@ func TestCanMigrateTextType(t *testing.T) {
 		existing   boilerplate.ExistingField
 		canMigrate bool
 	}
-	tests := []struct {
+	var tests = []struct {
 		name       string
 		projection *sql.Projection
 		targetDDL  string

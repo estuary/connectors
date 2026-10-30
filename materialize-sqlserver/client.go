@@ -27,12 +27,12 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	connector, err := ep.Config.ToSQLConnector(ctx)
+	var connector, err = ep.Config.ToSQLConnector(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	db := stdsql.OpenDB(connector)
+	var db = stdsql.OpenDB(connector)
 
 	return &client{
 		db: db,
@@ -41,15 +41,15 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	connector, err := cfg.ToSQLConnector(ctx)
+	var connector, err = cfg.ToSQLConnector(ctx)
 	if err != nil {
 		errs.Err(err)
 		return errs
 	}
 
-	db := stdsql.OpenDB(connector)
+	var db = stdsql.OpenDB(connector)
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
@@ -95,15 +95,15 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		return nil
 	}
 
-	schemas := make([]string, 0, len(resourcePaths))
+	var schemas = make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
+		var loc = c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
 	}
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+	var rows, err = c.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT table_schema, table_name, column_name, data_type, datetime_precision
 		FROM information_schema.columns
 		WHERE table_catalog = %s AND table_schema IN (%s) AND data_type IN ('datetime', 'datetime2', 'smalldatetime')`,
@@ -171,10 +171,10 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 			// in a Flow projection name. The second argument is the bare new
 			// column name; both arguments are inside T-SQL '...' literals, so
 			// any apostrophe needs to be doubled.
-			tempColumn := ins.TypeMigration.Field + sql.ColumnMigrationTemporarySuffix
-			tempBracketed := "[" + strings.ReplaceAll(tempColumn, "]", "]]") + "]"
-			src := strings.ReplaceAll(table.Identifier+"."+tempBracketed, "'", "''")
-			newName := strings.ReplaceAll(ins.TypeMigration.Field, "'", "''")
+			var tempColumn = ins.TypeMigration.Field + sql.ColumnMigrationTemporarySuffix
+			var tempBracketed = "[" + strings.ReplaceAll(tempColumn, "]", "]]") + "]"
+			var src = strings.ReplaceAll(table.Identifier+"."+tempBracketed, "'", "''")
+			var newName = strings.ReplaceAll(ins.TypeMigration.Field, "'", "''")
 			queries = append(
 				queries,
 				fmt.Sprintf(
@@ -228,18 +228,18 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		// string-type columns also have an collation that needs to be considered. Flow will create
 		// new string-type columns with a selected collation, but won't change the collation for
 		// pre-existing columns.
-		tableDetails, err := tableDetails(ctx, c.db, c.ep.Dialect, c.ep.Config.Database, ta.InfoLocation.TableSchema, ta.InfoLocation.TableName)
+		var tableDetails, err = tableDetails(ctx, c.db, c.ep.Dialect, c.ep.Config.Database, ta.InfoLocation.TableSchema, ta.InfoLocation.TableName)
 		if err != nil {
 			return "", nil, fmt.Errorf("getting table details: %w", err)
 		}
 
 		for _, dn := range ta.DropNotNulls {
-			col, ok := tableDetails[dn.Name]
+			var col, ok = tableDetails[dn.Name]
 			if !ok {
 				return "", nil, fmt.Errorf("could not find column info for %q", dn.Name)
 			}
 
-			ddl, err := col.nullableDDL()
+			var ddl, err = col.nullableDDL()
 			if err != nil {
 				return "", nil, err
 			}
@@ -280,24 +280,24 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	var _, err = c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -338,9 +338,9 @@ func (c *client) Close() {
 }
 
 func tableDetails(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, catalog string, tableSchema string, tableName string) (map[string]foundColumn, error) {
-	columns := make(map[string]foundColumn)
+	var columns = make(map[string]foundColumn)
 
-	rows, err := db.QueryContext(ctx, fmt.Sprintf(`
+	var rows, err = db.QueryContext(ctx, fmt.Sprintf(`
 		select column_name, is_nullable, data_type, character_maximum_length, collation_name, numeric_precision, numeric_scale, datetime_precision
 		from information_schema.columns where table_catalog=%s and table_schema=%s and table_name=%s
 		`,
@@ -379,9 +379,9 @@ type foundColumn struct {
 }
 
 func (c foundColumn) nullableDDL() (string, error) {
-	ddl := strings.ToUpper(c.Type)
+	var ddl = strings.ToUpper(c.Type)
 
-	intOrMax := func(i int64) string {
+	var intOrMax = func(i int64) string {
 		if i == -1 {
 			return "MAX"
 		}

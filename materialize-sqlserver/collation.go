@@ -31,7 +31,7 @@ const collationQuery = "SELECT name FROM sys.fn_helpcollations() WHERE name LIKE
 //
 // [0]: https://learn.microsoft.com/en-us/sql/relational-databases/collations/collation-and-unicode-support?view=sql-server-ver16#Supplementary_Characters
 func getCollation(ctx context.Context, db *stdsql.DB) (string, error) {
-	rows, err := db.QueryContext(ctx, collationQuery)
+	var rows, err = db.QueryContext(ctx, collationQuery)
 	if err != nil {
 		return "", fmt.Errorf("querying available collations: %w", err)
 	}

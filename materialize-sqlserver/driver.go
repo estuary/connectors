@@ -58,7 +58,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
 	}
 	subSchemas = append(subSchemas,
@@ -66,7 +66,7 @@ func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
 	subSchemas = append(subSchemas,
 		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)))
 
-	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
+	var schema = schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
 	return schema
 }
 
@@ -178,11 +178,11 @@ func (c *config) ToURI() *url.URL {
 	params.Add("TrustServerCertificate", "true")
 	params.Add("database", c.Database)
 
-	userInfo := url.UserPassword(c.User, c.Password)
+	var userInfo = url.UserPassword(c.User, c.Password)
 	if c.Credentials != nil {
 		switch c.Credentials.AuthType {
 		case UserPassword:
-			pass := c.Credentials.Password
+			var pass = c.Credentials.Password
 			userInfo = url.UserPassword(c.User, pass)
 		case AWSIAM:
 			userInfo = url.User(c.User)
@@ -203,25 +203,25 @@ func (c *config) ToURI() *url.URL {
 
 // ToSQLConnector converts the Config to a sql Connector for use with OpenDB.
 func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
-	uri := c.ToURI()
+	var uri = c.ToURI()
 
 	if c.Credentials != nil {
 		switch c.Credentials.AuthType {
 		case AWSIAM:
-			credProvider, err := c.Credentials.AWSCredentialsProvider()
+			var credProvider, err = c.Credentials.AWSCredentialsProvider()
 			if err != nil {
 				return nil, err
 			}
 
 			// In the case of a network tunnel, we want to use the RDS Proxy
 			// endpoint when building the token.
-			endpoint := c.Address
+			var endpoint = c.Address
 			if !strings.Contains(endpoint, ":") {
 				endpoint = endpoint + ":" + defaultPort
 			}
 
-			tokenProvider := func(ctx context.Context) (string, error) {
-				token, err := auth.BuildAuthToken(
+			var tokenProvider = func(ctx context.Context) (string, error) {
+				var token, err = auth.BuildAuthToken(
 					ctx,
 					endpoint,
 					c.Credentials.AWSRegion,
@@ -232,7 +232,7 @@ func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
 
 			return mssqldb.NewConnectorWithAccessTokenProvider(uri.String(), tokenProvider)
 		case AzureIAM:
-			token := c.Credentials.AzureToken()
+			var token = c.Credentials.AzureToken()
 			return mssqldb.NewAccessTokenConnector(uri.String(), func() (string, error) {
 				return token, nil
 			})
@@ -280,7 +280,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(cfg.Address)
+				var host, port, err = net.SplitHostPort(cfg.Address)
 				if err != nil {
 					return fmt.Errorf("splitting address to host and port: %w", err)
 				}
@@ -315,12 +315,12 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 
-			connector, err := cfg.ToSQLConnector(ctx)
+			var connector, err = cfg.ToSQLConnector(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			db := stdsql.OpenDB(connector)
+			var db = stdsql.OpenDB(connector)
 			defer db.Close()
 
 			// sql.OpenDB does not connect. db.Conn logs in without running a query,
@@ -339,7 +339,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 
 			// If an explicit schema is not configured, query the default schema
 			// for the configured user.
-			schema := cfg.Schema
+			var schema = cfg.Schema
 			if schema == "" {
 				if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
 					return nil, fmt.Errorf("querying schema for current user: %w", err)
@@ -419,13 +419,13 @@ func prepareNewTransactor(
 		}
 		d.store.fence = fence
 
-		connector, err := ep.Config.ToSQLConnector(ctx)
+		var connector, err = ep.Config.ToSQLConnector(ctx)
 		if err != nil {
 			return nil, err
 		}
 
 		// Establish connections.
-		db := stdsql.OpenDB(connector)
+		var db = stdsql.OpenDB(connector)
 		if d.load.conn, err = db.Conn(ctx); err != nil {
 			return nil, fmt.Errorf("load db.Conn: %w", err)
 		}
@@ -550,7 +550,7 @@ func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) erro
 	if existing == nil {
 		return fmt.Errorf("column %s was not found in the table", col.Identifier)
 	}
-	meta, ok := existing.Meta.(datetimeFieldMeta)
+	var meta, ok = existing.Meta.(datetimeFieldMeta)
 	if !ok {
 		return fmt.Errorf("column %s is not a DATETIME, DATETIME2 or SMALLDATETIME", col.Identifier)
 	}
@@ -666,7 +666,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
 		}
-		doc := json.RawMessage([]byte(document))
+		var doc = json.RawMessage([]byte(document))
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -695,15 +695,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
-	txn, err := d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
+	var ctx = it.Context()
+	var txn, err = d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
 
 	// If a Tx is open and you attempt to close the connection, msqldb will
 	// deadlock.  This handles the case of both an error or a panic occurring.
-	defuser := sql.NewTxDefuser(txn)
+	var defuser = sql.NewTxDefuser(txn)
 	defer defuser.MaybeRollback()
 
 	// The mssql driver uses prepared statements to drive bulk inserts. A bulk
@@ -720,8 +720,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var lastBinding = -1
 
 	// Finishing a bulk insert reports the rows it copied.
-	finishBatch := func(idx int) error {
-		batch, ok := batches[idx]
+	var finishBatch = func(idx int) error {
+		var batch, ok = batches[idx]
 		if !ok {
 			return nil
 		}
@@ -734,7 +734,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
-	round := it.Round
+	var round = it.Round
 	var truncations = d.truncations
 
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
@@ -755,7 +755,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var b = d.bindings[it.Binding]
 
 		var flowDelete = d.cfg.HardDelete && it.Delete
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		var converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
@@ -808,7 +808,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if b.hasData {
 				// A single-statement batch, so RowsAffected is the target rows
 				// this statement touched; MERGE counts every clause that fired.
-				stmt, what := b.directCopy, "direct insert"
+				var stmt, what = b.directCopy, "direct insert"
 				if b.needsMerge {
 					stmt, what = b.mergeInto, "merge"
 				}

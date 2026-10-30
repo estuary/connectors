@@ -24,7 +24,7 @@ var strToInt sql.ElementConverter = sql.StringCastConverter(func(str string) (in
 		str = str[:idx]
 	}
 
-	out, err := strconv.ParseInt(str, 10, 64)
+	var out, err = strconv.ParseInt(str, 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
 	}
@@ -44,10 +44,10 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
 
 	// Define base date/time mappings without primary key wrapper
-	primaryKeyTextType := sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType))
-	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))
-	timeMapping := sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))
+	var primaryKeyTextType = sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType))
+	var dateMapping = sql.MapStatic("DATE")
+	var datetimeMapping = sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))
+	var timeMapping = sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -56,7 +56,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
-	binaryMapping := sql.MapPrimaryKey(
+	var binaryMapping = sql.MapPrimaryKey(
 		sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
 		sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 	)
@@ -70,7 +70,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 		)
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT"),
@@ -202,7 +202,7 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 // native_binary_column_type feature flag is enabled on a task that previously
 // stored binary fields as base64 text.
 func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
-	colRef := xqueryColumnRef("", migration.Field)
+	var colRef = xqueryColumnRef("", migration.Field)
 	// The whole XQuery is wrapped in a T-SQL '...' literal, so any single
 	// quotes that survived the inner escapes need to be doubled here.
 	colRef = strings.ReplaceAll(colRef, "'", "''")
@@ -214,7 +214,7 @@ func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
 // migration; direction is determined by the cast target type. Used when
 // reverting from native binary back to base64 text storage.
 func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
-	colRef := xqueryColumnRef("", migration.Field)
+	var colRef = xqueryColumnRef("", migration.Field)
 	colRef = strings.ReplaceAll(colRef, "'", "''")
 	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARCHAR(MAX)')`, colRef)
 }
@@ -230,7 +230,7 @@ func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
 // is still responsible for doubling any embedded `'` for the outer T-SQL
 // string literal.
 func xqueryColumnRef(alias, field string) string {
-	bracketed := "[" + strings.ReplaceAll(field, "]", "]]") + "]"
+	var bracketed = "[" + strings.ReplaceAll(field, "]", "]]") + "]"
 	if alias != "" {
 		bracketed = alias + "." + bracketed
 	}

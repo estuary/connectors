@@ -36,7 +36,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 			Delta: delta,
@@ -59,7 +59,7 @@ func TestIntegration(t *testing.T) {
 		}
 		var ctx = context.Background()
 		var cfg = testConfig()
-		connector, err := cfg.ToSQLConnector(ctx)
+		var connector, err = cfg.ToSQLConnector(ctx)
 		require.NoError(t, err)
 		var db = stdsql.OpenDB(connector)
 		defer db.Close()
@@ -138,9 +138,9 @@ func TestPrereqs(t *testing.T) {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
-	cfg := testConfig()
+	var cfg = testConfig()
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		cfg  func(config) config
 		want []string
@@ -176,7 +176,7 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -202,10 +202,10 @@ func TestNewEndpointConnectError(t *testing.T) {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
-	cfg := testConfig()
+	var cfg = testConfig()
 	cfg.Password = "wrong" + cfg.Password
 
-	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	var _, err = NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 	require.ErrorContains(t, err, "unable to connect to database: ")
 	require.ErrorContains(t, err, "Login failed for user 'sa'")
 

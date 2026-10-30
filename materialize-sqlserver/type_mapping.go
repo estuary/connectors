@@ -85,13 +85,13 @@ func MapSizedText(stringType string, limit int, collation string) sql.MapProject
 	}
 
 	return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
-		high, requiredSizeBytes := bits.Mul32(p.Inference.String_.MaxLength, bytesPerCharacter)
+		var high, requiredSizeBytes = bits.Mul32(p.Inference.String_.MaxLength, bytesPerCharacter)
 		if high != 0 {
 			requiredSizeBytes = math.MaxUint32
 		}
 
 		if p.Inference.String_ == nil || requiredSizeBytes == 0 || requiredSizeBytes > maxStringSize {
-			column := &SizedText{
+			var column = &SizedText{
 				ColumnType: stringType,
 				Size:       limit,
 				Collation:  collation,
@@ -99,7 +99,7 @@ func MapSizedText(stringType string, limit int, collation string) sql.MapProject
 			return column, []sql.CompatibleColumnType{column}, nil
 		}
 
-		column := &SizedText{
+		var column = &SizedText{
 			ColumnType: stringType,
 			Size:       int(requiredSizeBytes),
 			Collation:  collation,
@@ -111,7 +111,7 @@ func MapSizedText(stringType string, limit int, collation string) sql.MapProject
 type StringSizeMigrationTarget struct{}
 
 func (*StringSizeMigrationTarget) CanMigrate(existing boilerplate.ExistingField, desired sql.MappedType) bool {
-	target, ok := desired.TargetType.(*SizedText)
+	var target, ok = desired.TargetType.(*SizedText)
 	if !ok {
 		return false
 	}
