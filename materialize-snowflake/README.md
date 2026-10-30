@@ -62,7 +62,7 @@ the bare words.
 ### How a row reaches the table
 
 The connector calls the Snowpipe Streaming REST API directly. Rows travel as
-zstd-compressed NDJSON, and a JWT signed with the configured private key is
+gzip-compressed NDJSON, and a JWT signed with the configured private key is
 exchanged for a scoped token for the account's ingest host.
 
 The connector opens four Snowpipe channels for each Estuary binding+shard, one per
@@ -79,20 +79,21 @@ each shard four times the single-channel ceiling.
    ┌─────────────────────────────────────────┐
    │  materialize-snowflake (Go)             │
    │                                         │
-   │    convert ──► batch buffer ──► append  │
-   │              (1,000,000 rows or 32 MiB) │
+   │    convert ──► batch file ──► append    │
+   │           (250 MiB after compression)   │
    └────────────────────┬────────────────────┘
                         │  one append at a time, per channel,
-                        │  HTTPS, zstd-compressed NDJSON
+                        │  HTTPS, gzip-compressed NDJSON
                         ▼
                   Snowflake table
 ```
 
-The connector converts each document to a JSON row and holds it in a buffer. It
-appends the buffer to the channel at 1,000,000 rows or at 32 MiB, whichever limit
-it reaches first. When documents switch to a different binding, it also appends
-the buffers of the binding before, so a binding that has stopped receiving
-documents holds no memory.
+The connector converts each document to a JSON row and writes it, gzip-compressed,
+to a local batch file for its channel. It appends the file to the channel once the
+file holds 250 MiB after compression, and at the end of the transaction. When
+documents switch to a different binding, it also appends the files of the binding
+before, so a binding that has stopped receiving documents holds no open file or
+compressor.
 
 The API caps one append request at 4 MiB after compression. A batch over that
 cap takes the stage path instead. The connector asks the pipe for a stage bucket
@@ -103,10 +104,8 @@ two endpoints are not documented by Snowflake. Snowflake refuses a file that was
 uploaded in parts, so each file goes up in a single request.
 
 One append per channel is pending at a time. A slow channel therefore applies
-back pressure to the buffer instead of opening more requests. All channels
-together hold 256 MiB of rows at most, counting each batch until its append
-returns. A row that would pass that ceiling first appends every batch, then
-waits for appends to return.
+back pressure to its batch file instead of opening more requests. The connector
+deletes a batch file once its append returns.
 
 Every append carries an offset token. Snowflake stores the token of the last
 append that it committed, and the connector reads that token back when it starts.
@@ -194,7 +193,7 @@ own. Either half of that convergence can be interrupted and repeats safely.
   Restore that path for one transaction, or backfill the binding.
 - An API error that retries do not clear fails the transaction. The runtime
   restarts the connector, and recovery replays through the offset token.
-- A batch whose zstd-compressed rows exceed 4 MiB is written through the
+- A batch whose gzip-compressed rows exceed 4 MiB is written through the
   pipe's stage bucket rather than an append request. The stage is on the cloud
   the Snowflake account runs on (GCS, S3 or Azure), and Snowflake lends the
   credentials for it, so the connector needs no extra configuration. Only the
