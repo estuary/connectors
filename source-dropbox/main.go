@@ -30,7 +30,7 @@ type advancedConfig struct {
 }
 
 func (c config) Validate() error {
-	requiredProperties := [][]string{
+	var requiredProperties = [][]string{
 		{"Path", c.Path},
 	}
 	for _, req := range requiredProperties {
@@ -43,7 +43,7 @@ func (c config) Validate() error {
 		return fmt.Errorf("invalid configured path '%s': path must be absolute (must start with a '/')", c.Path)
 	}
 
-	err := c.Credentials.validate()
+	var err = c.Credentials.validate()
 	if err != nil {
 		return err
 	}
@@ -72,13 +72,13 @@ func (c config) PathRegex() string {
 }
 
 func newDropboxStore(ctx context.Context, cfg config) (*dropboxStore, error) {
-	oauthClient := cfg.Credentials.getOauthClient(ctx)
-	config := dropbox.Config{
+	var oauthClient = cfg.Credentials.getOauthClient(ctx)
+	var config = dropbox.Config{
 		Client: oauthClient,
 	}
-	client := files.New(config)
+	var client = files.New(config)
 
-	store := dropboxStore{
+	var store = dropboxStore{
 		client: client,
 		config: cfg,
 	}
@@ -99,7 +99,7 @@ type dropboxStore struct {
 // It returns an error if the path does not exist or if there was an error
 // while checking the path.
 func (dbStore *dropboxStore) check() error {
-	_, err := dbStore.client.ListFolder(&files.ListFolderArg{Path: dbStore.config.Path, Limit: 1})
+	var _, err = dbStore.client.ListFolder(&files.ListFolderArg{Path: dbStore.config.Path, Limit: 1})
 	if err != nil {
 		return err
 	}
@@ -113,17 +113,17 @@ func (dbStore *dropboxStore) List(ctx context.Context, query filesource.Query) (
 	// all entries, convert them to `filesource.ObjectInfo`s, and sort them based on their path.
 
 	// Get the first page of entries at the specified path from Dropbox.
-	arg := &files.ListFolderArg{Path: query.Prefix, Recursive: query.Recursive}
-	f, err := dbStore.client.ListFolder(arg)
+	var arg = &files.ListFolderArg{Path: query.Prefix, Recursive: query.Recursive}
+	var f, err = dbStore.client.ListFolder(arg)
 	if err != nil {
 		return nil, fmt.Errorf("retrieving folder: %w", err)
 	}
 
-	entries := f.Entries
+	var entries = f.Entries
 
 	// Get the remaining pages of entries.
 	for f.HasMore {
-		arg := files.NewListFolderContinueArg(f.Cursor)
+		var arg = files.NewListFolderContinueArg(f.Cursor)
 		f, err = dbStore.client.ListFolderContinue(arg)
 		if err != nil {
 			return nil, fmt.Errorf("retrieving additional files: %w", err)
@@ -181,7 +181,7 @@ func (dbStore *dropboxStore) List(ctx context.Context, query filesource.Query) (
 }
 
 func (dbStore *dropboxStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	file, reader, err := dbStore.client.Download(&files.DownloadArg{Path: obj.Path})
+	var file, reader, err = dbStore.client.Download(&files.DownloadArg{Path: obj.Path})
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
@@ -206,7 +206,7 @@ func (l *dropboxListing) Next() (filesource.ObjectInfo, error) {
 		return filesource.ObjectInfo{}, io.EOF
 	}
 
-	obj := l.objects[l.index]
+	var obj = l.objects[l.index]
 	l.index++
 	return obj, nil
 }

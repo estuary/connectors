@@ -16,9 +16,9 @@ import (
 var scopes = []string{"files.metadata.read", "files.content.read"}
 
 func oauth2Spec() *pf.OAuth2 {
-	AUTH_URL_TEMPLATE_FORMAT_STR := "https://www.dropbox.com/oauth2/authorize?token_access_type=offline&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&response_type=code&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{{ state }}}&scope={{#urlencode}}%s{{/urlencode}}"
+	var AUTH_URL_TEMPLATE_FORMAT_STR = "https://www.dropbox.com/oauth2/authorize?token_access_type=offline&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&response_type=code&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{{ state }}}&scope={{#urlencode}}%s{{/urlencode}}"
 
-	spec := pf.OAuth2{
+	var spec = pf.OAuth2{
 		Provider:                  "dropbox",
 		AuthUrlTemplate:           fmt.Sprintf(AUTH_URL_TEMPLATE_FORMAT_STR, strings.Join(scopes, " ")),
 		AccessTokenUrlTemplate:    "https://api.dropboxapi.com/oauth2/token",
@@ -39,7 +39,7 @@ type credentials struct {
 }
 
 func (c *credentials) validate() error {
-	requiredProperties := [][]string{
+	var requiredProperties = [][]string{
 		{"RefreshToken", c.RefreshToken},
 		{"ClientID", c.ClientID},
 		{"ClientSecret", c.ClientSecret},
@@ -54,14 +54,14 @@ func (c *credentials) validate() error {
 }
 
 func (c *credentials) getOauthClient(ctx context.Context) *http.Client {
-	oauthConfig := &oauth2.Config{
+	var oauthConfig = &oauth2.Config{
 		ClientID:     c.ClientID,
 		ClientSecret: c.ClientSecret,
 		Endpoint:     dropbox.OAuthEndpoint(""),
 		Scopes:       scopes,
 	}
 
-	token := &oauth2.Token{
+	var token = &oauth2.Token{
 		RefreshToken: c.RefreshToken,
 		Expiry:       time.Now(), // Require a new access token to be obtained.
 	}
