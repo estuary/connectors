@@ -211,7 +211,7 @@ func (m MappedType) Compatible(existing boilerplate.ExistingField) bool {
 }
 
 func (m MappedType) CanMigrate(existing boilerplate.ExistingField) bool {
-	res := m.MigratableTypes.FindMigrationSpec(existing, m) != nil
+	var res = m.MigratableTypes.FindMigrationSpec(existing, m) != nil
 	return res
 }
 
@@ -234,7 +234,7 @@ type DDLMapper struct {
 type FlatTypeMappings map[FlatType]MapProjectionFn
 
 func NewDDLMapper(mappings FlatTypeMappings, opts ...DDLMapperOption) DDLMapper {
-	out := DDLMapper{
+	var out = DDLMapper{
 		notNullFn:  func(ddl string) string { return ddl },
 		nullableFn: func(ddl string) string { return ddl },
 		m:          make(map[FlatType]MapProjectionFn),
@@ -320,7 +320,7 @@ func UsingConverter(converter ElementConverter) MapStaticOption {
 // arrangement of additional MapProjectionFn's, such as MapPrimaryKey or
 // MapString.
 func MapStatic(ddl string, opts ...MapStaticOption) MapProjectionFn {
-	cfg := mapStaticConfig{
+	var cfg = mapStaticConfig{
 		// A projection is always valid with a reported endpoint column type
 		// that matches it exactly.
 		compatible: []CompatibleColumnType{&CompatibleStringEqualFold{ddl}},
@@ -379,7 +379,7 @@ type StringMappings struct {
 // the column.
 func MapString(m StringMappings) MapProjectionFn {
 	return func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter) {
-		delegate := m.Fallback
+		var delegate = m.Fallback
 
 		if p.Inference.String_ != nil {
 			if h, ok := m.WithFormat[p.Inference.String_.Format]; ok {
@@ -445,16 +445,16 @@ func (fc FieldConfig) Validate() error {
 }
 
 func (d DDLMapper) MapType(p *Projection, fc FieldConfig) MappedType {
-	ft, mustExist := p.AsFlatType()
+	var ft, mustExist = p.AsFlatType()
 
-	h, ok := d.m[ft]
+	var h, ok = d.m[ft]
 	if !ok {
 		// This can only happen due to a programming error, where a Flow field
 		// schema type is not present in the dialect's set of mappings.
 		panic(fmt.Sprintf("internal error: unable to map field %s with type %s", p.Field, p.Inference.Types))
 	}
 
-	ddl, compatibleTypes, converter := h(p)
+	var ddl, compatibleTypes, converter = h(p)
 	if converter == nil {
 		converter = passThrough
 	}
@@ -462,7 +462,7 @@ func (d DDLMapper) MapType(p *Projection, fc FieldConfig) MappedType {
 	if fc.IgnoreStringFormat || fc.CastToString_ {
 		// Materialize this field as a "plain" string, and convert its values to
 		// strings if configured.
-		p := *p
+		var p = *p
 		p.Inference.String_ = &pf.Inference_String{}
 		ddl, compatibleTypes, _ = d.m[STRING](&p)
 		converter = ToStr
@@ -473,14 +473,14 @@ func (d DDLMapper) MapType(p *Projection, fc FieldConfig) MappedType {
 		ddl = StringDDL(fc.DDL)
 	}
 
-	bareDDL := ddl.DDL()
-	nullableDDL := d.nullableFn(bareDDL)
-	createDDL := nullableDDL
+	var bareDDL = ddl.DDL()
+	var nullableDDL = d.nullableFn(bareDDL)
+	var createDDL = nullableDDL
 	if mustExist {
 		createDDL = d.notNullFn(bareDDL)
 	}
 
-	out := MappedType{
+	var out = MappedType{
 		DDL:                   createDDL,
 		BareDDL:               bareDDL,
 		NullableDDL:           nullableDDL,

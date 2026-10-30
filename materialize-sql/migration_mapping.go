@@ -60,7 +60,7 @@ func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) Migratio
 	for _, ddl := range targetDDLs {
 		targets = append(targets, StringTarget(ddl))
 	}
-	out := MigrationSpec{
+	var out = MigrationSpec{
 		targets: targets,
 		CastSQL: func(m ColumnTypeMigration) string {
 			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.BareDDL)
@@ -75,7 +75,7 @@ func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) Migratio
 }
 
 func NewMigrationSpecTarget(mt MigrationTarget, opts ...MigrationSpecOption) MigrationSpec {
-	out := MigrationSpec{
+	var out = MigrationSpec{
 		targets: []MigrationTarget{mt},
 		CastSQL: func(m ColumnTypeMigration) string {
 			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.BareDDL)

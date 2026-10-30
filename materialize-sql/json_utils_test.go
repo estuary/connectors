@@ -8,7 +8,7 @@ import (
 )
 
 func TestStripNullFields(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		input    string
 		fields   []string
@@ -72,7 +72,7 @@ func TestStripNullFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := StripNullFields(json.RawMessage(tt.input), tt.fields)
+			var result, err = StripNullFields(json.RawMessage(tt.input), tt.fields)
 			require.NoError(t, err)
 			var expectedMap, resultMap map[string]json.RawMessage
 			if json.Unmarshal([]byte(tt.expected), &expectedMap) == nil && json.Unmarshal(result, &resultMap) == nil {
@@ -85,7 +85,7 @@ func TestStripNullFields(t *testing.T) {
 }
 
 func TestStripNullFieldsErrors(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name   string
 		input  string
 		fields []string
@@ -109,7 +109,7 @@ func TestStripNullFieldsErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := StripNullFields(json.RawMessage(tt.input), tt.fields)
+			var _, err = StripNullFields(json.RawMessage(tt.input), tt.fields)
 			require.Error(t, err)
 		})
 	}

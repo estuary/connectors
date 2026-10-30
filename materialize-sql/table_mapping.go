@@ -172,7 +172,7 @@ func TruncateAfterBackfill(featureFlags map[string]bool) bool {
 // Columns returns all columns of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) Columns() []*Column {
-	out := t.KeyPtrs()
+	var out = t.KeyPtrs()
 	for i := range t.Values {
 		out = append(out, &t.Values[i])
 	}
@@ -204,8 +204,8 @@ func (t *Table) KeyPtrs() []*Column {
 
 // KeyNames returns all key names of the Table as a single slice.
 func (t *Table) KeyNames() []string {
-	keys := t.KeyPtrs()
-	out := make([]string, 0, len(keys))
+	var keys = t.KeyPtrs()
+	var out = make([]string, 0, len(keys))
 	for _, c := range keys {
 		out = append(out, c.Field)
 	}
@@ -215,8 +215,8 @@ func (t *Table) KeyNames() []string {
 // ColumnNames returns all column names of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) ColumnNames() []string {
-	cols := t.Columns()
-	out := make([]string, 0, len(cols))
+	var cols = t.Columns()
+	var out = make([]string, 0, len(cols))
 	for _, c := range cols {
 		out = append(out, c.Field)
 	}
@@ -250,7 +250,7 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 			}
 		}
 
-		resolved := resolveColumn(index, &col.Projection, fc, dialect)
+		var resolved = resolveColumn(index, &col.Projection, fc, dialect)
 		*col = resolved
 	}
 
@@ -258,8 +258,8 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 }
 
 func resolveColumn(index int, projection *Projection, fc FieldConfig, dialect Dialect) Column {
-	mappedType := dialect.MapType(projection, fc)
-	_, mustExist := projection.AsFlatType()
+	var mappedType = dialect.MapType(projection, fc)
+	var _, mustExist = projection.AsFlatType()
 
 	return Column{
 		Projection:  *projection,

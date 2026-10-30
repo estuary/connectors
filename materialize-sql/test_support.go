@@ -88,21 +88,21 @@ func DrainSeedInsertQuery[EC boilerplate.EndpointConfiger, RC boilerplate.Resour
 	jsonLiteral string,
 ) string {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	flags, err := boilerplate.ResolveFlags(cfg, appliedSpec)
+	var flags, err = boilerplate.ResolveFlags(cfg, appliedSpec)
 	require.NoError(t, err)
 
 	m, err := driver.NewMaterializer(ctx, "apply-drain-seed", cfg, flags)
 	require.NoError(t, err)
 	defer m.Close(ctx)
-	s, ok := m.(*sqlMaterialization[EC, RC])
+	var s, ok = m.(*sqlMaterialization[EC, RC])
 	require.True(t, ok)
-	dialect := s.endpoint.Dialect
+	var dialect = s.endpoint.Dialect
 
 	// Literals for the fields of the testutil drain fixture specs
 	// (validate_apply_test_cases base.flow.proto).
-	literals := map[string]string{
+	var literals = map[string]string{
 		"key":                  "'k1'",
 		"flow_published_at":    "CURRENT_TIMESTAMP",
 		"_meta/flow_truncated": "false",
@@ -118,15 +118,15 @@ func DrainSeedInsertQuery[EC boilerplate.EndpointConfiger, RC boilerplate.Resour
 		"flow_document":        jsonLiteral,
 	}
 
-	b := appliedSpec.Bindings[0]
-	fields := append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
+	var b = appliedSpec.Bindings[0]
+	var fields = append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
 	if b.FieldSelection.Document != "" {
 		fields = append(fields, b.FieldSelection.Document)
 	}
 
 	var cols, vals []string
 	for _, f := range fields {
-		lit, ok := literals[f]
+		var lit, ok = literals[f]
 		require.True(t, ok, "no seed literal for selected field %q", f)
 		cols = append(cols, dialect.Identifier(dialect.ColumnLocator(f)))
 		vals = append(vals, lit)
@@ -192,14 +192,14 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 	// which is the key range under test.
 	var runTest = func(t *testing.T, taskName string, cfg EC, ranges ...uint32) {
 		var ctx = context.Background()
-		tsSuffix := fmt.Sprintf("_flow_test_%d", time.Now().Unix())
-		rngSuffix := "_" + uuid.NewString()[:8] + tsSuffix
+		var tsSuffix = fmt.Sprintf("_flow_test_%d", time.Now().Unix())
+		var rngSuffix = "_" + uuid.NewString()[:8] + tsSuffix
 
-		checkpointsTable := "temp_test_fencing_checkpoints" + rngSuffix
+		var checkpointsTable = "temp_test_fencing_checkpoints" + rngSuffix
 
 		// The fencing harness has no runtime spec to take a creation date from,
 		// so date-gated flags resolve as they do for a brand-new task.
-		parsedFlags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		var parsedFlags, err = boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
 		require.NoError(t, err)
 
 		ep, err := driver.NewEndpoint(ctx, cfg, parsedFlags)
@@ -208,8 +208,8 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		m, err := driver.NewMaterializer(ctx, taskName, cfg, parsedFlags)
 		require.NoError(t, err)
 
-		dialect := ep.Dialect
-		checkpointsRes := makeResourceFn(checkpointsTable, false).WithDefaults(cfg)
+		var dialect = ep.Dialect
+		var checkpointsRes = makeResourceFn(checkpointsTable, false).WithDefaults(cfg)
 		checkpointsPath, _, err := checkpointsRes.Parameters()
 		require.NoError(t, err)
 
@@ -280,7 +280,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		dump3, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
-		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
+		var snapshotter = cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
 
 		snapshotter.SnapshotT(t,
 			"After installing fixtures:\n"+dump1+
@@ -361,14 +361,14 @@ func RunSqlGenTests(
 	newPath func(table string) []string,
 	templates TestTemplates,
 ) (*strings.Builder, []Table) {
-	specBytes, err := testFS.ReadFile("testdata/generated_specs/flow.proto")
+	var specBytes, err = testFS.ReadFile("testdata/generated_specs/flow.proto")
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
 
-	tables := []Table{}
+	var tables = []Table{}
 	for idx, delta := range []bool{false, true} {
-		shape := BuildTableShape(
+		var shape = BuildTableShape(
 			spec.Name.String(),
 			spec.Bindings[idx],
 			idx,
@@ -380,7 +380,7 @@ func RunSqlGenTests(
 			shape.Document = nil
 		}
 
-		table, err := ResolveTable(shape, dialect)
+		var table, err = ResolveTable(shape, dialect)
 		require.NoError(t, err)
 		tables = append(tables, table)
 	}
@@ -396,11 +396,11 @@ func RunSqlGenTests(
 		}
 	}
 
-	addCols := []Column{
+	var addCols = []Column{
 		{Identifier: "first_new_column", MappedType: MappedType{BareDDL: "STRING", NullableDDL: "STRING"}},
 		{Identifier: "second_new_column", MappedType: MappedType{BareDDL: "BOOL", NullableDDL: "BOOL"}},
 	}
-	dropNotNulls := []boilerplate.ExistingField{
+	var dropNotNulls = []boilerplate.ExistingField{
 		{
 			Name:               "first_required_column",
 			Nullable:           true,
@@ -476,7 +476,7 @@ func RunSqlGenTests(
 }
 
 func ListCheckpointsEntries(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, fmt.Sprintf("select materialization from %s;", tableIdentifier))
+	var rows, err = db.QueryContext(ctx, fmt.Sprintf("select materialization from %s;", tableIdentifier))
 	if err != nil {
 		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
 	}
@@ -498,7 +498,7 @@ func ListCheckpointsEntries(ctx context.Context, db *stdsql.DB, tableIdentifier 
 }
 
 func DeleteCheckpointsEntry(ctx context.Context, db *stdsql.DB, tableIdentifier, taskName string) error {
-	_, err := db.ExecContext(ctx, fmt.Sprintf(
+	var _, err = db.ExecContext(ctx, fmt.Sprintf(
 		"delete from %s where materialization='%s';",
 		tableIdentifier,
 		taskName,
@@ -516,7 +516,7 @@ func SnapshotTestTable(ctx context.Context, db *stdsql.DB, tableIdentifier strin
 // needs to apply dialect-specific casts (e.g. decoding VARBYTE values) in the
 // query itself. tableIdentifier is used for error messages only.
 func SnapshotTestTableQuery(ctx context.Context, db *stdsql.DB, tableIdentifier, query string) ([]string, [][]any, error) {
-	rows, err := db.QueryContext(ctx, query)
+	var rows, err = db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to query table %s: %w", tableIdentifier, err)
 	}
@@ -554,7 +554,7 @@ func SnapshotTestTableQuery(ctx context.Context, db *stdsql.DB, tableIdentifier,
 					// If the database has a specific UUID column type, format
 					// it as a string. Currently this only applies to
 					// MotherDuck.
-					u, err := uuid.FromBytes(b)
+					var u, err = uuid.FromBytes(b)
 					if err != nil {
 						return nil, nil, fmt.Errorf("parsing UUID from bytes in column %q: %w", cols[i], err)
 					}
@@ -584,7 +584,7 @@ func SortRows(rows [][]any) {
 	slices.SortFunc(rows, func(a, b []any) int {
 		// Compare each column in order
 		for col := 0; col < len(a) && col < len(b); col++ {
-			cmp := compareValues(a[col], b[col])
+			var cmp = compareValues(a[col], b[col])
 			if cmp == 0 {
 				continue
 			}
@@ -605,7 +605,7 @@ func compareValues(a, b any) int {
 		return 1
 	}
 
-	normalizeValue := func(v any) any {
+	var normalizeValue = func(v any) any {
 		switch val := v.(type) {
 		case int:
 			return int64(val)
@@ -626,8 +626,8 @@ func compareValues(a, b any) int {
 		}
 	}
 
-	aVal := normalizeValue(a)
-	bVal := normalizeValue(b)
+	var aVal = normalizeValue(a)
+	var bVal = normalizeValue(b)
 
 	switch av := aVal.(type) {
 	case int64:
@@ -643,7 +643,7 @@ func compareValues(a, b any) int {
 	// A json.RawMessage is compared by its byte slice formatting, which is how
 	// fmt printed it before Go 1.27 made it a fmt.Stringer. This keeps the row
 	// order of existing snapshots.
-	fmtValue := func(v any) string {
+	var fmtValue = func(v any) string {
 		if raw, ok := v.(json.RawMessage); ok {
 			return fmt.Sprintf("%v", []byte(raw))
 		}

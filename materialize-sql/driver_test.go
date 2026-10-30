@@ -102,7 +102,7 @@ func TestCreateResourceCarriesStateKey(t *testing.T) {
 		Config: stateKeyTestResource{},
 	}
 
-	_, apply, err := s.CreateResource(context.Background(), binding)
+	var _, apply, err = s.CreateResource(context.Background(), binding)
 	require.NoError(t, err)
 	require.NoError(t, apply(context.Background()))
 

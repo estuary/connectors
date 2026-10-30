@@ -76,7 +76,7 @@ func ToJsonBytes(te tuple.TupleElement) (any, error) {
 		return nil, nil
 	default:
 		// Everything else is serialized to its JSON representation.
-		bytes, err := json.Marshal(te)
+		var bytes, err = json.Marshal(te)
 		if err != nil {
 			return nil, fmt.Errorf("could not serialize %q as json bytes: %w", te, err)
 		}
@@ -92,7 +92,7 @@ func ToJsonString(te tuple.TupleElement) (any, error) {
 		return nil, nil
 	}
 
-	bytes, err := ToJsonBytes(te)
+	var bytes, err = ToJsonBytes(te)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ var StrToInt ElementConverter = StringCastConverter(func(str string) (interface{
 	}
 
 	var i big.Int
-	out, ok := i.SetString(str, 10)
+	var out, ok = i.SetString(str, 10)
 	if !ok {
 		return nil, fmt.Errorf("could not convert %q to big.Int", str)
 	}
@@ -152,7 +152,7 @@ func StrToFloat(nan, posInfinity, negInfinity interface{}) ElementConverter {
 		case "-Infinity":
 			return negInfinity, nil
 		default:
-			out, err := strconv.ParseFloat(str, 64)
+			var out, err = strconv.ParseFloat(str, 64)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert %q to float64: %w", str, err)
 			}
@@ -206,7 +206,7 @@ var NormalizeDatetimeString ElementConverter = StringCastConverter(func(str stri
 // ClampDatetime provides handling for endpoints that do not accept "0000" as a year by replacing
 // these datetimes with minimumTimestamp.
 var ClampDatetime ElementConverter = StringCastConverter(func(str string) (interface{}, error) {
-	parsed, canonical, err := ParseRFC3339Nano(str)
+	var parsed, canonical, err = ParseRFC3339Nano(str)
 	if err != nil {
 		return nil, err
 	} else if parsed.Year() == 0 {
@@ -252,7 +252,7 @@ var Base64Decoder ElementConverter = func(te tuple.TupleElement) (any, error) {
 // emitting hex from the connector, the loader can decode binary directly into
 // the native column without an intermediate staging step.
 var Base64ToHex ElementConverter = func(te tuple.TupleElement) (any, error) {
-	raw, err := Base64Decoder(te)
+	var raw, err = Base64Decoder(te)
 	if err != nil {
 		return nil, fmt.Errorf("Base64ToHex: %w", err)
 	}

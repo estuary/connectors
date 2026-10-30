@@ -197,7 +197,7 @@ func StdDumpTable(ctx context.Context, db *sql.DB, table Table) (string, error) 
 		table.Identifier,
 		strings.Join(keys, ","))
 
-	rows, err := db.Query(sql)
+	var rows, err = db.Query(sql)
 	if err != nil {
 		return "", err
 	}
@@ -267,7 +267,7 @@ func (col anyColumn) String() string {
 // implementations which use Go's standard `sql.DB` type and systems with an information_schema
 // schema.
 func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string, name string) (string, error) {
-	q := fmt.Sprintf(`
+	var q = fmt.Sprintf(`
 	select column_name, is_nullable, data_type, character_maximum_length
 	from information_schema.columns
 	where
@@ -280,7 +280,7 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 		name,
 	)
 
-	rows, err := db.QueryContext(ctx, q)
+	var rows, err = db.QueryContext(ctx, q)
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +293,7 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 		CharacterMaxLength *int `json:",omitempty"`
 	}
 
-	cols := []foundColumn{}
+	var cols = []foundColumn{}
 	for rows.Next() {
 		var c foundColumn
 		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type, &c.CharacterMaxLength); err != nil {
@@ -310,7 +310,7 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 	})
 
 	var out strings.Builder
-	enc := json.NewEncoder(&out)
+	var enc = json.NewEncoder(&out)
 	for _, c := range cols {
 		if err := enc.Encode(c); err != nil {
 			return "", err
@@ -338,9 +338,9 @@ func StdPopulateInfoSchema(
 	}
 
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
-	schemas := make([]string, 0, len(resourcePaths))
+	var schemas = make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := dialect.TableLocator(p)
+		var loc = dialect.TableLocator(p)
 		schemas = append(schemas, dialect.Literal(loc.TableSchema))
 	}
 
@@ -349,7 +349,7 @@ func StdPopulateInfoSchema(
 
 	// Populate the list of applicable tables first, since it is possible for a table to exist with
 	// no columns that we'd otherwise not know about when only looking for columns.
-	tables, err := db.QueryContext(ctx, fmt.Sprintf(`
+	var tables, err = db.QueryContext(ctx, fmt.Sprintf(`
 		select table_schema, table_name
 		from information_schema.tables
 		where table_catalog = %s
@@ -427,13 +427,13 @@ type ListSchemasFn func(context.Context) ([]string, error)
 type CreateSchemaFn func(context.Context, string) error
 
 func StdListSchemas(ctx context.Context, db *sql.DB) ([]string, error) {
-	rows, err := db.QueryContext(ctx, "select schema_name from information_schema.schemata")
+	var rows, err = db.QueryContext(ctx, "select schema_name from information_schema.schemata")
 	if err != nil {
 		return nil, fmt.Errorf("querying information_schema.schemata: %w", err)
 	}
 	defer rows.Close()
 
-	out := []string{}
+	var out = []string{}
 
 	for rows.Next() {
 		var schema string
@@ -450,7 +450,7 @@ func StdListSchemas(ctx context.Context, db *sql.DB) ([]string, error) {
 }
 
 func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaName string) (string, error) {
-	stmt := fmt.Sprintf("CREATE SCHEMA %s;", dialect.Identifier(schemaName))
+	var stmt = fmt.Sprintf("CREATE SCHEMA %s;", dialect.Identifier(schemaName))
 	if _, err := db.ExecContext(ctx, stmt); err != nil {
 		return "", err
 	}
@@ -613,7 +613,7 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 	var renderedSteps []string
 	for step, instructions := range stepInstructions {
 		for i, s := range steps[step:] {
-			newStep, err := s(dialect, table, instructions)
+			var newStep, err = s(dialect, table, instructions)
 			if err != nil {
 				return nil, fmt.Errorf("rendering step %d: %w", i, err)
 			}
@@ -627,7 +627,7 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 
 func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {
 	return func(in []string) []string {
-		loc := fn(in)
+		var loc = fn(in)
 		return []string{
 			loc.TableSchema,
 			loc.TableName,

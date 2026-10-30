@@ -17,7 +17,7 @@ func StripNullFields(doc json.RawMessage, fields []string) (json.RawMessage, err
 	if err := json.Unmarshal(doc, &m); err != nil {
 		return nil, fmt.Errorf("unmarshalling document for null field stripping: %w", err)
 	}
-	stripped := false
+	var stripped = false
 	for _, f := range fields {
 		if v, ok := m[f]; ok && string(v) == "null" {
 			delete(m, f)
@@ -27,7 +27,7 @@ func StripNullFields(doc json.RawMessage, fields []string) (json.RawMessage, err
 	if !stripped {
 		return doc, nil
 	}
-	result, err := json.Marshal(m)
+	var result, err = json.Marshal(m)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling document after null field stripping: %w", err)
 	}

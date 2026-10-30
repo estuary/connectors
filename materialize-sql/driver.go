@@ -42,7 +42,7 @@ var _ boilerplate.Connector = &Driver[boilerplate.EndpointConfiger, Resource]{}
 // documentation URL. It uses that instead of the default documentation URL from the connector if
 // found.
 func docsUrlFromEnv(providedURL string) string {
-	fromEnv := os.Getenv("DOCS_URL")
+	var fromEnv = os.Getenv("DOCS_URL")
 	if fromEnv != "" {
 		return fromEnv
 	}
@@ -100,7 +100,7 @@ func (d *Driver[EC, RC]) NewMaterializer(ctx context.Context, materializationNam
 		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	}
 
-	endpoint, err := d.NewEndpoint(ctx, cfg, featureFlags)
+	var endpoint, err = d.NewEndpoint(ctx, cfg, featureFlags)
 	if err != nil {
 		return nil, fmt.Errorf("creating endpoint: %w", err)
 	}
@@ -131,7 +131,7 @@ func (s *sqlMaterialization[EC, RC]) CheckPrerequisites(ctx context.Context) *ce
 }
 
 func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
-	_, doCreateSchemas := s.client.(SchemaManager)
+	var _, doCreateSchemas = s.client.(SchemaManager)
 
 	return boilerplate.MaterializeCfg{
 		Locate:                   ToLocatePathFn(s.endpoint.Dialect.TableLocator),
@@ -149,7 +149,7 @@ func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
 }
 
 func (s *sqlMaterialization[EC, RC]) CreateNamespace(ctx context.Context, ns string) (string, error) {
-	desc, err := s.client.(SchemaManager).CreateSchema(ctx, ns)
+	var desc, err = s.client.(SchemaManager).CreateSchema(ctx, ns)
 	if err != nil {
 		return "", fmt.Errorf("creating schema: %w", err)
 	}
@@ -158,7 +158,7 @@ func (s *sqlMaterialization[EC, RC]) CreateNamespace(ctx context.Context, ns str
 }
 
 func (s *sqlMaterialization[EC, RC]) CreateResource(ctx context.Context, binding boilerplate.MappedBinding[EC, RC, MappedType]) (string, boilerplate.ActionApplyFn, error) {
-	table, err := getTable(s.endpoint, s.materializationName, binding)
+	var table, err = getTable(s.endpoint, s.materializationName, binding)
 	if err != nil {
 		return "", nil, err
 	}
@@ -204,16 +204,16 @@ func (s *sqlMaterialization[EC, RC]) MustRecreateResource(req *pm.Request_Apply,
 }
 
 func (s *sqlMaterialization[EC, RC]) MapType(p boilerplate.Projection, fc FieldConfig) (MappedType, boilerplate.ElementConverter) {
-	pp := buildProjection(&p.Projection)
+	var pp = buildProjection(&p.Projection)
 
-	m := s.endpoint.Dialect.MapType(&pp, fc)
+	var m = s.endpoint.Dialect.MapType(&pp, fc)
 	m.MigratableTypes = s.endpoint.Dialect.MigratableTypes
 
 	return m, boilerplate.ElementConverter(m.Converter)
 }
 
 func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates bool, fc FieldConfig) pm.Response_Validated_Constraint {
-	_, isNumeric := m.AsFormattedNumeric(&p)
+	var _, isNumeric = m.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
@@ -267,7 +267,7 @@ func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, is 
 	}
 
 	if schemaLister, ok := s.client.(SchemaManager); ok {
-		schemas, err := schemaLister.ListSchemas(ctx)
+		var schemas, err = schemaLister.ListSchemas(ctx)
 		if err != nil {
 			return fmt.Errorf("listing schemas: %w", err)
 		}
@@ -305,7 +305,7 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 	existingResource boilerplate.ExistingResource,
 	bindingUpdate boilerplate.BindingUpdate[EC, RC, MappedType],
 ) (string, boilerplate.ActionApplyFn, error) {
-	table, err := getTable(s.endpoint, s.materializationName, bindingUpdate.Binding)
+	var table, err = getTable(s.endpoint, s.materializationName, bindingUpdate.Binding)
 	if err != nil {
 		return "", nil, err
 	}
@@ -316,7 +316,7 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 		}
 	}
 
-	getColumn := func(field string) (Column, error) {
+	var getColumn = func(field string) (Column, error) {
 		for _, c := range table.Columns() {
 			if field == c.Field {
 				return *c, nil
@@ -325,13 +325,13 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 		return Column{}, fmt.Errorf("could not find column for field %q in table %s", field, table.Identifier)
 	}
 
-	alter := TableAlter{
+	var alter = TableAlter{
 		Table:        table,
 		DropNotNulls: bindingUpdate.NewlyNullableFields,
 	}
 
 	for _, newProjection := range bindingUpdate.NewProjections {
-		col, err := getColumn(newProjection.Field)
+		var col, err = getColumn(newProjection.Field)
 		if err != nil {
 			return "", nil, err
 		}
@@ -352,12 +352,12 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 	}
 
 	for _, migrate := range bindingUpdate.FieldsToMigrate {
-		col, err := getColumn(migrate.To.Field)
+		var col, err = getColumn(migrate.To.Field)
 		if err != nil {
 			return "", nil, err
 		}
 
-		migrationSpec := s.endpoint.Dialect.MigratableTypes.FindMigrationSpec(migrate.From, migrate.To.Mapped)
+		var migrationSpec = s.endpoint.Dialect.MigratableTypes.FindMigrationSpec(migrate.From, migrate.To.Mapped)
 		var m = ColumnTypeMigration{
 			Column:               col,
 			MigrationSpec:        *migrationSpec,
@@ -382,9 +382,9 @@ func (s *sqlMaterialization[EC, RC]) NewTransactor(
 	bindings []boilerplate.MappedBinding[EC, RC, MappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	tables := make([]Table, 0, len(bindings))
+	var tables = make([]Table, 0, len(bindings))
 	for _, binding := range bindings {
-		table, err := getTable(s.endpoint, s.materializationName, binding)
+		var table, err = getTable(s.endpoint, s.materializationName, binding)
 		if err != nil {
 			return nil, fmt.Errorf("getting table for binding %d: %w", binding.Index, err)
 		}
@@ -449,11 +449,11 @@ func (s *sqlMaterialization[EC, RC]) Close(ctx context.Context) {
 }
 
 func getTable[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](endpoint *Endpoint[EC], materializationName string, binding boilerplate.MappedBinding[EC, RC, MappedType]) (Table, error) {
-	path, delta, err := binding.Config.Parameters()
+	var path, delta, err = binding.Config.Parameters()
 	if err != nil {
 		return Table{}, fmt.Errorf("getting parameters for binding %d: %w", binding.Index, err)
 	}
-	tableShape := BuildTableShape(materializationName, &binding.MaterializationSpec_Binding, binding.Index, path, delta)
+	var tableShape = BuildTableShape(materializationName, &binding.MaterializationSpec_Binding, binding.Index, path, delta)
 	table, err := ResolveTable(tableShape, endpoint.Dialect)
 	if err != nil {
 		return Table{}, err

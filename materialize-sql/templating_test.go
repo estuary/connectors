@@ -15,7 +15,7 @@ import (
 )
 
 func newTestDialect() Dialect {
-	mapper := NewDDLMapper(
+	var mapper = NewDDLMapper(
 		FlatTypeMappings{
 			ARRAY:          MapStatic("JSON"),
 			BINARY:         MapStatic("BYTEA"),
@@ -92,15 +92,15 @@ func TestTableTemplate(t *testing.T) {
 }
 
 func TestMergeBoundsBuilder(t *testing.T) {
-	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+	var literaler = ToLiteralFn(QuoteTransform("'", "''"))
 
-	colA := Column{Identifier: "colA"}
-	colB := Column{Identifier: "colB", Projection: Projection{Projection: pf.Projection{
+	var colA = Column{Identifier: "colA"}
+	var colB = Column{Identifier: "colB", Projection: Projection{Projection: pf.Projection{
 		Inference: pf.Inference{
 			Types: []string{"boolean"},
 		},
 	}}}
-	colC := Column{Identifier: "colC"}
+	var colC = Column{Identifier: "colC"}
 
 	for _, tt := range []struct {
 		name       string
@@ -150,7 +150,7 @@ func TestMergeBoundsBuilder(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewMergeBoundsBuilder(tt.keyColumns, literaler)
+			var b = NewMergeBoundsBuilder(tt.keyColumns, literaler)
 			for _, store := range tt.keys {
 				b.NextKey(store)
 			}
@@ -161,7 +161,7 @@ func TestMergeBoundsBuilder(t *testing.T) {
 
 func TestRootLevelColumns(t *testing.T) {
 	// Create test columns with different pointer paths
-	columns := []Column{
+	var columns = []Column{
 		{Projection: Projection{Projection: pf.Projection{Field: "root_field", Ptr: "/root_field"}}},
 		{Projection: Projection{Projection: pf.Projection{Field: "nested_field", Ptr: "/nested/field"}}},
 		{Projection: Projection{Projection: pf.Projection{Field: "another_root", Ptr: "/another_root"}}},
@@ -170,17 +170,17 @@ func TestRootLevelColumns(t *testing.T) {
 	}
 
 	// Create a table with these columns
-	table := Table{
+	var table = Table{
 		Keys:   []Column{columns[0]}, // root_field as key
 		Values: columns[1:],          // rest as values
 	}
 
 	// Call RootLevelColumns method
-	rootLevelCols := table.RootLevelColumns()
+	var rootLevelCols = table.RootLevelColumns()
 
 	// Verify only root-level columns are returned
-	expectedFields := []string{"root_field", "another_root", "root_array"}
-	actualFields := make([]string, len(rootLevelCols))
+	var expectedFields = []string{"root_field", "another_root", "root_array"}
+	var actualFields = make([]string, len(rootLevelCols))
 	for i, col := range rootLevelCols {
 		actualFields[i] = col.Field
 	}
@@ -195,23 +195,23 @@ func TestRootLevelColumns(t *testing.T) {
 }
 
 func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
-	literaler := ToLiteralFn(QuoteTransform("'", "''"))
-	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
+	var literaler = ToLiteralFn(QuoteTransform("'", "''"))
+	var datetime = Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
 		Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}},
 	}}}
-	id := Column{Identifier: "id"}
-	exact := []MergeBoundsOption{WithExactDatetimeBounds(func(Column) bool { return true })}
-	declined := []MergeBoundsOption{WithExactDatetimeBounds(func(Column) bool { return false })}
+	var id = Column{Identifier: "id"}
+	var exact = []MergeBoundsOption{WithExactDatetimeBounds(func(Column) bool { return true })}
+	var declined = []MergeBoundsOption{WithExactDatetimeBounds(func(Column) bool { return false })}
 
 	// Valid RFC3339 forms of three instants, in neither text nor time order.
-	keys := [][]any{
+	var keys = [][]any{
 		{"2025-05-05T02:00:00+02:00", "k"}, // 00:00:00Z
 		{"2025-05-05T00:00:01.5Z", "k"},    // the latest
 		{"2025-05-04T23:59:59.999999999Z", "k"},
 		{"2025-05-05T00:00:00.000Z", "k"},  // 00:00:00Z again, different precision
 		{"2025-05-04T22:59:59-01:00", "k"}, // 23:59:59Z, the earliest
 	}
-	withKey := func(k ...any) [][]any { return append(append([][]any{}, keys...), k) }
+	var withKey = func(k ...any) [][]any { return append(append([][]any{}, keys...), k) }
 
 	for _, tt := range []struct {
 		name string
@@ -236,11 +236,11 @@ func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 			MergeBound{datetime, literaler("0001-01-01T00:00:00Z"), literaler("2025-05-05T00:00:01.5Z"), nil}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewMergeBoundsBuilder([]Column{datetime, id}, literaler, tt.opts...)
+			var b = NewMergeBoundsBuilder([]Column{datetime, id}, literaler, tt.opts...)
 			for _, k := range tt.keys {
 				b.NextKey(k)
 			}
-			got := b.Build()
+			var got = b.Build()
 			require.Equal(t, tt.want, got[0])
 			require.Equal(t, MergeBound{id, literaler("k"), literaler("k"), nil}, got[1], "other keys are unaffected")
 
@@ -252,25 +252,25 @@ func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 }
 
 func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
-	literaler := ToLiteralFn(QuoteTransform("'", "''"))
-	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
+	var literaler = ToLiteralFn(QuoteTransform("'", "''"))
+	var datetime = Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
 		Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}},
 	}}}
-	exact := WithExactDatetimeBounds(func(Column) bool { return true })
-	declined := WithExactDatetimeBounds(func(Column) bool { return false })
+	var exact = WithExactDatetimeBounds(func(Column) bool { return true })
+	var declined = WithExactDatetimeBounds(func(Column) bool { return false })
 
 	// A band of recent keys, and two outliers months before it.
-	band := func() []string {
+	var band = func() []string {
 		var out []string
 		for i := 0; i < 500; i++ {
 			out = append(out, time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC).Add(time.Duration(i)*time.Second).Format(time.RFC3339Nano))
 		}
 		return out
 	}()
-	withOutliers := append([]string{"2026-03-01T10:00:00+01:00", "2025-11-30T00:00:00Z"}, band...)
+	var withOutliers = append([]string{"2026-03-01T10:00:00+01:00", "2025-11-30T00:00:00Z"}, band...)
 
-	build := func(keys []string, opts ...MergeBoundsOption) MergeBound {
-		b := NewMergeBoundsBuilder([]Column{datetime}, literaler, opts...)
+	var build = func(keys []string, opts ...MergeBoundsOption) MergeBound {
+		var b = NewMergeBoundsBuilder([]Column{datetime}, literaler, opts...)
 		for _, k := range keys {
 			b.NextKey([]any{k})
 		}
@@ -278,7 +278,7 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	}
 
 	t.Run("outliers get ranges of their own", func(t *testing.T) {
-		got := build(withOutliers, exact, WithDatetimeRanges(8))
+		var got = build(withOutliers, exact, WithDatetimeRanges(8))
 		require.Equal(t, literaler("2025-11-30T00:00:00Z"), got.LiteralLower)
 		require.Equal(t, literaler(band[len(band)-1]), got.LiteralUpper)
 		require.Equal(t, []MergeRange{
@@ -293,7 +293,7 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	})
 
 	t.Run("a range limit merges the narrowest gaps", func(t *testing.T) {
-		got := build(withOutliers, exact, WithDatetimeRanges(2))
+		var got = build(withOutliers, exact, WithDatetimeRanges(2))
 		require.Equal(t, []MergeRange{
 			{literaler("2025-11-30T00:00:00Z"), literaler("2026-03-01T10:00:00+01:00")},
 			{literaler(band[0]), literaler(band[len(band)-1])},
@@ -311,7 +311,7 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	})
 
 	t.Run("the next transaction starts clean", func(t *testing.T) {
-		b := NewMergeBoundsBuilder([]Column{datetime}, literaler, exact, WithDatetimeRanges(8))
+		var b = NewMergeBoundsBuilder([]Column{datetime}, literaler, exact, WithDatetimeRanges(8))
 		for _, k := range withOutliers {
 			b.NextKey([]any{k})
 		}
@@ -321,24 +321,24 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	})
 
 	t.Run("ranges enclose every key", func(t *testing.T) {
-		rng := rand.New(rand.NewSource(1))
+		var rng = rand.New(rand.NewSource(1))
 		for i := 0; i < 200; i++ {
 			var keys []string
 			var instants []time.Time
 			for clusters := rng.Intn(100) + 1; clusters > 0; clusters-- {
-				center := time.Unix(rng.Int63n(2e9), 0)
+				var center = time.Unix(rng.Int63n(2e9), 0)
 				for n := rng.Intn(20) + 1; n > 0; n-- {
-					ts := center.Add(time.Duration(rng.Int63n(int64(time.Hour))))
+					var ts = center.Add(time.Duration(rng.Int63n(int64(time.Hour))))
 					keys = append(keys, ts.In(time.FixedZone("", (rng.Intn(48)-24)*1800)).Format(time.RFC3339Nano))
 					instants = append(instants, ts)
 				}
 			}
 			rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i]; instants[i], instants[j] = instants[j], instants[i] })
 
-			got := build(keys, exact, WithDatetimeRanges(4))
+			var got = build(keys, exact, WithDatetimeRanges(4))
 			require.LessOrEqual(t, len(got.Ranges), 4)
 			var parse = func(literal string) time.Time {
-				ts, err := time.Parse(time.RFC3339Nano, strings.Trim(literal, "'"))
+				var ts, err = time.Parse(time.RFC3339Nano, strings.Trim(literal, "'"))
 				require.NoError(t, err)
 				return ts
 			}
@@ -358,15 +358,15 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 // relies on: any RFC3339 spelling of an instant within a transaction's range
 // sorts, as text, between the widened bounds.
 func TestDateBoundsEncloseEverySpelling(t *testing.T) {
-	rng := rand.New(rand.NewSource(1))
-	spell := func(ts time.Time) string {
-		offset := (rng.Intn(2*24*60) - 24*60 + 1) * 60 // -23:59 .. +23:59 in seconds
+	var rng = rand.New(rand.NewSource(1))
+	var spell = func(ts time.Time) string {
+		var offset = (rng.Intn(2*24*60) - 24*60 + 1) * 60 // -23:59 .. +23:59 in seconds
 		if rng.Intn(4) == 0 {
 			offset = 0
 		}
 		ts = ts.In(time.FixedZone("", offset))
-		sep := []string{"T", "t", " "}[rng.Intn(3)]
-		s := ts.Format("2006-01-02") + sep + ts.Format("15:04:05")
+		var sep = []string{"T", "t", " "}[rng.Intn(3)]
+		var s = ts.Format("2006-01-02") + sep + ts.Format("15:04:05")
 		if digits := rng.Intn(10); digits > 0 {
 			s += "." + fmt.Sprintf("%09d", ts.Nanosecond())[:digits]
 		}
@@ -379,14 +379,14 @@ func TestDateBoundsEncloseEverySpelling(t *testing.T) {
 	}
 
 	for i := 0; i < 20000; i++ {
-		base := time.Unix(rng.Int63n(4e9)-1e9, rng.Int63n(1e9)).UTC()
-		span := time.Duration(rng.Int63n(int64(72 * time.Hour)))
-		lo, hi, ok := dateBounds(base, base.Add(span))
+		var base = time.Unix(rng.Int63n(4e9)-1e9, rng.Int63n(1e9)).UTC()
+		var span = time.Duration(rng.Int63n(int64(72 * time.Hour)))
+		var lo, hi, ok = dateBounds(base, base.Add(span))
 		require.True(t, ok)
 
 		for j := 0; j < 5; j++ {
-			inRange := base.Add(time.Duration(rng.Int63n(int64(span) + 1)))
-			s := spell(inRange)
+			var inRange = base.Add(time.Duration(rng.Int63n(int64(span) + 1)))
+			var s = spell(inRange)
 			require.GreaterOrEqual(t, s, lo, "%s spelled as %s", inRange, s)
 			require.LessOrEqual(t, s, hi, "%s spelled as %s", inRange, s)
 		}

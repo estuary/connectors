@@ -10,8 +10,8 @@ import (
 )
 
 func TestBase64Decoder(t *testing.T) {
-	raw := []byte{0x00, 0x01, 0xff, 0xfe, 0x7f}
-	encoded := base64.StdEncoding.EncodeToString(raw)
+	var raw = []byte{0x00, 0x01, 0xff, 0xfe, 0x7f}
+	var encoded = base64.StdEncoding.EncodeToString(raw)
 
 	for _, tc := range []struct {
 		name  string
@@ -22,23 +22,23 @@ func TestBase64Decoder(t *testing.T) {
 		{"json.RawMessage", json.RawMessage(`"` + encoded + `"`)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := Base64Decoder(tc.input)
+			var got, err = Base64Decoder(tc.input)
 			require.NoError(t, err)
 			require.Equal(t, raw, got)
 		})
 	}
 
 	t.Run("nil", func(t *testing.T) {
-		got, err := Base64Decoder(nil)
+		var got, err = Base64Decoder(nil)
 		require.NoError(t, err)
 		require.Nil(t, got)
 	})
 }
 
 func TestBase64ToHex(t *testing.T) {
-	raw := []byte{0x00, 0x01, 0xff, 0xfe, 0x7f}
-	encoded := base64.StdEncoding.EncodeToString(raw)
-	wantHex := "0001fffe7f"
+	var raw = []byte{0x00, 0x01, 0xff, 0xfe, 0x7f}
+	var encoded = base64.StdEncoding.EncodeToString(raw)
+	var wantHex = "0001fffe7f"
 
 	for _, tc := range []struct {
 		name  string
@@ -49,14 +49,14 @@ func TestBase64ToHex(t *testing.T) {
 		{"json.RawMessage", json.RawMessage(`"` + encoded + `"`)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := Base64ToHex(tc.input)
+			var got, err = Base64ToHex(tc.input)
 			require.NoError(t, err)
 			require.Equal(t, wantHex, got)
 		})
 	}
 
 	t.Run("nil", func(t *testing.T) {
-		got, err := Base64ToHex(nil)
+		var got, err = Base64ToHex(nil)
 		require.NoError(t, err)
 		require.Nil(t, got)
 	})
@@ -89,7 +89,7 @@ func TestStdStrToInt(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := StrToInt(tt.input)
+			var got, err = StrToInt(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got.(*big.Int).Int64())
 		})
@@ -177,7 +177,7 @@ func TestClampDatetime(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := ClampDatetime(tt.input)
+			var got, err = ClampDatetime(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -242,7 +242,7 @@ func TestParseRFC3339Nano(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			parsed, canonical, err := ParseRFC3339Nano(tt.input)
+			var parsed, canonical, err = ParseRFC3339Nano(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -293,7 +293,7 @@ func TestNormalizeDatetimeString(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := NormalizeDatetimeString(tt.input)
+			var got, err = NormalizeDatetimeString(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -332,7 +332,7 @@ func TestClampDate(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := ClampDate(tt.input)
+			var got, err = ClampDate(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -369,7 +369,7 @@ func TestToJsonString(t *testing.T) {
 			want:  "{\"hello\": \"world\"}",
 		},
 	} {
-		got, err := ToJsonString(tt.input)
+		var got, err = ToJsonString(tt.input)
 		require.NoError(t, err)
 		require.Equal(t, tt.want, got)
 	}

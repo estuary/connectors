@@ -7,7 +7,7 @@ import (
 )
 
 func TestQuoteTransform(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		input    string
 		quote    string
@@ -45,15 +45,15 @@ func TestQuoteTransform(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			transform := QuoteTransform(tt.quote, tt.escape)
-			actual := transform(tt.input)
+			var transform = QuoteTransform(tt.quote, tt.escape)
+			var actual = transform(tt.input)
 			require.Equal(t, tt.expected, actual)
 		})
 	}
 }
 
 func TestQuoteTransformEscapedBackslash(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name     string
 		input    string
 		quote    string
@@ -91,8 +91,8 @@ func TestQuoteTransformEscapedBackslash(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			transform := QuoteTransformEscapedBackslash(tt.quote, tt.escape)
-			actual := transform(tt.input)
+			var transform = QuoteTransformEscapedBackslash(tt.quote, tt.escape)
+			var actual = transform(tt.input)
 			require.Equal(t, tt.expected, actual)
 		})
 	}

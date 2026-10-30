@@ -64,7 +64,7 @@ func TestPublishedAtColumn(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var table = Table{Values: tc.values}
-			col, err := table.PublishedAtColumn()
+			var col, err = table.PublishedAtColumn()
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
 				require.Nil(t, col)

@@ -17,10 +17,10 @@ import (
 func TestMapType_NullabilityDDL(t *testing.T) {
 	const baseDDL = "TEXT"
 
-	notNullFn := func(ddl string) string { return ddl + " NOT NULL" }
-	nullableFn := func(ddl string) string { return ddl + " NULL" }
+	var notNullFn = func(ddl string) string { return ddl + " NOT NULL" }
+	var nullableFn = func(ddl string) string { return ddl + " NULL" }
 
-	mustExistProjection := Projection{
+	var mustExistProjection = Projection{
 		Projection: pf.Projection{
 			Field: "f",
 			Inference: pf.Inference{
@@ -30,7 +30,7 @@ func TestMapType_NullabilityDDL(t *testing.T) {
 			},
 		},
 	}
-	mayExistProjection := Projection{
+	var mayExistProjection = Projection{
 		Projection: pf.Projection{
 			Field: "f",
 			Inference: pf.Inference{
@@ -42,7 +42,7 @@ func TestMapType_NullabilityDDL(t *testing.T) {
 	}
 	// A projection whose types include "null" has mustExist=false even when
 	// Exists is MUST.
-	mustExistWithNullProjection := Projection{
+	var mustExistWithNullProjection = Projection{
 		Projection: pf.Projection{
 			Field: "f",
 			Inference: pf.Inference{
@@ -143,14 +143,14 @@ func TestMapType_NullabilityDDL(t *testing.T) {
 				opts = append(opts, WithNullableFn(tc.nullableFn))
 			}
 
-			mapper := NewDDLMapper(
+			var mapper = NewDDLMapper(
 				FlatTypeMappings{
 					STRING: MapStatic(baseDDL),
 				},
 				opts...,
 			)
 
-			got := mapper.MapType(&tc.projection, FieldConfig{})
+			var got = mapper.MapType(&tc.projection, FieldConfig{})
 
 			require.Equal(t, tc.wantDDL, got.DDL, "DDL")
 			require.Equal(t, tc.wantNullableDDL, got.NullableDDL, "NullableDDL")
@@ -162,7 +162,7 @@ func TestMapType_NullabilityDDL(t *testing.T) {
 }
 
 func TestAsFlatType_Binary(t *testing.T) {
-	cases := []struct {
+	var cases = []struct {
 		name            string
 		contentEncoding string
 		contentMediaType string
@@ -202,7 +202,7 @@ func TestAsFlatType_Binary(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := &Projection{Projection: pf.Projection{
+			var p = &Projection{Projection: pf.Projection{
 				Inference: pf.Inference{
 					Types: []string{"string"},
 					String_: &pf.Inference_String{
@@ -212,7 +212,7 @@ func TestAsFlatType_Binary(t *testing.T) {
 					Exists: pf.Inference_MAY,
 				},
 			}}
-			ft, _ := p.AsFlatType()
+			var ft, _ = p.AsFlatType()
 			require.Equal(t, tc.want, ft)
 		})
 	}

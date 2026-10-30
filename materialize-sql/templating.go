@@ -18,7 +18,7 @@ type ColumnWithAlias struct {
 }
 
 func (c ColumnWithAlias) AsFlatType() FlatType {
-	t, _ := c.Column.AsFlatType()
+	var t, _ = c.Column.AsFlatType()
 	return t
 }
 
@@ -29,7 +29,7 @@ func (c ColumnWithAlias) Format() string {
 // MustParseTemplate is a convenience which parses the template `body` and
 // installs common functions for accessing Dialect behavior.
 func MustParseTemplate(dialect Dialect, name, body string, extraFuncs ...template.FuncMap) *template.Template {
-	funcs := template.FuncMap{
+	var funcs = template.FuncMap{
 		"Literal":          dialect.Literal,
 		"Base64Std":        base64.StdEncoding.EncodeToString,
 		"ColumnIdentifier": dialect.Identifier,
@@ -53,7 +53,7 @@ func MustParseTemplate(dialect Dialect, name, body string, extraFuncs ...templat
 			}
 			var chunks [][]*Column
 			for i := 0; i < len(cols); i += size {
-				end := i + size
+				var end = i + size
 				if end > len(cols) {
 					end = len(cols)
 				}
@@ -209,11 +209,11 @@ func isDatetimeColumn(col Column) bool {
 }
 
 func parseDatetime(v any) (time.Time, bool) {
-	s, ok := v.(string)
+	var s, ok = v.(string)
 	if !ok {
 		return time.Time{}, false
 	}
-	t, _, err := ParseRFC3339Nano(s)
+	var t, _, err = ParseRFC3339Nano(s)
 	return t, err == nil
 }
 
@@ -221,9 +221,9 @@ func parseDatetime(v any) (time.Time, bool) {
 // and k, compared as instants, along with the instant of k. It reports false
 // if any isn't a date-time.
 func minMaxDatetime(lower, upper, k any) (any, any, time.Time, bool) {
-	tl, okL := parseDatetime(lower)
-	tu, okU := parseDatetime(upper)
-	tk, okK := parseDatetime(k)
+	var tl, okL = parseDatetime(lower)
+	var tu, okU = parseDatetime(upper)
+	var tk, okK = parseDatetime(k)
 	if !okL || !okU || !okK {
 		return nil, nil, time.Time{}, false
 	}
@@ -290,12 +290,12 @@ func maxKey(k1 any, k2 any) any {
 // Build outputs the computed merge conditions for this transaction and resets
 // the tracked values in preparation for the next transaction.
 func (b *MergeBoundsBuilder) Build() []MergeBound {
-	conditions := make([]MergeBound, len(b.lower))
+	var conditions = make([]MergeBound, len(b.lower))
 
 	for idx, col := range b.keyColumns {
 		conditions[idx] = MergeBound{Column: col}
 
-		ft, _ := col.AsFlatType()
+		var ft, _ = col.AsFlatType()
 		if ft == BOOLEAN {
 			// Boolean keys cannot reasonably support bounds for merge queries.
 			continue
@@ -310,8 +310,8 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 			// Endpoints compare a date-time literal to a stored value with
 			// differing precision or, for text columns, as text, so the bound
 			// is widened to dates to be safe under either.
-			lower, _ := parseDatetime(b.lower[idx])
-			upper, _ := parseDatetime(b.upper[idx])
+			var lower, _ = parseDatetime(b.lower[idx])
+			var upper, _ = parseDatetime(b.upper[idx])
 			if lo, hi, ok := dateBounds(lower, upper); ok {
 				conditions[idx].LiteralLower = b.literaler(lo)
 				conditions[idx].LiteralUpper = b.literaler(hi)
