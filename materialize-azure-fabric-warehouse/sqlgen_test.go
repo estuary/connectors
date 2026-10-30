@@ -14,9 +14,9 @@ var testDialect = createDialect(common.ResolveFlagDefaults(featureFlagDefaults, 
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	testDialect := createDialect(map[string]bool{"datetime_keys_as_string": true}, false)
+	var testDialect = createDialect(map[string]bool{"datetime_keys_as_string": true}, false)
 
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -57,7 +57,7 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.dropLoadTable,
 		testTemplates.storeDeleteQuery,
 	} {
-		tbl := tables[0] // these queries are never run for delta updates mode
+		var tbl = tables[0] // these queries are never run for delta updates mode
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
 		snap.WriteString("--- Begin " + testcase + " ---")
@@ -83,7 +83,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	{
-		params := migrateParams{
+		var params = migrateParams{
 			SourceTable: "some_table",
 			TmpName:     "some_table_tmp",
 			Columns: []migrateColumn{

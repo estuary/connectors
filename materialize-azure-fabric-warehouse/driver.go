@@ -75,7 +75,7 @@ func (c config) Validate() error {
 }
 
 func (c config) db() (*stdsql.DB, error) {
-	db, err := stdsql.Open(
+	var db, err = stdsql.Open(
 		azuread.DriverName,
 		fmt.Sprintf(
 			"server=%s;user id=%s;password=%s;port=%d;database=%s;fedauth=ActiveDirectoryServicePrincipal",
@@ -130,7 +130,7 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 // SQL Server collations use _CI_ for case-insensitive and _CS_ for case-sensitive.
 func isCaseInsensitiveDatabase(ctx context.Context, db *stdsql.DB, warehouse string) (bool, error) {
 	// Create a temporary dialect just to get the Literal function for the query
-	tmpDialect := createDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}), false)
+	var tmpDialect = createDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}), false)
 	var collation string
 	if err := db.QueryRowContext(ctx, fmt.Sprintf(
 		"SELECT DATABASEPROPERTYEX(%s, 'Collation')",
@@ -148,7 +148,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			// Query database collation to determine if resources are case-insensitive
-			db, err := cfg.db()
+			var db, err = cfg.db()
 			if err != nil {
 				return nil, fmt.Errorf("opening database connection: %w", err)
 			}
@@ -168,8 +168,8 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				return nil, err
 			}
 
-			dialect := createDialect(featureFlags, caseInsensitiveResources)
-			templates := renderTemplates(dialect)
+			var dialect = createDialect(featureFlags, caseInsensitiveResources)
+			var templates = renderTemplates(dialect)
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,

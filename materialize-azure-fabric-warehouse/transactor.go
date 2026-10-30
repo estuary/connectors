@@ -60,7 +60,7 @@ func newTransactor(
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var cfg = ep.Config
-	bucket, err := blob.NewAzureBlobBucket(
+	var bucket, err = blob.NewAzureBlobBucket(
 		ctx,
 		cfg.ContainerName,
 		cfg.StorageAccountName,
@@ -70,9 +70,9 @@ func newTransactor(
 		return nil, fmt.Errorf("creating azure blob bucket: %w", err)
 	}
 
-	templates := renderTemplates(ep.Dialect)
+	var templates = renderTemplates(ep.Dialect)
 
-	t := &transactor{
+	var t = &transactor{
 		cfg:        cfg,
 		templates:  templates,
 		fence:      fence,
@@ -85,14 +85,14 @@ func newTransactor(
 		t.loadFiles.AddBinding(idx, target.KeyNames())
 		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
 
-		hasBinaryColumns := false
+		var hasBinaryColumns = false
 		for _, col := range target.Columns() {
 			if col.DDL == "VARBINARY(MAX)" {
 				hasBinaryColumns = true
 			}
 		}
 
-		b := &binding{
+		var b = &binding{
 			target:           target,
 			hasBinaryColumns: hasBinaryColumns,
 		}
@@ -123,10 +123,10 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	hadLoads := false
+	var hadLoads = false
 	for it.Next() {
 		hadLoads = true
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -147,7 +147,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	defer t.loadFiles.CleanupCurrentTransaction(ctx)
 
 	t.be.StartedEvaluatingLoads()
-	db, err := t.cfg.db()
+	var db, err = t.cfg.db()
 	if err != nil {
 		return fmt.Errorf("creating db: %w", err)
 	}
@@ -166,12 +166,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		uris, err := t.loadFiles.Flush(idx)
+		var uris, err = t.loadFiles.Flush(idx)
 		if err != nil {
 			return fmt.Errorf("flushing store file: %w", err)
 		}
 
-		params := &queryParams{
+		var params = &queryParams{
 			Table:             b.target,
 			URIs:              uris,
 			StorageAccountKey: t.cfg.StorageAccountKey,
@@ -207,7 +207,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		dropQueries = append(dropQueries, dropQuery)
 	}
 
-	q := strings.Join(unionQueries, "\nUNION ALL\n")
+	var q = strings.Join(unionQueries, "\nUNION ALL\n")
 	rows, err := txn.QueryContext(ctx, q)
 	if err != nil {
 		log.WithField("query", q).Error("load query failed")
@@ -224,7 +224,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("scanning load document: %w", err)
 		}
 
-		doc := json.RawMessage(document)
+		var doc = json.RawMessage(document)
 		if b := t.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -257,13 +257,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 		var b = t.bindings[it.Binding]
 
-		flowDelete := t.cfg.HardDelete && it.Delete
+		var flowDelete = t.cfg.HardDelete && it.Delete
 
 		if it.Exists {
 			b.store.mustMerge = true
@@ -284,7 +284,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	round := it.Round
+	var round = it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
@@ -316,12 +316,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				continue
 			}
 
-			uris, err := t.storeFiles.Flush(idx)
+			var uris, err = t.storeFiles.Flush(idx)
 			if err != nil {
 				return nil, m.FinishedOperation(fmt.Errorf("flushing store file for binding[%d]: %w", idx, err))
 			}
 
-			params := &queryParams{
+			var params = &queryParams{
 				Table:             b.target,
 				URIs:              uris,
 				StorageAccountKey: t.cfg.StorageAccountKey,
@@ -331,19 +331,19 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// Statements run one per Exec: go-mssqldb sums the row counts of
 			// every statement in a batch, which would fold the staging load
 			// into the count of target rows affected.
-			exec := func(tpl *template.Template, name string) (int64, error) {
+			var exec = func(tpl *template.Template, name string) (int64, error) {
 				var query strings.Builder
 				if err := tpl.Execute(&query, params); err != nil {
 					return 0, err
 				}
-				res, err := txn.ExecContext(ctx, query.String())
+				var res, err = txn.ExecContext(ctx, query.String())
 				if err != nil {
 					log.WithField(
 						"query", redactedQuery(query, t.cfg.StorageAccountKey),
 					).Error(name + " query failed")
 					return 0, fmt.Errorf("executing store %s query for binding[%d]: %w", name, idx, err)
 				}
-				rows, _ := res.RowsAffected()
+				var rows, _ = res.RowsAffected()
 				return rows, nil
 			}
 

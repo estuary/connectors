@@ -16,14 +16,14 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 			Delta: delta,
 		}
 	}
 
-	actionDescSanitizers := []func(string) string{
+	var actionDescSanitizers = []func(string) string{
 		func(s string) string {
 			return regexp.MustCompile(`(sp_rename\s+'[^.]+\.\\?")[a-fA-F0-9\-]{36}(\\?"')`).ReplaceAllString(s, `${1}<uuid>${2}`)
 		},

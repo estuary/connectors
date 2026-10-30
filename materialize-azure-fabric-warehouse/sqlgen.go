@@ -15,7 +15,7 @@ func createDialect(featureFlags map[string]bool, caseInsensitiveResources bool) 
 	// testing I have determined it to actually be 1 MiB.
 	const maxFabricStringLength = 1024 * 1024
 
-	checkedStringLength := func(conv sql.ElementConverter) sql.ElementConverter {
+	var checkedStringLength = func(conv sql.ElementConverter) sql.ElementConverter {
 		return func(te tuple.TupleElement) (any, error) {
 			var err error
 			if conv != nil {
@@ -35,12 +35,12 @@ func createDialect(featureFlags map[string]bool, caseInsensitiveResources bool) 
 		}
 	}
 
-	primaryKeyTextType := sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(nil)))
+	var primaryKeyTextType = sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(nil)))
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
-	datetimeMapping := sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime))
-	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"), sql.UsingConverter(sql.StringCastConverter(normalizeTime)))
+	var dateMapping = sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	var datetimeMapping = sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime))
+	var timeMapping = sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"), sql.UsingConverter(sql.StringCastConverter(normalizeTime)))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -49,7 +49,7 @@ func createDialect(featureFlags map[string]bool, caseInsensitiveResources bool) 
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT"),
@@ -182,7 +182,7 @@ type templates struct {
 }
 
 func renderTemplates(dialect sql.Dialect) *templates {
-	tplAll := sql.MustParseTemplate(dialect, "root", tplRoot)
+	var tplAll = sql.MustParseTemplate(dialect, "root", tplRoot)
 	return &templates{
 		createTargetTable:        tplAll.Lookup("createTargetTable"),
 		alterTableColumns:        tplAll.Lookup("alterTableColumns"),

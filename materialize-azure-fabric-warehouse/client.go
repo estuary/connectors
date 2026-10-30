@@ -32,12 +32,12 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	db, err := ep.Config.db()
+	var db, err = ep.Config.db()
 	if err != nil {
 		return nil, err
 	}
 
-	templates := renderTemplates(ep.Dialect)
+	var templates = renderTemplates(ep.Dialect)
 
 	return &client{
 		db:        db,
@@ -57,16 +57,16 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		return nil
 	}
 
-	schemas := make([]string, 0, len(resourcePaths))
+	var schemas = make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
+		var loc = c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
 	}
 
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	tables, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+	var tables, err = c.db.QueryContext(ctx, fmt.Sprintf(`
 		select table_schema, table_name
 		from INFORMATION_SCHEMA.TABLES
 		where table_catalog = %s
@@ -139,24 +139,24 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	var _, err = c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -178,21 +178,21 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	var migrateQueries []string
 	if len(ta.ColumnTypeChanges) > 0 {
-		sourceTable := ta.Table.Identifier
-		tmpTable := c.ep.Dialect.Identifier(ta.InfoLocation.TableSchema, uuid.NewString())
+		var sourceTable = ta.Table.Identifier
+		var tmpTable = c.ep.Dialect.Identifier(ta.InfoLocation.TableSchema, uuid.NewString())
 
-		params := migrateParams{
+		var params = migrateParams{
 			SourceTable: sourceTable,
 			TmpName:     tmpTable,
 		}
 
 		for _, col := range ta.Columns() {
-			mCol := migrateColumn{Identifier: col.Identifier}
+			var mCol = migrateColumn{Identifier: col.Identifier}
 
 			if n := slices.IndexFunc(ta.ColumnTypeChanges, func(m sql.ColumnTypeMigration) bool {
 				return m.Identifier == col.Identifier
 			}); n != -1 {
-				m := ta.ColumnTypeChanges[n]
+				var m = ta.ColumnTypeChanges[n]
 				mCol.CastSQL = m.CastSQL(m)
 			}
 
@@ -214,7 +214,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
-	allQueries := append(addColumnsQuery, migrateQueries...)
+	var allQueries = append(addColumnsQuery, migrateQueries...)
 
 	return strings.Join(allQueries, "\n"), func(ctx context.Context) error {
 		if len(addColumnsQuery) == 1 { // slice is either empty or has a single query
@@ -229,7 +229,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		// different name, dropping the original table, and renaming the
 		// temporary table to replace the original table. This will all be done
 		// as an atomic action via the transaction.
-		txn, err := c.db.BeginTx(ctx, nil)
+		var txn, err = c.db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("db.BeginTx: %w", err)
 		}
@@ -251,13 +251,13 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
-	rows, err := c.db.QueryContext(ctx, "select schema_name from INFORMATION_SCHEMA.SCHEMATA")
+	var rows, err = c.db.QueryContext(ctx, "select schema_name from INFORMATION_SCHEMA.SCHEMATA")
 	if err != nil {
 		return nil, fmt.Errorf("querying schemata: %w", err)
 	}
 	defer rows.Close()
 
-	out := []string{}
+	var out = []string{}
 
 	for rows.Next() {
 		var schema string
@@ -308,20 +308,20 @@ func connectError(err error, cfg config) error {
 }
 
 func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	db, err := cfg.db()
+	var db, err = cfg.db()
 	if err != nil {
 		errs.Err(err)
 		return errs
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	var pingCtx, cancel = context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	// This is the first query, so it also reports connection failures. Literal
 	// quoting does not depend on the database collation, so none is queried.
-	dialect := createDialect(featureFlags, false)
+	var dialect = createDialect(featureFlags, false)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
 		if errors.Is(err, stdsql.ErrNoRows) {
