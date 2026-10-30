@@ -531,8 +531,7 @@ func (c *capture) readout(ctx context.Context, binding *bindingInfo) error {
 // isTableNotFound reports whether err is a BigQuery 404 (typically because
 // the table was dropped between enumeration and readout).
 func isTableNotFound(err error) bool {
-	var gerr *googleapi.Error
-	if errors.As(err, &gerr) {
+	if gerr, ok := errors.AsType[*googleapi.Error](err); ok {
 		return gerr.Code == 404
 	}
 	// Some BigQuery error paths surface the 404 as a plain error string.
