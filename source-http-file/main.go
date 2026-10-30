@@ -71,7 +71,7 @@ func isStreamCancelledError(err error) bool {
 	if err == nil {
 		return false
 	}
-	errStr := err.Error()
+	var errStr = err.Error()
 	return strings.Contains(errStr, "stream ID") &&
 		strings.Contains(errStr, "CANCEL") &&
 		strings.Contains(errStr, "received from peer")
@@ -119,13 +119,13 @@ type httpSource struct {
 }
 
 func doHttpRequest(ctx context.Context, cfg *config) (*http.Request, *http.Response, error) {
-	parsedURL, err := url.Parse(cfg.URL)
+	var parsedURL, err = url.Parse(cfg.URL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not parse URL %s: %w", cfg.URL, err)
 	}
 
 	// Prepare request.
-	req := (&http.Request{
+	var req = (&http.Request{
 		Method: "GET",
 		URL:    parsedURL,
 		Header: make(http.Header),
@@ -155,7 +155,7 @@ func doHttpRequest(ctx context.Context, cfg *config) (*http.Request, *http.Respo
 				return nil, nil, fmt.Errorf("could not close response body: %w", err)
 			}
 		}
-		bodyText := string(bodyBytes)
+		var bodyText = string(bodyBytes)
 		if len(bodyText) > 500 {
 			bodyText = bodyText[:500] + "..."
 		}
@@ -230,7 +230,7 @@ func (s *httpSource) List(_ context.Context, query filesource.Query) (filesource
 func (s *httpSource) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	// We already started our read under a different parent context.
 	// Retain this Read `ctx` and wrap so that we cancel appropriately.
-	reader := &ctxReader{
+	var reader = &ctxReader{
 		ReadCloser: s.resp.Body,
 		ctx:        ctx,
 	}
@@ -257,7 +257,7 @@ func (w *reconnectableWrapper) reconnect() error {
 	}
 
 	// Create a new connection.
-	_, resp, err := doHttpRequest(w.ctxReader.ctx, w.source.cfg)
+	var _, resp, err = doHttpRequest(w.ctxReader.ctx, w.source.cfg)
 	if err != nil {
 		return fmt.Errorf("reconnecting to stream: %w", err)
 	}
