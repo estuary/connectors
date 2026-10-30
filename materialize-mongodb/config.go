@@ -89,14 +89,14 @@ func (c *config) UnmarshalJSON(data []byte) error {
 // contain one, but users sometimes paste a full connection string, and the
 // configured user and password replace it when connecting anyway.
 func withoutCredentials(address string) string {
-	uri, err := url.Parse(address)
+	var uri, err = url.Parse(address)
 	if err == nil && uri.Scheme != "" && uri.Host != "" {
 		uri.User = nil
 		return uri.String()
 	}
 	// ToURI treats anything else as a bare host, so everything up to the last
 	// '@' can only be a login.
-	scheme, rest, ok := strings.Cut(address, "://")
+	var scheme, rest, ok = strings.Cut(address, "://")
 	if !ok {
 		scheme, rest = "", address
 	}

@@ -35,7 +35,7 @@ func NewDriver() boilerplate.Connector { return driver{} }
 func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		uri, err := url.Parse(cfg.Address)
+		var uri, err = url.Parse(cfg.Address)
 		if err != nil {
 			// A *url.Error repeats its input, which may contain a password, so unwrap it
 			// to get the actual error.
@@ -57,7 +57,7 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	}
 
 	// Create a new client and connect to the server
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
+	var client, err = mongo.Connect(ctx, options.Client().ApplyURI(cfg.ToURI()))
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 // address shouldn't contain credentials, but users sometimes paste a full
 // connection string.
 func redactedAddress(address string) string {
-	uri, err := url.Parse(address)
+	var uri, err = url.Parse(address)
 	if err != nil {
 		return "<unparseable address>"
 	}
@@ -106,7 +106,7 @@ func redactedAddress(address string) string {
 }
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	configSchema, err := schemagen.GenerateSchema("Materialize MongoDB Spec", &config{}).MarshalJSON()
+	var configSchema, err = schemagen.GenerateSchema("Materialize MongoDB Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating config schema: %w", err)
 	}
@@ -142,7 +142,7 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	client, err := connect(ctx, cfg)
+	var client, err = connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
@@ -163,8 +163,8 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 }
 
 func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	db := d.client.Database(d.cfg.Database)
-	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
+	var db = d.client.Database(d.cfg.Database)
+	var collections, err = db.ListCollectionSpecifications(ctx, bson.D{})
 	if err != nil {
 		return err
 	}
@@ -212,15 +212,15 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
-	dbName := res.ResourcePath[0]
-	collectionName := res.ResourcePath[1]
+	var dbName = res.ResourcePath[0]
+	var collectionName = res.ResourcePath[1]
 
 	return fmt.Sprintf("create collection %q", collectionName), func(ctx context.Context) error {
 		// Explicitly create the collection so it is visible to PopulateInfoSchema.
-		err := d.client.Database(dbName).CreateCollection(ctx, collectionName)
+		var err = d.client.Database(dbName).CreateCollection(ctx, collectionName)
 
 		if err != nil {
-			mongoErr := mongo.CommandError{}
+			var mongoErr = mongo.CommandError{}
 			// Error code 48 is "Collection already exists", which we ignore
 			// this error is no longer emitted since Mongo 8, and we keep this code
 			// for backward compatibility with older Mongo versions
@@ -238,8 +238,8 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
-	dbName := resourcePath[0]
-	collectionName := resourcePath[1]
+	var dbName = resourcePath[0]
+	var collectionName = resourcePath[1]
 
 	return fmt.Sprintf("drop collection %q", collectionName), func(ctx context.Context) error {
 		return d.client.Database(dbName).Collection(collectionName).Drop(ctx)
@@ -308,7 +308,7 @@ func (d *materialization) NewTransactor(
 // unconditionally could flip its stored BSON type inconsistently across
 // documents.
 func isIntegerKeyType(types []string) bool {
-	nonNull, isInteger := 0, false
+	var nonNull, isInteger = 0, false
 	for _, t := range types {
 		if t == "null" {
 			continue
@@ -330,11 +330,11 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	dbName := path[0]
-	collectionName := path[1]
+	var dbName = path[0]
+	var collectionName = path[1]
 
-	coll := d.client.Database(dbName).Collection(collectionName)
-	cursor, err := coll.Find(ctx, bson.D{})
+	var coll = d.client.Database(dbName).Collection(collectionName)
+	var cursor, err = coll.Find(ctx, bson.D{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("finding documents in %s.%s: %w", dbName, collectionName, err)
 	}
@@ -350,14 +350,14 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	}
 
 	// Collect all field names across all documents.
-	colSet := make(map[string]struct{})
+	var colSet = make(map[string]struct{})
 	for _, doc := range docs {
 		for k := range doc {
 			colSet[k] = struct{}{}
 		}
 	}
 
-	columns := make([]string, 0, len(colSet))
+	var columns = make([]string, 0, len(colSet))
 	for k := range colSet {
 		columns = append(columns, k)
 	}
@@ -367,7 +367,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// a stable representation since auto-generated _id values differ between runs.
 	var rows [][]any
 	for _, doc := range docs {
-		row := make([]any, len(columns))
+		var row = make([]any, len(columns))
 		for i, col := range columns {
 			if v, ok := doc[col]; ok {
 				// Replace MongoDB ObjectIDs with a stable string so snapshots
@@ -386,8 +386,8 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// Sort rows for deterministic output.
 	sort.Slice(rows, func(i, j int) bool {
 		for c := range columns {
-			vi := fmt.Sprint(rows[i][c])
-			vj := fmt.Sprint(rows[j][c])
+			var vi = fmt.Sprint(rows[i][c])
+			var vj = fmt.Sprint(rows[j][c])
 			if vi != vj {
 				return vi < vj
 			}

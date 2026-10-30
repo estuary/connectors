@@ -26,7 +26,7 @@ func storeAndReload(t *testing.T, raw json.RawMessage, idValue string, deltaUpda
 	for i, ptr := range keyPtrs {
 		restorations = append(restorations, keyRestoration{tupleIndex: i, tokens: parsePointerTokens(ptr)})
 	}
-	doc, err := storeDocument(raw, idValue, deltaUpdates, key, restorations)
+	var doc, err = storeDocument(raw, idValue, deltaUpdates, key, restorations)
 	require.NoError(t, err)
 
 	encoded, err := bson.Marshal(doc)
@@ -43,11 +43,11 @@ func storeAndReload(t *testing.T, raw json.RawMessage, idValue string, deltaUpda
 // given top-level field, so tests can assert exact (non-lossy) round-tripping.
 func numberAt(t *testing.T, loadedJSON []byte, field string) json.Number {
 	t.Helper()
-	dec := json.NewDecoder(bytes.NewReader(loadedJSON))
+	var dec = json.NewDecoder(bytes.NewReader(loadedJSON))
 	dec.UseNumber()
 	var m map[string]interface{}
 	require.NoError(t, dec.Decode(&m))
-	n, ok := m[field].(json.Number)
+	var n, ok = m[field].(json.Number)
 	require.True(t, ok, "field %q is not a number: %v", field, m[field])
 	return n
 }
@@ -64,11 +64,11 @@ func TestStoreDocumentPreservesLargeIntegerKey(t *testing.T) {
 	// A real colliding EVENT_ID from the field: ~-9.2e18, far beyond 2^53, and
 	// odd (so not representable as a float64, whose ULP at this magnitude is 2048).
 	const eventID int64 = -9223341701339290697
-	raw := json.RawMessage(fmt.Sprintf(`{"EVENT_ID":%d,"EVENT_TYPE":"u","NEW_VALUE":1.5}`, eventID))
+	var raw = json.RawMessage(fmt.Sprintf(`{"EVENT_ID":%d,"EVENT_TYPE":"u","NEW_VALUE":1.5}`, eventID))
 	// _id is the exact packed key; it is always faithful. The bug is in the body.
 	const packedKeyHex = "0c80001b97099fe3b6"
 
-	_, loadedJSON := storeAndReload(t, raw, packedKeyHex, false,
+	var _, loadedJSON = storeAndReload(t, raw, packedKeyHex, false,
 		tuple.Tuple{eventID}, []string{"/EVENT_ID"})
 
 	// The runtime re-derives the key by parsing EVENT_ID out of the loaded doc.
@@ -84,9 +84,9 @@ func TestStoreDocumentPreservesLargeIntegerKey(t *testing.T) {
 func TestStoreDocumentLeavesNonKeyIntegersAsDouble(t *testing.T) {
 	const key int64 = 1
 	const nonKey int64 = 9223372036854775807 // MaxInt64, far beyond 2^53
-	raw := json.RawMessage(fmt.Sprintf(`{"id":%d,"COUNT":%d}`, key, nonKey))
+	var raw = json.RawMessage(fmt.Sprintf(`{"id":%d,"COUNT":%d}`, key, nonKey))
 
-	doc, loadedJSON := storeAndReload(t, raw, "00", false,
+	var doc, loadedJSON = storeAndReload(t, raw, "00", false,
 		tuple.Tuple{key}, []string{"/id"})
 
 	require.IsType(t, int64(0), doc["id"], "key field must be stored as int64")
@@ -103,9 +103,9 @@ func TestStoreDocumentLeavesNonKeyIntegersAsDouble(t *testing.T) {
 // map[string]interface{} produced by json.Unmarshal.
 func TestStoreDocumentNestedKeyPointer(t *testing.T) {
 	const id int64 = 9223372036854775807
-	raw := json.RawMessage(fmt.Sprintf(`{"a":{"b":{"id":%d}}}`, id))
+	var raw = json.RawMessage(fmt.Sprintf(`{"a":{"b":{"id":%d}}}`, id))
 
-	_, loadedJSON := storeAndReload(t, raw, "00", false,
+	var _, loadedJSON = storeAndReload(t, raw, "00", false,
 		tuple.Tuple{id}, []string{"/a/b/id"})
 
 	var got struct {
@@ -115,7 +115,7 @@ func TestStoreDocumentNestedKeyPointer(t *testing.T) {
 			} `json:"b"`
 		} `json:"a"`
 	}
-	dec := json.NewDecoder(bytes.NewReader(loadedJSON))
+	var dec = json.NewDecoder(bytes.NewReader(loadedJSON))
 	dec.UseNumber()
 	require.NoError(t, dec.Decode(&got))
 	require.Equal(t, fmt.Sprint(id), got.A.B.ID.String(), "nested key must round-trip exactly")
@@ -128,9 +128,9 @@ func TestStoreDocumentNestedKeyPointer(t *testing.T) {
 // duplicate-key crash loop.
 func TestStoreDocumentArrayNestedKey(t *testing.T) {
 	const id int64 = 9223372036854775807 // MaxInt64, far beyond 2^53
-	raw := json.RawMessage(fmt.Sprintf(`{"items":[{"id":%d}]}`, id))
+	var raw = json.RawMessage(fmt.Sprintf(`{"items":[{"id":%d}]}`, id))
 
-	_, loadedJSON := storeAndReload(t, raw, "00", false,
+	var _, loadedJSON = storeAndReload(t, raw, "00", false,
 		tuple.Tuple{id}, []string{"/items/0/id"})
 
 	var got struct {
@@ -138,7 +138,7 @@ func TestStoreDocumentArrayNestedKey(t *testing.T) {
 			ID json.Number `json:"id"`
 		} `json:"items"`
 	}
-	dec := json.NewDecoder(bytes.NewReader(loadedJSON))
+	var dec = json.NewDecoder(bytes.NewReader(loadedJSON))
 	dec.UseNumber()
 	require.NoError(t, dec.Decode(&got))
 	require.Len(t, got.Items, 1)
@@ -152,9 +152,9 @@ func TestStoreDocumentArrayNestedKey(t *testing.T) {
 // reverses the rename.
 func TestStoreDocumentIdCollisionKey(t *testing.T) {
 	const id int64 = 9223372036854775807
-	raw := json.RawMessage(fmt.Sprintf(`{"_id":%d}`, id))
+	var raw = json.RawMessage(fmt.Sprintf(`{"_id":%d}`, id))
 
-	_, loadedJSON := storeAndReload(t, raw, "00", false,
+	var _, loadedJSON = storeAndReload(t, raw, "00", false,
 		tuple.Tuple{id}, []string{"/_id"})
 
 	require.Equal(t, fmt.Sprint(id), numberAt(t, loadedJSON, "_id").String(),
@@ -169,9 +169,9 @@ func TestStoreDocumentIdCollisionKey(t *testing.T) {
 // overwrite the restored key with the unrelated _id value.
 func TestStoreDocumentIdFlowIdCollisionReturnsError(t *testing.T) {
 	const id int64 = 9223372036854775807
-	raw := json.RawMessage(fmt.Sprintf(`{"_id":"arbitrary","_flow_id":%d}`, id))
+	var raw = json.RawMessage(fmt.Sprintf(`{"_id":"arbitrary","_flow_id":%d}`, id))
 
-	_, err := storeDocument(raw, "00", false,
+	var _, err = storeDocument(raw, "00", false,
 		tuple.Tuple{id}, []keyRestoration{{tupleIndex: 0, tokens: []string{"_flow_id"}}})
 	require.Error(t, err)
 }
@@ -181,9 +181,9 @@ func TestStoreDocumentIdFlowIdCollisionReturnsError(t *testing.T) {
 // overwritten (the string key and non-key number are left as decoded).
 func TestStoreDocumentCompositeMixedKey(t *testing.T) {
 	const id int64 = 9223372036854775807
-	raw := json.RawMessage(fmt.Sprintf(`{"id":%d,"name":"abc","n":5}`, id))
+	var raw = json.RawMessage(fmt.Sprintf(`{"id":%d,"name":"abc","n":5}`, id))
 
-	doc, loadedJSON := storeAndReload(t, raw, "00", false,
+	var doc, loadedJSON = storeAndReload(t, raw, "00", false,
 		tuple.Tuple{id, "abc"}, []string{"/id", "/name"})
 
 	require.IsType(t, int64(0), doc["id"], "int64 key element is overwritten exactly")
@@ -201,14 +201,14 @@ func TestStoreDocumentCompositeMixedKey(t *testing.T) {
 // collections.
 func TestStoreDocumentDeltaUpdatesLeavesKeyAsDouble(t *testing.T) {
 	const id int64 = 9223372036854775807
-	raw := json.RawMessage(fmt.Sprintf(`{"id":%d}`, id))
+	var raw = json.RawMessage(fmt.Sprintf(`{"id":%d}`, id))
 
-	doc, _ := storeAndReload(t, raw, "00", true,
+	var doc, _ = storeAndReload(t, raw, "00", true,
 		tuple.Tuple{id}, []string{"/id"})
 
 	require.IsType(t, float64(0), doc["id"],
 		"delta-update key field must stay float64 (BSON type unchanged)")
-	_, hasID := doc[idField]
+	var _, hasID = doc[idField]
 	require.False(t, hasID, "delta updates must not set _id")
 }
 
@@ -218,8 +218,8 @@ func TestStoreDocumentDeltaUpdatesLeavesKeyAsDouble(t *testing.T) {
 // declared key field — fails loudly rather than silently storing a document
 // with un-restored key precision.
 func TestStoreDocumentKeyIndexOutOfBoundsReturnsError(t *testing.T) {
-	raw := json.RawMessage(`{"id":1}`)
-	_, err := storeDocument(raw, "00", false,
+	var raw = json.RawMessage(`{"id":1}`)
+	var _, err = storeDocument(raw, "00", false,
 		tuple.Tuple{int64(1)}, []keyRestoration{{tupleIndex: 5, tokens: []string{"id"}}})
 	require.Error(t, err)
 }
@@ -229,8 +229,8 @@ func TestStoreDocumentKeyIndexOutOfBoundsReturnsError(t *testing.T) {
 // precision, when a key field's declared JSON pointer doesn't resolve in the
 // document body (here, the intermediate object "a" is missing entirely).
 func TestStoreDocumentKeyPointerUnresolvedReturnsError(t *testing.T) {
-	raw := json.RawMessage(`{}`)
-	_, err := storeDocument(raw, "00", false,
+	var raw = json.RawMessage(`{}`)
+	var _, err = storeDocument(raw, "00", false,
 		tuple.Tuple{int64(1)}, []keyRestoration{{tupleIndex: 0, tokens: []string{"a", "id"}}})
 	require.Error(t, err)
 }
@@ -244,12 +244,12 @@ func TestStoreDocumentKeyPointerUnresolvedReturnsError(t *testing.T) {
 // round-tripped through bson.Marshal/Unmarshal so the test exercises the
 // driver-authentic primitive.A shape rather than a hand-built []interface{}.
 func TestSanitizeDocumentInnerArrayNaN(t *testing.T) {
-	encoded, err := bson.Marshal(bson.M{"items": bson.A{bson.M{"val": math.NaN()}}})
+	var encoded, err = bson.Marshal(bson.M{"items": bson.A{bson.M{"val": math.NaN()}}})
 	require.NoError(t, err)
 	var doc bson.M
 	require.NoError(t, bson.Unmarshal(encoded, &doc))
 
-	sanitized := sanitizeDocumentInner(doc)
+	var sanitized = sanitizeDocumentInner(doc)
 	_, err = json.Marshal(sanitized)
 	require.NoError(t, err, "NaN nested inside an array must be sanitized before marshaling")
 }
@@ -260,12 +260,12 @@ func TestSanitizeDocumentInnerArrayNaN(t *testing.T) {
 // map[string]interface{}, so a NaN nested inside a sub-object — not even
 // inside an array — also passed through sanitizeDocumentInner untouched.
 func TestSanitizeDocumentInnerNestedObjectNaN(t *testing.T) {
-	encoded, err := bson.Marshal(bson.M{"obj": bson.M{"val": math.NaN()}})
+	var encoded, err = bson.Marshal(bson.M{"obj": bson.M{"val": math.NaN()}})
 	require.NoError(t, err)
 	var doc bson.M
 	require.NoError(t, bson.Unmarshal(encoded, &doc))
 
-	sanitized := sanitizeDocumentInner(doc)
+	var sanitized = sanitizeDocumentInner(doc)
 	_, err = json.Marshal(sanitized)
 	require.NoError(t, err, "NaN nested inside a sub-object must be sanitized before marshaling")
 }
@@ -278,11 +278,11 @@ func TestSanitizeDocumentInnerNestedObjectNaN(t *testing.T) {
 // with the binding's total key-field count.
 func BenchmarkStoreDocumentCompositeKey(b *testing.B) {
 	const id int64 = 9223372036854775807
-	raw := json.RawMessage(fmt.Sprintf(`{"id":%d,"code":"abc","active":true,"name":"n"}`, id))
-	key := tuple.Tuple{id, "abc", true}
+	var raw = json.RawMessage(fmt.Sprintf(`{"id":%d,"code":"abc","active":true,"name":"n"}`, id))
+	var key = tuple.Tuple{id, "abc", true}
 	// Only "id" is integer-typed; driver.go's isIntegerKeyType filter would
 	// exclude "code" and "active" from keyRestorations entirely.
-	restorations := []keyRestoration{{tupleIndex: 0, tokens: []string{"id"}}}
+	var restorations = []keyRestoration{{tupleIndex: 0, tokens: []string{"id"}}}
 
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -316,9 +316,9 @@ func noDelay(context.Context, int) error { return nil }
 // code 189) must be retried by re-sending only the failed model, not surfaced as
 // fatal. Counts from each attempt accumulate so the caller's sanity check holds.
 func TestStoreBulkRetryResendsOnlyFailedModels(t *testing.T) {
-	models := []mongo.WriteModel{model("A"), model("B"), model("C")}
+	var models = []mongo.WriteModel{model("A"), model("B"), model("C")}
 
-	responses := []struct {
+	var responses = []struct {
 		res *mongo.BulkWriteResult
 		err error
 	}{
@@ -326,14 +326,14 @@ func TestStoreBulkRetryResendsOnlyFailedModels(t *testing.T) {
 		{&mongo.BulkWriteResult{MatchedCount: 1}, nil},                           // resent B succeeds
 	}
 	var sent [][]mongo.WriteModel
-	send := func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
+	var send = func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
 		sent = append(sent, models)
-		r := responses[0]
+		var r = responses[0]
 		responses = responses[1:]
 		return r.res, r.err
 	}
 
-	res, err := storeBulkWithRetry(context.Background(), models, maxStoreRetries, send, noDelay)
+	var res, err = storeBulkWithRetry(context.Background(), models, maxStoreRetries, send, noDelay)
 	require.NoError(t, err)
 	require.Len(t, sent, 2, "should send the initial batch then a retry")
 	require.Len(t, sent[0], 3, "first send is the whole batch")
@@ -347,15 +347,15 @@ func TestStoreBulkRetryResendsOnlyFailedModels(t *testing.T) {
 // E11000 duplicate-key (code 11000) is non-retryable and must be returned
 // immediately without retrying.
 func TestStoreBulkRetryFailsFastOnDuplicateKey(t *testing.T) {
-	models := []mongo.WriteModel{model("A")}
+	var models = []mongo.WriteModel{model("A")}
 
 	var sends int
-	send := func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
+	var send = func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
 		sends++
 		return &mongo.BulkWriteResult{}, bulkErr(map[int]int{0: 11000})
 	}
 
-	_, err := storeBulkWithRetry(context.Background(), models, maxStoreRetries, send, noDelay)
+	var _, err = storeBulkWithRetry(context.Background(), models, maxStoreRetries, send, noDelay)
 	require.Error(t, err)
 	require.Equal(t, 1, sends, "a duplicate-key error must not be retried")
 	var bwe mongo.BulkWriteException
@@ -367,15 +367,15 @@ func TestStoreBulkRetryFailsFastOnDuplicateKey(t *testing.T) {
 // gives up after maxAttempts rather than looping forever, surfacing the
 // underlying error.
 func TestStoreBulkRetryExhaustsAttempts(t *testing.T) {
-	models := []mongo.WriteModel{model("A")}
+	var models = []mongo.WriteModel{model("A")}
 
 	var sends int
-	send := func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
+	var send = func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
 		sends++
 		return &mongo.BulkWriteResult{}, bulkErr(map[int]int{0: 10107}) // NotWritablePrimary
 	}
 
-	_, err := storeBulkWithRetry(context.Background(), models, 3 /* maxAttempts */, send, noDelay)
+	var _, err = storeBulkWithRetry(context.Background(), models, 3 /* maxAttempts */, send, noDelay)
 	require.Error(t, err)
 	require.Equal(t, 3, sends, "should attempt exactly maxAttempts times")
 }

@@ -39,29 +39,29 @@ func TestStoreDocumentPublishedAt(t *testing.T) {
 	var want = primitive.NewDateTimeFromTime(time.Date(1970, 1, 1, 3, 0, 9, 0, time.UTC))
 
 	t.Run("standard updates", func(t *testing.T) {
-		doc, loadedJSON := storeAndReload(t, raw, "00", false, nil, nil)
+		var doc, loadedJSON = storeAndReload(t, raw, "00", false, nil, nil)
 		require.Equal(t, want, doc[publishedAtField])
 		// The field is the connector's own, so a loaded document omits it.
 		require.JSONEq(t, string(raw), string(loadedJSON))
 	})
 
 	t.Run("delta updates", func(t *testing.T) {
-		doc, _ := storeAndReload(t, raw, "00", true, nil, nil)
+		var doc, _ = storeAndReload(t, raw, "00", true, nil, nil)
 		require.NotContains(t, doc, publishedAtField)
 	})
 
 	t.Run("no uuid", func(t *testing.T) {
-		doc, _ := storeAndReload(t, json.RawMessage(`{"id":1}`), "00", false, nil, nil)
+		var doc, _ = storeAndReload(t, json.RawMessage(`{"id":1}`), "00", false, nil, nil)
 		require.NotContains(t, doc, publishedAtField)
 	})
 
 	t.Run("invalid uuid", func(t *testing.T) {
-		_, err := storeDocument(json.RawMessage(`{"id":1,"_meta":{"uuid":"nope"}}`), "00", false, nil, nil)
+		var _, err = storeDocument(json.RawMessage(`{"id":1,"_meta":{"uuid":"nope"}}`), "00", false, nil, nil)
 		require.ErrorContains(t, err, "/_meta/uuid")
 	})
 
 	t.Run("field collision", func(t *testing.T) {
-		_, err := storeDocument(json.RawMessage(`{"id":1,"_flow_published_at":1,"_meta":{"uuid":"3e2bc280-1deb-11b2-8000-071353030311"}}`), "00", false, nil, nil)
+		var _, err = storeDocument(json.RawMessage(`{"id":1,"_flow_published_at":1,"_meta":{"uuid":"3e2bc280-1deb-11b2-8000-071353030311"}}`), "00", false, nil, nil)
 		require.ErrorContains(t, err, publishedAtField)
 	})
 }

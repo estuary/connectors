@@ -18,7 +18,7 @@ import (
 // restoring it unconditionally could flip its stored BSON type inconsistently
 // across documents.
 func TestIsIntegerKeyType(t *testing.T) {
-	cases := []struct {
+	var cases = []struct {
 		name  string
 		types []string
 		want  bool
@@ -43,7 +43,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(collection string, delta bool) resource {
+	var makeResourceFn = func(collection string, delta bool) resource {
 		return resource{Collection: collection, DeltaUpdates: delta}
 	}
 
@@ -71,7 +71,7 @@ func TestIntegration(t *testing.T) {
 		}
 		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			var ctx = context.Background()
-			client, err := connect(ctx, cfg)
+			var client, err = connect(ctx, cfg)
 			require.NoError(t, err)
 			defer client.Disconnect(ctx)
 			var db = client.Database(cfg.Database)
@@ -100,7 +100,7 @@ func TestIntegration(t *testing.T) {
 				"truncate_standard": {1},
 				"truncate_delta":    {1, 1, 2, 3, 99},
 			} {
-				cur, err := db.Collection(name).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "id", Value: 1}}))
+				var cur, err = db.Collection(name).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "id", Value: 1}}))
 				require.NoError(t, err)
 				var docs []struct {
 					ID int64 `bson:"id"`

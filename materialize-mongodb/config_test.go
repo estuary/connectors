@@ -41,7 +41,7 @@ func TestUnmarshalConfig(t *testing.T) {
 		{name: "unparseable", address: "mongodb://fake-user:fake-password@my-mongo.test:bad", want: "mongodb://my-mongo.test:bad"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			raw, err := json.Marshal(map[string]string{"user": "user", "password": "password", "database": "db", "address": tt.address})
+			var raw, err = json.Marshal(map[string]string{"user": "user", "password": "password", "database": "db", "address": tt.address})
 			require.NoError(t, err)
 
 			var cfg config

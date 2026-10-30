@@ -135,27 +135,27 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	ctx := it.Context()
+	var ctx = it.Context()
 	it.WaitForAcknowledged()
 
 	var mu sync.Mutex
-	lockedAndLoaded := func(binding int, doc json.RawMessage) error {
+	var lockedAndLoaded = func(binding int, doc json.RawMessage) error {
 		// Prevent concurrent load workers from interleaving |loaded| responses.
 		mu.Lock()
 		defer mu.Unlock()
 		return loaded(binding, doc)
 	}
 
-	sendBatches := make(chan loadBatch)
+	var sendBatches = make(chan loadBatch)
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	for idx := 0; idx < concurrentLoadWorkers; idx++ {
 		group.Go(func() error {
 			return t.loadWorker(groupCtx, lockedAndLoaded, sendBatches)
 		})
 	}
 
-	sendBatch := func(binding int, batch []string) error {
+	var sendBatch = func(binding int, batch []string) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -164,13 +164,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	batches := make([][]string, len(t.bindings))
+	var batches = make([][]string, len(t.bindings))
 	// Approximate the size of the batch in memory based on the length of the packed key as a
 	// protection against huge document keys running the connector out of memory.
-	batchSizes := make([]int, len(t.bindings))
+	var batchSizes = make([]int, len(t.bindings))
 
 	for it.Next() {
-		key := fmt.Sprintf("%x", it.PackedKey) // Hex-encode
+		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode
 
 		batches[it.Binding] = append(batches[it.Binding], key)
 		batchSizes[it.Binding] += len(it.PackedKey)
@@ -200,9 +200,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	sendBatches := make(chan storeBatch)
+	var sendBatches = make(chan storeBatch)
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.Go(func() error {
 		return t.storeWorker(groupCtx, sendBatches)
 	})
@@ -210,10 +210,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var batch []mongo.WriteModel
 	// Approximate the size of the batch in memory based on the length of the document JSON as a
 	// protection against huge documents running the connector out of memory.
-	batchSize := 0
-	lastBinding := -1
+	var batchSize = 0
+	var lastBinding = -1
 
-	sendBatch := func() error {
+	var sendBatch = func() error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -232,15 +232,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		key := fmt.Sprintf("%x", it.PackedKey) // Hex-encode
+		var key = fmt.Sprintf("%x", it.PackedKey) // Hex-encode
 
 		if it.Delete && t.cfg.HardDelete {
-			del := &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
+			var del = &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
 			batch = append(batch, del)
 			batchSize += len(key)
 		} else {
-			b := t.bindings[it.Binding]
-			doc, err := storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyRestorations)
+			var b = t.bindings[it.Binding]
+			var doc, err = storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyRestorations)
 			if err != nil {
 				return nil, err
 			}
@@ -283,7 +283,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// A BSON date holds milliseconds, so the boundary is floored to
 		// match the stored precision.
 		var before = primitive.NewDateTimeFromTime(boundary)
-		res, err := b.collection.DeleteMany(ctx, bson.D{{Key: "$or", Value: bson.A{
+		var res, err = b.collection.DeleteMany(ctx, bson.D{{Key: "$or", Value: bson.A{
 			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$lt", Value: before}}}},
 			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$exists", Value: false}}}},
 		}}})
@@ -324,9 +324,9 @@ func (t *transactor) loadWorker(
 			}
 
 			if err := func() error { // Closure for the deferred cur.Close()
-				b := t.bindings[batch.binding]
-				collection := b.collection
-				cur, err := collection.Find(ctx, bson.D{{
+				var b = t.bindings[batch.binding]
+				var collection = b.collection
+				var cur, err = collection.Find(ctx, bson.D{{
 					Key:   idField,
 					Value: bson.D{{Key: "$in", Value: batch.keys}},
 				}})
@@ -341,7 +341,7 @@ func (t *transactor) loadWorker(
 						return fmt.Errorf("decoding document in collection %s: %w", collection.Name(), err)
 					}
 
-					js, err := json.Marshal(sanitizedLoadedDocument(doc))
+					var js, err = json.Marshal(sanitizedLoadedDocument(doc))
 					if err != nil {
 						return fmt.Errorf("encoding document in collection %s as json: %w", collection.Name(), err)
 					} else if err := loaded(batch.binding, js); err != nil {
@@ -390,14 +390,14 @@ func (t *transactor) storeWorker(
 				}
 			}
 
-			b := t.bindings[batch.binding]
-			collection := b.collection
+			var b = t.bindings[batch.binding]
+			var collection = b.collection
 
 			// Ordered operations are not needed since each key can only be seen a single time in a
 			// Flow transaction. Turning this off supposedly allows for optimizations by the server.
 			// Transient per-item write errors (e.g. a primary stepdown) are retried by re-sending
 			// only the failed models; a duplicate-key (E11000) is terminal and fails fast.
-			res, err := storeBulkWithRetry(ctx, batch.models, maxStoreRetries,
+			var res, err = storeBulkWithRetry(ctx, batch.models, maxStoreRetries,
 				func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
 					return collection.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
 				},
@@ -489,11 +489,11 @@ func storeBulkWithRetry(
 	send func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error),
 	delay func(ctx context.Context, attempt int) error,
 ) (*mongo.BulkWriteResult, error) {
-	pending := models
-	total := &mongo.BulkWriteResult{}
+	var pending = models
+	var total = &mongo.BulkWriteResult{}
 
 	for attempt := 0; ; attempt++ {
-		res, err := send(pending)
+		var res, err = send(pending)
 		if res != nil {
 			total.InsertedCount += res.InsertedCount
 			total.MatchedCount += res.MatchedCount
@@ -502,7 +502,7 @@ func storeBulkWithRetry(
 			total.UpsertedCount += res.UpsertedCount
 		}
 
-		terminal, retryable := classifyBulkErr(err)
+		var terminal, retryable = classifyBulkErr(err)
 		if terminal != nil {
 			return total, terminal
 		}
@@ -513,7 +513,7 @@ func storeBulkWithRetry(
 			return total, fmt.Errorf("%d write models still failing after %d attempts: %w", len(retryable), attempt+1, err)
 		}
 
-		next := make([]mongo.WriteModel, len(retryable))
+		var next = make([]mongo.WriteModel, len(retryable))
 		for i, idx := range retryable {
 			next[i] = pending[idx]
 		}
@@ -528,7 +528,7 @@ func storeBulkWithRetry(
 // storeRetryDelay waits before re-sending failed models, with exponential
 // backoff capped at 5s.
 func storeRetryDelay(ctx context.Context, attempt int) error {
-	d := time.Duration(1<<attempt) * time.Second
+	var d = time.Duration(1<<attempt) * time.Second
 	if d > 5*time.Second {
 		d = 5 * time.Second
 	}
@@ -560,7 +560,7 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 
 	// Renaming runs before key restoration below so a key pointer can be
 	// redirected to wherever its value actually ends up living.
-	_, hadIDCollision := doc[idField]
+	var _, hadIDCollision = doc[idField]
 	if hadIDCollision {
 		// Preserve the original value of a collection field with a name
 		// that collides with the MongoDB _id field by materializing it
@@ -582,7 +582,7 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 			if kr.tupleIndex >= len(key) {
 				return nil, fmt.Errorf("store key tuple has %d elements but binding declares a key field at index %d", len(key), kr.tupleIndex)
 			}
-			v, ok := key[kr.tupleIndex].(int64)
+			var v, ok = key[kr.tupleIndex].(int64)
 			if !ok {
 				continue
 			}
@@ -595,7 +595,7 @@ func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, k
 			// the rename just pushed onto _flow_id), so there's no single
 			// location left to hold both — fail rather than let the rename
 			// silently clobber the key.
-			target := kr.tokens
+			var target = kr.tokens
 			if hadIDCollision && len(target) == 1 {
 				switch target[0] {
 				case idField:
@@ -659,7 +659,7 @@ func parsePointerTokens(ptr string) []string {
 		return nil
 	}
 
-	tokens := strings.Split(strings.TrimPrefix(ptr, "/"), "/")
+	var tokens = strings.Split(strings.TrimPrefix(ptr, "/"), "/")
 	for i, token := range tokens {
 		token = strings.ReplaceAll(token, "~1", "/")
 		tokens[i] = strings.ReplaceAll(token, "~0", "~")
@@ -689,7 +689,7 @@ func setAtPointer(doc bson.M, tokens []string, val any) bool {
 		}
 	}
 
-	leaf := tokens[len(tokens)-1]
+	var leaf = tokens[len(tokens)-1]
 	switch parent := current.(type) {
 	case map[string]interface{}:
 		parent[leaf] = val
@@ -721,7 +721,7 @@ func childAtToken(node any, token string) any {
 // arrayIndex parses an RFC6901 array-index token and reports whether it is a
 // valid in-bounds index into a slice of the given length.
 func arrayIndex(token string, length int) (int, bool) {
-	idx, err := strconv.Atoi(token)
+	var idx, err = strconv.Atoi(token)
 	if err != nil || idx < 0 || idx >= length {
 		return 0, false
 	}
