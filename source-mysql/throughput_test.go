@@ -214,7 +214,7 @@ func runBenchmarkCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) 
 	}
 
 	log.WithField("checkpoint", string(cs.Checkpoint)).Debug("running test capture")
-	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
+	var endpointSpecJSON, err = json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
 
 	var open proto.Message = &pc.Request{

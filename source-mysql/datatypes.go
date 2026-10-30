@@ -187,7 +187,7 @@ func transcodeTimestampValue(buf []byte, val any) ([]byte, error) {
 			return json.Append(buf, "0001-01-01T00:00:00Z", 0)
 		}
 		var inputTimestamp = normalizeMySQLTimestamp(str)
-		t, err := time.Parse(mysqlTimestampLayout, inputTimestamp)
+		var t, err = time.Parse(mysqlTimestampLayout, inputTimestamp)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing timestamp %q: %w", inputTimestamp, err)
 		}
@@ -215,7 +215,7 @@ func (t *mysqlDatetimeTranscoder) TranscodeJSON(buf []byte, val any) ([]byte, er
 			return nil, fmt.Errorf("unable to translate DATETIME values: %w", errDatabaseTimezoneUnknown)
 		}
 		var inputTimestamp = normalizeMySQLTimestamp(str)
-		t, err := time.ParseInLocation(mysqlTimestampLayout, inputTimestamp, t.Location)
+		var t, err = time.ParseInLocation(mysqlTimestampLayout, inputTimestamp, t.Location)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing datetime %q: %w", inputTimestamp, err)
 		}
@@ -257,7 +257,7 @@ func transcodeSpatialValue(buf []byte, val any) ([]byte, error) {
 		val = []byte(str)
 	}
 	if bs, ok := val.([]byte); ok {
-		wkt, err := spatial.ParseToWKT(bs)
+		var wkt, err = spatial.ParseToWKT(bs)
 		if err != nil {
 			return nil, fmt.Errorf("parsing spatial value: %w", err)
 		}

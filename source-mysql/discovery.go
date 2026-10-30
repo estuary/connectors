@@ -301,7 +301,7 @@ func (db *mysqlDatabase) applySystemVersioning(ctx context.Context, dst map[sqlc
 	if len(versioned) == 0 {
 		return nil
 	}
-	explicit, err := getExplicitSystemTimePeriods(ctx, db.conn, schema, versioned)
+	var explicit, err = getExplicitSystemTimePeriods(ctx, db.conn, schema, versioned)
 	if err != nil {
 		return err
 	}
@@ -818,7 +818,7 @@ func parseEnumValues(details string) ([]string, error) {
 	// Construct a simple dummy query containing the full enum column type.
 	var query = fmt.Sprintf(`CREATE TABLE dummy (x %s)`, details)
 
-	parser, err := sqlparser.New(sqlparser.Options{})
+	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("error constructing SQL parser: %w", err)
 	}

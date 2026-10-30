@@ -25,7 +25,7 @@ func TestPrerequisites(t *testing.T) {
 	t.Run("validateAB", func(t *testing.T) {
 		var cs = tb.CaptureSpec(ctx, t)
 		cs.Bindings = []*flow.CaptureSpec_Binding{bindingA, bindingB}
-		_, err := cs.Validate(ctx, t)
+		var _, err = cs.Validate(ctx, t)
 		if err != nil {
 			cupaloy.SnapshotT(t, err.Error())
 		} else {
@@ -35,7 +35,7 @@ func TestPrerequisites(t *testing.T) {
 	t.Run("validateABC-fails", func(t *testing.T) {
 		var cs = tb.CaptureSpec(ctx, t)
 		cs.Bindings = []*flow.CaptureSpec_Binding{bindingA, bindingB, bindingC}
-		_, err := cs.Validate(ctx, t)
+		var _, err = cs.Validate(ctx, t)
 		if err != nil {
 			cupaloy.SnapshotT(t, err.Error())
 		} else {

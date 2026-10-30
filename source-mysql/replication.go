@@ -220,11 +220,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 }
 
 func parseCursor(cursor string) (mysql.Position, error) {
-	seps := strings.Split(cursor, ":")
+	var seps = strings.Split(cursor, ":")
 	if len(seps) != 2 {
 		return mysql.Position{}, fmt.Errorf("input %q must have <logfile>:<offset> shape", cursor)
 	}
-	offset, err := strconv.ParseInt(seps[1], 10, 64)
+	var offset, err = strconv.ParseInt(seps[1], 10, 64)
 	if err != nil {
 		return mysql.Position{}, fmt.Errorf("invalid offset value %q: %w", seps[1], err)
 	}
@@ -242,7 +242,7 @@ func wrapMySQLReplicationError(err error) error {
 		return nil
 	}
 	if mysqlErr.Code == 1236 {
-		msg := mysqlErr.Message
+		var msg = mysqlErr.Message
 		switch {
 		case strings.Contains(msg, "Could not find first log file name"):
 			return cerrors.NewUserError(err, "the MySQL binary logs that this capture was tracking have been purged and replication cannot resume. This typically happens when binlog retention is too short (we recommend 7 days or more), binary logging was disabled and re-enabled, or the database was restored from a snapshot. To recover, trigger a backfill of all capture bindings.")
@@ -269,11 +269,11 @@ func unmarshalJSONString(bs json.RawMessage) (string, error) {
 }
 
 func splitHostPort(addr string) (string, int64, error) {
-	seps := strings.Split(addr, ":")
+	var seps = strings.Split(addr, ":")
 	if len(seps) != 2 {
 		return "", 0, fmt.Errorf("input %q must have <host>:<port> shape", addr)
 	}
-	port, err := strconv.ParseInt(seps[1], 10, 64)
+	var port, err = strconv.ParseInt(seps[1], 10, 64)
 	if err != nil {
 		return "", 0, fmt.Errorf("invalid port number %q: %w", seps[1], err)
 	}
@@ -400,7 +400,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 	// previous version of the vitess SQL parser that we used the default was 5.07.09, but
 	// I don't think this should have any practical implications on our usage of the
 	// parser.
-	parser, err := sqlparser.New(sqlparser.Options{})
+	var parser, err = sqlparser.New(sqlparser.Options{})
 	if err != nil {
 		return fmt.Errorf("creating SQL parser: %w", err)
 	}
@@ -743,7 +743,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		for rowIdx := range data.Rows {
 			// Update events contain alternating (before, after) pairs of rows
 			if rowIdx%2 == 1 {
-				before, err := decodeRow(streamID, len(columnNames), data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1], nil)
+				var before, err = decodeRow(streamID, len(columnNames), data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1], nil)
 				if err != nil {
 					return fmt.Errorf("error decoding 'before' row values: %w", err)
 				}
@@ -1109,7 +1109,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 			}
 		}
 	case *sqlparser.Insert:
-		table, err := stmt.Table.TableName()
+		var table, err = stmt.Table.TableName()
 		if err != nil {
 			return fmt.Errorf("internal error: could no determine table name for Insert query %s: %w", query, err)
 		}
@@ -1162,7 +1162,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 	// easier to get the lock here.
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
-	meta := rs.tables.metadata[streamID]
+	var meta = rs.tables.metadata[streamID]
 
 	for _, alterOpt := range stmt.AlterOptions {
 		switch alter := alterOpt.(type) {

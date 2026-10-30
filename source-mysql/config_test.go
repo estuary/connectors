@@ -202,7 +202,7 @@ func TestEffectivePassword(t *testing.T) {
 		var cfg = Config{Address: "example.com:3306", User: "flow_capture", Password: "secret1234"}
 		cfg.normalizeCredentials()
 
-		password, err := cfg.EffectivePassword(context.Background())
+		var password, err = cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, "secret1234", password)
 	})
@@ -212,7 +212,7 @@ func TestEffectivePassword(t *testing.T) {
 		cfg.normalizeCredentials()
 
 		require.NoError(t, cfg.Validate())
-		password, err := cfg.EffectivePassword(context.Background())
+		var password, err = cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		// The RDS auth token is a presigned request against the configured endpoint,
 		// and is far longer than the 32 characters allowed for a real password.
@@ -229,7 +229,7 @@ func TestEffectivePassword(t *testing.T) {
 		cfg.normalizeCredentials()
 		cfg.Credentials.AWSRegion = "us-west-2"
 
-		password, err := cfg.EffectivePassword(context.Background())
+		var password, err = cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		require.Contains(t, password, "us-west-2%2Frds-db%2Faws4_request")
 	})
@@ -239,7 +239,7 @@ func TestEffectivePassword(t *testing.T) {
 		cfg.Credentials.AWSAccessKeyID = ""
 		cfg.normalizeCredentials()
 
-		_, err := cfg.EffectivePassword(context.Background())
+		var _, err = cfg.EffectivePassword(context.Background())
 		require.ErrorContains(t, err, "missing iam session 'aws_access_key_id'")
 	})
 
@@ -257,7 +257,7 @@ func TestEffectivePassword(t *testing.T) {
 		legacy.normalizeCredentials()
 		union.normalizeCredentials()
 
-		legacyPassword, err := legacy.EffectivePassword(context.Background())
+		var legacyPassword, err = legacy.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		unionPassword, err := union.EffectivePassword(context.Background())
 		require.NoError(t, err)
@@ -285,7 +285,7 @@ func TestEffectivePassword(t *testing.T) {
 		cfg.normalizeCredentials()
 
 		require.NoError(t, cfg.Validate())
-		password, err := cfg.EffectivePassword(context.Background())
+		var password, err = cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, token, password)
 	})
@@ -298,7 +298,7 @@ func TestEffectivePassword(t *testing.T) {
 		}
 		cfg.normalizeCredentials()
 
-		_, err := cfg.EffectivePassword(context.Background())
+		var _, err = cfg.EffectivePassword(context.Background())
 		require.ErrorContains(t, err, "missing 'gcp_access_token'")
 	})
 
@@ -323,7 +323,7 @@ func TestEffectivePassword(t *testing.T) {
 		cfg.normalizeCredentials()
 
 		require.NoError(t, cfg.Validate())
-		password, err := cfg.EffectivePassword(context.Background())
+		var password, err = cfg.EffectivePassword(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, token, password)
 	})
@@ -336,7 +336,7 @@ func TestEffectivePassword(t *testing.T) {
 		}
 		cfg.normalizeCredentials()
 
-		_, err := cfg.EffectivePassword(context.Background())
+		var _, err = cfg.EffectivePassword(context.Background())
 		require.ErrorContains(t, err, "missing 'azure_access_token'")
 	})
 
@@ -347,7 +347,7 @@ func TestEffectivePassword(t *testing.T) {
 			Credentials: &CredentialsConfig{AuthType: "Bogus"},
 		}
 
-		_, err := cfg.EffectivePassword(context.Background())
+		var _, err = cfg.EffectivePassword(context.Background())
 		require.ErrorContains(t, err, `unsupported 'auth_type' "Bogus"`)
 	})
 }
@@ -378,7 +378,7 @@ func TestDefaultSSLMode(t *testing.T) {
 // cases that need 'ssl_server_ca' to contain something that actually parses.
 func testCAPEM(t *testing.T) string {
 	t.Helper()
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	var key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	var tmpl = &x509.Certificate{
 		SerialNumber:          big.NewInt(1),

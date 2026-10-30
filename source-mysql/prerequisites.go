@@ -105,7 +105,7 @@ func (db *mysqlDatabase) prerequisiteBinlogExpiry(ctx context.Context) error {
 	}
 
 	// Sanity-check binlog retention and error out if it's insufficiently long.
-	expiryTime, err := getBinlogExpiry(db.conn)
+	var expiryTime, err = getBinlogExpiry(db.conn)
 	logrus.WithField("expiry", expiryTime.String()).Info("queried binlog expiry time")
 	if err != nil {
 		return fmt.Errorf("error querying binlog expiry time: %w", err)
@@ -144,7 +144,7 @@ func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, tables []s
 func (db *mysqlDatabase) setupTablePrerequisite(_ context.Context, schema, table string) error {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
-	results, err := db.conn.Execute(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 0;", schema, table))
+	var results, err = db.conn.Execute(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 0;", schema, table))
 	if err != nil {
 		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
 	}
@@ -154,7 +154,7 @@ func (db *mysqlDatabase) setupTablePrerequisite(_ context.Context, schema, table
 	// couldn't be determined.
 	// Requirement: (*db).connect has already been called to initialize the datetimeLocation field.
 	if db.datetimeLocation == nil {
-		results, err := db.conn.Execute(fmt.Sprintf(`
+		var results, err = db.conn.Execute(fmt.Sprintf(`
 			SELECT column_name
 			FROM information_schema.columns
 			WHERE data_type='datetime' AND table_schema='%s' AND table_name='%s';
@@ -180,7 +180,7 @@ func (db *mysqlDatabase) setupTablePrerequisite(_ context.Context, schema, table
 func getBinlogExpiry(conn mysqlClient) (time.Duration, error) {
 	// When running on Amazon RDS MySQL there's an RDS-specific configuration
 	// for binlog retention, so that takes precedence if it exists.
-	rdsRetentionHours, err := queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
+	var rdsRetentionHours, err = queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
 	logrus.WithFields(logrus.Fields{"hours": rdsRetentionHours, "err": err}).Debug("queried RDS-specific binlog retention setting")
 	if err == nil {
 		return time.Duration(rdsRetentionHours) * time.Hour, nil

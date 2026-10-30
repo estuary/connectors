@@ -259,7 +259,7 @@ func TestBackfillModes(t *testing.T) {
 	require.NoError(t, json.Unmarshal(cs.Bindings[1].ResourceConfigJson, &resB))
 	resA.Mode = sqlcapture.BackfillModeNormal
 	resB.Mode = sqlcapture.BackfillModePrecise
-	resourceSpecA, err := json.Marshal(resA)
+	var resourceSpecA, err = json.Marshal(resA)
 	require.NoError(t, err)
 	resourceSpecB, err := json.Marshal(resB)
 	require.NoError(t, err)
@@ -605,7 +605,7 @@ func TestPrimaryKeyUpdateOfOnlyChangesBinding(t *testing.T) {
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Mode = sqlcapture.BackfillModeOnlyChanges
-	resJSON, err := json.Marshal(res)
+	var resJSON, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resJSON
 
@@ -883,7 +883,7 @@ func TestActivateStreamsBeforeCatchup(t *testing.T) {
 			var res sqlcapture.Resource
 			require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 			res.Advanced = &sqlcapture.AdvancedResourceOptions{AdditionalBackfillFilter: "id <= 2"}
-			resJSON, err := json.Marshal(res)
+			var resJSON, err = json.Marshal(res)
 			require.NoError(t, err)
 			cs.Bindings[0].ResourceConfigJson = resJSON
 			cs.Bindings[0].StateKey += ".v1"

@@ -102,7 +102,7 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
+		var host, port, err = net.SplitHostPort(config.Address)
 		if err != nil {
 			return nil, fmt.Errorf("splitting address to host and port: %w", err)
 		}
@@ -370,7 +370,7 @@ func (c *Config) EffectivePassword(ctx context.Context) (string, error) {
 	case UserPassword:
 		return c.Credentials.Password, nil
 	case AWSIAM:
-		credProvider, err := c.Credentials.AWSCredentialsProvider()
+		var credProvider, err = c.Credentials.AWSCredentialsProvider()
 		if err != nil {
 			return "", err
 		}
@@ -567,7 +567,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	if db.config.Timezone != "" {
 		// The user-entered timezone value is verified to parse without error in (*Config).Validate,
 		// so this parsing is not expected to fail.
-		loc, err := schedule.ParseTimezone(db.config.Timezone)
+		var loc, err = schedule.ParseTimezone(db.config.Timezone)
 		if err != nil {
 			return fmt.Errorf("invalid config timezone: %w", err)
 		}

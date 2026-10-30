@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := logrus.ParseLevel(logLevel)
+		var level, err = logrus.ParseLevel(logLevel)
 		if err != nil {
 			logrus.WithField("level", logLevel).Fatal("invalid log level")
 		}

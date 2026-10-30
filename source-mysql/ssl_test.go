@@ -24,7 +24,7 @@ func presentedChain(t *testing.T) []*x509.Certificate {
 			InsecureSkipVerify: true,
 			VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 				for _, raw := range rawCerts {
-					cert, err := x509.ParseCertificate(raw)
+					var cert, err = x509.ParseCertificate(raw)
 					if err != nil {
 						return err
 					}
