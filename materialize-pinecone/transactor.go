@@ -63,16 +63,16 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	t.group, t.groupCtx = errgroup.WithContext(ctx)
 	t.group.SetLimit(concurrentWorkers)
 	t.upserted = make([]atomic.Int64, len(t.bindings))
-	round := it.Round
+	var round = it.Round
 
 	var batch []upsertDoc
 
-	lastBinding := -1
+	var lastBinding = -1
 	for it.Next(false) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
@@ -86,18 +86,18 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			lastBinding = it.Binding
 		}
 
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
-		allFields := append(it.Key, it.Values...)
+		var allFields = append(it.Key, it.Values...)
 
-		data := make(map[string]interface{})
+		var data = make(map[string]interface{})
 		for idx, val := range allFields {
 			if val != nil {
 				data[b.dataHeaders[idx]] = val
 			}
 		}
 
-		embeddingInput, err := makeInput(data)
+		var embeddingInput, err = makeInput(data)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func makeInput(fields map[string]interface{}) (string, error) {
 	var out strings.Builder
 
-	count := 0
+	var count = 0
 	for k, v := range fields {
 		if c, ok := v.([]byte); ok {
 			// We get JSON arrays and objects as raw bytes of their encoded JSON. Rather than
@@ -150,7 +150,7 @@ func makeInput(fields map[string]interface{}) (string, error) {
 			v = json.RawMessage(c)
 		}
 
-		m, err := json.Marshal(v)
+		var m, err = json.Marshal(v)
 		if err != nil {
 			return "", fmt.Errorf("serializing input field: %w", err)
 		}
@@ -166,18 +166,18 @@ func makeInput(fields map[string]interface{}) (string, error) {
 }
 
 func (t *transactor) sendBatch(idx int, batch []upsertDoc) error {
-	b := t.bindings[idx]
+	var b = t.bindings[idx]
 	select {
 	case <-t.groupCtx.Done():
 		return t.group.Wait()
 	default:
 		t.group.Go(func() error {
-			input := make([]string, 0, len(batch))
+			var input = make([]string, 0, len(batch))
 			for _, r := range batch {
 				input = append(input, r.input)
 			}
 
-			embeddings, err := t.openAiClient.CreateEmbeddings(t.groupCtx, input)
+			var embeddings, err = t.openAiClient.CreateEmbeddings(t.groupCtx, input)
 			if err != nil {
 				return fmt.Errorf("openAI creating embeddings: %w", err)
 			}
@@ -185,9 +185,9 @@ func (t *transactor) sendBatch(idx int, batch []upsertDoc) error {
 			var vecs []*pinecone.Vector
 
 			for _, e := range embeddings {
-				thisUpsert := batch[e.Index]
+				var thisUpsert = batch[e.Index]
 
-				metadata, err := structpb.NewStruct(thisUpsert.metadata)
+				var metadata, err = structpb.NewStruct(thisUpsert.metadata)
 				if err != nil {
 					return fmt.Errorf("creating metadata: %w", err)
 				}

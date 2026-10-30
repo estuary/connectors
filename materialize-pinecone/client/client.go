@@ -60,8 +60,8 @@ type openAiEmbeddingsError struct {
 }
 
 func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]Embedding, error) {
-	res, err := withRetry(ctx, func() (*http.Response, error) {
-		body := new(bytes.Buffer)
+	var res, err = withRetry(ctx, func() (*http.Response, error) {
+		var body = new(bytes.Buffer)
 		if err := json.NewEncoder(body).Encode(&OpenAIEmbeddingsRequest{
 			Model: c.embeddingModel,
 			Input: input,
@@ -69,7 +69,7 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 			return nil, err
 		}
 
-		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/embeddings", body)
+		var req, err = http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/embeddings", body)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +100,7 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 		return nil, fmt.Errorf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)
 	}
 
-	embeddings := OpenAIEmbeddingsResponse{}
+	var embeddings = OpenAIEmbeddingsResponse{}
 	if err := json.NewDecoder(res.Body).Decode(&embeddings); err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 }
 
 func (c *OpenAiClient) VerifyModelExists(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.openai.com/v1/models/%s", c.embeddingModel), nil)
+	var req, err = http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.openai.com/v1/models/%s", c.embeddingModel), nil)
 	if err != nil {
 		return err
 	}
@@ -148,13 +148,13 @@ var (
 )
 
 func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Response, error) {
-	n := 0
-	backoff := initialBackoff
+	var n = 0
+	var backoff = initialBackoff
 
 	for {
 		n++
 
-		res, err := fn()
+		var res, err = fn()
 		if err != nil {
 			return nil, fmt.Errorf("withRetry: %w", err)
 		}
@@ -173,7 +173,7 @@ func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Re
 
 			res.Body.Close()
 			backoff *= math.Pow(2, 1+rand.Float64())
-			delay := time.Duration(backoff * float64(time.Millisecond))
+			var delay = time.Duration(backoff * float64(time.Millisecond))
 			if delay > maxBackoff {
 				delay = maxBackoff
 			}

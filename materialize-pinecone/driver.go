@@ -84,7 +84,7 @@ func (c *config) pineconeClient() (*pinecone.Client, error) {
 }
 
 func (c *config) openAiClient() *client.OpenAiClient {
-	selectedModel := textEmbeddingAda002
+	var selectedModel = textEmbeddingAda002
 	if c.EmbeddingModel != "" {
 		selectedModel = c.EmbeddingModel
 	}
@@ -120,8 +120,8 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	es := schemagen.GenerateSchema("Materialize Pinecone Spec", &config{})
-	endpointSchema, err := es.MarshalJSON()
+	var es = schemagen.GenerateSchema("Materialize Pinecone Spec", &config{})
+	var endpointSchema, err = es.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -140,7 +140,7 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	cfg, err := resolveEndpointConfig(req.ConfigJson)
+	var cfg, err = resolveEndpointConfig(req.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			indexed = *idx.Spec.Pod.MetadataConfig.Indexed
 		}
 
-		entry := log.WithFields(log.Fields{
+		var entry = log.WithFields(log.Fields{
 			"index": cfg.Index,
 		})
 		if len(indexed) == 0 {
@@ -191,7 +191,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
@@ -260,7 +260,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.B
 
 	var bindings []binding
 	for _, b := range open.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, nil, nil, err
 		}
