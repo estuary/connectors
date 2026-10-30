@@ -10,6 +10,12 @@
 - With Exclude Flow Document enabled, documents now load correctly when a
   top-level field contains special or non-ASCII characters, or has a custom
   projection name.
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. Controlled by the `truncate_after_backfill`
+  feature flag, enabled by default; a binding without a `flow_published_at`
+  column, or in delta-updates mode, is unaffected.
 
 ## 2026-10-31
 ### Changed
