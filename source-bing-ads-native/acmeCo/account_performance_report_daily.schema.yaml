@@ -24,34 +24,22 @@ properties:
     description: Document metadata
   AccountId:
     title: Accountid
-    type: integer
+    type: string
   TimePeriod:
     title: Timeperiod
     type: string
-  CurrencyCode:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Currencycode
   AdDistribution:
     anyOf:
     - type: string
     - type: 'null'
     default: null
     title: Addistribution
-  DeviceType:
+  BidMatchType:
     anyOf:
     - type: string
     - type: 'null'
     default: null
-    title: Devicetype
-  Network:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Network
+    title: Bidmatchtype
   DeliveredMatchType:
     anyOf:
     - type: string
@@ -64,186 +52,24 @@ properties:
     - type: 'null'
     default: null
     title: Deviceos
+  DeviceType:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Devicetype
+  Network:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Network
   TopVsOther:
     anyOf:
     - type: string
     - type: 'null'
     default: null
     title: Topvsother
-  BidMatchType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Bidmatchtype
-  AccountName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Accountname
-  AccountNumber:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Accountnumber
-  PhoneImpressions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Phoneimpressions
-  PhoneCalls:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Phonecalls
-  Clicks:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Clicks
-  Ctr:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Ctr
-  Spend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Spend
-  Impressions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Impressions
-  CostPerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Costperconversion
-  Ptr:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Ptr
-  Assists:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Assists
-  ReturnOnAdSpend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Returnonadspend
-  CostPerAssist:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Costperassist
-  AverageCpc:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averagecpc
-  AveragePosition:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averageposition
-  AverageCpm:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averagecpm
-  Conversions:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversions
-  ConversionRate:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversionrate
-  ConversionsQualified:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversionsqualified
-  LowQualityClicks:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Lowqualityclicks
-  LowQualityClicksPercent:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Lowqualityclickspercent
-  LowQualityImpressions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Lowqualityimpressions
-  LowQualitySophisticatedClicks:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Lowqualitysophisticatedclicks
-  LowQualityConversions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Lowqualityconversions
-  LowQualityConversionRate:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Lowqualityconversionrate
-  Revenue:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenue
-  RevenuePerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenueperconversion
-  RevenuePerAssist:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenueperassist
 required:
 - AccountId
 - TimePeriod

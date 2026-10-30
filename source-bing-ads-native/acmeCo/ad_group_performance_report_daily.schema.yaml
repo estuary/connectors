@@ -24,46 +24,34 @@ properties:
     description: Document metadata
   AccountId:
     title: Accountid
-    type: integer
-  CampaignId:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Campaignid
-  AdGroupId:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Adgroupid
+    type: string
   TimePeriod:
     title: Timeperiod
     type: string
-  CurrencyCode:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Currencycode
   AdDistribution:
     anyOf:
     - type: string
     - type: 'null'
     default: null
     title: Addistribution
-  DeviceType:
+  AdGroupId:
     anyOf:
     - type: string
     - type: 'null'
     default: null
-    title: Devicetype
-  Network:
+    title: Adgroupid
+  BidMatchType:
     anyOf:
     - type: string
     - type: 'null'
     default: null
-    title: Network
+    title: Bidmatchtype
+  CampaignId:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Campaignid
   DeliveredMatchType:
     anyOf:
     - type: string
@@ -76,270 +64,30 @@ properties:
     - type: 'null'
     default: null
     title: Deviceos
-  TopVsOther:
+  DeviceType:
     anyOf:
     - type: string
     - type: 'null'
     default: null
-    title: Topvsother
-  BidMatchType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Bidmatchtype
+    title: Devicetype
   Language:
     anyOf:
     - type: string
     - type: 'null'
     default: null
     title: Language
-  AccountName:
+  Network:
     anyOf:
     - type: string
     - type: 'null'
     default: null
-    title: Accountname
-  CampaignName:
+    title: Network
+  TopVsOther:
     anyOf:
     - type: string
     - type: 'null'
     default: null
-    title: Campaignname
-  CampaignType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Campaigntype
-  AdGroupName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Adgroupname
-  AdGroupType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Adgrouptype
-  Impressions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Impressions
-  Clicks:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Clicks
-  Ctr:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Ctr
-  Spend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Spend
-  CostPerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Costperconversion
-  QualityScore:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Qualityscore
-  ExpectedCtr:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Expectedctr
-  AdRelevance:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Adrelevance
-  LandingPageExperience:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Landingpageexperience
-  PhoneImpressions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Phoneimpressions
-  PhoneCalls:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Phonecalls
-  Ptr:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Ptr
-  Assists:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Assists
-  CostPerAssist:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Costperassist
-  CustomParameters:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Customparameters
-  FinalUrlSuffix:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Finalurlsuffix
-  ViewThroughConversions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Viewthroughconversions
-  AllCostPerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allcostperconversion
-  AllReturnOnAdSpend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allreturnonadspend
-  AllConversions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Allconversions
-  AllConversionRate:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allconversionrate
-  AllRevenue:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allrevenue
-  AllRevenuePerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allrevenueperconversion
-  AverageCpc:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averagecpc
-  AveragePosition:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averageposition
-  AverageCpm:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averagecpm
-  Conversions:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversions
-  ConversionRate:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversionrate
-  ConversionsQualified:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversionsqualified
-  Revenue:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenue
-  RevenuePerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenueperconversion
-  RevenuePerAssist:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenueperassist
-  HistoricalQualityScore:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Historicalqualityscore
-  HistoricalExpectedCtr:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Historicalexpectedctr
-  HistoricalAdRelevance:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Historicaladrelevance
-  HistoricalLandingPageExperience:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Historicallandingpageexperience
+    title: Topvsother
 required:
 - AccountId
 - TimePeriod
