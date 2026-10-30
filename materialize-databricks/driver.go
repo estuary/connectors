@@ -182,6 +182,12 @@ type transactor struct {
 	// where the rows matching the keys exist on, and another to read
 	// flow_document from those specific files.
 	twoPhaseLoads bool
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging by Store.
+	truncations map[int]time.Time
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -337,6 +343,7 @@ func newTransactor(
 		materializationName:   materializationName,
 		stagingPrefix:         stagingPrefix(materializationName),
 		twoPhaseLoads:         featureFlags["two_phase_loads"],
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -391,6 +398,11 @@ func (t *transactor) openDB() (*stdsql.DB, error) {
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+
+	// truncateSQL deletes rows published before a backfill's boundary, with
+	// %s for the boundary literal. Empty if the binding excludes
+	// flow_published_at and so cannot be truncated.
+	truncateSQL string
 
 	// path to where we store staging files
 	rootStagingPath string
@@ -447,6 +459,10 @@ func (t *transactor) addBinding(target sql.Table) error {
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
 	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
 	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
+	}
 
 	t.bindings = append(t.bindings, b)
 
@@ -726,6 +742,11 @@ type checkpointItem struct {
 	// NeedsMerge marks entries whose files must MERGE into the target table;
 	// otherwise a direct COPY INTO suffices.
 	NeedsMerge bool `json:",omitempty"`
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. The entry's apply deletes the target's rows published
+	// before it, after the entry's stores. It is omitted when unset, so that
+	// the entry stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 
 	// round is the transaction round this session staged the entry in, for
 	// attributing its commit's row stats. Recovered and peer entries are
@@ -1035,6 +1056,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		b.needsMerge, b.stagingTable = false, "" // reset for next round
 	}
 
+	for binding, boundary := range d.truncations {
+		var b = d.bindings[binding]
+		var item = d.cp[b.target.StateKey][d.rangeKey]
+		if item == nil {
+			item = &checkpointItem{round: it.Round}
+			d.cp.add(b.target.StateKey, d.rangeKey, item)
+		}
+		item.TruncateBefore = &boundary
+	}
+	d.truncations = nil
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		if state, err := d.startCommitState(); err != nil {
 			return nil, m.FinishedOperation(err)
@@ -1097,7 +1129,31 @@ func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
-func (d *transactor) Flush(context.Context, map[int]time.Time) error {
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged work.
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	d.truncations = make(map[int]time.Time, len(completes))
+	if !d.primary {
+		return nil
+	}
+	for binding, boundary := range completes {
+		var b = d.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			d.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		d.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -1250,7 +1306,11 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 	var report = func(stats m.RowStats) {
 		d.be.ReportRowStats(items[0].round, b.target.Path, stats)
 	}
+	var truncateBefore *time.Time
 	for _, item := range items {
+		if item.TruncateBefore != nil && (truncateBefore == nil || item.TruncateBefore.After(*truncateBefore)) {
+			truncateBefore = item.TruncateBefore
+		}
 		if item.Directory != "" || len(item.StagedFiles) > 0 {
 			coalesce = append(coalesce, item)
 			continue
@@ -1287,6 +1347,29 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			return err
 		}
 	}
+
+	// The truncation runs after the stores, so that it keeps the rows they
+	// just wrote, which were published after the boundary.
+	if truncateBefore == nil {
+		// Pass.
+	} else if b.truncateSQL == "" {
+		var _, reason = b.target.PublishedAtColumn()
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": *truncateBefore,
+			"reason":   reason.Error(),
+		}).Warn("skipping staged truncation because the binding no longer supports it")
+	} else if stats, err := d.execQuery(ctx, db, log.Fields{"resourcePath": b.target.Path}, b.truncateSQL, truncateBefore.UTC().Truncate(time.Microsecond)); err != nil {
+		return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+	} else {
+		report(m.ExactRowStats(0, 0, 0).WithTruncated(stats.Total))
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": *truncateBefore,
+			"deleted":  stats.Total,
+		}).Info("truncated rows published before the backfill")
+	}
+
 	d.be.FinishedResourceCommit(b.target.Path)
 
 	var dirs, files []string
@@ -1377,10 +1460,10 @@ func isRetriableError(err error) bool {
 
 // execQuery runs a commit query, profiled with the given fields, and returns
 // the row counts of its result row.
-func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile log.Fields, query string) (m.RowStats, error) {
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile log.Fields, query string, args ...any) (m.RowStats, error) {
 	for attempt := 0; ; attempt++ {
 		var queryCtx, trace = d.profiler.trace(ctx, statementKind(query), profile)
-		var rows, err = db.QueryContext(queryCtx, query)
+		var rows, err = db.QueryContext(queryCtx, query, args...)
 		trace.finish(err, nil)
 		if err == nil {
 			return scanRowStats(rows), nil

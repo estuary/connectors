@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-30
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. Controlled by the `truncate_after_backfill`
+  feature flag, enabled by default; a binding without a `flow_published_at`
+  column, or in delta-updates mode, is unaffected.
+
 ## 2026-10-29
 ### Fixed
 - Load, staging and commit queries now carry the `materialization_name` query
