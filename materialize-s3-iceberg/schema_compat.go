@@ -41,7 +41,7 @@ func collapseNullableScalars(s *jsonschema.Schema) {
 	if len(s.OneOf) != 2 {
 		return
 	}
-	scalar, null := s.OneOf[0], s.OneOf[1]
+	var scalar, null = s.OneOf[0], s.OneOf[1]
 	if null.Type != "null" {
 		scalar, null = null, scalar
 	}
@@ -52,7 +52,7 @@ func collapseNullableScalars(s *jsonschema.Schema) {
 	// Widen the scalar branch's type in place, then replace the wrapper with
 	// it. `type` must go through Extras because jsonschema.Schema.Type is a
 	// plain string that cannot hold the [type, "null"] array.
-	scalarType := scalar.Type
+	var scalarType = scalar.Type
 	scalar.Type = ""
 	if scalar.Extras == nil {
 		scalar.Extras = map[string]any{}

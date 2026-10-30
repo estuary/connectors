@@ -134,7 +134,7 @@ type advancedConfig struct {
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
-	cfg := filesink.S3StoreConfig{
+	var cfg = filesink.S3StoreConfig{
 		Bucket:   c.Bucket,
 		Region:   c.Region,
 		Endpoint: c.S3Endpoint,
@@ -160,8 +160,8 @@ func (c config) s3StoreConfig() filesink.S3StoreConfig {
 // legacy and modern configs identically. When both are supplied, the explicit
 // credentials win and the legacy keys are ignored.
 func (c *config) normalizeCredentials() {
-	legacyAccessKey := strVal(c.AWSAccessKeyID)
-	legacySecretKey := strVal(c.AWSSecretAccessKey)
+	var legacyAccessKey = strVal(c.AWSAccessKeyID)
+	var legacySecretKey = strVal(c.AWSSecretAccessKey)
 	c.AWSAccessKeyID = nil
 	c.AWSSecretAccessKey = nil
 
@@ -186,7 +186,7 @@ func (c *config) normalizeCredentials() {
 }
 
 func (c config) Validate() error {
-	requiredProperties := [][]string{
+	var requiredProperties = [][]string{
 		{"bucket", c.Bucket},
 		{"namespace", c.Namespace},
 		{"region", c.Region},
@@ -198,8 +198,8 @@ func (c config) Validate() error {
 		}
 	}
 
-	legacyAccessKey := strVal(c.AWSAccessKeyID)
-	legacySecretKey := strVal(c.AWSSecretAccessKey)
+	var legacyAccessKey = strVal(c.AWSAccessKeyID)
+	var legacySecretKey = strVal(c.AWSSecretAccessKey)
 
 	if c.Credentials != nil {
 		if err := c.Credentials.Validate(); err != nil {
@@ -265,7 +265,7 @@ func (c config) variantColumns() bool {
 }
 
 func parse8601(in string) (time.Duration, error) {
-	parsed, err := iso8601.ParseISO8601(in)
+	var parsed, err = iso8601.ParseISO8601(in)
 	if err != nil {
 		return 0, err
 	}
@@ -334,9 +334,9 @@ var _ boilerplate.Connector = &driver{}
 func NewDriver() boilerplate.Connector { return driver{} }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchemaObj := schemagen.GenerateSchema("EndpointConfig", &config{})
+	var endpointSchemaObj = schemagen.GenerateSchema("EndpointConfig", &config{})
 	collapseNullableScalars(endpointSchemaObj)
-	endpointSchema, err := endpointSchemaObj.MarshalJSON()
+	var endpointSchema, err = endpointSchemaObj.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -374,12 +374,12 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 			cfg.Prefix = "__r2_data_catalog/" + cfg.Prefix
 		}
 	}
-	locationStyle := NestedLocationStyle
+	var locationStyle = NestedLocationStyle
 	if featureFlags["nested_dot_hash_location_style"] {
 		locationStyle = NestedDotHashLocationStyle
 	}
 
-	catalog, err := newCatalog(ctx, cfg, locationStyle)
+	var catalog, err = newCatalog(ctx, cfg, locationStyle)
 	if err != nil {
 		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
 	}
@@ -391,7 +391,7 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 }
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
-	interval, err := parse8601(d.cfg.UploadInterval)
+	var interval, err = parse8601(d.cfg.UploadInterval)
 	if err != nil {
 		interval = time.Hour
 	}
@@ -417,18 +417,18 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 }
 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
+	var s3store, err = filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
 	if err != nil {
 		errs.Err(fmt.Errorf("creating s3 store: %w", err))
 		return errs
 	}
 
-	s3client := s3store.Client()
+	var s3client = s3store.Client()
 	// Overwriting a fixed key on each check leaves no object behind without
 	// requiring s3:DeleteObject.
-	testKey := path.Join(d.cfg.Prefix, ".estuary-prerequisites-check")
+	var testKey = path.Join(d.cfg.Prefix, ".estuary-prerequisites-check")
 
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
@@ -458,7 +458,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 }
 
 func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
-	_, isNumeric := m.AsFormattedNumeric(&p)
+	var _, isNumeric = m.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
@@ -499,7 +499,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg)
+	var s, err = projectionToParquetSchemaElement(p.Projection, fc, d.cfg)
 	if err != nil {
 		// The only error here is ignoreStringFormat being set on a non-string
 		// field, where it is a no-op. Map by the field's native type rather
@@ -570,8 +570,8 @@ func (d *materialization) NewTransactor(
 	var bindings []binding
 
 	for i := range mappedBindings {
-		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg)
+		var b = &mappedBindings[i]
+		var pqSchema, err = parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -585,13 +585,13 @@ func (d *materialization) NewTransactor(
 		})
 	}
 
-	tableInfos, err := d.catalog.tableInfos(ctx, resourcePaths)
+	var tableInfos, err = d.catalog.tableInfos(ctx, resourcePaths)
 	if err != nil {
 		return nil, fmt.Errorf("looking up tables: %w", err)
 	}
 
 	for idx := range bindings {
-		b := &bindings[idx]
+		var b = &bindings[idx]
 		b.catalogTablePath = tableInfos[idx].location
 
 		// Embed the table's field IDs in written parquet files so they are
@@ -600,11 +600,11 @@ func (d *materialization) NewTransactor(
 		// same name) to read correctly from new files while old ID-less files
 		// resolve to null.
 		for i := range b.pqSchema {
-			id, ok := tableInfos[idx].fieldIDs[b.pqSchema[i].Name]
+			var id, ok = tableInfos[idx].fieldIDs[b.pqSchema[i].Name]
 			if !ok {
 				return nil, fmt.Errorf("selected field %q has no column in table %q", b.pqSchema[i].Name, pathToFQN(b.path))
 			}
-			fieldID := int32(id)
+			var fieldID = int32(id)
 			b.pqSchema[i].FieldId = &fieldID
 		}
 	}
@@ -634,26 +634,26 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	tablePaths, err := d.catalog.tablePaths(ctx, [][]string{path})
+	var tablePaths, err = d.catalog.tablePaths(ctx, [][]string{path})
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting table path for %s.%s: %w", path[0], path[1], err)
 	}
 
-	tableLocation := tablePaths[0]
+	var tableLocation = tablePaths[0]
 	if tableLocation == "" {
 		return nil, nil, nil
 	}
 
 	// The data directory is at {tableLocation}/data/
 	// tableLocation is like s3://{bucket}/{prefix}/...
-	dataPrefix := strings.TrimPrefix(tableLocation, "s3://"+d.cfg.Bucket+"/")
+	var dataPrefix = strings.TrimPrefix(tableLocation, "s3://"+d.cfg.Bucket+"/")
 	dataPrefix = dataPrefix + "/data/"
 
 	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating s3 store: %w", err)
 	}
-	s3client := s3store.Client()
+	var s3client = s3store.Client()
 
 	listOut, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(d.cfg.Bucket),
@@ -682,7 +682,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// columns are only readable from DuckDB 1.5.3 on.
 	var allRows []map[string]any
 	for _, key := range parquetKeys {
-		getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+		var getOut, err = s3client.GetObject(ctx, &s3.GetObjectInput{
 			Bucket: aws.String(d.cfg.Bucket),
 			Key:    aws.String(key),
 		})
@@ -708,13 +708,13 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	}
 
 	// Extract column names.
-	colSet := make(map[string]struct{})
+	var colSet = make(map[string]struct{})
 	for _, row := range allRows {
 		for k := range row {
 			colSet[k] = struct{}{}
 		}
 	}
-	columns := make([]string, 0, len(colSet))
+	var columns = make([]string, 0, len(colSet))
 	for k := range colSet {
 		columns = append(columns, k)
 	}
@@ -723,7 +723,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// Build rows in column order.
 	var result [][]any
 	for _, row := range allRows {
-		r := make([]any, len(columns))
+		var r = make([]any, len(columns))
 		for i, col := range columns {
 			r[i] = row[col]
 		}
@@ -733,8 +733,8 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// Sort for determinism.
 	sort.Slice(result, func(i, j int) bool {
 		for c := range columns {
-			vi := fmt.Sprint(result[i][c])
-			vj := fmt.Sprint(result[j][c])
+			var vi = fmt.Sprint(result[i][c])
+			var vj = fmt.Sprint(result[j][c])
 			if vi != vj {
 				return vi < vj
 			}
@@ -749,7 +749,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 // returns its rows. The file is staged in a temp directory that is removed
 // before returning rather than accumulating across a caller's loop.
 func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, error) {
-	tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
+	var tmpDir, err = os.MkdirTemp("", "iceberg-test-*")
 	if err != nil {
 		return nil, fmt.Errorf("creating temporary directory: %w", err)
 	}
@@ -802,7 +802,7 @@ func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, erro
 // JSON, which is neither valid JSON nor comparable to the JSON string columns
 // the same field produces without variant_columns enabled.
 func duckdbSelectList(ctx context.Context, db *sql.DB, path string) (string, error) {
-	rows, err := db.QueryContext(ctx, fmt.Sprintf("DESCRIBE SELECT * FROM '%s'", path))
+	var rows, err = db.QueryContext(ctx, fmt.Sprintf("DESCRIBE SELECT * FROM '%s'", path))
 	if err != nil {
 		return "", fmt.Errorf("describing %s: %w", path, err)
 	}

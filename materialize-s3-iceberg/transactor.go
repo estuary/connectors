@@ -37,7 +37,7 @@ func tablePath(bucket, prefix, namespace, table string, style LocationStyle) str
 // key and full s3Path in s3:// format.
 func filePath(catalogTablePath string) (fileKey string, s3Path string) {
 	s3Path = strings.TrimSuffix(catalogTablePath, "/") + "/data/" + uuid.New().String() + ".parquet"
-	parts := strings.Split(strings.TrimPrefix(s3Path, "s3://"), "/")
+	var parts = strings.Split(strings.TrimPrefix(s3Path, "s3://"), "/")
 	fileKey = strings.Join(parts[1:], "/")
 
 	return
@@ -71,7 +71,7 @@ type bindingState struct {
 }
 
 func hashCheckpoint(cp *protocol.Checkpoint) (string, error) {
-	mcp, err := cp.Marshal()
+	var mcp, err = cp.Marshal()
 	if err != nil {
 		return "", fmt.Errorf("marshalling checkpoint: %w", err)
 	}
@@ -124,12 +124,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var group errgroup.Group
 	var states = t.state.BindingStates
 
-	startFile := func(b binding) error {
+	var startFile = func(b binding) error {
 		// Start uploading a new file, either because the binding changed or because the prior file
 		// got sufficiently large.
-		r, w := io.Pipe()
+		var r, w = io.Pipe()
 
-		key, s3Path := filePath(b.catalogTablePath)
+		var key, s3Path = filePath(b.catalogTablePath)
 		states[b.stateKey].FileKeys = append(states[b.stateKey].FileKeys, s3Path)
 
 		group.Go(func() error {
@@ -152,7 +152,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
-	finishFile := func() error {
+	var finishFile = func() error {
 		if pqw == nil {
 			return nil
 		} else if err := pqw.Close(); err != nil {
@@ -165,10 +165,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
-	rows := make(map[int]int64)
-	lastBinding := -1
+	var rows = make(map[int]int64)
+	var lastBinding = -1
 	for it.Next(false) {
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 		rows[it.Binding]++
 
 		if lastBinding != -1 && lastBinding != it.Binding {
@@ -184,7 +184,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		row, err := b.mapped.ConvertAll(it.Key, it.Values, it.RawJSON)
+		var row, err = b.mapped.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting row: %w", err)
 		}
@@ -206,20 +206,20 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := finishFile(); err != nil {
 		return nil, fmt.Errorf("final finishFile: %w", err)
 	}
-	round := it.Round
+	var round = it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// The driver checkpoint for this transaction will include the list of files upload for each
 		// binding, the previously committed runtime checkpoint, and current runtime checkpoint. We
 		// will append files to tables that still are still checkpointed with the previous
 		// checkpoint in Acknowledge.
-		currentCp, err := hashCheckpoint(runtimeCheckpoint)
+		var currentCp, err = hashCheckpoint(runtimeCheckpoint)
 		if err != nil {
 			return nil, m.FinishedOperation(err)
 		}
 
 		for idx, b := range t.bindings {
-			bindingState := t.state.BindingStates[b.stateKey]
+			var bindingState = t.state.BindingStates[b.stateKey]
 
 			if len(bindingState.FileKeys) == 0 {
 				continue // no data for this binding
@@ -244,7 +244,7 @@ func (t *transactor) Flush(context.Context, map[int]time.Time) error {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 
 	var processed bool
 	for _, b := range t.bindings {
@@ -254,21 +254,21 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		bindingState := t.state.BindingStates[b.stateKey]
+		var bindingState = t.state.BindingStates[b.stateKey]
 
 		if len(bindingState.FileKeys) == 0 {
 			continue // no data for this binding
 		}
 		processed = true
 
-		ll := log.WithFields(log.Fields{
+		var ll = log.WithFields(log.Fields{
 			"table":              pathToFQN(b.path),
 			"previousCheckpoint": bindingState.PreviousCheckpoint,
 			"currentCheckpoint":  bindingState.CurrentCheckpoint,
 		})
 
 		ll.Info("starting appendFiles for table")
-		appendCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		var appendCtx, cancel = context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
 		if err := t.catalog.appendFiles(appendCtx, t.materialization, b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
 			return nil, fmt.Errorf("appendFiles for %s: %w", b.path, err)
@@ -288,7 +288,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		return nil, nil
 	}
 
-	checkpointJSON, err := json.Marshal(t.state)
+	var checkpointJSON, err = json.Marshal(t.state)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint json: %w", err)
 	}

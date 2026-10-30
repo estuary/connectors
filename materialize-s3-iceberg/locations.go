@@ -38,14 +38,14 @@ func sanitize(name string) string {
 // characters they allow but generally characters outside of these common ones
 // can cause issues with clients trying to read the named objects.
 func sanitizeTable(table string) string {
-	sanitized := sanitize(table)
+	var sanitized = sanitize(table)
 	if len(sanitized) > 64 {
 		// Limit the length of the "human readable" part of the table name to
 		// something reasonable.
 		sanitized = sanitized[:64]
 	}
 
-	hash := xxhash.Sum64String(table)
+	var hash = xxhash.Sum64String(table)
 	return fmt.Sprintf("%s_%016X", sanitized, hash)
 }
 
@@ -54,7 +54,7 @@ func createNestedLocation(namespace, table string) string {
 }
 
 func createNestedDotHashLocation(namespace, table string) string {
-	sanitized := path.Join(sanitize(namespace), sanitize(table))
+	var sanitized = path.Join(sanitize(namespace), sanitize(table))
 	return fmt.Sprintf("%s.%016X", sanitized, xxhash.Sum64String(sanitized))
 }
 

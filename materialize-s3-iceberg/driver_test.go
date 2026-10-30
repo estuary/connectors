@@ -59,7 +59,7 @@ func TestSpec(t *testing.T) {
 // regexpReplace returns a sanitizer that replaces every match of pattern with
 // repl.
 func regexpReplace(pattern, repl string) func(string) string {
-	re := regexp.MustCompile(pattern)
+	var re = regexp.MustCompile(pattern)
 	return func(s string) string { return re.ReplaceAllString(s, repl) }
 }
 
@@ -98,7 +98,7 @@ func materializeSanitizers() []func(string) string {
 func ensureNamespace(t *testing.T, cfg config) {
 	t.Helper()
 
-	cat, err := newCatalog(context.Background(), cfg, NestedLocationStyle)
+	var cat, err = newCatalog(context.Background(), cfg, NestedLocationStyle)
 	require.NoError(t, err)
 	// Glue's CreateDatabase returns a raw AWS AlreadyExistsException that
 	// iceberg-go does not map to ErrNamespaceAlreadyExists (mirroring the
@@ -121,11 +121,11 @@ func TestIntegration(t *testing.T) {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
-	cfg := loadTestConfig(t)
+	var cfg = loadTestConfig(t)
 	ensureNamespace(t, cfg)
 
-	d := true
-	makeResourceFn := func(table string, delta bool) resource {
+	var d = true
+	var makeResourceFn = func(table string, delta bool) resource {
 		return resource{Table: table, Delta: &d}
 	}
 
@@ -149,19 +149,19 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
-		ctx := context.Background()
-		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
-		res := makeResourceFn(tableName, true).WithDefaults(cfg)
+		var ctx = context.Background()
+		var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		var res = makeResourceFn(tableName, true).WithDefaults(cfg)
 
-		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+		var seedPending = func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 			// A staged transaction is a set of parquet data files recorded in
 			// the connector state, appended to the Iceberg table during
 			// Acknowledge under a per-materialization checkpoint fence. The
 			// file must carry the table's field IDs, exactly as the connector
 			// writes them.
-			b := appliedSpec.Bindings[0]
+			var b = appliedSpec.Bindings[0]
 
-			cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+			var cat, err = newCatalog(ctx, cfg, NestedLocationStyle)
 			require.NoError(t, err)
 			infos, err := cat.tableInfos(ctx, [][]string{b.ResourcePath})
 			require.NoError(t, err)
@@ -170,14 +170,14 @@ func TestIntegration(t *testing.T) {
 			pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, cfg)
 			require.NoError(t, err)
 			for i := range pqSchema {
-				id, ok := infos[0].fieldIDs[pqSchema[i].Name]
+				var id, ok = infos[0].fieldIDs[pqSchema[i].Name]
 				require.True(t, ok, "no field ID for column %q", pqSchema[i].Name)
-				id32 := int32(id)
+				var id32 = int32(id)
 				pqSchema[i].FieldId = &id32
 			}
 
 			// Values for the fields of the drain fixture specs.
-			literals := map[string]any{
+			var literals = map[string]any{
 				"key":                  "k1",
 				"flow_published_at":    "2024-01-01T00:00:00Z",
 				"_meta/flow_truncated": false,
@@ -194,12 +194,12 @@ func TestIntegration(t *testing.T) {
 			}
 			var row []any
 			for _, f := range b.FieldSelection.AllFields() {
-				v, ok := literals[f]
+				var v, ok = literals[f]
 				require.True(t, ok, "no seed value for selected field %q", f)
 				row = append(row, v)
 			}
 
-			s3opts := s3.Options{
+			var s3opts = s3.Options{
 				Region:      cfg.Region,
 				Credentials: credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
 			}
@@ -207,14 +207,14 @@ func TestIntegration(t *testing.T) {
 				s3opts.BaseEndpoint = aws.String(cfg.S3Endpoint)
 				s3opts.UsePathStyle = true
 			}
-			rt := &regressionTable{
+			var rt = &regressionTable{
 				cfg:      cfg,
 				cat:      cat,
 				ident:    icebergtable.Identifier(b.ResourcePath),
 				location: infos[0].location,
 				s3client: s3.New(s3opts),
 			}
-			s3Path, _ := rt.uploadParquetRows(t, ctx, pqSchema, row)
+			var s3Path, _ = rt.uploadParquetRows(t, ctx, pqSchema, row)
 
 			state, err := json.Marshal(map[string]any{
 				"bindingStates": map[string]any{
@@ -228,7 +228,7 @@ func TestIntegration(t *testing.T) {
 			return state
 		}
 
-		verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+		var verifyDrained = func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
 			require.Len(t, rows, 1, "the staged transaction's files must have been appended")
 		}
 
@@ -305,11 +305,11 @@ func TestIntegrationGlue(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	cfg := loadGlueTestConfig(t)
+	var cfg = loadGlueTestConfig(t)
 	ensureNamespace(t, cfg)
 
-	d := true
-	makeResourceFn := func(table string, delta bool) resource {
+	var d = true
+	var makeResourceFn = func(table string, delta bool) resource {
 		return resource{Table: table, Delta: &d}
 	}
 
@@ -379,7 +379,7 @@ func TestIntegrationGlue(t *testing.T) {
 // exists to catch.
 func TestRestGlueSnapshotParity(t *testing.T) {
 	for _, name := range []string{"materialize", "materialize-ns", "materialize-variant"} {
-		rest, err := os.ReadFile(".snapshots/TestIntegration-" + name)
+		var rest, err = os.ReadFile(".snapshots/TestIntegration-" + name)
 		require.NoError(t, err)
 		glue, err := os.ReadFile(".snapshots/TestIntegrationGlue-" + name)
 		require.NoError(t, err)
@@ -394,14 +394,14 @@ func TestRestGlueSnapshotParity(t *testing.T) {
 // year 10000; clampTimestamp rewrites it to the year-9999 boundary before the
 // writer sees it, so the append round-trips without error.
 func runTimestampOverflowRegression(t *testing.T, cfg config) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	rt := newRegressionTable(t, ctx, cfg, "ts_overflow_regression", nil,
+	var rt = newRegressionTable(t, ctx, cfg, "ts_overflow_regression", nil,
 		iceberg.NestedField{ID: 1, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTz, Required: false})
 
-	clampedTS, err := clampTimestamp("9999-12-31T23:59:59-14:00")
+	var clampedTS, err = clampTimestamp("9999-12-31T23:59:59-14:00")
 	require.NoError(t, err)
-	s3Path, _ := rt.uploadParquet(t, ctx,
+	var s3Path, _ = rt.uploadParquet(t, ctx,
 		writer.ParquetSchemaElement{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false}, clampedTS)
 
 	require.NoError(t, rt.cat.appendFiles(ctx,
@@ -427,7 +427,7 @@ type regressionTable struct {
 func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table string, extraProps iceberg.Properties, fields ...iceberg.NestedField) *regressionTable {
 	t.Helper()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	var cat, err = newCatalog(ctx, cfg, NestedLocationStyle)
 	require.NoError(t, err)
 
 	ensureNamespace(t, cfg)
@@ -437,20 +437,20 @@ func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table str
 	// other's tables, and lets the boilerplate subtests' stale-item sweep
 	// reclaim tables leaked by crashed runs.
 	table = fmt.Sprintf("%s_flow_test_%d", table, time.Now().Unix())
-	ident := icebergtable.Identifier{cfg.Namespace, table}
+	var ident = icebergtable.Identifier{cfg.Namespace, table}
 
-	schema := iceberg.NewSchema(0, fields...)
+	var schema = iceberg.NewSchema(0, fields...)
 	nameMappingJSON, err := json.Marshal(schema.NameMapping())
 	require.NoError(t, err)
 
-	props := iceberg.Properties{
+	var props = iceberg.Properties{
 		icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
 	}
 	for k, v := range extraProps {
 		props[k] = v
 	}
 
-	location := tablePath(cfg.Bucket, cfg.Prefix, cfg.Namespace, table, NestedLocationStyle)
+	var location = tablePath(cfg.Bucket, cfg.Prefix, cfg.Namespace, table, NestedLocationStyle)
 	_, err = cat.cat.CreateTable(ctx, ident, schema,
 		icebergcatalog.WithLocation(location),
 		icebergcatalog.WithProperties(props),
@@ -462,7 +462,7 @@ func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table str
 		}
 	})
 
-	s3opts := s3.Options{
+	var s3opts = s3.Options{
 		Region:      cfg.Region,
 		Credentials: credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
 	}
@@ -487,7 +487,7 @@ func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table str
 // bytes.
 func (rt *regressionTable) uploadParquet(t *testing.T, ctx context.Context, col writer.ParquetSchemaElement, rows ...any) (string, string) {
 	t.Helper()
-	wide := make([][]any, len(rows))
+	var wide = make([][]any, len(rows))
 	for i, row := range rows {
 		wide[i] = []any{row}
 	}
@@ -497,8 +497,8 @@ func (rt *regressionTable) uploadParquet(t *testing.T, ctx context.Context, col 
 func (rt *regressionTable) uploadParquetRows(t *testing.T, ctx context.Context, cols writer.ParquetSchema, rows ...[]any) (string, string) {
 	t.Helper()
 
-	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
-	parquetFile, err := os.Create(parquetPath)
+	var parquetPath = filepath.Join(t.TempDir(), "data.parquet")
+	var parquetFile, err = os.Create(parquetPath)
 	require.NoError(t, err)
 	pqw, err := writer.NewParquetWriter(parquetFile, cols,
 		writer.WithParquetCompression(writer.Snappy))
@@ -508,7 +508,7 @@ func (rt *regressionTable) uploadParquetRows(t *testing.T, ctx context.Context, 
 	}
 	require.NoError(t, pqw.Close())
 
-	s3Path := strings.TrimSuffix(rt.location, "/") + "/data/" + uuid.New().String() + ".parquet"
+	var s3Path = strings.TrimSuffix(rt.location, "/") + "/data/" + uuid.New().String() + ".parquet"
 
 	uploadFile, err := os.Open(parquetPath)
 	require.NoError(t, err)
@@ -527,14 +527,14 @@ func (rt *regressionTable) uploadParquetRows(t *testing.T, ctx context.Context, 
 // clampDate rewrites a year > 9999 (which time.Parse rejects outright) to the
 // year-9999 boundary before the writer sees it, so the append round-trips.
 func runDateOverflowRegression(t *testing.T, cfg config) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	rt := newRegressionTable(t, ctx, cfg, "date_overflow_regression", nil,
+	var rt = newRegressionTable(t, ctx, cfg, "date_overflow_regression", nil,
 		iceberg.NestedField{ID: 1, Name: "d", Type: iceberg.PrimitiveTypes.Date, Required: false})
 
-	clampedDate, err := clampDate("10000-01-01")
+	var clampedDate, err = clampDate("10000-01-01")
 	require.NoError(t, err)
-	s3Path, _ := rt.uploadParquet(t, ctx,
+	var s3Path, _ = rt.uploadParquet(t, ctx,
 		writer.ParquetSchemaElement{Name: "d", DataType: writer.LogicalTypeDate, Required: false}, clampedDate)
 
 	require.NoError(t, rt.cat.appendFiles(ctx,
@@ -552,15 +552,15 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 // appendFiles does not scan existing manifests for duplicate paths, matching
 // the pyiceberg 0.7.0 behavior this connector originally shipped with.
 func runCheckpointFenceRegression(t *testing.T, cfg config) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	const materialization = "acmeCo/tests/regression"
 
-	rt := newRegressionTable(t, ctx, cfg, "checkpoint_fence_regression", nil,
+	var rt = newRegressionTable(t, ctx, cfg, "checkpoint_fence_regression", nil,
 		iceberg.NestedField{ID: 1, Name: "v", Type: iceberg.PrimitiveTypes.String, Required: false})
 
-	vCol := writer.ParquetSchemaElement{Name: "v", DataType: writer.LogicalTypeString, Required: false}
-	first, _ := rt.uploadParquet(t, ctx, vCol, "one")
+	var vCol = writer.ParquetSchemaElement{Name: "v", DataType: writer.LogicalTypeString, Required: false}
+	var first, _ = rt.uploadParquet(t, ctx, vCol, "one")
 	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{first}, "", "checkpoint-1"))
 
@@ -569,12 +569,12 @@ func runCheckpointFenceRegression(t *testing.T, cfg config) {
 	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{first}, "", "checkpoint-1"))
 
-	second, _ := rt.uploadParquet(t, ctx, vCol, "two")
+	var second, _ = rt.uploadParquet(t, ctx, vCol, "two")
 	require.NoError(t, rt.cat.appendFiles(ctx, materialization, rt.ident,
 		[]string{second}, "checkpoint-1", "checkpoint-2"))
 
 	// Two data files total: the replay added nothing.
-	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	var tbl, err = rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 	fs, err := tbl.FS(ctx)
 	require.NoError(t, err)
@@ -603,8 +603,8 @@ func TestNormalizeLegacyCredentials(t *testing.T) {
 	)
 
 	t.Run("legacy-only promotes to Credentials and enables direct S3 access", func(t *testing.T) {
-		legacyID, legacySecret := akid, secret
-		cfg := config{
+		var legacyID, legacySecret = akid, secret
+		var cfg = config{
 			Region:             "us-east-1",
 			AWSAccessKeyID:     &legacyID,
 			AWSSecretAccessKey: &legacySecret,
@@ -624,14 +624,14 @@ func TestNormalizeLegacyCredentials(t *testing.T) {
 			cfg.Credentials.AuthType == filesink.AWSAccessKey &&
 			cfg.Region != "")
 
-		props := s3PropsForDirectCreds(&cfg)
+		var props = s3PropsForDirectCreds(&cfg)
 		require.Equal(t, akid, props[icebergio.S3AccessKeyID])
 		require.Equal(t, secret, props[icebergio.S3SecretAccessKey])
 	})
 
 	t.Run("credentials take precedence over legacy keys when both set", func(t *testing.T) {
-		legacyID, legacySecret := akid, secret
-		cfg := config{
+		var legacyID, legacySecret = akid, secret
+		var cfg = config{
 			Region:             "us-east-1",
 			AWSAccessKeyID:     &legacyID,
 			AWSSecretAccessKey: &legacySecret,
@@ -651,7 +651,7 @@ func TestNormalizeLegacyCredentials(t *testing.T) {
 	})
 
 	t.Run("no credentials leaves config unchanged", func(t *testing.T) {
-		cfg := config{Region: "us-east-1"}
+		var cfg = config{Region: "us-east-1"}
 		cfg.normalizeCredentials()
 		require.Nil(t, cfg.Credentials)
 	})
@@ -670,7 +670,7 @@ func TestS3PropsForIAMCredentials(t *testing.T) {
 		secret  = "iamsecret"
 		session = "iamsessiontoken"
 	)
-	cfg := config{
+	var cfg = config{
 		Region: "us-east-1",
 		Credentials: &filesink.CredentialsConfig{
 			AuthType: filesink.AWSIAM,
@@ -686,7 +686,7 @@ func TestS3PropsForIAMCredentials(t *testing.T) {
 		},
 	}
 
-	props := s3PropsForDirectCreds(&cfg)
+	var props = s3PropsForDirectCreds(&cfg)
 	require.Equal(t, akid, props[icebergio.S3AccessKeyID])
 	require.Equal(t, secret, props[icebergio.S3SecretAccessKey])
 	require.Equal(t, session, props[icebergio.S3SessionToken])
@@ -709,8 +709,8 @@ func (f *fakeCatalog) ListNamespaces(ctx context.Context, parent icebergtable.Id
 func (f *fakeCatalog) ListTables(ctx context.Context, namespace icebergtable.Identifier) iter.Seq2[icebergtable.Identifier, error] {
 	f.listTablesCalled = true
 	return func(yield func(icebergtable.Identifier, error) bool) {
-		name := namespace[0]
-		tbls, ok := f.tablesByNS[name]
+		var name = namespace[0]
+		var tbls, ok = f.tablesByNS[name]
 		if !ok {
 			// Reproduce Glue's ListTables, which yields a raw AWS
 			// EntityNotFoundException for an absent database rather than
@@ -732,7 +732,7 @@ func (f *fakeCatalog) ListTables(ctx context.Context, namespace icebergtable.Ide
 // silently — on Glue, ListTables surfaces a raw EntityNotFoundException that is
 // never catalog.ErrNoSuchNamespace, so error-matching alone fails to bootstrap.
 func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
-	newIS := func() *mboilerplate.InfoSchema {
+	var newIS = func() *mboilerplate.InfoSchema {
 		return mboilerplate.NewInfoSchema(
 			func(p []string) []string { return p },
 			func(ns string) string { return ns },
@@ -742,22 +742,22 @@ func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
 	}
 
 	t.Run("absent namespace is skipped without error", func(t *testing.T) {
-		fake := &fakeCatalog{namespaces: nil}
-		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
+		var fake = &fakeCatalog{namespaces: nil}
+		var c = &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
 
-		err := c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
+		var err = c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
 		require.NoError(t, err)
 		require.False(t, fake.listTablesCalled, "must not scan a namespace that does not exist")
 	})
 
 	t.Run("existing namespace is scanned", func(t *testing.T) {
-		fake := &fakeCatalog{
+		var fake = &fakeCatalog{
 			namespaces: []icebergtable.Identifier{{"tests"}},
 			tablesByNS: map[string][]string{"tests": {"other"}},
 		}
-		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
+		var c = &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
 
-		err := c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
+		var err = c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
 		require.NoError(t, err)
 		require.True(t, fake.listTablesCalled)
 	})
@@ -784,10 +784,10 @@ func withAdvanced(cfg config, set func(*advancedConfig)) config {
 //     (asserted against the raw column bytes)
 func runNanosecondTimestampTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
-	rt := newRegressionTable(t, ctx, cfg, "ns_timestamp", iceberg.Properties{icebergtable.PropertyFormatVersion: "3"},
+	var rt = newRegressionTable(t, ctx, cfg, "ns_timestamp", iceberg.Properties{icebergtable.PropertyFormatVersion: "3"},
 		iceberg.NestedField{ID: 1, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTzNs, Required: false})
 
 	// Values pass through clampTimestampNanos as they do in production, where
@@ -798,11 +798,11 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 		"1000-01-01T00:00:00Z",           // out-of-range past: clamps to math.MinInt64 rather than overflowing
 		"3000-01-01T00:00:00Z",           // out-of-range future: clamps to math.MaxInt64 rather than overflowing
 	} {
-		v, err := clampTimestampNanos(raw)
+		var v, err = clampTimestampNanos(raw)
 		require.NoError(t, err)
 		rows = append(rows, v)
 	}
-	s3Path, parquetPath := rt.uploadParquet(t, ctx,
+	var s3Path, parquetPath = rt.uploadParquet(t, ctx,
 		writer.ParquetSchemaElement{Name: "ts", DataType: writer.LogicalTypeTimestampNanos, Required: false}, rows...)
 
 	require.NoError(t, rt.cat.appendFiles(ctx,
@@ -816,7 +816,7 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 	// Verify nanosecond precision by reading the raw int64 values from the Parquet file.
 	// DuckDB maps nanosecond Parquet timestamps to TIMESTAMPTZ (microsecond precision),
 	// dropping sub-microsecond digits — so we read the encoded bytes directly instead.
-	pqf, err := os.Open(parquetPath)
+	var pqf, err = os.Open(parquetPath)
 	require.NoError(t, err)
 	defer pqf.Close()
 
@@ -827,9 +827,9 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 	col, err := pqr.RowGroup(0).Column(0)
 	require.NoError(t, err)
 
-	int64Col := col.(*parquetfile.Int64ColumnChunkReader)
-	vals := make([]int64, 3)
-	defLevels := make([]int16, 3)
+	var int64Col = col.(*parquetfile.Int64ColumnChunkReader)
+	var vals = make([]int64, 3)
+	var defLevels = make([]int16, 3)
 	_, valuesRead, err := int64Col.ReadBatch(3, vals, defLevels, nil)
 	require.NoError(t, err)
 	require.Equal(t, 3, valuesRead)
@@ -846,19 +846,19 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 // valid.
 func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
-	rt := newRegressionTable(t, ctx, cfg, "ns_v2_upgrade", iceberg.Properties{icebergtable.PropertyFormatVersion: "2"},
+	var rt = newRegressionTable(t, ctx, cfg, "ns_v2_upgrade", iceberg.Properties{icebergtable.PropertyFormatVersion: "2"},
 		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false})
-	cat := rt.cat
-	tableIdent := rt.ident
+	var cat = rt.cat
+	var tableIdent = rt.ident
 
-	tbl, err := cat.cat.LoadTable(ctx, tableIdent)
+	var tbl, err = cat.cat.LoadTable(ctx, tableIdent)
 	require.NoError(t, err)
 	require.Equal(t, 2, tbl.Metadata().Version())
 
-	update := mboilerplate.BindingUpdate[config, resource, mappedType]{
+	var update = mboilerplate.BindingUpdate[config, resource, mappedType]{
 		Binding: mboilerplate.MappedBinding[config, resource, mappedType]{
 			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
 				ResourcePath: tableIdent,
@@ -884,7 +884,7 @@ func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
 	tbl, err = cat.cat.LoadTable(ctx, tableIdent)
 	require.NoError(t, err)
 	require.Equal(t, 3, tbl.Metadata().Version())
-	f, ok := tbl.Schema().FindFieldByName("ts")
+	var f, ok = tbl.Schema().FindFieldByName("ts")
 	require.True(t, ok)
 	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.TimestampTzNs))
 }
@@ -896,20 +896,20 @@ func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
 // timestamptz_ns column.
 func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	var cat, err = newCatalog(ctx, cfg, NestedLocationStyle)
 	require.NoError(t, err)
 	ensureNamespace(t, cfg)
 
 	// Same per-run naming convention as newRegressionTable, so concurrent runs
 	// can't collide and leaked tables are swept by the boilerplate cleanup.
-	table := fmt.Sprintf("ns_create_flow_test_%d", time.Now().Unix())
-	ident := icebergtable.Identifier{cfg.Namespace, table}
+	var table = fmt.Sprintf("ns_create_flow_test_%d", time.Now().Unix())
+	var ident = icebergtable.Identifier{cfg.Namespace, table}
 
-	binding := &pf.MaterializationSpec_Binding{
+	var binding = &pf.MaterializationSpec_Binding{
 		ResourcePath: ident,
 		Collection: pf.CollectionSpec{
 			Name: "acmeCo/tests/ns-create",
@@ -943,7 +943,7 @@ func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 	tbl, err := cat.cat.LoadTable(ctx, ident)
 	require.NoError(t, err)
 	require.Equal(t, 3, tbl.Metadata().Version())
-	f, ok := tbl.Schema().FindFieldByName("ts")
+	var f, ok = tbl.Schema().FindFieldByName("ts")
 	require.True(t, ok)
 	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.TimestampTzNs))
 }
@@ -960,28 +960,28 @@ func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 // reverse direction.
 func runNanosecondMigrateTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	// The table keeps a non-timestamp column alongside ts: iceberg-go's
 	// scanner refuses data files that contribute zero projected columns, so a
 	// realistic multi-column shape is required for reading back the
 	// pre-migration file whose only timestamp column was migrated away.
-	rt := newRegressionTable(t, ctx, cfg, "ns_migrate", nil,
+	var rt = newRegressionTable(t, ctx, cfg, "ns_migrate", nil,
 		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false},
 		iceberg.NestedField{ID: 2, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTz, Required: false})
 
 	// A microsecond row lands before the migration in a file without embedded
 	// field IDs, as the connector wrote before field-ID embedding.
-	oldPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var oldPath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false},
 		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
 	}, []any{"old", "2023-01-15T12:34:56.123456Z"})
 	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/ns-migrate", rt.ident,
 		[]string{oldPath}, "", "checkpoint-1"))
 
-	migrate := func(fromType string, to iceberg.Type) {
+	var migrate = func(fromType string, to iceberg.Type) {
 		t.Helper()
-		update := mboilerplate.BindingUpdate[config, resource, mappedType]{
+		var update = mboilerplate.BindingUpdate[config, resource, mappedType]{
 			Binding: mboilerplate.MappedBinding[config, resource, mappedType]{
 				MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
 					ResourcePath: rt.ident,
@@ -995,17 +995,17 @@ func runNanosecondMigrateTest(t *testing.T, cfg config) {
 				},
 			}},
 		}
-		_, apply, err := rt.cat.UpdateResource(ctx, update)
+		var _, apply, err = rt.cat.UpdateResource(ctx, update)
 		require.NoError(t, err)
 		require.NoError(t, apply(ctx))
 	}
 
 	migrate("timestamptz", iceberg.PrimitiveTypes.TimestampTzNs)
 
-	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	var tbl, err = rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 	require.Equal(t, 3, tbl.Metadata().Version())
-	f, ok := tbl.Schema().FindFieldByName("ts")
+	var f, ok = tbl.Schema().FindFieldByName("ts")
 	require.True(t, ok)
 	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.TimestampTzNs))
 	require.NotEqual(t, 2, f.ID, "migrated column must get a new field ID")
@@ -1023,8 +1023,8 @@ func runNanosecondMigrateTest(t *testing.T, cfg config) {
 
 	// A nanosecond row lands after the migration with the table's field IDs
 	// embedded, as the connector now writes.
-	idID, tsID := int32(1), int32(f.ID)
-	newPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var idID, tsID = int32(1), int32(f.ID)
+	var newPath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
 		{Name: "ts", DataType: writer.LogicalTypeTimestampNanos, Required: false, FieldId: &tsID},
 	}, []any{"new", "2025-06-15T12:00:00.123456789Z"})
@@ -1058,13 +1058,13 @@ func runNanosecondMigrateTest(t *testing.T, cfg config) {
 func scanColumn(t *testing.T, ctx context.Context, rt *regressionTable, name string, opts ...icebergtable.ScanOption) []any {
 	t.Helper()
 
-	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	var tbl, err = rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 	arrowTbl, err := tbl.Scan(opts...).ToArrowTable(ctx)
 	require.NoError(t, err)
 	defer arrowTbl.Release()
 
-	idx := arrowTbl.Schema().FieldIndices(name)
+	var idx = arrowTbl.Schema().FieldIndices(name)
 	require.Len(t, idx, 1)
 
 	var out []any
@@ -1080,7 +1080,7 @@ func scanColumn(t *testing.T, ctx context.Context, rt *regressionTable, name str
 			case *array.String:
 				out = append(out, arr.Value(i))
 			case *extensions.VariantArray:
-				v, err := arr.Value(i)
+				var v, err = arr.Value(i)
 				require.NoError(t, err)
 				j, err := json.Marshal(v)
 				require.NoError(t, err)
@@ -1096,10 +1096,10 @@ func scanColumn(t *testing.T, ctx context.Context, rt *regressionTable, name str
 func loadTestConfig(t *testing.T) config {
 	t.Helper()
 
-	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize.flow.yaml")
-	taskName := "acmeCo/tests/materialize-s3-iceberg"
+	var bundled = boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize.flow.yaml")
+	var taskName = "acmeCo/tests/materialize-s3-iceberg"
 
-	raw := json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
+	var raw = json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
 	require.NotEmpty(t, raw, "could not find config in bundled spec")
 
 	var cfg config
@@ -1113,10 +1113,10 @@ func loadTestConfig(t *testing.T) config {
 func loadGlueTestConfig(t *testing.T) config {
 	t.Helper()
 
-	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize-glue.flow.yaml")
-	taskName := "acmeCo/tests/materialize-s3-iceberg"
+	var bundled = boilerplate.RunFlowctl(t, "raw", "bundle", "--source", "testdata/materialize-glue.flow.yaml")
+	var taskName = "acmeCo/tests/materialize-s3-iceberg"
 
-	raw := json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
+	var raw = json.RawMessage(gjson.GetBytes(bundled, "materializations."+taskName+".endpoint.local.config").Raw)
 	require.NotEmpty(t, raw, "could not find config in bundled spec")
 
 	if gjson.GetBytes(raw, "sops").Exists() {
@@ -1134,8 +1134,8 @@ func loadGlueTestConfig(t *testing.T) config {
 func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
 	t.Helper()
 
-	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
-	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	var sopsCmd = exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
+	var jqCmd = exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
 	sopsCmd.Stdin = bytes.NewReader(raw)
 
 	var err error
@@ -1155,7 +1155,7 @@ func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
 // ignoreStringFormat is a no-op on a non-string field, so the field maps by
 // its native type instead.
 func TestMapTypeIgnoreStringFormatOnNonStringField(t *testing.T) {
-	proj := mboilerplate.Projection{
+	var proj = mboilerplate.Projection{
 		Projection: pf.Projection{
 			Field: "n",
 			Inference: pf.Inference{
@@ -1166,7 +1166,7 @@ func TestMapTypeIgnoreStringFormatOnNonStringField(t *testing.T) {
 	}
 
 	var d = &materialization{}
-	mt, conv := d.MapType(proj, fieldConfig{IgnoreStringFormat: true})
+	var mt, conv = d.MapType(proj, fieldConfig{IgnoreStringFormat: true})
 
 	require.Equal(t, "long", mt.String())
 	require.Nil(t, conv)
@@ -1178,7 +1178,7 @@ func TestMapTypeIgnoreStringFormatOnNonStringField(t *testing.T) {
 // fallback to the microsecond clamp would pass every other test while
 // overflowing int64 nanoseconds in production.
 func TestMapTypeNanosecondWiring(t *testing.T) {
-	proj := mboilerplate.Projection{
+	var proj = mboilerplate.Projection{
 		Projection: pf.Projection{
 			Field: "ts",
 			Inference: pf.Inference{
@@ -1195,9 +1195,9 @@ func TestMapTypeNanosecondWiring(t *testing.T) {
 	const probe = "3000-01-01T00:00:00Z"
 
 	var micro = &materialization{}
-	mt, conv := micro.MapType(proj, fieldConfig{})
+	var mt, conv = micro.MapType(proj, fieldConfig{})
 	require.Equal(t, "timestamptz", mt.String())
-	v, err := conv(probe)
+	var v, err = conv(probe)
 	require.NoError(t, err)
 	require.Equal(t, probe, v)
 
@@ -1215,9 +1215,9 @@ func TestMapTypeNanosecondWiring(t *testing.T) {
 // conflict check runs before any catalog access, so a bare catalog struct is
 // enough here.
 func TestCreateResourceFormatVersionConflictNamesOptions(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	binding := &pf.MaterializationSpec_Binding{
+	var binding = &pf.MaterializationSpec_Binding{
 		ResourcePath: []string{"test_namespace", "format_version_conflict"},
 		Collection: pf.CollectionSpec{
 			Name: "acmeCo/tests/format-version-conflict",
@@ -1245,7 +1245,7 @@ func TestCreateResourceFormatVersionConflictNamesOptions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var adv = tt.adv
 			var cat = &catalog{cfg: &config{Advanced: &adv}, locationStyle: NestedLocationStyle}
-			_, _, err := cat.CreateResource(ctx, binding, resource{
+			var _, _, err = cat.CreateResource(ctx, binding, resource{
 				AdditionalTableProperties: map[string]string{
 					icebergtable.PropertyFormatVersion: "2",
 				},
@@ -1266,24 +1266,24 @@ func TestCreateResourceFormatVersionConflictNamesOptions(t *testing.T) {
 // field keep their string mapping.
 func runVariantCreateResourceTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	var cat, err = newCatalog(ctx, cfg, NestedLocationStyle)
 	require.NoError(t, err)
 	ensureNamespace(t, cfg)
 
 	// Same per-run naming convention as newRegressionTable, so concurrent runs
 	// can't collide and leaked tables are swept by the boilerplate cleanup.
-	table := fmt.Sprintf("variant_create_flow_test_%d", time.Now().Unix())
-	ident := icebergtable.Identifier{cfg.Namespace, table}
+	var table = fmt.Sprintf("variant_create_flow_test_%d", time.Now().Unix())
+	var ident = icebergtable.Identifier{cfg.Namespace, table}
 
 	// A multi-type collection key is not expressible in a Flow catalog today
 	// (keys must be a single scalar type), but legacy or synthesized specs can
 	// still present one, so the binding is built directly to pin that a key
 	// never maps to variant.
-	binding := &pf.MaterializationSpec_Binding{
+	var binding = &pf.MaterializationSpec_Binding{
 		ResourcePath: ident,
 		Collection: pf.CollectionSpec{
 			Name: "acmeCo/tests/variant-create",
@@ -1347,7 +1347,7 @@ func runVariantCreateResourceTest(t *testing.T, cfg config) {
 		"multiKey":      iceberg.PrimitiveTypes.String,
 		"obj":           iceberg.VariantType{},
 	} {
-		f, ok := tbl.Schema().FindFieldByName(name)
+		var f, ok = tbl.Schema().FindFieldByName(name)
 		require.True(t, ok, "column %q missing", name)
 		require.True(t, f.Type.Equals(want), "column %q: got %s, want %s", name, f.Type, want)
 	}
@@ -1361,10 +1361,10 @@ func runVariantCreateResourceTest(t *testing.T, cfg config) {
 func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
 	t.Helper()
 
-	clientID, clientSecret, ok := strings.Cut(cfg.Catalog.Credential, ":")
+	var clientID, clientSecret, ok = strings.Cut(cfg.Catalog.Credential, ":")
 	require.True(t, ok, "catalog credential must be client_id:client_secret")
 
-	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	var db, err = sql.Open("duckdb", "") // opens an in-memory database
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -1379,11 +1379,11 @@ func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
 		fmt.Sprintf("ATTACH '%s' AS ice (TYPE iceberg, SECRET icesec, ENDPOINT '%s', ACCESS_DELEGATION_MODE 'none')",
 			cfg.Catalog.Warehouse, cfg.Catalog.URI),
 	} {
-		_, err := db.Exec(stmt)
+		var _, err = db.Exec(stmt)
 		require.NoError(t, err, "duckdb setup failed")
 	}
 
-	outFile := filepath.Join(t.TempDir(), "out")
+	var outFile = filepath.Join(t.TempDir(), "out")
 	_, err = db.Exec(fmt.Sprintf("COPY (%s) TO '%s' (FORMAT JSON, ARRAY true)", strings.TrimSuffix(strings.TrimSpace(query), ";"), outFile))
 	require.NoError(t, err, "duckdb query failed")
 
@@ -1401,18 +1401,18 @@ func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
 // and the variant encoding under test is identical for both.
 func runVariantDuckDBRegression(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	var cat, err = newCatalog(ctx, cfg, NestedLocationStyle)
 	require.NoError(t, err)
 	ensureNamespace(t, cfg)
 
-	table := fmt.Sprintf("variant_duckdb_flow_test_%d", time.Now().Unix())
-	ident := icebergtable.Identifier{cfg.Namespace, table}
+	var table = fmt.Sprintf("variant_duckdb_flow_test_%d", time.Now().Unix())
+	var ident = icebergtable.Identifier{cfg.Namespace, table}
 
-	binding := &pf.MaterializationSpec_Binding{
+	var binding = &pf.MaterializationSpec_Binding{
 		ResourcePath: ident,
 		Collection: pf.CollectionSpec{
 			Name: "acmeCo/tests/variant-duckdb",
@@ -1444,14 +1444,14 @@ func runVariantDuckDBRegression(t *testing.T, cfg config) {
 
 	tbl, err := cat.cat.LoadTable(ctx, ident)
 	require.NoError(t, err)
-	vField, ok := tbl.Schema().FindFieldByName("v")
+	var vField, ok = tbl.Schema().FindFieldByName("v")
 	require.True(t, ok)
 	require.True(t, vField.Type.Equals(iceberg.VariantType{}),
 		"column v: got %s, want variant", vField.Type)
 	idField, ok := tbl.Schema().FindFieldByName("id")
 	require.True(t, ok)
 
-	rt := &regressionTable{
+	var rt = &regressionTable{
 		cfg:      cfg,
 		cat:      cat,
 		ident:    ident,
@@ -1461,7 +1461,7 @@ func runVariantDuckDBRegression(t *testing.T, cfg config) {
 
 	// The JSON round-tripped through the variant encoding, in `id` order. A
 	// JSON null value and an absent (SQL NULL) value both read back as NULL.
-	vals := []string{
+	var vals = []string{
 		`{"a": 1, "b": {"c": [1, 2, "three"], "d": null}}`,
 		`[1, "two", 3.5, false, null, {"nested": true}]`,
 		`"plain string"`,
@@ -1471,23 +1471,23 @@ func runVariantDuckDBRegression(t *testing.T, cfg config) {
 		"",
 	}
 
-	idID, vID := int32(idField.ID), int32(vField.ID)
-	rows := make([][]any, len(vals))
+	var idID, vID = int32(idField.ID), int32(vField.ID)
+	var rows = make([][]any, len(vals))
 	for i, v := range vals {
-		row := []any{i + 1, any(nil)}
+		var row = []any{i + 1, any(nil)}
 		if v != "" {
 			row[1] = []byte(v)
 		}
 		rows[i] = row
 	}
-	s3Path, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var s3Path, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.PrimitiveTypeInteger, Required: true, FieldId: &idID},
 		{Name: "v", DataType: writer.LogicalTypeVariant, Required: false, FieldId: &vID},
 	}, rows...)
 	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-duckdb", rt.ident,
 		[]string{s3Path}, "", "deadbeefdeadbeef"))
 
-	out := duckdbAttachQuery(t, cfg, fmt.Sprintf(
+	var out = duckdbAttachQuery(t, cfg, fmt.Sprintf(
 		`SELECT id, v::JSON AS v FROM ice.%s."%s" ORDER BY id;`, cfg.Namespace, table))
 
 	var got []struct {
@@ -1512,7 +1512,7 @@ func runVariantDuckDBRegression(t *testing.T, cfg config) {
 // addressing only for S3-compatible stacks with a custom endpoint (rustfs in
 // TestIntegration); real AWS (Glue) uses the default endpoint resolution.
 func newTestS3Client(cfg config) *s3.Client {
-	s3opts := s3.Options{
+	var s3opts = s3.Options{
 		Region:      cfg.Region,
 		Credentials: credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
 	}
@@ -1538,19 +1538,19 @@ type migrateProbe struct {
 // former.
 func computeMigrateSet(t *testing.T, ctx context.Context, rt *regressionTable, d *materialization, fields []migrateProbe) []mboilerplate.MigrateField[mappedType] {
 	t.Helper()
-	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	var tbl, err = rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 
 	var out []mboilerplate.MigrateField[mappedType]
 	for _, field := range fields {
-		existing, ok := tbl.Schema().FindFieldByName(field.proj.Field)
+		var existing, ok = tbl.Schema().FindFieldByName(field.proj.Field)
 		require.True(t, ok)
-		ef := mboilerplate.ExistingField{
+		var ef = mboilerplate.ExistingField{
 			Name:     existing.Name,
 			Type:     existing.Type.Type(),
 			Nullable: !existing.Required,
 		}
-		mt, _ := d.MapType(mboilerplate.Projection{Projection: field.proj}, field.fc)
+		var mt, _ = d.MapType(mboilerplate.Projection{Projection: field.proj}, field.fc)
 		if !mt.Compatible(ef) && mt.CanMigrate(ef) {
 			out = append(out, mboilerplate.MigrateField[mappedType]{
 				From: ef,
@@ -1573,7 +1573,7 @@ func nameMappingNames(t *testing.T, tbl *icebergtable.Table) map[string]bool {
 	t.Helper()
 	var mapping iceberg.NameMapping
 	require.NoError(t, json.Unmarshal([]byte(tbl.Properties()[icebergtable.DefaultNameMappingKey]), &mapping))
-	mapped := make(map[string]bool)
+	var mapped = make(map[string]bool)
 	for _, mf := range mapping {
 		for _, n := range mf.Names {
 			mapped[n] = true
@@ -1598,14 +1598,14 @@ func nameMappingNames(t *testing.T, tbl *icebergtable.Table) map[string]bool {
 // repeated applies cause no schema churn.
 func runVariantMigrateTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
 
 	// The table as the connector created it before the flip: the JSON-shaped
 	// field v is a JSON-text string column, alongside a string key and a
 	// castToString-overridden field.
-	rt := newRegressionTable(t, ctx, cfg, "variant_migrate", nil,
+	var rt = newRegressionTable(t, ctx, cfg, "variant_migrate", nil,
 		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false},
 		iceberg.NestedField{ID: 2, Name: "v", Type: iceberg.PrimitiveTypes.String, Required: false},
 		iceberg.NestedField{ID: 3, Name: "cast", Type: iceberg.PrimitiveTypes.String, Required: false})
@@ -1614,13 +1614,13 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 	// embedded field IDs, as the connector wrote before field-ID embedding, and
 	// a recent row in a file with the table's field IDs embedded, as the
 	// connector writes today.
-	legacyPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var legacyPath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false},
 		{Name: "v", DataType: writer.LogicalTypeString, Required: false},
 		{Name: "cast", DataType: writer.LogicalTypeString, Required: false},
 	}, []any{"legacy", `{"l":true}`, "kept-legacy"})
-	preIDID, preVID, preCastID := int32(1), int32(2), int32(3)
-	oldPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var preIDID, preVID, preCastID = int32(1), int32(2), int32(3)
+	var oldPath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &preIDID},
 		{Name: "v", DataType: writer.LogicalTypeString, Required: false, FieldId: &preVID},
 		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &preCastID},
@@ -1628,24 +1628,24 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-migrate", rt.ident,
 		[]string{legacyPath, oldPath}, "", "checkpoint-1"))
 
-	preFlip, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	var preFlip, err = rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
-	preFlipSnapshot := preFlip.CurrentSnapshot().SnapshotID
+	var preFlipSnapshot = preFlip.CurrentSnapshot().SnapshotID
 
-	keyProj := pf.Projection{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
+	var keyProj = pf.Projection{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
 		Types:   []string{"string"},
 		String_: &pf.Inference_String{},
 		Exists:  pf.Inference_MUST,
 	}}
-	vProj := pf.Projection{Field: "v", Ptr: "/v", Inference: pf.Inference{Types: []string{"object"}}}
-	castProj := pf.Projection{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
+	var vProj = pf.Projection{Field: "v", Ptr: "/v", Inference: pf.Inference{Types: []string{"object"}}}
+	var castProj = pf.Projection{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
 		Types:   []string{"integer", "string"},
 		String_: &pf.Inference_String{},
 	}}
 
-	d := &materialization{cfg: cfg}
+	var d = &materialization{cfg: cfg}
 
-	computeMigrates := func() []mboilerplate.MigrateField[mappedType] {
+	var computeMigrates = func() []mboilerplate.MigrateField[mappedType] {
 		return computeMigrateSet(t, ctx, rt, d, []migrateProbe{
 			{vProj, fieldConfig{}},
 			{castProj, fieldConfig{IgnoreStringFormat: true}},
@@ -1654,10 +1654,10 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 
 	// The key column keeps its string mapping with the option on, so the flip
 	// leaves it compatible (the boilerplate additionally never migrates keys).
-	keyMapped, _ := d.MapType(mboilerplate.Projection{Projection: keyProj}, fieldConfig{})
+	var keyMapped, _ = d.MapType(mboilerplate.Projection{Projection: keyProj}, fieldConfig{})
 	require.True(t, keyMapped.Compatible(mboilerplate.ExistingField{Name: "id", Type: "string"}))
 
-	migrates := computeMigrates()
+	var migrates = computeMigrates()
 	require.Len(t, migrates, 1, "the variant_columns flip must route the JSON-shaped column through migration")
 	require.Equal(t, "v", migrates[0].From.Name)
 
@@ -1675,14 +1675,14 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 	require.Equal(t, 3, tbl.Metadata().Version(), "the flip must upgrade the table to format v3")
-	f, ok := tbl.Schema().FindFieldByName("v")
+	var f, ok = tbl.Schema().FindFieldByName("v")
 	require.True(t, ok, "the converted column must keep its name")
 	require.True(t, f.Type.Equals(iceberg.VariantType{}))
 	require.NotEqual(t, 2, f.ID, "the converted column must get a new field ID")
 
 	// The key and castToString columns are untouched by the flip.
 	for name, wantID := range map[string]int{"id": 1, "cast": 3} {
-		uf, ok := tbl.Schema().FindFieldByName(name)
+		var uf, ok = tbl.Schema().FindFieldByName(name)
 		require.True(t, ok)
 		require.Equal(t, wantID, uf.ID)
 		require.True(t, uf.Type.Equals(iceberg.PrimitiveTypes.String))
@@ -1691,7 +1691,7 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 	// The replaced name is scrubbed from the default name mapping so the
 	// pre-flip file's JSON-text column cannot mis-bind to the variant column;
 	// the untouched columns keep their entries.
-	mapped := nameMappingNames(t, tbl)
+	var mapped = nameMappingNames(t, tbl)
 	require.False(t, mapped["v"], "converted column must be removed from the name mapping")
 	require.True(t, mapped["id"] && mapped["cast"], "untouched columns must keep their name-mapping entries")
 
@@ -1714,8 +1714,8 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 
 	// A post-flip row lands with the table's field IDs embedded and the
 	// converted column written as variant, as the connector now writes.
-	idID, castID, vID := int32(1), int32(3), int32(f.ID)
-	newPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var idID, castID, vID = int32(1), int32(3), int32(f.ID)
+	var newPath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
 		{Name: "v", DataType: writer.LogicalTypeVariant, Required: false, FieldId: &vID},
 		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &castID},
@@ -1746,14 +1746,14 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 // schema churn.
 func runVariantDisableFlipTest(t *testing.T, cfg config) {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = false })
 
 	// The table as the connector created it while variant_columns was on: the
 	// JSON-shaped field v is a variant column in a format v3 table, alongside
 	// a string key and a castToString-overridden field.
-	rt := newRegressionTable(t, ctx, cfg, "variant_disable",
+	var rt = newRegressionTable(t, ctx, cfg, "variant_disable",
 		iceberg.Properties{icebergtable.PropertyFormatVersion: "3"},
 		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: false},
 		iceberg.NestedField{ID: 2, Name: "v", Type: iceberg.VariantType{}, Required: false},
@@ -1761,8 +1761,8 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 
 	// A pre-flip row lands as the connector wrote it with the option on:
 	// field IDs embedded and v encoded as variant.
-	idID, vID, castID := int32(1), int32(2), int32(3)
-	prePath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var idID, vID, castID = int32(1), int32(2), int32(3)
+	var prePath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
 		{Name: "v", DataType: writer.LogicalTypeVariant, Required: false, FieldId: &vID},
 		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &castID},
@@ -1770,24 +1770,24 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 	require.NoError(t, rt.cat.appendFiles(ctx, "acmeCo/tests/variant-disable",
 		rt.ident, []string{prePath}, "", "checkpoint-1"))
 
-	preFlip, err := rt.cat.cat.LoadTable(ctx, rt.ident)
+	var preFlip, err = rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
-	preFlipSnapshot := preFlip.CurrentSnapshot().SnapshotID
+	var preFlipSnapshot = preFlip.CurrentSnapshot().SnapshotID
 
-	keyProj := pf.Projection{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
+	var keyProj = pf.Projection{Field: "id", Ptr: "/id", IsPrimaryKey: true, Inference: pf.Inference{
 		Types:   []string{"string"},
 		String_: &pf.Inference_String{},
 		Exists:  pf.Inference_MUST,
 	}}
-	vProj := pf.Projection{Field: "v", Ptr: "/v", Inference: pf.Inference{Types: []string{"object"}}}
-	castProj := pf.Projection{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
+	var vProj = pf.Projection{Field: "v", Ptr: "/v", Inference: pf.Inference{Types: []string{"object"}}}
+	var castProj = pf.Projection{Field: "cast", Ptr: "/cast", Inference: pf.Inference{
 		Types:   []string{"integer", "string"},
 		String_: &pf.Inference_String{},
 	}}
 
-	d := &materialization{cfg: cfg}
+	var d = &materialization{cfg: cfg}
 
-	computeMigrates := func() []mboilerplate.MigrateField[mappedType] {
+	var computeMigrates = func() []mboilerplate.MigrateField[mappedType] {
 		return computeMigrateSet(t, ctx, rt, d, []migrateProbe{
 			{vProj, fieldConfig{}},
 			{castProj, fieldConfig{IgnoreStringFormat: true}},
@@ -1796,10 +1796,10 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 
 	// The key column's string mapping is unaffected by the option, so the flip
 	// leaves it compatible (the boilerplate additionally never migrates keys).
-	keyMapped, _ := d.MapType(mboilerplate.Projection{Projection: keyProj}, fieldConfig{})
+	var keyMapped, _ = d.MapType(mboilerplate.Projection{Projection: keyProj}, fieldConfig{})
 	require.True(t, keyMapped.Compatible(mboilerplate.ExistingField{Name: "id", Type: "string"}))
 
-	migrates := computeMigrates()
+	var migrates = computeMigrates()
 	require.Len(t, migrates, 1, "the disable flip must route the variant column through migration")
 	require.Equal(t, "v", migrates[0].From.Name)
 
@@ -1817,14 +1817,14 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 	tbl, err := rt.cat.cat.LoadTable(ctx, rt.ident)
 	require.NoError(t, err)
 	require.Equal(t, 3, tbl.Metadata().Version(), "the disable flip must leave the table at format v3")
-	f, ok := tbl.Schema().FindFieldByName("v")
+	var f, ok = tbl.Schema().FindFieldByName("v")
 	require.True(t, ok, "the converted column must keep its name")
 	require.True(t, f.Type.Equals(iceberg.PrimitiveTypes.String))
 	require.NotEqual(t, 2, f.ID, "the converted column must get a new field ID")
 
 	// The key and castToString columns are untouched by the flip.
 	for name, wantID := range map[string]int{"id": 1, "cast": 3} {
-		uf, ok := tbl.Schema().FindFieldByName(name)
+		var uf, ok = tbl.Schema().FindFieldByName(name)
 		require.True(t, ok)
 		require.Equal(t, wantID, uf.ID)
 		require.True(t, uf.Type.Equals(iceberg.PrimitiveTypes.String))
@@ -1833,7 +1833,7 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 	// The replaced name is scrubbed from the default name mapping, matching
 	// the enable flip's guard against mis-binding field-ID-less files; the
 	// untouched columns keep their entries.
-	mapped := nameMappingNames(t, tbl)
+	var mapped = nameMappingNames(t, tbl)
 	require.False(t, mapped["v"], "converted column must be removed from the name mapping")
 	require.True(t, mapped["id"] && mapped["cast"], "untouched columns must keep their name-mapping entries")
 
@@ -1852,8 +1852,8 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 
 	// A post-flip row lands with the converted column written as JSON text
 	// under its new field ID, as the connector now writes.
-	newVID := int32(f.ID)
-	newPath, _ := rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
+	var newVID = int32(f.ID)
+	var newPath, _ = rt.uploadParquetRows(t, ctx, writer.ParquetSchema{
 		{Name: "id", DataType: writer.LogicalTypeString, Required: false, FieldId: &idID},
 		{Name: "v", DataType: writer.LogicalTypeString, Required: false, FieldId: &newVID},
 		{Name: "cast", DataType: writer.LogicalTypeString, Required: false, FieldId: &castID},
@@ -1875,12 +1875,12 @@ func runVariantDisableFlipTest(t *testing.T, cfg config) {
 // keep their string mapping. With the option disabled, everything keeps the
 // current JSON-string mapping.
 func TestMapTypeVariantWiring(t *testing.T) {
-	mkProj := func(field string, isKey bool, withString bool, types ...string) mboilerplate.Projection {
-		inference := pf.Inference{Exists: pf.Inference_MUST, Types: types}
+	var mkProj = func(field string, isKey bool, withString bool, types ...string) mboilerplate.Projection {
+		var inference = pf.Inference{Exists: pf.Inference_MUST, Types: types}
 		if withString {
 			inference.String_ = &pf.Inference_String{}
 		}
-		ptr := "/" + field
+		var ptr = "/" + field
 		if field == "flow_document" {
 			ptr = ""
 		}
@@ -1894,8 +1894,8 @@ func TestMapTypeVariantWiring(t *testing.T) {
 		}
 	}
 
-	mkFormattedNumeric := func(field string, format string, types ...string) mboilerplate.Projection {
-		p := mkProj(field, false, true, types...)
+	var mkFormattedNumeric = func(field string, format string, types ...string) mboilerplate.Projection {
+		var p = mkProj(field, false, true, types...)
 		p.Inference.String_.Format = format
 		return p
 	}
@@ -1927,7 +1927,7 @@ func TestMapTypeVariantWiring(t *testing.T) {
 		{"single scalar", mkProj("num", false, false, "integer"), fieldConfig{}, "long", "long"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mt, conv := plain.MapType(tc.p, tc.fc)
+			var mt, conv = plain.MapType(tc.p, tc.fc)
 			require.Equal(t, tc.wantPlain, mt.String())
 			require.Nil(t, conv)
 
@@ -1944,22 +1944,22 @@ func TestMapTypeVariantWiring(t *testing.T) {
 // array fields are exactly the ones a user reaches for it on. With the option
 // disabled it stays a rejected no-op, as before.
 func TestParquetSchemaCastToStringOnJSONField(t *testing.T) {
-	collection := pf.CollectionSpec{
+	var collection = pf.CollectionSpec{
 		Name: "acmeCo/tests/cast",
 		Projections: []pf.Projection{
 			{Field: "arr", Ptr: "/arr", Inference: pf.Inference{Exists: pf.Inference_MUST, Types: []string{"array"}}},
 			{Field: "obj", Ptr: "/obj", Inference: pf.Inference{Exists: pf.Inference_MUST, Types: []string{"object"}}},
 		},
 	}
-	fields := []string{"arr", "obj"}
-	fieldConfigs := map[string]json.RawMessage{
+	var fields = []string{"arr", "obj"}
+	var fieldConfigs = map[string]json.RawMessage{
 		"arr": json.RawMessage(`{"ignoreStringFormat": true}`),
 		"obj": json.RawMessage(`{"ignoreStringFormat": true}`),
 	}
 
 	var variantCfg = withAdvanced(config{}, func(a *advancedConfig) { a.VariantColumns = true })
 
-	got, err := parquetSchema(fields, collection, fieldConfigs, variantCfg)
+	var got, err = parquetSchema(fields, collection, fieldConfigs, variantCfg)
 	require.NoError(t, err)
 	for _, el := range got {
 		require.Equalf(t, writer.LogicalTypeString, el.DataType, "field %s", el.Name)
@@ -1974,7 +1974,7 @@ func TestParquetSchemaCastToStringOnJSONField(t *testing.T) {
 // would have had as a column of its own. The connector's schema options apply
 // to that resolution too, so formats it lowers to string stay strings.
 func TestParquetSchemaVariantStringTypes(t *testing.T) {
-	mkProj := func(field, format string) pf.Projection {
+	var mkProj = func(field, format string) pf.Projection {
 		return pf.Projection{
 			Field: field,
 			Ptr:   "/" + field,
@@ -1986,7 +1986,7 @@ func TestParquetSchemaVariantStringTypes(t *testing.T) {
 		}
 	}
 
-	collection := pf.CollectionSpec{
+	var collection = pf.CollectionSpec{
 		Name: "acmeCo/tests/variantStrings",
 		// GetProjection binary-searches, so these must be sorted by field.
 		Projections: []pf.Projection{
@@ -1997,7 +1997,7 @@ func TestParquetSchemaVariantStringTypes(t *testing.T) {
 			mkProj("uuidField", "uuid"),
 		},
 	}
-	fields := []string{"dateField", "dateTimeField", "plainField", "timeField", "uuidField"}
+	var fields = []string{"dateField", "dateTimeField", "plainField", "timeField", "uuidField"}
 
 	var variantCfg = withAdvanced(config{}, func(a *advancedConfig) { a.VariantColumns = true })
 
@@ -2032,7 +2032,7 @@ func TestParquetSchemaVariantStringTypes(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := parquetSchema(fields, collection, nil, tc.cfg)
+			var got, err = parquetSchema(fields, collection, nil, tc.cfg)
 			require.NoError(t, err)
 
 			for _, el := range got {
@@ -2050,11 +2050,11 @@ func TestParquetSchemaVariantStringTypes(t *testing.T) {
 // castToString). Anything else must remain INCOMPATIBLE (backfill) rather
 // than silently migrating.
 func TestCanMigrate(t *testing.T) {
-	us := mappedType{icebergType: iceberg.PrimitiveTypes.TimestampTz}
-	ns := mappedType{icebergType: iceberg.PrimitiveTypes.TimestampTzNs}
-	str := mappedType{icebergType: iceberg.PrimitiveTypes.String}
-	vnt := mappedType{icebergType: iceberg.VariantType{}}
-	lng := mappedType{icebergType: iceberg.PrimitiveTypes.Int64}
+	var us = mappedType{icebergType: iceberg.PrimitiveTypes.TimestampTz}
+	var ns = mappedType{icebergType: iceberg.PrimitiveTypes.TimestampTzNs}
+	var str = mappedType{icebergType: iceberg.PrimitiveTypes.String}
+	var vnt = mappedType{icebergType: iceberg.VariantType{}}
+	var lng = mappedType{icebergType: iceberg.PrimitiveTypes.Int64}
 
 	require.True(t, ns.CanMigrate(mboilerplate.ExistingField{Type: "timestamptz"}))
 	require.True(t, us.CanMigrate(mboilerplate.ExistingField{Type: "timestamptz_ns"}))

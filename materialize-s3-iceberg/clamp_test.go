@@ -7,7 +7,7 @@ import (
 )
 
 func TestClampTimestamp(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		input   any
 		want    any
@@ -52,7 +52,7 @@ func TestClampTimestamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := clampTimestamp(tt.input)
+			var got, err = clampTimestamp(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -64,7 +64,7 @@ func TestClampTimestamp(t *testing.T) {
 }
 
 func TestClampTimestampNanos(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		input   any
 		want    any
@@ -109,7 +109,7 @@ func TestClampTimestampNanos(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := clampTimestampNanos(tt.input)
+			var got, err = clampTimestampNanos(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -121,7 +121,7 @@ func TestClampTimestampNanos(t *testing.T) {
 }
 
 func TestClampDate(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		input   any
 		want    any
@@ -161,7 +161,7 @@ func TestClampDate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := clampDate(tt.input)
+			var got, err = clampDate(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

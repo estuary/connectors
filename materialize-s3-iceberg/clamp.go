@@ -31,12 +31,12 @@ var dateLikeRe = regexp.MustCompile(`^(\d+)-(\d{2})-(\d{2})$`)
 // clampTimestamp returns a boundary RFC3339Nano value when v parses cleanly
 // but its UTC-normalized year is outside [minYear, maxYear].
 func clampTimestamp(v tuple.TupleElement) (any, error) {
-	s, ok := v.(string)
+	var s, ok = v.(string)
 	if !ok {
 		return v, nil
 	}
 
-	t, canonical, err := sql.ParseRFC3339Nano(s)
+	var t, canonical, err = sql.ParseRFC3339Nano(s)
 	if err != nil {
 		return nil, err
 	}
@@ -63,12 +63,12 @@ var (
 // clampTimestampNanos is the nanosecond-precision analog of clampTimestamp,
 // bounded by the int64-ns band rather than [minYear, maxYear].
 func clampTimestampNanos(v tuple.TupleElement) (any, error) {
-	s, ok := v.(string)
+	var s, ok = v.(string)
 	if !ok {
 		return v, nil
 	}
 
-	t, canonical, err := sql.ParseRFC3339Nano(s)
+	var t, canonical, err = sql.ParseRFC3339Nano(s)
 	if err != nil {
 		return nil, err
 	}
@@ -84,16 +84,16 @@ func clampTimestampNanos(v tuple.TupleElement) (any, error) {
 // clampDate also rescues > 4-digit years, which time.Parse(time.DateOnly, ...)
 // refuses to parse at all.
 func clampDate(v tuple.TupleElement) (any, error) {
-	s, ok := v.(string)
+	var s, ok = v.(string)
 	if !ok {
 		return v, nil
 	}
 
-	m := dateLikeRe.FindStringSubmatch(s)
+	var m = dateLikeRe.FindStringSubmatch(s)
 	if m == nil {
 		return nil, fmt.Errorf("could not parse %q as simple date", s)
 	}
-	year, _ := strconv.Atoi(m[1])
+	var year, _ = strconv.Atoi(m[1])
 	switch {
 	case year > maxYear:
 		return fmt.Sprintf("%04d-12-31", maxYear), nil

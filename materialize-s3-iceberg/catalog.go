@@ -80,7 +80,7 @@ func buildRestCatalog(ctx context.Context, cfg *config) (icebergcatalog.Catalog,
 	// resolve the S3 endpoint. Always pass it so the catalog-vended path (AWS
 	// Lakekeeper / Polaris, used by AWSIAM) can reach S3. Without this, vended
 	// reads/writes fail with "A region must be set when sending requests to S3".
-	fileIOProps := iceberg.Properties{}
+	var fileIOProps = iceberg.Properties{}
 	if cfg.Region != "" {
 		fileIOProps[icebergio.S3Region] = cfg.Region
 	}
@@ -93,7 +93,7 @@ func buildRestCatalog(ctx context.Context, cfg *config) (icebergcatalog.Catalog,
 	// handles both S3-compatible setups (rustfs, MinIO) and non-vending REST
 	// catalogs (e.g. Nessie) on real AWS. AWSIAM users fall through to the
 	// catalog-vended path, which is the model AWS Lakekeeper / Polaris assume.
-	directS3Creds := cfg.Credentials != nil &&
+	var directS3Creds = cfg.Credentials != nil &&
 		cfg.Credentials.AuthType == filesink.AWSAccessKey &&
 		cfg.Region != ""
 
@@ -116,7 +116,7 @@ func buildRestCatalog(ctx context.Context, cfg *config) (icebergcatalog.Catalog,
 }
 
 func buildGlueCatalog(ctx context.Context, cfg *config) (icebergcatalog.Catalog, error) {
-	credProvider, err := cfg.s3StoreConfig().CredentialsProvider(ctx)
+	var credProvider, err = cfg.s3StoreConfig().CredentialsProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("building AWS credentials: %w", err)
 	}
@@ -128,7 +128,7 @@ func buildGlueCatalog(ctx context.Context, cfg *config) (icebergcatalog.Catalog,
 		return nil, fmt.Errorf("loading AWS config: %w", err)
 	}
 
-	glueProps := icebergglue.AwsProperties{}
+	var glueProps = icebergglue.AwsProperties{}
 	if cfg.Catalog.GlueID != "" {
 		glueProps[icebergglue.CatalogIdKey] = cfg.Catalog.GlueID
 	}
@@ -164,7 +164,7 @@ func exportGlueFileIOEnv(cfg *config) {
 	if cfg.Region != "" {
 		os.Setenv("AWS_REGION", cfg.Region)
 	}
-	props := s3PropsForDirectCreds(cfg)
+	var props = s3PropsForDirectCreds(cfg)
 	for prop, env := range map[string]string{
 		icebergio.S3AccessKeyID:     "AWS_ACCESS_KEY_ID",
 		icebergio.S3SecretAccessKey: "AWS_SECRET_ACCESS_KEY",
@@ -181,10 +181,10 @@ func exportGlueFileIOEnv(cfg *config) {
 // credentials). Returns an empty map if there are no direct credentials, in
 // which case the catalog vends credentials via its standard flow.
 func s3PropsForDirectCreds(cfg *config) iceberg.Properties {
-	props := iceberg.Properties{}
+	var props = iceberg.Properties{}
 
-	legacyAccessKey := strVal(cfg.AWSAccessKeyID)
-	legacySecretKey := strVal(cfg.AWSSecretAccessKey)
+	var legacyAccessKey = strVal(cfg.AWSAccessKeyID)
+	var legacySecretKey = strVal(cfg.AWSSecretAccessKey)
 
 	switch {
 	case legacyAccessKey != "" && legacySecretKey != "":
@@ -241,11 +241,11 @@ func (t *stripDelegationTransport) RoundTrip(req *http.Request) (*http.Response,
 // holding one per binding exhausts the container's memory on materializations
 // with many long-lived tables. fn must be safe to call concurrently.
 func (c *catalog) forEachTable(ctx context.Context, idents []icebergtable.Identifier, fn func(idx int, tbl *icebergtable.Table) error) error {
-	g, gctx := errgroup.WithContext(ctx)
+	var g, gctx = errgroup.WithContext(ctx)
 	g.SetLimit(10)
 	for i, ident := range idents {
 		g.Go(func() error {
-			tbl, err := c.cat.LoadTable(gctx, ident)
+			var tbl, err = c.cat.LoadTable(gctx, ident)
 			if err != nil {
 				return fmt.Errorf("loading table %s: %w", pathToFQN(ident), err)
 			}
@@ -261,7 +261,7 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 	// only in namespaces that exist, mirroring the removed Python info_schema.
 	// Relying on ListTables to report an absent namespace is not portable: Glue
 	// surfaces a raw EntityNotFoundException never mapped to ErrNoSuchNamespace.
-	existing, err := c.listNamespaces(ctx)
+	var existing, err = c.listNamespaces(ctx)
 	if err != nil {
 		return fmt.Errorf("listing namespaces: %w", err)
 	}
@@ -274,7 +274,7 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 		return nil
 	}
 
-	wantTables := make(map[string]map[string]struct{})
+	var wantTables = make(map[string]map[string]struct{})
 	for _, p := range resourcePaths {
 		if wantTables[p[0]] == nil {
 			wantTables[p[0]] = map[string]struct{}{}
@@ -284,7 +284,7 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 
 	log.WithField("count", len(resourcePaths)).Info("info-schema: scanning tables")
 
-	existingNamespaces := make(map[string]struct{}, len(existing))
+	var existingNamespaces = make(map[string]struct{}, len(existing))
 	for _, ns := range existing {
 		existingNamespaces[ns] = struct{}{}
 	}
@@ -294,22 +294,22 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 		if _, ok := existingNamespaces[ns]; !ok {
 			continue
 		}
-		nsIdent := icebergtable.Identifier{ns}
+		var nsIdent = icebergtable.Identifier{ns}
 		for tblIdent, err := range c.cat.ListTables(ctx, nsIdent) {
 			if err != nil {
 				return fmt.Errorf("listing tables in %s: %w", ns, err)
 			}
-			tbl := tblIdent[len(tblIdent)-1]
+			var tbl = tblIdent[len(tblIdent)-1]
 			if _, ok := want[tbl]; ok {
 				matched = append(matched, tblIdent)
 			}
 		}
 	}
 
-	fields := make([][]boilerplate.ExistingField, len(matched))
+	var fields = make([][]boilerplate.ExistingField, len(matched))
 	if err := c.forEachTable(ctx, matched, func(idx int, tbl *icebergtable.Table) error {
-		schemaFields := tbl.Schema().Fields()
-		out := make([]boilerplate.ExistingField, len(schemaFields))
+		var schemaFields = tbl.Schema().Fields()
+		var out = make([]boilerplate.ExistingField, len(schemaFields))
 		for i, f := range schemaFields {
 			out[i] = boilerplate.ExistingField{
 				Name:     f.Name,
@@ -324,8 +324,8 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 	}
 
 	for i, ident := range matched {
-		ns, name := ident[0], ident[len(ident)-1]
-		res := is.PushResource(ns, name)
+		var ns, name = ident[0], ident[len(ident)-1]
+		var res = is.PushResource(ns, name)
 		for _, f := range fields[i] {
 			res.PushField(f)
 		}
@@ -337,11 +337,11 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 // tablePaths returns the registered storage path for each resource path in a
 // list, in the same order as the input.
 func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]string, error) {
-	infos, err := c.tableInfos(ctx, resourcePaths)
+	var infos, err = c.tableInfos(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]string, len(infos))
+	var out = make([]string, len(infos))
 	for i, info := range infos {
 		out[i] = info.location
 	}
@@ -357,13 +357,13 @@ type tableInfo struct {
 }
 
 func (c *catalog) tableInfos(ctx context.Context, resourcePaths [][]string) ([]tableInfo, error) {
-	idents := make([]icebergtable.Identifier, len(resourcePaths))
+	var idents = make([]icebergtable.Identifier, len(resourcePaths))
 	for i, p := range resourcePaths {
 		idents[i] = p
 	}
-	out := make([]tableInfo, len(idents))
+	var out = make([]tableInfo, len(idents))
 	if err := c.forEachTable(ctx, idents, func(idx int, tbl *icebergtable.Table) error {
-		fieldIDs := make(map[string]int)
+		var fieldIDs = make(map[string]int)
 		for _, f := range tbl.Schema().Fields() {
 			fieldIDs[f.Name] = f.ID
 		}
@@ -376,12 +376,12 @@ func (c *catalog) tableInfos(ctx context.Context, resourcePaths [][]string) ([]t
 }
 
 func (c *catalog) listNamespaces(ctx context.Context) ([]string, error) {
-	got, err := c.cat.ListNamespaces(ctx, nil)
+	var got, err = c.cat.ListNamespaces(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]string, 0, len(got))
+	var out = make([]string, 0, len(got))
 	for _, ns := range got {
 		if len(ns) == 0 {
 			continue
@@ -396,9 +396,9 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 }
 
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
-	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
+	var location = tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
 
-	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, *c.cfg)
+	var parquetSchema, err = parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, *c.cfg)
 	if err != nil {
 		return "", nil, err
 	}
@@ -420,7 +420,7 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			icebergtable.PropertyFormatVersion, v, strings.Join(opts, " and "))
 	}
 
-	fields := make([]iceberg.NestedField, 0, len(parquetSchema))
+	var fields = make([]iceberg.NestedField, 0, len(parquetSchema))
 	for i, f := range parquetSchema {
 		fields = append(fields, iceberg.NestedField{
 			ID:       i + 1,
@@ -429,16 +429,16 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			Required: f.Required,
 		})
 	}
-	schema := iceberg.NewSchema(0, fields...)
+	var schema = iceberg.NewSchema(0, fields...)
 
-	fqn := pathToFQN(b.ResourcePath)
+	var fqn = pathToFQN(b.ResourcePath)
 
 	return fmt.Sprintf("create table %q", fqn), func(ctx context.Context) error {
-		nameMappingJSON, err := json.Marshal(schema.NameMapping())
+		var nameMappingJSON, err = json.Marshal(schema.NameMapping())
 		if err != nil {
 			return fmt.Errorf("marshaling name mapping: %w", err)
 		}
-		props := iceberg.Properties{
+		var props = iceberg.Properties{
 			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
 		}
 		if c.cfg.nanosecondTimestamps() || c.cfg.variantColumns() {
@@ -464,7 +464,7 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 }
 
 func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	fqn := pathToFQN(path)
+	var fqn = pathToFQN(path)
 
 	return fmt.Sprintf("drop table %q", fqn), func(ctx context.Context) error {
 		if err := c.cat.DropTable(ctx, path); err != nil {
@@ -503,27 +503,27 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, *c.cfg)
+		var s, err = projectionToParquetSchemaElement(p.Projection.Projection, fc, *c.cfg)
 		if err != nil {
 			return "", nil, err
 		}
 		adds = append(adds, addCol{name: s.Name, typ: parquetTypeToIcebergType(s.DataType)})
 	}
 
-	relax := make([]string, 0, len(bindingUpdate.NewlyNullableFields))
+	var relax = make([]string, 0, len(bindingUpdate.NewlyNullableFields))
 	for _, f := range bindingUpdate.NewlyNullableFields {
 		relax = append(relax, f.Name)
 	}
 
-	fqn := pathToFQN(bindingUpdate.Binding.ResourcePath)
+	var fqn = pathToFQN(bindingUpdate.Binding.ResourcePath)
 
 	return fmt.Sprintf("alter table %q", fqn), func(ctx context.Context) error {
-		tbl, err := c.cat.LoadTable(ctx, bindingUpdate.Binding.ResourcePath)
+		var tbl, err = c.cat.LoadTable(ctx, bindingUpdate.Binding.ResourcePath)
 		if err != nil {
 			return fmt.Errorf("loading table %q: %w", fqn, err)
 		}
 
-		tx := tbl.NewTransaction()
+		var tx = tbl.NewTransaction()
 		// timestamptz_ns and variant columns are only valid in Iceberg format
 		// v3. A table created before nanosecond_timestamps or variant_columns
 		// was enabled may still be v2, so upgrade it as part of the same
@@ -560,7 +560,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 		// caseSensitive=true matches pyiceberg's update_schema() default that
 		// the removed Python tool relied on; the connector's field names are
 		// case-sensitive, so column matches during add/relax must be too.
-		us := tx.UpdateSchema(true, false)
+		var us = tx.UpdateSchema(true, false)
 		for _, a := range adds {
 			us = us.AddColumn([]string{a.name}, stagedType(a.typ), "", false, nil)
 		}
@@ -619,7 +619,7 @@ func (c *catalog) commitSchemaWithVariants(
 ) error {
 	var fqn = pathToFQN(path)
 
-	newSchema, err := us.Apply()
+	var newSchema, err = us.Apply()
 	if err != nil {
 		return fmt.Errorf("staging schema update for %q: %w", fqn, err)
 	}
@@ -640,7 +640,7 @@ func (c *catalog) commitSchemaWithVariants(
 		icebergtable.NewSetCurrentSchemaUpdate(finalSchema.ID),
 	)
 	if len(migratedNames) > 0 {
-		mappingJSON, ok, err := scrubNameMapping(tbl.Properties(), migratedNames)
+		var mappingJSON, ok, err = scrubNameMapping(tbl.Properties(), migratedNames)
 		if err != nil {
 			return fmt.Errorf("updating name mapping of %q: %w", fqn, err)
 		}
@@ -671,7 +671,7 @@ func (c *catalog) commitSchemaWithVariants(
 // the new type; files written after the migration embed field IDs and never
 // consult the mapping.
 func removeFromNameMapping(tx *icebergtable.Transaction, props iceberg.Properties, migrated []string) error {
-	mappingJSON, ok, err := scrubNameMapping(props, migrated)
+	var mappingJSON, ok, err = scrubNameMapping(props, migrated)
 	if err != nil || !ok {
 		return err
 	}
@@ -681,7 +681,7 @@ func removeFromNameMapping(tx *icebergtable.Transaction, props iceberg.Propertie
 // scrubNameMapping returns the table's default name mapping with the migrated
 // column names removed, reporting ok=false when the table has no mapping.
 func scrubNameMapping(props iceberg.Properties, migrated []string) (string, bool, error) {
-	raw, ok := props[icebergtable.DefaultNameMappingKey]
+	var raw, ok = props[icebergtable.DefaultNameMappingKey]
 	if !ok {
 		return "", false, nil
 	}
@@ -694,7 +694,7 @@ func scrubNameMapping(props iceberg.Properties, migrated []string) (string, bool
 			return slices.Contains(f.Names, name)
 		})
 	})
-	mappingJSON, err := json.Marshal(mapping)
+	var mappingJSON, err = json.Marshal(mapping)
 	if err != nil {
 		return "", false, fmt.Errorf("marshaling name mapping: %w", err)
 	}
@@ -709,9 +709,9 @@ func (c *catalog) appendFiles(
 	prevCheckpoint string,
 	nextCheckpoint string,
 ) error {
-	fqn := pathToFQN(tablePath)
+	var fqn = pathToFQN(tablePath)
 
-	logger := log.WithFields(log.Fields{
+	var logger = log.WithFields(log.Fields{
 		"table":           fqn,
 		"materialization": materialization,
 		"prev_checkpoint": prevCheckpoint,
@@ -722,7 +722,7 @@ func (c *catalog) appendFiles(
 
 	const maxAttempts = 3
 	for attempt := 1; ; attempt++ {
-		tbl, err := c.cat.LoadTable(ctx, tablePath)
+		var tbl, err = c.cat.LoadTable(ctx, tablePath)
 		if err != nil {
 			err = fmt.Errorf("loading table %q: %w", fqn, err)
 			if attempt >= maxAttempts {
@@ -735,7 +735,7 @@ func (c *catalog) appendFiles(
 			continue
 		}
 
-		checkpoints := map[string]string{}
+		var checkpoints = map[string]string{}
 		if raw, ok := tbl.Properties()[flowCheckpointsKey]; ok && raw != "" {
 			if err := json.Unmarshal([]byte(raw), &checkpoints); err != nil {
 				return fmt.Errorf("parsing %s on %q: %w", flowCheckpointsKey, fqn, err)
@@ -753,7 +753,7 @@ func (c *catalog) appendFiles(
 			return fmt.Errorf("marshaling checkpoints: %w", err)
 		}
 
-		tx := tbl.NewTransaction()
+		var tx = tbl.NewTransaction()
 		// ignoreDuplicates=true: checking for duplicates requires reading
 		// every manifest of the current snapshot, which cannot finish within
 		// the Acknowledge deadline on long-lived tables. The checkpoint fence

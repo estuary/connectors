@@ -41,7 +41,7 @@ func (fc fieldConfig) CastToString() bool {
 }
 
 func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, cfg config) (writer.ParquetSchema, error) {
-	out := make(writer.ParquetSchema, 0, len(fields))
+	var out = make(writer.ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
 		var fc fieldConfig
@@ -53,7 +53,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, cfg)
+		var s, err = projectionToParquetSchemaElement(*collection.GetProjection(f), fc, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -150,7 +150,7 @@ func (mt mappedType) Compatible(existing boilerplate.ExistingField) bool {
 // type applies to data going forward, and prior rows read as null for the
 // column.
 func (mt mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
-	from, to := strings.ToLower(existing.Type), mt.icebergType.String()
+	var from, to = strings.ToLower(existing.Type), mt.icebergType.String()
 	switch {
 	case from == "timestamptz" && to == "timestamptz_ns":
 		return true
