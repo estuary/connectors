@@ -286,8 +286,8 @@ func alreadyExists(err error) bool {
 	if err == nil {
 		return false
 	}
-	var rae *ebtypes.ResourceAlreadyExistsException
-	return errors.As(err, &rae)
+	var _, ok = errors.AsType[*ebtypes.ResourceAlreadyExistsException](err)
+	return ok
 }
 
 // receivedEvent matches the JSON shape EventBridge writes to SQS via a rule
