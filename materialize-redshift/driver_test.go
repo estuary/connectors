@@ -30,7 +30,7 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.local.yaml").Output()
+	var jsonBytes, err = exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.local.yaml").Output()
 	require.NoError(t, err)
 
 	var out config
@@ -45,7 +45,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 			Delta: delta,
@@ -53,7 +53,7 @@ func TestIntegration(t *testing.T) {
 	}
 
 	// Staged manifest keys in the connector state carry per-transaction UUIDs.
-	sanitizers := []func(string) string{
+	var sanitizers = []func(string) string{
 		func(s string) string {
 			return regexp.MustCompile(`[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}`).
 				ReplaceAllString(s, "<uuid>")
@@ -78,13 +78,13 @@ func TestIntegration(t *testing.T) {
 		var taskName = "acmeCo/tests/materialize-redshift-truncate"
 		var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
 
-		conn, err := pgx.Connect(ctx, cfg.toURI())
+		var conn, err = pgx.Connect(ctx, cfg.toURI())
 		require.NoError(t, err)
 		defer conn.Close(ctx)
 
 		var identifiers = make(map[string]string)
 		for _, table := range tables {
-			path, _, err := tableConfig{Table: table}.WithDefaults(cfg).Parameters()
+			var path, _, err = tableConfig{Table: table}.WithDefaults(cfg).Parameters()
 			require.NoError(t, err)
 			identifiers[table] = pgx.Identifier(path).Sanitize()
 			_, err = conn.Exec(ctx, "DROP TABLE IF EXISTS "+identifiers[table]+";")
@@ -127,12 +127,12 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("apply-drain", func(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
-			ctx := context.Background()
-			tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
-			res := makeResourceFn(tableName, false).WithDefaults(cfg)
+			var ctx = context.Background()
+			var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 
 			// Values for the fields of the testutil drain fixture specs.
-			values := map[string]any{
+			var values = map[string]any{
 				"key":                  "k1",
 				"flow_published_at":    "2024-01-01T00:00:00Z",
 				"_meta/flow_truncated": false,
@@ -148,31 +148,31 @@ func TestIntegration(t *testing.T) {
 				"flow_document":        json.RawMessage(`{}`),
 			}
 
-			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
-				b := appliedSpec.Bindings[0]
-				fields := append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
+			var seedPending = func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+				var b = appliedSpec.Bindings[0]
+				var fields = append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
 				if b.FieldSelection.Document != "" {
 					fields = append(fields, b.FieldSelection.Document)
 				}
 				var row []any
 				for _, f := range fields {
-					v, ok := values[f]
+					var v, ok = values[f]
 					require.True(t, ok, "no seed value for selected field %q", f)
 					row = append(row, v)
 				}
 
-				entry := stageRows(t, cfg, fields, [][]any{row})
+				var entry = stageRows(t, cfg, fields, [][]any{row})
 				return mustMarshal(t, connectorState{b.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
 			}
 
-			verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+			var verifyDrained = func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
 				require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 			}
 
 			// The drain applies under the fixture spec's own name and leaves
 			// its tokens row behind.
 			t.Cleanup(func() {
-				materializer, err := NewDriver().NewMaterializer(ctx, taskName, cfg, testFlags(t, cfg))
+				var materializer, err = NewDriver().NewMaterializer(ctx, taskName, cfg, testFlags(t, cfg))
 				require.NoError(t, err)
 				defer materializer.Close(ctx)
 				require.NoError(t, materializer.CleanupTestTask(ctx, "test/sqlite"))
@@ -198,12 +198,12 @@ func TestIntegration(t *testing.T) {
 // column fields would, returning the entry describing them.
 func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stateItem {
 	t.Helper()
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	client, err := cfg.toS3Client(ctx, testFlags(t, cfg))
+	var client, err = cfg.toS3Client(ctx, testFlags(t, cfg))
 	require.NoError(t, err)
 
-	f := newStagedFile(newS3Store(client, cfg.Bucket), cfg.effectiveBucketPath(), fields)
+	var f = newStagedFile(newS3Store(client, cfg.Bucket), cfg.effectiveBucketPath(), fields)
 	f.start()
 	for _, row := range rows {
 		require.NoError(t, f.writeRow(ctx, row))
@@ -219,13 +219,13 @@ func stageRows(t *testing.T, cfg config, fields []string, rows [][]any) *stateIt
 // committed is skipped, and a task crossing over from the old checkpoints row
 // format hands back its runtime checkpoint exactly once.
 func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableConfig) {
-	ctx := context.Background()
-	cfg := mustGetCfg(t)
-	flags := testFlags(t, cfg)
-	suffix := fmt.Sprintf("%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+	var ctx = context.Background()
+	var cfg = mustGetCfg(t)
+	var flags = testFlags(t, cfg)
+	var suffix = fmt.Sprintf("%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
 
-	driver := NewDriver()
-	ep, err := driver.NewEndpoint(ctx, cfg, flags)
+	var driver = NewDriver()
+	var ep, err = driver.NewEndpoint(ctx, cfg, flags)
 	require.NoError(t, err)
 	materializer, err := driver.NewMaterializer(ctx, "acmeCo/tests/idempotency_"+suffix, cfg, flags)
 	require.NoError(t, err)
@@ -236,14 +236,14 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 
 	// A delta-updates table: with no MERGE the token is all that stands
 	// between a re-applied entry and duplicated rows.
-	intProjection := func(field string) sql.Projection {
+	var intProjection = func(field string) sql.Projection {
 		return sql.Projection{Projection: pf.Projection{
 			Field:     field,
 			Ptr:       "/" + field,
 			Inference: pf.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST},
 		}}
 	}
-	res := makeResourceFn("idempotency"+suffix, true).WithDefaults(cfg)
+	var res = makeResourceFn("idempotency"+suffix, true).WithDefaults(cfg)
 	path, _, err := res.Parameters()
 	require.NoError(t, err)
 	table, err := sql.ResolveTable(sql.TableShape{
@@ -265,57 +265,57 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 		}
 	})
 
-	is := boilerplate.InitInfoSchema(materializer.Config())
+	var is = boilerplate.InitInfoSchema(materializer.Config())
 	require.NoError(t, materializer.PopulateInfoSchema(ctx, is, [][]string{path}))
 	_, err = materializer.Setup(ctx, is)
 	require.NoError(t, err)
 
-	checkpointsTable := ep.Dialect.Identifier(ep.MetaCheckpoints.Path...)
-	newTransactor := func(t *testing.T, taskName string, state json.RawMessage) *transactor {
+	var checkpointsTable = ep.Dialect.Identifier(ep.MetaCheckpoints.Path...)
+	var newTransactor = func(t *testing.T, taskName string, state json.RawMessage) *transactor {
 		t.Helper()
-		fence := sql.Fence{
+		var fence = sql.Fence{
 			TablePath:       ep.MetaCheckpoints.Path,
 			Materialization: pf.Materialization(taskName),
 			KeyBegin:        0,
 			KeyEnd:          math.MaxUint32,
 		}
-		d, err := ep.NewTransactor(ctx, taskName, flags, ep, fence, []sql.Table{table}, pm.Request_Open{StateJson: state}, is, m.NewBindingEvents())
+		var d, err = ep.NewTransactor(ctx, taskName, flags, ep, fence, []sql.Table{table}, pm.Request_Open{StateJson: state}, is, m.NewBindingEvents())
 		require.NoError(t, err)
 		return d.(*transactor)
 	}
-	recoverCheckpoint := func(t *testing.T, d *transactor) m.RuntimeCheckpoint {
+	var recoverCheckpoint = func(t *testing.T, d *transactor) m.RuntimeCheckpoint {
 		t.Helper()
-		cp, err := d.RecoverCheckpoint(ctx, pf.MaterializationSpec{}, pf.RangeSpec{})
+		var cp, err = d.RecoverCheckpoint(ctx, pf.MaterializationSpec{}, pf.RangeSpec{})
 		require.NoError(t, err)
 		return cp
 	}
-	acknowledge := func(t *testing.T, d *transactor) *pf.ConnectorState {
+	var acknowledge = func(t *testing.T, d *transactor) *pf.ConnectorState {
 		t.Helper()
-		patch, err := d.Acknowledge(ctx, nil, nil)
+		var patch, err = d.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		return patch
 	}
-	countRows := func(t *testing.T) int {
+	var countRows = func(t *testing.T) int {
 		t.Helper()
-		_, rows, err := materializer.SnapshotTestResource(ctx, path)
+		var _, rows, err = materializer.SnapshotTestResource(ctx, path)
 		require.NoError(t, err)
 		return len(rows)
 	}
-	stateWith := func(t *testing.T, entry *stateItem) json.RawMessage {
+	var stateWith = func(t *testing.T, entry *stateItem) json.RawMessage {
 		return mustMarshal(t, connectorState{table.StateKey: {rangeKeyOf(0, math.MaxUint32): entry}})
 	}
 
 	t.Run("a committed token settles a recovered entry", func(t *testing.T) {
-		taskName := "acmeCo/tests/idempotency_double_apply_" + suffix
+		var taskName = "acmeCo/tests/idempotency_double_apply_" + suffix
 		t.Cleanup(func() { require.NoError(t, materializer.CleanupTestTask(ctx, taskName)) })
 
-		before := countRows(t)
-		state := stateWith(t, stageRows(t, cfg, table.ColumnNames(), [][]any{{1, 10}, {2, 20}, {3, 30}}))
+		var before = countRows(t)
+		var state = stateWith(t, stageRows(t, cfg, table.ColumnNames(), [][]any{{1, 10}, {2, 20}, {3, 30}}))
 
 		// No row yet: the task is new and its first apply commits the entry.
-		d := newTransactor(t, taskName, state)
+		var d = newTransactor(t, taskName, state)
 		require.Nil(t, recoverCheckpoint(t, d))
-		patch := acknowledge(t, d)
+		var patch = acknowledge(t, d)
 		require.NotNil(t, patch)
 		require.JSONEq(t, `{"idempotency.v1": {"00000000-ffffffff": null}}`, string(patch.UpdatedJson))
 		require.Equal(t, before+3, countRows(t))
@@ -333,11 +333,11 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 	})
 
 	t.Run("a task crossing over hands back its checkpoint once", func(t *testing.T) {
-		taskName := "acmeCo/tests/idempotency_crossover_" + suffix
+		var taskName = "acmeCo/tests/idempotency_crossover_" + suffix
 		t.Cleanup(func() { require.NoError(t, materializer.CleanupTestTask(ctx, taskName)) })
 
-		checkpoint := []byte("runtime-checkpoint-of-the-old-format")
-		compressed, err := compressBytes(checkpoint)
+		var checkpoint = []byte("runtime-checkpoint-of-the-old-format")
+		var compressed, err = compressBytes(checkpoint)
 		require.NoError(t, err)
 		conn, err := pgx.Connect(ctx, cfg.toURI())
 		require.NoError(t, err)
@@ -353,12 +353,12 @@ func runIdempotencyTest(t *testing.T, makeResourceFn func(string, bool) tableCon
 
 		// Once the runtime has committed a staged transaction, returning the
 		// row's checkpoint would rewind it and apply that transaction twice.
-		state := stateWith(t, stageRows(t, cfg, table.ColumnNames(), [][]any{{4, 40}}))
-		d := newTransactor(t, taskName, state)
+		var state = stateWith(t, stageRows(t, cfg, table.ColumnNames(), [][]any{{4, 40}}))
+		var d = newTransactor(t, taskName, state)
 		require.Nil(t, recoverCheckpoint(t, d))
 
 		// The first apply rewrites the row, and the checkpoint is gone for good.
-		before := countRows(t)
+		var before = countRows(t)
 		require.NotNil(t, acknowledge(t, d))
 		require.Equal(t, before+1, countRows(t))
 		require.Nil(t, recoverCheckpoint(t, newTransactor(t, taskName, nil)))
@@ -370,11 +370,11 @@ func TestPrereqs(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	cfg := mustGetCfg(t)
+	var cfg = mustGetCfg(t)
 
-	nonExistentBucket := uuid.NewString()
+	var nonExistentBucket = uuid.NewString()
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		cfg  func(config) config
 		want []error
@@ -446,7 +446,7 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -458,10 +458,10 @@ func TestPrereqs(t *testing.T) {
 // NewEndpoint runs before the prerequisite checks, so a login failure must be
 // reported as a connection failure rather than as the first query it runs.
 func TestNewEndpointConnectError(t *testing.T) {
-	cfg := mustGetCfg(t)
+	var cfg = mustGetCfg(t)
 	cfg.User = "wrong" + cfg.User
 
-	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	var _, err = NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 	require.ErrorContains(t, err, "unable to connect to database: incorrect username or password")
 
 	var userErr *cerrors.UserError
@@ -473,7 +473,7 @@ func TestNewEndpointConnectError(t *testing.T) {
 func testFlags(t *testing.T, cfg config) map[string]bool {
 	t.Helper()
 
-	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	var flags, err = boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
 	require.NoError(t, err)
 
 	return flags

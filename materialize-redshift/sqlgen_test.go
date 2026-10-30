@@ -15,7 +15,7 @@ var testDialect = createRsDialect(false, common.ResolveFlagDefaults(featureFlagD
 var testTemplates = renderTemplates(testDialect)
 
 func flagsWithoutNativeBinary() map[string]bool {
-	out := common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
+	var out = common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
 	out["native_binary_column_type"] = false
 	return out
 }
@@ -25,13 +25,13 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGeneration_NoNativeBinaryColumnType(t *testing.T) {
-	dialect := createRsDialect(false, flagsWithoutNativeBinary())
-	tpls := renderTemplates(dialect)
+	var dialect = createRsDialect(false, flagsWithoutNativeBinary())
+	var tpls = renderTemplates(dialect)
 	runSQLGen(t, dialect, tpls)
 }
 
 func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -49,10 +49,10 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	)
 
 	for _, tbl := range tables {
-		tpl := testTemplates.createLoadTable
+		var tpl = testTemplates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		data := loadTableParams{
+		var data = loadTableParams{
 			Target: tbl,
 		}
 
@@ -62,10 +62,10 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	}
 
 	for _, tbl := range tables {
-		tpl := testTemplates.createLoadTable
+		var tpl = testTemplates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		data := loadTableParams{
+		var data = loadTableParams{
 			Target:        tbl,
 			VarCharLength: 400,
 		}
@@ -77,11 +77,11 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 
 	for _, tbl := range tables {
 		t.Run("createStoreTable/"+tbl.Identifier, func(t *testing.T) {
-			tpl := testTemplates.createStoreTable
+			var tpl = testTemplates.createStoreTable
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
-			data := storeTableParams{
+			var meta = make([]VarcharColumnMeta, len(tbl.Columns()))
+			var data = storeTableParams{
 				Target:            &tbl,
 				VarcharColumnMeta: meta,
 			}
@@ -92,16 +92,16 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		})
 
 		t.Run("createStoreTable/"+tbl.Identifier+"/varchar", func(t *testing.T) {
-			tpl := testTemplates.createStoreTable
+			var tpl = testTemplates.createStoreTable
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
+			var meta = make([]VarcharColumnMeta, len(tbl.Columns()))
 			for idx, col := range tbl.Columns() {
 				if col.DDL == "TEXT" {
 					meta[idx] = VarcharColumnMeta{MaxLength: idx + 42}
 				}
 			}
-			data := storeTableParams{
+			var data = storeTableParams{
 				Target:            &tbl,
 				VarcharColumnMeta: meta,
 			}
@@ -114,11 +114,11 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 
 	for _, tbl := range tables {
 		t.Run("createDeleteTable/"+tbl.Identifier, func(t *testing.T) {
-			tpl := testTemplates.createDeleteTable
+			var tpl = testTemplates.createDeleteTable
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
-			data := deleteTableParams{
+			var meta = make([]VarcharColumnMeta, len(tbl.Columns()))
+			var data = deleteTableParams{
 				Target:            &tbl,
 				VarcharColumnMeta: meta,
 			}
@@ -129,16 +129,16 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		})
 
 		t.Run("createDeleteTable/"+tbl.Identifier+"/varchar", func(t *testing.T) {
-			tpl := testTemplates.createDeleteTable
+			var tpl = testTemplates.createDeleteTable
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
-			meta := make([]VarcharColumnMeta, len(tbl.Columns()))
+			var meta = make([]VarcharColumnMeta, len(tbl.Columns()))
 			for idx, col := range tbl.Columns() {
 				if col.DDL == "TEXT" {
 					meta[idx] = VarcharColumnMeta{MaxLength: idx + 42}
 				}
 			}
-			data := deleteTableParams{
+			var data = deleteTableParams{
 				Target:            &tbl,
 				VarcharColumnMeta: meta,
 			}
@@ -175,7 +175,7 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 }
 
 func TestTruncatedIdentifier(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name  string
 		input string
 		want  string
@@ -210,7 +210,7 @@ func TestTruncatedIdentifier(t *testing.T) {
 }
 
 func TestIdentifierer(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name       string
 		identifier []string
 		expected   string
@@ -223,7 +223,7 @@ func TestIdentifierer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := testDialect.Identifier(tt.identifier...)
+			var actual = testDialect.Identifier(tt.identifier...)
 			require.Equal(t, tt.expected, actual)
 		})
 	}

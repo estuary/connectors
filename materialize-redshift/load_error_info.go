@@ -33,8 +33,8 @@ type loadErrorInfo struct {
 func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, dialect sql.Dialect, bucket string, files []string) (loadErrorInfo, error) {
 	var prefixes []string
 	for _, f := range files {
-		bucketPath := fmt.Sprintf("s3://%s/%s/", bucket, path.Dir(f))
-		bucketPattern := likePatternReplacer.Replace(bucketPath) + "%"
+		var bucketPath = fmt.Sprintf("s3://%s/%s/", bucket, path.Dir(f))
+		var bucketPattern = likePatternReplacer.Replace(bucketPath) + "%"
 		if p := fmt.Sprintf("file_name LIKE %s ESCAPE '^'", dialect.Literal(bucketPattern)); !slices.Contains(prefixes, p) {
 			prefixes = append(prefixes, p)
 		}
@@ -43,7 +43,7 @@ func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, dialect sql.Dialect, 
 		return loadErrorInfo{}, fmt.Errorf("no staged files to look up")
 	}
 
-	q := fmt.Sprintf(`
+	var q = fmt.Sprintf(`
 	SELECT 
 		error_message,
 		error_code, 

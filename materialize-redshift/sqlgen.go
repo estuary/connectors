@@ -13,7 +13,7 @@ import (
 )
 
 func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[string]bool) sql.Dialect {
-	textConverter := func(te tuple.TupleElement) (interface{}, error) {
+	var textConverter = func(te tuple.TupleElement) (interface{}, error) {
 		if s, ok := te.(string); ok {
 			// Redshift will terminate values going into VARCHAR columns where the null
 			// escape sequence occurs. This is especially a problem when it is the first
@@ -29,16 +29,16 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 		return te, nil
 	}
 
-	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter))
+	var primaryKeyTextType = sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter))
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.NormalizeDatetimeString))
-	datetimeMapping := sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
+	var dateMapping = sql.MapStatic("DATE", sql.UsingConverter(sql.NormalizeDatetimeString))
+	var datetimeMapping = sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
 		// Redshift supports timestamps with microsecond precision. It will reject
 		// timestamps with higher precision than that, so we truncate anything
 		// beyond microseconds.
 		s = strings.Replace(s, "z", "Z", 1)
-		parsed, err := time.Parse(time.RFC3339Nano, s)
+		var parsed, err = time.Parse(time.RFC3339Nano, s)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
 		}
@@ -52,7 +52,7 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
-	binaryMapping := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
+	var binaryMapping = sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
 	if featureFlags["native_binary_column_type"] {
 		// VARBYTE's maximum size is 1,024,000 bytes. The element converter
 		// re-encodes base64 input as hex so the staged JSON files contain
@@ -68,7 +68,7 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 		binaryMapping = sql.MapStatic("VARBYTE(1024000)", sql.AlsoCompatibleWith("varbyte", "binary varying"), sql.UsingConverter(sql.Base64ToHex))
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT"),
@@ -116,7 +116,7 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 	// Redshift lowercases all identifiers by default, unless the parameter
 	// `enable_case_sensitive_identifier` is TRUE, which causes quoted identifiers preserve their
 	// case.
-	identifierTransform := func(in string) string {
+	var identifierTransform = func(in string) string {
 		return truncatedIdentifier(strings.ToLower(in))
 	}
 	if caseSensitiveIdentifierEnabled {
@@ -480,13 +480,13 @@ const varcharTableAlter = "ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(MAX);"
 // This means we have to be aware of this possible truncation when querying the information_schema
 // view.
 func truncatedIdentifier(in string) string {
-	maxByteLength := 127
+	var maxByteLength = 127
 
 	if len(in) <= maxByteLength {
 		return in
 	}
 
-	bytes := []byte(in)
+	var bytes = []byte(in)
 	for maxByteLength >= 0 && !utf8.Valid(bytes[:maxByteLength]) {
 		// Don't mangle multi-byte characters; this seems to be consistent with Redshift truncation
 		// as well.

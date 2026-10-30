@@ -37,7 +37,7 @@ func isRetriable(err error) bool {
 
 func retry(ctx context.Context, fn func() error) error {
 	for attempt := 1; ; attempt++ {
-		err := fn()
+		var err = fn()
 		if err == nil || !isRetriable(err) || attempt == maxAttempts {
 			return err
 		}

@@ -35,9 +35,9 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	cfg := ep.Config
+	var cfg = ep.Config
 
-	db, err := stdsql.Open("pgx", cfg.toURI())
+	var db, err = stdsql.Open("pgx", cfg.toURI())
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	catalog := c.cfg.Database
+	var catalog = c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
 		// database if that's the case.
@@ -63,24 +63,24 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	var _, err = c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -93,7 +93,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		return "", nil, fmt.Errorf("redshift cannot drop nullability constraints but got %d DropNotNulls for table %s", len(ta.DropNotNulls), ta.Identifier)
 	}
 
-	stmts := []string{}
+	var stmts = []string{}
 	for _, c := range ta.AddColumns {
 		stmts = append(stmts, fmt.Sprintf(
 			"ALTER TABLE %s ADD COLUMN %s %s;",
@@ -113,7 +113,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
-			_, err := c.db.ExecContext(ctx, stmt)
+			var _, err = c.db.ExecContext(ctx, stmt)
 			if err != nil {
 				return err
 			}
@@ -123,13 +123,13 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
-	rows, err := c.db.QueryContext(ctx, "select schema_name from svv_all_schemas")
+	var rows, err = c.db.QueryContext(ctx, "select schema_name from svv_all_schemas")
 	if err != nil {
 		return nil, fmt.Errorf("querying svv_all_schemas: %w", err)
 	}
 	defer rows.Close()
 
-	out := []string{}
+	var out = []string{}
 
 	for rows.Next() {
 		var schema string
@@ -160,7 +160,7 @@ func connectError(err error, cfg config) error {
 		} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
 			err = fmt.Errorf("database %q does not exist", cfg.Database)
 		} else if strings.Contains(errStr, "context deadline exceeded") {
-			errStr := `connection to host at address %q timed out, possible causes:
+			var errStr = `connection to host at address %q timed out, possible causes:
 				* Redshift endpoint is not set to be publicly accessible
 				* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
 				* the configured address is incorrect, possibly with an incorrect host or port
@@ -172,9 +172,9 @@ func connectError(err error, cfg config) error {
 }
 
 func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	db, err := stdsql.Open("pgx", cfg.toURI())
+	var db, err = stdsql.Open("pgx", cfg.toURI())
 	if err != nil {
 		errs.Err(err)
 		return errs
@@ -183,7 +183,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
 	// bail out well before then.
-	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	var pingCtx, cancel = context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
@@ -199,7 +199,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	}
 
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
-	testKey := path.Join(cfg.effectiveBucketPath(), uuid.NewString())
+	var testKey = path.Join(cfg.effectiveBucketPath(), uuid.NewString())
 
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
@@ -309,7 +309,7 @@ func snapshotTestTable(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, 
 		return nil, nil, fmt.Errorf("unexpected resource path length %d", len(path))
 	}
 
-	colRows, err := db.QueryContext(
+	var colRows, err = db.QueryContext(
 		ctx,
 		`SELECT column_name, data_type FROM information_schema.columns
 			WHERE table_schema = $1 AND table_name = $2
@@ -328,7 +328,7 @@ func snapshotTestTable(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, 
 		if err := colRows.Scan(&name, &dataType); err != nil {
 			return nil, nil, err
 		}
-		ident := dialect.Identifier(name)
+		var ident = dialect.Identifier(name)
 		if dataType == "binary varying" {
 			// FROM_VARBYTE may insert line breaks for large base64 outputs.
 			// Strip them so snapshots and downstream base64 decoders see a
@@ -345,8 +345,8 @@ func snapshotTestTable(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, 
 		return nil, nil, fmt.Errorf("no columns found for %s.%s", tableSchema, tableName)
 	}
 
-	tableIdentifier := dialect.Identifier(path...)
-	query := fmt.Sprintf("SELECT %s FROM %s;", strings.Join(selectExprs, ", "), tableIdentifier)
+	var tableIdentifier = dialect.Identifier(path...)
+	var query = fmt.Sprintf("SELECT %s FROM %s;", strings.Join(selectExprs, ", "), tableIdentifier)
 	return sql.SnapshotTestTableQuery(ctx, db, tableIdentifier, query)
 }
 
@@ -366,7 +366,7 @@ func (c *client) withDB(fn func(*stdsql.DB) error) error {
 // compressBytes gzips b, matching the format decodeLegacyCheckpoint expects.
 func compressBytes(b []byte) ([]byte, error) {
 	var gzb bytes.Buffer
-	w := gzip.NewWriter(&gzb)
+	var w = gzip.NewWriter(&gzb)
 	if _, err := w.Write(b); err != nil {
 		return nil, fmt.Errorf("compressing bytes: %w", err)
 	} else if err := w.Close(); err != nil {

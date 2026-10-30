@@ -129,7 +129,7 @@ func (s *checkpointsTable) decodeLegacyCheckpoint(raw *string) ([]byte, error) {
 	if raw == nil {
 		return nil, nil
 	}
-	decoded, err := hex.DecodeString(*raw)
+	var decoded, err = hex.DecodeString(*raw)
 	if err != nil {
 		return nil, fmt.Errorf("decoding checkpoints row: %w", err)
 	}
@@ -149,7 +149,7 @@ func (s *checkpointsTable) decodeTokensColumn(raw *string) (checkpointTokensMap,
 	if raw == nil {
 		return nil, nil
 	}
-	decoded, err := hex.DecodeString(*raw)
+	var decoded, err = hex.DecodeString(*raw)
 	if err != nil {
 		return nil, fmt.Errorf("decoding checkpoint tokens row: %w", err)
 	}
@@ -183,7 +183,7 @@ func (s *checkpointsTable) ensureTokensColumn(ctx context.Context, conn *pgx.Con
 // into a different row, and its tokens must still settle the entries it
 // applied.
 func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[string]bool, []byte, bool, error) {
-	rows, err := conn.Query(ctx, fmt.Sprintf(
+	var rows, err = conn.Query(ctx, fmt.Sprintf(
 		"SELECT key_begin, key_end, checkpoint, %s FROM %s WHERE materialization = $1;", checkpointTokensColumn, s.table), s.materialization)
 	if err != nil {
 		return nil, nil, false, fmt.Errorf("reading checkpoints rows: %w", err)
@@ -200,7 +200,7 @@ func (s *checkpointsTable) readAll(ctx context.Context, conn *pgx.Conn) (map[str
 		if err := rows.Scan(&keyBegin, &keyEnd, &checkpointRaw, &tokensRaw); err != nil {
 			return nil, nil, false, fmt.Errorf("scanning checkpoints row: %w", err)
 		}
-		tokens, err := s.decodeTokensColumn(tokensRaw)
+		var tokens, err = s.decodeTokensColumn(tokensRaw)
 		if err != nil {
 			return nil, nil, false, err
 		}
@@ -248,14 +248,14 @@ func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkp
 		}
 	}
 
-	tokensPayload, err := json.Marshal(s.payload)
+	var tokensPayload, err = json.Marshal(s.payload)
 	if err != nil {
 		return fmt.Errorf("marshalling applied tokens: %w", err)
 	}
 
 	var legacyPayload *string
 	if legacyCheckpoint != nil {
-		compressed, err := compressBytes(legacyCheckpoint)
+		var compressed, err = compressBytes(legacyCheckpoint)
 		if err != nil {
 			return fmt.Errorf("compressing runtime checkpoint: %w", err)
 		}
@@ -265,7 +265,7 @@ func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkp
 
 	var rowsAffected int64
 	if legacyPayload == nil {
-		res, err := txn.Exec(ctx, fmt.Sprintf(
+		var res, err = txn.Exec(ctx, fmt.Sprintf(
 			"UPDATE %s SET %s = $1 WHERE materialization = $2 AND key_begin = $3 AND key_end = $4;", s.table, checkpointTokensColumn),
 			string(tokensPayload), s.materialization, s.keyBegin, s.keyEnd,
 		)
@@ -274,7 +274,7 @@ func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkp
 		}
 		rowsAffected = res.RowsAffected()
 	} else {
-		res, err := txn.Exec(ctx, fmt.Sprintf(
+		var res, err = txn.Exec(ctx, fmt.Sprintf(
 			"UPDATE %s SET %s = $1, checkpoint = $2 WHERE materialization = $3 AND key_begin = $4 AND key_end = $5;", s.table, checkpointTokensColumn),
 			string(tokensPayload), *legacyPayload, s.materialization, s.keyBegin, s.keyEnd,
 		)

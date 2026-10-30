@@ -60,7 +60,7 @@ func (s *s3Store) objectURI(key string) string {
 
 // upload streams body to key as a single multipart upload.
 func (s *s3Store) upload(ctx context.Context, key string, body io.Reader) error {
-	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
+	var _, err = s.uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 		Body:   body,
@@ -82,7 +82,7 @@ type manifestEntry struct {
 // putManifest writes a COPY manifest at manifestKey listing the given data
 // files, each an object key.
 func (s *s3Store) putManifest(ctx context.Context, manifestKey string, files []string) error {
-	manifest := copyManifest{Entries: make([]manifestEntry, 0, len(files))}
+	var manifest = copyManifest{Entries: make([]manifestEntry, 0, len(files))}
 	for _, key := range files {
 		manifest.Entries = append(manifest.Entries, manifestEntry{
 			URL:       s.objectURI(key),
@@ -90,7 +90,7 @@ func (s *s3Store) putManifest(ctx context.Context, manifestKey string, files []s
 		})
 	}
 
-	manifestBytes, err := json.Marshal(manifest)
+	var manifestBytes, err = json.Marshal(manifest)
 	if err != nil {
 		return fmt.Errorf("marshalling manifest file: %w", err)
 	}
@@ -109,12 +109,12 @@ func (s *s3Store) putManifest(ctx context.Context, manifestKey string, files []s
 // a leftover object costs storage but nothing else.
 func (s *s3Store) deleteObjects(ctx context.Context, keys []string) {
 	for chunk := range slices.Chunk(keys, 1000) {
-		toDelete := make([]types.ObjectIdentifier, 0, len(chunk))
+		var toDelete = make([]types.ObjectIdentifier, 0, len(chunk))
 		for _, key := range chunk {
 			toDelete = append(toDelete, types.ObjectIdentifier{Key: aws.String(key)})
 		}
 
-		d, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		var d, err = s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
 			Bucket: aws.String(s.bucket),
 			Delete: &types.Delete{Objects: toDelete},
 		})
@@ -195,13 +195,13 @@ func (f *stagedFile) start() {
 }
 
 func (f *stagedFile) newFile(ctx context.Context) {
-	r, w := io.Pipe()
+	var r, w = io.Pipe()
 
 	f.writer = writer.NewJsonWriter(w, f.fields)
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	f.group = group
-	fName := uuid.NewString()
+	var fName = uuid.NewString()
 	f.uploaded = append(f.uploaded, fName)
 
 	f.group.Go(func() error {
@@ -256,7 +256,7 @@ func (f *stagedFile) flush() ([]string, error) {
 		return nil, err
 	}
 
-	files := make([]string, 0, len(f.uploaded))
+	var files = make([]string, 0, len(f.uploaded))
 	for _, u := range f.uploaded {
 		files = append(files, path.Join(f.prefix, u))
 	}

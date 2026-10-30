@@ -175,7 +175,7 @@ func (c config) toURI() string {
 }
 
 func (c config) toS3Client(ctx context.Context, featureFlags map[string]bool) (*s3.Client, error) {
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""),
 		),
@@ -186,7 +186,7 @@ func (c config) toS3Client(ctx context.Context, featureFlags map[string]bool) (*
 		opts = append(opts, awsConfig.WithUseDualStackEndpoint(aws.DualStackEndpointStateEnabled))
 	}
 
-	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
+	var awsCfg, err = awsConfig.LoadDefaultConfig(ctx, opts...)
 
 	if err != nil {
 		return nil, err
@@ -232,7 +232,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.networkTunnelEnabled() {
-				host, port, err := net.SplitHostPort(cfg.Address)
+				var host, port, err = net.SplitHostPort(cfg.Address)
 				if err != nil {
 					return fmt.Errorf("splitting address to host and port: %w", err)
 				}
@@ -265,7 +265,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 
-			db, err := stdsql.Open("pgx", cfg.toURI())
+			var db, err = stdsql.Open("pgx", cfg.toURI())
 			if err != nil {
 				return nil, fmt.Errorf("opening db: %w", err)
 			}
@@ -412,7 +412,7 @@ func prepareNewTransactor(
 			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 		}
 
-		client, err := d.cfg.toS3Client(ctx, featureFlags)
+		var client, err = d.cfg.toS3Client(ctx, featureFlags)
 		if err != nil {
 			return nil, err
 		}
@@ -538,10 +538,10 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 	// configuration when the connector started, indexed in the same order as values will be
 	// received from the runtime for Store requests. Only VARCHAR columns will have non-zero-valued
 	// varcharColumnMeta.
-	allColumns := target.Columns()
-	columnMetas := make([]VarcharColumnMeta, len(allColumns))
+	var allColumns = target.Columns()
+	var columnMetas = make([]VarcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
-		existing := is.GetResource(target.Path).GetField(col.Field)
+		var existing = is.GetResource(target.Path).GetField(col.Field)
 		if existing.Type == "character varying" {
 			columnMetas[idx] = VarcharColumnMeta{
 				Identifier: col.Identifier,
@@ -583,7 +583,7 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	if !t.primary {
 		return nil
 	}
-	pending, err := parseState(state)
+	var pending, err = parseState(state)
 	if err != nil {
 		return err
 	}
@@ -605,7 +605,7 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			// replacement, which no shard here ever produces.
 			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
 		}
-		state, err := parseState(patch)
+		var state, err = parseState(patch)
 		if err != nil {
 			return fmt.Errorf("parsing aggregated state patch: %w", err)
 		}
@@ -628,11 +628,11 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
-	gotLoads := false
+	var gotLoads = false
 
 	// Keep track of the maximum length of any string values encountered so the temporary load table
 	// can be created with long enough string columns.
-	maxStringLengths := make([]int, len(d.bindings))
+	var maxStringLengths = make([]int, len(d.bindings))
 
 	for it.Next() {
 		gotLoads = true
@@ -640,14 +640,14 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var b = d.bindings[it.Binding]
 		b.loadFile.start()
 
-		converted, err := b.target.ConvertKey(it.Key)
+		var converted, err = b.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		}
 
 		for _, c := range converted {
 			if s, ok := c.(string); ok {
-				l := len(s)
+				var l = len(s)
 
 				if l > redshiftVarcharMaxLength {
 					return fmt.Errorf(
@@ -679,7 +679,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return nil
 	}
 
-	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	var conn, err = pgx.Connect(ctx, d.cfg.toURI())
 	if err != nil {
 		return fmt.Errorf("load pgx.Connect: %w", err)
 	}
@@ -711,7 +711,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table for target table '%s': %w", b.target.Identifier, err)
 		}
 
-		files, err := b.loadFile.flush()
+		var files, err = b.loadFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
@@ -731,7 +731,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	loadAllSQL := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	var loadAllSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 	d.be.StartedEvaluatingLoads()
 	rows, err := txn.Query(ctx, loadAllSQL)
 	if err != nil {
@@ -748,7 +748,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("scanning load document: %w", err)
 		}
 
-		doc := json.RawMessage(document)
+		var doc = json.RawMessage(document)
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -770,9 +770,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	flushStagedFile := func(ctx context.Context, b *binding) error {
+	var flushStagedFile = func(ctx context.Context, b *binding) error {
 		var err error
 		if b.storeFile.started {
 			if b.staged.StoreFiles, err = b.storeFile.flush(); err != nil {
@@ -841,7 +841,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		// See if we need to increase any VARCHAR column lengths.
 		for idx, c := range converted {
-			varcharMeta := b.varcharColumnMetas[idx]
+			var varcharMeta = b.varcharColumnMetas[idx]
 			if varcharMeta.IsVarchar {
 				switch v := c.(type) {
 				case string:
@@ -896,7 +896,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	return func(ctx context.Context, checkpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		if checkpoint != nil {
-			raw, err := checkpoint.Marshal()
+			var raw, err = checkpoint.Marshal()
 			if err != nil {
 				return nil, m.FinishedOperation(fmt.Errorf("marshalling runtime checkpoint: %w", err))
 			}
@@ -919,7 +919,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.staged = nil
 		}
 
-		patch, err := json.Marshal(update)
+		var patch, err = json.Marshal(update)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling staged transactions: %w", err))
 		}
@@ -1009,7 +1009,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 	}
 
-	patch, err := json.Marshal(clear)
+	var patch, err = json.Marshal(clear)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling state clearing patch: %w", err)
 	}
@@ -1020,7 +1020,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // COPY's command tag carries no row count, unlike DELETE.
 func lastCopyCount(ctx context.Context, txn pgx.Tx) (int64, error) {
 	var n int64
-	err := txn.QueryRow(ctx, "SELECT pg_last_copy_count()").Scan(&n)
+	var err = txn.QueryRow(ctx, "SELECT pg_last_copy_count()").Scan(&n)
 	return n, err
 }
 
@@ -1101,7 +1101,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 		}
 	}
 
-	conn, err := pgx.Connect(ctx, d.cfg.toURI())
+	var conn, err = pgx.Connect(ctx, d.cfg.toURI())
 	if err != nil {
 		return fmt.Errorf("store pgx.Connect: %w", err)
 	}
@@ -1163,7 +1163,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 	}
 
 	for _, g := range groups {
-		stats := m.TotalRowStats(affected[g])
+		var stats = m.TotalRowStats(affected[g])
 		if g.merged.Rows > 0 {
 			stats = stats.WithStaged(g.merged.Rows)
 		}
@@ -1184,7 +1184,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 // applyStaged applies the groups in one transaction and returns the target
 // rows each touched.
 func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*commitGroup, tokensMap checkpointTokensMap, legacyCheckpoint []byte) (map[*commitGroup]int64, error) {
-	txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
+	var txn, err = conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("store BeginTx: %w", err)
 	}
@@ -1325,9 +1325,9 @@ func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, dialect sql.Dialect, buc
 	// The transaction has failed. It must be finish being rolled back before using its underlying
 	// connection again.
 	txn.Rollback(ctx)
-	conn := txn.Conn()
+	var conn = txn.Conn()
 
-	loadErrInfo, err := getLoadErrorInfo(ctx, conn, dialect, bucket, files)
+	var loadErrInfo, err = getLoadErrorInfo(ctx, conn, dialect, bucket, files)
 	if err != nil {
 		// If querying sys_load_error_detail fails for some reason, return the original error back
 		// unchanged, but log why sys_load_error_detail could not be queried. Some errors (target
