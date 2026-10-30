@@ -26,7 +26,7 @@ const (
 // since ClickHouse's Date32 type has a minimum value of 1900-01-01. It also returns a time.Time
 // rather than a string, as required by the ClickHouse driver.
 var clickHouseClampDate = sql.StringCastConverter(func(str string) (interface{}, error) {
-	parsed, err := time.Parse(time.DateOnly, str)
+	var parsed, err = time.Parse(time.DateOnly, str)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse %q as date: %w", str, err)
 	}
@@ -40,7 +40,7 @@ var clickHouseClampDate = sql.StringCastConverter(func(str string) (interface{},
 // year 0, since ClickHouse's DateTime type has a minimum value of 1925-01-01. It also returns a
 // time.Time rather than a string, as required by the ClickHouse driver.
 var clickHouseClampDatetime = sql.StringCastConverter(func(str string) (interface{}, error) {
-	parsed, _, err := sql.ParseRFC3339Nano(str)
+	var parsed, _, err = sql.ParseRFC3339Nano(str)
 	if err != nil {
 		return nil, err
 	}
@@ -129,23 +129,23 @@ func mapSignedIntegers() sql.MapProjectionFn {
 	// also typed float64.
 
 	// 2^127
-	halfInt128 := new(big.Int).Lsh(big.NewInt(1), 127)
+	var halfInt128 = new(big.Int).Lsh(big.NewInt(1), 127)
 	// 2^127 - 1
-	maxInt128, _ := new(big.Int).Sub(halfInt128, big.NewInt(1)).Float64()
+	var maxInt128, _ = new(big.Int).Sub(halfInt128, big.NewInt(1)).Float64()
 	// -2^127
-	minInt128, _ := new(big.Int).Neg(halfInt128).Float64()
+	var minInt128, _ = new(big.Int).Neg(halfInt128).Float64()
 
 	// 2^255
-	halfInt256 := new(big.Int).Lsh(big.NewInt(1), 255)
+	var halfInt256 = new(big.Int).Lsh(big.NewInt(1), 255)
 	// 2^255 - 1
-	maxInt256, _ := new(big.Int).Sub(halfInt256, big.NewInt(1)).Float64()
+	var maxInt256, _ = new(big.Int).Sub(halfInt256, big.NewInt(1)).Float64()
 	// -2^255
-	minInt256, _ := new(big.Int).Neg(halfInt256).Float64()
+	var minInt256, _ = new(big.Int).Neg(halfInt256).Float64()
 
-	fn64 := sql.MapStatic("Int64", sql.UsingConverter(toInt64))
-	fn128 := sql.MapStatic("Int128", sql.UsingConverter(toBigInt))
-	fn256 := sql.MapStatic("Int256", sql.UsingConverter(toBigInt))
-	fnString := sql.MapStatic("String", sql.UsingConverter(sql.ToStr))
+	var fn64 = sql.MapStatic("Int64", sql.UsingConverter(toInt64))
+	var fn128 = sql.MapStatic("Int128", sql.UsingConverter(toBigInt))
+	var fn256 = sql.MapStatic("Int256", sql.UsingConverter(toBigInt))
+	var fnString = sql.MapStatic("String", sql.UsingConverter(sql.ToStr))
 
 	return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
 		// STRING_INTEGER projections (format: "integer") route by declared
@@ -209,7 +209,7 @@ var datetimeToStringCast = func(migration sql.ColumnTypeMigration) string {
 }
 
 var clickHouseDialect = func(database string) sql.Dialect {
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER:        mapSignedIntegers(),
 			sql.NUMBER:         sql.MapStatic("Float64"),
@@ -235,7 +235,7 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		sql.WithNullableFn(func(ddl string) string { return "Nullable(" + ddl + ")" }),
 	)
 
-	simpleIdentifier := regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`)
+	var simpleIdentifier = regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`)
 
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -718,7 +718,7 @@ func storeTableName(table sql.Table, rangeKey uint32) string {
 }
 
 func renderTableAndRangeKey(table sql.Table, rangeKey uint32, tpl *template.Template) (rendered string, err error) {
-	v := struct {
+	var v = struct {
 		sql.Table
 		RangeKey string
 	}{

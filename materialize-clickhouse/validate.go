@@ -19,7 +19,7 @@ import (
 )
 
 func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	resp, err := d.sqlDriver.Validate(ctx, req)
+	var resp, err = d.sqlDriver.Validate(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func dryRunPartitionBy(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, 
 	var scratch = fmt.Sprintf("flow_partition_dryrun_%x", nonce)
 
 	var shape = sql.BuildTableShape(materializationName, synth, bindingIdx, []string{scratch}, rc.Delta)
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	if err != nil {
 		return fmt.Errorf("resolving dry-run table: %w", err)
 	}
@@ -143,7 +143,7 @@ func dryRunPartitionBy(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, 
 		return fmt.Errorf("rendering dry-run CREATE TABLE: %w", err)
 	}
 
-	_, createErr := db.ExecContext(ctx, createSQL)
+	var _, createErr = db.ExecContext(ctx, createSQL)
 	if _, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", dialect.Identifier(scratch))); err != nil {
 		log.WithFields(log.Fields{"table": scratch, "error": err}).Warn("failed to drop partition_by dry-run table")
 	}

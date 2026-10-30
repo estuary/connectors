@@ -22,7 +22,7 @@ func TestIntegration(t *testing.T) {
 	}
 	ensureDockerUp(t)
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{Table: table, Delta: delta}
 	}
 
@@ -41,7 +41,7 @@ func TestIntegration(t *testing.T) {
 		}
 		var ctx = t.Context()
 		var cfg = testConfig()
-		conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+		var conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 		require.NoError(t, err)
 		defer conn.Close()
 
@@ -69,7 +69,7 @@ func TestIntegration(t *testing.T) {
 			"truncate_standard": {1},
 			"truncate_delta":    {1, 1, 2, 3},
 		} {
-			rows, err := conn.Query(ctx, fmt.Sprintf("SELECT id FROM `%s` ORDER BY id;", table))
+			var rows, err = conn.Query(ctx, fmt.Sprintf("SELECT id FROM `%s` ORDER BY id;", table))
 			require.NoError(t, err)
 			var ids []int64
 			for rows.Next() {
@@ -88,25 +88,25 @@ func TestIntegration(t *testing.T) {
 		var cfg = testConfig()
 		var dialect = clickHouseDialect(cfg.Database)
 
-		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
-		res := makeResourceFn(tableName, false).WithDefaults(cfg)
+		var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 
-		conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+		var conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = conn.Close() })
 
-		target := dialect.Identifier(tableName)
-		stage := dialect.Identifier(fmt.Sprintf("flow_temp_store_0_%s", tableName))
+		var target = dialect.Identifier(tableName)
+		var stage = dialect.Identifier(fmt.Sprintf("flow_temp_store_0_%s", tableName))
 		t.Cleanup(func() { _ = conn.Exec(context.Background(), "DROP TABLE IF EXISTS "+stage) })
 
-		count := func(t *testing.T, ident string) uint64 {
+		var count = func(t *testing.T, ident string) uint64 {
 			t.Helper()
 			var c uint64
 			require.NoError(t, conn.QueryRow(ctx, "SELECT count(*) FROM "+ident).Scan(&c))
 			return c
 		}
 
-		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+		var seedPending = func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 			// Stage a row of a committed-but-unacknowledged transaction: the
 			// store stage table is a structural copy of the target, holding
 			// rows whose MOVE PARTITION into the target only happens at
@@ -125,7 +125,7 @@ func TestIntegration(t *testing.T) {
 			return json.RawMessage(fmt.Sprintf(`{%q: {"StoredRows": 1}}`, appliedSpec.Bindings[0].StateKey))
 		}
 
-		verifyDrained := func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any) {
+		var verifyDrained = func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any) {
 			require.Len(t, rows, 1, "the staged row must have been moved to the target")
 			require.EqualValues(t, 0, count(t, stage), "the stage table must have been drained")
 		}
@@ -244,10 +244,10 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 	var tableName = "test_no_flow_doc_object"
 
 	var shape = noFlowDocShape(tableName)
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 
-	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	storeRows(t, ctx, storeConn, b, cfg.Database, []any{
 		"k1",                         // id
@@ -259,7 +259,7 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 		testTime,                     // flow_published_at (date-time)
 	})
 
-	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"})
+	var docs = loadDocuments(t, ctx, loadConn, b, []any{"k1"})
 	require.Len(t, docs, 1)
 
 	var parsed map[string]json.RawMessage
@@ -300,10 +300,10 @@ func TestNoFlowDocumentNullValues(t *testing.T) {
 	var tableName = "test_no_flow_doc_nulls"
 
 	var shape = noFlowDocShape(tableName)
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 
-	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store a row where all nullable columns are NULL.
 	storeRows(t, ctx, storeConn, b, cfg.Database, []any{
@@ -316,7 +316,7 @@ func TestNoFlowDocumentNullValues(t *testing.T) {
 		testTime,     // flow_published_at
 	})
 
-	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"})
+	var docs = loadDocuments(t, ctx, loadConn, b, []any{"k1"})
 	require.Len(t, docs, 1)
 
 	var parsed map[string]json.RawMessage

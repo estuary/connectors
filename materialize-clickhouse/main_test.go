@@ -25,17 +25,17 @@ var (
 func ensureDockerUp(t *testing.T) {
 	t.Helper()
 	dockerOnce.Do(func() {
-		out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
+		var out, err = exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
 		if err != nil {
 			t.Fatalf("docker compose up failed: %s\n%s", err, out)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		var ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		var lastErr error
 		for ctx.Err() == nil {
-			conn, err := clickhouse.Open(testConfig().newClickhouseOptions())
+			var conn, err = clickhouse.Open(testConfig().newClickhouseOptions())
 			if err == nil {
 				if err = conn.Ping(ctx); err == nil {
 					conn.Close()
@@ -55,7 +55,7 @@ func ensureDockerUp(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	code := m.Run()
+	var code = m.Run()
 	if dockerUp {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	}

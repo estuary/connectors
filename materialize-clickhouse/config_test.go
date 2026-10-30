@@ -10,7 +10,7 @@ import (
 )
 
 func TestClickHouseConfig(t *testing.T) {
-	validConfig := config{
+	var validConfig = config{
 		Address: "clickhouse.example.com:9000",
 		Credentials: credentialConfig{
 			AuthType:         UserPass,
@@ -20,19 +20,19 @@ func TestClickHouseConfig(t *testing.T) {
 	}
 	require.NoError(t, validConfig.Validate())
 
-	noAddress := validConfig
+	var noAddress = validConfig
 	noAddress.Address = ""
 	require.Error(t, noAddress.Validate())
 
-	noUser := validConfig
+	var noUser = validConfig
 	noUser.Credentials.Username = ""
 	require.Error(t, noUser.Validate())
 
-	noPass := validConfig
+	var noPass = validConfig
 	noPass.Credentials.Password = ""
 	require.Error(t, noPass.Validate())
 
-	noDatabase := validConfig
+	var noDatabase = validConfig
 	noDatabase.Database = ""
 	require.Error(t, noDatabase.Validate())
 }
@@ -73,14 +73,14 @@ func TestResolvedAddress(t *testing.T) {
 }
 
 func TestAcknowledge(t *testing.T) {
-	tr := transactor{ensured: make(chan struct{})}
-	state, err := tr.Acknowledge(t.Context(), nil, nil)
+	var tr = transactor{ensured: make(chan struct{})}
+	var state, err = tr.Acknowledge(t.Context(), nil, nil)
 	require.NoError(t, err)
 	require.Nil(t, state)
 }
 
 func TestSpecification(t *testing.T) {
-	resp, err := NewDriver().
+	var resp, err = NewDriver().
 		Spec(t.Context(), &pm.Request_Spec{})
 	require.NoError(t, err)
 

@@ -164,7 +164,7 @@ func TestRetryPolicy(t *testing.T) {
 			maxBackoff:     time.Minute,
 			maxElapsed:     time.Hour,
 		}
-		cancelCtx, cancel := context.WithCancel(ctx)
+		var cancelCtx, cancel = context.WithCancel(ctx)
 		var calls int
 		var done = make(chan error, 1)
 		go func() {

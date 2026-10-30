@@ -20,7 +20,7 @@ func TestSQLGeneration(t *testing.T) {
 	// Load/store templates require a RangeKey field that RunSqlGenTests does not
 	// provide, so only the target template goes through the standard test harness.
 	// The load/store templates are rendered separately with renderTableAndRangeKey.
-	rangeKeyTemplates := []*template.Template{
+	var rangeKeyTemplates = []*template.Template{
 		testTemplates.createLoadTable,
 		testTemplates.truncateLoadTable,
 		testTemplates.countLoadKeys,
@@ -36,7 +36,7 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.dropStoreTable,
 	}
 
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -56,7 +56,7 @@ func TestSQLGeneration(t *testing.T) {
 		for _, tbl := range tables {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 			snap.WriteString("--- Begin " + testcase + " ---\n")
-			rendered, err := renderTableAndRangeKey(tbl, 0, tpl)
+			var rendered, err = renderTableAndRangeKey(tbl, 0, tpl)
 			if err != nil {
 				t.Fatalf("rendering %s: %v", testcase, err)
 			}
@@ -71,7 +71,7 @@ func TestSQLGeneration(t *testing.T) {
 func TestSQLGenerationNoHardDelete(t *testing.T) {
 	var noDeleteTemplates = renderTemplates(testDialect, false)
 
-	_, tables := sql.RunSqlGenTests(
+	var _, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -90,7 +90,7 @@ func TestSQLGenerationNoHardDelete(t *testing.T) {
 	var snap strings.Builder
 	for _, tbl := range tables {
 		snap.WriteString("--- Begin " + tbl.Identifier + " createTargetTable ---\n")
-		rendered, err := sql.RenderTableTemplate(tbl, noDeleteTemplates.createTargetTable)
+		var rendered, err = sql.RenderTableTemplate(tbl, noDeleteTemplates.createTargetTable)
 		if err != nil {
 			t.Fatalf("rendering createTargetTable: %v", err)
 		}
@@ -112,7 +112,7 @@ func TestSQLGenerationNoHardDelete(t *testing.T) {
 func TestSQLGenerationQuotedTableNames(t *testing.T) {
 	var testTemplates = renderTemplates(testDialect, true)
 
-	rangeKeyTemplates := []*template.Template{
+	var rangeKeyTemplates = []*template.Template{
 		testTemplates.createLoadTable,
 		testTemplates.truncateLoadTable,
 		testTemplates.countLoadKeys,
@@ -128,7 +128,7 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 		testTemplates.dropStoreTable,
 	}
 
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -148,7 +148,7 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 		for _, tbl := range tables {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 			snap.WriteString("--- Begin " + testcase + " ---\n")
-			rendered, err := renderTableAndRangeKey(tbl, 0, tpl)
+			var rendered, err = renderTableAndRangeKey(tbl, 0, tpl)
 			if err != nil {
 				t.Fatalf("rendering %s: %v", testcase, err)
 			}
@@ -192,7 +192,7 @@ func TestClickHouseClampDatetime(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := clickHouseClampDatetime(tt.input)
+			var got, err = clickHouseClampDatetime(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -227,7 +227,7 @@ func TestClickHouseClampDate(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := clickHouseClampDate(tt.input)
+			var got, err = clickHouseClampDate(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

@@ -33,7 +33,7 @@ func TestParseSortingKey(t *testing.T) {
 		{name: "arithmetic", key: "id + 1", wantCols: []string{}, wantPlain: false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cols, allPlain := parseSortingKey(tt.key)
+			var cols, allPlain = parseSortingKey(tt.key)
 			require.Equal(t, tt.wantPlain, allPlain)
 			require.Equal(t, tt.wantCols, cols)
 		})
@@ -70,7 +70,7 @@ func TestCheckSortingKey(t *testing.T) {
 		{name: "binding without keys", want: nil, meta: tableKeyMeta{replacing, ""}, exists: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			warning, err := checkSortingKey("`t`", tt.want, tt.meta, tt.exists)
+			var warning, err = checkSortingKey("`t`", tt.want, tt.meta, tt.exists)
 			if tt.wantWarn {
 				require.NoError(t, err)
 				require.Contains(t, warning, "sorting key")
@@ -97,7 +97,7 @@ func createRawTable(t *testing.T, ctx context.Context, cfg config, tableName, co
 	t.Helper()
 
 	var dialect = clickHouseDialect(cfg.Database)
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	var names = []string{tableName, storeTableName(sql.Table{TableShape: sql.TableShape{Path: sql.TablePath{tableName}}}, 0)}
@@ -110,7 +110,7 @@ func createRawTable(t *testing.T, ctx context.Context, cfg config, tableName, co
 		}
 	})
 
-	_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (%s) ENGINE = %s ORDER BY %s",
+	var _, err = db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (%s) ENGINE = %s ORDER BY %s",
 		dialect.Identifier(tableName), columns, engine, orderBy))
 	require.NoError(t, err)
 }
@@ -147,8 +147,8 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 	var be = &m.BindingEvents{}
 	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
 
-	openTransactor := func(t *testing.T, table sql.Table) error {
-		txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)
+	var openTransactor = func(t *testing.T, table sql.Table) error {
+		var txn, err = newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)
 		if txn != nil {
 			t.Cleanup(txn.Destroy)
 		}
@@ -160,7 +160,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 		createRawTable(t, ctx, cfg, tableName, testTableColumns,
 			"ReplacingMergeTree(flow_published_at)", "tuple()")
 
-		err := openTransactor(t, buildTestTable(t, dialect, tableName))
+		var err = openTransactor(t, buildTestTable(t, dialect, tableName))
 		require.Error(t, err)
 		require.ErrorContains(t, err, tableName)
 		require.ErrorContains(t, err, "sorting key")
@@ -171,7 +171,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 		createRawTable(t, ctx, cfg, tableName, compositeColumns,
 			"ReplacingMergeTree(flow_published_at)", "(tenant)")
 
-		err := openTransactor(t, buildCompositeKeyTable(t, dialect, tableName))
+		var err = openTransactor(t, buildCompositeKeyTable(t, dialect, tableName))
 		require.Error(t, err)
 		require.ErrorContains(t, err, tableName)
 		require.ErrorContains(t, err, "sorting key")
@@ -194,7 +194,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 		createRawTable(t, ctx, cfg, tableName, testTableColumns,
 			"ReplacingMergeTree(flow_published_at)", "(cityHash64(id))")
 
-		err := openTransactor(t, buildTestTable(t, dialect, tableName))
+		var err = openTransactor(t, buildTestTable(t, dialect, tableName))
 		require.Error(t, err)
 		require.ErrorContains(t, err, tableName)
 	})
@@ -214,10 +214,10 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 		var tableName = "test_sorting_key_correct"
 		var table = buildTestTable(t, dialect, tableName)
 
-		db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+		var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 		defer db.Close()
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s SYNC", dialect.Identifier(tableName)))
-		createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+		var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 		require.NoError(t, err)
 		_, err = db.ExecContext(ctx, createSQL)
 		require.NoError(t, err)
@@ -231,7 +231,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 	t.Run("accepts a table that does not exist yet", func(t *testing.T) {
 		// Apply creates it with the correct sorting key.
 		var tableName = "test_sorting_key_absent"
-		db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+		var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 		defer db.Close()
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s SYNC", dialect.Identifier(tableName)))
 
@@ -258,7 +258,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 
 		var table = buildCompositeKeyTable(t, dialect, tableName)
 		table.DeltaUpdates = true
-		err := openTransactor(t, table)
+		var err = openTransactor(t, table)
 		require.Error(t, err)
 		require.ErrorContains(t, err, tableName)
 	})
@@ -281,7 +281,7 @@ func TestValidateRejectsSortingKeyMismatch(t *testing.T) {
 		createRawTable(t, ctx, cfg, tableName, validateTableColumns,
 			"ReplacingMergeTree(flow_published_at)", "tuple()")
 
-		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "", 0, nil))
+		var _, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "", 0, nil))
 		require.Error(t, err)
 		require.ErrorContains(t, err, tableName)
 		require.ErrorContains(t, err, "sorting key")
@@ -291,7 +291,7 @@ func TestValidateRejectsSortingKeyMismatch(t *testing.T) {
 		createRawTable(t, ctx, cfg, tableName, validateTableColumns,
 			"ReplacingMergeTree(flow_published_at)", "(key)")
 
-		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "", 0, nil))
+		var _, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "", 0, nil))
 		require.NoError(t, err)
 	})
 }

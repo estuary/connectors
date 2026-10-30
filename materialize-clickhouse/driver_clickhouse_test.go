@@ -41,9 +41,9 @@ func TestPrereqs(t *testing.T) {
 	}
 	ensureDockerUp(t)
 
-	cfg := testConfig()
+	var cfg = testConfig()
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		cfg  func(config) config
 		want []string
@@ -164,7 +164,7 @@ func buildTestTable(t *testing.T, dialect sql.Dialect, tableName string) sql.Tab
 		},
 	}
 
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 	return table
 }
@@ -179,7 +179,7 @@ func TestInstallFence(t *testing.T) {
 	var ctx = t.Context()
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: clickHouseDialect(cfg.Database)}
 
-	c, err := newClient(ctx, "test", ep)
+	var c, err = newClient(ctx, "test", ep)
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -197,7 +197,7 @@ func TestExecStatements(t *testing.T) {
 	var ctx = t.Context()
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: clickHouseDialect(cfg.Database)}
 
-	c, err := newClient(ctx, "test", ep)
+	var c, err = newClient(ctx, "test", ep)
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -216,12 +216,12 @@ func TestTruncateTable(t *testing.T) {
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var tableName = "test_truncate"
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	// Create a table and insert a row.
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	_, err := db.ExecContext(ctx, fmt.Sprintf(
+	var _, err = db.ExecContext(ctx, fmt.Sprintf(
 		"CREATE TABLE IF NOT EXISTS %s (id String, flow_published_at DateTime64(6, 'UTC'), _is_deleted UInt8 DEFAULT 0) ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted) ORDER BY (id)",
 		dialect.Identifier(tableName),
 	))
@@ -268,14 +268,14 @@ func TestAlterTableOrphanedSortingKeyColumn(t *testing.T) {
 	var tableName = "test_orphaned_sorting_key"
 	var table = buildTestTable(t, dialect, tableName)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 
 	// The table reflects an older keying of the data: legacy_key participates
 	// in ORDER BY but is no longer part of the collection or field selection,
 	// and orphaned_value is a non-key column that is also no longer selected.
-	_, err := db.ExecContext(ctx, fmt.Sprintf(`
+	var _, err = db.ExecContext(ctx, fmt.Sprintf(`
 		CREATE TABLE %s (
 			id String,
 			legacy_key String,
@@ -306,7 +306,7 @@ func TestAlterTableOrphanedSortingKeyColumn(t *testing.T) {
 		dialect.CaseInsensitiveResources,
 	)
 	require.NoError(t, c.PopulateInfoSchema(ctx, is, [][]string{{tableName}}))
-	existing := is.GetResource([]string{tableName})
+	var existing = is.GetResource([]string{tableName})
 	require.NotNil(t, existing)
 
 	// Mirror the orphan sweep of materialize-boilerplate's computeBindingUpdate:
@@ -332,7 +332,7 @@ func TestAlterTableOrphanedSortingKeyColumn(t *testing.T) {
 
 	// The sorting-key column must be left untouched, and the non-key orphaned
 	// column must still be widened to Nullable.
-	colTypes := make(map[string]string)
+	var colTypes = make(map[string]string)
 	rows, err := db.QueryContext(ctx, fmt.Sprintf(
 		"SELECT name, type FROM system.columns WHERE database = %s AND table = %s",
 		dialect.Literal(cfg.Database), dialect.Literal(tableName),
@@ -356,7 +356,7 @@ func TestOpenNativeConn(t *testing.T) {
 	ensureDockerUp(t)
 
 	var cfg = testConfig()
-	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	var conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -397,10 +397,10 @@ func TestAddBinding(t *testing.T) {
 	var tableName = "test_add_binding"
 	var table = buildTestTable(t, dialect, tableName)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -435,7 +435,7 @@ func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding
 	require.NoError(t, conn.Exec(ctx, b.store.createTableSQL))
 	require.NoError(t, conn.Exec(ctx, b.store.truncateSQL))
 
-	batch, err := conn.PrepareBatch(ctx, b.store.insertSQL)
+	var batch, err = conn.PrepareBatch(ctx, b.store.insertSQL)
 	require.NoError(t, err)
 	for _, row := range rows {
 		require.NoError(t, batch.Append(row...))
@@ -465,7 +465,7 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 	require.NoError(t, loadConn.Exec(ctx, b.load.createTableSQL))
 	require.NoError(t, loadConn.Exec(ctx, b.load.truncateSQL))
 
-	batch, err := loadConn.PrepareBatch(ctx, b.load.insertSQL)
+	var batch, err = loadConn.PrepareBatch(ctx, b.load.insertSQL)
 	require.NoError(t, err)
 	for _, key := range keys {
 		require.NoError(t, batch.Append(key...))
@@ -504,12 +504,12 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	var tableName = "test_data_path"
 	var table = buildTestTable(t, dialect, tableName)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	// Drop any stale table from a previous run, then create fresh.
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -536,7 +536,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`, uint8(0)})
 
 	// Load: query back the document via temp table JOIN.
-	docs := loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"})
+	var docs = loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 
@@ -567,14 +567,14 @@ func TestPrepareNewTransactor(t *testing.T) {
 	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
 
 	// No bindings — returns a valid transactor.
-	txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, nil, open, nil, be)
+	var txn, err = newTransactor(ctx, "test", nil, ep, sql.Fence{}, nil, open, nil, be)
 	require.NoError(t, err)
 	require.NotNil(t, txn)
 	txn.Destroy()
 
 	// One binding — transactor has one binding.
 	var table = buildTestTable(t, dialect, "test_prepare_txn")
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
@@ -614,7 +614,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 	var be = &m.BindingEvents{}
 	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	t.Run("rejects adopted table without _is_deleted", func(t *testing.T) {
@@ -624,7 +624,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 		// A table adopted via allow_existing_tables_for_new_bindings that was
 		// pre-created WITHOUT the connector's internal _is_deleted column.
-		_, err := db.ExecContext(ctx, fmt.Sprintf(`
+		var _, err = db.ExecContext(ctx, fmt.Sprintf(`
 			CREATE TABLE %s (
 				id String,
 				value Nullable(String),
@@ -651,7 +651,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 		var table = buildTestTable(t, dialect, tableName)
 
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-		createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+		var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 		require.NoError(t, err)
 		_, err = db.ExecContext(ctx, createSQL)
 		require.NoError(t, err)
@@ -670,7 +670,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 		table.DeltaUpdates = true
 
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-		_, err := db.ExecContext(ctx, fmt.Sprintf(`
+		var _, err = db.ExecContext(ctx, fmt.Sprintf(`
 			CREATE TABLE %s (
 				id String,
 				value Nullable(String),
@@ -780,10 +780,10 @@ func TestHardDeleteTombstone(t *testing.T) {
 			},
 		},
 	}
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
@@ -826,16 +826,16 @@ func TestHardDeleteTombstone(t *testing.T) {
 func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Dialect, tpls templates, table sql.Table, tableName string) (*binding, chdriver.Conn, chdriver.Conn) {
 	t.Helper()
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		cleanDB := clickhouse.OpenDB(cfg.newClickhouseOptions())
+		var cleanDB = clickhouse.OpenDB(cfg.newClickhouseOptions())
 		defer cleanDB.Close()
 		_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
@@ -911,7 +911,7 @@ func buildCompositeKeyTable(t *testing.T, dialect sql.Dialect, tableName string)
 		},
 	}
 
-	table, err := sql.ResolveTable(shape, dialect)
+	var table, err = sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 	return table
 }
@@ -929,7 +929,7 @@ func TestLoadNonExistentKey(t *testing.T) {
 	var tableName = "test_load_nonexistent"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, _, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, _, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Query for a key that doesn't exist in the empty table.
 	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"nonexistent"}))
@@ -948,7 +948,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	var tableName = "test_load_multi"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows.
 	storeRows(t, ctx, storeConn, b, cfg.Database,
@@ -958,7 +958,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	)
 
 	// Load all 3 keys.
-	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
+	var docs = loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
 	require.Len(t, docs, 3)
 	sort.Strings(docs)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
@@ -991,7 +991,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	var tableName = "test_composite_key"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
-	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows with composite keys: (tenant, id).
 	storeRows(t, ctx, storeConn, b, cfg.Database,
@@ -1001,7 +1001,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	)
 
 	// Load (acme,1) → doc1.
-	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
+	var docs = loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
@@ -1038,23 +1038,23 @@ func TestVersionDeduplication(t *testing.T) {
 	var tableName = "test_version_dedup"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, storeConn, _ := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, _ = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Simulate 3 successive Store commits for the same key, each in a separate
 	// batch with increasing flow_published_at timestamps.
 	for seq := 1; seq <= 3; seq++ {
-		doc := fmt.Sprintf(`{"id":"k1","seq":%d}`, seq)
-		ts := testTime.Add(time.Duration(seq) * time.Second)
+		var doc = fmt.Sprintf(`{"id":"k1","seq":%d}`, seq)
+		var ts = testTime.Add(time.Duration(seq) * time.Second)
 		storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", fmt.Sprintf("v%d", seq), "c", ts, doc})
 	}
 
 	// Query ClickHouse directly with FINAL to verify deduplication picks the
 	// most recently inserted row.
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	var doc string
-	err := db.QueryRowContext(ctx, fmt.Sprintf(
+	var err = db.QueryRowContext(ctx, fmt.Sprintf(
 		"SELECT flow_document FROM %s FINAL WHERE id = 'k1'",
 		dialect.Identifier(tableName),
 	)).Scan(&doc)
@@ -1075,7 +1075,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	var tableName = "test_store_batch"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows in a single batch, then move to target.
 	storeRows(t, ctx, storeConn, b, cfg.Database,
@@ -1085,7 +1085,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	)
 
 	// Load all 3 → all present.
-	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
+	var docs = loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
 	require.Len(t, docs, 3)
 }
 
@@ -1107,20 +1107,20 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	tableB.Binding = 1
 
 	// Set up both tables manually since setupTable builds a single-binding transactor.
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	for _, tn := range []string{tableNameA, tableNameB} {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tn)))
 	}
 	for _, tbl := range []sql.Table{tableA, tableB} {
-		createSQL, err := sql.RenderTableTemplate(tbl, tpls.createTargetTable)
+		var createSQL, err = sql.RenderTableTemplate(tbl, tpls.createTargetTable)
 		require.NoError(t, err)
 		_, err = db.ExecContext(ctx, createSQL)
 		require.NoError(t, err)
 	}
 	t.Cleanup(func() {
-		cleanDB := clickhouse.OpenDB(cfg.newClickhouseOptions())
+		var cleanDB = clickhouse.OpenDB(cfg.newClickhouseOptions())
 		defer cleanDB.Close()
 		for _, tn := range []string{tableNameA, tableNameB} {
 			_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tn)))
@@ -1129,7 +1129,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 
 	// Build transactor with 2 bindings.
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
-	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	var loadConn, err = clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
 	t.Cleanup(func() {
@@ -1154,7 +1154,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	storeRows(t, ctx, storeConn, bB, cfg.Database, []any{"keyB", "valB", "c", testTime, `{"id":"keyB"}`})
 
 	// Load from table A → correct doc.
-	docs := loadDocuments(t, ctx, tr.load.conn, bA, []any{"keyA"})
+	var docs = loadDocuments(t, ctx, tr.load.conn, bA, []any{"keyA"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"keyA"}`, docs[0])
 
@@ -1181,13 +1181,13 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	var tableName = "test_composite_tombstone"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
-	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	var b, storeConn, loadConn = setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store a live row (acme, 1).
 	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "c", testTime, `{"tenant":"acme","id":1}`, uint8(0)})
 
 	// Load → present.
-	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
+	var docs = loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
@@ -1211,13 +1211,13 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	var tableName = "test_move_partition_missing_target"
 	var table = buildTestTable(t, dialect, tableName)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	// Create the target table so that CREATE TABLE ... AS can clone its schema
 	// for the store stage table.
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -1276,11 +1276,11 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var table = buildTestTable(t, dialect, tableName)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -1303,7 +1303,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 
 func stageTestRows(t *testing.T, ctx context.Context, tr *transactor, b *binding, rows ...[]any) {
 	t.Helper()
-	batch, err := tr.store.conn.PrepareBatch(ctx, b.store.insertSQL)
+	var batch, err = tr.store.conn.PrepareBatch(ctx, b.store.insertSQL)
 	require.NoError(t, err)
 	for _, row := range rows {
 		require.NoError(t, batch.Append(row...))
@@ -1333,9 +1333,9 @@ func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
 
 	var ctx = t.Context()
 	var tableName = "test_move_refuses_on_mismatch"
-	tr, b := newTestTransactor(t, ctx, tableName)
-	stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
-	targetName := tr.dialect.Identifier(tableName)
+	var tr, b = newTestTransactor(t, ctx, tableName)
+	var stageName = tr.dialect.Identifier(storeTableName(b.target, 0))
+	var targetName = tr.dialect.Identifier(tableName)
 
 	// Ensure + stage two rows.
 	require.NoError(t, tr.ensureTempTables(ctx, b))
@@ -1343,10 +1343,10 @@ func TestMoveRefusesOnStoredRowsMismatch(t *testing.T) {
 		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
 		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`})
 
-	si := &stateItem{StoredRows: 3} // deliberately wrong: only 2 rows were staged
+	var si = &stateItem{StoredRows: 3} // deliberately wrong: only 2 rows were staged
 
 	// Mismatch: the commit must fail, naming the counts, ...
-	err := tr.moveStorePartitionsToTarget(ctx, b, si, false)
+	var err = tr.moveStorePartitionsToTarget(ctx, b, si, false)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "refusing to commit store table")
 	require.Contains(t, err.Error(), "contains 2 staged rows")
@@ -1380,7 +1380,7 @@ func TestVerifyStagedRows(t *testing.T) {
 
 	var ctx = t.Context()
 	var tableName = "test_verify_staged_rows"
-	tr, b := newTestTransactor(t, ctx, tableName)
+	var tr, b = newTestTransactor(t, ctx, tableName)
 	require.NoError(t, tr.ensureTempTables(ctx, b))
 	stageTestRows(t, ctx, tr, b,
 		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
@@ -1389,7 +1389,7 @@ func TestVerifyStagedRows(t *testing.T) {
 	var stateKeys = []string{b.target.StateKey}
 	tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
 
-	err := tr.verifyStagedRows(ctx, stateKeys)
+	var err = tr.verifyStagedRows(ctx, stateKeys)
 	require.Error(t, err)
 	require.ErrorContains(t, err, tableName)
 	require.ErrorContains(t, err, "contains 2 staged rows")
@@ -1424,7 +1424,7 @@ func TestFailedVerificationLeavesNoStagedRows(t *testing.T) {
 
 	var ctx = t.Context()
 	var tableName = "test_failed_verify_discards"
-	tr, b := newTestTransactor(t, ctx, tableName)
+	var tr, b = newTestTransactor(t, ctx, tableName)
 	require.NoError(t, tr.ensureTempTables(ctx, b))
 	var stageName = tr.dialect.Identifier(storeTableName(b.target, 0))
 
@@ -1443,7 +1443,7 @@ func TestFailedVerificationLeavesNoStagedRows(t *testing.T) {
 	require.NoError(t, tr.UnmarshalState([]byte(fmt.Sprintf(
 		`{%q: {"StoredRows": 2, "Verified": true, "MovePartitions": [{"id":"all","rows":2}]}}`,
 		b.target.StateKey))))
-	_, err := tr.Acknowledge(ctx, nil, nil)
+	var _, err = tr.Acknowledge(ctx, nil, nil)
 	require.NoError(t, err)
 	require.Empty(t, tr.state)
 
@@ -1468,7 +1468,7 @@ func TestCommitRefusesVanishedPartition(t *testing.T) {
 
 	var ctx = t.Context()
 	var tableName = "test_commit_vanished_partition"
-	tr, b := newTestTransactor(t, ctx, tableName)
+	var tr, b = newTestTransactor(t, ctx, tableName)
 	require.NoError(t, tr.ensureTempTables(ctx, b))
 
 	stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
@@ -1480,7 +1480,7 @@ func TestCommitRefusesVanishedPartition(t *testing.T) {
 	require.NoError(t, tr.store.conn.Exec(ctx, b.store.truncateSQL))
 
 	var si = tr.state[b.target.StateKey]
-	err := tr.moveStorePartitionsToTarget(ctx, b, si, false)
+	var err = tr.moveStorePartitionsToTarget(ctx, b, si, false)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "is now gone from the store table")
 	require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(tableName)))
@@ -1508,7 +1508,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 	var storeName = storeTableName(table, 0)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	for _, name := range []string{tableName, storeName} {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
@@ -1518,7 +1518,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
 		}
 	})
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -1585,7 +1585,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 	var table = buildTestTable(t, dialect, tableName)
 	var storeName = storeTableName(table, 0)
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	for _, name := range []string{tableName, storeName} {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(name)))
@@ -1599,7 +1599,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 	// The target as it was adopted via allow_existing_tables_for_new_bindings:
 	// the connector's columns and engine, but a sorting key that covers none of
 	// the binding's keys.
-	_, err := db.ExecContext(ctx, fmt.Sprintf(`
+	var _, err = db.ExecContext(ctx, fmt.Sprintf(`
 		CREATE TABLE %s (
 			id String,
 			value Nullable(String),
@@ -1634,7 +1634,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 		[]any{"k3", "v3", "c", testTime, `{"id":"k3"}`})
 
 	// The mechanism itself: three distinct keys were sent, one row exists.
-	stageIdentifier := dialect.Identifier(storeName)
+	var stageIdentifier = dialect.Identifier(storeName)
 	require.EqualValues(t, 1, countTable(t, ctx, tr, stageIdentifier),
 		"an empty sorting key collapses the whole inserted block")
 
@@ -1668,20 +1668,20 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 	var ctx = t.Context()
 
 	t.Run("pending state with all rows staged is recovered", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_full")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_full")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_full")))
 		require.Empty(t, tr.state)
 	})
 
 	t.Run("legacy pending state with unaccounted rows refuses", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_partial")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_partial")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
@@ -1693,14 +1693,14 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// commit what could be a truncated transaction.
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 3}
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "refusing")
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_partial")))
 	})
 
 	t.Run("pending state with a missing store table recovers as a no-op", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_missing_store")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_missing_store")
 		// The store table was lost out-of-band (e.g. dropped) while the
 		// connector state still records a pending commit referencing it. There
 		// are no staged rows left to recover, so Acknowledge must not crash on
@@ -1711,49 +1711,49 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.Empty(t, tr.state)
 
 		// The store table is back, empty, and ready for the next round's store.
-		stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
+		var stageName = tr.dialect.Identifier(storeTableName(b.target, 0))
 		require.EqualValues(t, 0, countTable(t, ctx, tr, stageName))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 		require.EqualValues(t, 1, countTable(t, ctx, tr, stageName))
 	})
 
 	t.Run("leftover rows of an uncommitted transaction are truncated", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_leftovers")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_leftovers")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
 		// No pending state for the binding: the staged row was never
 		// committed and must be discarded, not moved.
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_leftovers")))
 	})
 
 	t.Run("missing temp tables are created", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_fresh")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_fresh")
 		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
 
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 	})
 
 	t.Run("schema-drifted stage table is re-created", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_drift")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_drift")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		// Simulate a migration that ran in a prior session: the target gained
 		// a column the stage table doesn't have.
-		stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
+		var stageName = tr.dialect.Identifier(storeTableName(b.target, 0))
 		require.NoError(t, tr.store.conn.Exec(ctx,
 			fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", stageName, tr.dialect.Identifier("value"))))
 
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 
 		// The stage table must once again match the target (and so accept
@@ -1773,10 +1773,10 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// commit's MOVE PARTITION does not fail with code 122 ("Tables have
 		// different structure"), which would otherwise crash-loop recovery
 		// forever.
-		tr, b := newTestTransactor(t, ctx, "test_recovery_drift_pending")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_drift_pending")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
-		stageName := tr.dialect.Identifier(storeTableName(b.target, 0))
-		targetName := tr.dialect.Identifier("test_recovery_drift_pending")
+		var stageName = tr.dialect.Identifier(storeTableName(b.target, 0))
+		var targetName = tr.dialect.Identifier("test_recovery_drift_pending")
 
 		// Migrate the target as the Apply RPC would while the commit was
 		// pending; the store table keeps its pre-migration structure.
@@ -1787,7 +1787,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// this is what drives Acknowledge through the trivial recovery move.
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 
 		// The next transaction must stage and commit cleanly. On the unfixed
@@ -1800,7 +1800,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 	})
 
 	t.Run("pre-StoredRows checkpoint state recovers without executing persisted SQL", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_recovery_upgrade")
+		var tr, b = newTestTransactor(t, ctx, "test_recovery_upgrade")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
@@ -1808,7 +1808,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// SQL (including a single-column parts query) and has no StoredRows.
 		// Recovery must ignore the persisted SQL entirely and use freshly
 		// rendered statements.
-		oldState := fmt.Sprintf(`{%q: {
+		var oldState = fmt.Sprintf(`{%q: {
 			"QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'obsolete' AND database = ? AND active\nSETTINGS select_sequential_consistency = 1;\n",
 			"MovePartitionSQL": "\nALTER TABLE obsolete MOVE PARTITION ID ? TO TABLE also_obsolete;\n",
 			"DropTableSQL": "\nDROP TABLE IF EXISTS obsolete;\n"
@@ -1816,7 +1816,7 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		require.NoError(t, tr.UnmarshalState([]byte(oldState)))
 		require.True(t, tr.recovery)
 
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_recovery_upgrade")))
 	})
@@ -1824,11 +1824,11 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 	t.Run("load table is truncated between rounds", func(t *testing.T) {
 		// Covered end-to-end by loadDocuments-based tests; this asserts the
 		// truncate-between-rounds behavior directly.
-		tr, b := newTestTransactor(t, ctx, "test_load_truncate_rounds")
+		var tr, b = newTestTransactor(t, ctx, "test_load_truncate_rounds")
 		require.NoError(t, tr.store.conn.Exec(ctx, b.load.createTableSQL))
 		require.NoError(t, tr.store.conn.Exec(ctx, b.load.truncateSQL))
 
-		batch, err := tr.store.conn.PrepareBatch(ctx, b.load.insertSQL)
+		var batch, err = tr.store.conn.PrepareBatch(ctx, b.load.insertSQL)
 		require.NoError(t, err)
 		require.NoError(t, batch.Append("k1"))
 		require.NoError(t, batch.Send())
@@ -1851,17 +1851,17 @@ func TestAcknowledgeRecoveryMatrix(t *testing.T) {
 		// The Apply RPC invokes Acknowledge with only the state keys of
 		// bindings receiving schema updates: pending rows of every other
 		// binding must remain staged, and their state entries retained.
-		tr, b1 := newTestTransactor(t, ctx, "test_subset_a")
+		var tr, b1 = newTestTransactor(t, ctx, "test_subset_a")
 		b1.target.StateKey = "test_subset_a.v1"
 
-		table2 := buildTestTable(t, tr.dialect, "test_subset_b")
+		var table2 = buildTestTable(t, tr.dialect, "test_subset_b")
 		table2.StateKey = "test_subset_b.v1"
-		createSQL, err := sql.RenderTableTemplate(table2, tr.templates.createTargetTable)
+		var createSQL, err = sql.RenderTableTemplate(table2, tr.templates.createTargetTable)
 		require.NoError(t, err)
 		require.NoError(t, tr.store.conn.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", tr.dialect.Identifier("test_subset_b"))))
 		require.NoError(t, tr.store.conn.Exec(ctx, createSQL))
 		require.NoError(t, tr.addBinding(ctx, table2))
-		b2 := tr.bindings[1]
+		var b2 = tr.bindings[1]
 
 		require.NoError(t, tr.ensureTempTables(ctx, b1))
 		require.NoError(t, tr.ensureTempTables(ctx, b2))
@@ -1929,24 +1929,24 @@ func TestAcknowledgeRidesOutConnectionDrops(t *testing.T) {
 	var ctx = t.Context()
 
 	t.Run("ensuring temp tables", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_ack_drop_ensure")
+		var tr, b = newTestTransactor(t, ctx, "test_ack_drop_ensure")
 		_ = tr.store.conn.Exec(ctx, b.store.dropTableSQL)
 		tr.store.conn = &droppingConn{Conn: tr.store.conn, drops: 1}
 
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 0, countTable(t, ctx, tr, tr.dialect.Identifier(storeTableName(b.target, 0))))
 	})
 
 	t.Run("recovering a pending commit", func(t *testing.T) {
-		tr, b := newTestTransactor(t, ctx, "test_ack_drop_recover")
+		var tr, b = newTestTransactor(t, ctx, "test_ack_drop_recover")
 		require.NoError(t, tr.ensureTempTables(ctx, b))
 		stageTestRows(t, ctx, tr, b, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 		tr.store.conn = &droppingConn{Conn: tr.store.conn, drops: 1}
 
 		tr.recovery = true
 		tr.state[b.target.StateKey] = &stateItem{StoredRows: 1}
-		_, err := tr.Acknowledge(ctx, nil, nil)
+		var _, err = tr.Acknowledge(ctx, nil, nil)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_ack_drop_recover")))
 		require.Empty(t, tr.state)

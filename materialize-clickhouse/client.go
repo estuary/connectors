@@ -149,7 +149,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 
 	// Step 0: Add new columns using temporary names.
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		d := struct {
+		var d = struct {
 			Table        sql.Table
 			Instructions []sql.MigrationInstruction
 		}{
@@ -161,7 +161,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		if err := renderTemplates(dialect, false).alterTargetMigrateAddColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate add column: %w", err)
 		}
-		stmts := make([]string, 0, len(instructions))
+		var stmts = make([]string, 0, len(instructions))
 		for _, s := range strings.Split(alterStmt.String(), ";") {
 			if s = strings.TrimSpace(s); s != "" {
 				stmts = append(stmts, s+";")
@@ -172,7 +172,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 
 	// Step 1: Populate the temporary columns
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		d := struct {
+		var d = struct {
 			Table        sql.Table
 			Instructions []sql.MigrationInstruction
 		}{
@@ -184,7 +184,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		if err := renderTemplates(dialect, false).alterTargetMigratePopulateColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate populate column: %w", err)
 		}
-		stmts := make([]string, 0, len(instructions))
+		var stmts = make([]string, 0, len(instructions))
 		for _, s := range strings.Split(alterStmt.String(), ";") {
 			if s = strings.TrimSpace(s); s != "" {
 				stmts = append(stmts, s+";")
@@ -197,7 +197,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 	// DROP block until the mutation completes, so an interruption between
 	// steps cannot leave a *_flowtmp1 orphan paired with its original.
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		d := struct {
+		var d = struct {
 			Table        sql.Table
 			Instructions []sql.MigrationInstruction
 		}{
@@ -209,7 +209,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		if err := renderTemplates(dialect, false).alterTargetMigrateDropColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate drop column: %w", err)
 		}
-		stmts := make([]string, 0, len(instructions))
+		var stmts = make([]string, 0, len(instructions))
 		for _, s := range strings.Split(alterStmt.String(), ";") {
 			if s = strings.TrimSpace(s); s != "" {
 				stmts = append(stmts, s+";")
@@ -220,7 +220,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 
 	// Step 3: Rename the temporary columns, also blocking on completion.
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		d := struct {
+		var d = struct {
 			Table        sql.Table
 			Instructions []sql.MigrationInstruction
 		}{
@@ -232,7 +232,7 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		if err := renderTemplates(dialect, false).alterTargetMigrateRenameColumn.Execute(&alterStmt, d); err != nil {
 			return nil, fmt.Errorf("executing alter target migrate rename column: %w", err)
 		}
-		stmts := make([]string, 0, len(instructions))
+		var stmts = make([]string, 0, len(instructions))
 		for _, s := range strings.Split(alterStmt.String(), ";") {
 			if s = strings.TrimSpace(s); s != "" {
 				stmts = append(stmts, s+";")
@@ -296,7 +296,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		// DROP COLUMN (code 47) on partition-key columns, so the multi-step
 		// rename migration can never succeed. Fail before executing any step,
 		// so no temporary column is left behind and the error says what to do.
-		partitionKeyCols, err := c.partitionKeyColumns(ctx, ta.Path[0])
+		var partitionKeyCols, err = c.partitionKeyColumns(ctx, ta.Path[0])
 		if err != nil {
 			return "", nil, err
 		}
@@ -328,7 +328,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 // partitionKeyColumns returns the set of column names referenced by the
 // table's PARTITION BY key.
 func (c *client) partitionKeyColumns(ctx context.Context, table string) (map[string]bool, error) {
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+	var rows, err = c.db.QueryContext(ctx, fmt.Sprintf(
 		"SELECT name FROM system.columns WHERE database = %s AND table = %s AND is_in_partition_key = 1",
 		c.ep.Dialect.Literal(c.ep.Config.Database), c.ep.Dialect.Literal(table),
 	))

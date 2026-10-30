@@ -32,7 +32,7 @@ func TestPartitionExpr(t *testing.T) {
 		{name: "invalid json", raw: `{`, wantErr: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := partitionExpr(json.RawMessage(tt.raw))
+			var got, err = partitionExpr(json.RawMessage(tt.raw))
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -64,7 +64,7 @@ func TestMustRecreateResourcePartitionBy(t *testing.T) {
 		{name: "expression removed", last: binding(`{"table":"t","partition_by":"toYYYYMM(ts)"}`), next: binding(`{"table":"t"}`), want: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := c.MustRecreateResource(nil, tt.last, tt.next)
+			var got, err = c.MustRecreateResource(nil, tt.last, tt.next)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -112,7 +112,7 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 	// PARTITION BY clause.
 	var composite = buildTestTable(t, testDialect, "composite_table")
 	composite.ResourceConfigJson = json.RawMessage(`{"table":"composite_table","partition_by":"value, toYYYYMM(flow_published_at)"}`)
-	rendered, err := sql.RenderTableTemplate(composite, renderTemplates(testDialect, true).createTargetTable)
+	var rendered, err = sql.RenderTableTemplate(composite, renderTemplates(testDialect, true).createTargetTable)
 	require.NoError(t, err)
 	snap.WriteString("--- Begin composite expression createTargetTable ---\n")
 	snap.WriteString(rendered)
@@ -126,7 +126,7 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 func loadBaseSpec(t *testing.T) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := os.ReadFile("../materialize-boilerplate/testdata/validate_apply_test_cases/generated_specs/base.flow.proto")
+	var specBytes, err = os.ReadFile("../materialize-boilerplate/testdata/validate_apply_test_cases/generated_specs/base.flow.proto")
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -135,7 +135,7 @@ func loadBaseSpec(t *testing.T) *pf.MaterializationSpec {
 
 func mustMarshal(t *testing.T, v any) json.RawMessage {
 	t.Helper()
-	raw, err := json.Marshal(v)
+	var raw, err = json.Marshal(v)
 	require.NoError(t, err)
 	return raw
 }
@@ -173,7 +173,7 @@ func validatePartitionByReq(t *testing.T, cfg config, table string, partitionBy 
 func countDryRunTables(t *testing.T, ctx context.Context, cfg config) int {
 	t.Helper()
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	var count int
@@ -194,7 +194,7 @@ func TestValidatePartitionBy(t *testing.T) {
 	var tableName = "test_validate_partition_by"
 
 	t.Run("dry-run accepts a valid expression", func(t *testing.T) {
-		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, nil))
+		var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, nil))
 		require.NoError(t, err)
 		for _, pc := range resp.Bindings[0].ProjectionConstraints {
 			require.NotEqual(t, pm.Response_Validated_Constraint_INCOMPATIBLE, pc.Constraint.Type)
@@ -203,14 +203,14 @@ func TestValidatePartitionBy(t *testing.T) {
 	})
 
 	t.Run("dry-run rejects a bad expression", func(t *testing.T) {
-		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, nil))
+		var _, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, nil))
 		require.ErrorContains(t, err, "no_such_column")
 		require.Zero(t, countDryRunTables(t, ctx, cfg), "dry-run scratch tables must be dropped even on failure")
 	})
 
 	t.Run("change without backfill is INCOMPATIBLE", func(t *testing.T) {
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
-		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, lastSpec))
+		var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0, lastSpec))
 		require.NoError(t, err)
 
 		var incompatible []string
@@ -232,7 +232,7 @@ func TestValidatePartitionBy(t *testing.T) {
 
 	t.Run("change with a backfill bump is allowed", func(t *testing.T) {
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
-		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 1, lastSpec))
+		var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 1, lastSpec))
 		require.NoError(t, err)
 		for _, pc := range resp.Bindings[0].ProjectionConstraints {
 			require.NotEqual(t, pm.Response_Validated_Constraint_INCOMPATIBLE, pc.Constraint.Type)
@@ -246,7 +246,7 @@ func TestValidatePartitionBy(t *testing.T) {
 		// dry-run (which would fail on the missing column) for an expression
 		// identical to the last applied spec's.
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "toYYYYMM(no_such_column)", 0)
-		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, lastSpec))
+		var _, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, lastSpec))
 		require.NoError(t, err)
 	})
 
@@ -254,7 +254,7 @@ func TestValidatePartitionBy(t *testing.T) {
 		var lastSpec = specWithPartitionBy(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0)
 		lastSpec.InactiveBindings = lastSpec.Bindings
 		lastSpec.Bindings = nil
-		resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, " toYYYYMM(flow_published_at) ", 0, lastSpec))
+		var resp, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, " toYYYYMM(flow_published_at) ", 0, lastSpec))
 		require.NoError(t, err)
 		for _, pc := range resp.Bindings[0].ProjectionConstraints {
 			require.NotEqual(t, pm.Response_Validated_Constraint_INCOMPATIBLE, pc.Constraint.Type)
@@ -273,14 +273,14 @@ func TestApplyPartitionByBackfillRecreates(t *testing.T) {
 	var dialect = clickHouseDialect(cfg.Database)
 	var tableName = "test_apply_partition_by"
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	t.Cleanup(func() {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	partitionKey := func() string {
+	var partitionKey = func() string {
 		var pk string
 		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
 			"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = %s", dialect.Literal(tableName),
@@ -289,7 +289,7 @@ func TestApplyPartitionByBackfillRecreates(t *testing.T) {
 	}
 
 	var specA = specWithPartitionBy(t, cfg, tableName, "toYYYYMM(flow_published_at)", 0)
-	_, err := NewDriver().Apply(ctx, &pm.Request_Apply{Materialization: specA, Version: "test"})
+	var _, err = NewDriver().Apply(ctx, &pm.Request_Apply{Materialization: specA, Version: "test"})
 	require.NoError(t, err)
 	require.Equal(t, "toYYYYMM(flow_published_at)", partitionKey())
 
@@ -322,10 +322,10 @@ func TestPartitionByDataPath(t *testing.T) {
 	var tableName = "test_partition_by_data_path"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestPartitionByDataPath(t *testing.T) {
 	require.Zero(t, staged, "all staged partitions must have moved to the target")
 
 	// The rows remain loadable through the standard load path.
-	docs := loadDocuments(t, ctx, tr.load.conn, b, []any{"k2"})
+	var docs = loadDocuments(t, ctx, tr.load.conn, b, []any{"k2"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k2"}`, docs[0])
 }
@@ -393,7 +393,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	var tableName = "test_recovery_partition_backfill"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	var storeName = storeTableName(table, 0)
 	for _, name := range []string{tableName, storeName} {
@@ -406,7 +406,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 	})
 
 	// The target as the backfill re-created it, with the new partition key.
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -481,10 +481,10 @@ func TestAlterTableRejectsPartitionKeyColumnMigration(t *testing.T) {
 	var tableName = "test_partition_key_migration"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -550,7 +550,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 	var tableName = "test_partition_drift"
 	var table = partitionedTestTable(t, dialect, tableName, "toYYYYMM(flow_published_at)")
 
-	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	var storeName = storeTableName(table, 0)
 	for _, name := range []string{tableName, storeName} {
@@ -562,7 +562,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 		}
 	})
 
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	var createSQL, err = sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -588,7 +588,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 
 	require.NoError(t, tr.ensureTempTables(ctx, tr.bindings[0]))
 
-	partitionKey := func(name string) string {
+	var partitionKey = func(name string) string {
 		var pk string
 		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
 			"SELECT partition_key FROM system.tables WHERE database = currentDatabase() AND name = %s", dialect.Literal(name),

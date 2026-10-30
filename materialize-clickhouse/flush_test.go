@@ -52,7 +52,7 @@ func TestAddBindingTruncateSQL(t *testing.T) {
 		},
 	}}
 
-	table, err := sql.ResolveTable(sql.TableShape{
+	var table, err = sql.ResolveTable(sql.TableShape{
 		Path:   sql.TablePath{"the_table"},
 		Keys:   []sql.Projection{id},
 		Values: []sql.Projection{publishedAt},

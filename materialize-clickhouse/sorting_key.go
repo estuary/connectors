@@ -74,7 +74,7 @@ func scanTableKeyMeta(rows keyMetaRows) (map[string]tableKeyMeta, error) {
 }
 
 func readTableKeyMeta(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, database string) (map[string]tableKeyMeta, error) {
-	rows, err := db.QueryContext(ctx, fmt.Sprintf(tableKeyMetaSQL, dialect.Literal(database)))
+	var rows, err = db.QueryContext(ctx, fmt.Sprintf(tableKeyMetaSQL, dialect.Literal(database)))
 	if err != nil {
 		return nil, fmt.Errorf("querying table sorting keys: %w", err)
 	}
@@ -197,7 +197,7 @@ func checkSortingKey(identifier string, want []string, meta tableKeyMeta, exists
 		return "", nil
 	}
 
-	got, allPlain := parseSortingKey(meta.sortingKey)
+	var got, allPlain = parseSortingKey(meta.sortingKey)
 	if allPlain && sortingKeyMatches(want, got) {
 		return "", nil
 	}

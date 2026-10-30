@@ -210,7 +210,7 @@ type driver struct {
 var _ boilerplate.Connector = &driver{}
 
 func NewDriver() *driver {
-	sqlDriver := &sql.Driver[config, tableConfig]{
+	var sqlDriver = &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-clickhouse",
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			return nil
@@ -376,7 +376,7 @@ func newTransactor(
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var cfg = ep.Config
-	t := &transactor{
+	var t = &transactor{
 		dialect:           ep.Dialect,
 		templates:         renderTemplates(ep.Dialect, cfg.HardDelete),
 		cfg:               cfg,
@@ -390,12 +390,12 @@ func newTransactor(
 	}
 
 	var err error
-	loadOptions := cfg.newClickhouseOptions()
+	var loadOptions = cfg.newClickhouseOptions()
 	if t.load.conn, err = clickhouse.Open(loadOptions); err != nil {
 		return nil, fmt.Errorf("openNativeConn (load): %w", err)
 	}
 
-	storeOptions := cfg.newClickhouseOptions()
+	var storeOptions = cfg.newClickhouseOptions()
 	if t.store.conn, err = clickhouse.Open(storeOptions); err != nil {
 		return nil, fmt.Errorf("openNativeConn (store): %w", err)
 	}
@@ -435,7 +435,7 @@ func newTransactor(
 // already exist, not whether it is usable. A table can also reach this state from
 // a restore, a hand edit, or another tool writing at the same name.
 func (t *transactor) requireSortingKeysMatchBindings(ctx context.Context) error {
-	rows, err := t.store.conn.Query(ctx, fmt.Sprintf(tableKeyMetaSQL, "currentDatabase()"))
+	var rows, err = t.store.conn.Query(ctx, fmt.Sprintf(tableKeyMetaSQL, "currentDatabase()"))
 	if err != nil {
 		return fmt.Errorf("querying table sorting keys: %w", err)
 	}
@@ -447,7 +447,7 @@ func (t *transactor) requireSortingKeysMatchBindings(ctx context.Context) error 
 	for _, b := range t.bindings {
 		var meta, exists = metas[b.target.Path[0]]
 		var keys = b.target.KeyNames()
-		warning, err := checkSortingKey(b.target.Identifier, keys, meta, exists)
+		var warning, err = checkSortingKey(b.target.Identifier, keys, meta, exists)
 		var ll = log.WithFields(log.Fields{
 			"table":           b.target.Identifier,
 			"want_keys":       strings.Join(keys, ", "),
@@ -537,7 +537,7 @@ type binding struct {
 }
 
 func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
-	b := &binding{target: target}
+	var b = &binding{target: target}
 
 	var queryLoadTemplate = t.templates.queryLoadTable
 	if t.cfg.Advanced.NoFlowDocument {
@@ -627,11 +627,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// activeBindings tracks the number of keys inserted into each binding's
 	// load table this round, for verification against an authoritative count
 	// before the load query runs.
-	activeBindings := make(map[int]int64, len(t.bindings))
-	batch := make([]batchItem, 0, maxBatchSize)
-	batchBytes := 0
+	var activeBindings = make(map[int]int64, len(t.bindings))
+	var batch = make([]batchItem, 0, maxBatchSize)
+	var batchBytes = 0
 
-	flushBindings := func() error {
+	var flushBindings = func() error {
 		if len(batch) == 0 {
 			return nil
 		}
@@ -640,14 +640,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return cmp.Compare(a.Binding, b.Binding)
 		})
 
-		begin := 0
+		var begin = 0
 		for begin < len(batch) {
-			lastBinding := batch[begin].Binding
-			end := begin
+			var lastBinding = batch[begin].Binding
+			var end = begin
 			for end < len(batch) && batch[end].Binding == lastBinding {
 				end++
 			}
-			items := batch[begin:end]
+			var items = batch[begin:end]
 
 			// PrepareBatch fails before any rows have been sent, so retrying a
 			// transient connection drop is a clean no-op on the ClickHouse side.
@@ -681,7 +681,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	defer func() {
 		for i := range activeBindings {
-			b := t.bindings[i]
+			var b = t.bindings[i]
 			// Free resources on the ClickHouse server. Truncate rather than
 			// drop: the load table's identity must stay stable so that key
 			// inserts and the load query resolve the same table from any
@@ -708,7 +708,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	for it.Next() {
 		if _, found := activeBindings[it.Binding]; !found {
-			b := t.bindings[it.Binding]
+			var b = t.bindings[it.Binding]
 			// The load table exists (ensured at session start); truncate
 			// clears any keys left over from a previous round. TRUNCATE is
 			// idempotent, so a transient connection drop is simply retried.
@@ -720,8 +720,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			activeBindings[it.Binding] = 0
 		}
 
-		b := t.bindings[it.Binding]
-		converted, err := b.target.ConvertKey(it.Key)
+		var b = t.bindings[it.Binding]
+		var converted, err = b.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting load key for %s: %w", b.target.Identifier, err)
 		}
@@ -751,7 +751,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// would silently treat existing documents as absent, storing unreduced
 	// documents over them.
 	for i, inserted := range activeBindings {
-		b := t.bindings[i]
+		var b = t.bindings[i]
 		var counted uint64
 		if err = t.load.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted); err != nil {
 			return fmt.Errorf("counting load table keys for %s: %w", b.target.Identifier, err)
@@ -764,7 +764,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Keys are now staged and ready for the target table to be queried for them.
-	loadBinding := func(i int, b *binding) error {
+	var loadBinding = func(i int, b *binding) error {
 		// Documents already delivered via loaded() cannot be recalled, so the
 		// query may only be retried while nothing has been emitted: re-running
 		// it afterwards would deliver duplicates, which the runtime would
@@ -775,7 +775,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return transientRetryPolicy.retry(ctx, "querying Load documents",
 			func(err error) bool { return !emitted && isTransientErr(err) },
 			func() error {
-				rows, err := t.load.conn.Query(ctx, b.load.querySQL)
+				var rows, err = t.load.conn.Query(ctx, b.load.querySQL)
 				if err != nil {
 					return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
 				}
@@ -813,18 +813,18 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	lastBinding := -1
-	batch := make([][]any, 0, maxBatchSize)
-	batchBytes := 0
+	var lastBinding = -1
+	var batch = make([][]any, 0, maxBatchSize)
+	var batchBytes = 0
 	// The state keys this store phase staged rows for. Only these may be
 	// verified at StartCommit: a key left pending by the Apply RPC's narrowed
 	// drain (see Acknowledge) holds a prior process's staged rows, which have
 	// nothing to do with this transaction's StoredRows.
 	var storedKeys []string
 
-	flushLastBinding := func() error {
+	var flushLastBinding = func() error {
 		if len(batch) == 0 || lastBinding < 0 {
 			return nil
 		}
@@ -862,15 +862,15 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// The stage table itself exists and is empty: it was ensured at
 			// session start and emptied by the previous transaction's
 			// partition moves.
-			stateKey := t.bindings[it.Binding].target.StateKey
+			var stateKey = t.bindings[it.Binding].target.StateKey
 			if _, found := t.state[stateKey]; !found {
 				t.state[stateKey] = &stateItem{Round: it.Round}
 				storedKeys = append(storedKeys, stateKey)
 			}
 		}
 
-		b := t.bindings[it.Binding]
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		var b = t.bindings[it.Binding]
+		var converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store record for %s: %w", b.target.Identifier, err)
 		}
@@ -901,7 +901,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// A truncation travels in the binding's state item so that it survives
 	// a restart, and so that a binding which stored nothing still has one.
 	for binding, boundary := range t.truncations {
-		stateKey := t.bindings[binding].target.StateKey
+		var stateKey = t.bindings[binding].target.StateKey
 		if _, found := t.state[stateKey]; !found {
 			t.state[stateKey] = &stateItem{Round: it.Round}
 			storedKeys = append(storedKeys, stateKey)
@@ -918,7 +918,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, pf.FinishedOperation(err)
 		}
 
-		checkpointJSON, err := json.Marshal(t.state)
+		var checkpointJSON, err = json.Marshal(t.state)
 		if err != nil {
 			return nil, pf.FinishedOperation(fmt.Errorf("marshalling connector state JSON: %w", err))
 		}
@@ -960,7 +960,7 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 	var drained []string
 
 	select {
@@ -1000,7 +1000,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			// stage table of a removed binding with pending state is stranded
 			// (never moved, never dropped) -- a known limitation requiring
 			// manual cleanup.
-			b, found := t.bindingForStateKey(stateKey)
+			var b, found = t.bindingForStateKey(stateKey)
 			if !found {
 				continue
 			}
@@ -1030,7 +1030,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		delete(t.state, sk)
 	}
 
-	checkpointJSON, err := json.Marshal(stateClear)
+	var checkpointJSON, err = json.Marshal(stateClear)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling connector state clearing JSON: %w", err)
 	}
@@ -1119,7 +1119,7 @@ func (t *transactor) queryStoreParts(ctx context.Context, b *binding) (parts []s
 	err = transientRetryPolicy.retry(ctx, "querying store table partitions", isTransientErr, func() error {
 		parts, totalRows = nil, 0
 
-		rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
+		var rows, err = t.store.conn.Query(ctx, b.store.queryPartsSQL)
 		if err != nil {
 			return fmt.Errorf("querying store table partitions: %w", err)
 		}
@@ -1160,16 +1160,16 @@ func (t *transactor) queryStoreParts(ctx context.Context, b *binding) (parts []s
 // legitimately already moved.
 func (t *transactor) verifyStagedRows(ctx context.Context, stateKeys []string) error {
 	for _, stateKey := range stateKeys {
-		si, ok := t.state[stateKey]
+		var si, ok = t.state[stateKey]
 		if !ok {
 			continue
 		}
-		b, found := t.bindingForStateKey(stateKey)
+		var b, found = t.bindingForStateKey(stateKey)
 		if !found {
 			continue
 		}
 
-		parts, totalRows, err := t.queryStoreParts(ctx, b)
+		var parts, totalRows, err = t.queryStoreParts(ctx, b)
 		if err != nil {
 			return fmt.Errorf("verifying staged rows of %s: %w", b.target.Identifier, err)
 		}
@@ -1206,7 +1206,7 @@ func (t *transactor) verifyStagedRows(ctx context.Context, stateKeys []string) e
 // worth reporting, and a session start with no pending state truncates anyway.
 func (t *transactor) discardFailedTransactionRows(ctx context.Context, stateKeys []string) {
 	for _, stateKey := range stateKeys {
-		b, found := t.bindingForStateKey(stateKey)
+		var b, found = t.bindingForStateKey(stateKey)
 		if !found {
 			continue
 		}
@@ -1230,7 +1230,7 @@ func (t *transactor) discardFailedTransactionRows(ctx context.Context, stateKeys
 // missing from the stage table was moved by that process, while one that is
 // present but short means rows were never staged, which must never be committed.
 func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding, si *stateItem, recovery bool) error {
-	observed, totalRows, err := t.queryStoreParts(ctx, b)
+	var observed, totalRows, err = t.queryStoreParts(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -1270,7 +1270,7 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 
 	// totalRows is the authoritative count of what the moves carried into
 	// the target; StoredRows is what Store inserted (zero when unknown).
-	stats := m.TotalRowStats(totalRows)
+	var stats = m.TotalRowStats(totalRows)
 	if si.StoredRows > 0 {
 		stats = stats.WithStaged(si.StoredRows)
 	}
@@ -1344,7 +1344,7 @@ func (t *transactor) reconcileStagedPartitions(
 
 		var toMove = make([]string, 0, len(si.MovePartitions))
 		for _, planned := range si.MovePartitions {
-			rows, present := observedRows[planned.ID]
+			var rows, present = observedRows[planned.ID]
 			if !present {
 				if !recovery {
 					// This process verified the partition moments ago and nothing
@@ -1430,7 +1430,7 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 	// Every step is idempotent (CREATE IF NOT EXISTS, a read, DROP IF EXISTS,
 	// TRUNCATE), so a transient connection drop restarts the sequence from
 	// the top without changing its outcome.
-	ensure := func(createSQL, truncateSQL, dropSQL string, tableName string) error {
+	var ensure = func(createSQL, truncateSQL, dropSQL string, tableName string) error {
 		return transientRetryPolicy.retry(ctx, "ensuring temp table", isTransientErr, func() error {
 			return t.ensureTempTable(ctx, b, createSQL, truncateSQL, dropSQL, tableName)
 		})
@@ -1455,7 +1455,7 @@ func (t *transactor) ensureTempTable(ctx context.Context, b *binding, createSQL,
 	if err := t.store.conn.Exec(ctx, createSQL); err != nil {
 		return fmt.Errorf("creating temp table: %w", err)
 	}
-	matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
+	var matches, err = t.tempTableMatchesTarget(ctx, tableName, b)
 	if err != nil {
 		return err
 	}
@@ -1485,7 +1485,7 @@ func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (
 
 	var keys map[string]string
 	if err := transientRetryPolicy.retry(ctx, "querying partition keys", isTransientErr, func() error {
-		rows, err := t.store.conn.Query(ctx,
+		var rows, err = t.store.conn.Query(ctx,
 			"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
 			storeTable, targetTable)
 		if err != nil {
@@ -1506,8 +1506,8 @@ func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (
 		return false, err
 	}
 
-	storeKey, haveStore := keys[storeTable]
-	targetKey, haveTarget := keys[targetTable]
+	var storeKey, haveStore = keys[storeTable]
+	var targetKey, haveTarget = keys[targetTable]
 	return haveStore && haveTarget && storeKey != targetKey, nil
 }
 
@@ -1523,8 +1523,8 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 	type column struct {
 		name, typ string
 	}
-	readColumns := func(table string) ([]column, error) {
-		rows, err := t.store.conn.Query(ctx,
+	var readColumns = func(table string) ([]column, error) {
+		var rows, err = t.store.conn.Query(ctx,
 			"SELECT name, type FROM system.columns WHERE database = currentDatabase() AND table = ? ORDER BY position", table)
 		if err != nil {
 			return nil, fmt.Errorf("querying system.columns of %q: %w", table, err)
@@ -1541,7 +1541,7 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 		return out, rows.Err()
 	}
 
-	tempCols, err := readColumns(tempTable)
+	var tempCols, err = readColumns(tempTable)
 	if err != nil {
 		return false, err
 	}
@@ -1550,7 +1550,7 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 		return false, err
 	}
 
-	want := targetCols
+	var want = targetCols
 	if tempTable == loadTableName(b.target, t._range.KeyBegin) {
 		// Load tables contain only the key columns.
 		if len(targetCols) < len(b.target.Keys) {
@@ -1577,7 +1577,7 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 	// persistent store table keeps the old definition. Load tables are never
 	// moved and hold only lookup keys, so neither key matters for them.
 	if tempTable == storeTableName(b.target, t._range.KeyBegin) {
-		readKeys := func(table string) (partitionKey, sortingKey string, err error) {
+		var readKeys = func(table string) (partitionKey, sortingKey string, err error) {
 			if err := t.store.conn.QueryRow(ctx,
 				"SELECT partition_key, sorting_key FROM system.tables WHERE database = currentDatabase() AND name = ?", table,
 			).Scan(&partitionKey, &sortingKey); err != nil {
@@ -1585,7 +1585,7 @@ func (t *transactor) tempTableMatchesTarget(ctx context.Context, tempTable strin
 			}
 			return partitionKey, sortingKey, nil
 		}
-		tempPartitionKey, tempSortingKey, err := readKeys(tempTable)
+		var tempPartitionKey, tempSortingKey, err = readKeys(tempTable)
 		if err != nil {
 			return false, err
 		}
