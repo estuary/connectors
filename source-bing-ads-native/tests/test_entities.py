@@ -1,11 +1,13 @@
-"""Offline tests for account discovery and the entity snapshots.
+"""Offline tests for validation, account discovery and the entity snapshots.
 
-No live credentials are available, so a stub session answers each endpoint
-with canned JSON shaped after Microsoft's documented REST responses.
+A stub session answers each endpoint with canned JSON shaped after
+Microsoft's REST responses, so edge cases the sandbox can't produce are
+covered too.
 """
 
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
 from logging import getLogger
 from typing import Any, Callable, cast
 
@@ -24,6 +26,8 @@ from source_bing_ads_native.api import (
     token_exchange_scope,
 )
 from source_bing_ads_native.errors import should_retry
+from source_bing_ads_native.models import EndpointConfig
+from source_bing_ads_native.resources import validate_credentials
 from source_bing_ads_native.http import with_developer_token
 
 LOG = getLogger(__name__)
@@ -70,7 +74,7 @@ class StubSession:
     ) -> bytes:
         suffix = next(s for s in self.handlers if url.endswith(s))
         self.calls.append((suffix, json, headers or {}))
-        delay = self.delays.get(f"{suffix}:{next(iter(json.values()), '')}")
+        delay = self.delays.get(f"{suffix}:{next(iter((json or {}).values()), '')}")
         if delay:
             await asyncio.sleep(delay)
         result = self.handlers[suffix](json, headers or {})
@@ -388,3 +392,40 @@ def test_unknown_environment_fails(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv(ENVIRONMENT_VAR, "staging")
     with pytest.raises(RuntimeError, match=ENVIRONMENT_VAR):
         token_exchange_scope()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("expires_in, exchanges", [(timedelta(hours=-1), 1), (timedelta(hours=1), 0)])
+async def test_validate_exchanges_only_an_expired_access_token(expires_in: timedelta, exchanges: int):
+    http = _session(
+        {
+            "/oauth2/v2.0/token": lambda body, headers: {
+                "access_token": "fresh",
+                "expires_in": 3599,
+                "refresh_token": "rotated",
+            },
+            "/User/Query": _user(),
+            "/Accounts/Search": _accounts(_account("1")),
+            "/Campaigns/QueryByAccountId": _campaigns({"1": []}),
+        }
+    )
+    config = EndpointConfig.model_validate(
+        {
+            "credentials": {
+                "credentials_title": "OAuth Credentials",
+                "client_id": "id",
+                "client_secret": "secret",
+                "refresh_token": "stored",
+                "developer_token": "token",
+                "access_token": "stored",
+                "access_token_expires_at": (datetime.now(tz=UTC) + expires_in).isoformat(),
+            }
+        }
+    )
+
+    await validate_credentials(LOG, http, config)
+
+    assert sum(1 for s, _, _ in http.calls if s == "/oauth2/v2.0/token") == exchanges
+    assert config.credentials.access_token == ("fresh" if exchanges else "stored")
+    # Saving a rotated refresh token is left to capture startup.
+    assert config.credentials.refresh_token == "stored"

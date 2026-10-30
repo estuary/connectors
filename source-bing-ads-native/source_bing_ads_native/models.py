@@ -7,7 +7,7 @@ from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, model_vali
 
 from estuary_cdk.capture.common import (
     BaseDocument,
-    BaseOAuth2Credentials,
+    RotatingOAuth2Credentials,
     ResourceState,
     OAuth2Spec,
 )
@@ -63,6 +63,8 @@ OAUTH2_SPEC = OAuth2Spec(
     ),
     accessTokenResponseMap={
         "refresh_token": "/refresh_token",
+        "access_token": "/access_token",
+        "access_token_expires_at": r"{{#now_plus}}{{ expires_in }}{{/now_plus}}",
     },
     # Sent on the connector's own refresh-token exchanges, so a refreshed
     # access token keeps the Microsoft Advertising scope.
@@ -70,12 +72,12 @@ OAUTH2_SPEC = OAuth2Spec(
 )
 
 
-# Access tokens last about an hour, so they're refreshed mid-run from the
-# configured refresh token, which Microsoft keeps valid after issuing a new
-# one: Airbyte's connector and source-onedrive refresh this way too.
-# RotatingOAuth2Credentials would refresh only at startup, crashing the task
-# each time an access token expired.
-class BingAdsOAuth2Credentials(BaseOAuth2Credentials):
+# Microsoft returns a new refresh token with every access token, and users of
+# the Airbyte-based connector have had to sign in again about every 90 days.
+# Rotating credentials save each new refresh token back to the config, so
+# the stored one never gets that old. The cost: the CDK only rotates at startup, so the task
+# restarts each time its hour-long access token expires.
+class BingAdsOAuth2Credentials(RotatingOAuth2Credentials):
     # Estuary's developer token, like the OAuth app's client ID and secret,
     # is Estuary's rather than the user's, so Flow adds it to the credentials
     # from the connector's `oauth2_injected_values` instead of asking for it.
