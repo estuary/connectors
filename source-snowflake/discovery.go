@@ -228,7 +228,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 			isFallbackKey = true
 		}
 
-		resourceConfigJSON, err := json.Marshal(resource{
+		var resourceConfigJSON, err = json.Marshal(resource{
 			Schema: info.Table.Schema,
 			Table:  info.Table.Name,
 		})

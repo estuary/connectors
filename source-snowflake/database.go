@@ -25,7 +25,7 @@ func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 	// it is our normal error propagation will handle it.
 	gosnowflake.GetLogger().SetLogLevel("OFF")
 
-	dsn, err := cfg.ToURI()
+	var dsn, err = cfg.ToURI()
 	if err != nil {
 		return nil, fmt.Errorf("error generating DSN: %w", err)
 	}

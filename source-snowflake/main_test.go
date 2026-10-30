@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -72,7 +72,7 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	if controlPass == "" {
 		controlPass = *dbCapturePass
 	}
-	controlURI, err := (&config{
+	var controlURI, err = (&config{
 		Host:      *dbHost,
 		Database:  *dbName,
 		Warehouse: *dbWarehouse,
@@ -217,7 +217,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 
 	var arrs []any
 	for idx := range cols {
-		arr, err := gosnowflake.Array(&cols[idx])
+		var arr, err = gosnowflake.Array(&cols[idx])
 		require.NoError(t, err, "creating array binding")
 		arrs = append(arrs, arr)
 	}
@@ -257,7 +257,7 @@ func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, ar
 func TestSpec(t *testing.T) {
 	var ctx, tb = context.Background(), snowflakeTestBackend(t)
 
-	response, err := tb.CaptureSpec(ctx, t).Driver.Spec(ctx, &pc.Request_Spec{})
+	var response, err = tb.CaptureSpec(ctx, t).Driver.Spec(ctx, &pc.Request_Spec{})
 	require.NoError(t, err)
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)

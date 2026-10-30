@@ -59,8 +59,8 @@ func (c *config) Validate() error {
 	}
 
 	// Host must look correct
-	hasProtocol := strings.Contains(c.Host, "://")
-	missingDomain := !hostRe.MatchString(c.Host)
+	var hasProtocol = strings.Contains(c.Host, "://")
+	var missingDomain = !hostRe.MatchString(c.Host)
 	if hasProtocol && missingDomain {
 		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com and not include a protocol)", c.Host)
 	} else if hasProtocol {
@@ -93,7 +93,7 @@ func (c *config) ToURI() (string, error) {
 	var trueString = "true"
 	var jsonString = "json"
 
-	queryParams := make(url.Values)
+	var queryParams = make(url.Values)
 
 	// Required params
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
@@ -133,7 +133,7 @@ func (c *config) ToURI() (string, error) {
 		} else if privateKey, err := x509.MarshalPKCS8PrivateKey(key); err != nil {
 			return "", fmt.Errorf("parsing private key: %w", err)
 		} else {
-			privateKeyString := base64.URLEncoding.EncodeToString(privateKey)
+			var privateKeyString = base64.URLEncoding.EncodeToString(privateKey)
 			queryParams.Add("privateKey", privateKeyString)
 			queryParams.Add("authenticator", strings.ToLower(sf.AuthTypeJwt.String()))
 		}
@@ -142,7 +142,7 @@ func (c *config) ToURI() (string, error) {
 		return "", fmt.Errorf("unknown auth type: %s", c.Credentials.AuthType)
 	}
 
-	dsn := user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
+	var dsn = user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
 	return dsn, nil
 }
 

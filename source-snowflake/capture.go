@@ -166,7 +166,7 @@ func (c *capture) Run(ctx context.Context) error {
 		return fmt.Errorf("error pruning deleted streams: %w", err)
 	}
 
-	highestStaged, err := c.pruneStagingTables(ctx)
+	var highestStaged, err = c.pruneStagingTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error pruning staging tables: %w", err)
 	}
@@ -236,7 +236,7 @@ func (c *capture) updateState(ctx context.Context) error {
 		}
 	}
 
-	dynamicTables, err := listDynamicTables(ctx, c.Config, c.DB)
+	var dynamicTables, err = listDynamicTables(ctx, c.Config, c.DB)
 	if err != nil {
 		return fmt.Errorf("error listing dynamic tables: %w", err)
 	}
@@ -252,7 +252,7 @@ func (c *capture) updateState(ctx context.Context) error {
 
 			var _, isDynamic = dynamicTables[binding.Table] // Any table with an entry in the dynamicTables map must be a dynamic table
 
-			streamName, err := createChangeStream(ctx, c.Config, c.DB, binding.Table, isDynamic, uniqueID)
+			var streamName, err = createChangeStream(ctx, c.Config, c.DB, binding.Table, isDynamic, uniqueID)
 			if err != nil {
 				return err
 			}
@@ -461,7 +461,7 @@ func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.
 
 	// Read contents of staging table and output to Flow.
 	logEntry.WithField("query", readStagingTableQuery).Info("querying staging table")
-	rows, err := c.DB.QueryContext(ctx, readStagingTableQuery)
+	var rows, err = c.DB.QueryContext(ctx, readStagingTableQuery)
 	if err != nil {
 		return fmt.Errorf("error querying staging table %q: %w", stagingName.String(), err)
 	}
@@ -512,7 +512,7 @@ func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.
 		// Extract 'METADATA$ACTION', 'METADATA$ROW_ID' and 'METADATA$ISUPDATE' from change data.
 		// If the fields are missing, this staging table can be presumed to be the initial clone
 		// and we should fill in suitable placeholders for each.
-		action, ok := fields["METADATA$ACTION"].(string)
+		var action, ok = fields["METADATA$ACTION"].(string)
 		if !ok {
 			action = "INSERT"
 		}
@@ -682,7 +682,7 @@ func translateFieldValue(x any, ctype *sql.ColumnType) (any, error) {
 	case string:
 		switch dbType {
 		case "FIXED":
-			_, scale, ok := ctype.DecimalSize()
+			var _, scale, ok = ctype.DecimalSize()
 			if !ok {
 				return nil, fmt.Errorf("internal error: decimal size unknown")
 			}
