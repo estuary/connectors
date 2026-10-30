@@ -86,14 +86,14 @@ type bindingInfo struct {
 }
 
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	ctx := stream.Context()
+	var ctx = stream.Context()
 
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := buildClient(ctx, &cfg, receiversPerBinding*len(open.Capture.Bindings)+deleteWorkers)
+	var client, err = buildClient(ctx, &cfg, receiversPerBinding*len(open.Capture.Bindings)+deleteWorkers)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		info, err := newBindingInfo(ctx, client, idx, res.QueueURL)
+		var info, err = newBindingInfo(ctx, client, idx, res.QueueURL)
 		if err != nil {
 			return err
 		}
@@ -122,17 +122,17 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 	// bounds memory. The two cover different things, so we need both.
 	// The budget has to cover at least one receive reservation or receivers
 	// could never acquire, so clamp it up rather than deadlock.
-	bodyBudget := max(maxBufferedBodyBytes, receiveReservationBytes)
-	bodyBytes := semaphore.NewWeighted(int64(bodyBudget))
+	var bodyBudget = max(maxBufferedBodyBytes, receiveReservationBytes)
+	var bodyBytes = semaphore.NewWeighted(int64(bodyBudget))
 
-	totalUnacked := maxUnackedMessages * len(bindings)
-	batches := make(chan capturedBatch, 2*receiversPerBinding*len(bindings))
+	var totalUnacked = maxUnackedMessages * len(bindings)
+	var batches = make(chan capturedBatch, 2*receiversPerBinding*len(bindings))
 	// Both `pending` and `deletes` are sized to the per-binding unacked
 	// caps, so entries can never outnumber unacked messages and sends never
 	// block. The ack processor can't afford to stall on a slow delete path:
 	// the runtime fails the task if an Acknowledge goes unread for 10s.
-	pending := make(chan pendingEntry, totalUnacked)
-	deletes := make(chan deleteJob, totalUnacked)
+	var pending = make(chan pendingEntry, totalUnacked)
+	var deletes = make(chan deleteJob, totalUnacked)
 
 	// The pipeline is four stages connected by channels. Receivers long-poll
 	// SQS and hand off transformed batches. The transaction loop
@@ -142,10 +142,10 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 	// delete workers, which remove the committed messages from SQS.
 	// Emission doesn't wait on acknowledgement, so many checkpoints can be
 	// outstanding at once and throughput isn't gated on commit latency.
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
-	ackLatency := new(ackLatencyStats)
-	acks := make(chan ackMessage, 16)
+	var ackLatency = new(ackLatencyStats)
+	var acks = make(chan ackMessage, 16)
 	// Detached rather than in the errgroup since stream.Recv cannot be
 	// cancelled. Its blocked read is reclaimed at process exit.
 	go readAcknowledgements(stream, acks)
@@ -182,7 +182,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 }
 
 func newBindingInfo(ctx context.Context, client *sqs.Client, index int, queueURL string) (*bindingInfo, error) {
-	name, _, err := parseQueueURL(queueURL)
+	var name, _, err = parseQueueURL(queueURL)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func newBindingInfo(ctx context.Context, client *sqs.Client, index int, queueURL
 	if err != nil {
 		return nil, fmt.Errorf("queue %q is not accessible: %w", queueURL, err)
 	}
-	visibilitySeconds, _ := strconv.Atoi(attrs.Attributes[string(types.QueueAttributeNameVisibilityTimeout)])
+	var visibilitySeconds, _ = strconv.Atoi(attrs.Attributes[string(types.QueueAttributeNameVisibilityTimeout)])
 
 	// The zero lastMessageAt means bindings start idle. That costs a busy
 	// queue almost nothing, since a scout's long poll returns as soon as a
@@ -227,8 +227,8 @@ func runTransactionLoop(ctx context.Context, stream *boilerplate.PullOutput, bat
 		case first = <-batches:
 		}
 
-		group := []capturedBatch{first}
-		messages, groupBytes := len(first.docs), first.bodyBytes
+		var group = []capturedBatch{first}
+		var messages, groupBytes = len(first.docs), first.bodyBytes
 
 		// Coalesce whatever is already waiting, but never wait for more.
 	drain:
@@ -243,7 +243,7 @@ func runTransactionLoop(ctx context.Context, stream *boilerplate.PullOutput, bat
 			}
 		}
 
-		entry := pendingEntry{jobs: make([]deleteJob, 0, len(group))}
+		var entry = pendingEntry{jobs: make([]deleteJob, 0, len(group))}
 		for _, batch := range group {
 			if err := stream.Documents(batch.binding.index, batch.docs...); err != nil {
 				return err

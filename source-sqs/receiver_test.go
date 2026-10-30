@@ -23,12 +23,12 @@ import (
 // returns OverLimit and the second returns a message, proving the loop kept
 // going.
 func TestReceiverBacksOffOnOverLimit(t *testing.T) {
-	prevBackoff := overLimitBackoff
+	var prevBackoff = overLimitBackoff
 	overLimitBackoff = 10 * time.Millisecond
 	t.Cleanup(func() { overLimitBackoff = prevBackoff })
 
 	var calls atomic.Int32
-	inject := middleware.InitializeMiddlewareFunc("InjectResponses", func(
+	var inject = middleware.InitializeMiddlewareFunc("InjectResponses", func(
 		ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler,
 	) (middleware.InitializeOutput, middleware.Metadata, error) {
 		switch calls.Add(1) {
@@ -49,25 +49,25 @@ func TestReceiverBacksOffOnOverLimit(t *testing.T) {
 		}
 	})
 
-	client := sqs.New(sqs.Options{
+	var client = sqs.New(sqs.Options{
 		Region: "us-east-1",
 		APIOptions: []func(*middleware.Stack) error{func(stack *middleware.Stack) error {
 			return stack.Initialize.Add(inject, middleware.Before)
 		}},
 	})
 
-	binding := &bindingInfo{
+	var binding = &bindingInfo{
 		index:    0,
 		queueURL: "https://sqs.test.example/123456789012/test-queue",
 		inflight: semaphore.NewWeighted(int64(maxUnackedMessages)),
 	}
 	binding.wake()
-	bodyBytes := semaphore.NewWeighted(receiveReservationBytes)
-	batches := make(chan capturedBatch, 1)
+	var bodyBytes = semaphore.NewWeighted(receiveReservationBytes)
+	var batches = make(chan capturedBatch, 1)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	done := make(chan error, 1)
+	var done = make(chan error, 1)
 	go func() { done <- runReceiver(ctx, client, binding, 0, bodyBytes, batches) }()
 
 	select {
@@ -96,17 +96,17 @@ func TestReceiverBacksOffOnOverLimit(t *testing.T) {
 // non-scout receivers entirely, scouts ask for one message per call, and a
 // received message wakes the binding back to full-size asks.
 func TestReceiverIdleScouting(t *testing.T) {
-	prevIdle, prevRecheck := idleAfter, parkedRecheck
+	var prevIdle, prevRecheck = idleAfter, parkedRecheck
 	idleAfter, parkedRecheck = 50*time.Millisecond, 10*time.Millisecond
 	t.Cleanup(func() { idleAfter, parkedRecheck = prevIdle, prevRecheck })
 
 	var mu sync.Mutex
 	var asks []int32
 	var calls atomic.Int32
-	inject := middleware.InitializeMiddlewareFunc("InjectResponses", func(
+	var inject = middleware.InitializeMiddlewareFunc("InjectResponses", func(
 		ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler,
 	) (middleware.InitializeOutput, middleware.Metadata, error) {
-		input := in.Parameters.(*sqs.ReceiveMessageInput)
+		var input = in.Parameters.(*sqs.ReceiveMessageInput)
 		mu.Lock()
 		asks = append(asks, input.MaxNumberOfMessages)
 		mu.Unlock()
@@ -125,7 +125,7 @@ func TestReceiverIdleScouting(t *testing.T) {
 			middleware.Metadata{}, nil
 	})
 
-	client := sqs.New(sqs.Options{
+	var client = sqs.New(sqs.Options{
 		Region: "us-east-1",
 		APIOptions: []func(*middleware.Stack) error{func(stack *middleware.Stack) error {
 			return stack.Initialize.Add(inject, middleware.Before)
@@ -133,7 +133,7 @@ func TestReceiverIdleScouting(t *testing.T) {
 	})
 
 	// The zero lastMessageAt makes the binding idle from the start.
-	binding := &bindingInfo{
+	var binding = &bindingInfo{
 		index:    0,
 		queueURL: "https://sqs.test.example/123456789012/test-queue",
 		inflight: semaphore.NewWeighted(int64(maxUnackedMessages)),
@@ -141,12 +141,12 @@ func TestReceiverIdleScouting(t *testing.T) {
 	require.True(t, binding.isIdle())
 	// Extra headroom because delivered batches hold their body bytes until
 	// emission, which never happens in this harness.
-	bodyBytes := semaphore.NewWeighted(3 * receiveReservationBytes)
-	batches := make(chan capturedBatch, 4)
+	var bodyBytes = semaphore.NewWeighted(3 * receiveReservationBytes)
+	var batches = make(chan capturedBatch, 4)
 
 	// A non-scout receiver on an idle binding must park and never call SQS.
-	parkedCtx, cancelParked := context.WithCancel(context.Background())
-	parkedDone := make(chan error, 1)
+	var parkedCtx, cancelParked = context.WithCancel(context.Background())
+	var parkedDone = make(chan error, 1)
 	go func() { parkedDone <- runReceiver(parkedCtx, client, binding, scoutsPerBinding, bodyBytes, batches) }()
 	time.Sleep(60 * time.Millisecond)
 	require.Equal(t, int32(0), calls.Load(), "parked receiver must not call SQS")
@@ -155,8 +155,8 @@ func TestReceiverIdleScouting(t *testing.T) {
 
 	// A scout polls with one-message asks, then wakes the binding when a
 	// message arrives, and subsequent asks are full size.
-	scoutCtx, cancelScout := context.WithCancel(context.Background())
-	scoutDone := make(chan error, 1)
+	var scoutCtx, cancelScout = context.WithCancel(context.Background())
+	var scoutDone = make(chan error, 1)
 	go func() { scoutDone <- runReceiver(scoutCtx, client, binding, 0, bodyBytes, batches) }()
 
 	select {

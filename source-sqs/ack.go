@@ -45,7 +45,7 @@ type ackMessage struct {
 // and forwards them to the ack processor.
 func readAcknowledgements(stream *boilerplate.PullOutput, acks chan<- ackMessage) {
 	for {
-		request, err := stream.Recv()
+		var request, err = stream.Recv()
 		if err != nil {
 			acks <- ackMessage{err: err}
 			return
@@ -122,14 +122,14 @@ func runDeleteWorker(ctx context.Context, client *sqs.Client, deletes <-chan del
 				return err
 			}
 		case <-ctx.Done():
-			deadline := time.After(5 * time.Second)
+			var deadline = time.After(5 * time.Second)
 			for {
 				select {
 				case job := <-deletes:
 					// The capture context is gone, so use a short
 					// independent timeout for the remaining calls.
-					drainCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					err := deleteBatch(drainCtx, client, job)
+					var drainCtx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+					var err = deleteBatch(drainCtx, client, job)
 					cancel()
 					if err != nil {
 						return nil // Shutting down, the drain is best-effort.
@@ -162,9 +162,9 @@ func deleteBatch(ctx context.Context, client *sqs.Client, job deleteJob) error {
 		return nil
 	}
 
-	handles := job.handles
+	var handles = job.handles
 	for attempt := 0; len(handles) > 0; attempt++ {
-		entries := make([]types.DeleteMessageBatchRequestEntry, len(handles))
+		var entries = make([]types.DeleteMessageBatchRequestEntry, len(handles))
 		for i, handle := range handles {
 			entries[i] = types.DeleteMessageBatchRequestEntry{
 				Id:            aws.String(strconv.Itoa(i)),
@@ -172,7 +172,7 @@ func deleteBatch(ctx context.Context, client *sqs.Client, job deleteJob) error {
 			}
 		}
 
-		resp, err := client.DeleteMessageBatch(ctx, &sqs.DeleteMessageBatchInput{
+		var resp, err = client.DeleteMessageBatch(ctx, &sqs.DeleteMessageBatchInput{
 			QueueUrl: aws.String(job.binding.queueURL),
 			Entries:  entries,
 		})
@@ -196,7 +196,7 @@ func deleteBatch(ctx context.Context, client *sqs.Client, job deleteJob) error {
 
 		var retry []string
 		for _, failed := range resp.Failed {
-			idx, err := strconv.Atoi(aws.ToString(failed.Id))
+			var idx, err = strconv.Atoi(aws.ToString(failed.Id))
 			if err != nil || idx < 0 || idx >= len(handles) {
 				continue
 			}

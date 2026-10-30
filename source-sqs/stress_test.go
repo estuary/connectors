@@ -50,7 +50,7 @@ import (
 )
 
 func BenchmarkMakeDocument(b *testing.B) {
-	attributes := map[string]string{
+	var attributes = map[string]string{
 		"SentTimestamp":           "1784055166151",
 		"ApproximateReceiveCount": "1",
 	}
@@ -66,7 +66,7 @@ func BenchmarkMakeDocument(b *testing.B) {
 		{"text-2KiB", strings.Repeat("plain text ", 190)},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
-			msg := types.Message{
+			var msg = types.Message{
 				MessageId:  aws.String("d6bf4b71-0a55-4c3e-9c6e-000000000000"),
 				Body:       aws.String(tc.body),
 				Attributes: attributes,
@@ -127,7 +127,7 @@ func (s *benchStream) Send(m *pc.Response) error {
 		s.mu.Lock()
 		s.docs++
 		s.docBytes += int64(len(m.Captured.DocJson))
-		docs := s.docs
+		var docs = s.docs
 		s.mu.Unlock()
 		s.onDocument(docs)
 	} else if m.Checkpoint != nil {
@@ -143,8 +143,8 @@ func (s *benchStream) Send(m *pc.Response) error {
 func (s *benchStream) Recv() (*pc.Request, error) {
 	for {
 		s.mu.Lock()
-		pending := s.pendingAcks
-		ready := s.ackReady
+		var pending = s.pendingAcks
+		var ready = s.ackReady
 		s.mu.Unlock()
 
 		if pending > 0 {
@@ -156,7 +156,7 @@ func (s *benchStream) Recv() (*pc.Request, error) {
 				}
 			}
 			s.mu.Lock()
-			n := s.pendingAcks
+			var n = s.pendingAcks
 			s.pendingAcks = 0
 			s.mu.Unlock()
 			return &pc.Request{Acknowledge: &pc.Request_Acknowledge{Checkpoints: n}}, nil
@@ -188,32 +188,32 @@ func (s *benchStream) SetTrailer(metadata.MD)       {}
 func seedQueue(t *testing.T, ctx context.Context, client *sqs.Client, queueURL string, n, bodyBytes, groups int) {
 	t.Helper()
 
-	payload := strings.Repeat("x", max(bodyBytes-48, 16))
+	var payload = strings.Repeat("x", max(bodyBytes-48, 16))
 	// STRESS_PARTS > 0 adds a low-cardinality "part" field (i % parts) to each
 	// body, for capturing into logically-partitioned collections when
 	// measuring journal-count scaling.
-	docParts := stressEnvInt("STRESS_PARTS", 0)
+	var docParts = stressEnvInt("STRESS_PARTS", 0)
 	// Deduplication IDs incorporate a per-run nonce so that repeated seedings
 	// of the same FIFO queue aren't silently collapsed by SQS's 5-minute
 	// producer dedup window.
-	runID := uuid.NewString()[:8]
+	var runID = uuid.NewString()[:8]
 	const seeders = 16
-	group, groupCtx := errgroup.WithContext(ctx)
-	perSeeder := (n + seeders - 1) / seeders
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var perSeeder = (n + seeders - 1) / seeders
 
 	for s := range seeders {
-		start := s * perSeeder
-		end := min(start+perSeeder, n)
+		var start = s * perSeeder
+		var end = min(start+perSeeder, n)
 		group.Go(func() error {
 			for batchStart := start; batchStart < end; batchStart += 10 {
-				batchEnd := min(batchStart+10, end)
-				entries := make([]types.SendMessageBatchRequestEntry, 0, batchEnd-batchStart)
+				var batchEnd = min(batchStart+10, end)
+				var entries = make([]types.SendMessageBatchRequestEntry, 0, batchEnd-batchStart)
 				for i := batchStart; i < batchEnd; i++ {
-					body := fmt.Sprintf(`{"idx": %d, "payload": %q}`, i, payload)
+					var body = fmt.Sprintf(`{"idx": %d, "payload": %q}`, i, payload)
 					if docParts > 0 {
 						body = fmt.Sprintf(`{"idx": %d, "part": %d, "payload": %q}`, i, i%docParts, payload)
 					}
-					entry := types.SendMessageBatchRequestEntry{
+					var entry = types.SendMessageBatchRequestEntry{
 						Id:          aws.String(strconv.Itoa(i - batchStart)),
 						MessageBody: aws.String(body),
 					}
@@ -223,7 +223,7 @@ func seedQueue(t *testing.T, ctx context.Context, client *sqs.Client, queueURL s
 					}
 					entries = append(entries, entry)
 				}
-				resp, err := client.SendMessageBatch(groupCtx, &sqs.SendMessageBatchInput{
+				var resp, err = client.SendMessageBatch(groupCtx, &sqs.SendMessageBatchInput{
 					QueueUrl: aws.String(queueURL),
 					Entries:  entries,
 				})
@@ -243,26 +243,26 @@ func seedQueue(t *testing.T, ctx context.Context, client *sqs.Client, queueURL s
 // message has been captured, and reports capture throughput plus how long
 // the post-capture delete drain took.
 func runStressCapture(t *testing.T, queueName string, groups int) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := stressConfig(t)
-	client := testClient(t, ctx, &conf)
-	queueURL := createQueue(t, ctx, client, queueName)
+	var conf = stressConfig(t)
+	var client = testClient(t, ctx, &conf)
+	var queueURL = createQueue(t, ctx, client, queueName)
 
-	messages := stressEnvInt("STRESS_MESSAGES", 20_000)
-	bodyBytes := stressEnvInt("STRESS_BODY_BYTES", 1024)
-	ackDelay, _ := time.ParseDuration(os.Getenv("STRESS_ACK_DELAY"))
+	var messages = stressEnvInt("STRESS_MESSAGES", 20_000)
+	var bodyBytes = stressEnvInt("STRESS_BODY_BYTES", 1024)
+	var ackDelay, _ = time.ParseDuration(os.Getenv("STRESS_ACK_DELAY"))
 
-	seedStart := time.Now()
+	var seedStart = time.Now()
 	seedQueue(t, ctx, client, queueURL, messages, bodyBytes, groups)
 	t.Logf("seeded %d messages of ~%dB in %s", messages, bodyBytes, time.Since(seedStart).Round(time.Millisecond))
 
-	resourceJSON, err := json.Marshal(resource{QueueURL: queueURL})
+	var resourceJSON, err = json.Marshal(resource{QueueURL: queueURL})
 	require.NoError(t, err)
 	configJSON, err := json.Marshal(&conf)
 	require.NoError(t, err)
 
-	open := &pc.Request_Open{
+	var open = &pc.Request_Open{
 		Capture: &pf.CaptureSpec{
 			Name:       "acmeCo/stress/source-sqs",
 			ConfigJson: configJSON,
@@ -273,7 +273,7 @@ func runStressCapture(t *testing.T, queueName string, groups int) {
 		},
 	}
 
-	captureCtx, cancel := context.WithCancel(ctx)
+	var captureCtx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
 	// Cancelling the moment the last document arrives would strand the tail.
@@ -284,9 +284,9 @@ func runStressCapture(t *testing.T, queueName string, groups int) {
 	// then shut down.
 	var once sync.Once
 	var captureElapsed time.Duration
-	capturedAll := make(chan struct{})
-	captureStart := time.Now()
-	stream := newBenchStream(captureCtx, ackDelay, func(docs int64) {
+	var capturedAll = make(chan struct{})
+	var captureStart = time.Now()
+	var stream = newBenchStream(captureCtx, ackDelay, func(docs int64) {
 		if docs >= int64(messages) {
 			once.Do(func() {
 				captureElapsed = time.Since(captureStart)
@@ -295,7 +295,7 @@ func runStressCapture(t *testing.T, queueName string, groups int) {
 		}
 	})
 
-	pullDone := make(chan error, 1)
+	var pullDone = make(chan error, 1)
 	go func() {
 		pullDone <- driver{}.Pull(open, &boilerplate.PullOutput{Connector_CaptureServer: stream})
 	}()
@@ -308,16 +308,16 @@ func runStressCapture(t *testing.T, queueName string, groups int) {
 		t.Fatal("timed out waiting for capture to receive all messages")
 	}
 
-	drainStart := time.Now()
+	var drainStart = time.Now()
 	requireQueueDrained(t, ctx, client, queueURL)
-	drainElapsed := time.Since(drainStart)
+	var drainElapsed = time.Since(drainStart)
 
 	cancel()
 	if err := <-pullDone; err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatalf("capture failed: %v", err)
 	}
 
-	docs, capturedBytes := stream.totals()
+	var docs, capturedBytes = stream.totals()
 	require.GreaterOrEqual(t, docs, int64(messages))
 
 	t.Logf("captured %d docs (%.1f MB) in %s: %.0f msgs/sec, %.1f MB/sec (ackDelay=%s, groups=%d)",
@@ -332,26 +332,26 @@ func runStressCapture(t *testing.T, queueName string, groups int) {
 // real Flow stack. FIFO queues get STRESS_GROUPS message groups. Re-run it to
 // keep a sustained backlog while measuring Flow-side commit+ack latency.
 func TestStressSeed(t *testing.T) {
-	conf := stressConfig(t)
-	queueURL := os.Getenv("STRESS_QUEUE_URL")
+	var conf = stressConfig(t)
+	var queueURL = os.Getenv("STRESS_QUEUE_URL")
 	if queueURL == "" {
 		t.Skip("set STRESS_QUEUE_URL to the queue to seed")
 	}
-	name, _, err := parseQueueURL(queueURL)
+	var name, _, err = parseQueueURL(queueURL)
 	require.NoError(t, err)
 
-	groups := 0
+	var groups = 0
 	if isFifoQueueName(name) {
 		groups = stressEnvInt("STRESS_GROUPS", 32)
 	}
-	messages := stressEnvInt("STRESS_MESSAGES", 20_000)
-	bodyBytes := stressEnvInt("STRESS_BODY_BYTES", 1024)
+	var messages = stressEnvInt("STRESS_MESSAGES", 20_000)
+	var bodyBytes = stressEnvInt("STRESS_BODY_BYTES", 1024)
 
-	ctx := context.Background()
-	client := testClient(t, ctx, &conf)
-	start := time.Now()
+	var ctx = context.Background()
+	var client = testClient(t, ctx, &conf)
+	var start = time.Now()
 	seedQueue(t, ctx, client, queueURL, messages, bodyBytes, groups)
-	elapsed := time.Since(start)
+	var elapsed = time.Since(start)
 	t.Logf("seeded %d messages of ~%dB (groups=%d) in %s: %.0f msgs/sec",
 		messages, bodyBytes, groups, elapsed.Round(time.Millisecond), float64(messages)/elapsed.Seconds())
 }

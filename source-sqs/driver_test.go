@@ -40,7 +40,7 @@ func testConfig(t *testing.T) config {
 	}
 
 	if useRealAWS() {
-		region := os.Getenv("AWS_REGION")
+		var region = os.Getenv("AWS_REGION")
 		if region == "" {
 			region = "us-east-1"
 		}
@@ -73,7 +73,7 @@ func testConfig(t *testing.T) config {
 
 func testClient(t *testing.T, ctx context.Context, cfg *config) *sqs.Client {
 	t.Helper()
-	client, err := buildClient(ctx, cfg, 0)
+	var client, err = buildClient(ctx, cfg, 0)
 	require.NoError(t, err)
 	return client
 }
@@ -84,14 +84,14 @@ func testClient(t *testing.T, ctx context.Context, cfg *config) *sqs.Client {
 func createQueue(t *testing.T, ctx context.Context, client *sqs.Client, name string) string {
 	t.Helper()
 
-	input := &sqs.CreateQueueInput{QueueName: aws.String(name)}
+	var input = &sqs.CreateQueueInput{QueueName: aws.String(name)}
 	if isFifoQueueName(name) {
 		input.Attributes = map[string]string{
 			string(types.QueueAttributeNameFifoQueue): "true",
 		}
 	}
 
-	created, err := client.CreateQueue(ctx, input)
+	var created, err = client.CreateQueue(ctx, input)
 	require.NoError(t, err, "failed to create queue %q", name)
 	t.Cleanup(func() {
 		_, _ = client.DeleteQueue(ctx, &sqs.DeleteQueueInput{QueueUrl: created.QueueUrl})
@@ -100,37 +100,37 @@ func createQueue(t *testing.T, ctx context.Context, client *sqs.Client, name str
 }
 
 func TestDiscover(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
 
 	createQueue(t, ctx, client, "test-discover-standard")
 	createQueue(t, ctx, client, "test-discover-ordered.fifo")
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &conf,
 	}
 
-	bindings := cs.Discover(ctx, t, regexp.MustCompile(`/test-discover-`))
+	var bindings = cs.Discover(ctx, t, regexp.MustCompile(`/test-discover-`))
 	cupaloy.SnapshotT(t, sanitizeQueueURLs(st.SummarizeBindings(t, bindings)))
 }
 
 func TestValidate(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
 
-	standardURL := createQueue(t, ctx, client, "test-validate-standard")
-	fifoURL := createQueue(t, ctx, client, "test-validate-ordered.fifo")
+	var standardURL = createQueue(t, ctx, client, "test-validate-standard")
+	var fifoURL = createQueue(t, ctx, client, "test-validate-ordered.fifo")
 
-	configJSON, err := json.Marshal(conf)
+	var configJSON, err = json.Marshal(conf)
 	require.NoError(t, err)
 
-	mkBinding := func(queueURL string) *pc.Request_Validate_Binding {
-		resourceJSON, err := json.Marshal(resource{QueueURL: queueURL})
+	var mkBinding = func(queueURL string) *pc.Request_Validate_Binding {
+		var resourceJSON, err = json.Marshal(resource{QueueURL: queueURL})
 		require.NoError(t, err)
 		return &pc.Request_Validate_Binding{ResourceConfigJson: resourceJSON}
 	}
@@ -146,16 +146,16 @@ func TestValidate(t *testing.T) {
 }
 
 func TestValidateNonexistentQueue(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
 
 	// Derive a plausible URL for a queue that doesn't exist from one that does.
-	existingURL := createQueue(t, ctx, client, "test-validate-exists")
-	missingURL := regexp.MustCompile(`/[^/]+$`).ReplaceAllString(existingURL, "/test-validate-does-not-exist")
+	var existingURL = createQueue(t, ctx, client, "test-validate-exists")
+	var missingURL = regexp.MustCompile(`/[^/]+$`).ReplaceAllString(existingURL, "/test-validate-does-not-exist")
 
-	configJSON, err := json.Marshal(conf)
+	var configJSON, err = json.Marshal(conf)
 	require.NoError(t, err)
 	resourceJSON, err := json.Marshal(resource{QueueURL: missingURL})
 	require.NoError(t, err)

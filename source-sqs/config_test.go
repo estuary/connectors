@@ -45,7 +45,7 @@ func TestParseQueueURL(t *testing.T) {
 		{url: "https://sqs.us-east-1.amazonaws.com/1234/queue/extra", wantErr: true},
 		{url: "", wantErr: true},
 	} {
-		name, region, err := parseQueueURL(tc.url)
+		var name, region, err = parseQueueURL(tc.url)
 		if tc.wantErr {
 			require.Error(t, err, "url %q", tc.url)
 			continue
@@ -63,7 +63,7 @@ func TestIsFifoQueueName(t *testing.T) {
 }
 
 func TestConfigValidate(t *testing.T) {
-	validCreds := &CredentialsConfig{
+	var validCreds = &CredentialsConfig{
 		AuthType: AWSAccessKey,
 		AccessKeyCredentials: AccessKeyCredentials{
 			AWSAccessKeyID:     "id",
@@ -97,7 +97,7 @@ func TestCredentialsConfigUnmarshal(t *testing.T) {
 // A region mismatch between the endpoint config and a binding's queue URL is
 // caught before any API call is made, so this needs no backend.
 func TestValidateRegionMismatch(t *testing.T) {
-	configJSON, err := json.Marshal(config{
+	var configJSON, err = json.Marshal(config{
 		Region: "us-west-2",
 		Credentials: &CredentialsConfig{
 			AuthType: AWSAccessKey,

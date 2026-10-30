@@ -39,11 +39,11 @@ type ackLatencyStats struct {
 }
 
 func (s *ackLatencyStats) observe(d time.Duration) {
-	micros := d.Microseconds()
+	var micros = d.Microseconds()
 	s.count.Add(1)
 	s.sumMicros.Add(micros)
 	for {
-		prev := s.maxMicros.Load()
+		var prev = s.maxMicros.Load()
 		if micros <= prev || s.maxMicros.CompareAndSwap(prev, micros) {
 			return
 		}
@@ -54,8 +54,8 @@ func (s *ackLatencyStats) observe(d time.Duration) {
 // latencies, then zeroes the aggregates for the next interval.
 func (s *ackLatencyStats) snapshotAndReset() (count int64, avg, max time.Duration) {
 	count = s.count.Swap(0)
-	sum := s.sumMicros.Swap(0)
-	maxMicros := s.maxMicros.Swap(0)
+	var sum = s.sumMicros.Swap(0)
+	var maxMicros = s.maxMicros.Swap(0)
 	if count > 0 {
 		avg = time.Duration(sum/count) * time.Microsecond
 	}
@@ -65,10 +65,10 @@ func (s *ackLatencyStats) snapshotAndReset() (count int64, avg, max time.Duratio
 // runStatsLogger periodically logs per-queue progress and a task-level
 // connectorStatus rollup, sampling queue depth from GetQueueAttributes.
 func runStatsLogger(ctx context.Context, client *sqs.Client, bindings []*bindingInfo, latency *ackLatencyStats) error {
-	ticker := time.NewTicker(statsInterval)
+	var ticker = time.NewTicker(statsInterval)
 	defer ticker.Stop()
 
-	prevReceived := make([]int64, len(bindings))
+	var prevReceived = make([]int64, len(bindings))
 	var lastStatus string
 	for {
 		select {
@@ -80,11 +80,11 @@ func runStatsLogger(ctx context.Context, client *sqs.Client, bindings []*binding
 		var totalBacklog int64
 		var queuesBehind int
 		for i, binding := range bindings {
-			received := binding.stats.received.Load()
-			rate := (received - prevReceived[i]) / int64(statsInterval/time.Second)
+			var received = binding.stats.received.Load()
+			var rate = (received - prevReceived[i]) / int64(statsInterval/time.Second)
 			prevReceived[i] = received
 
-			backlog := int64(-1)
+			var backlog = int64(-1)
 			if attrs, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 				QueueUrl:       aws.String(binding.queueURL),
 				AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameApproximateNumberOfMessages},
@@ -110,7 +110,7 @@ func runStatsLogger(ctx context.Context, client *sqs.Client, bindings []*binding
 			}
 		}
 
-		ackCount, ackAvg, ackMax := latency.snapshotAndReset()
+		var ackCount, ackAvg, ackMax = latency.snapshotAndReset()
 		log.WithFields(log.Fields{
 			"checkpoints":   ackCount,
 			"ackLatencyAvg": ackAvg.String(),
@@ -124,7 +124,7 @@ func runStatsLogger(ctx context.Context, client *sqs.Client, bindings []*binding
 		// treat it as a trend, not an exact figure.
 		//
 		// Emit connectorStatus only when the rollup changes.
-		status := fmt.Sprintf("%d messages behind across %d of %d queues", totalBacklog, queuesBehind, len(bindings))
+		var status = fmt.Sprintf("%d messages behind across %d of %d queues", totalBacklog, queuesBehind, len(bindings))
 		if status != lastStatus {
 			log.WithField("eventType", "connectorStatus").Info(status)
 			lastStatus = status

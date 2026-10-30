@@ -24,15 +24,15 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := buildClient(ctx, &cfg, 0)
+	var client, err = buildClient(ctx, &cfg, 0)
 	if err != nil {
 		return nil, err
 	}
 
 	var queueURLs []string
-	paginator := sqs.NewListQueuesPaginator(client, &sqs.ListQueuesInput{MaxResults: aws.Int32(1000)})
+	var paginator = sqs.NewListQueuesPaginator(client, &sqs.ListQueuesInput{MaxResults: aws.Int32(1000)})
 	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
+		var page, err = paginator.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("listing queues: %w", err)
 		}
@@ -40,9 +40,9 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	}
 	sort.Strings(queueURLs)
 
-	bindings := make([]*pc.Response_Discovered_Binding, 0, len(queueURLs))
+	var bindings = make([]*pc.Response_Discovered_Binding, 0, len(queueURLs))
 	for _, queueURL := range queueURLs {
-		name, _, err := parseQueueURL(queueURL)
+		var name, _, err = parseQueueURL(queueURL)
 		if err != nil {
 			return nil, fmt.Errorf("parsing discovered queue URL: %w", err)
 		}
@@ -52,7 +52,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 			return nil, fmt.Errorf("marshalling resource: %w", err)
 		}
 
-		binding := &pc.Response_Discovered_Binding{
+		var binding = &pc.Response_Discovered_Binding{
 			RecommendedName:    name,
 			ResourceConfigJson: resourceJSON,
 		}
@@ -73,7 +73,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 }
 
 func generateMinimalSchema(fifo bool) json.RawMessage {
-	metaProperties := map[string]*jsonschema.Schema{
+	var metaProperties = map[string]*jsonschema.Schema{
 		"queueUrl": {
 			Type:  "string",
 			Title: "URL of the queue the message was received from",
@@ -96,7 +96,7 @@ func generateMinimalSchema(fifo bool) json.RawMessage {
 			Title: "Message attributes attached by the producer",
 		},
 	}
-	metaRequired := []string{"messageId"}
+	var metaRequired = []string{"messageId"}
 
 	if fifo {
 		metaProperties["messageGroupId"] = &jsonschema.Schema{
@@ -114,7 +114,7 @@ func generateMinimalSchema(fifo bool) json.RawMessage {
 		metaRequired = []string{"messageId", "messageGroupId", "sequenceNumber"}
 	}
 
-	schema := &jsonschema.Schema{
+	var schema = &jsonschema.Schema{
 		Type:     "object",
 		Required: []string{"_meta"},
 		Extras: map[string]any{
@@ -131,7 +131,7 @@ func generateMinimalSchema(fifo bool) json.RawMessage {
 		},
 	}
 
-	schemaJSON, err := json.Marshal(schema)
+	var schemaJSON, err = json.Marshal(schema)
 	if err != nil {
 		panic(fmt.Errorf("error generating schema: %v", err))
 	}

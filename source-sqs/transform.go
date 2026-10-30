@@ -34,8 +34,8 @@ type documentMessageAttribute struct {
 // The connector's _meta is written last and always wins over any _meta field
 // the body happens to carry.
 func makeDocument(queueURL string, m types.Message) (json.RawMessage, error) {
-	body := aws.ToString(m.Body)
-	doc, ok := parseObjectBody(body)
+	var body = aws.ToString(m.Body)
+	var doc, ok = parseObjectBody(body)
 	if !ok {
 		// SQS bodies are arbitrary text, and only a body that is exactly one
 		// JSON object can be spread into the document root without loss.
@@ -43,7 +43,7 @@ func makeDocument(queueURL string, m types.Message) (json.RawMessage, error) {
 		doc = map[string]any{"body": body}
 	}
 
-	meta := documentMetadata{
+	var meta = documentMetadata{
 		QueueURL:  queueURL,
 		MessageID: aws.ToString(m.MessageId),
 
@@ -69,7 +69,7 @@ func makeDocument(queueURL string, m types.Message) (json.RawMessage, error) {
 	}
 	doc["_meta"] = meta
 
-	out, err := json.Marshal(doc)
+	var out, err = json.Marshal(doc)
 	if err != nil {
 		return nil, fmt.Errorf("serializing document for message %q: %w", aws.ToString(m.MessageId), err)
 	}
@@ -86,7 +86,7 @@ func makeDocument(queueURL string, m types.Message) (json.RawMessage, error) {
 // as a raw string rather than a truncated object.
 func parseObjectBody(body string) (map[string]any, bool) {
 	var doc map[string]any
-	leftover, err := json.Parse([]byte(body), &doc, json.UseNumber)
+	var leftover, err = json.Parse([]byte(body), &doc, json.UseNumber)
 	if err != nil || doc == nil || len(leftover) != 0 {
 		return nil, false
 	}

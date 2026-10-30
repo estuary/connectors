@@ -68,7 +68,7 @@ func TestMakeDocumentBodies(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			doc, err := makeDocument(queueURL, types.Message{
+			var doc, err = makeDocument(queueURL, types.Message{
 				MessageId: aws.String("m-1"),
 				Body:      aws.String(tc.body),
 			})
@@ -84,7 +84,7 @@ func TestMakeDocumentBodies(t *testing.T) {
 func TestMakeDocumentMessageAttributes(t *testing.T) {
 	const queueURL = "https://sqs.test.example/123456789012/test-queue"
 
-	doc, err := makeDocument(queueURL, types.Message{
+	var doc, err = makeDocument(queueURL, types.Message{
 		MessageId: aws.String("m-1"),
 		Body:      aws.String(`{"x": 1}`),
 		MessageAttributes: map[string]types.MessageAttributeValue{

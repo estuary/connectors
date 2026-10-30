@@ -102,7 +102,7 @@ type capturedBatch struct {
 // received message wakes the full fleet within a recheck interval.
 func runReceiver(ctx context.Context, client *sqs.Client, binding *bindingInfo, index int, bodyBytes *semaphore.Weighted, batches chan<- capturedBatch) error {
 	for ctx.Err() == nil {
-		isIdle := binding.isIdle()
+		var isIdle = binding.isIdle()
 		if isIdle && index >= scoutsPerBinding {
 			// Non-scout receivers on an idle binding park here, rechecking
 			// until the scout receives a message and wakes the binding.
@@ -113,11 +113,11 @@ func runReceiver(ctx context.Context, client *sqs.Client, binding *bindingInfo, 
 			}
 			continue
 		}
-		ask := receiveBatchSize
+		var ask = receiveBatchSize
 		if isIdle {
 			ask = scoutAskMessages
 		}
-		askBytes := int64(ask) * 1024 * 1024
+		var askBytes = int64(ask) * 1024 * 1024
 
 		if err := binding.inflight.Acquire(ctx, int64(ask)); err != nil {
 			return err
@@ -127,7 +127,7 @@ func runReceiver(ctx context.Context, client *sqs.Client, binding *bindingInfo, 
 			return err
 		}
 
-		input := &sqs.ReceiveMessageInput{
+		var input = &sqs.ReceiveMessageInput{
 			QueueUrl:            aws.String(binding.queueURL),
 			MaxNumberOfMessages: int32(ask),
 			WaitTimeSeconds:     longPollWaitSeconds,
@@ -144,10 +144,10 @@ func runReceiver(ctx context.Context, client *sqs.Client, binding *bindingInfo, 
 			input.ReceiveRequestAttemptId = aws.String(uuid.NewString())
 		}
 
-		callCtx, cancel := context.WithTimeout(ctx, receiveCallTimeout)
-		resp, err := client.ReceiveMessage(callCtx, input)
+		var callCtx, cancel = context.WithTimeout(ctx, receiveCallTimeout)
+		var resp, err = client.ReceiveMessage(callCtx, input)
 		cancel()
-		receivedAt := time.Now()
+		var receivedAt = time.Now()
 
 		if err != nil {
 			binding.inflight.Release(int64(ask))
@@ -198,10 +198,10 @@ func runReceiver(ctx context.Context, client *sqs.Client, binding *bindingInfo, 
 		binding.stats.unacked.Add(int64(len(resp.Messages)))
 		binding.stats.redelivered.Add(redelivered)
 
-		docs := make([]json.RawMessage, len(resp.Messages))
-		handles := make([]string, len(resp.Messages))
+		var docs = make([]json.RawMessage, len(resp.Messages))
+		var handles = make([]string, len(resp.Messages))
 		for i, m := range resp.Messages {
-			doc, err := makeDocument(binding.queueURL, m)
+			var doc, err = makeDocument(binding.queueURL, m)
 			if err != nil {
 				return err
 			}

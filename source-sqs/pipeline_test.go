@@ -67,7 +67,7 @@ func (f *fakeCaptureServer) SetHeader(metadata.MD) error  { panic("unimplemented
 func (f *fakeCaptureServer) SetTrailer(metadata.MD)       { panic("unimplemented") }
 
 func docsOf(ids ...string) []json.RawMessage {
-	out := make([]json.RawMessage, len(ids))
+	var out = make([]json.RawMessage, len(ids))
 	for i, id := range ids {
 		out[i] = json.RawMessage(`{"id":"` + id + `"}`)
 	}
@@ -78,9 +78,9 @@ func docsOf(ids ...string) []json.RawMessage {
 // checkpoints are popped in emission order and their delete jobs dispatched in
 // the same order, including a checkpoint that coalesced multiple batches.
 func TestProcessAcknowledgementsDispatchesInOrder(t *testing.T) {
-	b := &bindingInfo{index: 0, queueURL: "queue-a"}
+	var b = &bindingInfo{index: 0, queueURL: "queue-a"}
 
-	entries := []pendingEntry{
+	var entries = []pendingEntry{
 		{emittedAt: time.Now(), jobs: []deleteJob{{binding: b, handles: []string{"h0", "h1"}}}},
 		{emittedAt: time.Now(), jobs: []deleteJob{
 			{binding: b, handles: []string{"h2"}},
@@ -89,18 +89,18 @@ func TestProcessAcknowledgementsDispatchesInOrder(t *testing.T) {
 		{emittedAt: time.Now(), jobs: []deleteJob{{binding: b, handles: []string{"h5"}}}},
 	}
 
-	pending := make(chan pendingEntry, len(entries))
+	var pending = make(chan pendingEntry, len(entries))
 	for _, e := range entries {
 		pending <- e
 	}
-	acks := make(chan ackMessage, 4)
-	deletes := make(chan deleteJob, 8)
-	latency := new(ackLatencyStats)
+	var acks = make(chan ackMessage, 4)
+	var deletes = make(chan deleteJob, 8)
+	var latency = new(ackLatencyStats)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	done := make(chan error, 1)
+	var done = make(chan error, 1)
 	go func() { done <- processAcknowledgements(ctx, acks, pending, deletes, latency) }()
 
 	// Acknowledge the first checkpoint, then the remaining two together.
@@ -131,18 +131,18 @@ func TestProcessAcknowledgementsDispatchesInOrder(t *testing.T) {
 // emitted, a condition that is otherwise near-impossible to provoke against a
 // real runtime.
 func TestProcessAcknowledgementsRejectsUnknownCheckpoint(t *testing.T) {
-	b := &bindingInfo{index: 0, queueURL: "queue-a"}
+	var b = &bindingInfo{index: 0, queueURL: "queue-a"}
 
-	pending := make(chan pendingEntry, 1)
+	var pending = make(chan pendingEntry, 1)
 	pending <- pendingEntry{emittedAt: time.Now(), jobs: []deleteJob{{binding: b, handles: []string{"h0"}}}}
 
-	acks := make(chan ackMessage, 1)
-	deletes := make(chan deleteJob, 4)
+	var acks = make(chan ackMessage, 1)
+	var deletes = make(chan deleteJob, 4)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	done := make(chan error, 1)
+	var done = make(chan error, 1)
 	go func() { done <- processAcknowledgements(ctx, acks, pending, deletes, new(ackLatencyStats)) }()
 
 	// Acknowledge two checkpoints when only one was ever emitted.
@@ -161,14 +161,14 @@ func TestProcessAcknowledgementsRejectsUnknownCheckpoint(t *testing.T) {
 // how it coalesces batches into checkpoints), and releases each checkpoint's
 // body-bytes reservation once emitted.
 func TestTransactionLoopOrdersAndReleasesBudget(t *testing.T) {
-	fake := newFakeCaptureServer()
-	stream := &boilerplate.PullOutput{Connector_CaptureServer: fake}
+	var fake = newFakeCaptureServer()
+	var stream = &boilerplate.PullOutput{Connector_CaptureServer: fake}
 
-	bindingA := &bindingInfo{index: 0, queueURL: "queue-a"}
-	bindingB := &bindingInfo{index: 1, queueURL: "queue-b"}
+	var bindingA = &bindingInfo{index: 0, queueURL: "queue-a"}
+	var bindingB = &bindingInfo{index: 1, queueURL: "queue-b"}
 
 	const perBatch = int64(1024)
-	batchesIn := []capturedBatch{
+	var batchesIn = []capturedBatch{
 		{binding: bindingA, docs: docsOf("a0", "a1"), handles: []string{"a0", "a1"}, bodyBytes: perBatch},
 		{binding: bindingB, docs: docsOf("b0"), handles: []string{"b0"}, bodyBytes: perBatch},
 		{binding: bindingA, docs: docsOf("a2"), handles: []string{"a2"}, bodyBytes: perBatch},
@@ -183,17 +183,17 @@ func TestTransactionLoopOrdersAndReleasesBudget(t *testing.T) {
 
 	// Stand in for the receivers having reserved the body budget. The loop is
 	// responsible for releasing it after emission.
-	bodyBytes := semaphore.NewWeighted(totalBytes)
+	var bodyBytes = semaphore.NewWeighted(totalBytes)
 	require.True(t, bodyBytes.TryAcquire(totalBytes))
 
-	batches := make(chan capturedBatch, len(batchesIn))
+	var batches = make(chan capturedBatch, len(batchesIn))
 	for _, b := range batchesIn {
 		batches <- b
 	}
-	pending := make(chan pendingEntry, len(batchesIn))
+	var pending = make(chan pendingEntry, len(batchesIn))
 
-	group, groupCtx := errgroup.WithContext(context.Background())
-	loopCtx, cancel := context.WithCancel(groupCtx)
+	var group, groupCtx = errgroup.WithContext(context.Background())
+	var loopCtx, cancel = context.WithCancel(groupCtx)
 	group.Go(func() error {
 		return runTransactionLoop(loopCtx, stream, batches, pending, bodyBytes)
 	})
@@ -224,7 +224,7 @@ func TestTransactionLoopOrdersAndReleasesBudget(t *testing.T) {
 	cancel()
 	require.ErrorIs(t, group.Wait(), context.Canceled)
 
-	docs, checkpoints := fake.snapshot()
+	var docs, checkpoints = fake.snapshot()
 	require.Len(t, docs, totalDocs)
 	require.GreaterOrEqual(t, checkpoints, 1)
 	require.LessOrEqual(t, checkpoints, len(batchesIn))

@@ -24,13 +24,13 @@ const minHTTPPoolSize = 128
 // (receivers plus delete workers). Unary RPCs like Spec/Validate/Discover
 // pass zero to get the floor.
 func buildClient(ctx context.Context, cfg *config, concurrencyHint int) (*sqs.Client, error) {
-	creds, err := cfg.CredentialsProvider()
+	var creds, err = cfg.CredentialsProvider()
 	if err != nil {
 		return nil, fmt.Errorf("creating credentials provider: %w", err)
 	}
 
-	poolSize := max(minHTTPPoolSize, concurrencyHint)
-	httpClient := awshttp.NewBuildableClient().WithTransportOptions(func(t *http.Transport) {
+	var poolSize = max(minHTTPPoolSize, concurrencyHint)
+	var httpClient = awshttp.NewBuildableClient().WithTransportOptions(func(t *http.Transport) {
 		t.MaxIdleConns = poolSize
 		t.MaxIdleConnsPerHost = poolSize
 	})

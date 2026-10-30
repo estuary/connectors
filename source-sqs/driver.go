@@ -21,7 +21,7 @@ import (
 type driver struct{}
 
 func (driver) Spec(context.Context, *pc.Request_Spec) (*pc.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Source SQS Spec", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Source SQS Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -44,7 +44,7 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := buildClient(ctx, &cfg, 0)
+	var client, err = buildClient(ctx, &cfg, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 }
 
 func validateQueue(ctx context.Context, client *sqs.Client, cfg *config, queueURL string) error {
-	name, urlRegion, err := parseQueueURL(queueURL)
+	var name, urlRegion, err = parseQueueURL(queueURL)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func validateQueue(ctx context.Context, client *sqs.Client, cfg *config, queueUR
 	// A mismatch here shouldn't be possible against real AWS (the `.fifo`
 	// suffix is enforced at queue creation), so it points to a misbehaving
 	// emulator or a malformed URL.
-	attrFifo := attrs.Attributes[string(types.QueueAttributeNameFifoQueue)] == "true"
+	var attrFifo = attrs.Attributes[string(types.QueueAttributeNameFifoQueue)] == "true"
 	if attrFifo != isFifoQueueName(name) {
 		return fmt.Errorf("queue %q name indicates fifo=%v but its FifoQueue attribute indicates fifo=%v", queueURL, isFifoQueueName(name), attrFifo)
 	}
@@ -117,7 +117,7 @@ func validateQueue(ctx context.Context, client *sqs.Client, cfg *config, queueUR
 // surfaces as an error, while an allowed call fails with a harmless
 // invalid-handle error (or is ignored by emulators) with no side effects.
 func probeDeletePermission(ctx context.Context, client *sqs.Client, queueURL string) error {
-	_, err := client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+	var _, err = client.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      aws.String(queueURL),
 		ReceiptHandle: aws.String("flow-validate-permissions-probe"),
 	})

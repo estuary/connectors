@@ -31,13 +31,13 @@ func testCaptureSpec(t *testing.T, conf *config, queueURLs ...string) *st.Captur
 
 	// Modest concurrency keeps the LocalStack emulator responsive. Defaults
 	// are sized for real AWS at high throughput.
-	prevReceivers, prevDeleteWorkers := receiversPerBinding, deleteWorkers
+	var prevReceivers, prevDeleteWorkers = receiversPerBinding, deleteWorkers
 	receiversPerBinding, deleteWorkers = 4, 4
 	t.Cleanup(func() { receiversPerBinding, deleteWorkers = prevReceivers, prevDeleteWorkers })
 
 	var bindings []*pf.CaptureSpec_Binding
 	for _, queueURL := range queueURLs {
-		resourceJSON, err := json.Marshal(resource{QueueURL: queueURL})
+		var resourceJSON, err = json.Marshal(resource{QueueURL: queueURL})
 		require.NoError(t, err)
 		name, _, err := parseQueueURL(queueURL)
 		require.NoError(t, err)
@@ -63,8 +63,8 @@ func testCaptureSpec(t *testing.T, conf *config, queueURLs ...string) *st.Captur
 func advanceCapture(t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
 
-	captureCtx, cancelCapture := context.WithCancel(context.Background())
-	shutdownWatchdog := time.AfterFunc(60*time.Second, func() {
+	var captureCtx, cancelCapture = context.WithCancel(context.Background())
+	var shutdownWatchdog = time.AfterFunc(60*time.Second, func() {
 		log.Debug("capture initial timeout expired with no data")
 		cancelCapture()
 	})
@@ -81,15 +81,15 @@ func advanceCapture(t testing.TB, cs *st.CaptureSpec) {
 func sendTestMessages(t *testing.T, ctx context.Context, client *sqs.Client, queueURL string, bodies []string) {
 	t.Helper()
 	for start := 0; start < len(bodies); start += 10 {
-		batch := bodies[start:min(start+10, len(bodies))]
-		entries := make([]types.SendMessageBatchRequestEntry, len(batch))
+		var batch = bodies[start:min(start+10, len(bodies))]
+		var entries = make([]types.SendMessageBatchRequestEntry, len(batch))
 		for i, body := range batch {
 			entries[i] = types.SendMessageBatchRequestEntry{
 				Id:          aws.String(strconv.Itoa(i)),
 				MessageBody: aws.String(body),
 			}
 		}
-		resp, err := client.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
+		var resp, err = client.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
 			QueueUrl: aws.String(queueURL),
 			Entries:  entries,
 		})
@@ -105,9 +105,9 @@ func sendTestMessages(t *testing.T, ctx context.Context, client *sqs.Client, que
 func requireQueueDrained(t *testing.T, ctx context.Context, client *sqs.Client, queueURL string) {
 	t.Helper()
 
-	deadline := time.Now().Add(30 * time.Second)
+	var deadline = time.Now().Add(30 * time.Second)
 	for {
-		attrs, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+		var attrs, err = client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 			QueueUrl: aws.String(queueURL),
 			AttributeNames: []types.QueueAttributeName{
 				types.QueueAttributeNameApproximateNumberOfMessages,
@@ -116,8 +116,8 @@ func requireQueueDrained(t *testing.T, ctx context.Context, client *sqs.Client, 
 		})
 		require.NoError(t, err)
 
-		visible := attrs.Attributes[string(types.QueueAttributeNameApproximateNumberOfMessages)]
-		inflight := attrs.Attributes[string(types.QueueAttributeNameApproximateNumberOfMessagesNotVisible)]
+		var visible = attrs.Attributes[string(types.QueueAttributeNameApproximateNumberOfMessages)]
+		var inflight = attrs.Attributes[string(types.QueueAttributeNameApproximateNumberOfMessagesNotVisible)]
 		if visible == "0" && inflight == "0" {
 			return
 		}
@@ -131,8 +131,8 @@ func requireQueueDrained(t *testing.T, ctx context.Context, client *sqs.Client, 
 func sendFifoMessages(t *testing.T, ctx context.Context, client *sqs.Client, queueURL string, group string, bodies []string) {
 	t.Helper()
 	for start := 0; start < len(bodies); start += 10 {
-		batch := bodies[start:min(start+10, len(bodies))]
-		entries := make([]types.SendMessageBatchRequestEntry, len(batch))
+		var batch = bodies[start:min(start+10, len(bodies))]
+		var entries = make([]types.SendMessageBatchRequestEntry, len(batch))
 		for i, body := range batch {
 			entries[i] = types.SendMessageBatchRequestEntry{
 				Id:                     aws.String(strconv.Itoa(i)),
@@ -141,7 +141,7 @@ func sendFifoMessages(t *testing.T, ctx context.Context, client *sqs.Client, que
 				MessageDeduplicationId: aws.String(fmt.Sprintf("%s-%02d", group, start+i)),
 			}
 		}
-		resp, err := client.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
+		var resp, err = client.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{
 			QueueUrl: aws.String(queueURL),
 			Entries:  entries,
 		})
@@ -156,13 +156,13 @@ func sendFifoMessages(t *testing.T, ctx context.Context, client *sqs.Client, que
 // matches queue order. It doubles as a check that the emulator implements
 // FIFO group locking; if it doesn't, the per-group order assertion fails.
 func TestCaptureFifoOrdering(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
-	queueURL := createQueue(t, ctx, client, "test-capture-ordered.fifo")
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
+	var queueURL = createQueue(t, ctx, client, "test-capture-ordered.fifo")
 
-	groups := []string{"group-a", "group-b", "group-c"}
+	var groups = []string{"group-a", "group-b", "group-c"}
 	const perGroup = 60
 	for _, group := range groups {
 		var bodies []string
@@ -172,15 +172,15 @@ func TestCaptureFifoOrdering(t *testing.T) {
 		sendFifoMessages(t, ctx, client, queueURL, group, bodies)
 	}
 
-	cs := testCaptureSpec(t, &conf, queueURL)
+	var cs = testCaptureSpec(t, &conf, queueURL)
 
 	// Collect documents in emission order and assert that within each group,
 	// sequence positions are strictly increasing. Cross-group interleaving is
 	// arbitrary, but per-group order is the guarantee.
-	captureCtx, cancelCapture := context.WithCancel(context.Background())
-	shutdownWatchdog := time.AfterFunc(60*time.Second, func() { cancelCapture() })
+	var captureCtx, cancelCapture = context.WithCancel(context.Background())
+	var shutdownWatchdog = time.AfterFunc(60*time.Second, func() { cancelCapture() })
 
-	lastSeq := make(map[string]int)
+	var lastSeq = make(map[string]int)
 	var captured int
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		shutdownWatchdog.Reset(2 * time.Second)
@@ -200,7 +200,7 @@ func TestCaptureFifoOrdering(t *testing.T) {
 		require.Equal(t, doc.Group, doc.Meta.MessageGroupID, "_meta.messageGroupId must match the group the message was sent to")
 		require.NotEmpty(t, doc.Meta.SequenceNumber)
 
-		last, seen := lastSeq[doc.Group]
+		var last, seen = lastSeq[doc.Group]
 		if seen {
 			require.Greater(t, doc.Seq, last, "group %q emitted out of order", doc.Group)
 		}
@@ -221,11 +221,11 @@ func TestCaptureFifoOrdering(t *testing.T) {
 // and Flow commit) become visible again after the visibility timeout and are
 // re-captured, with approximateReceiveCount reflecting the redelivery.
 func TestCaptureRedelivery(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
-	queueURL := createQueue(t, ctx, client, "test-capture-redelivery")
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
+	var queueURL = createQueue(t, ctx, client, "test-capture-redelivery")
 
 	sendTestMessages(t, ctx, client, queueURL, []string{
 		`{"idx": 0, "kind": "redelivered"}`,
@@ -235,9 +235,9 @@ func TestCaptureRedelivery(t *testing.T) {
 
 	// A raw receive with a short per-receive visibility override locks the
 	// messages and then abandons them, as a crashed consumer would.
-	received := 0
+	var received = 0
 	for received < 3 {
-		resp, err := client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		var resp, err = client.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl:            aws.String(queueURL),
 			MaxNumberOfMessages: 10,
 			WaitTimeSeconds:     5,
@@ -248,7 +248,7 @@ func TestCaptureRedelivery(t *testing.T) {
 	}
 	time.Sleep(1500 * time.Millisecond) // Let the visibility timeout expire.
 
-	cs := testCaptureSpec(t, &conf, queueURL)
+	var cs = testCaptureSpec(t, &conf, queueURL)
 	advanceCapture(t, cs)
 	cupaloy.SnapshotT(t, cs.Summary())
 
@@ -256,11 +256,11 @@ func TestCaptureRedelivery(t *testing.T) {
 }
 
 func TestCaptureStandard(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
-	queueURL := createQueue(t, ctx, client, "test-capture-standard")
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
+	var queueURL = createQueue(t, ctx, client, "test-capture-standard")
 
 	var bodies []string
 	for i := range 20 {
@@ -274,7 +274,7 @@ func TestCaptureStandard(t *testing.T) {
 	)
 	sendTestMessages(t, ctx, client, queueURL, bodies)
 
-	cs := testCaptureSpec(t, &conf, queueURL)
+	var cs = testCaptureSpec(t, &conf, queueURL)
 	advanceCapture(t, cs)
 	cupaloy.SnapshotT(t, cs.Summary())
 
@@ -288,16 +288,16 @@ func TestCaptureStandard(t *testing.T) {
 // to the right binding via _meta.queueUrl, and the drain assertion proves
 // the busy binding is unimpeded by the idle one.
 func TestCaptureMultiQueue(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	prevIdle, prevPoll := idleAfter, longPollWaitSeconds
+	var prevIdle, prevPoll = idleAfter, longPollWaitSeconds
 	idleAfter, longPollWaitSeconds = 100*time.Millisecond, 1
 	t.Cleanup(func() { idleAfter, longPollWaitSeconds = prevIdle, prevPoll })
 
-	conf := testConfig(t)
-	client := testClient(t, ctx, &conf)
-	busyURL := createQueue(t, ctx, client, "test-capture-multi-busy")
-	idleURL := createQueue(t, ctx, client, "test-capture-multi-idle")
+	var conf = testConfig(t)
+	var client = testClient(t, ctx, &conf)
+	var busyURL = createQueue(t, ctx, client, "test-capture-multi-busy")
+	var idleURL = createQueue(t, ctx, client, "test-capture-multi-idle")
 
 	var bodies []string
 	for i := range 12 {
@@ -305,7 +305,7 @@ func TestCaptureMultiQueue(t *testing.T) {
 	}
 	sendTestMessages(t, ctx, client, busyURL, bodies)
 
-	cs := testCaptureSpec(t, &conf, busyURL, idleURL)
+	var cs = testCaptureSpec(t, &conf, busyURL, idleURL)
 	advanceCapture(t, cs)
 	cupaloy.SnapshotT(t, cs.Summary())
 

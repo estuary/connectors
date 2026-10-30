@@ -137,7 +137,7 @@ func parseQueueURL(queueURL string) (name string, region string, err error) {
 		return "", "", fmt.Errorf("queue URL %q is not a valid URL", queueURL)
 	}
 
-	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
+	var segments = strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(segments) != 2 || segments[0] == "" || segments[1] == "" {
 		return "", "", fmt.Errorf("queue URL %q does not have the expected <endpoint>/<account-id>/<queue-name> form", queueURL)
 	}
