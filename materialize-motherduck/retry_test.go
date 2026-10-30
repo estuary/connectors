@@ -35,7 +35,7 @@ type injectingConnector struct {
 }
 
 func (c *injectingConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	inner, err := c.Connector.Connect(ctx)
+	var inner, err = c.Connector.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (c *injectingConn) Begin() (driver.Tx, error) {
 }
 
 func (c *injectingConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	tx, err := c.inner.(driver.ConnBeginTx).BeginTx(ctx, opts)
+	var tx, err = c.inner.(driver.ConnBeginTx).BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (t *injectingTx) Rollback() error {
 func newInjectingClient(t *testing.T) (*client, *injectingConnector) {
 	t.Helper()
 
-	inner, err := duckdb.NewConnector("", nil)
+	var inner, err = duckdb.NewConnector("", nil)
 	require.NoError(t, err)
 	var connector = &injectingConnector{Connector: inner}
 
@@ -176,7 +176,7 @@ func TestApplyActionsRetryCommitConflicts(t *testing.T) {
 			setup:    []string{"CREATE TABLE memory.main.target (a INTEGER);"},
 			failures: []error{duckLakeConflictErr},
 			apply: func(c *client) error {
-				_, fn, err := c.DeleteTable(ctx, path)
+				var _, fn, err = c.DeleteTable(ctx, path)
 				require.NoError(t, err)
 				return fn(ctx)
 			},
@@ -188,7 +188,7 @@ func TestApplyActionsRetryCommitConflicts(t *testing.T) {
 			setup:    []string{"CREATE TABLE memory.main.target (a INTEGER);", "INSERT INTO memory.main.target VALUES (1), (2);"},
 			failures: []error{duckLakeConflictErr},
 			apply: func(c *client) error {
-				_, fn, err := c.TruncateTable(ctx, path)
+				var _, fn, err = c.TruncateTable(ctx, path)
 				require.NoError(t, err)
 				return fn(ctx)
 			},
@@ -202,7 +202,7 @@ func TestApplyActionsRetryCommitConflicts(t *testing.T) {
 			setup:    []string{"CREATE TABLE memory.main.target (a INTEGER);"},
 			failures: []error{nil, duckLakeConflictErr},
 			apply: func(c *client) error {
-				_, fn, err := c.AlterTable(ctx, sql.TableAlter{
+				var _, fn, err = c.AlterTable(ctx, sql.TableAlter{
 					Table: sql.Table{Identifier: "memory.main.target"},
 					AddColumns: []sql.Column{
 						{Identifier: "b", MappedType: sql.MappedType{NullableDDL: "INTEGER"}},
@@ -219,7 +219,7 @@ func TestApplyActionsRetryCommitConflicts(t *testing.T) {
 			name:     "create schema",
 			failures: []error{duckLakeConflictErr},
 			apply: func(c *client) error {
-				_, err := c.CreateSchema(ctx, "other")
+				var _, err = c.CreateSchema(ctx, "other")
 				return err
 			},
 			check: "SELECT count(*) FROM duckdb_schemas() WHERE schema_name = 'other'",
@@ -227,9 +227,9 @@ func TestApplyActionsRetryCommitConflicts(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c, connector := newInjectingClient(t)
+			var c, connector = newInjectingClient(t)
 			for _, stmt := range tc.setup {
-				_, err := c.db.Exec(stmt)
+				var _, err = c.db.Exec(stmt)
 				require.NoError(t, err)
 			}
 
@@ -242,9 +242,9 @@ func TestApplyActionsRetryCommitConflicts(t *testing.T) {
 
 func TestInstallFenceRetriesCommitConflict(t *testing.T) {
 	var ctx = context.Background()
-	c, connector := newInjectingClient(t)
+	var c, connector = newInjectingClient(t)
 
-	checkpoints, err := sql.ResolveTable(*sql.FlowCheckpointsTable([]string{"memory", "main"}), c.ep.Dialect)
+	var checkpoints, err = sql.ResolveTable(*sql.FlowCheckpointsTable([]string{"memory", "main"}), c.ep.Dialect)
 	require.NoError(t, err)
 	createSQL, err := sql.RenderTableTemplate(checkpoints, renderTemplates(c.ep.Dialect).createTargetTable)
 	require.NoError(t, err)
@@ -264,7 +264,7 @@ func TestInstallFenceRetriesCommitConflict(t *testing.T) {
 
 func TestCommitConflictRetriesGiveUp(t *testing.T) {
 	var ctx = context.Background()
-	c, connector := newInjectingClient(t)
+	var c, connector = newInjectingClient(t)
 
 	var savedDelay = retryBaseDelay
 	retryBaseDelay = time.Millisecond
@@ -276,14 +276,14 @@ func TestCommitConflictRetriesGiveUp(t *testing.T) {
 	}
 	connector.inject(conflicts...)
 
-	err := c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
+	var err = c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
 	require.ErrorIs(t, err, duckLakeConflictErr)
 	require.Equal(t, maxAttempts, connector.attemptedCommits())
 }
 
 func TestOtherErrorsAreNotRetried(t *testing.T) {
 	var ctx = context.Background()
-	c, connector := newInjectingClient(t)
+	var c, connector = newInjectingClient(t)
 
 	var catalogErr = &duckdb.Error{
 		Type: duckdb.ErrorTypeCatalog,
@@ -291,7 +291,7 @@ func TestOtherErrorsAreNotRetried(t *testing.T) {
 	}
 	connector.inject(catalogErr)
 
-	err := c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
+	var err = c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
 	require.ErrorIs(t, err, catalogErr)
 	require.Equal(t, 1, connector.attemptedCommits())
 }

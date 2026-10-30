@@ -9,7 +9,7 @@ import (
 )
 
 func TestS3ConfigWithEndpoint(t *testing.T) {
-	baseConfig := func() config {
+	var baseConfig = func() config {
 		return config{
 			Token:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
 			Database: "test_db",
@@ -27,23 +27,23 @@ func TestS3ConfigWithEndpoint(t *testing.T) {
 	}
 
 	t.Run("valid config without endpoint", func(t *testing.T) {
-		cfg := baseConfig()
-		err := cfg.Validate()
+		var cfg = baseConfig()
+		var err = cfg.Validate()
 		require.NoError(t, err)
 	})
 
 	t.Run("valid config with endpoint", func(t *testing.T) {
-		cfg := baseConfig()
+		var cfg = baseConfig()
 		cfg.StagingBucket.Endpoint = "https://abc123.r2.cloudflarestorage.com"
-		err := cfg.Validate()
+		var err = cfg.Validate()
 		require.NoError(t, err)
 	})
 
 	t.Run("valid config with endpoint and auto region", func(t *testing.T) {
-		cfg := baseConfig()
+		var cfg = baseConfig()
 		cfg.StagingBucket.Endpoint = "https://abc123.r2.cloudflarestorage.com"
 		cfg.StagingBucket.Region = "auto"
-		err := cfg.Validate()
+		var err = cfg.Validate()
 		require.NoError(t, err)
 	})
 }
@@ -51,9 +51,9 @@ func TestS3ConfigWithEndpoint(t *testing.T) {
 func TestBucketPathValidation(t *testing.T) {
 	// Validate() only checks that each dot-separated part is valid base64url,
 	// so this doesn't need to look like a real JWT.
-	baseToken := "YQ.YQ.YQ"
+	var baseToken = "YQ.YQ.YQ"
 
-	s3Config := func() config {
+	var s3Config = func() config {
 		return config{
 			Token:    baseToken,
 			Database: "test_db",
@@ -70,7 +70,7 @@ func TestBucketPathValidation(t *testing.T) {
 		}
 	}
 
-	gcsConfig := func() config {
+	var gcsConfig = func() config {
 		return config{
 			Token:    baseToken,
 			Database: "test_db",
@@ -87,7 +87,7 @@ func TestBucketPathValidation(t *testing.T) {
 		}
 	}
 
-	azureConfig := func() config {
+	var azureConfig = func() config {
 		return config{
 			Token:    baseToken,
 			Database: "test_db",
@@ -103,7 +103,7 @@ func TestBucketPathValidation(t *testing.T) {
 		}
 	}
 
-	cases := []struct {
+	var cases = []struct {
 		name       string
 		baseConfig func() config
 		setPath    func(cfg *config, path string)
@@ -115,9 +115,9 @@ func TestBucketPathValidation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name+" valid bucket path prefix", func(t *testing.T) {
-			cfg := tc.baseConfig()
+			var cfg = tc.baseConfig()
 			tc.setPath(&cfg, "some/prefix/path")
-			err := cfg.Validate()
+			var err = cfg.Validate()
 			require.NoError(t, err)
 		})
 
@@ -127,23 +127,23 @@ func TestBucketPathValidation(t *testing.T) {
 			// than being rejected. This preserves the connector's existing
 			// tolerance of a leading slash, matching effectiveBucketPath() on
 			// materialize-bigquery and materialize-redshift.
-			cfg := tc.baseConfig()
+			var cfg = tc.baseConfig()
 			tc.setPath(&cfg, "/some/prefix")
-			err := cfg.Validate()
+			var err = cfg.Validate()
 			require.NoError(t, err)
 		})
 
 		t.Run(tc.name+" rejects full URI", func(t *testing.T) {
-			cfg := tc.baseConfig()
+			var cfg = tc.baseConfig()
 			tc.setPath(&cfg, "s3://bucket/prefix")
-			err := cfg.Validate()
+			var err = cfg.Validate()
 			require.ErrorContains(t, err, "must be a bare key prefix within the bucket")
 		})
 
 		t.Run(tc.name+" rejects full URI with leading slash", func(t *testing.T) {
-			cfg := tc.baseConfig()
+			var cfg = tc.baseConfig()
 			tc.setPath(&cfg, "/s3://bucket/prefix")
-			err := cfg.Validate()
+			var err = cfg.Validate()
 			require.ErrorContains(t, err, "must be a bare key prefix within the bucket")
 		})
 	}

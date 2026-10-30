@@ -25,7 +25,7 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	db, err := ep.Config.db(ctx)
+	var db, err = ep.Config.db(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -42,28 +42,28 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return withRetries(ctx, "create table", func() error {
-		_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+		var _, err = c.db.ExecContext(ctx, tc.TableCreateSql)
 		return err
 	})
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		return withRetries(ctx, "drop table", func() error {
-			_, err := c.db.ExecContext(ctx, stmt)
+			var _, err = c.db.ExecContext(ctx, stmt)
 			return err
 		})
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		return withRetries(ctx, "truncate table", func() error {
-			_, err := c.db.ExecContext(ctx, stmt)
+			var _, err = c.db.ExecContext(ctx, stmt)
 			return err
 		})
 	}, nil
@@ -100,7 +100,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
 			if err := withRetries(ctx, "alter table", func() error {
-				_, err := c.db.ExecContext(ctx, stmt)
+				var _, err = c.db.ExecContext(ctx, stmt)
 				return err
 			}); err != nil {
 				return err
@@ -113,7 +113,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	// MotherDuck does not limit the schema listing to the currently connected database, so the
 	// StdListSchemasFn won't work if there are schemas with the same name in other databases.
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+	var rows, err = c.db.QueryContext(ctx, fmt.Sprintf(
 		"select schema_name from information_schema.schemata where catalog_name = %s",
 		c.ep.Dialect.Literal(c.ep.Config.Database),
 	))
@@ -122,7 +122,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	}
 	defer rows.Close()
 
-	out := []string{}
+	var out = []string{}
 
 	for rows.Next() {
 		var schema string
@@ -140,7 +140,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	var stmt string
-	err := withRetries(ctx, "create schema", func() (err error) {
+	var err = withRetries(ctx, "create schema", func() (err error) {
 		stmt, err = sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 		return err
 	})
@@ -148,15 +148,15 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	db, err := cfg.db(ctx)
+	var db, err = cfg.db(ctx)
 	if err != nil {
 		errs.Err(err)
 		return errs
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	var pingCtx, cancel = context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
@@ -182,7 +182,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var installed sql.Fence
-	err := withRetries(ctx, "install fence", func() (err error) {
+	var err = withRetries(ctx, "install fence", func() (err error) {
 		installed, err = sql.StdInstallFence(ctx, c.db, checkpoints, fence)
 		return err
 	})

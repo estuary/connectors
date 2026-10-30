@@ -32,13 +32,13 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				"database": cfg.Database,
 			}).Info("opening database")
 
-			isDuckLake, err := cfg.isDuckLake(ctx)
+			var isDuckLake, err = cfg.isDuckLake(ctx)
 			if err != nil {
 				return nil, err
 			}
 
-			dialect := createDuckDialect(featureFlags, isDuckLake)
-			templates := renderTemplates(dialect)
+			var dialect = createDuckDialect(featureFlags, isDuckLake)
+			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -119,7 +119,7 @@ func newTransactor(
 		return nil, err
 	}
 
-	t := &transactor{
+	var t = &transactor{
 		cfg:        cfg,
 		conn:       conn,
 		bucket:     bucket,
@@ -136,7 +136,7 @@ func newTransactor(
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
 		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
-		b := &binding{
+		var b = &binding{
 			target:           target,
 			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
 			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
@@ -225,7 +225,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var ctx = it.Context()
 
 	for it.Next() {
-		b := d.bindings[it.Binding]
+		var b = d.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -271,15 +271,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if len(subqueries) == 0 {
 		return nil // Nothing to load.
 	}
-	loadAllSql := strings.Join(subqueries, "\nUNION ALL\n")
+	var loadAllSql = strings.Join(subqueries, "\nUNION ALL\n")
 
 	// The results of the load query will be written to an S3 object, which
 	// we'll then read directly from S3. This is done instead of running the
 	// query in-process to avoid blowing out the memory usage of the connector,
 	// since iterating over the returned rows directly results in the entire
 	// query being materialized in-memory.
-	loadResKey := path.Join(d.bucketPath, "loaded_"+uuid.NewString()+".json.gz")
-	loadResURI := d.bucket.URI(loadResKey)
+	var loadResKey = path.Join(d.bucketPath, "loaded_"+uuid.NewString()+".json.gz")
+	var loadResURI = d.bucket.URI(loadResKey)
 
 	// TODO(whb): In the future it may be useful to persist the load query
 	// results in the driver checkpoint via the `Flushed` response and use them
@@ -298,9 +298,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// stuck indefinitely, while still allowing any reasonable query to
 	// complete. Hopefully MD will fix this eventually and we can remove this
 	// timeout.
-	queryCtx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	var queryCtx, cancel = context.WithTimeout(ctx, 4*time.Hour)
 	defer cancel()
-	rows, err := d.conn.QueryContext(queryCtx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, loadResURI))
+	var rows, err = d.conn.QueryContext(queryCtx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, loadResURI))
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
@@ -336,8 +336,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		Doc     json.RawMessage
 	}
 
-	dec := json.NewDecoder(gzr)
-	loadedCount := 0
+	var dec = json.NewDecoder(gzr)
+	var loadedCount = 0
 	for {
 		var doc bindingDoc
 		if err := dec.Decode(&doc); err != nil {
@@ -346,7 +346,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 			return fmt.Errorf("scanning loaded document from file: %w", err)
 		}
-		loadDoc := doc.Doc
+		var loadDoc = doc.Doc
 		if b := d.bindings[doc.Binding]; len(b.nullFieldsToStrip) > 0 {
 			var err error
 			if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
@@ -374,13 +374,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
-		flowDelete := d.cfg.HardDelete && it.Delete
+		var flowDelete = d.cfg.HardDelete && it.Delete
 
 		if it.Exists {
 			b.mustMerge = true
@@ -404,7 +404,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	round := it.Round
+	var round = it.Round
 	var truncations = d.truncations
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -459,13 +459,13 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, 
 			continue
 		}
 
-		uris, err := d.storeFiles.Flush(idx)
+		var uris, err = d.storeFiles.Flush(idx)
 		if err != nil {
 			return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
 
 		var queries []string
-		params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
+		var params = &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
 
 		if b.mustMerge {
 			// In-place updates are accomplished by deleting the
@@ -512,10 +512,10 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	// stuck indefinitely, while still allowing any reasonable query to
 	// complete. Hopefully MD will fix this eventually and we can remove this
 	// timeout.
-	txnCtx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	var txnCtx, cancel = context.WithTimeout(ctx, 4*time.Hour)
 	defer cancel()
 
-	txn, err := d.conn.BeginTx(txnCtx, nil)
+	var txn, err = d.conn.BeginTx(txnCtx, nil)
 	if err != nil {
 		return fmt.Errorf("store BeginTx: %w", err)
 	}
@@ -523,12 +523,12 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 
 	// Target rows affected per binding, reported only once the transaction
 	// commits so that a retried attempt is not counted twice.
-	affected := make([]int64, len(bindings))
-	truncated := make([]int64, len(bindings))
+	var affected = make([]int64, len(bindings))
+	var truncated = make([]int64, len(bindings))
 	for idx, b := range bindings {
 		d.be.StartedResourceCommit(b.path)
 		for i, query := range b.queries {
-			res, err := txn.ExecContext(txnCtx, query)
+			var res, err = txn.ExecContext(txnCtx, query)
 			if err != nil {
 				return fmt.Errorf("executing store query for %s: %w", b.path, err)
 			}

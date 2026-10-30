@@ -22,10 +22,10 @@ const (
 
 func createDuckDialect(featureFlags map[string]bool, isDuckLake bool) sql.Dialect {
 	// Define base date/time mappings without primary key wrapper
-	primaryKeyTextType := sql.MapStatic("VARCHAR")
-	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.UsingConverter(sql.NormalizeDatetimeString))
-	timeMapping := sql.MapStatic("TIME")
+	var primaryKeyTextType = sql.MapStatic("VARCHAR")
+	var dateMapping = sql.MapStatic("DATE")
+	var datetimeMapping = sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.UsingConverter(sql.NormalizeDatetimeString))
+	var timeMapping = sql.MapStatic("TIME")
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -34,12 +34,12 @@ func createDuckDialect(featureFlags map[string]bool, isDuckLake bool) sql.Dialec
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
-	binaryMapping := sql.MapStatic("VARCHAR")
+	var binaryMapping = sql.MapStatic("VARCHAR")
 	if featureFlags["native_binary_column_type"] {
 		binaryMapping = sql.MapStatic("BLOB")
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT"),
@@ -134,7 +134,7 @@ type templates struct {
 }
 
 func renderTemplates(dialect sql.Dialect) *templates {
-	tplAll := sql.MustParseTemplate(dialect, "root", tplRoot)
+	var tplAll = sql.MustParseTemplate(dialect, "root", tplRoot)
 	return &templates{
 		createTargetTable:       tplAll.Lookup("createTargetTable"),
 		storeQuery:              tplAll.Lookup("storeQuery"),

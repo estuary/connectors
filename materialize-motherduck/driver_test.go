@@ -96,7 +96,7 @@ func TestIntegration(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				var ctx = context.Background()
-				db, err := cfg.db(ctx)
+				var db, err = cfg.db(ctx)
 				require.NoError(t, err)
 				defer db.Close()
 
@@ -188,7 +188,7 @@ func requireDatabaseFormat(t *testing.T, variant integrationVariant) {
 	t.Helper()
 
 	testutil.RunTestAllTasks(t, variant.materializeSpec, func(t *testing.T, _ []byte, taskName string, cfg config) {
-		isDuckLake, err := cfg.isDuckLake(context.Background())
+		var isDuckLake, err = cfg.isDuckLake(context.Background())
 		require.NoError(t, err)
 		require.Equalf(t, variant.duckLake, isDuckLake,
 			"database %q of task %q does not have the format the %q variant covers",
@@ -228,13 +228,13 @@ func maintainSnapshots(t *testing.T, variant integrationVariant) {
 		var ctx = context.Background()
 		var database = createDuckDialect(nil, true).Literal(cfg.Database)
 
-		db, err := cfg.bareOpen()
+		var db, err = cfg.bareOpen()
 		require.NoError(t, err)
 
 		t.Cleanup(func() {
 			defer db.Close()
 
-			expired, err := expireSnapshots(ctx, db, database)
+			var expired, err = expireSnapshots(ctx, db, database)
 			if err != nil {
 				t.Logf("expired %d snapshots of %s before stopping: %s", expired, cfg.Database, err)
 			} else {
@@ -255,7 +255,7 @@ func maintainSnapshots(t *testing.T, variant integrationVariant) {
 // snapshots expireSnapshots may remove.
 func snapshotBacklog(ctx context.Context, db *stdsql.DB, database string) (int, error) {
 	var count int
-	err := db.QueryRowContext(ctx, fmt.Sprintf(
+	var err = db.QueryRowContext(ctx, fmt.Sprintf(
 		"SELECT count(*) FROM ducklake_snapshots(%s) WHERE snapshot_time < now() - INTERVAL %s",
 		database, snapshotRetention,
 	)).Scan(&count)
@@ -273,7 +273,7 @@ func expireSnapshots(ctx context.Context, db *stdsql.DB, database string) (int, 
 
 	// The cutoff is held in a session variable, so every statement must run on
 	// the same connection.
-	conn, err := db.Conn(ctx)
+	var conn, err = db.Conn(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -311,7 +311,7 @@ func TestSnapshotBacklog(t *testing.T) {
 	var ctx = context.Background()
 	var dir = t.TempDir()
 
-	db, err := stdsql.Open("duckdb", "")
+	var db, err = stdsql.Open("duckdb", "")
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -326,7 +326,7 @@ func TestSnapshotBacklog(t *testing.T) {
 			SET snapshot_time = now() - INTERVAL %s - INTERVAL 1 MINUTE
 			WHERE snapshot_id < 3`, snapshotRetention),
 	} {
-		_, err := db.ExecContext(ctx, stmt)
+		var _, err = db.ExecContext(ctx, stmt)
 		require.NoError(t, err)
 	}
 

@@ -138,7 +138,7 @@ func (c config) Validate() error {
 		}
 
 		// Azure storage account name: 3-24 characters, lowercase letters and numbers only
-		storageAccountName := c.StagingBucket.StorageAccountName
+		var storageAccountName = c.StagingBucket.StorageAccountName
 		if len(storageAccountName) < 3 || len(storageAccountName) > 24 {
 			return fmt.Errorf("invalid storageAccountName: must be between 3 and 24 characters")
 		}
@@ -148,7 +148,7 @@ func (c config) Validate() error {
 
 		// Azure container name: 3-63 characters, lowercase letters/numbers/hyphens,
 		// must start and end with letter or number, no consecutive hyphens
-		containerName := c.StagingBucket.ContainerName
+		var containerName = c.StagingBucket.ContainerName
 		if len(containerName) < 3 || len(containerName) > 63 {
 			return fmt.Errorf("invalid containerName: must be between 3 and 63 characters")
 		}
@@ -230,7 +230,7 @@ type stagingBucketAzureConfig struct {
 // isDuckLake reports whether the destination is a DuckLake database rather than a
 // classic MotherDuck database.
 func (c *config) isDuckLake(ctx context.Context) (bool, error) {
-	db, err := c.bareOpen()
+	var db, err = c.bareOpen()
 	if err != nil {
 		return false, err
 	}
@@ -265,7 +265,7 @@ func (c *config) isDuckLake(ctx context.Context) (bool, error) {
 func (c *config) bareOpen() (*stdsql.DB, error) {
 	var userAgent = "Estuary"
 
-	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, userAgent))
+	var db, err = stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, userAgent))
 	if err != nil {
 		if strings.Contains(err.Error(), "Jwt header is an invalid JSON") {
 			return nil, fmt.Errorf("invalid token: unauthenticated")
@@ -277,7 +277,7 @@ func (c *config) bareOpen() (*stdsql.DB, error) {
 }
 
 func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
-	db, err := c.bareOpen()
+	var db, err = c.bareOpen()
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	switch c.StagingBucket.StagingBucketType {
 	case stagingBucketTypeS3:
 		if c.StagingBucket.Endpoint != "" {
-			endpointURL, err := url.Parse(c.StagingBucket.Endpoint)
+			var endpointURL, err = url.Parse(c.StagingBucket.Endpoint)
 			if err != nil {
 				return nil, err
 			}
@@ -331,7 +331,7 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 		tempSecretName = "__default_gcs"
 	case stagingBucketTypeAzure:
 		// Build Azure connection string from account name and key
-		connectionString := fmt.Sprintf(
+		var connectionString = fmt.Sprintf(
 			"DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s;EndpointSuffix=core.windows.net",
 			c.StagingBucket.StorageAccountName,
 			c.StagingBucket.StorageAccountKey,
@@ -414,7 +414,7 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 
 	switch c.StagingBucket.StagingBucketType {
 	case stagingBucketTypeS3:
-		creds := credentials.NewStaticCredentialsProvider(
+		var creds = credentials.NewStaticCredentialsProvider(
 			c.StagingBucket.AWSAccessKeyID,
 			c.StagingBucket.AWSSecretAccessKey,
 			"",
@@ -431,12 +431,12 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 			return nil, "", fmt.Errorf("creating S3 bucket: %w", err)
 		}
 	case stagingBucketTypeGCS:
-		auth := option.WithCredentialsJSON([]byte(c.StagingBucket.CredentialsJSON))
+		var auth = option.WithCredentialsJSON([]byte(c.StagingBucket.CredentialsJSON))
 		if bucket, err = blob.NewGCSBucket(ctx, c.StagingBucket.BucketGCS, auth); err != nil {
 			return nil, "", fmt.Errorf("creating GCS bucket: %w", err)
 		}
 	case stagingBucketTypeAzure:
-		azureBucket, err := blob.NewAzureBlobBucket(ctx,
+		var azureBucket, err = blob.NewAzureBlobBucket(ctx,
 			c.StagingBucket.ContainerName,
 			c.StagingBucket.StorageAccountName,
 			blob.WithAzureStorageAccountKey(c.StagingBucket.StorageAccountKey),

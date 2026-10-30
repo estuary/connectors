@@ -42,9 +42,9 @@ func (b *azureBucketWrapper) URI(key string) string {
 
 // Delete converts az:// URIs back to HTTPS URLs before delegating to the Azure SDK.
 func (b *azureBucketWrapper) Delete(ctx context.Context, uris []string) error {
-	httpsURIs := make([]string, len(uris))
+	var httpsURIs = make([]string, len(uris))
 	for i, uri := range uris {
-		key := strings.TrimPrefix(uri, "az://"+b.container+"/")
+		var key = strings.TrimPrefix(uri, "az://"+b.container+"/")
 		httpsURIs[i] = b.AzureBlobBucket.URI(key)
 	}
 	return b.AzureBlobBucket.Delete(ctx, httpsURIs)

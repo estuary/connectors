@@ -14,7 +14,7 @@ var testDialect = createDuckDialect(common.ResolveFlagDefaults(featureFlagDefaul
 var testTemplates = renderTemplates(testDialect)
 
 func flagsWithoutNativeBinary() map[string]bool {
-	out := common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
+	var out = common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
 	out["native_binary_column_type"] = false
 	return out
 }
@@ -24,13 +24,13 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGeneration_NoNativeBinaryColumnType(t *testing.T) {
-	dialect := createDuckDialect(flagsWithoutNativeBinary(), false)
-	tpls := renderTemplates(dialect)
+	var dialect = createDuckDialect(flagsWithoutNativeBinary(), false)
+	var tpls = renderTemplates(dialect)
 	runSQLGen(t, dialect, tpls)
 }
 
 func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates *templates) {
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -52,11 +52,11 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates *templates) 
 	} {
 		// Standard updates cases, which use merge bounds for load and merge
 		// queries.
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		bounds := []sql.MergeBound{
+		var bounds = []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
 				LiteralLower: testDialect.Literal(int64(10)),
@@ -85,8 +85,8 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates *templates) 
 
 	{
 		// Delta updates only run stores, never loads or merges.
-		tpl := testTemplates.storeQuery
-		tbl := tables[1]
+		var tpl = testTemplates.storeQuery
+		var tbl = tables[1]
 		require.True(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
