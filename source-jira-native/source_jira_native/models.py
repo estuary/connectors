@@ -13,6 +13,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     Logger,
 )
+from estuary_cdk.feature_flags import FeatureFlagsConfig
 from pydantic import AwareDatetime, BaseModel, Field
 
 
@@ -71,7 +72,7 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"order": 3}
     )
 
-    class Advanced(BaseModel):
+    class Advanced(FeatureFlagsConfig):
         projects: str = Field(
             description="Comma-separated list of project IDs from which to replicate issues. If left blank, issues from all projects wil be replicated.",
             title="Projects",

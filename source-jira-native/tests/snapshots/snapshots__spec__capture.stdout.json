@@ -11,6 +11,13 @@
               "pattern": "^$|^([a-zA-Z0-9]+)(,[a-zA-Z0-9]+)*$",
               "title": "Projects",
               "type": "string"
+            },
+            "feature_flags": {
+              "default": "",
+              "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+              "nonsensitive": true,
+              "title": "Feature Flags",
+              "type": "string"
             }
           },
           "title": "Advanced",
