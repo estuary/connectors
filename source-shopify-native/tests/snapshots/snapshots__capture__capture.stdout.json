@@ -294,6 +294,26 @@
     }
   ],
   [
+    "acmeCo/product_variant_market_prices",
+    {
+      "_meta": {
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "compareAtPrice": null,
+      "country": "GB",
+      "id": "gid://shopify/ProductVariant/43217823334445",
+      "price": {
+        "amount": "10.0",
+        "currencyCode": "USD"
+      },
+      "product": {
+        "id": "gid://shopify/Product/8086707830829"
+      },
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/product_variant_metafields",
     {
       "__parentId": "gid://shopify/Product/8086707830829",
@@ -6842,6 +6862,44 @@
       "priceInclusions": null,
       "status": "ACTIVE",
       "type": "REGION"
+    }
+  ],
+  [
+    "acmeCo/price_list_prices",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "compareAtPrice": null,
+      "originType": "RELATIVE",
+      "price": {
+        "amount": "9.5",
+        "currencyCode": "USD"
+      },
+      "priceList": {
+        "catalog": null,
+        "currency": "USD",
+        "id": "gid://shopify/PriceList/27592196141",
+        "name": "Price List example Buyers",
+        "parent": {
+          "adjustment": {
+            "type": "PERCENTAGE_DECREASE",
+            "value": 5.0
+          },
+          "settings": {
+            "compareAtMode": "ADJUSTED"
+          }
+        }
+      },
+      "variant": {
+        "id": "gid://shopify/ProductVariant/43217823334445",
+        "product": {
+          "id": "gid://shopify/Product/8086707830829"
+        }
+      }
     }
   ]
 ]
