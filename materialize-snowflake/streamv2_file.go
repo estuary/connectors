@@ -57,6 +57,11 @@ type streamV2PipeInfo struct {
 		Diversifier       string          `json:"diversifier"`
 		EncryptionVersion string          `json:"encryption_version"`
 	} `json:"pipe_encryption_info"`
+	ParameterOverrides struct {
+		// BinaryInputFormat is the format the pipe reads binary values in. It must
+		// be BASE64 when set, because binary values are written as base64.
+		BinaryInputFormat string `json:"binary_input_format"`
+	} `json:"parameter_overrides"`
 
 	uploader streamV2Uploader
 }
@@ -98,6 +103,9 @@ func (c *streamV2Client) pipeInfo(ctx context.Context, pipePath string) (*stream
 	var info = new(streamV2PipeInfo)
 	if err := c.call(ctx, http.MethodPost, pipePath+":pipe-info", nil, bytes.NewReader(body), nil, info); err != nil {
 		return nil, err
+	}
+	if f := info.ParameterOverrides.BinaryInputFormat; f != "" && !strings.EqualFold(f, "BASE64") {
+		return nil, fmt.Errorf("pipe %s reads binary values in binary input format %q, but this connector writes them as BASE64", pipePath, f)
 	}
 	var uploader, err = c.newUploader(ctx, info.Stage)
 	if err != nil {
