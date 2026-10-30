@@ -44,7 +44,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
 	}
 	subSchemas = append(subSchemas,
@@ -184,7 +184,7 @@ func (r resource) WithDefaults(cfg config) resource {
 }
 
 func (r resource) Parameters() ([]string, bool, error) {
-	tableName, err := normalizeTableName(r.Table)
+	var tableName, err = normalizeTableName(r.Table)
 	if err != nil {
 		return nil, false, err
 	}
@@ -201,7 +201,7 @@ var (
 // For table naming requirements, see
 // https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html#HowItWorks.NamingRules
 func normalizeTableName(t string) (string, error) {
-	cleaned := tableNameSanitizer.ReplaceAllString(t, "_")
+	var cleaned = tableNameSanitizer.ReplaceAllString(t, "_")
 
 	// The cleaned string is now guaranteed to be only ASCII characters.
 	if len(cleaned) < minTableNameLength {
@@ -220,12 +220,12 @@ func normalizeTableName(t string) (string, error) {
 }
 
 func (c *config) client(ctx context.Context) (*client, error) {
-	credProvider, err := c.CredentialsProvider(ctx)
+	var credProvider, err = c.CredentialsProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(c.Region),
 		awsConfig.WithRetryer(func() aws.Retryer {
@@ -239,7 +239,7 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	}
 
 	if c.Advanced.Endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		var customResolver = aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: c.Advanced.Endpoint}, nil
 		})
 
@@ -267,7 +267,7 @@ var _ boilerplate.Connector = &driver{}
 func NewDriver() boilerplate.Connector { return driver{} }
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Materialize DynamoDB Spec", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Materialize DynamoDB Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -313,7 +313,7 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
-	client, err := cfg.client(ctx)
+	var client, err = cfg.client(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -335,9 +335,9 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 
 func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	for _, p := range resourcePaths {
-		tableName := p[0]
+		var tableName = p[0]
 
-		d, err := d.client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		var d, err = d.client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(tableName),
 		})
 		if err != nil {
@@ -349,7 +349,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 			return fmt.Errorf("describing table %q: %w", tableName, err)
 		}
 
-		res := is.PushResource(tableName)
+		var res = is.PushResource(tableName)
 		for _, def := range d.Table.AttributeDefinitions {
 			res.PushField(boilerplate.ExistingField{
 				Name:               *def.AttributeName,
@@ -403,8 +403,8 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
-	tableName := res.ResourcePath[0]
-	attrs, schema := tableConfigFromProjections(res.Keys)
+	var tableName = res.ResourcePath[0]
+	var attrs, schema = tableConfigFromProjections(res.Keys)
 
 	return fmt.Sprintf("create table %q", tableName), func(ctx context.Context) error {
 		return createTable(ctx, d.client, tableName, attrs, schema)
@@ -445,9 +445,9 @@ func (d *materialization) NewTransactor(
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var bindings []binding
-	tablesToBindings := make(map[string]int)
+	var tablesToBindings = make(map[string]int)
 	for idx, b := range mappedBindings {
-		mappedFields := make([]mappedType, 0, len(b.FieldSelection.AllFields()))
+		var mappedFields = make([]mappedType, 0, len(b.FieldSelection.AllFields()))
 		for _, p := range b.SelectedProjections() {
 			mappedFields = append(mappedFields, p.Mapped)
 		}
@@ -478,13 +478,13 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	tableName := path[0]
+	var tableName = path[0]
 
 	var items []map[string]types.AttributeValue
 	var exclusiveStartKey map[string]types.AttributeValue
 
 	for {
-		out, err := d.client.db.Scan(ctx, &dynamodb.ScanInput{
+		var out, err = d.client.db.Scan(ctx, &dynamodb.ScanInput{
 			TableName:         aws.String(tableName),
 			ExclusiveStartKey: exclusiveStartKey,
 		})
@@ -503,14 +503,14 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	}
 
 	// Collect all attribute names across all items.
-	colSet := make(map[string]struct{})
+	var colSet = make(map[string]struct{})
 	for _, item := range items {
 		for k := range item {
 			colSet[k] = struct{}{}
 		}
 	}
 
-	columns := make([]string, 0, len(colSet))
+	var columns = make([]string, 0, len(colSet))
 	for k := range colSet {
 		columns = append(columns, k)
 	}
@@ -519,7 +519,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// Build rows with values in column order.
 	var rows [][]any
 	for _, item := range items {
-		row := make([]any, len(columns))
+		var row = make([]any, len(columns))
 		for i, col := range columns {
 			if av, ok := item[col]; ok {
 				row[i] = attributeValueToAny(av)
@@ -531,8 +531,8 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	// Sort rows for deterministic output.
 	sort.Slice(rows, func(i, j int) bool {
 		for c := range columns {
-			vi := fmt.Sprint(rows[i][c])
-			vj := fmt.Sprint(rows[j][c])
+			var vi = fmt.Sprint(rows[i][c])
+			var vj = fmt.Sprint(rows[j][c])
 			if vi != vj {
 				return vi < vj
 			}
@@ -556,13 +556,13 @@ func attributeValueToAny(av types.AttributeValue) any {
 	case *types.AttributeValueMemberB:
 		return v.Value
 	case *types.AttributeValueMemberM:
-		m := make(map[string]any, len(v.Value))
+		var m = make(map[string]any, len(v.Value))
 		for k, val := range v.Value {
 			m[k] = attributeValueToAny(val)
 		}
 		return m
 	case *types.AttributeValueMemberL:
-		l := make([]any, len(v.Value))
+		var l = make([]any, len(v.Value))
 		for i, val := range v.Value {
 			l[i] = attributeValueToAny(val)
 		}
@@ -582,10 +582,10 @@ func (d *materialization) Close(ctx context.Context) {}
 
 func tableConfigFromProjections(keys []boilerplate.MappedProjection[mappedType]) ([]types.AttributeDefinition, []types.KeySchemaElement) {
 	// The collection keys will be used as the partition key and sort key, respectively.
-	keyTypes := [2]types.KeyType{types.KeyTypeHash, types.KeyTypeRange}
+	var keyTypes = [2]types.KeyType{types.KeyTypeHash, types.KeyTypeRange}
 
-	attrs := []types.AttributeDefinition{}
-	schema := []types.KeySchemaElement{}
+	var attrs = []types.AttributeDefinition{}
+	var schema = []types.KeySchemaElement{}
 
 	for idx, k := range keys {
 		attrs = append(attrs, types.AttributeDefinition{

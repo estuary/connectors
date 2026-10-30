@@ -60,12 +60,12 @@ func (b binding) convertKey(ts tuple.Tuple) (map[string]types.AttributeValue, er
 }
 
 func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]types.AttributeValue, error) {
-	vals := make(map[string]any)
+	var vals = make(map[string]any)
 
-	fieldsIdx := 0
-	do := func(v tuple.TupleElement) error {
-		f := b.fields[fieldsIdx]
-		c, err := f.converter(v)
+	var fieldsIdx = 0
+	var do = func(v tuple.TupleElement) error {
+		var f = b.fields[fieldsIdx]
+		var c, err = f.converter(v)
 		if err != nil {
 			return fmt.Errorf("converting field %s: %w", f.field, err)
 		}
@@ -88,7 +88,7 @@ func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]types.
 		}
 	}
 
-	attrs, err := attributevalue.MarshalMap(vals)
+	var attrs, err = attributevalue.MarshalMap(vals)
 	if err != nil {
 		return nil, fmt.Errorf("marshalMap: %w", err)
 	}
@@ -110,23 +110,23 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// Processing load requests as the arrive, so make sure the previous transaction has fully
 	// committed before evaluating any loads.
 	it.WaitForAcknowledged()
 
-	batches := make(chan map[string]types.KeysAndAttributes)
-	group, groupCtx := errgroup.WithContext(ctx)
+	var batches = make(chan map[string]types.KeysAndAttributes)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	group.Go(func() error {
 		return t.loadWorker(groupCtx, loaded, batches)
 	})
 
-	batch := make(map[string]types.KeysAndAttributes)
-	batchSize := 0
+	var batch = make(map[string]types.KeysAndAttributes)
+	var batchSize = 0
 
-	sendBatch := func(b map[string]types.KeysAndAttributes) error {
+	var sendBatch = func(b map[string]types.KeysAndAttributes) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -136,9 +136,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	for it.Next() {
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
-		key, err := b.convertKey(it.Key)
+		var key, err = b.convertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting key for table '%s': %w", b.tableName, err)
 		}
@@ -155,7 +155,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
-		keyAndAttrs := batch[b.tableName]
+		var keyAndAttrs = batch[b.tableName]
 		keyAndAttrs.Keys = append(keyAndAttrs.Keys, key)
 		batch[b.tableName] = keyAndAttrs
 		batchSize++
@@ -180,23 +180,23 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
-	batches := make(chan map[string][]types.WriteRequest)
-	group, groupCtx := errgroup.WithContext(ctx)
-	round := it.Round
+	var batches = make(chan map[string][]types.WriteRequest)
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var round = it.Round
 	// stored counts the items DynamoDB accepted per binding, for the
 	// transaction health report.
-	stored := make([]atomic.Int64, len(t.bindings))
+	var stored = make([]atomic.Int64, len(t.bindings))
 
 	group.Go(func() error {
 		return t.storeWorker(groupCtx, batches, stored)
 	})
 
-	batch := make(map[string][]types.WriteRequest)
-	batchSize := 0
+	var batch = make(map[string][]types.WriteRequest)
+	var batchSize = 0
 
-	sendBatch := func(b map[string][]types.WriteRequest) error {
+	var sendBatch = func(b map[string][]types.WriteRequest) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -206,9 +206,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	for it.Next(false) {
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
-		item, err := b.convert(append(it.Key, it.Values...), it.RawJSON)
+		var item, err = b.convert(append(it.Key, it.Values...), it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting values for table '%s': %w", b.tableName, err)
 		}
@@ -257,7 +257,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 			}
 
 			for attempt := 1; ; attempt++ {
-				res, err := t.client.db.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+				var res, err = t.client.db.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 					RequestItems: batch,
 				})
 				if err != nil {
@@ -265,10 +265,10 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 				}
 
 				for table, records := range res.Responses {
-					b := t.tablesToBindings[table]
+					var b = t.tablesToBindings[table]
 
 					for _, record := range records {
-						doc := make(map[string]any)
+						var doc = make(map[string]any)
 						if err := attributevalue.UnmarshalMap(record, &doc); err != nil {
 							return fmt.Errorf("unmarshalling attributevalue: %w", err)
 						}
@@ -280,7 +280,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 						}
 
 						for _, d := range doc {
-							j, err := json.Marshal(d)
+							var j, err = json.Marshal(d)
 							if err != nil {
 								return fmt.Errorf("marshalling document to JSON bytes: %w", err)
 							}
@@ -322,7 +322,7 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 			}
 
 			for attempt := 1; ; attempt++ {
-				res, err := t.client.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+				var res, err = t.client.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
 					RequestItems: batch,
 				})
 				if err != nil {
@@ -357,16 +357,16 @@ func delay(ctx context.Context, attempt int, key string) error {
 		return fmt.Errorf("%s worker failed after %d retry attempts", key, maxAttempts)
 	}
 
-	d := time.Duration(1<<attempt) * initialBackoff
+	var d = time.Duration(1<<attempt) * initialBackoff
 	if d > maxBackoff {
 		d = maxBackoff
 	}
 
-	entry := log.WithFields(log.Fields{
+	var entry = log.WithFields(log.Fields{
 		"attempt":  attempt,
 		"waitTime": d.String(),
 	})
-	msg := fmt.Sprintf("%s worker waiting to retry unprocessed items", key)
+	var msg = fmt.Sprintf("%s worker waiting to retry unprocessed items", key)
 
 	if attempt < 15 {
 		entry.Debug(msg)

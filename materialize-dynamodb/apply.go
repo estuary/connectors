@@ -19,14 +19,14 @@ func createTable(
 	attrs []types.AttributeDefinition,
 	keySchema []types.KeySchemaElement,
 ) error {
-	input := &dynamodb.CreateTableInput{
+	var input = &dynamodb.CreateTableInput{
 		AttributeDefinitions: attrs,
 		KeySchema:            keySchema,
 		TableName:            aws.String(name),
 		BillingMode:          types.BillingModePayPerRequest,
 	}
 
-	_, err := client.db.CreateTable(ctx, input)
+	var _, err = client.db.CreateTable(ctx, input)
 	if err != nil {
 		var errInUse *types.ResourceInUseException
 		// Any error other than an "already exists" error is a more serious problem. Usually we
@@ -39,9 +39,9 @@ func createTable(
 	}
 
 	// Wait for the table to be in an "active" state.
-	maxAttempts := 30
+	var maxAttempts = 30
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		var d, err = client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(name),
 		})
 		if err != nil {
@@ -72,13 +72,13 @@ func deleteTable(ctx context.Context, client *client, name string) error {
 	}
 
 	// Wait for the table to be fully deleted.
-	attempts := 30
+	var attempts = 30
 	for {
 		if attempts < 0 {
 			return fmt.Errorf("table %s did not finish deleting in time", name)
 		}
 
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+		var d, err = client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
 			TableName: aws.String(name),
 		})
 		if err != nil {

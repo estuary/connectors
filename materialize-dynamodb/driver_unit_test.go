@@ -15,8 +15,8 @@ import (
 func TestSpec(t *testing.T) {
 	t.Parallel()
 
-	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pm.Request_Spec{})
+	var driver = driver{}
+	var response, err = driver.Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -63,7 +63,7 @@ func TestNormalizeTableName(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := normalizeTableName(tt.input)
+			var got, err = normalizeTableName(tt.input)
 			require.Equal(t, tt.wantErr, err)
 			require.Equal(t, tt.want, got)
 		})

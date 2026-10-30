@@ -28,7 +28,7 @@ type mappedType struct {
 }
 
 func (m mappedType) String() string {
-	out := ""
+	var out = ""
 	switch t := m.ddbScalarType; t {
 	case types.ScalarAttributeTypeS:
 		out = "string"
@@ -52,7 +52,7 @@ func (m mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
 }
 
 func mapType(p pf.Projection) mappedType {
-	out := mappedType{
+	var out = mappedType{
 		field: p.Field,
 	}
 
@@ -63,7 +63,7 @@ func mapType(p pf.Projection) mappedType {
 		return out
 	}
 
-	jsonTypes := typesWithoutNull(p.Inference.Types)
+	var jsonTypes = typesWithoutNull(p.Inference.Types)
 
 	if len(jsonTypes) != 1 {
 		// Multiple possible types, a single null type, or completely unconstrained types.
@@ -110,7 +110,7 @@ func mapType(p pf.Projection) mappedType {
 }
 
 func typesWithoutNull(ts []string) []string {
-	out := []string{}
+	var out = []string{}
 	for _, t := range ts {
 		if t != "null" {
 			out = append(out, t)
@@ -121,7 +121,7 @@ func typesWithoutNull(ts []string) []string {
 }
 
 func stringify(te tuple.TupleElement) (any, error) {
-	b, err := json.Marshal(te)
+	var b, err = json.Marshal(te)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (w *wrappedNumeric) MarshalDynamoDBAttributeValue() (types.AttributeValue, 
 }
 
 func convertNumeric(te tuple.TupleElement) (any, error) {
-	out := &wrappedNumeric{}
+	var out = &wrappedNumeric{}
 
 	switch tt := te.(type) {
 	case string:
@@ -200,7 +200,7 @@ func convertNumeric(te tuple.TupleElement) (any, error) {
 func convertBase64(te tuple.TupleElement) (any, error) {
 	switch t := te.(type) {
 	case string:
-		bytes, err := base64.StdEncoding.DecodeString(t)
+		var bytes, err = base64.StdEncoding.DecodeString(t)
 		if err != nil {
 			return nil, fmt.Errorf("decoding bytes from string: %w", err)
 		}

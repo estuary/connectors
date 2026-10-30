@@ -26,7 +26,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) resource {
+	var makeResourceFn = func(table string, delta bool) resource {
 		return resource{Table: table}
 	}
 
