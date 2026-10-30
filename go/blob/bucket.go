@@ -191,8 +191,7 @@ func checkPermissions[T error](
 	handleErr func(err T) error,
 ) error {
 	adaptErr := func(err error) error {
-		var asErr T
-		if errors.As(err, &asErr) {
+		if asErr, ok := errors.AsType[T](err); ok {
 			// Log the original error message, since it can sometimes contain
 			// useful (although potentially confusing) information.
 			log.WithField("err", err).Error("bucket permissions check failed")
