@@ -23,7 +23,7 @@ var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
 
-	snap, _ := sql.RunSqlGenTests(
+	var snap, _ = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -52,8 +52,8 @@ func TestSQLGeneration(t *testing.T) {
 	// a value field carrying the application/vnd.postgresql.jsonb+json
 	// contentMediaType must render as JSONB, while a sibling field without
 	// the annotation stays on JSON.
-	jsonbTable := buildJSONBTestTable(t)
-	jsonbName := "createTargetTable [jsonb contentMediaType]"
+	var jsonbTable = buildJSONBTestTable(t)
+	var jsonbName = "createTargetTable [jsonb contentMediaType]"
 	snap.WriteString("--- Begin " + jsonbName + " ---\n")
 	require.NoError(t, testTemplates.createTargetTable.Execute(snap, &jsonbTable))
 	snap.WriteString("--- End " + jsonbName + " ---\n\n")
@@ -68,10 +68,10 @@ func buildJSONBTestTable(t *testing.T) sql.Table {
 	t.Helper()
 
 	const jsonbMediaType = "application/vnd.estuary.postgresql.jsonb+json"
-	multipleTypes := []string{"object", "string", "array", "number", "boolean", "null"}
+	var multipleTypes = []string{"object", "string", "array", "number", "boolean", "null"}
 
-	mkValue := func(field, contentType string) sql.Column {
-		p := sql.Projection{
+	var mkValue = func(field, contentType string) sql.Column {
+		var p = sql.Projection{
 			Projection: pf.Projection{
 				Field: field,
 				Ptr:   "/" + field,
@@ -89,7 +89,7 @@ func buildJSONBTestTable(t *testing.T) sql.Table {
 		}
 	}
 
-	keyProj := sql.Projection{
+	var keyProj = sql.Projection{
 		Projection: pf.Projection{
 			Field:        "id",
 			Ptr:          "/id",
@@ -100,14 +100,14 @@ func buildJSONBTestTable(t *testing.T) sql.Table {
 			},
 		},
 	}
-	keyCol := sql.Column{
+	var keyCol = sql.Column{
 		Projection: keyProj,
 		MappedType: testDialect.MapType(&keyProj, sql.FieldConfig{}),
 		Identifier: testDialect.Identifier("id"),
 		MustExist:  true,
 	}
 
-	tableName := "jsonb_round_trip"
+	var tableName = "jsonb_round_trip"
 	return sql.Table{
 		TableShape: sql.TableShape{
 			Path:    []string{"public", tableName},
@@ -135,15 +135,15 @@ func TestDateTimeColumn(t *testing.T) {
 	}, sql.FieldConfig{})
 	require.Equal(t, "TIMESTAMPTZ NOT NULL", mapped.DDL)
 
-	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
+	var parsed, err = mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
 	require.NoError(t, err)
 }
 
 func TestJSONBContentMediaType(t *testing.T) {
-	jsonbMediaType := "application/vnd.estuary.postgresql.jsonb+json"
+	var jsonbMediaType = "application/vnd.estuary.postgresql.jsonb+json"
 
-	mapWithMediaType := func(types []string, contentType string) string {
+	var mapWithMediaType = func(types []string, contentType string) string {
 		return testDialect.MapType(&sql.Projection{
 			Projection: pf.Projection{
 				Inference: pf.Inference{
@@ -173,12 +173,12 @@ func TestJSONBContentMediaType(t *testing.T) {
 // the contentMediaType is ignored entirely and every field collapses onto JSON,
 // preserving the pre-JSONB behavior.
 func TestJSONBFeatureFlagDisabled(t *testing.T) {
-	flags := testFlagDefaults()
+	var flags = testFlagDefaults()
 	flags["jsonb"] = false
-	dialect := createPgDialect(flags)
+	var dialect = createPgDialect(flags)
 
-	jsonbMediaType := "application/vnd.estuary.postgresql.jsonb+json"
-	mapWithMediaType := func(types []string, contentType string) string {
+	var jsonbMediaType = "application/vnd.estuary.postgresql.jsonb+json"
+	var mapWithMediaType = func(types []string, contentType string) string {
 		return dialect.MapType(&sql.Projection{
 			Projection: pf.Projection{
 				Inference: pf.Inference{
@@ -205,7 +205,7 @@ func TestJSONBFeatureFlagDisabled(t *testing.T) {
 }
 
 func TestTruncatedIdentifier(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name  string
 		input string
 		want  string

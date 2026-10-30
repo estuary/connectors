@@ -106,12 +106,12 @@ type credentialConfig struct {
 }
 
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
 	}
 	subSchemas = append(subSchemas, (iam.IAMConfig{}).OneOfSubSchemas()...)
 
-	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
+	var schema = schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
 
 	return schema
 }
@@ -212,7 +212,7 @@ func (c config) ToURI(ctx context.Context) (string, error) {
 		case UserPassword:
 			pass = c.Credentials.Password
 		case AWSIAM:
-			credProvider, err := c.Credentials.AWSCredentialsProvider()
+			var credProvider, err = c.Credentials.AWSCredentialsProvider()
 			if err != nil {
 				return "", err
 			}
@@ -311,7 +311,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(ensurePort(cfg.Address))
+				var host, port, err = net.SplitHostPort(ensurePort(cfg.Address))
 				if err != nil {
 					return fmt.Errorf("splitting address to host and port: %w", err)
 				}
@@ -347,8 +347,8 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			}
 
 			// Create dialect with feature flags
-			dialect := createPgDialect(featureFlags)
-			templates := renderTemplates(dialect)
+			var dialect = createPgDialect(featureFlags)
+			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -408,7 +408,7 @@ func newTransactor(
 	var cfg = ep.Config
 
 	// Create templates using the dialect from the endpoint (which already has feature flags)
-	templates := renderTemplates(ep.Dialect)
+	var templates = renderTemplates(ep.Dialect)
 
 	var d = &transactor{
 		cfg:                   cfg,
@@ -504,9 +504,9 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
-	input := loadTableColumns{Binding: b.target.Binding}
+	var input = loadTableColumns{Binding: b.target.Binding}
 	for _, k := range b.target.Keys {
-		existing := is.GetResource(target.Path).GetField(k.Field)
+		var existing = is.GetResource(target.Path).GetField(k.Field)
 		input.Keys = append(input.Keys, loadTableKey{
 			Identifier: k.Identifier,
 			DDL:        existing.Type + " NOT NULL", // nullable key fields are not allowed
@@ -563,7 +563,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// for this Flow transaction.
 	var txn pgx.Tx
 	var batch pgx.Batch
-	batchBytes := 0
+	var batchBytes = 0
 	for it.Next() {
 		if txn == nil {
 			// Use a read-only "load" transaction, which will automatically
@@ -610,11 +610,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	loadCtx, touch, cancel := ctxWithIdleQueryTimeout(ctx, queryTimeout)
+	var loadCtx, touch, cancel = ctxWithIdleQueryTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	d.be.StartedEvaluatingLoads()
-	rows, err := txn.Query(loadCtx, d.load.unionSQL)
+	var rows, err = txn.Query(loadCtx, d.load.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", errors.Join(err, context.Cause(loadCtx)))
 	}
@@ -630,7 +630,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("scanning Load document: %w", err)
 		}
 
-		doc := json.RawMessage(document)
+		var doc = json.RawMessage(document)
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -675,25 +675,25 @@ func (t *TxDefuser) Defuse() {
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 	txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
 	// All transactions must be complete before closing the database.  This
 	// handles the case of both an error or a panic occurring.
-	defuser := NewTxDefuser(txn)
+	var defuser = NewTxDefuser(txn)
 	defer defuser.MaybeRollback()
 
 	var batch pgx.Batch
 	var batchBindings []int // Binding of each queued statement, parallel to batch.
-	batchBytes := 0
+	var batchBytes = 0
 
 	var round = it.Round
 	var truncations = d.truncations
 	var rowsAffected = make([]int64, len(d.bindings))
 	var stored = make([]bool, len(d.bindings))
-	countRows := func(rows []int64) {
+	var countRows = func(rows []int64) {
 		for i, n := range rows {
 			rowsAffected[batchBindings[i]] += n
 		}
@@ -757,7 +757,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// commit into a single normalized entry rather than one per checkpoint.
 		batch.Queue(fenceUpdate.String(), fenceUpdateArgs(d.store.fence)...)
 
-		results := txn.SendBatch(ctx, &batch)
+		var results = txn.SendBatch(ctx, &batch)
 
 		// Execute all remaining doc inserts & updates.
 		for i := 0; i < batch.Len()-1; i++ {
@@ -807,7 +807,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			d.be.ReportRowStats(round, b.target.Path, stats)
 		}
 
-		commitCtx, cancel := ctxWithQueryTimeout(ctx)
+		var commitCtx, cancel = ctxWithQueryTimeout(ctx)
 		defer cancel()
 		if err := txn.Commit(commitCtx); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("committing Store transaction: %w", err))
@@ -842,8 +842,8 @@ func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) ([]int64, erro
 	ctx, cancel := ctxWithQueryTimeout(ctx)
 	defer cancel()
 
-	results := txn.SendBatch(ctx, batch)
-	rows := make([]int64, 0, batch.Len())
+	var results = txn.SendBatch(ctx, batch)
+	var rows = make([]int64, 0, batch.Len())
 	for i := range batch.Len() {
 		if tag, err := results.Exec(); err != nil {
 			return nil, fmt.Errorf("exec at index %d: %w", i, err)

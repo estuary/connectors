@@ -41,11 +41,11 @@ func (e *PgEnum) Compatible(existing boilerplate.ExistingField) bool {
 	if !strings.EqualFold(existing.Type, "USER-DEFINED") {
 		return false
 	}
-	m, ok := existing.Meta.(pgFieldMeta)
+	var m, ok = existing.Meta.(pgFieldMeta)
 	if !ok {
 		return false
 	}
-	expected, err := enumBaseName(m.Path, e.Field)
+	var expected, err = enumBaseName(m.Path, e.Field)
 	if err != nil {
 		return false
 	}
@@ -60,7 +60,7 @@ var _ sql.CompatibleColumnType = (*PgEnum)(nil)
 type EnumMigrationTarget struct{}
 
 func (EnumMigrationTarget) CanMigrate(_ boilerplate.ExistingField, mapped sql.MappedType) bool {
-	_, ok := mapped.TargetType.(*PgEnum)
+	var _, ok = mapped.TargetType.(*PgEnum)
 	return ok
 }
 
@@ -81,7 +81,7 @@ func MapEnum(fallback sql.MapProjectionFn) sql.MapProjectionFn {
 			}
 		}
 
-		data, err := json.Marshal(p.Inference.EnumJsonVec)
+		var data, err = json.Marshal(p.Inference.EnumJsonVec)
 		if err != nil {
 			log.WithField("field", p.Field).WithError(err).Fatal("marshaling EnumJsonVec")
 		}
@@ -94,7 +94,7 @@ func MapEnum(fallback sql.MapProjectionFn) sql.MapProjectionFn {
 		if len(values) == 0 {
 			return fallback(p)
 		}
-		e := &PgEnum{
+		var e = &PgEnum{
 			Field:  p.Field,
 			Values: values,
 		}
@@ -147,8 +147,8 @@ func enumBaseName(path []string, field string) (string, error) {
 	if len(path) == 0 {
 		return "", fmt.Errorf("unexpected empty resource path for enum type naming")
 	}
-	tableName := truncatedIdentifier(path[len(path)-1])
-	base := tableName + "_" + field + "_flow_enum"
+	var tableName = truncatedIdentifier(path[len(path)-1])
+	var base = tableName + "_" + field + "_flow_enum"
 
 	if len([]byte(base)) > 63 {
 		// Hash mode: <tableName>_<truncatedField>_<8hexHash>_flow_enum
@@ -156,10 +156,10 @@ func enumBaseName(path []string, field string) (string, error) {
 		// Cap tableName to 42 bytes so the field portion gets at least 1 byte.
 		// Use the full pre-truncation names as hash input for better collision resistance.
 		const maxTableBytes = 42
-		h := sha256.Sum256([]byte(tableName + "_" + field))
-		hash := fmt.Sprintf("%x", h[:4])
+		var h = sha256.Sum256([]byte(tableName + "_" + field))
+		var hash = fmt.Sprintf("%x", h[:4])
 		tableName = truncateToBytes(tableName, maxTableBytes)
-		fieldPart := truncateToBytes(field, 63-len([]byte(tableName))-20)
+		var fieldPart = truncateToBytes(field, 63-len([]byte(tableName))-20)
 		base = tableName + "_" + fieldPart + "_" + hash + "_flow_enum"
 	}
 
@@ -168,7 +168,7 @@ func enumBaseName(path []string, field string) (string, error) {
 
 // truncateToBytes truncates s to at most maxBytes bytes while retaining valid UTF-8.
 func truncateToBytes(s string, maxBytes int) string {
-	b := []byte(s)
+	var b = []byte(s)
 	if len(b) <= maxBytes {
 		return s
 	}
@@ -185,13 +185,13 @@ func truncateToBytes(s string, maxBytes int) string {
 // The caller must pass a pointer to the Table so that column modifications
 // (which are made via pointer) are visible when the table is later rendered.
 func resolveEnumTypes(dialect sql.Dialect, table *sql.Table) ([]*PgEnum, error) {
-	seen := make(map[string]*PgEnum)
+	var seen = make(map[string]*PgEnum)
 	for _, col := range table.Columns() {
-		e, ok := col.MappedType.TargetType.(*PgEnum)
+		var e, ok = col.MappedType.TargetType.(*PgEnum)
 		if !ok {
 			continue
 		}
-		_, _, typeName, err := enumTypeNameParts(dialect, table.Path, col.Field)
+		var _, _, typeName, err = enumTypeNameParts(dialect, table.Path, col.Field)
 		if err != nil {
 			return nil, fmt.Errorf("resolving enum type for column %q: %w", col.Field, err)
 		}
@@ -202,7 +202,7 @@ func resolveEnumTypes(dialect sql.Dialect, table *sql.Table) ([]*PgEnum, error) 
 		}
 	}
 
-	out := make([]*PgEnum, 0, len(seen))
+	var out = make([]*PgEnum, 0, len(seen))
 	for _, e := range seen {
 		out = append(out, e)
 	}

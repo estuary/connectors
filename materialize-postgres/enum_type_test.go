@@ -9,7 +9,7 @@ import (
 )
 
 func TestCompatibleFallback(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name         string
 		field        string
 		path         []string
@@ -82,12 +82,12 @@ func TestCompatibleFallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &PgEnum{Field: tt.field}
-			existingType := tt.existingType
+			var e = &PgEnum{Field: tt.field}
+			var existingType = tt.existingType
 			if existingType == "" {
 				existingType = "USER-DEFINED"
 			}
-			existing := boilerplate.ExistingField{Type: existingType}
+			var existing = boilerplate.ExistingField{Type: existingType}
 			if !tt.noMeta {
 				existing.Meta = pgFieldMeta{UDTName: tt.udtName, Path: tt.path}
 			}
@@ -99,9 +99,9 @@ func TestCompatibleFallback(t *testing.T) {
 // TestCompatibleRoundTrip asserts that every name the generator produces is
 // recognized as compatible by Compatible, across the truncation/hash regimes.
 func TestCompatibleRoundTrip(t *testing.T) {
-	dialect := createPgDialect(testFlagDefaults())
+	var dialect = createPgDialect(testFlagDefaults())
 
-	cases := []struct {
+	var cases = []struct {
 		name  string
 		path  []string
 		field string
@@ -114,11 +114,11 @@ func TestCompatibleRoundTrip(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, base, _, err := enumTypeNameParts(dialect, tc.path, tc.field)
+			var _, base, _, err = enumTypeNameParts(dialect, tc.path, tc.field)
 			require.NoError(t, err)
 
-			e := &PgEnum{Field: tc.field}
-			existing := boilerplate.ExistingField{
+			var e = &PgEnum{Field: tc.field}
+			var existing = boilerplate.ExistingField{
 				Type: "USER-DEFINED",
 				Meta: pgFieldMeta{UDTName: base, Path: tc.path},
 			}
@@ -128,10 +128,10 @@ func TestCompatibleRoundTrip(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsNormal(t *testing.T) {
-	dialect := createPgDialect(testFlagDefaults())
+	var dialect = createPgDialect(testFlagDefaults())
 
 	// Short names: no hash, base <= 63 bytes
-	schema, base, typeName, err := enumTypeNameParts(dialect, []string{"public", "orders"}, "status")
+	var schema, base, typeName, err = enumTypeNameParts(dialect, []string{"public", "orders"}, "status")
 	require.NoError(t, err)
 	require.Equal(t, "public", schema)
 	require.Equal(t, "orders_status_flow_enum", base)
@@ -140,11 +140,11 @@ func TestEnumTypeNamePartsNormal(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsHashed(t *testing.T) {
-	dialect := createPgDialect(testFlagDefaults())
+	var dialect = createPgDialect(testFlagDefaults())
 
 	// Long field name triggers hash mode
-	longField := strings.Repeat("x", 50)
-	schema, base, typeName, err := enumTypeNameParts(dialect, []string{"public", "orders"}, longField)
+	var longField = strings.Repeat("x", 50)
+	var schema, base, typeName, err = enumTypeNameParts(dialect, []string{"public", "orders"}, longField)
 	require.NoError(t, err)
 	require.Equal(t, "public", schema)
 	require.LessOrEqual(t, len([]byte(base)), 63, "base must fit within Postgres 63-byte identifier limit")
@@ -153,21 +153,21 @@ func TestEnumTypeNamePartsHashed(t *testing.T) {
 }
 
 func TestEnumTypeNamePartsLongTableName(t *testing.T) {
-	dialect := createPgDialect(testFlagDefaults())
+	var dialect = createPgDialect(testFlagDefaults())
 
 	// tableName at max length (63 bytes) — previously caused base to exceed 63 bytes
-	longTable := strings.Repeat("a", 63)
-	longField := strings.Repeat("b", 50)
-	_, base, _, err := enumTypeNameParts(dialect, []string{"public", longTable}, longField)
+	var longTable = strings.Repeat("a", 63)
+	var longField = strings.Repeat("b", 50)
+	var _, base, _, err = enumTypeNameParts(dialect, []string{"public", longTable}, longField)
 	require.NoError(t, err)
 	require.LessOrEqual(t, len([]byte(base)), 63, "base must fit within Postgres 63-byte identifier limit")
 	require.True(t, strings.HasSuffix(base, "_flow_enum"))
 }
 
 func TestEnumTypeNamePartsSinglePathElement(t *testing.T) {
-	dialect := createPgDialect(testFlagDefaults())
+	var dialect = createPgDialect(testFlagDefaults())
 
-	schema, base, _, err := enumTypeNameParts(dialect, []string{"mytable"}, "col")
+	var schema, base, _, err = enumTypeNameParts(dialect, []string{"mytable"}, "col")
 	require.NoError(t, err)
 	require.Equal(t, "public", schema)
 	require.Equal(t, "mytable_col_flow_enum", base)

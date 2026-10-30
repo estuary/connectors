@@ -30,7 +30,7 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	uri, err := ep.Config.ToURI(ctx)
+	var uri, err = ep.Config.ToURI(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("building connection URI: %w", err)
 	}
@@ -39,7 +39,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		return nil, err
 	}
 
-	templates := renderTemplates(ep.Dialect)
+	var templates = renderTemplates(ep.Dialect)
 
 	return &client{
 		db:        db,
@@ -50,11 +50,11 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func preReqs(ctx context.Context, conf config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	cfg := conf
+	var cfg = conf
 
-	uri, err := cfg.ToURI(ctx)
+	var uri, err = cfg.ToURI(ctx)
 	if err != nil {
 		errs.Err(fmt.Errorf("building connection URI: %w", err))
 		return errs
@@ -92,7 +92,7 @@ func preReqs(ctx context.Context, conf config, _ map[string]bool) *cerrors.Prere
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	catalog := c.cfg.Database
+	var catalog = c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
 		// database if that's the case.
@@ -112,15 +112,15 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	// Enrich USER-DEFINED columns with udt_name so PgEnum.Compatible can
 	// identify whether the existing column has the expected enum type.
-	schemas := make([]string, 0, len(resourcePaths))
+	var schemas = make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
+		var loc = c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
 	}
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+	var rows, err = c.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT table_schema, table_name, column_name, udt_name
 		FROM information_schema.columns
 		WHERE table_catalog = %s AND table_schema IN (%s) AND data_type = 'USER-DEFINED'`,
@@ -152,7 +152,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 // PrepareTable resolves PgEnum type names before
 // materialize-sql renders the CREATE TABLE statement used as the action description.
 func (c *client) PrepareTable(table *sql.Table) error {
-	_, err := resolveEnumTypes(c.ep.Dialect, table)
+	var _, err = resolveEnumTypes(c.ep.Dialect, table)
 	return err
 }
 
@@ -162,7 +162,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		res = tc.Resource.(tableConfig)
 	}
 
-	txn, err := c.db.BeginTx(ctx, nil)
+	var txn, err = c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("db.BeginTx: %w", err)
 	}
@@ -170,7 +170,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 
 	for _, col := range tc.Table.Columns() {
 		if e, ok := col.MappedType.TargetType.(*PgEnum); ok && e.TypeName != "" {
-			stmt, err := c.createEnumTypeSQL(e)
+			var stmt, err = c.createEnumTypeSQL(e)
 			if err != nil {
 				return err
 			}
@@ -202,19 +202,19 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -225,7 +225,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	// CREATE TYPE for newly added enum columns
 	for i := range ta.AddColumns {
 		if e, ok := ta.AddColumns[i].MappedType.TargetType.(*PgEnum); ok {
-			stmt, err := c.createEnumTypeSQL(e)
+			var stmt, err = c.createEnumTypeSQL(e)
 			if err != nil {
 				return "", nil, err
 			}
@@ -236,7 +236,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	// CREATE TYPE for enum migrations
 	for _, change := range ta.ColumnTypeChanges {
 		if e, ok := change.Column.MappedType.TargetType.(*PgEnum); ok {
-			stmt, err := c.createEnumTypeSQL(e)
+			var stmt, err = c.createEnumTypeSQL(e)
 			if err != nil {
 				return "", nil, err
 			}
@@ -246,7 +246,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	// ALTER TYPE ADD VALUE for existing enum columns
 	for _, col := range ta.Table.Columns() {
-		e, ok := col.MappedType.TargetType.(*PgEnum)
+		var e, ok = col.MappedType.TargetType.(*PgEnum)
 		if !ok || e.TypeName == "" {
 			continue
 		}
@@ -261,7 +261,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := c.templates.alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		alterColumnStmt := alterColumnStmtBuilder.String()
+		var alterColumnStmt = alterColumnStmtBuilder.String()
 
 		stmts = append(stmts, alterColumnStmt)
 	}
@@ -277,7 +277,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 
 		for _, change := range enumChanges {
-			e := change.Column.MappedType.TargetType.(*PgEnum)
+			var e = change.Column.MappedType.TargetType.(*PgEnum)
 			stmts = append(stmts, fmt.Sprintf(
 				"ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
 				ta.Identifier, change.Identifier, e.TypeName, change.Identifier, e.TypeName,
@@ -318,7 +318,7 @@ func (c *client) createEnumTypeSQL(e *PgEnum) (string, error) {
 	if e.TypeName == "" {
 		return "", fmt.Errorf("internal: PgEnum TypeName not resolved for field %q", e.Field)
 	}
-	quotedVals := make([]string, len(e.Values))
+	var quotedVals = make([]string, len(e.Values))
 	for i, v := range e.Values {
 		quotedVals[i] = c.ep.Dialect.Literal(v)
 	}
@@ -358,7 +358,7 @@ func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) er
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
 	// Use a fresh connection for this operation to prevent problems with cached
 	// query plans for migration test cases.
-	uri, err := c.cfg.ToURI(ctx)
+	var uri, err = c.cfg.ToURI(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building connection URI: %w", err)
 	}

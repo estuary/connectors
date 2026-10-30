@@ -11,16 +11,16 @@ import (
 )
 
 func createPgDialect(featureFlags map[string]bool) sql.Dialect {
-	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"),
+	var primaryKeyTextType = sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"),
 		sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) {
 			return strings.ReplaceAll(in, "\u0000", ""), nil
 		})),
 	)
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
-	datetimeMapping := sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime))
-	timeMapping := sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone"))
+	var dateMapping = sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	var datetimeMapping = sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime))
+	var timeMapping = sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone"))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -29,7 +29,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
-	binaryMapping := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
+	var binaryMapping = sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
 	if featureFlags["native_binary_column_type"] {
 		binaryMapping = sql.MapStatic("BYTEA", sql.UsingConverter(sql.Base64Decoder))
 	}
@@ -43,8 +43,8 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 	// Gated behind the "jsonb" feature flag: when disabled the
 	// contentMediaType is ignored entirely and everything maps to JSON, exactly
 	// as it did before JSONB support was introduced.
-	jsonbContentMediaType := "application/vnd.estuary.postgresql.jsonb+json"
-	jsonOrJsonb := func(jsonMapper, jsonbMapper sql.MapProjectionFn) sql.MapProjectionFn {
+	var jsonbContentMediaType = "application/vnd.estuary.postgresql.jsonb+json"
+	var jsonOrJsonb = func(jsonMapper, jsonbMapper sql.MapProjectionFn) sql.MapProjectionFn {
 		if !featureFlags["jsonb"] {
 			return jsonMapper
 		}
@@ -56,7 +56,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		}
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
@@ -474,13 +474,13 @@ UPDATE {{ Identifier $.TablePath }}
 // This means we have to be aware of this possible truncation when querying the information_schema
 // view.
 func truncatedIdentifier(in string) string {
-	maxByteLength := 63
+	var maxByteLength = 63
 
 	if len(in) <= maxByteLength {
 		return in
 	}
 
-	bytes := []byte(in)
+	var bytes = []byte(in)
 	for maxByteLength >= 0 && !utf8.Valid(bytes[:maxByteLength]) {
 		// Don't mangle multi-byte characters; this seems to be consistent with Postgres truncation
 		// as well.

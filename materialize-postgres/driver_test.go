@@ -39,7 +39,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 			Delta: delta,
@@ -52,7 +52,7 @@ func TestIntegration(t *testing.T) {
 	// prefix of rndSuffix survives. We strip that truncated prefix here too.
 	// Additionally, the 8-hex hash in hash-mode type names is computed from the random table
 	// name and therefore changes per run; normalize it to a stable placeholder.
-	actionDescSanitizers := []func(string) string{
+	var actionDescSanitizers = []func(string) string{
 		func(s string) string {
 			// Strip truncated test-suffix components (_<uuid8>_flow_test_<partial_ts>) that
 			// remain after the full rndSuffix has already been removed by the framework.
@@ -151,7 +151,7 @@ func TestIntegration(t *testing.T) {
 				// The fence update is parameterized, so it must be executed with
 				// bind arguments rather than as a plain statement, mirroring the
 				// driver's own fenced-off detection via RowsAffected.
-				res, err := c.(*client).db.ExecContext(ctx, fenceUpdate.String(), fenceUpdateArgs(fence)...)
+				var res, err = c.(*client).db.ExecContext(ctx, fenceUpdate.String(), fenceUpdateArgs(fence)...)
 				if err != nil {
 					return fmt.Errorf("updating fence: %w", err)
 				} else if rows, err := res.RowsAffected(); err != nil {
@@ -172,9 +172,9 @@ func TestPrereqs(t *testing.T) {
 
 	t.Skip("todo: fix pre-reqs tests")
 
-	cfg := testConfig()
+	var cfg = testConfig()
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		cfg  func(config) config
 		want []error

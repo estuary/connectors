@@ -19,7 +19,7 @@ func TestPostgresConfig(t *testing.T) {
 		Database: "namegame",
 	}
 	require.NoError(t, validConfig.Validate())
-	uri, err := validConfig.ToURI(context.Background())
+	var uri, err = validConfig.ToURI(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame?tcp_keepalives_count=6&tcp_keepalives_idle=120&tcp_keepalives_interval=30", uri)
 
@@ -93,7 +93,7 @@ func TestConfigURI(t *testing.T) {
 			if err := cfg.Validate(); err != nil {
 				valid = err.Error()
 			}
-			uri, err := cfg.ToURI(context.Background())
+			var uri, err = cfg.ToURI(context.Background())
 			require.NoError(t, err)
 			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
 		})

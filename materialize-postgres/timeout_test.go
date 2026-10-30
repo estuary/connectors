@@ -11,7 +11,7 @@ import (
 func TestIdleQueryTimeout(t *testing.T) {
 	const timeout = 50 * time.Millisecond
 
-	ctx, touch, cancel := ctxWithIdleQueryTimeout(context.Background(), timeout)
+	var ctx, touch, cancel = ctxWithIdleQueryTimeout(context.Background(), timeout)
 	for range 6 {
 		time.Sleep(timeout / 2)
 		touch()
