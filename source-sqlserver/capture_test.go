@@ -431,7 +431,7 @@ func TestDDLHistoryFiltering(t *testing.T) {
 			tableName, strandedObjectID))
 	})
 
-	ddlHistory, err := cdcGetDDLHistory(context.Background(), db.conn)
+	var ddlHistory, err = cdcGetDDLHistory(context.Background(), db.conn)
 	require.NoError(t, err)
 	require.Empty(t, ddlHistory[streamID], "a DDL history row whose change table no longer exists must not be reported as an alteration")
 

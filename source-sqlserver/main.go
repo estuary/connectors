@@ -313,7 +313,7 @@ func (c *Config) buildConnector() (*mssqldb.Connector, error) {
 	case UserPassword:
 		return mssqldb.NewConnector(uri)
 	case AWSIAM:
-		credProvider, err := c.Credentials.AWSCredentialsProvider()
+		var credProvider, err = c.Credentials.AWSCredentialsProvider()
 		if err != nil {
 			return nil, err
 		}
@@ -404,7 +404,7 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
+		var host, port, err = net.SplitHostPort(config.Address)
 		if err != nil {
 			return nil, fmt.Errorf("splitting address to host and port: %w", err)
 		}
@@ -468,7 +468,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		"user":    db.config.User,
 	}).Info("connecting to database")
 
-	connector, err := db.config.buildConnector()
+	var connector, err = db.config.buildConnector()
 	if err != nil {
 		return fmt.Errorf("error creating connector: %w", err)
 	}

@@ -17,7 +17,7 @@ func (db *sqlserverDatabase) WatermarksTable() sqlcapture.StreamID {
 
 func (db *sqlserverDatabase) createWatermarksTable(ctx context.Context) error {
 	var tableName = db.config.Advanced.WatermarksTable
-	rows, err := db.conn.QueryContext(ctx, fmt.Sprintf(`CREATE TABLE %s(slot INTEGER PRIMARY KEY, watermark TEXT);`, tableName))
+	var rows, err = db.conn.QueryContext(ctx, fmt.Sprintf(`CREATE TABLE %s(slot INTEGER PRIMARY KEY, watermark TEXT);`, tableName))
 	if err != nil {
 		return fmt.Errorf("error creating watermarks table: %w", err)
 	}

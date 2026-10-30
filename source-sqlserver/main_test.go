@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -64,7 +64,7 @@ var connectorBinary string
 // Split out from TestMain because os.Exit would skip deferred cleanup of the build.
 func runTests(m *testing.M) int {
 	if os.Getenv("TEST_DATABASE") == "yes" {
-		buildDir, err := os.MkdirTemp("", "source-sqlserver-build-*")
+		var buildDir, err = os.MkdirTemp("", "source-sqlserver-build-*")
 		if err != nil {
 			log.WithField("err", err).Error("error creating build directory")
 			return 1
@@ -118,7 +118,7 @@ func controlConfigURI() (string, error) {
 // frequent scans make a fence available sooner, but the connector's default one second
 // poll still quantizes every fence to a one second boundary.
 func startManualCDCScanner() (func(), error) {
-	controlURI, err := controlConfigURI()
+	var controlURI, err = controlConfigURI()
 	if err != nil {
 		return nil, fmt.Errorf("building scanner connection DSN: %w", err)
 	}
@@ -223,7 +223,7 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 	var fullName = *testSchemaName + "." + baseName
 
 	// Setup: Create black-box test capture
-	tc, err := blackbox.NewWithTranscript("testdata/flow.yaml")
+	var tc, err = blackbox.NewWithTranscript("testdata/flow.yaml")
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)

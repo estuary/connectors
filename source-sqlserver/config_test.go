@@ -52,7 +52,7 @@ func TestNormalizeCredentials(t *testing.T) {
 		legacy.normalizeCredentials()
 		union.normalizeCredentials()
 
-		unionURI, err := union.ToURI()
+		var unionURI, err = union.ToURI()
 		require.NoError(t, err)
 		legacyURI, err := legacy.ToURI()
 		require.NoError(t, err)
@@ -155,7 +155,7 @@ func TestAWSIAMConfigURI(t *testing.T) {
 
 	// The DSN carries the user but no password: the RDS auth token is supplied
 	// out-of-band by the connector's access token provider.
-	uri, err := cfg.ToURI()
+	var uri, err = cfg.ToURI()
 	require.NoError(t, err)
 	require.Equal(t,
 		"sqlserver://flow_capture@example.rds.amazonaws.com:1433?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=flow&encrypt=true",
@@ -182,7 +182,7 @@ func TestAzureIAMConfigURI(t *testing.T) {
 
 	// The DSN carries no user info at all: the Entra access token supplied
 	// out-of-band identifies the principal.
-	uri, err := cfg.ToURI()
+	var uri, err = cfg.ToURI()
 	require.NoError(t, err)
 	require.Equal(t,
 		"sqlserver://example.database.windows.net:1433?TrustServerCertificate=true&app+name=Flow+CDC+Connector&database=flow&encrypt=true",
@@ -197,7 +197,7 @@ func TestUnsupportedAuthTypeURI(t *testing.T) {
 		Credentials: &CredentialsConfig{AuthType: "Bogus"},
 	}
 
-	_, err := cfg.ToURI()
+	var _, err = cfg.ToURI()
 	require.ErrorContains(t, err, `unsupported 'auth_type' "Bogus"`)
 
 	_, err = cfg.buildConnector()

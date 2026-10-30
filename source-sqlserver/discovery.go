@@ -212,7 +212,7 @@ func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested
 // derivations (fallback keys, key-ordering predictability) can be finalized
 // here rather than after all chunks complete.
 func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, requested []sqlcapture.TableID) error {
-	tables, err := getTables(ctx, db.conn, requested)
+	var tables, err = getTables(ctx, db.conn, requested)
 	if err != nil {
 		return fmt.Errorf("unable to list database tables: %w", err)
 	}
@@ -412,7 +412,7 @@ SELECT DISTINCT IST.TABLE_SCHEMA, IST.TABLE_NAME
 	}
 	query.WriteString(";")
 
-	rows, err := conn.QueryContext(ctx, query.String(), args...)
+	var rows, err = conn.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -441,7 +441,7 @@ func getTables(ctx context.Context, conn *sql.DB, requested []sqlcapture.TableID
 	var predicate, args = tableIDsPredicate("TABLE_SCHEMA", "TABLE_NAME", requested, 1)
 	var query = fmt.Sprintf("SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE %s;", predicate)
 
-	rows, err := conn.QueryContext(ctx, query, args...)
+	var rows, err = conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}

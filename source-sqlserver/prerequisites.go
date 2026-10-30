@@ -288,7 +288,7 @@ func (db *sqlserverDatabase) prerequisiteTableCaptureInstances(ctx context.Conte
 	var errs = make(map[sqlcapture.TableID]error)
 
 	// Query all capture instances once upfront
-	captureInstances, err := cdcListCaptureInstances(ctx, db.conn)
+	var captureInstances, err = cdcListCaptureInstances(ctx, db.conn)
 	if err != nil {
 		for _, table := range tables {
 			errs[table] = fmt.Errorf("unable to query capture instances: %w", err)

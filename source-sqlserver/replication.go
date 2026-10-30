@@ -50,7 +50,7 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursorJ
 	}
 
 	// Decode start cursor from a JSON quoted string into its actual string contents
-	startCursor, err := unmarshalJSONString(startCursorJSON)
+	var startCursor, err = unmarshalJSONString(startCursorJSON)
 	if err != nil {
 		return nil, fmt.Errorf("invalid start cursor JSON: %w", err)
 	}
@@ -154,7 +154,7 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	// SetupPrerequisites already verified that CDC is enabled, so it isn't checked again here.
 
 	// Check replica status. Some operations work differently on replicas.
-	isReplica, err := rs.db.replicaStatus(ctx)
+	var isReplica, err = rs.db.replicaStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("error determining if database is a replica: %w", err)
 	}
@@ -550,7 +550,7 @@ func (rs *sqlserverReplicationStream) tryToEstablishFencePosition(ctx context.Co
 	//
 	// TODO(wgd): Consider making it a hard failure if we lack this permission?
 	if rs.maxTransactionsPerScanSession == 0 {
-		jobConfig, err := cdcQueryCaptureJobConfig(ctx, rs.conn)
+		var jobConfig, err = cdcQueryCaptureJobConfig(ctx, rs.conn)
 		if err == nil {
 			log.WithFields(log.Fields{
 				"jobID":      jobConfig.JobID,
@@ -570,7 +570,7 @@ func (rs *sqlserverReplicationStream) tryToEstablishFencePosition(ctx context.Co
 	// Obtain information about the latest CDC log scan session and the current maximum CDC LSN.
 	// The order in which we fetch these is important, because we need to know that the CDC max-LSN
 	// value is causally not-before the log scan session we examine.
-	session, err := latestCDCLogScanSession(ctx, rs.conn)
+	var session, err = latestCDCLogScanSession(ctx, rs.conn)
 	if err != nil {
 		return nil, err
 	}
@@ -921,7 +921,7 @@ func (rs *sqlserverReplicationStream) manageCaptureInstances(ctx context.Context
 	}
 
 	// Query system tables for the latest instance list and any DDL events of note.
-	captureInstances, err := cdcListCaptureInstances(ctx, rs.conn)
+	var captureInstances, err = cdcListCaptureInstances(ctx, rs.conn)
 	if err != nil {
 		return fmt.Errorf("error listing CDC instances: %w", err)
 	}
@@ -1025,7 +1025,7 @@ func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) e
 	rs.cleanup.RUnlock()
 
 	// Enumerate all capture instances currently available on the server.
-	captureInstances, err := cdcListCaptureInstances(ctx, rs.conn)
+	var captureInstances, err = cdcListCaptureInstances(ctx, rs.conn)
 	if err != nil {
 		return fmt.Errorf("error listing CDC instances: %w", err)
 	}
@@ -1079,7 +1079,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	//}).Trace("polling stream")
 
 	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
-	rows, err := rs.conn.QueryContext(ctx, query, info.FromLSN, info.ToLSN)
+	var rows, err = rs.conn.QueryContext(ctx, query, info.FromLSN, info.ToLSN)
 	if err != nil {
 		return fmt.Errorf("error requesting changes: %w", err)
 	}
@@ -1387,7 +1387,7 @@ func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamI
 func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []string) (map[string]LSN, error) {
 	var query, sortedInstanceNames = cdcInstanceMaxLSNsQuery(instanceNames)
 
-	rows, err := conn.QueryContext(ctx, query)
+	var rows, err = conn.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -1569,7 +1569,7 @@ func (db *sqlserverDatabase) replicaStatus(ctx context.Context) (bool, error) {
 	if db.isReplica != nil {
 		return *db.isReplica, nil
 	}
-	isReplica, err := isReplicaDatabase(ctx, db.conn)
+	var isReplica, err = isReplicaDatabase(ctx, db.conn)
 	if err != nil {
 		return false, err
 	}
