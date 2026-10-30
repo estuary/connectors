@@ -262,8 +262,7 @@ func (s *streamClient) dropChannel(ctx context.Context, schema, table, channelNa
 		Table:       table,
 		ChannelName: channelName,
 	})
-	var apiErr *streamingApiError
-	if errors.As(err, &apiErr) && (apiErr.Code == 19 || apiErr.Code == 25) {
+	if apiErr, ok := errors.AsType[*streamingApiError](err); ok && (apiErr.Code == 19 || apiErr.Code == 25) {
 		return nil
 	} else if err != nil {
 		return err
