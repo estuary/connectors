@@ -97,7 +97,7 @@ func (c *config) Validate() error {
 	}
 
 	if c.Advanced.MaxBackfillInterval != "" {
-		parsed, err := time.ParseDuration(c.Advanced.MaxBackfillInterval)
+		var parsed, err = time.ParseDuration(c.Advanced.MaxBackfillInterval)
 		if err != nil {
 			return fmt.Errorf("invalid max_backfill_interval %q: %w", c.Advanced.MaxBackfillInterval, err)
 		}
@@ -108,7 +108,7 @@ func (c *config) Validate() error {
 	}
 
 	if c.Advanced.MinBackfillInterval != "" {
-		parsed, err := time.ParseDuration(c.Advanced.MinBackfillInterval)
+		var parsed, err = time.ParseDuration(c.Advanced.MinBackfillInterval)
 		if err != nil {
 			return fmt.Errorf("invalid min_backfill_interval %q: %w", c.Advanced.MinBackfillInterval, err)
 		}

@@ -47,14 +47,14 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		checkpoint.BackfilledUntil = make(map[boilerplate.StateKey]time.Time)
 	}
 
-	resourceStates := make(map[string]*resourceState)
+	var resourceStates = make(map[string]*resourceState)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		resourceState := &resourceState{
+		var resourceState = &resourceState{
 			stateKey:     boilerplate.StateKey(binding.StateKey),
 			bindingIndex: idx,
 			startDate:    cfg.StartDate,
@@ -98,7 +98,7 @@ func (c *capture) Run() error {
 
 	// Capture each resource.
 	for name, res := range c.resourceStates {
-		name, res := name, res // Copy the loop variables for each closure
+		var name, res = name, res // Copy the loop variables for each closure
 		eg.Go(func() error {
 			return c.captureResource(ctx, name, res)
 		})
@@ -108,17 +108,17 @@ func (c *capture) Run() error {
 }
 
 func (c *capture) captureResource(ctx context.Context, name string, r *resourceState) error {
-	dataClient := marketdata.NewClient(marketdata.ClientOpts{
+	var dataClient = marketdata.NewClient(marketdata.ClientOpts{
 		ApiKey:    c.config.ApiKeyID,
 		ApiSecret: c.config.ApiSecretKey,
 	})
 
-	streamClient := marketdataStream.NewStocksClient(
+	var streamClient = marketdataStream.NewStocksClient(
 		c.config.Feed,
 		marketdataStream.WithCredentials(c.config.ApiKeyID, c.config.ApiSecretKey),
 	)
 
-	worker := alpacaWorker{
+	var worker = alpacaWorker{
 		flowStream:   c.stream,
 		bindingIdx:   r.bindingIndex,
 		dataClient:   dataClient,
@@ -132,7 +132,7 @@ func (c *capture) captureResource(ctx context.Context, name string, r *resourceS
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	caughtUp := make(chan struct{})
+	var caughtUp = make(chan struct{})
 
 	if !c.config.Advanced.DisableBackfill {
 		eg.Go(func() error {

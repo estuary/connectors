@@ -12,8 +12,8 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pc.Request_Spec{})
+	var driver = driver{}
+	var response, err = driver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -26,11 +26,11 @@ func TestDiscover(t *testing.T) {
 	// can always test it as part of the normal unit tests.
 	t.Setenv("TEST_DATABASE", "yes")
 
-	startDate, err := time.Parse(time.RFC3339Nano, "2019-01-02T15:04:05.999999999Z")
+	var startDate, err = time.Parse(time.RFC3339Nano, "2019-01-02T15:04:05.999999999Z")
 	require.NoError(t, err)
 	endDate, err := time.Parse(time.RFC3339Nano, "2019-02-03T15:04:05.999999999Z")
 	require.NoError(t, err)
 
-	capture := captureSpec(t, []string{"trades"}, []string{"AAPL"}, startDate, endDate, nil)
+	var capture = captureSpec(t, []string{"trades"}, []string{"AAPL"}, startDate, endDate, nil)
 	capture.VerifyDiscover(context.Background(), t, nil...)
 }

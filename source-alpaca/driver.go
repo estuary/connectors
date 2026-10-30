@@ -59,8 +59,8 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 
 	// Query an arbitrary time in the past so that we don't have to worry about the "free plan"
 	// option which cannot query within the last 15 minutes.
-	testTime := time.Now().Add(-1 * time.Hour)
-	_, err := marketdata.NewClient(marketdata.ClientOpts{
+	var testTime = time.Now().Add(-1 * time.Hour)
+	var _, err = marketdata.NewClient(marketdata.ClientOpts{
 		ApiKey:    cfg.ApiKeyID,
 		ApiSecret: cfg.ApiSecretKey,
 	}).GetTrades(cfg.GetSymbols()[0], marketdata.GetTradesParams{Feed: cfg.Feed, Start: testTime, End: testTime})
@@ -78,7 +78,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	documentSchema, err := schemagen.GenerateSchema("", &tradeDocument{}).MarshalJSON()
+	var documentSchema, err = schemagen.GenerateSchema("", &tradeDocument{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating document schema: %w", err)
 	}

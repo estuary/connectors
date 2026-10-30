@@ -63,16 +63,16 @@ func (c *alpacaWorker) handleDocuments(docs <-chan tradeDocument, checkpointJSON
 }
 
 func (c *alpacaWorker) streamTrades(ctx context.Context) error {
-	streamedCount := 0
-	logTimer := time.NewTimer(streamerLoggingInterval)
+	var streamedCount = 0
+	var logTimer = time.NewTimer(streamerLoggingInterval)
 
 	// Communicate errors encountered inside the async trade handler callback so we can respond
 	// appropriately in the main thread.
-	handlerErr := make(chan error)
+	var handlerErr = make(chan error)
 
-	streamedTradeHandler := func(t marketdataStream.Trade) {
-		docsChan := make(chan tradeDocument)
-		eg := errgroup.Group{}
+	var streamedTradeHandler = func(t marketdataStream.Trade) {
+		var docsChan = make(chan tradeDocument)
+		var eg = errgroup.Group{}
 		eg.Go(func() error {
 			return c.handleDocuments(docsChan, []byte(emptyCheckpoint))
 		})
@@ -141,16 +141,16 @@ func (c *alpacaWorker) backfillTrades(ctx context.Context, start, end time.Time,
 	// for a short duration before performing smaller incremental backfills.
 	for {
 		var err error
-		thisEnd := getEndDate(c.freePlan, end)
-		dataDurationCovered := thisEnd.Sub(start)
+		var thisEnd = getEndDate(c.freePlan, end)
+		var dataDurationCovered = thisEnd.Sub(start)
 
-		now := time.Now()
+		var now = time.Now()
 		if start, err = c.doBackfill(ctx, start, thisEnd, maxInterval, minInterval); err != nil {
 			return err
 		}
-		dataCollectionTime := time.Since(now)
+		var dataCollectionTime = time.Since(now)
 
-		nextEnd := getEndDate(c.freePlan, end)
+		var nextEnd = getEndDate(c.freePlan, end)
 		if dataCollectionTime > dataDurationCovered && dataCollectionTime > minInterval {
 			log.WithFields(log.Fields{
 				"binding":             c.resourceName,
@@ -195,9 +195,9 @@ func (c *alpacaWorker) doBackfill(ctx context.Context, startLimit, endLimit time
 	}
 
 	// For logging purposes.
-	totalTrades := 0
+	var totalTrades = 0
 
-	start := startLimit
+	var start = startLimit
 	var end time.Time
 
 	for {
@@ -229,26 +229,26 @@ func (c *alpacaWorker) doBackfill(ctx context.Context, startLimit, endLimit time
 			return end, nil
 		}
 
-		params := marketdata.GetTradesParams{
+		var params = marketdata.GetTradesParams{
 			Start:    start,
 			End:      end,
 			Feed:     c.feed,
 			Currency: defaultCurrency,
 		}
 
-		tChan := c.dataClient.GetMultiTradesAsync(c.symbols, params)
+		var tChan = c.dataClient.GetMultiTradesAsync(c.symbols, params)
 
-		docsChan := make(chan tradeDocument)
+		var docsChan = make(chan tradeDocument)
 
-		eg := errgroup.Group{}
+		var eg = errgroup.Group{}
 		eg.Go(func() error {
-			checkpoint := captureState{
+			var checkpoint = captureState{
 				BackfilledUntil: map[boilerplate.StateKey]time.Time{
 					c.stateKey: end,
 				},
 			}
 
-			serialized, err := json.Marshal(checkpoint)
+			var serialized, err = json.Marshal(checkpoint)
 			if err != nil {
 				return fmt.Errorf("error serializing checkpoint %q: %w", checkpoint, err)
 			}
@@ -256,7 +256,7 @@ func (c *alpacaWorker) doBackfill(ctx context.Context, startLimit, endLimit time
 			return c.handleDocuments(docsChan, serialized)
 		})
 
-		theseTrades := 0
+		var theseTrades = 0
 		for item := range tChan {
 			if err := item.Error; err != nil {
 				return time.Time{}, fmt.Errorf("trade item error: %w", err)
@@ -306,7 +306,7 @@ func getEndDate(freePlan bool, endDate time.Time) time.Time {
 		return endDate
 	}
 
-	now := time.Now()
+	var now = time.Now()
 
 	// Free plans can't get data from within the last 15 minutes.
 	if freePlan {

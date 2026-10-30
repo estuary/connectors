@@ -19,7 +19,7 @@ import (
 )
 
 func TestConfigValidate(t *testing.T) {
-	valid := config{
+	var valid = config{
 		ApiKeyID:     "something",
 		ApiSecretKey: "something",
 		Feed:         "iex",
@@ -27,28 +27,28 @@ func TestConfigValidate(t *testing.T) {
 		StartDate:    time.Now(),
 	}
 
-	stopBeforeStart := valid
+	var stopBeforeStart = valid
 	stopBeforeStart.StartDate = time.Now()
 	stopBeforeStart.Advanced.StopDate = stopBeforeStart.StartDate.Add(-1 * time.Minute)
 
-	missingStart := valid
+	var missingStart = valid
 	missingStart.StartDate = time.Time{}
 
-	tooEarlyStartDate := valid
+	var tooEarlyStartDate = valid
 	tooEarlyStartDate.StartDate = time.Unix(0, minStartTimeNanos).Add(-1 * time.Second)
 
-	wrongFeed := valid
+	var wrongFeed = valid
 	wrongFeed.Feed = "otherThing"
 
-	minBackfillBiggerThanMaxBackfill := valid
+	var minBackfillBiggerThanMaxBackfill = valid
 	minBackfillBiggerThanMaxBackfill.Advanced.MaxBackfillInterval = "15m0s"
 	minBackfillBiggerThanMaxBackfill.Advanced.MinBackfillInterval = "16m0s"
 
-	backfillAndRealTimeDisabled := valid
+	var backfillAndRealTimeDisabled = valid
 	backfillAndRealTimeDisabled.Advanced.DisableBackfill = true
 	backfillAndRealTimeDisabled.Advanced.DisableRealTime = true
 
-	tests := []struct {
+	var tests = []struct {
 		name   string
 		config config
 		want   error
@@ -97,7 +97,7 @@ func TestConfigValidate(t *testing.T) {
 	}
 
 	t.Run("default intervals are set correctly", func(t *testing.T) {
-		conf := &config{
+		var conf = &config{
 			ApiKeyID:     "something",
 			ApiSecretKey: "something",
 			Feed:         "iex",
@@ -141,12 +141,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestCaptureMultipleBindings(t *testing.T) {
-	start, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:00:00Z")
+	var start, err = time.Parse(time.RFC3339Nano, "2022-12-19T14:00:00Z")
 	require.NoError(t, err)
 	end, err := time.Parse(time.RFC3339Nano, "2022-12-19T14:10:00Z")
 	require.NoError(t, err)
 
-	capture := captureSpec(t,
+	var capture = captureSpec(t,
 		[]string{"first", "second"},
 		[]string{"AAPL", "MSFT", "AMZN"},
 		start,
@@ -154,7 +154,7 @@ func TestCaptureMultipleBindings(t *testing.T) {
 		&st.SortedCaptureValidator{},
 	)
 
-	captureCtx, cancelCapture := context.WithCancel(context.Background())
+	var captureCtx, cancelCapture = context.WithCancel(context.Background())
 
 	// We need to use a relatively long shutdown delay, since the backfill can potentially cover
 	// periods of time with no historical data.
@@ -177,7 +177,7 @@ func TestCaptureMultipleBindings(t *testing.T) {
 // TestLargeCapture tests a fairly large backfill over a week's time with high-volume symbols. The
 // watchdog timeout may need to be increased based on specific network conditions.
 func TestLargeCapture(t *testing.T) {
-	start, err := time.Parse(time.RFC3339Nano, "2022-12-12T00:00:00Z")
+	var start, err = time.Parse(time.RFC3339Nano, "2022-12-12T00:00:00Z")
 	require.NoError(t, err)
 	end, err := time.Parse(time.RFC3339Nano, "2022-12-17T00:00:00Z")
 	require.NoError(t, err)
@@ -186,13 +186,13 @@ func TestLargeCapture(t *testing.T) {
 	// captured for 60 seconds. The WDT will be fed via the `WatchdogValidator` wrapper around the
 	// actual capture output validator.
 	const quiescentTimeout = 60 * time.Second
-	ctx, cancel := context.WithCancel(context.Background())
-	wdt := time.AfterFunc(quiescentTimeout, func() {
+	var ctx, cancel = context.WithCancel(context.Background())
+	var wdt = time.AfterFunc(quiescentTimeout, func() {
 		log.WithField("timeout", quiescentTimeout.String()).Debug("capture watchdog timeout expired")
 		cancel()
 	})
 
-	capture := captureSpec(t,
+	var capture = captureSpec(t,
 		[]string{"trades"},
 		[]string{"AAPL", "MSFT", "GOOG", "AMZN"},
 		start,
@@ -209,7 +209,7 @@ func TestLargeCapture(t *testing.T) {
 	// Since the backfill takes about 300s to complete this should restart about 30 times along the
 	// way.
 	for ctx.Err() == nil {
-		ctx, cancel := context.WithCancel(ctx)
+		var ctx, cancel = context.WithCancel(ctx)
 		time.AfterFunc(10*time.Second, cancel)
 		capture.Capture(ctx, t, nil)
 	}
@@ -222,8 +222,8 @@ func captureSpec(t testing.TB, names []string, symbols []string, start, end time
 
 	// Use credentials if provided by flags, otherwise use placeholders for tests that don't
 	// interact with a real API.
-	apiKey := "apiKey"
-	apiSecret := "apiSecret"
+	var apiKey = "apiKey"
+	var apiSecret = "apiSecret"
 	if *testApiKey != "" {
 		apiKey = *testApiKey
 	}
@@ -231,7 +231,7 @@ func captureSpec(t testing.TB, names []string, symbols []string, start, end time
 		apiSecret = *testApiSecret
 	}
 
-	endpointSpec := &config{
+	var endpointSpec = &config{
 		ApiKeyID:     apiKey,
 		ApiSecretKey: apiSecret,
 		Feed:         "iex",
@@ -256,11 +256,11 @@ func captureSpec(t testing.TB, names []string, symbols []string, start, end time
 func makeBindings(t testing.TB, names []string, start, end time.Time) []*flow.CaptureSpec_Binding {
 	var bindings []*flow.CaptureSpec_Binding
 	for _, name := range names {
-		spec := resource{
+		var spec = resource{
 			Name: name,
 		}
 
-		specBytes, err := json.Marshal(spec)
+		var specBytes, err = json.Marshal(spec)
 		require.NoError(t, err)
 
 		bindings = append(bindings, &flow.CaptureSpec_Binding{
