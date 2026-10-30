@@ -156,7 +156,7 @@ func TestJsonWriterCompactRawLineBreaks(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			var w = NewJsonWriter(&testWriter{w: &buf}, []string{"doc"}, WithJsonDisableCompression(), WithJsonCompactRawLineBreaks())
+			var w = NewJsonWriter(&testWriter{w: &buf}, []string{"doc"}, WithJsonDisableCompression())
 			var row = []any{tt.input}
 
 			var err = w.Write(row)

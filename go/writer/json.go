@@ -27,9 +27,8 @@ const (
 )
 
 type jsonConfig struct {
-	disableCompression   bool
-	skipNulls            bool
-	compactRawLineBreaks bool
+	disableCompression bool
+	skipNulls          bool
 }
 
 type JsonOption func(*jsonConfig)
@@ -46,15 +45,6 @@ func WithJsonSkipNulls() JsonOption {
 	}
 }
 
-// WithJsonCompactRawLineBreaks compacts a pre-serialized JSON value that contains a
-// line break, so that every row is written on a single line. A value without one is
-// written as given, and an empty value is an error.
-func WithJsonCompactRawLineBreaks() JsonOption {
-	return func(cfg *jsonConfig) {
-		cfg.compactRawLineBreaks = true
-	}
-}
-
 type JsonWriter struct {
 	w            io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
 	cwc          *countingWriteCloser
@@ -64,8 +54,7 @@ type JsonWriter struct {
 	uncompressed int
 
 	// fields names the values of a row, for errors about a single value.
-	fields               []string
-	compactRawLineBreaks bool
+	fields []string
 }
 
 // NewJsonWriter creates a JsonWriter from w. w is closed when JsonWriter is closed. If `fields`
@@ -77,9 +66,8 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 	}
 
 	jw := &JsonWriter{
-		cwc:                  &countingWriteCloser{w: w},
-		fields:               fields,
-		compactRawLineBreaks: cfg.compactRawLineBreaks,
+		cwc:    &countingWriteCloser{w: w},
+		fields: fields,
 	}
 
 	if !cfg.disableCompression {
@@ -110,10 +98,8 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 }
 
 func (w *JsonWriter) Write(vals []any) (err error) {
-	if w.compactRawLineBreaks {
-		if vals, err = w.compactLineBreaks(vals); err != nil {
-			return err
-		}
+	if vals, err = w.compactLineBreaks(vals); err != nil {
+		return err
 	}
 
 	w.buf = w.buf[:0]
@@ -147,7 +133,8 @@ func (w *JsonWriter) Write(vals []any) (err error) {
 }
 
 // compactLineBreaks returns vals with each pre-serialized JSON value that contains a
-// line break replaced by its compacted form. vals itself is left unchanged.
+// line break replaced by its compacted form, so that every row is written on a single
+// line. vals itself is left unchanged, and an empty value is an error.
 func (w *JsonWriter) compactLineBreaks(vals []any) ([]any, error) {
 	var out, copied = vals, false
 	for i, v := range vals {
