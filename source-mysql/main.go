@@ -463,7 +463,6 @@ func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	var mysqlErr *mysql.MyError
 	var attempt = func(tlsConfig *tls.Config) (*client.Conn, error) {
 		var opts = []client.Option{withAttrs}
 		if tlsConfig != nil {
@@ -480,7 +479,7 @@ func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
 		if err == nil {
 			logrus.WithField("addr", address).Info("connected without TLS")
 			return conn, nil
-		} else if errors.As(err, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		} else if mysqlErr, ok := errors.AsType[*mysql.MyError](err); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 			return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 		}
 		return nil, fmt.Errorf("unable to connect to database without TLS: %w", err)
@@ -490,7 +489,7 @@ func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
 	if errWithTLS == nil {
 		logrus.WithFields(logrus.Fields{"addr": address, "sslmode": settings.EffectiveMode()}).Info("connected with TLS")
 		return connWithTLS, nil
-	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithTLS); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
 		if msg := db.config.sslFailureMessage(settings, errWithTLS); msg != "" {
@@ -508,10 +507,10 @@ func (db *mysqlDatabase) dial(address, password string) (*client.Conn, error) {
 	if connWithoutTLS, errWithoutTLS := attempt(nil); errWithoutTLS == nil {
 		logrus.WithFields(logrus.Fields{"addr": address, "errWithTLS": errWithTLS}).Warn("connected without TLS")
 		return connWithoutTLS, nil
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithoutTLS); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithoutTLS); ok && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
 		return nil, fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
