@@ -37,6 +37,16 @@
 #                            #   process. Fixture documents hash-route by
 #                            #   collection key, so each document lands on
 #                            #   exactly one shard.
+#
+#     [--preview-arg ARG]    # extra argument to the materialization's
+#                            #   `flowctl raw preview-next`, repeatable.
+#     [--tpcds-cache DIR]    # TPC-DS only: generate the fixture into DIR once
+#                            #   before the run and replay it, here and in
+#                            #   later runs of the same workload.
+#
+# A scenario with a `tpcds` block streams the TPC-DS dataset from the
+# source-tpc-ds capture instead of synthetic documents (see tpcds.py). Its
+# image is $TPCDS_IMAGE, default ghcr.io/estuary/source-tpc-ds:dev.
 
 set -o errexit
 set -o pipefail
@@ -57,6 +67,8 @@ SHARD_FLAGS=()
 TABLE_SUFFIX=""
 SHARD_LOG_LEVEL=""
 SHARDS=1
+TPCDS_CACHE=""
+PREVIEW_EXTRA=()
 
 while (($#)); do
   case "$1" in
@@ -72,8 +84,10 @@ while (($#)); do
     --table-suffix) TABLE_SUFFIX="$2";   shift 2 ;;
     --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
     --shards)    SHARDS="$2";    shift 2 ;;
+    --tpcds-cache) TPCDS_CACHE="$2"; shift 2 ;;
+    --preview-arg) PREVIEW_EXTRA+=("$2"); shift 2 ;;
     -h|--help)
-      sed -n '2,38p' "$0"; exit 0 ;;
+      sed -n '2,47p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -119,7 +133,8 @@ else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
   # Connectors structured as a library plus a cmd/ main (all the SQL ones)
   # match more than one package under ./<connector>/..., which `go build -o
-  # <file>` refuses. Prefer the cmd package when there is one.
+  # <file>` refuses. Prefer the cmd package when there is one, and
+  # cmd/connector where cmd holds several mains.
   if [[ -d "$ROOT_DIR/$CONNECTOR/cmd/connector" ]]; then
     BUILD_PKG="./$CONNECTOR/cmd/connector/..."
   elif [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
@@ -166,22 +181,29 @@ echo "task:      $TASK"
 # Bring up the connector's docker-compose stack (DB only). Some connectors
 # keep it under tests/materialize/<connector>/ (the integration-test convention),
 # others keep it at the connector root. Try both.
+COMPOSE_FILE=""
+COMPOSE_ARGS=()
 if (( DOCKER_COMPOSE )); then
-	COMPOSE_FILE=""
-	for cand in \
-	  "$ROOT_DIR/tests/materialize/$CONNECTOR/docker-compose.yaml" \
-	  "$ROOT_DIR/$CONNECTOR/docker-compose.yaml"
-	do
-	  if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
-	done
-	if [[ -n "$COMPOSE_FILE" ]]; then
-	  echo "starting docker-compose: $COMPOSE_FILE"
-	  docker compose -f "$COMPOSE_FILE" up --wait
-	  # Same grace period as tests/materialize/<connector>/setup.sh.
-	  sleep 5
-	else
-	  echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
-	fi
+  for cand in \
+    "$ROOT_DIR/tests/materialize/$CONNECTOR/docker-compose.yaml" \
+    "$ROOT_DIR/$CONNECTOR/docker-compose.yaml"
+  do
+    if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
+  done
+  # setup/<connector>.compose.yaml, when present, sizes the integration-test
+  # stack for benchmark loads.
+  COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+  if [[ -f "$BENCH_DIR/setup/${CONNECTOR}.compose.yaml" ]]; then
+    COMPOSE_ARGS+=(-f "$BENCH_DIR/setup/${CONNECTOR}.compose.yaml")
+  fi
+  if [[ -n "$COMPOSE_FILE" ]]; then
+    echo "starting docker-compose: ${COMPOSE_ARGS[*]}"
+    docker compose "${COMPOSE_ARGS[@]}" up --wait
+    # Same grace period as tests/materialize/<connector>/setup.sh.
+    sleep 5
+  else
+    echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
+  fi
 fi
 
 # clean up the destination resources using testctl
@@ -223,7 +245,7 @@ cleanup() {
     sweep_run
     if [[ -n "$COMPOSE_FILE" ]]; then
       echo "tearing down docker-compose"
-      docker compose -f "$COMPOSE_FILE" down -v || true
+      docker compose "${COMPOSE_ARGS[@]}" down -v || true
     fi
   fi
   return $status
@@ -239,6 +261,14 @@ if [[ -x "$SETUP_SCRIPT" ]]; then
   BENCH_CONFIG="$CONFIG" "$SETUP_SCRIPT"
 fi
 
+TPCDS=0
+if python3 -c 'import sys, yaml; sys.exit("tpcds" not in (yaml.safe_load(open(sys.argv[1])) or {}))' "$SCENARIO"; then
+  TPCDS=1
+  CAPTURE_SPEC="$OUT_DIR/capture.flow.yaml"
+  CAPTURE_TASK="bench/source-tpc-ds${RUN_SUFFIX}"
+  echo "workload:  TPC-DS via ${TPCDS_IMAGE:-ghcr.io/estuary/source-tpc-ds:dev}"
+fi
+
 # Render the flow spec.
 SPEC="$OUT_DIR/flow.yaml"
 SPEC_ARGS=(
@@ -248,6 +278,9 @@ SPEC_ARGS=(
   --output    "$SPEC"
   --task      "$TASK"
 )
+if (( TPCDS )); then
+  SPEC_ARGS+=(--capture-output "$CAPTURE_SPEC" --capture-task "$CAPTURE_TASK")
+fi
 if (( DOCKER )); then
   SPEC_ARGS+=(--docker)
 fi
@@ -286,13 +319,34 @@ FIFO="$OUT_DIR/fixture.fifo"
 [[ -p "$FIFO" ]] || mkfifo "$FIFO"
 
 STATE_LOG="$OUT_DIR/state.json"
-echo "starting generator (seed=$SEED)"
-python3 "$BENCH_DIR/generate.py" \
-  --scenario "$SCENARIO" \
-  --seed     "$SEED" \
-  --output   "$FIFO" \
-  --state    "$STATE_LOG" \
-  >"$OUT_DIR/generator.stderr" 2>&1 &
+if (( TPCDS )); then
+  TPCDS_ARGS=(
+    --scenario "$SCENARIO"
+    --source   "$CAPTURE_SPEC"
+    --name     "$CAPTURE_TASK"
+    --log      "$OUT_DIR/capture.log"
+  )
+  if [[ -n "$TPCDS_CACHE" ]]; then
+    TPCDS_ARGS+=(--cache "$TPCDS_CACHE")
+    # Generate before the preview starts, so the run times only the replay.
+    python3 "$BENCH_DIR/tpcds.py" prepare "${TPCDS_ARGS[@]}"
+    echo "replaying cached TPC-DS fixture from $TPCDS_CACHE"
+  else
+    echo "starting source-tpc-ds capture (log: $OUT_DIR/capture.log)"
+  fi
+  python3 "$BENCH_DIR/tpcds.py" relay "${TPCDS_ARGS[@]}" \
+    --output "$FIFO" \
+    --state  "$STATE_LOG" \
+    >"$OUT_DIR/generator.stderr" 2>&1 &
+else
+  echo "starting generator (seed=$SEED)"
+  python3 "$BENCH_DIR/generate.py" \
+    --scenario "$SCENARIO" \
+    --seed     "$SEED" \
+    --output   "$FIFO" \
+    --state    "$STATE_LOG" \
+    >"$OUT_DIR/generator.stderr" 2>&1 &
+fi
 GEN_PID=$!
 
 # Run the preview, timing the whole thing.
@@ -308,6 +362,7 @@ PREVIEW_ARGS=(
 if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
 fi
+PREVIEW_ARGS+=("${PREVIEW_EXTRA[@]+"${PREVIEW_EXTRA[@]}"}")
 
 # flowctl publishes one `transaction stats` line per round at info, which is
 # what results.py derives the transaction boundaries from. The task keeps its
@@ -322,14 +377,21 @@ flowctl raw preview-next "${PREVIEW_ARGS[@]}" \
 PREVIEW_RC=$?
 set -e
 
-# If the generator is still alive (e.g., preview died early), it's blocked
-# on writing to a FIFO no one reads. Kill it so we don't hang.
-if kill -0 $GEN_PID 2>/dev/null; then
+# If the preview died early, the generator is blocked writing to a FIFO no one
+# reads. Kill it so we don't hang. After a clean preview it has closed the FIFO
+# and is at most stopping its capture.
+if (( PREVIEW_RC )) && kill -0 $GEN_PID 2>/dev/null; then
   kill $GEN_PID 2>/dev/null || true
 fi
-wait $GEN_PID 2>/dev/null || true
+GEN_RC=0
+wait $GEN_PID 2>/dev/null || GEN_RC=$?
 
 echo "preview exit: $PREVIEW_RC"
+if (( GEN_RC )); then
+  echo "generator exit: $GEN_RC (see $OUT_DIR/generator.stderr)"
+  # A preview that drained a truncated fixture still exits 0.
+  (( PREVIEW_RC )) || PREVIEW_RC=$GEN_RC
+fi
 
 # Build results.json from the state log and the preview log's own timings.
 python3 "$BENCH_DIR/results.py" "$STATE_LOG" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json"
