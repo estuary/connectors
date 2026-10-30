@@ -675,6 +675,13 @@ exactly-once delivery.
 Collections which aren't last-write-wins can be turned into last-write-wins
 through the use of derivations.
 
+`materialize-spanner` follows this pattern for its data, which it applies in
+many independent Spanner commits during Store because one commit holds at most
+80,000 mutations.
+It still keeps a checkpoint in the destination, written only after all of a
+transaction's data and fenced so that a zombie can't overwrite the checkpoint
+the next instance resumes from.
+
 ### Push-only Endpoints & Delta Updates
 
 Some systems, such as APIs, Webhooks, and messages brokers, are push-only in

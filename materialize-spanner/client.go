@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
 )
 
 type client struct {
@@ -81,7 +82,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		return nil, err
 	}
 
-	templates := renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization)
+	templates := renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization, "")
 
 	return &client{
 		dataClient:  clients.dataClient,
@@ -665,6 +666,43 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 	log.Info("client: installed fence")
 	return resultFence, nil
+}
+
+// updateFence writes the fence's checkpoint to its row of the checkpoints
+// table, unless another instance has since installed a newer fence over it.
+// Reading and writing the row in one read-write transaction serializes this
+// against InstallFence.
+func updateFence(ctx context.Context, dataClient *spanner.Client, table string, fence sql.Fence) error {
+	var columns = []string{"materialization", "key_begin", "key_end", "checkpoint"}
+	var values = []interface{}{
+		fence.Materialization.String(),
+		int64(fence.KeyBegin),
+		int64(fence.KeyEnd),
+		base64.StdEncoding.EncodeToString(fence.Checkpoint),
+	}
+
+	_, err := dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		row, err := txn.ReadRow(ctx, table, spanner.Key(values[:3]), []string{"fence"})
+		if spanner.ErrCode(err) == codes.NotFound {
+			return fmt.Errorf("checkpoints table %s has no row for this instance's key range", table)
+		} else if err != nil {
+			return fmt.Errorf("reading fence: %w", err)
+		}
+
+		var current int64
+		if err := row.Columns(&current); err != nil {
+			return fmt.Errorf("scanning fence: %w", err)
+		} else if current != fence.Fence {
+			return fmt.Errorf("this instance was fenced off by another: fence is %d, want %d", current, fence.Fence)
+		}
+
+		return txn.BufferWrite([]*spanner.Mutation{spanner.Update(table, columns, values)})
+	})
+	if err != nil {
+		return fmt.Errorf("updating fence: %w", err)
+	}
+
+	return nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {

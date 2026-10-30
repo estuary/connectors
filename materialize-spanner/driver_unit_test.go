@@ -2,6 +2,7 @@ package connector
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,4 +99,22 @@ func TestComputeKeyHash_OrderMatters(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotEqual(t, hash1, hash2, "Different order should produce different hash")
+}
+
+func TestLoadTablePrefix(t *testing.T) {
+	long := "acmeCo/" + strings.Repeat("very-long-prefix/", 10) + "materialize-spanner"
+
+	prefixes := map[string]bool{}
+	for _, prefix := range []string{
+		loadTablePrefix("acmeCo/materialize-spanner", 0, math.MaxUint32),
+		loadTablePrefix("acmeCo/materialize_spanner", 0, math.MaxUint32),
+		loadTablePrefix("acmeCo/materialize-spanner", 0, 0x7fffffff),
+		loadTablePrefix("acmeCo/materialize-spanner", 0x80000000, math.MaxUint32),
+		loadTablePrefix(long, 0, math.MaxUint32),
+	} {
+		require.Regexp(t, `^flow_internal\.flow_temp_[_0-9a-zA-Z]+_$`, prefix)
+		require.LessOrEqual(t, len(strings.TrimPrefix(prefix, "flow_internal."))+len("4294967295"), 128)
+		prefixes[prefix] = true
+	}
+	require.Len(t, prefixes, 5)
 }
