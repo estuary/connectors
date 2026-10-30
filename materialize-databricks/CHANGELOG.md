@@ -1,25 +1,25 @@
 # Changelog
 
+## 2026-10-30
+### Changed
+- Every load runs as one SQL script, replacing the `two_phase_loads` feature
+  flag. The script first finds the files holding rows that match its keys,
+  reading only the key columns, then reads documents from those files alone.
+  Loads of large tables whose rows are updated get much faster: Databricks
+  otherwise reads every document of each file an update left a deletion
+  vector on. A load whose script fails, such as on a warehouse that can't
+  run SQL scripts, runs as a single query instead, as do that table's loads
+  for the next hour. A load fails, and its transaction is retried, if the
+  table's files were rewritten between finding and reading them.
+- A MERGE of fewer than 100,000 rows reads them straight from the staged
+  files, instead of first copying them into a staging table. This saves a
+  query of a few seconds from each commit of small batches.
+
 ## 2026-10-29
 ### Fixed
 - Load, staging and commit queries now carry the `materialization_name` query
   tag, so Databricks query history attributes them to the Estuary task.
   Previously only the queries that create and alter tables carried it.
-
-### Changed
-- Each table chooses its own load mode, replacing the `two_phase_loads`
-  feature flag. A load still running after 20 seconds, or after as long as
-  the table's last two-phase load took, is cancelled and run in two phases:
-  first finding the files holding rows that match its keys, then reading
-  documents from those files alone. Later loads stay in two phases, trying
-  one phase again after 2, 4, 8 and up to 64 loads or 6 hours, and keep one
-  phase once it's faster. Loads of under 1,000, 10,000, 100,000 and more keys
-  choose separately. Cancelled loads appear in the warehouse's query history.
-  A table whose two-phase load fails, such as when its history can't be
-  read, loads in one phase for the next hour.
-- A MERGE of fewer than 100,000 rows reads them straight from the staged
-  files, instead of first copying them into a staging table. This saves a
-  query of a few seconds from each commit of small batches.
 
 ## 2026-10-28
 ### Fixed

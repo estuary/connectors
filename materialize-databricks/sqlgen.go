@@ -146,15 +146,16 @@ func binaryToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	createTargetTable       *template.Template
-	alterTableColumns       *template.Template
-	loadQuery               *template.Template
-	loadQueryNoFlowDocument *template.Template
-	loadMatchFiles          *template.Template
-	copyIntoDirect          *template.Template
-	createStagingTable      *template.Template
-	copyIntoStaging         *template.Template
-	mergeInto               *template.Template
+	createTargetTable        *template.Template
+	alterTableColumns        *template.Template
+	loadQuery                *template.Template
+	loadQueryNoFlowDocument  *template.Template
+	loadScript               *template.Template
+	loadScriptNoFlowDocument *template.Template
+	copyIntoDirect           *template.Template
+	createStagingTable       *template.Template
+	copyIntoStaging          *template.Template
+	mergeInto                *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -189,7 +190,7 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, {{ $.LoadAlias }}.{{ $.Table.Document.Identifier }}
+SELECT {{ $.Table.Binding }}, l.{{ $.Table.Document.Identifier }}
 	{{ template "loadJoin" $ }}
 {{ else -}}
 SELECT -1, ""
@@ -203,35 +204,63 @@ SELECT {{ $.Table.Binding }},
 to_json(struct(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document
 {{ template "loadJoin" $ }}
 {{ end }}
 
--- The first phase of a two-phase load: the files of the table holding rows
--- that match the load keys, found by reading only the key columns.
+-- A load as one script, which first finds the files holding rows that match
+-- the load keys by reading only the key columns, and then reads documents from
+-- those files alone. Databricks reads every document of a file that an update
+-- left a deletion vector on, matched or not. Its last row, of binding -1, has
+-- the number of rows and files the match found.
 
-{{ define "loadMatchFiles" }}
-SELECT DISTINCT {{ $.LoadAlias }}._metadata.file_path
-	{{ template "loadJoin" $ }}
+{{ define "loadScript" }}
+BEGIN
+{{ template "loadMatch" $ }}
+{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" }}
+{{ template "loadMatchCounts" }}
+END
 {{ end }}
 
--- The join of the table and the load keys, at the pinned Version and
--- restricted to MatchedFiles when a two-phase load sets them.
+{{ define "loadScriptNoFlowDocument" }}
+BEGIN
+{{ template "loadMatch" $ }}
+{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" }}
+{{ template "loadMatchCounts" }}
+END
+{{ end }}
+
+{{ define "loadMatch" -}}
+DECLARE files ARRAY<STRING>;
+DECLARE matched BIGINT;
+SET (files, matched) = (
+	SELECT collect_set(l._metadata.file_path), count(*)
+	{{ template "loadJoin" $ }}
+);
+{{- end }}
+
+-- The variable list prunes files as a literal list does. A load matching more
+-- than MaxMatchedFiles reads every file within its key bounds.
+
+{{ define "loadMatchedFiles" -}}
+AND (size(files) > {{ MaxMatchedFiles }} OR array_contains(files, l._metadata.file_path))
+{{- end }}
+
+{{ define "loadMatchCounts" -}}
+UNION ALL SELECT -1, concat(matched, ' ', size(files));
+{{- end }}
+
+-- The join of the table and the load keys.
 
 {{ define "loadJoin" -}}
-FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS {{ $.LoadAlias }}{{ end }}
+FROM {{ $.Table.Identifier }} AS l
 	JOIN ({{ template "loadSource" $ }}) AS r
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
-	{{ $.LoadAlias }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- template "boundCondition" (BoundOn $.LoadAlias $bound) }}
-	{{- end }}
-	{{- if $.MatchedFiles }}
-	WHERE {{ $.LoadAlias }}._metadata.file_path IN (
-	{{- range $i, $file := $.MatchedFiles }}{{ if $i }}, {{ end }}{{ Literal $file }}{{ end -}}
-	)
+	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- template "boundCondition" (BoundOn "l" $bound) }}
 	{{- end }}
 {{- end }}
 
@@ -425,19 +454,21 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 	);
 {{ end }}
   `, template.FuncMap{
-		"BoundOn": func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+		"BoundOn":         func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+		"MaxMatchedFiles": func() int { return maxMatchedFiles },
 	})
 
 	return templates{
-		createTargetTable:       tplAll.Lookup("createTargetTable"),
-		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
-		loadQuery:               tplAll.Lookup("loadQuery"),
-		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
-		loadMatchFiles:          tplAll.Lookup("loadMatchFiles"),
-		copyIntoDirect:          tplAll.Lookup("copyIntoDirect"),
-		createStagingTable:      tplAll.Lookup("createStagingTable"),
-		copyIntoStaging:         tplAll.Lookup("copyIntoStaging"),
-		mergeInto:               tplAll.Lookup("mergeInto"),
+		createTargetTable:        tplAll.Lookup("createTargetTable"),
+		alterTableColumns:        tplAll.Lookup("alterTableColumns"),
+		loadQuery:                tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:  tplAll.Lookup("loadQueryNoFlowDocument"),
+		loadScript:               tplAll.Lookup("loadScript"),
+		loadScriptNoFlowDocument: tplAll.Lookup("loadScriptNoFlowDocument"),
+		copyIntoDirect:           tplAll.Lookup("copyIntoDirect"),
+		createStagingTable:       tplAll.Lookup("createStagingTable"),
+		copyIntoStaging:          tplAll.Lookup("copyIntoStaging"),
+		mergeInto:                tplAll.Lookup("mergeInto"),
 	}
 }
 
@@ -453,19 +484,6 @@ type tableWithFiles struct {
 	Schema      string
 	// Tables are the staging tables a MERGE reads.
 	Tables []string
-	// Version, when set, pins a load to that version of the table, and
-	// MatchedFiles restricts it to those of the table's files.
-	Version      string
-	MatchedFiles []string
-}
-
-// LoadAlias qualifies the table's columns in a load. A table read at a
-// version has no name to qualify them by, so it's aliased.
-func (t *tableWithFiles) LoadAlias() string {
-	if t.Version != "" {
-		return "l"
-	}
-	return t.Table.Identifier
 }
 
 // boundOn is a merge bound on the key column of the table aliased Alias.

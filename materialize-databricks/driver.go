@@ -7,7 +7,6 @@ import (
 	stdsql "database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -15,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,7 +31,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
@@ -403,11 +400,8 @@ type binding struct {
 	stagingTable string
 	storeRows    int
 
-	// loadModes are the modes of loads by their loadBucket.
-	loadModes [loadBuckets]loadMode
-	// noTwoPhaseUntil is when loads may run in two phases again after a
-	// two-phase load failed.
-	noTwoPhaseUntil time.Time
+	// noScriptUntil is when loads may run as scripts again after one failed.
+	noScriptUntil time.Time
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -482,9 +476,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var loadTemplate = d.templates.loadQuery
+	var script, single = d.templates.loadScript, d.templates.loadQuery
 	if d.cfg.Advanced.NoFlowDocument {
-		loadTemplate = d.templates.loadQueryNoFlowDocument
+		script, single = d.templates.loadScriptNoFlowDocument, d.templates.loadQueryNoFlowDocument
 	}
 
 	var loads []bindingLoad
@@ -501,7 +495,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var bounds = b.loadMergeBounds.Build()
 		loads = append(loads, bindingLoad{
 			binding: b,
-			keys:    keyCounts[idx],
 			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
 			fields: log.Fields{
 				"resourcePath": b.target.Path,
@@ -551,8 +544,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			rows, trace, err := d.evaluateLoad(groupCtx, db, loadTemplate, load)
-			if err != nil || rows == nil {
+			rows, trace, err := d.queryLoad(groupCtx, db, script, single, load)
+			if err != nil {
 				return err
 			}
 			var executeTook = time.Since(trace.started)
@@ -560,14 +553,20 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			defer rows.Close()
 
 			var docCount, docBytes int
+			var matched, matchedFiles = -1, -1
 			defer func() {
-				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
+				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes, "matchedFiles": matchedFiles})
 			}()
 			for rows.Next() {
 				var doc loadedDoc
 				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
 				} else if doc.binding < 0 {
+					if doc.document == "" {
+						continue
+					} else if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
+						return fmt.Errorf("parsing load match counts %q: %w", doc.document, err)
+					}
 					continue
 				}
 				docCount, docBytes = docCount+1, docBytes+len(doc.document)
@@ -579,6 +578,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 			if err := rows.Err(); err != nil {
 				return fmt.Errorf("querying Loads: %w", err)
+			} else if matched >= 0 && docCount != matched {
+				// Files rewritten between the script's match and its read of
+				// documents, such as by OPTIMIZE, hide their rows from the read.
+				return fmt.Errorf("load of %s read %d of the %d rows matching its keys, as the table's files changed during the load", load.binding.target.Identifier, docCount, matched)
 			}
 			return nil
 		})
@@ -597,260 +600,48 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // its query profile.
 type bindingLoad struct {
 	binding *binding
-	keys    int
 	data    *tableWithFiles
 	fields  log.Fields
 }
 
-const (
-	// loadDeadline is the least time a one-phase load runs before it's
-	// cancelled and run in two phases. The driver can only cancel a query on
-	// the warehouse once its first few seconds have passed.
-	loadDeadline = 20 * time.Second
-	// maxRetryLoads and maxRetryInterval bound how long loads run in two
-	// phases before one phase is tried again.
-	maxRetryLoads    = 64
-	maxRetryInterval = 6 * time.Hour
-	loadBuckets      = 4
-	// twoPhaseFailedFor is how long loads run in one phase after a two-phase
-	// load fails, which may be transient or may recur on every load.
-	twoPhaseFailedFor = time.Hour
-)
+// maxMatchedFiles is the most files a load script restricts its read of
+// documents to. A load matching more reads every file within its key bounds.
+// With usually 256 MB to 1 GB per table file in Databricks, 10,000 files is
+// about 2.5 to 10 TB of table.
+const maxMatchedFiles = 10000
 
-var errLoadDeadline = errors.New("load ran past its deadline")
+// scriptFailedFor is how long a binding's loads run as single queries after
+// its load script fails, which may be transient or recur on every load.
+const scriptFailedFor = time.Hour
 
-// loadBucket groups loads by their number of keys: under 1,000, 10,000,
-// 100,000, and more. Which mode is faster can differ between them, such as
-// between a backfill's loads and real-time ones.
-func loadBucket(keys int) int {
-	var bucket = 0
-	for k := keys / 1000; k > 0 && bucket < loadBuckets-1; k /= 10 {
-		bucket++
-	}
-	return bucket
-}
-
-// loadMode is whether loads run in one or two phases. Two phases read
-// documents from only the files holding matching keys, which is much faster
-// when those are few of the files within the key bounds and Databricks would
-// read all of them, but the version lookup and match query take a few seconds.
-// So loads run in one phase, cancelled to run in two once they've taken as
-// long as two phases last did, or loadDeadline, and stay in two phases. One
-// phase is tried again after 2, 4, 8 and up to maxRetryLoads loads, or after
-// maxRetryInterval, and kept once it's faster than two phases.
-type loadMode struct {
-	twoPhase     bool
-	twoPhaseTook time.Duration
-	retryIn      int
-	retryEvery   int
-	retryAt      time.Time
-}
-
-// onePhaseDeadline reports whether the next load runs in one phase, and how
-// long it may run.
-func (m *loadMode) onePhaseDeadline(now time.Time) (time.Duration, bool) {
-	if m.twoPhase {
-		if m.retryIn--; m.retryIn > 0 && now.Before(m.retryAt) {
-			return 0, false
+// queryLoad runs a binding's load script, and returns its rows with the trace
+// to finish once they're read. A script that fails, such as on a warehouse
+// that can't run scripts, is rerun as a single query, as are the binding's
+// loads for the next scriptFailedFor.
+func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, script, single *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
+	if time.Now().After(load.binding.noScriptUntil) {
+		rows, trace, err := d.runLoad(ctx, db, script, load)
+		if err == nil || ctx.Err() != nil {
+			return rows, trace, err
 		}
+		log.WithError(err).WithField("resourcePath", load.binding.target.Path).Warn("load script failed, loading with a single query instead")
+		load.binding.noScriptUntil = time.Now().Add(scriptFailedFor)
 	}
-	return max(loadDeadline, m.twoPhaseTook), true
+	return d.runLoad(ctx, db, single, load)
 }
 
-// onePhaseFinished records a one-phase load that finished by its deadline,
-// and reports whether the mode changed.
-func (m *loadMode) onePhaseFinished(took time.Duration, now time.Time) bool {
-	if m.twoPhase && took >= m.twoPhaseTook {
-		m.backOff(now)
-		return false
-	}
-	var changed = m.twoPhase
-	m.twoPhase, m.retryEvery = false, 0
-	return changed
-}
-
-// onePhaseTimedOut records a one-phase load cancelled at its deadline, and
-// reports whether the mode changed.
-func (m *loadMode) onePhaseTimedOut(now time.Time) bool {
-	var changed = !m.twoPhase
-	m.twoPhase = true
-	m.backOff(now)
-	return changed
-}
-
-func (m *loadMode) twoPhaseFinished(took time.Duration) {
-	m.twoPhaseTook = took
-}
-
-func (m *loadMode) backOff(now time.Time) {
-	m.retryEvery = min(max(2*m.retryEvery, 2), maxRetryLoads)
-	m.retryIn, m.retryAt = m.retryEvery, now.Add(maxRetryInterval)
-}
-
-func (d *transactor) loadModeChanged(load bindingLoad, changed bool, fields log.Fields) {
-	if changed {
-		log.WithFields(fields).WithFields(log.Fields{
-			"resourcePath": load.binding.target.Path,
-			"keys":         load.keys,
-			"twoPhase":     load.binding.loadModes[loadBucket(load.keys)].twoPhase,
-		}).Info("switched load phases")
-	}
-}
-
-// evaluateLoad runs a binding's load in one or two phases, as the mode of its
-// loadBucket has it, and returns the rows of its documents with the trace to
-// finish once they're read. Rows are nil when two phases found no match.
-func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
-	if time.Now().Before(load.binding.noTwoPhaseUntil) {
-		return d.queryLoad(ctx, db, tpl, load, 0)
-	}
-
-	var bucket = loadBucket(load.keys)
-	var mode = &load.binding.loadModes[bucket]
-	load.fields["bucket"] = bucket
-	load.fields["twoPhaseTook"] = mode.twoPhaseTook.String()
-	if deadline, ok := mode.onePhaseDeadline(time.Now()); ok {
-		rows, trace, err := d.queryLoad(ctx, db, tpl, load, deadline)
-		if errors.Is(err, errLoadDeadline) {
-			d.loadModeChanged(load, mode.onePhaseTimedOut(time.Now()), log.Fields{"deadline": deadline.String()})
-		} else if err != nil {
-			return nil, nil, err
-		} else {
-			var took = time.Since(trace.started)
-			d.loadModeChanged(load, mode.onePhaseFinished(took, time.Now()), log.Fields{"took": took.String()})
-			return rows, trace, nil
-		}
-	}
-
-	var started = time.Now()
-	var rows *stdsql.Rows
-	var trace *queryTrace
-	matched, err := d.matchLoadFiles(ctx, db, load)
-	if err == nil && matched {
-		rows, trace, err = d.queryLoad(ctx, db, tpl, load, 0)
-	}
-	if err == nil {
-		mode.twoPhaseFinished(time.Since(started))
-		return rows, trace, nil
-	} else if ctx.Err() != nil {
-		return nil, nil, err
-	}
-
-	// Two phases may not work on a table at all, such as when its history
-	// can't be read, so this load and those of the next while run in one phase.
-	log.WithError(err).WithField("resourcePath", load.binding.target.Path).Warn("two-phase load failed, loading in one phase instead")
-	load.binding.noTwoPhaseUntil = time.Now().Add(twoPhaseFailedFor)
-	load.data.Version, load.data.MatchedFiles = "", nil
-	delete(load.fields, "version")
-	delete(load.fields, "matchedFiles")
-	return d.queryLoad(ctx, db, tpl, load, 0)
-}
-
-// queryLoad runs a binding's load query. Unless deadline is zero, a query
-// still running after it is cancelled with errLoadDeadline. A query that
-// succeeds returns its rows and the trace to finish once they're read.
-func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad, deadline time.Duration) (*stdsql.Rows, *queryTrace, error) {
+func (d *transactor) runLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
 	query, err := renderTemplate(tpl, load.data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("loadQuery template: %w", err)
+		return nil, nil, fmt.Errorf("%s template: %w", tpl.Name(), err)
 	}
-
-	var fields = maps.Clone(load.fields)
-	if deadline > 0 {
-		fields["deadline"] = deadline.String()
-	}
-	var queryCtx, trace = d.profiler.trace(ctx, "load", fields)
-	var timedOut = func() bool { return false }
-	if deadline > 0 {
-		var cancel context.CancelCauseFunc
-		queryCtx, cancel = context.WithCancelCause(queryCtx)
-		var timer = time.AfterFunc(deadline, func() { cancel(errLoadDeadline) })
-		timedOut = func() bool { return !timer.Stop() }
-	}
-
+	var queryCtx, trace = d.profiler.trace(ctx, tpl.Name(), load.fields)
 	rows, err := db.QueryContext(queryCtx, query)
-	if timedOut() {
-		// Rows outlive their query only when the timer didn't cancel them.
-		if rows != nil {
-			rows.Close()
-		}
-		err = errLoadDeadline
-	}
-	if errors.Is(err, errLoadDeadline) {
-		trace.finish(err, log.Fields{"timedOut": true})
-		return nil, nil, err
-	} else if err != nil {
+	if err != nil {
 		trace.finish(err, nil)
 		return nil, nil, fmt.Errorf("querying Load documents: %w", err)
 	}
 	return rows, trace, nil
-}
-
-// maxMatchedFiles is the maximum number of files a two-phase load filters on.
-// A load that matches more, will omit the filter altogether, reading all the
-// files. With usually 256 MB to 1 GB per table file in Databricks, 10,000
-// files is about 2.5 to 10 TB of table. Each file path is about 280 bytes so
-// the longest list is about 2.9 MB that takes about 3s to compile.
-const maxMatchedFiles = 10000
-
-// matchLoadFiles is the first phase of a two-phase load. It pins the load to
-// the table's current version, so that both phases read the same files, and
-// restricts it to the files holding rows that match its keys, found by reading
-// only the key columns. It reports whether any rows matched.
-func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, load bindingLoad) (bool, error) {
-	version, err := tableVersion(ctx, db, load.data.Table.Identifier)
-	if err != nil {
-		return false, err
-	}
-	load.data.Version = strconv.FormatInt(version, 10)
-	load.fields["version"] = version
-
-	query, err := renderTemplate(d.templates.loadMatchFiles, load.data)
-	if err != nil {
-		return false, fmt.Errorf("loadMatchFiles template: %w", err)
-	}
-	var queryCtx, trace = d.profiler.trace(ctx, "loadMatch", load.fields)
-	files, err := queryStrings(queryCtx, db, query)
-	trace.finish(err, log.Fields{"matchedFiles": len(files)})
-	if err != nil {
-		return false, fmt.Errorf("matching Load files: %w", err)
-	}
-
-	load.fields["matchedFiles"] = len(files)
-	if len(files) <= maxMatchedFiles {
-		load.data.MatchedFiles = files
-	}
-	return len(files) > 0, nil
-}
-
-// tableVersion is the latest version of a Delta table.
-func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64, error) {
-	var latest struct {
-		Version int64 `db:"version"`
-	}
-	if err := sqlx.NewDb(db, "databricks").Unsafe().GetContext(ctx, &latest, "DESCRIBE HISTORY "+identifier+" LIMIT 1"); err != nil {
-		return 0, fmt.Errorf("describing history of %s: %w", identifier, err)
-	}
-	return latest.Version, nil
-}
-
-// queryStrings runs a query and returns the values of its first column.
-func queryStrings(ctx context.Context, db *stdsql.DB, query string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []string
-	for rows.Next() {
-		var value string
-		if err := rows.Scan(&value); err != nil {
-			return nil, err
-		}
-		out = append(out, value)
-	}
-	return out, rows.Err()
 }
 
 // loadedDoc is a document read by a binding's load query.
