@@ -205,7 +205,7 @@ func (c *credentials) Validate() error {
 			return fmt.Errorf("cannot set both API key and username/password")
 		}
 
-		dec, err := base64.StdEncoding.DecodeString(c.ApiKey)
+		var dec, err = base64.StdEncoding.DecodeString(c.ApiKey)
 		if err != nil {
 			return fmt.Errorf("API key must be base64 encoded: %w", err)
 		}
@@ -249,11 +249,11 @@ func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 // toClient initializes a client for connecting to Elasticsearch, starting the network tunnel if
 // configured.
 func (c config) toClient(disableRetry bool) (*client, error) {
-	endpoint := c.Endpoint
+	var endpoint = c.Endpoint
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-		u, err := url.Parse(c.Endpoint)
+		var u, err = url.Parse(c.Endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("parsing endpoint URL: %w", err)
 		}
@@ -276,7 +276,7 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 		endpoint = "http://localhost:9200"
 	}
 
-	es, err := elasticsearch.NewClient(
+	var es, err = elasticsearch.NewClient(
 		elasticsearch.Config{
 			Addresses:           []string{endpoint},
 			CompressRequestBody: true,
@@ -293,7 +293,7 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			Transport:     productHeaderInjector{inner: http.DefaultTransport},
 			RetryOnStatus: []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
-				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
+				var d = min(time.Duration(1<<i)*time.Second, 5*time.Second)
 				log.WithFields(log.Fields{
 					"attempt": i,
 					"delay":   d.String(),
@@ -319,7 +319,7 @@ type productHeaderInjector struct {
 }
 
 func (p productHeaderInjector) RoundTrip(req *http.Request) (*http.Response, error) {
-	res, err := p.inner.RoundTrip(req)
+	var res, err = p.inner.RoundTrip(req)
 	if err != nil {
 		return res, err
 	}
@@ -364,7 +364,7 @@ func (r resource) WithDefaults(cfg config) resource {
 }
 
 func (r resource) Parameters() ([]string, bool, error) {
-	indexName := normalizeIndexName(r.Index, maxByteLength)
+	var indexName = normalizeIndexName(r.Index, maxByteLength)
 	if len(indexName) == 0 {
 		return nil, false, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", r.Index)
 	}
@@ -379,7 +379,7 @@ const (
 // For index naming requirements, see
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-create-index.html#indices-create-api-path-params
 func normalizeIndexName(index string, truncateLimit int) string {
-	afterPrefix := false
+	var afterPrefix = false
 	var b strings.Builder
 	for _, r := range index {
 		// Replace disallowed characters with underscore. Most of the characters in this list are
@@ -398,7 +398,7 @@ func normalizeIndexName(index string, truncateLimit int) string {
 		afterPrefix = true
 
 		// Index names must be lowercase.
-		char := strings.ToLower(string(r))
+		var char = strings.ToLower(string(r))
 		if b.Len()+len(char) > truncateLimit {
 			// Truncate extremely long names. These must be less than 255 bytes.
 			break
@@ -418,7 +418,7 @@ var _ boilerplate.Connector = &driver{}
 func NewDriver() boilerplate.Connector { return new(driver) }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("Elasticsearch Index", &resource{}).MarshalJSON()
+	var resourceSchema, err = schemagen.GenerateSchema("Elasticsearch Index", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -426,7 +426,7 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 	// Variants (e.g. materialize-opensearch) supply an alternate documentation
 	// URL via the DOCS_URL environment variable; fall back to the Elasticsearch
 	// default when it is not set.
-	docsURL := "https://go.estuary.dev/materialize-elasticsearch"
+	var docsURL = "https://go.estuary.dev/materialize-elasticsearch"
 	if fromEnv := os.Getenv("DOCS_URL"); fromEnv != "" {
 		docsURL = fromEnv
 	}
@@ -487,7 +487,7 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
-	metaClient, err := cfg.toClient(true)
+	var metaClient, err = cfg.toClient(true)
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata client: %w", err)
 	}
@@ -531,9 +531,9 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 }
 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	var pingCtx, cancel = context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
 	if p, err := d.metaClient.es.Ping(d.metaClient.es.Ping.WithContext(pingCtx)); err != nil {
@@ -556,7 +556,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 }
 
 func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
-	_, isNumeric := m.AsFormattedNumeric(&p)
+	var _, isNumeric = m.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
@@ -597,7 +597,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (property, boilerplate.ElementConverter) {
-	prop := propForProjection(&p.Projection, p.Inference.Types, fc)
+	var prop = propForProjection(&p.Projection, p.Inference.Types, fc)
 	prop.IgnoreFormat = d.featureFlags["ignore_mapping_format_changes"]
 	if d.isOpenSearch {
 		prop = adaptForOpenSearch(prop)
@@ -614,8 +614,8 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, property]) (string, boilerplate.ActionApplyFn, error) {
-	indexName := res.ResourcePath[0]
-	props := buildIndexProperties(res.Keys, res.Values, res.Document, d.isOpenSearch)
+	var indexName = res.ResourcePath[0]
+	var props = buildIndexProperties(res.Keys, res.Values, res.Document, d.isOpenSearch)
 
 	return fmt.Sprintf("create index %q", indexName), func(ctx context.Context) error {
 		return d.metaClient.createIndex(ctx, indexName, res.Config.Shards, d.cfg.Advanced.Replicas, props)
@@ -623,7 +623,7 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
-	indexName := resourcePath[0]
+	var indexName = resourcePath[0]
 
 	return fmt.Sprintf("delete index %q", indexName), func(ctx context.Context) error {
 		return d.metaClient.deleteIndex(ctx, indexName)
@@ -649,7 +649,7 @@ func (d *materialization) UpdateResource(
 		return "", nil, nil
 	}
 
-	indexName := resourcePath[0]
+	var indexName = resourcePath[0]
 
 	var actions []string
 	for _, np := range update.NewProjections {
@@ -678,23 +678,23 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, property],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	info, err := d.dataClient.info(ctx)
+	var info, err = d.dataClient.info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting server info: %w", err)
 	}
-	isServerless := info.isServerless()
+	var isServerless = info.isServerless()
 	if isServerless {
 		log.Info("connected to a serverless elasticsearch cluster")
 	}
 
-	indexToBinding := make(map[string]int)
+	var indexToBinding = make(map[string]int)
 	var bindings []binding
 	for idx, b := range mappedBindings {
-		ps := append(b.Keys, b.Values...)
-		fields := make([]string, 0, len(ps))
-		floatFields := make([]bool, len(ps))
-		dateTimeFields := make([]bool, len(ps))
-		wrapFields := make([]bool, len(ps))
+		var ps = append(b.Keys, b.Values...)
+		var fields = make([]string, 0, len(ps))
+		var floatFields = make([]bool, len(ps))
+		var dateTimeFields = make([]bool, len(ps))
+		var wrapFields = make([]bool, len(ps))
 
 		for idx, p := range ps {
 			fields = append(fields, translateField(p.Field))

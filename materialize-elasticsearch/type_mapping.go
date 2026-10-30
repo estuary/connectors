@@ -102,7 +102,7 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 	}
 
 	if numericString, ok := m.AsFormattedNumeric(p); ok {
-		mappedType := numericStringTypes[numericString]
+		var mappedType = numericStringTypes[numericString]
 		if mappedType == elasticTypeLong && (exceedsSignedLongRange(p) || exceedsSignedLongStringLength(p)) {
 			return property{Type: elasticTypeUnsignedLong}
 		}
@@ -126,7 +126,7 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 			return property{Type: elasticTypeLong}
 		}
 	case pf.JsonTypeString:
-		inf := p.Inference.String_
+		var inf = p.Inference.String_
 		if inf == nil {
 			// This simplifies handling for arrays with string item types, since
 			// these will not have a string inference set.
@@ -164,7 +164,7 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 }
 
 func buildIndexProperties(keys, values []boilerplate.MappedProjection[property], document *boilerplate.MappedProjection[property], isOpenSearch bool) map[string]property {
-	props := make(map[string]property)
+	var props = make(map[string]property)
 
 	for _, v := range append(keys, values...) {
 		props[translateField(v.Field)] = v.Mapped
@@ -173,7 +173,7 @@ func buildIndexProperties(keys, values []boilerplate.MappedProjection[property],
 	if document != nil {
 		// Do not index the root document projection, since this would be less useful than other
 		// selected fields and potentially costly.
-		docProp := property{
+		var docProp = property{
 			Type: elasticTypeFlattened,
 			// See above for comment on pf.JsonTypeObject.
 			IgnoreAbove: 32766 / 4,
@@ -192,7 +192,7 @@ func boolPtr(b bool) *bool {
 }
 
 func typesWithoutNull(ts []string) []string {
-	out := []string{}
+	var out = []string{}
 	for _, t := range ts {
 		if t != "null" {
 			out = append(out, t)
@@ -207,7 +207,7 @@ func mustWrapAndFlatten(p *pf.Projection) bool {
 		return false
 	}
 
-	nonNullTypes := typesWithoutNull(p.Inference.Types)
+	var nonNullTypes = typesWithoutNull(p.Inference.Types)
 
 	if len(nonNullTypes) != 1 {
 		return true
@@ -218,7 +218,7 @@ func mustWrapAndFlatten(p *pf.Projection) bool {
 			return true
 		}
 
-		items := typesWithoutNull(p.Inference.Array.ItemTypes)
+		var items = typesWithoutNull(p.Inference.Array.ItemTypes)
 		if len(items) != 1 || items[0] == "array" {
 			// Nested arrays don't work because we need some non-array type
 			// somewhere in order to actually create the mapping.

@@ -32,7 +32,7 @@ type indexMappings struct {
 
 // createIndex creates a new index and sets its mappings per indexProps if it doesn't already exist.
 func (c *client) createIndex(ctx context.Context, index string, shards *int, replicas *int, indexProps map[string]property) error {
-	existResp, err := c.es.Indices.Exists(
+	var existResp, err = c.es.Indices.Exists(
 		[]string{index},
 		c.es.Indices.Exists.WithContext(ctx),
 	)
@@ -48,7 +48,7 @@ func (c *client) createIndex(ctx context.Context, index string, shards *int, rep
 	}
 
 	// Index does not exist, create a new one.
-	params := createIndexParams{
+	var params = createIndexParams{
 		Settings: indexSettings{
 			Shards:   shards,
 			Replicas: replicas,
@@ -76,7 +76,7 @@ func (c *client) createIndex(ctx context.Context, index string, shards *int, rep
 
 // deleteIndex deletes an index with the provided name.
 func (c *client) deleteIndex(ctx context.Context, index string) error {
-	res, err := c.es.Indices.Delete(
+	var res, err = c.es.Indices.Delete(
 		[]string{index},
 		c.es.Indices.Delete.WithContext(ctx),
 	)
@@ -92,7 +92,7 @@ func (c *client) deleteIndex(ctx context.Context, index string) error {
 }
 
 func (c *client) addMappingToIndex(ctx context.Context, index string, field string, prop property) error {
-	res, err := c.es.Indices.PutMapping(
+	var res, err = c.es.Indices.PutMapping(
 		[]string{index},
 		esutil.NewJSONReader(map[string]map[string]property{"properties": {field: prop}}),
 		c.es.Indices.PutMapping.WithContext(ctx),
@@ -115,7 +115,7 @@ type indexMetaResponse struct {
 }
 
 func (c *client) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema) error {
-	res, err := c.es.Indices.Get(
+	var res, err = c.es.Indices.Get(
 		[]string{"*"}, // Get info for all indices the connector has access to.
 		c.es.Indices.Get.WithContext(ctx),
 	)
@@ -133,7 +133,7 @@ func (c *client) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	for index, meta := range indexMeta {
-		res := is.PushResource(index)
+		var res = is.PushResource(index)
 		for field, prop := range meta.Mappings.Properties {
 			res.PushField(boilerplate.ExistingField{
 				Name:               field,
@@ -169,7 +169,7 @@ func (i serverInfo) isServerless() bool {
 }
 
 func (c *client) info(ctx context.Context) (serverInfo, error) {
-	res, err := c.es.Info(c.es.Info.WithContext(ctx))
+	var res, err = c.es.Info(c.es.Info.WithContext(ctx))
 	if err != nil {
 		return serverInfo{}, fmt.Errorf("getting server info: %w", err)
 	}

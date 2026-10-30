@@ -11,8 +11,8 @@ import (
 )
 
 func TestSpecification(t *testing.T) {
-	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pm.Request_Spec{})
+	var driver = driver{}
+	var response, err = driver.Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")

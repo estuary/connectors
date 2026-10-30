@@ -83,21 +83,21 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous
 	// commit.
 	it.WaitForAcknowledged()
 
 	var mu sync.Mutex
-	loadFn := func(b int, d json.RawMessage) error {
+	var loadFn = func(b int, d json.RawMessage) error {
 		mu.Lock()
 		defer mu.Unlock()
 		return loaded(b, d)
 	}
 
-	batchCh := make(chan []getDoc)
-	group, groupCtx := errgroup.WithContext(ctx)
+	var batchCh = make(chan []getDoc)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	for range loadWorkers {
 		group.Go(func() error {
 			for {
@@ -115,7 +115,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		})
 	}
 
-	sendBatch := func(b []getDoc) error {
+	var sendBatch = func(b []getDoc) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -125,10 +125,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	var batch []getDoc
-	batchSize := 0
+	var batchSize = 0
 	for it.Next() {
-		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
-		binding := t.bindings[it.Binding]
+		var id = base64.RawStdEncoding.EncodeToString(it.PackedKey)
+		var binding = t.bindings[it.Binding]
 
 		var routing any
 		if binding.routingField != nil {
@@ -163,7 +163,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 
 	type storeBatch struct {
 		// items holds one complete bulk item per element (an action line, plus a
@@ -174,8 +174,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		binding int
 	}
 
-	batchCh := make(chan storeBatch)
-	group, groupCtx := errgroup.WithContext(ctx)
+	var batchCh = make(chan storeBatch)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	for range storeWorkers {
 		group.Go(func() error {
 			for {
@@ -193,7 +193,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		})
 	}
 
-	sendBatch := func(items [][]byte, binding int) error {
+	var sendBatch = func(items [][]byte, binding int) error {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
@@ -204,10 +204,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	var batch [][]byte
 	var batchBytes int
-	lastBinding := -1
+	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
-		b := t.bindings[it.Binding]
+		var b = t.bindings[it.Binding]
 
 		if lastBinding != -1 && (batchBytes > storeBatchSize || lastBinding != it.Binding) {
 			if err := sendBatch(batch, lastBinding); err != nil {
@@ -218,11 +218,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		lastBinding = it.Binding
 
-		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
+		var id = base64.RawStdEncoding.EncodeToString(it.PackedKey)
 
 		var routingVal []byte
 		if b.routingField != nil {
-			routing := it.Key[*b.routingField]
+			var routing = it.Key[*b.routingField]
 			var err error
 			routingVal, err = json.Marshal(routing)
 			if err != nil {
@@ -247,7 +247,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		item = append(item, storeAction(it.Exists, b.deltaUpdates, id, routingVal)...)
 		item = append(item, '\n')
 
-		doc := make(map[string]any)
+		var doc = make(map[string]any)
 		for idx, v := range append(it.Key, it.Values...) {
 			if b, ok := v.([]byte); ok {
 				v = json.RawMessage(b)
@@ -269,7 +269,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			doc[b.docField] = it.RawJSON
 		}
 
-		bodyData, err := json.Marshal(doc)
+		var bodyData, err = json.Marshal(doc)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +349,7 @@ type docError struct {
 }
 
 func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func(int, json.RawMessage) error) error {
-	res, err := t.client.es.Mget(
+	var res, err = t.client.es.Mget(
 		esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}),
 		t.client.es.Mget.WithContext(ctx),
 	)
@@ -362,7 +362,7 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 	}
 
 	// Stream the results of the request directly into the loaded callback from the response body.
-	dec := json.NewDecoder(res.Body)
+	var dec = json.NewDecoder(res.Body)
 
 	// Read until the start of the response items array.
 	for {
@@ -379,7 +379,7 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 		}
 	}
 
-	gotCount := 0
+	var gotCount = 0
 	for dec.More() {
 		var d gotDoc
 		if err := dec.Decode(&d); err != nil {
@@ -398,7 +398,7 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 			continue
 		}
 
-		binding, ok := t.indexToBinding[d.Index]
+		var binding, ok = t.indexToBinding[d.Index]
 		if !ok {
 			return fmt.Errorf("invalid index name %q for loaded document id %q", d.Index, d.Id)
 		}
@@ -514,7 +514,7 @@ func (b bulkResponse) itemError(idx []int) error {
 // go-elasticsearch client has already retried those per its RetryOnStatus
 // config); per-item errors are carried in the returned bulkResponse.
 func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*bulkResponse, error) {
-	opts := []func(*esapi.BulkRequest){
+	var opts = []func(*esapi.BulkRequest){
 		t.client.es.Bulk.WithContext(ctx),
 		// Request bodies are structured so that all documents belong to the
 		// same index, which is set in the request path as a query parameter
@@ -539,7 +539,7 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 		opts = append(opts, t.client.es.Bulk.WithWaitForActiveShards("all"))
 	}
 
-	res, err := t.client.es.Bulk(bytes.NewReader(body), opts...)
+	var res, err = t.client.es.Bulk(bytes.NewReader(body), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("bulk request submission failed: %w", err)
 	}
@@ -557,8 +557,8 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 }
 
 func (t *transactor) doStore(ctx context.Context, items [][]byte, binding int, round int) error {
-	b := t.bindings[binding]
-	stats, err := retryBulkStore(ctx, items, maxStoreRetries,
+	var b = t.bindings[binding]
+	var stats, err = retryBulkStore(ctx, items, maxStoreRetries,
 		func(body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, b.index) },
 		storeRetryDelay,
 	)
@@ -582,18 +582,18 @@ func retryBulkStore(
 	send func(body []byte) (*bulkResponse, error),
 	delay func(ctx context.Context, attempt int) error,
 ) (m.RowStats, error) {
-	pending := items
+	var pending = items
 	var inserted, updated, deleted int64
-	stats := func() m.RowStats { return m.ExactRowStats(inserted, updated, deleted) }
+	var stats = func() m.RowStats { return m.ExactRowStats(inserted, updated, deleted) }
 	for attempt := 0; ; attempt++ {
-		resp, err := send(bytes.Join(pending, nil))
+		var resp, err = send(bytes.Join(pending, nil))
 		if err != nil {
 			return stats(), err
 		}
-		i, u, d := resp.rowCounts()
+		var i, u, d = resp.rowCounts()
 		inserted, updated, deleted = inserted+i, updated+u, deleted+d
 
-		terminal, retryableIdx := resp.classify()
+		var terminal, retryableIdx = resp.classify()
 		if terminal != nil {
 			return stats(), terminal
 		}
@@ -605,7 +605,7 @@ func retryBulkStore(
 				len(retryableIdx), attempt+1, resp.itemError(retryableIdx))
 		}
 
-		next := make([][]byte, len(retryableIdx))
+		var next = make([][]byte, len(retryableIdx))
 		for i, idx := range retryableIdx {
 			next[i] = pending[idx]
 		}
@@ -620,7 +620,7 @@ func retryBulkStore(
 // storeRetryDelay waits before re-sending failed bulk items, with exponential
 // backoff capped at 5s, mirroring the go-elasticsearch client's RetryBackoff.
 func storeRetryDelay(ctx context.Context, attempt int) error {
-	d := min(time.Duration(1<<attempt)*time.Second, 5*time.Second)
+	var d = min(time.Duration(1<<attempt)*time.Second, 5*time.Second)
 	log.WithFields(log.Fields{"attempt": attempt, "delay": d.String()}).
 		Info("waiting to retry bulk items on retryable error")
 	select {

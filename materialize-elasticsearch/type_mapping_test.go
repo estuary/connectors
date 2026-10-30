@@ -9,7 +9,7 @@ import (
 )
 
 func TestPropForProjection(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name string
 		in   *pf.Projection
 		want property
@@ -117,7 +117,7 @@ func TestPropForProjection(t *testing.T) {
 }
 
 func TestPropertyCompatible(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name       string
 		prop       property
 		existing   boilerplate.ExistingField

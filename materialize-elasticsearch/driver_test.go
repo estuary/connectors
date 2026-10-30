@@ -14,7 +14,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(index string, delta bool) resource {
+	var makeResourceFn = func(index string, delta bool) resource {
 		return resource{Index: index, DeltaUpdates: delta}
 	}
 
