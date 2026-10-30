@@ -24,40 +24,52 @@ properties:
     description: Document metadata
   AccountId:
     title: Accountid
-    type: integer
-  CampaignId:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Campaignid
-  AdGroupId:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Adgroupid
-  AdId:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Adid
+    type: string
   TimePeriod:
     title: Timeperiod
     type: string
-  CurrencyCode:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Currencycode
   AdDistribution:
     anyOf:
     - type: string
     - type: 'null'
     default: null
     title: Addistribution
+  AdGroupId:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Adgroupid
+  AdId:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Adid
+  BidMatchType:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Bidmatchtype
+  CampaignId:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Campaignid
+  DeliveredMatchType:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Deliveredmatchtype
+  DeviceOS:
+    anyOf:
+    - type: string
+    - type: 'null'
+    default: null
+    title: Deviceos
   DeviceType:
     anyOf:
     - type: string
@@ -76,234 +88,12 @@ properties:
     - type: 'null'
     default: null
     title: Network
-  DeviceOS:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Deviceos
   TopVsOther:
     anyOf:
     - type: string
     - type: 'null'
     default: null
     title: Topvsother
-  BidMatchType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Bidmatchtype
-  DeliveredMatchType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Deliveredmatchtype
-  AccountName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Accountname
-  CampaignName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Campaignname
-  CampaignType:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Campaigntype
-  AdGroupName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Adgroupname
-  Impressions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Impressions
-  Clicks:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Clicks
-  Ctr:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Ctr
-  Spend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Spend
-  CostPerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Costperconversion
-  DestinationUrl:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Destinationurl
-  Assists:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Assists
-  ReturnOnAdSpend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Returnonadspend
-  CostPerAssist:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Costperassist
-  CustomParameters:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Customparameters
-  FinalAppUrl:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Finalappurl
-  AdDescription:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Addescription
-  AdDescription2:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Addescription2
-  ViewThroughConversions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Viewthroughconversions
-  ViewThroughConversionsQualified:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Viewthroughconversionsqualified
-  AllCostPerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allcostperconversion
-  AllReturnOnAdSpend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allreturnonadspend
-  Conversions:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversions
-  ConversionRate:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversionrate
-  ConversionsQualified:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Conversionsqualified
-  AverageCpc:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averagecpc
-  AveragePosition:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averageposition
-  AverageCpm:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Averagecpm
-  AllConversions:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Allconversions
-  AllConversionRate:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allconversionrate
-  AllRevenue:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allrevenue
-  AllRevenuePerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Allrevenueperconversion
-  Revenue:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenue
-  RevenuePerConversion:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenueperconversion
-  RevenuePerAssist:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Revenueperassist
 required:
 - AccountId
 - TimePeriod

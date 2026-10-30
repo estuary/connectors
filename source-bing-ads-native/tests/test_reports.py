@@ -13,7 +13,6 @@ from logging import getLogger
 from typing import Any, AsyncGenerator, cast
 
 import pytest
-from pydantic import ValidationError as PydanticValidationError
 from estuary_cdk.capture.common import ResourceState
 from estuary_cdk.http import HTTPError, HTTPSession
 from source_bing_ads_native import reports
@@ -22,7 +21,6 @@ from source_bing_ads_native.models import Account
 from source_bing_ads_native.reports import (
     REPORTS,
     backfill_report,
-    convert_value,
     earliest_day,
     fetch_report,
     fetch_report_rows,
@@ -181,11 +179,10 @@ async def test_report_job_submits_polls_and_parses_the_download():
 
     assert [r.TimePeriod for r in rows] == ["2026-10-01", "2026-10-02"]  # type: ignore[attr-defined]
     row = rows[0].model_dump()
-    assert row["AccountId"] == 1 and row["CampaignId"] == 10
-    assert row["Clicks"] == 3 and row["Ctr"] == 0.015
-    # `--` is 0 in a numeric column; an empty value is null.
-    assert row["Spend"] == 0.0 and row["CampaignLabels"] is None
-    assert row["DeviceType"] == "Computer"
+    # Values are passed through as Microsoft writes them; only empty is null.
+    assert row["AccountId"] == "1" and row["CampaignId"] == "10"
+    assert row["Clicks"] == "3" and row["Ctr"] == "1.50%" and row["Spend"] == "--"
+    assert row["CampaignLabels"] is None and row["DeviceType"] == "Computer"
 
 
 @pytest.mark.asyncio
@@ -252,7 +249,7 @@ async def test_report_faults_name_the_account_and_tracking_id():
 
 
 @pytest.mark.asyncio
-async def test_budget_summary_dates_are_normalized_and_it_has_no_aggregation():
+async def test_budget_summary_has_no_aggregation_and_keeps_its_dates():
     class BudgetStub(ReportStub):
         async def request_stream(self, log: Any, url: str, with_token: bool = True, **kwargs: Any):
             payload = _zipped_csv(
@@ -282,49 +279,16 @@ async def test_budget_summary_dates_are_normalized_and_it_has_no_aggregation():
 
     assert "Aggregation" not in stub.submitted[0]["ReportRequest"]
     row = rows[0].model_dump()
-    assert row["Date"] == "2026-10-01"
-    assert row["AccountId"] == 1 and row["CampaignId"] == 10 and row["MonthlyBudget"] == 300.0
+    assert row["Date"] == "10/1/2026"
+    assert row["AccountId"] == "1" and row["CampaignId"] == "10" and row["MonthlyBudget"] == "300.00"
 
 
-@pytest.mark.parametrize(
-    "column, value, expected",
-    [
-        ("Clicks", "1,234", 1234),
-        ("Clicks", "--", 0),
-        ("Spend", "1,234.50", 1234.5),
-        ("Spend", "--", 0.0),
-        ("Ctr", "1.50%", 0.015),
-        ("QualityScore", "7", 7.0),
-        ("CampaignName", "--", "--"),
-        # Airbyte's connector types ExpectedCtr as a string.
-        ("ExpectedCtr", "1.50%", "1.50%"),
-    ],
-)
-def test_report_values_convert_as_airbyte_did(column: str, value: str, expected: Any):
-    result = convert_value(column, value)
-    assert result == expected and type(result) is type(expected)
-
-
-def test_report_schemas_carry_airbyte_types():
+def test_report_schemas_declare_only_key_columns():
     keyword = next(r for r in REPORTS if r.name == "keyword_performance_report_daily")
     properties = keyword.row_model().model_json_schema()["properties"]
 
-    def types(column: str) -> set[str]:
-        return {t["type"] for t in properties[column]["anyOf"]} - {"null"}
-
-    assert properties["AccountId"]["type"] == "integer"
-    assert types("KeywordId") == {"integer"} and types("Clicks") == {"integer"}
-    assert types("Spend") == {"number"} and types("HistoricalExpectedCtr") == {"number"}
-    assert types("ExpectedCtr") == {"string"} and types("DeviceType") == {"string"}
-    # Every requested column is declared, not left to schema inference.
-    assert set(keyword.columns) <= set(properties)
-
-
-def test_fractional_integer_fails_naming_the_column():
-    with pytest.raises(PydanticValidationError, match="AllConversions"):
-        CAMPAIGN_REPORT.row_model().model_validate(
-            {"AccountId": "1", "TimePeriod": "2026-10-01", "AllConversions": "1.5"}
-        )
+    assert set(properties) - {"_meta"} == {k.lstrip("/") for k in keyword.key()}
+    assert properties["AccountId"]["type"] == "string"
 
 
 def test_start_date_is_clamped_to_retention():

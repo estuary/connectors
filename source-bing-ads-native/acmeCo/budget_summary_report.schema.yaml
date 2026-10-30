@@ -24,58 +24,16 @@ properties:
     description: Document metadata
   AccountId:
     title: Accountid
-    type: integer
+    type: string
   Date:
     title: Date
     type: string
-  AccountName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Accountname
-  AccountNumber:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Accountnumber
-  CampaignName:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Campaignname
   CampaignId:
     anyOf:
-    - type: integer
+    - type: string
     - type: 'null'
     default: null
     title: Campaignid
-  CurrencyCode:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Currencycode
-  MonthlyBudget:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Monthlybudget
-  DailySpend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Dailyspend
-  MonthToDateSpend:
-    anyOf:
-    - type: number
-    - type: 'null'
-    default: null
-    title: Monthtodatespend
 required:
 - AccountId
 - Date

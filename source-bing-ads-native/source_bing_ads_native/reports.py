@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 from logging import DEBUG, Logger
 from typing import Any, AsyncGenerator, Literal
 
-from pydantic import BaseModel, ValidationInfo, create_model, field_validator
+from pydantic import BaseModel, create_model
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -77,115 +77,6 @@ GRAIN_COLUMNS = frozenset(
     }
 )
 
-type FieldType = Literal["integer", "number", "string"]
-
-# Report column types, copied verbatim from Airbyte's source-bing-ads 0.2.1
-# (the connector customers are migrating from), so collections keep the types
-# they have today. Its quirks are part of that: ExpectedCtr stays a string
-# while HistoricalExpectedCtr is a number. Columns not listed stay strings.
-# https://github.com/airbytehq/airbyte/blob/52025265d2c206bfb5a4b0d39afc4cb905e0a786/airbyte-integrations/connectors/source-bing-ads/source_bing_ads/reports.py
-REPORT_FIELD_TYPES: dict[str, FieldType] = {
-    "AccountId": "integer",
-    "AdId": "integer",
-    "AdGroupCriterionId": "integer",
-    "AdGroupId": "integer",
-    "AdRelevance": "number",
-    "Assists": "integer",
-    "AllCostPerConversion": "number",
-    "AllReturnOnAdSpend": "number",
-    "BusinessCategoryId": "integer",
-    "BusinessListingId": "integer",
-    "CampaignId": "integer",
-    "ClickCalls": "integer",
-    "Clicks": "integer",
-    "CostPerAssist": "number",
-    "CostPerConversion": "number",
-    "Ctr": "number",
-    "CurrentMaxCpc": "number",
-    "EstimatedClickPercent": "number",
-    "EstimatedClicks": "integer",
-    "EstimatedConversionRate": "number",
-    "EstimatedConversions": "integer",
-    "EstimatedCtr": "number",
-    "EstimatedImpressionPercent": "number",
-    "EstimatedImpressions": "integer",
-    "ExactMatchImpressionSharePercent": "number",
-    "Impressions": "integer",
-    "ImpressionSharePercent": "number",
-    "KeywordId": "integer",
-    "LandingPageExperience": "number",
-    "PhoneCalls": "integer",
-    "PhoneImpressions": "integer",
-    "Ptr": "number",
-    "QualityImpact": "number",
-    "QualityScore": "number",
-    "ReturnOnAdSpend": "number",
-    "SidebarBid": "number",
-    "Spend": "number",
-    "MonthlyBudget": "number",
-    "DailySpend": "number",
-    "MonthToDateSpend": "number",
-    "AbsoluteTopImpressionRatePercent": "number",
-    "ViewThroughConversions": "integer",
-    "ViewThroughConversionsQualified": "number",
-    "MainlineBid": "number",
-    "Mainline1Bid": "number",
-    "FirstPageBid": "number",
-    "AverageCpc": "number",
-    "AveragePosition": "number",
-    "AverageCpm": "number",
-    "Conversions": "number",
-    "ConversionRate": "number",
-    "ConversionsQualified": "number",
-    "AllConversions": "integer",
-    "AllConversionRate": "number",
-    "LowQualityClicks": "integer",
-    "LowQualityClicksPercent": "number",
-    "LowQualityImpressions": "integer",
-    "LowQualitySophisticatedClicks": "integer",
-    "LowQualityConversions": "integer",
-    "LowQualityConversionRate": "number",
-    "Revenue": "number",
-    "RevenuePerConversion": "number",
-    "RevenuePerAssist": "number",
-    "AllRevenue": "number",
-    "AllRevenuePerConversion": "number",
-    "ImpressionLostToBudgetPercent": "number",
-    "ImpressionLostToRankAggPercent": "number",
-    "HistoricalQualityScore": "number",
-    "HistoricalExpectedCtr": "number",
-    "HistoricalAdRelevance": "number",
-    "HistoricalLandingPageExperience": "number",
-    "BudgetName": "string",
-    "BudgetStatus": "string",
-    "BudgetAssociationStatus": "string",
-}
-
-_PYTHON_TYPES: dict[FieldType, type] = {"integer": int, "number": float, "string": str}
-
-
-def field_type(column: str) -> FieldType:
-    return REPORT_FIELD_TYPES.get(column, "string")
-
-
-def convert_value(column: str, value: str) -> int | float | str:
-    """A report value converted as Airbyte's connector converts it: Microsoft's
-    `--` ("not available") is 0 in numeric columns and kept as is in string
-    columns, percentages are fractions, and thousands separators are dropped.
-    A fractional value in an integer column fails loudly."""
-    match field_type(column):
-        case "integer":
-            return 0 if value == "--" else int(value.replace(",", ""))
-        case "number":
-            if value == "--":
-                return 0.0
-            if "%" in value:
-                return float(value.replace("%", "").replace(",", "")) / 100
-            return float(value.replace(",", ""))
-        case "string":
-            return value
-
-
 def months_before(day: date, months: int) -> date:
     month_index = day.year * 12 + day.month - 1 - months
     year, month = divmod(month_index, 12)
@@ -199,30 +90,10 @@ def months_before(day: date, months: int) -> date:
 
 
 class ReportRow(BaseCSVRow):
-    """A row of a downloaded report, with each value converted to its column's
-    type. An empty value is null; `--` is converted by `convert_value`."""
+    """A row of a downloaded report. Values are passed through as Microsoft
+    writes them, as strings; only an empty value becomes null."""
 
-    AccountId: int
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def _convert(cls, value: Any, info: ValidationInfo) -> Any:
-        if isinstance(value, str) and info.field_name is not None:
-            return convert_value(info.field_name, value)
-        return value
-
-
-class BudgetSummaryRow(ReportRow):
-    Date: str
-
-    # Budget summary dates are M/D/YYYY, unlike every other report.
-    @field_validator("Date", mode="before")
-    @classmethod
-    def _iso_date(cls, value: Any) -> Any:
-        if isinstance(value, str) and "/" in value:
-            month, day, year = (int(part) for part in value.split("/"))
-            return date(year, month, day).isoformat()
-        return value
+    AccountId: str
 
 
 @dataclass(frozen=True)
@@ -248,17 +119,10 @@ class ReportDefinition:
         ]
 
     def row_model(self) -> type[ReportRow]:
-        """Declares every requested column with its type, so the discovered
-        schema carries the same types Airbyte's connector declared."""
-        base = BudgetSummaryRow if self.time_column == "Date" else ReportRow
-        fields: dict[str, Any] = {
-            c: (_PYTHON_TYPES[field_type(c)] | None, None)
-            for c in self.columns
-            if c not in base.model_fields
-        }
-        if self.time_column == "TimePeriod":
-            fields["TimePeriod"] = (str, ...)
-        return create_model(f"{self.request_type}Row", __base__=base, **fields)
+        """Declares only the key columns. Schema inference types the rest."""
+        fields: dict[str, Any] = {self.time_column: (str, ...)}
+        fields.update({c: (str | None, None) for c in self.grain_columns()})
+        return create_model(f"{self.request_type}Row", __base__=ReportRow, **fields)
 
 
 class SubmitResponse(BaseModel, extra="allow"):

@@ -404,23 +404,11 @@
         },
         "AccountId": {
           "title": "Accountid",
-          "type": "integer"
+          "type": "string"
         },
         "TimePeriod": {
           "title": "Timeperiod",
           "type": "string"
-        },
-        "CurrencyCode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currencycode"
         },
         "AdDistribution": {
           "anyOf": [
@@ -434,7 +422,7 @@
           "default": null,
           "title": "Addistribution"
         },
-        "DeviceType": {
+        "BidMatchType": {
           "anyOf": [
             {
               "type": "string"
@@ -444,19 +432,7 @@
             }
           ],
           "default": null,
-          "title": "Devicetype"
-        },
-        "Network": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Network"
+          "title": "Bidmatchtype"
         },
         "DeliveredMatchType": {
           "anyOf": [
@@ -482,6 +458,30 @@
           "default": null,
           "title": "Deviceos"
         },
+        "DeviceType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Devicetype"
+        },
+        "Network": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network"
+        },
         "TopVsOther": {
           "anyOf": [
             {
@@ -493,354 +493,6 @@
           ],
           "default": null,
           "title": "Topvsother"
-        },
-        "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Bidmatchtype"
-        },
-        "AccountName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountname"
-        },
-        "AccountNumber": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountnumber"
-        },
-        "PhoneImpressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phoneimpressions"
-        },
-        "PhoneCalls": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phonecalls"
-        },
-        "Clicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Clicks"
-        },
-        "Ctr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ctr"
-        },
-        "Spend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Spend"
-        },
-        "Impressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Impressions"
-        },
-        "CostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperconversion"
-        },
-        "Ptr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ptr"
-        },
-        "Assists": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Assists"
-        },
-        "ReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Returnonadspend"
-        },
-        "CostPerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperassist"
-        },
-        "AverageCpc": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpc"
-        },
-        "AveragePosition": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averageposition"
-        },
-        "AverageCpm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpm"
-        },
-        "Conversions": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversions"
-        },
-        "ConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionrate"
-        },
-        "ConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionsqualified"
-        },
-        "LowQualityClicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityclicks"
-        },
-        "LowQualityClicksPercent": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityclickspercent"
-        },
-        "LowQualityImpressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityimpressions"
-        },
-        "LowQualitySophisticatedClicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualitysophisticatedclicks"
-        },
-        "LowQualityConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityconversions"
-        },
-        "LowQualityConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityconversionrate"
-        },
-        "Revenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenue"
-        },
-        "RevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperconversion"
-        },
-        "RevenuePerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperassist"
         }
       },
       "required": [
@@ -929,35 +581,11 @@
         },
         "AccountId": {
           "title": "Accountid",
-          "type": "integer"
-        },
-        "CampaignId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignid"
+          "type": "string"
         },
         "TimePeriod": {
           "title": "Timeperiod",
           "type": "string"
-        },
-        "CurrencyCode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currencycode"
         },
         "AdDistribution": {
           "anyOf": [
@@ -971,7 +599,7 @@
           "default": null,
           "title": "Addistribution"
         },
-        "DeviceType": {
+        "BidMatchType": {
           "anyOf": [
             {
               "type": "string"
@@ -981,9 +609,9 @@
             }
           ],
           "default": null,
-          "title": "Devicetype"
+          "title": "Bidmatchtype"
         },
-        "Network": {
+        "CampaignId": {
           "anyOf": [
             {
               "type": "string"
@@ -993,7 +621,7 @@
             }
           ],
           "default": null,
-          "title": "Network"
+          "title": "Campaignid"
         },
         "DeliveredMatchType": {
           "anyOf": [
@@ -1019,6 +647,30 @@
           "default": null,
           "title": "Deviceos"
         },
+        "DeviceType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Devicetype"
+        },
+        "Network": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network"
+        },
         "TopVsOther": {
           "anyOf": [
             {
@@ -1030,606 +682,6 @@
           ],
           "default": null,
           "title": "Topvsother"
-        },
-        "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Bidmatchtype"
-        },
-        "AccountName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountname"
-        },
-        "CampaignName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignname"
-        },
-        "CampaignType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaigntype"
-        },
-        "CampaignStatus": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignstatus"
-        },
-        "CampaignLabels": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignlabels"
-        },
-        "Impressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Impressions"
-        },
-        "Clicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Clicks"
-        },
-        "Ctr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ctr"
-        },
-        "Spend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Spend"
-        },
-        "CostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperconversion"
-        },
-        "QualityScore": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Qualityscore"
-        },
-        "AdRelevance": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adrelevance"
-        },
-        "LandingPageExperience": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Landingpageexperience"
-        },
-        "PhoneImpressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phoneimpressions"
-        },
-        "PhoneCalls": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phonecalls"
-        },
-        "Ptr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ptr"
-        },
-        "Assists": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Assists"
-        },
-        "ReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Returnonadspend"
-        },
-        "CostPerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperassist"
-        },
-        "CustomParameters": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Customparameters"
-        },
-        "ViewThroughConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Viewthroughconversions"
-        },
-        "AllCostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allcostperconversion"
-        },
-        "AllReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allreturnonadspend"
-        },
-        "AllConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversions"
-        },
-        "AllConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversionrate"
-        },
-        "AllRevenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenue"
-        },
-        "AllRevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenueperconversion"
-        },
-        "AverageCpc": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpc"
-        },
-        "AveragePosition": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averageposition"
-        },
-        "AverageCpm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpm"
-        },
-        "Conversions": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversions"
-        },
-        "ConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionrate"
-        },
-        "ConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionsqualified"
-        },
-        "LowQualityClicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityclicks"
-        },
-        "LowQualityClicksPercent": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityclickspercent"
-        },
-        "LowQualityImpressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityimpressions"
-        },
-        "LowQualitySophisticatedClicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualitysophisticatedclicks"
-        },
-        "LowQualityConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityconversions"
-        },
-        "LowQualityConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Lowqualityconversionrate"
-        },
-        "Revenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenue"
-        },
-        "RevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperconversion"
-        },
-        "RevenuePerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperassist"
-        },
-        "BudgetName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Budgetname"
-        },
-        "BudgetStatus": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Budgetstatus"
-        },
-        "BudgetAssociationStatus": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Budgetassociationstatus"
-        },
-        "HistoricalQualityScore": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicalqualityscore"
-        },
-        "HistoricalExpectedCtr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicalexpectedctr"
-        },
-        "HistoricalAdRelevance": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicaladrelevance"
-        },
-        "HistoricalLandingPageExperience": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicallandingpageexperience"
         }
       },
       "required": [
@@ -1719,47 +771,11 @@
         },
         "AccountId": {
           "title": "Accountid",
-          "type": "integer"
-        },
-        "CampaignId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignid"
-        },
-        "AdGroupId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgroupid"
+          "type": "string"
         },
         "TimePeriod": {
           "title": "Timeperiod",
           "type": "string"
-        },
-        "CurrencyCode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currencycode"
         },
         "AdDistribution": {
           "anyOf": [
@@ -1773,7 +789,7 @@
           "default": null,
           "title": "Addistribution"
         },
-        "DeviceType": {
+        "AdGroupId": {
           "anyOf": [
             {
               "type": "string"
@@ -1783,9 +799,9 @@
             }
           ],
           "default": null,
-          "title": "Devicetype"
+          "title": "Adgroupid"
         },
-        "Network": {
+        "BidMatchType": {
           "anyOf": [
             {
               "type": "string"
@@ -1795,7 +811,19 @@
             }
           ],
           "default": null,
-          "title": "Network"
+          "title": "Bidmatchtype"
+        },
+        "CampaignId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Campaignid"
         },
         "DeliveredMatchType": {
           "anyOf": [
@@ -1821,7 +849,7 @@
           "default": null,
           "title": "Deviceos"
         },
-        "TopVsOther": {
+        "DeviceType": {
           "anyOf": [
             {
               "type": "string"
@@ -1831,19 +859,7 @@
             }
           ],
           "default": null,
-          "title": "Topvsother"
-        },
-        "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Bidmatchtype"
+          "title": "Devicetype"
         },
         "Language": {
           "anyOf": [
@@ -1857,7 +873,7 @@
           "default": null,
           "title": "Language"
         },
-        "AccountName": {
+        "Network": {
           "anyOf": [
             {
               "type": "string"
@@ -1867,9 +883,9 @@
             }
           ],
           "default": null,
-          "title": "Accountname"
+          "title": "Network"
         },
-        "CampaignName": {
+        "TopVsOther": {
           "anyOf": [
             {
               "type": "string"
@@ -1879,475 +895,7 @@
             }
           ],
           "default": null,
-          "title": "Campaignname"
-        },
-        "CampaignType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaigntype"
-        },
-        "AdGroupName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgroupname"
-        },
-        "AdGroupType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgrouptype"
-        },
-        "Impressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Impressions"
-        },
-        "Clicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Clicks"
-        },
-        "Ctr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ctr"
-        },
-        "Spend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Spend"
-        },
-        "CostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperconversion"
-        },
-        "QualityScore": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Qualityscore"
-        },
-        "ExpectedCtr": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Expectedctr"
-        },
-        "AdRelevance": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adrelevance"
-        },
-        "LandingPageExperience": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Landingpageexperience"
-        },
-        "PhoneImpressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phoneimpressions"
-        },
-        "PhoneCalls": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Phonecalls"
-        },
-        "Ptr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ptr"
-        },
-        "Assists": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Assists"
-        },
-        "CostPerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperassist"
-        },
-        "CustomParameters": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Customparameters"
-        },
-        "FinalUrlSuffix": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Finalurlsuffix"
-        },
-        "ViewThroughConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Viewthroughconversions"
-        },
-        "AllCostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allcostperconversion"
-        },
-        "AllReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allreturnonadspend"
-        },
-        "AllConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversions"
-        },
-        "AllConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversionrate"
-        },
-        "AllRevenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenue"
-        },
-        "AllRevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenueperconversion"
-        },
-        "AverageCpc": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpc"
-        },
-        "AveragePosition": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averageposition"
-        },
-        "AverageCpm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpm"
-        },
-        "Conversions": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversions"
-        },
-        "ConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionrate"
-        },
-        "ConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionsqualified"
-        },
-        "Revenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenue"
-        },
-        "RevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperconversion"
-        },
-        "RevenuePerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperassist"
-        },
-        "HistoricalQualityScore": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicalqualityscore"
-        },
-        "HistoricalExpectedCtr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicalexpectedctr"
-        },
-        "HistoricalAdRelevance": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicaladrelevance"
-        },
-        "HistoricalLandingPageExperience": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicallandingpageexperience"
+          "title": "Topvsother"
         }
       },
       "required": [
@@ -2439,59 +987,11 @@
         },
         "AccountId": {
           "title": "Accountid",
-          "type": "integer"
-        },
-        "CampaignId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignid"
-        },
-        "AdGroupId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgroupid"
-        },
-        "AdId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adid"
+          "type": "string"
         },
         "TimePeriod": {
           "title": "Timeperiod",
           "type": "string"
-        },
-        "CurrencyCode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currencycode"
         },
         "AdDistribution": {
           "anyOf": [
@@ -2504,6 +1004,78 @@
           ],
           "default": null,
           "title": "Addistribution"
+        },
+        "AdGroupId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adgroupid"
+        },
+        "AdId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adid"
+        },
+        "BidMatchType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bidmatchtype"
+        },
+        "CampaignId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Campaignid"
+        },
+        "DeliveredMatchType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deliveredmatchtype"
+        },
+        "DeviceOS": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deviceos"
         },
         "DeviceType": {
           "anyOf": [
@@ -2541,18 +1113,6 @@
           "default": null,
           "title": "Network"
         },
-        "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Deviceos"
-        },
         "TopVsOther": {
           "anyOf": [
             {
@@ -2564,438 +1124,6 @@
           ],
           "default": null,
           "title": "Topvsother"
-        },
-        "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Bidmatchtype"
-        },
-        "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Deliveredmatchtype"
-        },
-        "AccountName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountname"
-        },
-        "CampaignName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignname"
-        },
-        "CampaignType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaigntype"
-        },
-        "AdGroupName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgroupname"
-        },
-        "Impressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Impressions"
-        },
-        "Clicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Clicks"
-        },
-        "Ctr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ctr"
-        },
-        "Spend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Spend"
-        },
-        "CostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperconversion"
-        },
-        "DestinationUrl": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Destinationurl"
-        },
-        "Assists": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Assists"
-        },
-        "ReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Returnonadspend"
-        },
-        "CostPerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperassist"
-        },
-        "CustomParameters": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Customparameters"
-        },
-        "FinalAppUrl": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Finalappurl"
-        },
-        "AdDescription": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Addescription"
-        },
-        "AdDescription2": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Addescription2"
-        },
-        "ViewThroughConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Viewthroughconversions"
-        },
-        "ViewThroughConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Viewthroughconversionsqualified"
-        },
-        "AllCostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allcostperconversion"
-        },
-        "AllReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allreturnonadspend"
-        },
-        "Conversions": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversions"
-        },
-        "ConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionrate"
-        },
-        "ConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionsqualified"
-        },
-        "AverageCpc": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpc"
-        },
-        "AveragePosition": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averageposition"
-        },
-        "AverageCpm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpm"
-        },
-        "AllConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversions"
-        },
-        "AllConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversionrate"
-        },
-        "AllRevenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenue"
-        },
-        "AllRevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenueperconversion"
-        },
-        "Revenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenue"
-        },
-        "RevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperconversion"
-        },
-        "RevenuePerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperassist"
         }
       },
       "required": [
@@ -3088,83 +1216,11 @@
         },
         "AccountId": {
           "title": "Accountid",
-          "type": "integer"
-        },
-        "CampaignId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignid"
-        },
-        "AdGroupId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgroupid"
-        },
-        "KeywordId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Keywordid"
-        },
-        "AdId": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adid"
+          "type": "string"
         },
         "TimePeriod": {
           "title": "Timeperiod",
           "type": "string"
-        },
-        "CurrencyCode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currencycode"
-        },
-        "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Deliveredmatchtype"
         },
         "AdDistribution": {
           "anyOf": [
@@ -3178,6 +1234,78 @@
           "default": null,
           "title": "Addistribution"
         },
+        "AdGroupId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adgroupid"
+        },
+        "AdId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Adid"
+        },
+        "BidMatchType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bidmatchtype"
+        },
+        "CampaignId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Campaignid"
+        },
+        "DeliveredMatchType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deliveredmatchtype"
+        },
+        "DeviceOS": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deviceos"
+        },
         "DeviceType": {
           "anyOf": [
             {
@@ -3189,6 +1317,18 @@
           ],
           "default": null,
           "title": "Devicetype"
+        },
+        "KeywordId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Keywordid"
         },
         "Language": {
           "anyOf": [
@@ -3214,18 +1354,6 @@
           "default": null,
           "title": "Network"
         },
-        "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Deviceos"
-        },
         "TopVsOther": {
           "anyOf": [
             {
@@ -3237,570 +1365,6 @@
           ],
           "default": null,
           "title": "Topvsother"
-        },
-        "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Bidmatchtype"
-        },
-        "AccountName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountname"
-        },
-        "CampaignName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignname"
-        },
-        "AdGroupName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adgroupname"
-        },
-        "Keyword": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Keyword"
-        },
-        "KeywordStatus": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Keywordstatus"
-        },
-        "Impressions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Impressions"
-        },
-        "Clicks": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Clicks"
-        },
-        "Ctr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ctr"
-        },
-        "CurrentMaxCpc": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currentmaxcpc"
-        },
-        "Spend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Spend"
-        },
-        "CostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperconversion"
-        },
-        "QualityScore": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Qualityscore"
-        },
-        "ExpectedCtr": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Expectedctr"
-        },
-        "AdRelevance": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Adrelevance"
-        },
-        "LandingPageExperience": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Landingpageexperience"
-        },
-        "QualityImpact": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Qualityimpact"
-        },
-        "Assists": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Assists"
-        },
-        "ReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Returnonadspend"
-        },
-        "CostPerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Costperassist"
-        },
-        "CustomParameters": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Customparameters"
-        },
-        "FinalAppUrl": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Finalappurl"
-        },
-        "Mainline1Bid": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Mainline1Bid"
-        },
-        "MainlineBid": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Mainlinebid"
-        },
-        "FirstPageBid": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Firstpagebid"
-        },
-        "FinalUrlSuffix": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Finalurlsuffix"
-        },
-        "ViewThroughConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Viewthroughconversions"
-        },
-        "ViewThroughConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Viewthroughconversionsqualified"
-        },
-        "AllCostPerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allcostperconversion"
-        },
-        "AllReturnOnAdSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allreturnonadspend"
-        },
-        "Conversions": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversions"
-        },
-        "ConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionrate"
-        },
-        "ConversionsQualified": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Conversionsqualified"
-        },
-        "AverageCpc": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpc"
-        },
-        "AveragePosition": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averageposition"
-        },
-        "AverageCpm": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Averagecpm"
-        },
-        "AllConversions": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversions"
-        },
-        "AllConversionRate": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allconversionrate"
-        },
-        "AllRevenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenue"
-        },
-        "AllRevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allrevenueperconversion"
-        },
-        "Revenue": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenue"
-        },
-        "RevenuePerConversion": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperconversion"
-        },
-        "RevenuePerAssist": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Revenueperassist"
-        },
-        "HistoricalQualityScore": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicalqualityscore"
-        },
-        "HistoricalExpectedCtr": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicalexpectedctr"
-        },
-        "HistoricalAdRelevance": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicaladrelevance"
-        },
-        "HistoricalLandingPageExperience": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Historicallandingpageexperience"
         }
       },
       "required": [
@@ -3894,52 +1458,16 @@
         },
         "AccountId": {
           "title": "Accountid",
-          "type": "integer"
+          "type": "string"
         },
         "Date": {
           "title": "Date",
           "type": "string"
         },
-        "AccountName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountname"
-        },
-        "AccountNumber": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Accountnumber"
-        },
-        "CampaignName": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Campaignname"
-        },
         "CampaignId": {
           "anyOf": [
             {
-              "type": "integer"
+              "type": "string"
             },
             {
               "type": "null"
@@ -3947,54 +1475,6 @@
           ],
           "default": null,
           "title": "Campaignid"
-        },
-        "CurrencyCode": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Currencycode"
-        },
-        "MonthlyBudget": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Monthlybudget"
-        },
-        "DailySpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Dailyspend"
-        },
-        "MonthToDateSpend": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Monthtodatespend"
         }
       },
       "required": [
