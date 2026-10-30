@@ -137,7 +137,7 @@ type documentSourceMetadata struct {
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("BigQuery Batch Resource Spec", &Resource{}).MarshalJSON()
+	var resourceSchema, err = schemagen.GenerateSchema("BigQuery Batch Resource Spec", &Resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -461,7 +461,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var isFullRefresh = len(cursorNames) == 0
 	var isInitialBackfill = len(cursorValues) == 0
 
-	templateString, err := c.Driver.SelectQueryTemplate(res)
+	var templateString, err = c.Driver.SelectQueryTemplate(res)
 	if err != nil {
 		return fmt.Errorf("error selecting query template: %w", err)
 	}

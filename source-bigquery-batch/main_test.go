@@ -52,7 +52,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -69,7 +69,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 
 	// Load credentials from disk and construct an endpoint spec
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credentialsJSON, err := os.ReadFile(credentialsPath)
+	var credentialsJSON, err = os.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	var endpointSpec = &Config{
@@ -125,7 +125,7 @@ func testBigQueryClient(t testing.TB) *bigquery.Client {
 	}
 
 	var credentialsPath = strings.ReplaceAll(*testCredentialsPath, "~", os.Getenv("HOME"))
-	credentialsJSON, err := os.ReadFile(credentialsPath)
+	var credentialsJSON, err = os.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
 	var clientOpts = []option.ClientOption{
@@ -169,7 +169,7 @@ func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string 
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
-		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		var bs, err = json.MarshalIndent(binding, "  ", "  ")
 		require.NoError(t, err)
 		io.Copy(summary, bytes.NewReader(bs))
 		fmt.Fprintf(summary, "\n")
@@ -225,7 +225,7 @@ func setCursorColumns(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...s
 	var res Resource
 	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
 	res.Cursor = cursor
-	resourceConfigBytes, err := json.Marshal(res)
+	var resourceConfigBytes, err = json.Marshal(res)
 	require.NoError(t, err)
 	binding.ResourceConfigJson = resourceConfigBytes
 }
@@ -234,7 +234,7 @@ func setQueryLimit(t testing.TB, binding *pf.CaptureSpec_Binding, limit int) {
 	var res Resource
 	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
 	res.Template = strings.ReplaceAll(res.Template, ";", fmt.Sprintf(" LIMIT %d;", limit))
-	resourceConfigBytes, err := json.Marshal(res)
+	var resourceConfigBytes, err = json.Marshal(res)
 	require.NoError(t, err)
 	binding.ResourceConfigJson = resourceConfigBytes
 }
@@ -253,7 +253,7 @@ func uniqueTableID(t testing.TB, extra ...string) string {
 
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
 func TestSpec(t *testing.T) {
-	response, err := bigqueryDriver.Spec(context.Background(), &pc.Request_Spec{})
+	var response, err = bigqueryDriver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -266,7 +266,7 @@ func TestSpec(t *testing.T) {
 func TestQueryTemplate(t *testing.T) {
 	var res = &Resource{Name: "foobar", SchemaName: "testdata", TableName: "foobar"}
 
-	tmplString, err := bigqueryDriver.SelectQueryTemplate(res)
+	var tmplString, err = bigqueryDriver.SelectQueryTemplate(res)
 	require.NoError(t, err)
 
 	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tmplString)
@@ -426,8 +426,8 @@ func TestNumericTypes(t *testing.T) {
 		setShutdownAfterQuery(t, true)
 
 		// Helper function to create *big.Rat values
-		mustRat := func(s string) *big.Rat {
-			r, ok := new(big.Rat).SetString(s)
+		var mustRat = func(s string) *big.Rat {
+			var r, ok = new(big.Rat).SetString(s)
 			require.True(t, ok, "Failed to parse rational number: %s", s)
 			return r
 		}
@@ -774,7 +774,7 @@ func TestCaptureWithUpdatedAtCursor(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial set of rows with sequential timestamps
 		require.NoError(t, parallelSetupQueries(ctx, t, control,
@@ -910,7 +910,7 @@ func TestCaptureWithModifications(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial set of rows with sequential timestamps
 		require.NoError(t, parallelSetupQueries(ctx, t, control,
@@ -958,7 +958,7 @@ func TestCaptureWithEmptyPoll(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// First batch of rows
 		require.NoError(t, parallelSetupQueries(ctx, t, control,
@@ -1049,7 +1049,7 @@ func TestQueryTemplateOverride(t *testing.T) {
 		Template: fmt.Sprintf(`SELECT * FROM %[1]s {{if not .IsFirstQuery}} WHERE updated_at > @p0 {{end}} ORDER BY updated_at`, tableName),
 		Cursor:   []string{"updated_at"},
 	}
-	bs, err := json.Marshal(res)
+	var bs, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 	cs.Bindings[0].ResourceConfigJson = bs
@@ -1058,7 +1058,7 @@ func TestQueryTemplateOverride(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial rows
 		require.NoError(t, parallelSetupQueries(ctx, t, control,
@@ -1101,7 +1101,7 @@ func TestKeylessCapture(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// Initial batch of data
 		require.NoError(t, parallelSetupQueries(ctx, t, control,
@@ -1326,7 +1326,7 @@ func TestCaptureFromView(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		// First batch: Insert rows into base table, some visible in view
 		var firstBatch [][]any
@@ -1359,7 +1359,7 @@ func TestCaptureFromView(t *testing.T) {
 		cs.Capture(ctx, t, nil)
 
 		// Update some rows to change their visibility
-		updateTime := baseTime.Add(20 * time.Minute)
+		var updateTime = baseTime.Add(20 * time.Minute)
 		require.NoError(t, parallelSetupQueries(ctx, t, control,
 			fmt.Sprintf("UPDATE %s SET visible = NOT visible, updated_at = @p0 WHERE id IN (@p1, @p2, @p3)", baseTableName),
 			[][]any{{updateTime, 2, 3, 4}}))
