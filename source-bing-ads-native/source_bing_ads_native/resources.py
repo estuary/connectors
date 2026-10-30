@@ -58,6 +58,22 @@ async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: Endp
     will read can be read with the headers the capture uses."""
     _configure_http(log, http, config)
 
+    # The stored access token may have expired, and the CDK only rotates
+    # tokens when a capture starts. Exchange for a fresh one just for this
+    # probe; Microsoft keeps the old refresh token working, so nothing is
+    # lost by not saving the new one here.
+    credentials = config.credentials
+    if credentials.access_token_expires_at < utc_now() + timedelta(minutes=5):
+        assert isinstance(http.token_source, TokenSource)
+        try:
+            token = await http.token_source.initialize_oauth2_tokens(log, http)
+        except HTTPError as err:
+            raise ValidationError(
+                [f"Invalid credentials. Please re-authenticate with Microsoft.\n\n{err.message}"]
+            )
+        credentials.access_token = token.access_token
+        credentials.access_token_expires_at = utc_now() + timedelta(seconds=token.expires_in)
+
     try:
         await query_user(http, log)
     except HTTPError as err:
