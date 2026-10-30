@@ -1,0 +1,30 @@
+info:
+  name: List Ads (filtering modified after)
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: '{{base_url}}/ad/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"AD_STATUS_ALL","modified_after":"2026-10-01 00:00:00","buying_types":["AUCTION","RESERVATION_RF"]}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ads"
+  (`GET /open_api/v1.3/ad/get/`).
+
+  **WHY:** the exact filter the Ads incremental sends: all statuses, one
+  buying-type group, and `modified_after` in the "YYYY-MM-DD HH:MM:SS" format
+  the connector formats cursors in.
+
+  **VERIFIED (2026-10-13, sandbox):** `code 0` with `modified_after` in the
+  connector's "YYYY-MM-DD HH:MM:SS" format, combined with the all-status and
+  buying-type filters; the same request with `modified_after: "not-a-date"` is
+  rejected (`code 40002`, "Not a valid datetime"), so the key is recognized,
+  not silently ignored.
+  **PENDING:** its inclusivity, which needs real ads to probe.
