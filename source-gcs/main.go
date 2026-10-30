@@ -101,7 +101,7 @@ func newGCStore(ctx context.Context, cfg config) (*gcStore, error) {
 // This is done in a way that requires only storage.objects.list and storage.objects.get since these
 // are the permissions required by the connector.
 func validateBucket(ctx context.Context, cfg config, client *storage.Client) error {
-	iter := client.Bucket(cfg.Bucket).Objects(ctx, &storage.Query{
+	var iter = client.Bucket(cfg.Bucket).Objects(ctx, &storage.Query{
 		Prefix: cfg.Prefix,
 	})
 
@@ -120,9 +120,9 @@ func validateBucket(ctx context.Context, cfg config, client *storage.Client) err
 	// object is not important here. We have verified our ability to list objects in this bucket
 	// (bucket exists & correct access) via the list operation, so we can interpret a "not found" as
 	// a successful outcome.
-	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
+	var objectKey = strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
 	var apiErr *googleapi.Error
-	_, err := client.Bucket(cfg.Bucket).Object(objectKey).Attrs(ctx)
+	var _, err = client.Bucket(cfg.Bucket).Object(objectKey).Attrs(ctx)
 	if !errors.As(err, &apiErr) || apiErr.Code != 404 {
 		return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
 	}
@@ -141,7 +141,7 @@ func (s *gcStore) List(ctx context.Context, query filesource.Query) (filesource.
 		gcsQuery.Delimiter = gcsDelimiter
 	}
 	if query.StartAt != "" {
-		_, startAt := filesource.PathToParts(query.StartAt)
+		var _, startAt = filesource.PathToParts(query.StartAt)
 		gcsQuery.StartOffset = startAt
 	}
 
@@ -185,7 +185,7 @@ func (s *gcStore) List(ctx context.Context, query filesource.Query) (filesource.
 func (s *gcStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	var bucket, key = filesource.PathToParts(obj.Path)
 
-	r, err := s.gcs.Bucket(bucket).Object(key).NewReader(ctx)
+	var r, err = s.gcs.Bucket(bucket).Object(key).NewReader(ctx)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
