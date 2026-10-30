@@ -128,8 +128,8 @@ func probeDeletePermission(ctx context.Context, client *sqs.Client, queueURL str
 }
 
 func isAccessDenied(err error) bool {
-	var ae smithy.APIError
-	return errors.As(err, &ae) && strings.Contains(ae.ErrorCode(), "AccessDenied")
+	var ae, ok = errors.AsType[smithy.APIError](err)
+	return ok && strings.Contains(ae.ErrorCode(), "AccessDenied")
 }
 
 // Apply is a no-op since the connector owns no server-side resources.
