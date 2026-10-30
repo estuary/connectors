@@ -82,7 +82,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 }
 
 func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *client.Conn, cfg *Config) (map[string]*discoveredTable, error) {
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	var tables, err = discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -195,7 +195,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	}
 
 	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
 	}

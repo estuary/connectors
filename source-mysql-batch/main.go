@@ -153,7 +153,7 @@ func translateMySQLValue(val any, fieldType byte, fieldCharset uint16) (any, err
 		switch fieldType {
 		case mysql.MYSQL_TYPE_GEOMETRY:
 			// Parse MySQL's internal geometry format and return as WKT string
-			wkt, err := spatial.ParseToWKT(bs)
+			var wkt, err = spatial.ParseToWKT(bs)
 			if err != nil {
 				return nil, fmt.Errorf("parsing spatial value: %w", err)
 			}
@@ -210,7 +210,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	if settings.Mode == "" {
 		log.WithField("sslmode", mysqltls.DefaultMode).Infof("'sslmode' is not set, defaulting to %q", mysqltls.DefaultMode)
 	}
-	tlsConfig, err := settings.Config(cfg.serverHost())
+	var tlsConfig, err = settings.Config(cfg.serverHost())
 	if err != nil {
 		return nil, err
 	}
