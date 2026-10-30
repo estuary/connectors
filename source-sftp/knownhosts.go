@@ -179,12 +179,10 @@ func (p *knownHosts) callback(address string) ssh.HostKeyCallback {
 			return nil
 		}
 
-		var revoked *knownhosts.RevokedError
-		var keyErr *knownhosts.KeyError
-		switch {
-		case errors.As(err, &revoked):
+		if _, ok := errors.AsType[*knownhosts.RevokedError](err); ok {
 			return fmt.Errorf("the %s host key presented by %s is revoked by the configured SSH Known Hosts", key.Type(), address)
-		case errors.As(err, &keyErr) && len(keyErr.Want) > 0:
+		}
+		if keyErr, ok := errors.AsType[*knownhosts.KeyError](err); ok && len(keyErr.Want) > 0 {
 			// Want holds every entry that applies to the host, @cert-authority lines
 			// included: a CA is pinned and the server offered a bare key instead of
 			// a certificate.
@@ -197,15 +195,15 @@ func (p *knownHosts) callback(address string) ssh.HostKeyCallback {
 				}
 			}
 			return p.mismatchError(address, key, pinned)
-		case errors.As(err, &keyErr):
+		}
+		if _, ok := errors.AsType[*knownhosts.KeyError](err); ok {
 			// Nothing applies to the host, whatever else is configured.
 			return p.unknownHostError(address, key)
-		default:
-			// Certificate checks report plain errors: not signed by a configured
-			// authority, expired, wrong principal, revoked CA. Never echo the
-			// presented certificate.
-			return fmt.Errorf("verifying the %s host key presented by %s against the configured SSH Known Hosts: %w", key.Type(), address, err)
 		}
+		// Certificate checks report plain errors: not signed by a configured
+		// authority, expired, wrong principal, revoked CA. Never echo the
+		// presented certificate.
+		return fmt.Errorf("verifying the %s host key presented by %s against the configured SSH Known Hosts: %w", key.Type(), address, err)
 	}
 }
 
