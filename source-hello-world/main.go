@@ -104,7 +104,7 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 }
 
 func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
-	messageSchema, err := schemagen.GenerateSchema("Example Output Record", &message{}).MarshalJSON()
+	var messageSchema, err = schemagen.GenerateSchema("Example Output Record", &message{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating message schema: %w", err)
 	}
@@ -194,7 +194,7 @@ func (c *capture) Run() error {
 				Timestamp: time.Now(),
 				Message:   text,
 			}
-			bs, err := json.Marshal(doc)
+			var bs, err = json.Marshal(doc)
 			if err != nil {
 				return fmt.Errorf("error serializing document: %w", err)
 			} else if err := c.Stream.Documents(idx, json.RawMessage(bs)); err != nil {
@@ -203,7 +203,7 @@ func (c *capture) Run() error {
 			c.State.Cursors[binding.stateKey]++
 		}
 
-		checkpointJsonBytes, err := json.Marshal(c.State)
+		var checkpointJsonBytes, err = json.Marshal(c.State)
 		if err != nil {
 			return fmt.Errorf("error serializing state: %w", err)
 		} else if err := c.Stream.Checkpoint(checkpointJsonBytes, true); err != nil {

@@ -16,14 +16,14 @@ func TestCapture(t *testing.T) {
 	// Always run the test since it doesn't rely on any external system.
 	t.Setenv("TEST_DATABASE", "yes")
 
-	resource := resource{
+	var resource = resource{
 		Name:   "helloCollection",
 		Prefix: "Hello {}",
 	}
-	resourceBytes, err := json.Marshal(resource)
+	var resourceBytes, err = json.Marshal(resource)
 	require.NoError(t, err)
 
-	capture := &st.CaptureSpec{
+	var capture = &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: &config{Rate: 10},
 		Bindings: []*flow.CaptureSpec_Binding{
@@ -40,8 +40,8 @@ func TestCapture(t *testing.T) {
 		Sanitizers: testSanitizers,
 	}
 
-	captureCtx, cancelCapture := context.WithCancel(context.Background())
-	count := 0
+	var captureCtx, cancelCapture = context.WithCancel(context.Background())
+	var count = 0
 	capture.Capture(captureCtx, t, func(msg json.RawMessage) {
 		count++
 		if count > 10 {
