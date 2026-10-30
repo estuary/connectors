@@ -175,6 +175,7 @@ class Account(BaseDocument, extra="allow"):
 class Campaign(StampedDocument):
     Id: str
     AccountId: str
+    CampaignType: str
 
 
 class AdGroup(StampedDocument):
@@ -203,6 +204,19 @@ class Ad(StampedDocument):
 
     # An asset's performance label is recomputed by Microsoft without anyone
     # editing the ad, so keeping it would rewrite every ad on most snapshots.
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_volatile_fields(cls, data: Any) -> Any:
+        return _drop_asset_performance_labels(data)
+
+
+# Performance Max campaigns have asset groups instead of ad groups and ads.
+class AssetGroup(StampedDocument):
+    Id: str
+    AccountId: str
+    CampaignId: str
+
+    # Same reason as Ad: asset links carry performance labels.
     @model_validator(mode="before")
     @classmethod
     def _drop_volatile_fields(cls, data: Any) -> Any:

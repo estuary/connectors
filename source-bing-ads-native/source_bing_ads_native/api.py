@@ -11,7 +11,16 @@ from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.http import HTTPError, HTTPSession
 
 from .errors import ACCESS_DENIED_CODES, fault_of
-from .models import SANDBOX_SCOPE, SCOPE, Account, Ad, AdGroup, Campaign, ParentIds
+from .models import (
+    SANDBOX_SCOPE,
+    SCOPE,
+    Account,
+    Ad,
+    AdGroup,
+    AssetGroup,
+    Campaign,
+    ParentIds,
+)
 
 # Microsoft sunsets Bing Ads API versions; bump this when migrating.
 # See https://learn.microsoft.com/en-us/advertising/guides/migration-guide?view=bingads-13
@@ -97,7 +106,7 @@ def reporting_url() -> str:
     return f"{_host('reporting')}/Reporting/{API_VERSION}"
 
 
-def by_id[T: (Account, Campaign, AdGroup, Ad)](items: list[T]) -> list[T]:
+def by_id[T: (Account, Campaign, AdGroup, Ad, AssetGroup)](items: list[T]) -> list[T]:
     """Sort entities by numeric Id, so snapshots are emitted in a stable order."""
     return sorted(items, key=lambda item: int(item.Id))
 
@@ -132,6 +141,10 @@ class AdGroupsResponse(BaseModel, extra="allow"):
 
 class AdsResponse(BaseModel, extra="allow"):
     Ads: list[Ad] | None = None
+
+
+class AssetGroupsResponse(BaseModel, extra="allow"):
+    AssetGroups: list[AssetGroup] | None = None
 
 
 async def query_user(http: HTTPSession, log: Logger) -> UserQueryResponse:
@@ -399,6 +412,24 @@ async def _ads(
     return by_id(response.Ads or [])
 
 
+async def _asset_groups(
+    http: HTTPSession, log: Logger, context: AccountContext, campaign: Campaign
+) -> list[AssetGroup]:
+    """https://learn.microsoft.com/en-us/advertising/campaign-management-service/getassetgroupsbycampaignid?view=bingads-13"""
+    url = f"{campaign_management_url()}/AssetGroups/QueryByCampaignId"
+    response = AssetGroupsResponse.model_validate_json(
+        await http.request(
+            log,
+            url,
+            method="POST",
+            json={"CampaignId": campaign.Id},
+            headers=context.headers(),
+        ),
+        context=ParentIds({"AccountId": context.id, "CampaignId": campaign.Id}),
+    )
+    return by_id(response.AssetGroups or [])
+
+
 async def _in_order[P, T](
     fetch: Callable[[P], Awaitable[list[T]]], parents: Iterable[P]
 ) -> AsyncGenerator[T, None]:
@@ -444,3 +475,18 @@ async def snapshot_ads(
             ad_groups = await _ad_groups(http, log, context, campaign)
             async for ad in _in_order(functools.partial(_ads, http, log, context), ad_groups):
                 yield ad
+
+
+async def snapshot_asset_groups(
+    http: HTTPSession, directory: AccountDirectory, log: Logger
+) -> AsyncGenerator[AssetGroup, None]:
+    for context in await directory.accounts(log):
+        # The endpoint only takes Performance Max campaigns, the only kind
+        # with asset groups.
+        campaigns = [
+            c for c in await _campaigns(http, log, context) if c.CampaignType == "PerformanceMax"
+        ]
+        async for asset_group in _in_order(
+            functools.partial(_asset_groups, http, log, context), campaigns
+        ):
+            yield asset_group

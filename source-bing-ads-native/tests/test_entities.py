@@ -19,6 +19,7 @@ from source_bing_ads_native.api import (
     snapshot_accounts,
     snapshot_ad_groups,
     snapshot_ads,
+    snapshot_asset_groups,
     snapshot_campaigns,
     token_exchange_scope,
 )
@@ -102,9 +103,14 @@ def _accounts(*accounts: dict[str, Any]) -> Handler:
     return lambda body, headers: {"Accounts": list(accounts)}
 
 
-def _campaigns(by_account: dict[str, list[str]]) -> Handler:
+def _campaigns(
+    by_account: dict[str, list[str]], types: dict[str, str] | None = None
+) -> Handler:
     return lambda body, headers: {
-        "Campaigns": [{"Id": i, "Name": f"c{i}"} for i in by_account[body["AccountId"]]]
+        "Campaigns": [
+            {"Id": i, "Name": f"c{i}", "CampaignType": (types or {}).get(i, "Search")}
+            for i in by_account[body["AccountId"]]
+        ]
     }
 
 
@@ -289,6 +295,47 @@ async def test_ad_groups_and_ads_carry_parent_ids_in_order():
     ads_calls = [(b, h) for s, b, h in http.calls if s == "/Ads/QueryByAdGroupId"]
     assert all(h == {"CustomerId": "900", "CustomerAccountId": "1"} for _, h in ads_calls)
     assert all("ResponsiveSearch" in b["AdTypes"] for b, _ in ads_calls)
+
+
+@pytest.mark.asyncio
+async def test_asset_groups_come_only_from_performance_max_campaigns():
+    http = _session(
+        {
+            "/User/Query": _user(),
+            "/Accounts/Search": _accounts(_account("1")),
+            "/Campaigns/QueryByAccountId": _campaigns(
+                {"1": ["10", "9", "8"]}, types={"10": "PerformanceMax", "8": "PerformanceMax"}
+            ),
+            "/AssetGroups/QueryByCampaignId": lambda body, headers: {
+                "AssetGroups": [
+                    {
+                        "Id": f"{body['CampaignId']}{n}",
+                        "Headlines": [
+                            {"Asset": {"Id": "5", "Text": "hi"}, "AssetPerformanceLabel": "Good"}
+                        ],
+                    }
+                    for n in ("2", "1")
+                ],
+                "PartialErrors": [],
+            },
+        },
+        delays={"/AssetGroups/QueryByCampaignId:8": 0.05},
+    )
+    directory = AccountDirectory(http, [])
+
+    groups = [g async for g in snapshot_asset_groups(http, directory, LOG)]
+
+    assert [(g.AccountId, g.CampaignId, g.Id) for g in groups] == [
+        ("1", "8", "81"),
+        ("1", "8", "82"),
+        ("1", "10", "101"),
+        ("1", "10", "102"),
+    ]
+    # Campaign 9 is a Search campaign, which the endpoint doesn't accept.
+    asked = [b["CampaignId"] for s, b, _ in http.calls if s == "/AssetGroups/QueryByCampaignId"]
+    assert sorted(asked) == ["10", "8"]
+    headline = groups[0].model_dump()["Headlines"][0]
+    assert "AssetPerformanceLabel" not in headline and headline["Asset"]["Text"] == "hi"
 
 
 @pytest.mark.parametrize(
