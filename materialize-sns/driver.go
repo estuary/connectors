@@ -44,7 +44,7 @@ type CredentialsConfig struct {
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
+	var subSchemas = []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
 		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
 	}
@@ -131,7 +131,7 @@ func (c *config) credentialsProvider() (aws.CredentialsProvider, error) {
 }
 
 func (c *config) awsConfig(ctx context.Context) (aws.Config, error) {
-	credProvider, err := c.credentialsProvider()
+	var credProvider, err = c.credentialsProvider()
 	if err != nil {
 		return aws.Config{}, err
 	}
@@ -152,7 +152,7 @@ func (c *config) awsConfig(ctx context.Context) (aws.Config, error) {
 func (c *config) snsClient(awsCfg aws.Config) *sns.Client {
 	var opts []func(*sns.Options)
 	if c.Advanced.Endpoint != "" {
-		ep := c.Advanced.Endpoint
+		var ep = c.Advanced.Endpoint
 		opts = append(opts, func(o *sns.Options) { o.BaseEndpoint = &ep })
 	}
 	return sns.NewFromConfig(awsCfg, opts...)
@@ -161,7 +161,7 @@ func (c *config) snsClient(awsCfg aws.Config) *sns.Client {
 func (c *config) stsClient(awsCfg aws.Config) *sts.Client {
 	var opts []func(*sts.Options)
 	if c.Advanced.Endpoint != "" {
-		ep := c.Advanced.Endpoint
+		var ep = c.Advanced.Endpoint
 		opts = append(opts, func(o *sts.Options) { o.BaseEndpoint = &ep })
 	}
 	return sts.NewFromConfig(awsCfg, opts...)
@@ -172,7 +172,7 @@ func (c *config) stsClient(awsCfg aws.Config) *sts.Client {
 // creates a same-named topic in our account and the ARN-mismatch only surfaces afterwards,
 // leaving an orphan topic behind.
 func callerAccountID(ctx context.Context, c *sts.Client) (string, error) {
-	out, err := c.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	var out, err = c.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return "", fmt.Errorf("identifying AWS caller via STS: %w", err)
 	}
@@ -239,7 +239,7 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	endpointSchema, err := schemagen.GenerateSchema("Materialize AWS SNS Spec", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Materialize AWS SNS Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -257,7 +257,7 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	cfg, err := resolveEndpointConfig(req.ConfigJson)
+	var cfg, err = resolveEndpointConfig(req.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 	if err != nil {
 		return nil, err
 	}
-	client := cfg.snsClient(awsCfg)
+	var client = cfg.snsClient(awsCfg)
 	account, err := callerAccountID(ctx, cfg.stsClient(awsCfg))
 	if err != nil {
 		return nil, err
@@ -274,11 +274,11 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 	var out []*pm.Response_Validated_Binding
 	for _, b := range req.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
-		topicARN := res.arn(cfg.Region, account)
+		var topicARN = res.arn(cfg.Region, account)
 
 		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range b.Collection.Projections {
@@ -326,7 +326,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
+	var cfg, err = resolveEndpointConfig(req.Materialization.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -335,20 +335,20 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	if err != nil {
 		return nil, err
 	}
-	client := cfg.snsClient(awsCfg)
+	var client = cfg.snsClient(awsCfg)
 	account, err := callerAccountID(ctx, cfg.stsClient(awsCfg))
 	if err != nil {
 		return nil, err
 	}
 
 	var actions []string
-	checked := make(map[string]struct{})
+	var checked = make(map[string]struct{})
 	for _, b := range req.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, err
 		}
-		topicARN := res.arn(cfg.Region, account)
+		var topicARN = res.arn(cfg.Region, account)
 		if _, ok := checked[topicARN]; ok {
 			continue
 		}
@@ -365,7 +365,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 			return nil, fmt.Errorf("checking SNS topic %q: %w", topicARN, err)
 		}
 
-		input := &sns.CreateTopicInput{Name: aws.String(res.TopicName)}
+		var input = &sns.CreateTopicInput{Name: aws.String(res.TopicName)}
 		if res.IsFifo() {
 			// ContentBasedDeduplication is explicitly disabled: the transactor always sets an
 			// explicit MessageDeduplicationId derived from (packedKey, document), so the
@@ -386,7 +386,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	cfg, err := resolveEndpointConfig(open.Materialization.ConfigJson)
+	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -395,7 +395,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.B
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	client := cfg.snsClient(awsCfg)
+	var client = cfg.snsClient(awsCfg)
 	account, err := callerAccountID(ctx, cfg.stsClient(awsCfg))
 	if err != nil {
 		return nil, nil, nil, err
@@ -403,7 +403,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.B
 
 	var bindings []*topicBinding
 	for _, b := range open.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
+		var res, err = resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
 			return nil, nil, nil, err
 		}

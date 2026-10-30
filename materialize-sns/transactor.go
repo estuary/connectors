@@ -56,17 +56,17 @@ func (t *transactor) Load(it *materialize.LoadIterator, _ func(int, json.RawMess
 }
 
 func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartCommitFunc, error) {
-	errGroup, ctx := errgroup.WithContext(it.Context())
+	var errGroup, ctx = errgroup.WithContext(it.Context())
 	errGroup.SetLimit(publishConcurrency)
-	round := it.Round
+	var round = it.Round
 	// published counts the messages SNS accepted per binding, for the
 	// transaction health report.
-	published := make([]atomic.Int64, len(t.bindings))
+	var published = make([]atomic.Int64, len(t.bindings))
 
 	for it.Next(false) {
-		bindingIdx := it.Binding
-		packedKey := it.PackedKey
-		doc := it.RawJSON
+		var bindingIdx = it.Binding
+		var packedKey = it.PackedKey
+		var doc = it.RawJSON
 		if err := t.publishOne(ctx, errGroup, bindingIdx, packedKey, doc, &published[bindingIdx]); err != nil {
 			return nil, err
 		}
@@ -92,20 +92,20 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 // errGroup, so its result is observed via errGroup.Wait(). A successful publish
 // increments published when it is given.
 func (t *transactor) publishOne(ctx context.Context, errGroup *errgroup.Group, bindingIdx int, packedKey []byte, doc json.RawMessage, published *atomic.Int64) error {
-	binding := t.bindings[bindingIdx]
+	var binding = t.bindings[bindingIdx]
 	if len(doc) > maxMessageBytes {
 		return fmt.Errorf(
 			"document for binding [%d] is %d bytes, which exceeds the SNS %d byte per-message limit",
 			bindingIdx, len(doc), maxMessageBytes,
 		)
 	}
-	input := &sns.PublishInput{
+	var input = &sns.PublishInput{
 		TopicArn: aws.String(binding.topicARN),
 		Message:  aws.String(string(doc)),
 	}
 	if binding.isFifo {
 		input.MessageGroupId = aws.String(fmt.Sprintf("%08x", keyhash.PackedKeyHash_HH64(packedKey)))
-		sum := sha256.Sum256(append(append([]byte{}, packedKey...), doc...))
+		var sum = sha256.Sum256(append(append([]byte{}, packedKey...), doc...))
 		input.MessageDeduplicationId = aws.String(hex.EncodeToString(sum[:]))
 	}
 

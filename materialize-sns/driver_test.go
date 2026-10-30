@@ -27,8 +27,8 @@ import (
 func TestSpec(t *testing.T) {
 	t.Parallel()
 
-	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pm.Request_Spec{})
+	var driver = driver{}
+	var response, err = driver.Spec(context.Background(), &pm.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -101,15 +101,15 @@ func testConfig() *config {
 // published messages for assertions.
 func buildAWSClients(t *testing.T, ctx context.Context) (*sns.Client, *sqs.Client) {
 	t.Helper()
-	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
+	var awsCfg, err = awsConfig.LoadDefaultConfig(ctx,
 		awsConfig.WithRegion(localstackRegion),
 		awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 	)
 	require.NoError(t, err)
 
-	ep := localstackEndpoint
-	snsClient := sns.NewFromConfig(awsCfg, func(o *sns.Options) { o.BaseEndpoint = &ep })
-	sqsClient := sqs.NewFromConfig(awsCfg, func(o *sqs.Options) { o.BaseEndpoint = &ep })
+	var ep = localstackEndpoint
+	var snsClient = sns.NewFromConfig(awsCfg, func(o *sns.Options) { o.BaseEndpoint = &ep })
+	var sqsClient = sqs.NewFromConfig(awsCfg, func(o *sqs.Options) { o.BaseEndpoint = &ep })
 	return snsClient, sqsClient
 }
 
@@ -130,9 +130,9 @@ func createTopicAndSubscribedQueue(t *testing.T, ctx context.Context, snsClient 
 	t.Helper()
 
 	topicName = baseName
-	queueName := baseName + "-q"
-	topicAttrs := map[string]string{}
-	queueAttrs := map[string]string{}
+	var queueName = baseName + "-q"
+	var topicAttrs = map[string]string{}
+	var queueAttrs = map[string]string{}
 	if fifo {
 		topicName += ".fifo"
 		queueName += ".fifo"
@@ -142,7 +142,7 @@ func createTopicAndSubscribedQueue(t *testing.T, ctx context.Context, snsClient 
 		queueAttrs["ContentBasedDeduplication"] = "true"
 	}
 
-	topic, err := snsClient.CreateTopic(ctx, &sns.CreateTopicInput{
+	var topic, err = snsClient.CreateTopic(ctx, &sns.CreateTopicInput{
 		Name:       aws.String(topicName),
 		Attributes: topicAttrs,
 	})
@@ -172,10 +172,10 @@ func createTopicAndSubscribedQueue(t *testing.T, ctx context.Context, snsClient 
 // hit. Messages are deleted as they are read.
 func drainQueue(t *testing.T, ctx context.Context, sqsClient *sqs.Client, queueURL string, expected int) []sqstypes.Message {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
+	var deadline = time.Now().Add(30 * time.Second)
 	var out []sqstypes.Message
 	for len(out) < expected && time.Now().Before(deadline) {
-		recv, err := sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		var recv, err = sqsClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl:              aws.String(queueURL),
 			MaxNumberOfMessages:   10,
 			WaitTimeSeconds:       2,
@@ -185,7 +185,7 @@ func drainQueue(t *testing.T, ctx context.Context, sqsClient *sqs.Client, queueU
 		require.NoError(t, err)
 		for _, msg := range recv.Messages {
 			out = append(out, msg)
-			_, err := sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+			var _, err = sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 				QueueUrl:      aws.String(queueURL),
 				ReceiptHandle: msg.ReceiptHandle,
 			})
@@ -199,12 +199,12 @@ func drainQueue(t *testing.T, ctx context.Context, sqsClient *sqs.Client, queueU
 // applyOnBindings invokes driver.Apply for a synthetic materialization with the given resources.
 func applyOnBindings(t *testing.T, ctx context.Context, d driver, cfg *config, resources []resource) (*pm.Response_Applied, error) {
 	t.Helper()
-	cfgJSON, err := json.Marshal(cfg)
+	var cfgJSON, err = json.Marshal(cfg)
 	require.NoError(t, err)
 
 	var bindings []*pf.MaterializationSpec_Binding
 	for _, r := range resources {
-		rJSON, err := json.Marshal(r)
+		var rJSON, err = json.Marshal(r)
 		require.NoError(t, err)
 		bindings = append(bindings, &pf.MaterializationSpec_Binding{
 			ResourceConfigJson: rJSON,
@@ -229,12 +229,12 @@ func applyOnBindings(t *testing.T, ctx context.Context, d driver, cfg *config, r
 // newTransactorFor builds a transactor for the given resources, mirroring the protocol path.
 func newTransactorFor(t *testing.T, ctx context.Context, d driver, cfg *config, resources []resource) *transactor {
 	t.Helper()
-	cfgJSON, err := json.Marshal(cfg)
+	var cfgJSON, err = json.Marshal(cfg)
 	require.NoError(t, err)
 
 	var bindings []*pf.MaterializationSpec_Binding
 	for _, r := range resources {
-		rJSON, err := json.Marshal(r)
+		var rJSON, err = json.Marshal(r)
 		require.NoError(t, err)
 		bindings = append(bindings, &pf.MaterializationSpec_Binding{
 			ResourceConfigJson: rJSON,
@@ -262,25 +262,25 @@ func TestIntegration(t *testing.T) {
 	// Ensure shared docker network exists; ignore failure if it already does.
 	_ = exec.Command("docker", "network", "create", "flow-test").Run()
 
-	cmd := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait")
-	out, err := cmd.CombinedOutput()
+	var cmd = exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait")
+	var out, err = cmd.CombinedOutput()
 	require.NoErrorf(t, err, "docker compose up failed: %s", string(out))
 	t.Cleanup(func() {
 		_ = exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	var ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	snsClient, sqsClient := buildAWSClients(t, ctx)
-	d := driver{}
-	cfg := testConfig()
+	var snsClient, sqsClient = buildAWSClients(t, ctx)
+	var d = driver{}
+	var cfg = testConfig()
 
 	t.Run("apply_creates_missing_topics", func(t *testing.T) {
-		stdName := "apply-std"
-		fifoName := "apply-fifo.fifo"
+		var stdName = "apply-std"
+		var fifoName = "apply-fifo.fifo"
 
-		resp, err := applyOnBindings(t, ctx, d, cfg, []resource{
+		var resp, err = applyOnBindings(t, ctx, d, cfg, []resource{
 			{TopicName: stdName}, {TopicName: fifoName},
 		})
 		require.NoError(t, err)
@@ -301,7 +301,7 @@ func TestIntegration(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		snap := map[string]any{
+		var snap = map[string]any{
 			"first_apply":  applySnapshot(resp),
 			"second_apply": applySnapshot(resp2),
 			"fifo_topic_attributes": map[string]string{
@@ -319,66 +319,66 @@ func TestIntegration(t *testing.T) {
 	t.Run("apply_errors_on_invalid_topic_name", func(t *testing.T) {
 		// Collection names like "acmeCo/orders" must be normalized by Flow's UI into a valid SNS
 		// topic name (no slashes). If something slips through, the resource validator rejects it.
-		_, err := applyOnBindings(t, ctx, d, cfg, []resource{{TopicName: "acmeCo/orders"}})
+		var _, err = applyOnBindings(t, ctx, d, cfg, []resource{{TopicName: "acmeCo/orders"}})
 		require.Error(t, err)
 		snapshotJSON(t, map[string]string{"error": err.Error()})
 	})
 
 	t.Run("publish_standard", func(t *testing.T) {
-		stdName, queueURL := createTopicAndSubscribedQueue(t, ctx, snsClient, sqsClient, "std-publish", false)
-		tx := newTransactorFor(t, ctx, d, cfg, []resource{{TopicName: stdName}})
+		var stdName, queueURL = createTopicAndSubscribedQueue(t, ctx, snsClient, sqsClient, "std-publish", false)
+		var tx = newTransactorFor(t, ctx, d, cfg, []resource{{TopicName: stdName}})
 
-		docs := []json.RawMessage{
+		var docs = []json.RawMessage{
 			json.RawMessage(`{"id":1,"v":"a"}`),
 			json.RawMessage(`{"id":2,"v":"b"}`),
 			json.RawMessage(`{"id":3,"v":"c"}`),
 		}
 
-		eg, egCtx := errgroup.WithContext(ctx)
+		var eg, egCtx = errgroup.WithContext(ctx)
 		eg.SetLimit(publishConcurrency)
 		for i, doc := range docs {
 			require.NoError(t, tx.publishOne(egCtx, eg, 0, []byte(fmt.Sprintf("k%d", i)), doc, nil))
 		}
 		require.NoError(t, eg.Wait())
 
-		msgs := drainQueue(t, ctx, sqsClient, queueURL, len(docs))
+		var msgs = drainQueue(t, ctx, sqsClient, queueURL, len(docs))
 		snapshotJSON(t, normalizeStandardMessages(msgs))
 	})
 
 	t.Run("publish_fifo_attributes_and_dedup", func(t *testing.T) {
-		fifoName, queueURL := createTopicAndSubscribedQueue(t, ctx, snsClient, sqsClient, "fifo-publish", true)
-		tx := newTransactorFor(t, ctx, d, cfg, []resource{{TopicName: fifoName}})
+		var fifoName, queueURL = createTopicAndSubscribedQueue(t, ctx, snsClient, sqsClient, "fifo-publish", true)
+		var tx = newTransactorFor(t, ctx, d, cfg, []resource{{TopicName: fifoName}})
 
-		keyA := []byte("group-a")
-		keyB := []byte("group-b")
-		docs := []json.RawMessage{
+		var keyA = []byte("group-a")
+		var keyB = []byte("group-b")
+		var docs = []json.RawMessage{
 			json.RawMessage(`{"i":0,"g":"a"}`),
 			json.RawMessage(`{"i":1,"g":"a"}`),
 			json.RawMessage(`{"i":2,"g":"b"}`),
 			json.RawMessage(`{"i":3,"g":"b"}`),
 		}
-		keys := [][]byte{keyA, keyA, keyB, keyB}
+		var keys = [][]byte{keyA, keyA, keyB, keyB}
 
-		eg, egCtx := errgroup.WithContext(ctx)
+		var eg, egCtx = errgroup.WithContext(ctx)
 		eg.SetLimit(publishConcurrency)
 		for i, doc := range docs {
 			require.NoError(t, tx.publishOne(egCtx, eg, 0, keys[i], doc, nil))
 		}
 		require.NoError(t, eg.Wait())
 
-		initial := drainQueue(t, ctx, sqsClient, queueURL, len(docs))
+		var initial = drainQueue(t, ctx, sqsClient, queueURL, len(docs))
 
 		// Re-publishing identical (key, body) pairs within the dedup window should be suppressed
 		// by the connector's explicit MessageDeduplicationId.
-		eg2, egCtx2 := errgroup.WithContext(ctx)
+		var eg2, egCtx2 = errgroup.WithContext(ctx)
 		eg2.SetLimit(publishConcurrency)
-		dup := json.RawMessage(`{"i":"dup"}`)
+		var dup = json.RawMessage(`{"i":"dup"}`)
 		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup, nil))
 		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup, nil))
 		require.NoError(t, tx.publishOne(egCtx2, eg2, 0, keyA, dup, nil))
 		require.NoError(t, eg2.Wait())
 
-		afterDedup := drainQueue(t, ctx, sqsClient, queueURL, 1)
+		var afterDedup = drainQueue(t, ctx, sqsClient, queueURL, 1)
 
 		snapshotJSON(t, map[string]any{
 			"initial_publish": normalizeFifoMessages(initial),
@@ -390,18 +390,18 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("publish_rejects_oversize_document", func(t *testing.T) {
-		stdName, _ := createTopicAndSubscribedQueue(t, ctx, snsClient, sqsClient, "oversize", false)
-		tx := newTransactorFor(t, ctx, d, cfg, []resource{{TopicName: stdName}})
+		var stdName, _ = createTopicAndSubscribedQueue(t, ctx, snsClient, sqsClient, "oversize", false)
+		var tx = newTransactorFor(t, ctx, d, cfg, []resource{{TopicName: stdName}})
 
 		// One byte past the SNS limit triggers the pre-check before we ever call Publish.
-		oversize := make([]byte, maxMessageBytes+1)
+		var oversize = make([]byte, maxMessageBytes+1)
 		for i := range oversize {
 			oversize[i] = 'a'
 		}
 
-		eg, egCtx := errgroup.WithContext(ctx)
+		var eg, egCtx = errgroup.WithContext(ctx)
 		eg.SetLimit(publishConcurrency)
-		err := tx.publishOne(egCtx, eg, 0, []byte("k"), json.RawMessage(oversize), nil)
+		var err = tx.publishOne(egCtx, eg, 0, []byte("k"), json.RawMessage(oversize), nil)
 		require.NoError(t, eg.Wait())
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "exceeds the SNS")
@@ -412,7 +412,7 @@ func TestIntegration(t *testing.T) {
 // the current (sub)test. Re-run with UPDATE_SNAPSHOTS=true to refresh.
 func snapshotJSON(t *testing.T, v any) {
 	t.Helper()
-	formatted, err := json.MarshalIndent(v, "", "  ")
+	var formatted, err = json.MarshalIndent(v, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, string(formatted))
 }
@@ -429,7 +429,7 @@ type fifoMessageView struct {
 
 // normalizeStandardMessages strips volatile SQS metadata and sorts by body for snapshot stability.
 func normalizeStandardMessages(msgs []sqstypes.Message) []stdMessageView {
-	out := make([]stdMessageView, 0, len(msgs))
+	var out = make([]stdMessageView, 0, len(msgs))
 	for _, m := range msgs {
 		out = append(out, stdMessageView{Body: *m.Body})
 	}
@@ -441,7 +441,7 @@ func normalizeStandardMessages(msgs []sqstypes.Message) []stdMessageView {
 // sorts by body. Group ID and dedup ID are deterministic because they're derived from
 // PackedKeyHash_HH64 and sha256 respectively, so they're stable across runs.
 func normalizeFifoMessages(msgs []sqstypes.Message) []fifoMessageView {
-	out := make([]fifoMessageView, 0, len(msgs))
+	var out = make([]fifoMessageView, 0, len(msgs))
 	for _, m := range msgs {
 		out = append(out, fifoMessageView{
 			Body:                   *m.Body,
