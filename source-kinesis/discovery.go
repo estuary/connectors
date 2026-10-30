@@ -53,13 +53,13 @@ var minimalSchema = &jsonschema.Schema{
 func discoverStreams(streams []kinesisStream) ([]*pc.Response_Discovered_Binding, error) {
 	var out = make([]*pc.Response_Discovered_Binding, 0, len(streams))
 
-	bs, err := json.Marshal(minimalSchema)
+	var bs, err = json.Marshal(minimalSchema)
 	if err != nil {
 		panic(fmt.Errorf("error generating schema: %v", err))
 	}
 
 	for _, s := range streams {
-		resourceJSON, err := json.Marshal(resource{Stream: s.name})
+		var resourceJSON, err = json.Marshal(resource{Stream: s.name})
 		if err != nil {
 			return nil, fmt.Errorf("serializing resource json: %w", err)
 		}

@@ -9,7 +9,7 @@ import (
 )
 
 func TestAvroToJSONSchema_PrimitiveTypes(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -23,12 +23,12 @@ func TestAvroToJSONSchema_PrimitiveTypes(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
 	assert.Equal(t, "object", result["type"])
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// int and long should map to integer
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, properties["intField"])
@@ -46,7 +46,7 @@ func TestAvroToJSONSchema_PrimitiveTypes(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"type": "string", "contentEncoding": "base64"}, properties["bytesField"])
 
 	// All primitive fields should be required
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 7)
 	assert.Contains(t, required, "intField")
 	assert.Contains(t, required, "longField")
@@ -58,7 +58,7 @@ func TestAvroToJSONSchema_PrimitiveTypes(t *testing.T) {
 }
 
 func TestAvroToJSONSchema_NullableTypes(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -69,10 +69,10 @@ func TestAvroToJSONSchema_NullableTypes(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Required field
 	assert.Equal(t, map[string]interface{}{"type": "string"}, properties["requiredString"])
@@ -83,7 +83,7 @@ func TestAvroToJSONSchema_NullableTypes(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"type": "number"}, properties["nullableDouble"])
 
 	// Only requiredString should be in required array
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 1)
 	assert.Contains(t, required, "requiredString")
 	assert.NotContains(t, required, "nullableString")
@@ -92,7 +92,7 @@ func TestAvroToJSONSchema_NullableTypes(t *testing.T) {
 }
 
 func TestAvroToJSONSchema_ArrayTypes(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -102,33 +102,33 @@ func TestAvroToJSONSchema_ArrayTypes(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Array of strings
-	stringArray := properties["stringArray"].(map[string]interface{})
+	var stringArray = properties["stringArray"].(map[string]interface{})
 	assert.Equal(t, "array", stringArray["type"])
 	assert.Equal(t, map[string]interface{}{"type": "string"}, stringArray["items"])
 
 	// Array of ints
-	intArray := properties["intArray"].(map[string]interface{})
+	var intArray = properties["intArray"].(map[string]interface{})
 	assert.Equal(t, "array", intArray["type"])
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, intArray["items"])
 
 	// Array of doubles
-	doubleArray := properties["doubleArray"].(map[string]interface{})
+	var doubleArray = properties["doubleArray"].(map[string]interface{})
 	assert.Equal(t, "array", doubleArray["type"])
 	assert.Equal(t, map[string]interface{}{"type": "number"}, doubleArray["items"])
 
 	// All array fields should be required
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 3)
 }
 
 func TestAvroToJSONSchema_NullableArray(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -136,40 +136,40 @@ func TestAvroToJSONSchema_NullableArray(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Nullable array should have the array type
-	nullableArray := properties["nullableArray"].(map[string]interface{})
+	var nullableArray = properties["nullableArray"].(map[string]interface{})
 	assert.Equal(t, "array", nullableArray["type"])
 	assert.Equal(t, map[string]interface{}{"type": "string"}, nullableArray["items"])
 
 	// Should not be required
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 0)
 }
 
 func TestAvroToJSONSchema_EmptyRecord(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "EmptyRecord",
 		"fields": []
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
 	assert.Equal(t, "object", result["type"])
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 	assert.Len(t, properties, 0)
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 0)
 }
 
 func TestAvroToJSONSchema_MixedRequiredAndOptional(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "MixedRecord",
 		"fields": [
@@ -181,10 +181,10 @@ func TestAvroToJSONSchema_MixedRequiredAndOptional(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 3)
 	assert.Contains(t, required, "id")
 	assert.Contains(t, required, "name")
@@ -194,15 +194,15 @@ func TestAvroToJSONSchema_MixedRequiredAndOptional(t *testing.T) {
 }
 
 func TestAvroToJSONSchema_InvalidJSON(t *testing.T) {
-	avroSchema := `{invalid json}`
+	var avroSchema = `{invalid json}`
 
-	_, err := avroToJSONSchema(avroSchema)
+	var _, err = avroToJSONSchema(avroSchema)
 	assert.Error(t, err)
 }
 
 func TestAvroToJSONSchema_ComplexSchema(t *testing.T) {
 	// A more realistic schema similar to what Glue might return
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "UserEvent",
 		"namespace": "com.example.events",
@@ -217,13 +217,13 @@ func TestAvroToJSONSchema_ComplexSchema(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
 	// Verify structure
 	assert.Equal(t, "object", result["type"])
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 	assert.Len(t, properties, 7)
 
 	// Check specific fields
@@ -232,15 +232,15 @@ func TestAvroToJSONSchema_ComplexSchema(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, properties["timestamp"])
 	assert.Equal(t, map[string]interface{}{"type": "string"}, properties["payload"])
 
-	tags := properties["tags"].(map[string]interface{})
+	var tags = properties["tags"].(map[string]interface{})
 	assert.Equal(t, "array", tags["type"])
 
-	metrics := properties["metrics"].(map[string]interface{})
+	var metrics = properties["metrics"].(map[string]interface{})
 	assert.Equal(t, "array", metrics["type"])
 	assert.Equal(t, map[string]interface{}{"type": "number"}, metrics["items"])
 
 	// Check required fields
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 5)
 	assert.Contains(t, required, "event_id")
 	assert.Contains(t, required, "user_id")
@@ -251,7 +251,7 @@ func TestAvroToJSONSchema_ComplexSchema(t *testing.T) {
 
 func TestConvertAvroType_UnknownType(t *testing.T) {
 	// Unknown complex types should fall back to string
-	result, nullable := convertAvroType(map[string]interface{}{
+	var result, nullable = convertAvroType(map[string]interface{}{
 		"type": "unknown_type",
 	})
 
@@ -261,7 +261,7 @@ func TestConvertAvroType_UnknownType(t *testing.T) {
 
 func TestConvertAvroType_NestedArray(t *testing.T) {
 	// Array of arrays (nested)
-	result, nullable := convertAvroType(map[string]interface{}{
+	var result, nullable = convertAvroType(map[string]interface{}{
 		"type": "array",
 		"items": map[string]interface{}{
 			"type":  "array",
@@ -272,13 +272,13 @@ func TestConvertAvroType_NestedArray(t *testing.T) {
 	assert.False(t, nullable)
 	assert.Equal(t, "array", result["type"])
 
-	items := result["items"].(map[string]interface{})
+	var items = result["items"].(map[string]interface{})
 	assert.Equal(t, "array", items["type"])
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, items["items"])
 }
 
 func TestAvroToJSONSchema_OutputIsValidJSON(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -287,7 +287,7 @@ func TestAvroToJSONSchema_OutputIsValidJSON(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
 	// Verify the result can be marshaled to JSON
@@ -303,7 +303,7 @@ func TestAvroToJSONSchema_OutputIsValidJSON(t *testing.T) {
 }
 
 func TestAvroToJSONSchema_LogicalTypes(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -317,10 +317,10 @@ func TestAvroToJSONSchema_LogicalTypes(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Date should have format: date
 	assert.Equal(t, map[string]interface{}{"type": "string", "format": "date"}, properties["dateField"])
@@ -341,7 +341,7 @@ func TestAvroToJSONSchema_LogicalTypes(t *testing.T) {
 }
 
 func TestAvroToJSONSchema_MapType(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -350,23 +350,23 @@ func TestAvroToJSONSchema_MapType(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Map should become object with additionalProperties
-	stringMap := properties["stringMap"].(map[string]interface{})
+	var stringMap = properties["stringMap"].(map[string]interface{})
 	assert.Equal(t, "object", stringMap["type"])
 	assert.Equal(t, map[string]interface{}{"type": "string"}, stringMap["additionalProperties"])
 
-	intMap := properties["intMap"].(map[string]interface{})
+	var intMap = properties["intMap"].(map[string]interface{})
 	assert.Equal(t, "object", intMap["type"])
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, intMap["additionalProperties"])
 }
 
 func TestAvroToJSONSchema_EnumType(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -374,19 +374,19 @@ func TestAvroToJSONSchema_EnumType(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Enum should become string with enum values
-	status := properties["status"].(map[string]interface{})
+	var status = properties["status"].(map[string]interface{})
 	assert.Equal(t, "string", status["type"])
 	assert.Equal(t, []string{"PENDING", "ACTIVE", "COMPLETED"}, status["enum"])
 }
 
 func TestAvroToJSONSchema_NestedRecord(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "OuterRecord",
 		"fields": [
@@ -402,29 +402,29 @@ func TestAvroToJSONSchema_NestedRecord(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Check outer fields
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, properties["id"])
 
 	// Check nested record
-	nested := properties["nested"].(map[string]interface{})
+	var nested = properties["nested"].(map[string]interface{})
 	assert.Equal(t, "object", nested["type"])
 
-	nestedProps := nested["properties"].(map[string]interface{})
+	var nestedProps = nested["properties"].(map[string]interface{})
 	assert.Equal(t, map[string]interface{}{"type": "string"}, nestedProps["innerField1"])
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, nestedProps["innerField2"])
 
-	nestedRequired := nested["required"].([]string)
+	var nestedRequired = nested["required"].([]string)
 	assert.Contains(t, nestedRequired, "innerField1")
 	assert.Contains(t, nestedRequired, "innerField2")
 }
 
 func TestAvroToJSONSchema_FixedType(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -432,17 +432,17 @@ func TestAvroToJSONSchema_FixedType(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Fixed should become string with base64 encoding
 	assert.Equal(t, map[string]interface{}{"type": "string", "contentEncoding": "base64"}, properties["fixedField"])
 }
 
 func TestAvroToJSONSchema_DefaultValues(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -452,10 +452,10 @@ func TestAvroToJSONSchema_DefaultValues(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 
 	// Only the field without a default should be required
 	assert.Len(t, required, 1)
@@ -465,7 +465,7 @@ func TestAvroToJSONSchema_DefaultValues(t *testing.T) {
 }
 
 func TestAvroToJSONSchema_NullableMap(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -473,23 +473,23 @@ func TestAvroToJSONSchema_NullableMap(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
 	// Nullable map should still have the map structure
-	nullableMap := properties["nullableMap"].(map[string]interface{})
+	var nullableMap = properties["nullableMap"].(map[string]interface{})
 	assert.Equal(t, "object", nullableMap["type"])
 	assert.Equal(t, map[string]interface{}{"type": "string"}, nullableMap["additionalProperties"])
 
 	// Should not be required
-	required := result["required"].([]string)
+	var required = result["required"].([]string)
 	assert.Len(t, required, 0)
 }
 
 func TestAvroToJSONSchema_ArrayOfRecords(t *testing.T) {
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -504,24 +504,24 @@ func TestAvroToJSONSchema_ArrayOfRecords(t *testing.T) {
 		]
 	}`
 
-	result, err := avroToJSONSchema(avroSchema)
+	var result, err = avroToJSONSchema(avroSchema)
 	require.NoError(t, err)
 
-	properties := result["properties"].(map[string]interface{})
+	var properties = result["properties"].(map[string]interface{})
 
-	items := properties["items"].(map[string]interface{})
+	var items = properties["items"].(map[string]interface{})
 	assert.Equal(t, "array", items["type"])
 
-	itemsSchema := items["items"].(map[string]interface{})
+	var itemsSchema = items["items"].(map[string]interface{})
 	assert.Equal(t, "object", itemsSchema["type"])
 
-	itemProps := itemsSchema["properties"].(map[string]interface{})
+	var itemProps = itemsSchema["properties"].(map[string]interface{})
 	assert.Equal(t, map[string]interface{}{"type": "string"}, itemProps["name"])
 	assert.Equal(t, map[string]interface{}{"type": "integer"}, itemProps["quantity"])
 }
 
 func TestAvroTypeToJSONSchema(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		avroType    string
 		logicalType string
 		expected    map[string]interface{}
@@ -544,12 +544,12 @@ func TestAvroTypeToJSONSchema(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		name := tt.avroType
+		var name = tt.avroType
 		if tt.logicalType != "" {
 			name = tt.avroType + "/" + tt.logicalType
 		}
 		t.Run(name, func(t *testing.T) {
-			result := avroTypeToJSONSchema(tt.avroType, tt.logicalType)
+			var result = avroTypeToJSONSchema(tt.avroType, tt.logicalType)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

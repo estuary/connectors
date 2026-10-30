@@ -24,7 +24,7 @@ func convertAvroType(avroType interface{}) (map[string]interface{}, bool) {
 
 	case []interface{}:
 		// Union type - check for nullable pattern ["null", "actualType"]
-		nullable := false
+		var nullable = false
 		var inner map[string]interface{}
 
 		for _, v := range t {
@@ -41,27 +41,27 @@ func convertAvroType(avroType interface{}) (map[string]interface{}, bool) {
 		return inner, nullable
 
 	case map[string]interface{}:
-		typeStr, _ := t["type"].(string)
-		logicalType, _ := t["logicalType"].(string)
+		var typeStr, _ = t["type"].(string)
+		var logicalType, _ = t["logicalType"].(string)
 
 		switch typeStr {
 		case "array":
-			items, _ := convertAvroType(t["items"])
+			var items, _ = convertAvroType(t["items"])
 			return map[string]interface{}{
 				"type":  "array",
 				"items": items,
 			}, false
 
 		case "map":
-			values, _ := convertAvroType(t["values"])
+			var values, _ = convertAvroType(t["values"])
 			return map[string]interface{}{
 				"type":                 "object",
 				"additionalProperties": values,
 			}, false
 
 		case "enum":
-			symbols, _ := t["symbols"].([]interface{})
-			enumValues := make([]string, 0, len(symbols))
+			var symbols, _ = t["symbols"].([]interface{})
+			var enumValues = make([]string, 0, len(symbols))
 			for _, s := range symbols {
 				if str, ok := s.(string); ok {
 					enumValues = append(enumValues, str)
@@ -81,21 +81,21 @@ func convertAvroType(avroType interface{}) (map[string]interface{}, bool) {
 
 		case "record":
 			// Nested record - recursively convert
-			fields, _ := t["fields"].([]interface{})
-			properties := map[string]interface{}{}
-			required := []string{}
+			var fields, _ = t["fields"].([]interface{})
+			var properties = map[string]interface{}{}
+			var required = []string{}
 
 			for _, f := range fields {
-				field, ok := f.(map[string]interface{})
+				var field, ok = f.(map[string]interface{})
 				if !ok {
 					continue
 				}
-				fieldName, _ := field["name"].(string)
-				fieldType := field["type"]
-				propSchema, nullable := convertAvroType(fieldType)
+				var fieldName, _ = field["name"].(string)
+				var fieldType = field["type"]
+				var propSchema, nullable = convertAvroType(fieldType)
 				properties[fieldName] = propSchema
 				if !nullable {
-					_, hasDefault := field["default"]
+					var _, hasDefault = field["default"]
 					if !hasDefault {
 						required = append(required, fieldName)
 					}
@@ -161,11 +161,11 @@ func avroToJSONSchema(schema string) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	properties := map[string]interface{}{}
-	required := []string{}
+	var properties = map[string]interface{}{}
+	var required = []string{}
 
 	for _, field := range avro.Fields {
-		propSchema, nullable := convertAvroType(field.Type)
+		var propSchema, nullable = convertAvroType(field.Type)
 		properties[field.Name] = propSchema
 		// A field is required if it's not nullable AND has no default value
 		if !nullable && field.Default == nil {

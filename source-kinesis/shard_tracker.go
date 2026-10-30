@@ -59,7 +59,7 @@ func (st *shardTracker) waitForFinished(shardId string) func(context.Context) er
 		return nil
 	}
 
-	ch, ok := st.waiters[shardId]
+	var ch, ok = st.waiters[shardId]
 	if !ok {
 		st.waiters[shardId] = make(chan struct{})
 		ch = st.waiters[shardId]

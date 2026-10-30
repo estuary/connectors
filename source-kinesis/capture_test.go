@@ -37,7 +37,7 @@ func testConfig(t *testing.T) Config {
 	}
 
 	if useRealAWS() {
-		region := os.Getenv("AWS_REGION")
+		var region = os.Getenv("AWS_REGION")
 		if region == "" {
 			region = "us-east-1"
 		}
@@ -59,15 +59,15 @@ func testConfig(t *testing.T) Config {
 }
 
 func TestDiscover(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client, err := connect(ctx, &conf)
+	var conf = testConfig(t)
+	var client, err = connect(ctx, &conf)
 	require.NoError(t, err)
 
-	testStreams := []string{"test-stream-1", "test-stream-2"}
+	var testStreams = []string{"test-stream-1", "test-stream-2"}
 
-	cleanup := func() {
+	var cleanup = func() {
 		for _, s := range testStreams {
 			_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(s)})
 		}
@@ -81,7 +81,7 @@ func TestDiscover(t *testing.T) {
 	}
 
 	for _, s := range testStreams {
-		s := s
+		var s = s
 		_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
 			StreamName: aws.String(s),
 			ShardCount: aws.Int32(2),
@@ -90,7 +90,7 @@ func TestDiscover(t *testing.T) {
 		awaitStreamCreated(t, ctx, client, s)
 	}
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &conf,
 	}
@@ -99,15 +99,15 @@ func TestDiscover(t *testing.T) {
 }
 
 func TestCapture(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client, err := connect(ctx, &conf)
+	var conf = testConfig(t)
+	var client, err = connect(ctx, &conf)
 	require.NoError(t, err)
 
-	testStreams := []string{"test-stream-1", "test-stream-2"}
+	var testStreams = []string{"test-stream-1", "test-stream-2"}
 
-	cleanup := func() {
+	var cleanup = func() {
 		for _, s := range testStreams {
 			_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(s)})
 		}
@@ -121,7 +121,7 @@ func TestCapture(t *testing.T) {
 	}
 
 	for _, s := range testStreams {
-		s := s
+		var s = s
 		_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
 			StreamName: aws.String(s),
 			ShardCount: aws.Int32(2),
@@ -130,9 +130,9 @@ func TestCapture(t *testing.T) {
 		awaitStreamCreated(t, ctx, client, s)
 	}
 
-	bindings := []*pf.CaptureSpec_Binding{}
+	var bindings = []*pf.CaptureSpec_Binding{}
 	for _, s := range testStreams {
-		resourceJson, err := json.Marshal(resource{
+		var resourceJson, err = json.Marshal(resource{
 			Stream: s,
 		})
 		require.NoError(t, err)
@@ -143,7 +143,7 @@ func TestCapture(t *testing.T) {
 		})
 	}
 
-	capture := st.CaptureSpec{
+	var capture = st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: conf,
 		Bindings:     bindings,
@@ -153,14 +153,14 @@ func TestCapture(t *testing.T) {
 		},
 	}
 
-	addData := func(t *testing.T, start, end int) {
+	var addData = func(t *testing.T, start, end int) {
 		for i := start; i < end; i++ {
 			var input = kinesis.PutRecordInput{
 				StreamName:   aws.String(testStreams[i%len(testStreams)]),
 				Data:         []byte(fmt.Sprintf(`{"i":"%02d"}`, i)),
 				PartitionKey: aws.String(fmt.Sprintf("partitionKey-%02d", i)),
 			}
-			_, err := client.PutRecord(ctx, &input)
+			var _, err = client.PutRecord(ctx, &input)
 			require.NoError(t, err)
 		}
 	}
@@ -198,14 +198,14 @@ func TestCapture(t *testing.T) {
 }
 
 func TestCaptureParsing(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testConfig(t)
-	client, err := connect(ctx, &conf)
+	var conf = testConfig(t)
+	var client, err = connect(ctx, &conf)
 	require.NoError(t, err)
 
-	testStream := "test-stream-parsing"
-	cleanup := func() {
+	var testStream = "test-stream-parsing"
+	var cleanup = func() {
 		_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(testStream)})
 	}
 	cleanup()
@@ -224,13 +224,13 @@ func TestCaptureParsing(t *testing.T) {
 	resourceJson, err := json.Marshal(resource{
 		Stream: testStream,
 	})
-	binding := &pf.CaptureSpec_Binding{
+	var binding = &pf.CaptureSpec_Binding{
 		ResourceConfigJson: resourceJson,
 		ResourcePath:       []string{testStream},
 		StateKey:           fmt.Sprintf("%s.v0", testStream),
 	}
 
-	capture := st.CaptureSpec{
+	var capture = st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: conf,
 		Bindings:     []*pf.CaptureSpec_Binding{binding},
@@ -240,7 +240,7 @@ func TestCaptureParsing(t *testing.T) {
 		},
 	}
 
-	data := [][]byte{
+	var data = [][]byte{
 		[]byte(`{"int1":-4974660706199429123,"int1AsStr":"-4974660706199429123","int2":9223372036854775807,"int2AsStr":"9223372036854775807"}`),
 		[]byte(`{"_meta":{"userMetaField1":"hello1","userMetaField2":"world1"},"other":"value"}`),
 		[]byte(`{"_meta":{"userMetaField1":"hello2","userMetaField2":"world2","source":{"userSourceField1":"clobbered"}},"other":"value"}`),
@@ -264,12 +264,12 @@ func TestCaptureParsing(t *testing.T) {
 // Uses testConfig and additionally checks if Glue is available when using localstack.
 func testGlueConfig(t *testing.T) Config {
 	t.Helper()
-	conf := testConfig(t)
+	var conf = testConfig(t)
 
 	// If using localstack, check if Glue is available (requires Pro)
 	if !useRealAWS() {
-		ctx := context.Background()
-		glueClient, err := connectGlue(ctx, &conf)
+		var ctx = context.Background()
+		var glueClient, err = connectGlue(ctx, &conf)
 		if err != nil {
 			t.Skipf("skipping Glue test: unable to connect to Glue (localstack Pro required): %v", err)
 		}
@@ -285,25 +285,25 @@ func testGlueConfig(t *testing.T) Config {
 }
 
 func TestCaptureGlueSchema(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testGlueConfig(t)
-	client, err := connect(ctx, &conf)
+	var conf = testGlueConfig(t)
+	var client, err = connect(ctx, &conf)
 	require.NoError(t, err)
 
 	glueClient, err := connectGlue(ctx, &conf)
 	require.NoError(t, err)
 
 	// Use unique names when testing against real AWS to avoid conflicts
-	suffix := ""
+	var suffix = ""
 	if useRealAWS() {
 		suffix = fmt.Sprintf("-%d", time.Now().UnixNano())
 	}
-	testStream := "test-stream-glue" + suffix
-	registryName := "test-registry" + suffix
-	schemaName := "test-schema" + suffix
+	var testStream = "test-stream-glue" + suffix
+	var registryName = "test-registry" + suffix
+	var schemaName = "test-schema" + suffix
 
-	cleanup := func() {
+	var cleanup = func() {
 		_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(testStream)})
 		_, _ = glueClient.DeleteSchema(ctx, &glue.DeleteSchemaInput{
 			SchemaId: &glueTypes.SchemaId{
@@ -330,7 +330,7 @@ func TestCaptureGlueSchema(t *testing.T) {
 	require.NoError(t, err, "failed to create glue registry")
 
 	// Create an Avro schema in Glue
-	avroSchema := `{
+	var avroSchema = `{
 		"type": "record",
 		"name": "TestRecord",
 		"fields": [
@@ -351,7 +351,7 @@ func TestCaptureGlueSchema(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create glue schema")
 
-	schemaVersionId := aws.ToString(createSchemaRes.SchemaVersionId)
+	var schemaVersionId = aws.ToString(createSchemaRes.SchemaVersionId)
 
 	// Create Kinesis stream
 	_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
@@ -366,13 +366,13 @@ func TestCaptureGlueSchema(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	binding := &pf.CaptureSpec_Binding{
+	var binding = &pf.CaptureSpec_Binding{
 		ResourceConfigJson: resourceJson,
 		ResourcePath:       []string{testStream},
 		StateKey:           fmt.Sprintf("%s.v0", testStream),
 	}
 
-	capture := st.CaptureSpec{
+	var capture = st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: conf,
 		Bindings:     []*pf.CaptureSpec_Binding{binding},
@@ -390,19 +390,19 @@ func TestCaptureGlueSchema(t *testing.T) {
 	// - Bytes 2-17: Schema version UUID (16 bytes)
 	// - Rest: JSON payload
 
-	testDocs := []map[string]any{
+	var testDocs = []map[string]any{
 		{"id": 1, "name": "first", "value": 1.5},
 		{"id": 2, "name": "second", "value": 2.5},
 		{"id": 3, "name": "third", "value": 3.5},
 	}
 
 	for i, doc := range testDocs {
-		payload, err := json.Marshal(doc)
+		var payload, err = json.Marshal(doc)
 		require.NoError(t, err)
 
 		// Build Glue header
-		header := buildGlueHeader(t, schemaVersionId)
-		data := append(header, payload...)
+		var header = buildGlueHeader(t, schemaVersionId)
+		var data = append(header, payload...)
 
 		_, err = client.PutRecord(ctx, &kinesis.PutRecordInput{
 			StreamName:   aws.String(testStream),
@@ -420,25 +420,25 @@ func TestCaptureGlueSchema(t *testing.T) {
 }
 
 func TestCaptureGlueSchemaJSON(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	conf := testGlueConfig(t)
-	client, err := connect(ctx, &conf)
+	var conf = testGlueConfig(t)
+	var client, err = connect(ctx, &conf)
 	require.NoError(t, err)
 
 	glueClient, err := connectGlue(ctx, &conf)
 	require.NoError(t, err)
 
 	// Use unique names when testing against real AWS to avoid conflicts
-	suffix := ""
+	var suffix = ""
 	if useRealAWS() {
 		suffix = fmt.Sprintf("-%d", time.Now().UnixNano())
 	}
-	testStream := "test-stream-glue-json" + suffix
-	registryName := "test-registry-json" + suffix
-	schemaName := "test-schema-json" + suffix
+	var testStream = "test-stream-glue-json" + suffix
+	var registryName = "test-registry-json" + suffix
+	var schemaName = "test-schema-json" + suffix
 
-	cleanup := func() {
+	var cleanup = func() {
 		_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(testStream)})
 		_, _ = glueClient.DeleteSchema(ctx, &glue.DeleteSchemaInput{
 			SchemaId: &glueTypes.SchemaId{
@@ -465,7 +465,7 @@ func TestCaptureGlueSchemaJSON(t *testing.T) {
 	require.NoError(t, err, "failed to create glue registry")
 
 	// Create a JSON Schema in Glue
-	jsonSchema := `{
+	var jsonSchema = `{
 		"type": "object",
 		"properties": {
 			"id": {"type": "integer"},
@@ -486,7 +486,7 @@ func TestCaptureGlueSchemaJSON(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create glue schema")
 
-	schemaVersionId := aws.ToString(createSchemaRes.SchemaVersionId)
+	var schemaVersionId = aws.ToString(createSchemaRes.SchemaVersionId)
 
 	// Create Kinesis stream
 	_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
@@ -501,13 +501,13 @@ func TestCaptureGlueSchemaJSON(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	binding := &pf.CaptureSpec_Binding{
+	var binding = &pf.CaptureSpec_Binding{
 		ResourceConfigJson: resourceJson,
 		ResourcePath:       []string{testStream},
 		StateKey:           fmt.Sprintf("%s.v0", testStream),
 	}
 
-	capture := st.CaptureSpec{
+	var capture = st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: conf,
 		Bindings:     []*pf.CaptureSpec_Binding{binding},
@@ -519,19 +519,19 @@ func TestCaptureGlueSchemaJSON(t *testing.T) {
 	}
 
 	// Create records with Glue schema header
-	testDocs := []map[string]any{
+	var testDocs = []map[string]any{
 		{"id": 1, "name": "first", "value": 1.5},
 		{"id": 2, "name": "second", "value": 2.5},
 		{"id": 3, "name": "third", "value": 3.5},
 	}
 
 	for i, doc := range testDocs {
-		payload, err := json.Marshal(doc)
+		var payload, err = json.Marshal(doc)
 		require.NoError(t, err)
 
 		// Build Glue header
-		header := buildGlueHeader(t, schemaVersionId)
-		data := append(header, payload...)
+		var header = buildGlueHeader(t, schemaVersionId)
+		var data = append(header, payload...)
 
 		_, err = client.PutRecord(ctx, &kinesis.PutRecordInput{
 			StreamName:   aws.String(testStream),
@@ -556,13 +556,13 @@ func TestCaptureGlueSchemaJSON(t *testing.T) {
 func buildGlueHeader(t *testing.T, schemaVersionId string) []byte {
 	t.Helper()
 
-	header := make([]byte, 18)
+	var header = make([]byte, 18)
 	header[0] = 3 // Header version
 	header[1] = 0 // No compression
 
 	// Parse UUID string (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) to binary
-	uuidStr := strings.ReplaceAll(schemaVersionId, "-", "")
-	uuidBytes, err := hex.DecodeString(uuidStr)
+	var uuidStr = strings.ReplaceAll(schemaVersionId, "-", "")
+	var uuidBytes, err = hex.DecodeString(uuidStr)
 	require.NoError(t, err, "failed to decode UUID")
 	require.Len(t, uuidBytes, 16, "UUID should be 16 bytes")
 
@@ -586,10 +586,10 @@ func advanceCapture(t testing.TB, cs *st.CaptureSpec) {
 func advanceCaptureWithTimeout(t testing.TB, cs *st.CaptureSpec, shutdownDelay time.Duration) {
 	t.Helper()
 
-	captureCtx, cancelCapture := context.WithCancel(context.Background())
+	var captureCtx, cancelCapture = context.WithCancel(context.Background())
 
 	// Start an initial watchdog that cancels if no data is received
-	shutdownWatchdog := time.AfterFunc(60*time.Second, func() {
+	var shutdownWatchdog = time.AfterFunc(60*time.Second, func() {
 		log.WithField("delay", "60s").Debug("capture initial timeout expired with no data")
 		cancelCapture()
 	})
@@ -614,8 +614,8 @@ func advanceCaptureWithTimeout(t testing.TB, cs *st.CaptureSpec, shutdownDelay t
 func awaitStreamCreated(t *testing.T, ctx context.Context, client *kinesis.Client, stream string) {
 	t.Helper()
 
-	waiter := kinesis.NewStreamExistsWaiter(client)
-	err := waiter.Wait(ctx, &kinesis.DescribeStreamInput{
+	var waiter = kinesis.NewStreamExistsWaiter(client)
+	var err = waiter.Wait(ctx, &kinesis.DescribeStreamInput{
 		StreamName: &stream,
 	}, 2*time.Minute)
 	require.NoError(t, err, "timed out waiting for stream %s to be created", stream)
@@ -624,8 +624,8 @@ func awaitStreamCreated(t *testing.T, ctx context.Context, client *kinesis.Clien
 func awaitStreamDeleted(t *testing.T, ctx context.Context, client *kinesis.Client, stream string) {
 	t.Helper()
 
-	waiter := kinesis.NewStreamNotExistsWaiter(client)
-	err := waiter.Wait(ctx, &kinesis.DescribeStreamInput{
+	var waiter = kinesis.NewStreamNotExistsWaiter(client)
+	var err = waiter.Wait(ctx, &kinesis.DescribeStreamInput{
 		StreamName: &stream,
 	}, 2*time.Minute)
 	require.NoError(t, err, "timed out waiting for stream %s to be deleted", stream)

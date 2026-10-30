@@ -47,7 +47,7 @@ func (c *capture) updateStats(stream string, shardID string, docs int, millisBeh
 		c.stats[stream] = make(map[string]shardStats)
 	}
 
-	upd := c.stats[stream][shardID]
+	var upd = c.stats[stream][shardID]
 	upd.docsThisRound += docs
 	upd.millisBehind = millisBehind
 	c.stats[stream][shardID] = upd
@@ -63,7 +63,7 @@ func (c *capture) statsLogger(ctx context.Context) error {
 				c.mu.Lock()
 				defer c.mu.Unlock()
 
-				fields := make(map[string]any)
+				var fields = make(map[string]any)
 				for streamName, shardStats := range c.stats {
 					for shardID, stats := range shardStats {
 						if stats.docsThisRound == 0 {
@@ -74,8 +74,8 @@ func (c *capture) statsLogger(ctx context.Context) error {
 							fields[streamName] = make(map[string]any)
 						}
 
-						lag := time.Duration(stats.millisBehind) * time.Millisecond
-						s := make(map[string]any)
+						var lag = time.Duration(stats.millisBehind) * time.Millisecond
+						var s = make(map[string]any)
 						s["docs"] = stats.docsThisRound
 						s["lag"] = lag.String()
 						fields[streamName].(map[string]any)[shardID] = s
@@ -127,7 +127,7 @@ func (c *capture) emitState() error {
 		return nil
 	}
 
-	cp := captureState{
+	var cp = captureState{
 		Streams: c.updateState,
 	}
 
@@ -147,7 +147,7 @@ func (c *capture) pruneShards(
 	streamState map[string]*string,
 	allShards map[string]types.Shard,
 ) error {
-	deleteCheckpoint := make(map[string]*string)
+	var deleteCheckpoint = make(map[string]*string)
 	for shardId := range streamState {
 		if _, ok := allShards[shardId]; !ok {
 			delete(streamState, shardId)
@@ -170,7 +170,7 @@ func (c *capture) pruneShards(
 		return c.stream.Checkpoint([]byte("{}"), true)
 	}
 
-	cp := captureState{
+	var cp = captureState{
 		Streams: map[boilerplate.StateKey]map[string]*string{
 			stateKey: deleteCheckpoint,
 		},
@@ -214,7 +214,7 @@ func (c *capture) readStream(
 	bindingIndex int,
 	initialState map[string]*string,
 ) error {
-	allShards, err := c.listAllShards(ctx, stream.arn)
+	var allShards, err = c.listAllShards(ctx, stream.arn)
 	if err != nil {
 		return fmt.Errorf("listing shards: %w", err)
 	}
@@ -230,7 +230,7 @@ func (c *capture) readStream(
 	// Root shards are those that either don't have a parent or the parent no
 	// longer exists. These are the shards we'll start reading from, and move on
 	// to their children when they are closed.
-	rootShards := make([]types.Shard, 0, len(allShards))
+	var rootShards = make([]types.Shard, 0, len(allShards))
 	for _, s := range allShards {
 		if s.ParentShardId == nil {
 			rootShards = append(rootShards, s)
@@ -239,14 +239,14 @@ func (c *capture) readStream(
 		}
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
-	readerOutput := make(chan shardCompletionEvent)
-	activeReaders := 0
-	tracker := newShardTracker()
+	var group, groupCtx = errgroup.WithContext(ctx)
+	var readerOutput = make(chan shardCompletionEvent)
+	var activeReaders = 0
+	var tracker = newShardTracker()
 
 	for _, shard := range rootShards {
 		activeReaders++
-		shard := shardToRead{shardId: *shard.ShardId}
+		var shard = shardToRead{shardId: *shard.ShardId}
 		group.Go(func() error {
 			return c.readShard(groupCtx, tracker, readerOutput, stream, stateKey, bindingIndex, shard, initialState)
 		})
@@ -259,7 +259,7 @@ func (c *capture) readStream(
 		case childShardCompletionEvent:
 			activeReaders++
 			group.Go(func() error {
-				shard := shardToRead{parents: e.child.ParentShards, shardId: *e.child.ShardId}
+				var shard = shardToRead{parents: e.child.ParentShards, shardId: *e.child.ShardId}
 				return c.readShard(groupCtx, tracker, readerOutput, stream, stateKey, bindingIndex, shard, initialState)
 			})
 		case shardDoneCompletionEvent:
@@ -277,7 +277,7 @@ func (c *capture) readStream(
 }
 
 func (c *capture) getShardIterator(ctx context.Context, stream kinesisStream, shardId string, startingSequence *string) (*string, error) {
-	iteratorInput := &kinesis.GetShardIteratorInput{
+	var iteratorInput = &kinesis.GetShardIteratorInput{
 		StreamARN:         &stream.arn,
 		ShardId:           &shardId,
 		ShardIteratorType: types.ShardIteratorTypeTrimHorizon,
@@ -289,7 +289,7 @@ func (c *capture) getShardIterator(ctx context.Context, stream kinesisStream, sh
 	}
 
 	for {
-		iterInit, err := c.client.GetShardIterator(ctx, iteratorInput)
+		var iterInit, err = c.client.GetShardIterator(ctx, iteratorInput)
 		if err != nil {
 			var invalidArugmentErr *types.InvalidArgumentException
 			if errors.As(err, &invalidArugmentErr) && iteratorInput.ShardIteratorType == types.ShardIteratorTypeAfterSequenceNumber {
@@ -324,7 +324,7 @@ func (c *capture) readShard(
 		output <- shardDoneCompletionEvent{}
 	}()
 
-	ll := log.WithFields(log.Fields{
+	var ll = log.WithFields(log.Fields{
 		"stream":       stream.name,
 		"kinesisShard": shard.shardId,
 	})
@@ -351,26 +351,26 @@ func (c *capture) readShard(
 		}
 	}
 
-	readLog := ll
+	var readLog = ll
 	var lastSequence *string
 	if lastSequence = state[shard.shardId]; lastSequence != nil {
 		readLog = readLog.WithField("startingSequenceNumber", *lastSequence)
 	}
 	readLog.Info("started reading kinesis shard")
 
-	iterator, err := c.getShardIterator(ctx, stream, shard.shardId, lastSequence)
+	var iterator, err = c.getShardIterator(ctx, stream, shard.shardId, lastSequence)
 	if err != nil {
 		return err
 	}
 
 	// Respect the kinesis 5 TPS rate limit.
-	limiter := rate.NewLimiter(rate.Every(time.Second), 5)
+	var limiter = rate.NewLimiter(rate.Every(time.Second), 5)
 	var didLogNoData bool
 	for {
 		if err := limiter.Wait(ctx); err != nil {
 			return fmt.Errorf("waiting for rate limiter: %w", err)
 		}
-		res, err := c.client.GetRecords(ctx, &kinesis.GetRecordsInput{
+		var res, err = c.client.GetRecords(ctx, &kinesis.GetRecordsInput{
 			ShardIterator: iterator,
 			StreamARN:     &stream.arn,
 		})
@@ -433,7 +433,7 @@ func (c *capture) readShard(
 // is a newly-seen schema version. Returns nil if the schema was already cached.
 // The caller should use data[18:] as the payload after this call succeeds.
 func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) (json.RawMessage, error) {
-	compression := data[1]
+	var compression = data[1]
 	if compression != 0 {
 		return nil, fmt.Errorf("compressed glue schema headers are not supported")
 	}
@@ -442,11 +442,11 @@ func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) (json
 		return nil, fmt.Errorf("got message with glue header, but glue connection previously failed")
 	}
 
-	schemaUUID, err := uuid.FromBytes(data[2:18])
+	var schemaUUID, err = uuid.FromBytes(data[2:18])
 	if err != nil {
 		return nil, fmt.Errorf("parsing schema version UUID: %w", err)
 	}
-	schemaVersionID := schemaUUID.String()
+	var schemaVersionID = schemaUUID.String()
 
 	// Check cache first - if cached, no schema to emit
 	c.mu.Lock()
@@ -463,7 +463,7 @@ func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) (json
 		return nil, err
 	}
 
-	schemaDefinition := aws.ToString(out.SchemaDefinition)
+	var schemaDefinition = aws.ToString(out.SchemaDefinition)
 
 	// Cache the schema
 	c.mu.Lock()
@@ -473,7 +473,7 @@ func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) (json
 	// Convert to JSON Schema based on the data format
 	switch out.DataFormat {
 	case glueTypes.DataFormatAvro:
-		jsonSchemaObj, err := avroToJSONSchema(schemaDefinition)
+		var jsonSchemaObj, err = avroToJSONSchema(schemaDefinition)
 		if err != nil {
 			return nil, fmt.Errorf("converting avro to JSON Schema: %w", err)
 		}
@@ -506,13 +506,13 @@ func (c *capture) processRecords(
 	for _, r := range records {
 		lastSequence = *r.SequenceNumber
 
-		doc := map[string]json.RawMessage{}
+		var doc = map[string]json.RawMessage{}
 
 		// Check for Glue Schema Registry header (version byte = 3)
 		// Header is 18 bytes: 1 version + 1 compression + 16 UUID
-		payload := r.Data
+		var payload = r.Data
 		if len(r.Data) >= 18 && r.Data[0] == 3 {
-			jsonSchema, err := c.getGlueSchemaForRecord(ctx, r.Data)
+			var jsonSchema, err = c.getGlueSchemaForRecord(ctx, r.Data)
 			if err != nil {
 				return fmt.Errorf(
 					"parsing glue header for record with sequenceNumber %q and partitionKey %q: %w",
@@ -535,7 +535,7 @@ func (c *capture) processRecords(
 			)
 		}
 
-		meta := map[string]any{
+		var meta = map[string]any{
 			sequenceNumber: *r.SequenceNumber,
 			partitionKey:   *r.PartitionKey,
 			sourceProperty: map[string]any{
@@ -547,7 +547,7 @@ func (c *capture) processRecords(
 		// If the Kinesis record happens to already have a property called
 		// "_meta", merge it into our synthesized metadata.
 		if existingMeta, ok := doc[metaProperty]; ok {
-			existingMetaParsed := map[string]json.RawMessage{}
+			var existingMetaParsed = map[string]json.RawMessage{}
 			// A parsing error here is ignored, because it means that the
 			// existing "_meta" field isn't an object, and must be completely
 			// overwritten by the connector's "_meta" object.
@@ -565,7 +565,7 @@ func (c *capture) processRecords(
 			}
 		}
 
-		metaBytes, err := json.Marshal(meta)
+		var metaBytes, err = json.Marshal(meta)
 		if err != nil {
 			return fmt.Errorf(
 				"marshalling metadata for record with sequenceNumber %q and partitionKey %q: %w",
@@ -585,11 +585,11 @@ func (c *capture) processRecords(
 }
 
 func (c *capture) listAllShards(ctx context.Context, arn string) (map[string]types.Shard, error) {
-	allShards := make(map[string]types.Shard)
+	var allShards = make(map[string]types.Shard)
 
-	input := &kinesis.ListShardsInput{StreamARN: &arn}
+	var input = &kinesis.ListShardsInput{StreamARN: &arn}
 	for {
-		res, err := c.client.ListShards(ctx, input)
+		var res, err = c.client.ListShards(ctx, input)
 		if err != nil {
 			return nil, err
 		}

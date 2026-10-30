@@ -53,7 +53,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	client, err := connect(ctx, &config)
+	var client, err = connect(ctx, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
@@ -94,7 +94,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	client, err := connect(ctx, &config)
+	var client, err = connect(ctx, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
@@ -135,7 +135,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		state.Streams = make(map[boilerplate.StateKey]map[string]*string)
 	}
 
-	client, err := connect(ctx, &config)
+	var client, err = connect(ctx, &config)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return err
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	for i, binding := range open.Capture.Bindings {
 		var res resource
@@ -171,12 +171,12 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
 
-		sk := boilerplate.StateKey(binding.StateKey)
+		var sk = boilerplate.StateKey(binding.StateKey)
 		if _, ok := state.Streams[sk]; !ok {
 			state.Streams[sk] = make(map[string]*string)
 		}
 
-		streamIdx := slices.IndexFunc(streams, func(s kinesisStream) bool {
+		var streamIdx = slices.IndexFunc(streams, func(s kinesisStream) bool {
 			return s.name == res.Stream
 		})
 		if streamIdx == -1 {

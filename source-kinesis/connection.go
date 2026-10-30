@@ -53,9 +53,9 @@ func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 	}
 
 	// Session token can be provided via environment variable for testing with temporary credentials
-	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
+	var sessionToken = os.Getenv("AWS_SESSION_TOKEN")
 
-	opts := []func(*awsConfig.LoadOptions) error{
+	var opts = []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, sessionToken),
 		),
@@ -82,7 +82,7 @@ func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 }
 
 func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
-	awsCfg, err := getAwsCfg(ctx, cfg)
+	var awsCfg, err = getAwsCfg(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 }
 
 func connectGlue(ctx context.Context, cfg *Config) (*glue.Client, error) {
-	awsCfg, err := getAwsCfg(ctx, cfg)
+	var awsCfg, err = getAwsCfg(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -122,9 +122,9 @@ func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, 
 	var streamNames []string
 	var streamARNs = make(map[string]string)
 
-	input := &kinesis.ListStreamsInput{}
+	var input = &kinesis.ListStreamsInput{}
 	for {
-		res, err := client.ListStreams(ctx, input)
+		var res, err = client.ListStreams(ctx, input)
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, 
 		} else if len(streamNames) > 0 {
 			// Older versions of the API paginate by asking for streams
 			// following the last one that was returned.
-			lastName := streamNames[len(streamNames)-1]
+			var lastName = streamNames[len(streamNames)-1]
 			input.NextToken = nil
 			input.ExclusiveStartStreamName = &lastName
 		} else {
@@ -164,8 +164,8 @@ func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, 
 	// They are also usually not needed at all since ListStreams almost always
 	// reports the ARN of every stream it returns.
 	var mu sync.Mutex
-	limiter := rate.NewLimiter(10, 10)
-	group, groupCtx := errgroup.WithContext(ctx)
+	var limiter = rate.NewLimiter(10, 10)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(5)
 
 	for _, n := range streamNames {
@@ -178,7 +178,7 @@ func listStreams(ctx context.Context, client *kinesis.Client) ([]kinesisStream, 
 				return fmt.Errorf("waiting for rate limiter: %w", err)
 			}
 
-			desc, err := client.DescribeStreamSummary(groupCtx, &kinesis.DescribeStreamSummaryInput{
+			var desc, err = client.DescribeStreamSummary(groupCtx, &kinesis.DescribeStreamSummaryInput{
 				StreamName: &n,
 			})
 			if err != nil {
