@@ -35,7 +35,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		level, err := log.ParseLevel(logLevel)
+		var level, err = log.ParseLevel(logLevel)
 		if err != nil {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestSpec(t *testing.T) {
-	response, err := oracleDriver.Spec(context.Background(), &pc.Request_Spec{})
+	var response, err = oracleDriver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -100,7 +100,7 @@ func TestBasicCapture(t *testing.T) {
 			cs.Capture(captureCtx, t, func(data json.RawMessage) {
 				if !strings.Contains(string(data), "bindingStateV1") {
 					var d doc
-					err := json.Unmarshal(data, &d)
+					var err = json.Unmarshal(data, &d)
 					require.NoError(t, err)
 					ids[d.Id] = true
 				}
@@ -164,7 +164,7 @@ func TestCaptureCheckpointSCN(t *testing.T) {
 				cancelCapture()
 			} else {
 				var d doc
-				err := json.Unmarshal(data, &d)
+				var err = json.Unmarshal(data, &d)
 				require.NoError(t, err)
 				ids[d.Id] = true
 			}
@@ -177,7 +177,7 @@ func TestCaptureCheckpointSCN(t *testing.T) {
 		cs.Capture(captureCtx, t, func(data json.RawMessage) {
 			if !strings.Contains(string(data), "bindingStateV1") {
 				var d doc
-				err := json.Unmarshal(data, &d)
+				var err = json.Unmarshal(data, &d)
 				require.NoError(t, err)
 				ids[d.Id] = true
 			}
@@ -334,7 +334,7 @@ func testConfig(ctx context.Context, t testing.TB) *Config {
 	}
 
 	var config Config
-	err := json.Unmarshal(configJSON, &config)
+	var err = json.Unmarshal(configJSON, &config)
 	require.NoError(t, err)
 
 	if err := config.Validate(); err != nil {
@@ -351,7 +351,7 @@ func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	var config = testConfig(ctx, t)
 
 	// Open control connection
-	db, err := connectOracle(ctx, config)
+	var db, err = connectOracle(ctx, config)
 	t.Logf("opening control connection: addr=%q, user=%q", config.Address, config.User)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -458,7 +458,7 @@ func snapshotBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) {
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
-		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		var bs, err = json.MarshalIndent(binding, "  ", "  ")
 		require.NoError(t, err)
 		io.Copy(summary, bytes.NewReader(bs))
 		fmt.Fprintf(summary, "\n")

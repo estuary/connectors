@@ -70,7 +70,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 }
 
 func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *Config) (map[string]*discoveredTable, error) {
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	var tables, err = discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -172,7 +172,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	}
 
 	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
 	}
@@ -222,7 +222,7 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 		fmt.Fprintf(query, " AND owner IN ('%s')", schemasComma)
 	}
 
-	rows, err := db.QueryContext(ctx, query.String())
+	var rows, err = db.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
@@ -306,7 +306,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 	fmt.Fprintf(query, " AND t.table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')")
 	fmt.Fprintf(query, " ORDER BY t.table_name, t.column_id")
 
-	rows, err := db.QueryContext(ctx, query.String())
+	var rows, err = db.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
@@ -415,7 +415,7 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	fmt.Fprintf(query, " AND t.table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')")
 	fmt.Fprintf(query, " ORDER BY t.table_name, c.position")
 
-	rows, err := db.QueryContext(ctx, query.String())
+	var rows, err = db.QueryContext(ctx, query.String())
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}

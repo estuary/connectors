@@ -133,7 +133,7 @@ type documentSourceMetadata struct {
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
+	var resourceSchema, err = schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -446,7 +446,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var cursorNames = state.CursorNames
 	var cursorValues = state.CursorValues
 
-	query, err := c.Driver.buildQuery(res, state)
+	var query, err = c.Driver.buildQuery(res, state)
 	if err != nil {
 		return fmt.Errorf("error building query: %w", err)
 	}
@@ -695,7 +695,7 @@ func expandQueryPlaceholders(query string, argvals []any) (string, []any, error)
 }
 
 func (drv *BatchSQLDriver) buildQuery(res *Resource, state *streamState) (string, error) {
-	templateString, err := drv.SelectQueryTemplate(res)
+	var templateString, err = drv.SelectQueryTemplate(res)
 	if err != nil {
 		return "", fmt.Errorf("error selecting query template: %w", err)
 	}
