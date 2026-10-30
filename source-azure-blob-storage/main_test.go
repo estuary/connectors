@@ -21,7 +21,7 @@ func getTestConfig(t *testing.T) config {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
 		return config{}
 	}
-	cfg := config{
+	var cfg = config{
 		Credentials: credentials{
 			ConnectionString:   connectionString,
 			StorageAccountName: "devstoreaccount1",
@@ -33,32 +33,32 @@ func getTestConfig(t *testing.T) config {
 
 func TestAzureBlobStore_newAzureBlobStore(t *testing.T) {
 	// Create a test instance of the azureBlobStore
-	cfg := getTestConfig(t)
-	ctx := context.TODO()
-	az, err := newAzureBlobStore(ctx, cfg)
+	var cfg = getTestConfig(t)
+	var ctx = context.TODO()
+	var az, err = newAzureBlobStore(ctx, cfg)
 	require.NoError(t, err)
 	require.NotNil(t, az)
 }
 
 func TestAzureBlobStore_getConfigSchema(t *testing.T) {
-	parserJsonSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
-	data := getConfigSchema(parserJsonSchema)
+	var parserJsonSchema = []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
+	var data = getConfigSchema(parserJsonSchema)
 
-	formatted, err := json.MarshalIndent(data, "", "  ")
+	var formatted, err = json.MarshalIndent(data, "", "  ")
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, string(formatted))
 }
 
 func TestAzureBlobStore_List(t *testing.T) {
-	cfg := getTestConfig(t)
-	ctx := context.TODO()
-	az, err := newAzureBlobStore(ctx, cfg)
+	var cfg = getTestConfig(t)
+	var ctx = context.TODO()
+	var az, err = newAzureBlobStore(ctx, cfg)
 
 	require.NoError(t, err)
 	require.NotNil(t, az)
 
-	query := filesource.Query{}
+	var query = filesource.Query{}
 	listing, err := az.List(ctx, query)
 
 	require.NoError(t, err)
@@ -71,22 +71,22 @@ func TestAzureBlobStore_List(t *testing.T) {
 	fmt.Println(file.Path)
 }
 func TestAzureBlobStore_Read(t *testing.T) {
-	cfg := getTestConfig(t)
+	var cfg = getTestConfig(t)
 
-	ctx := context.TODO()
-	az, err := newAzureBlobStore(ctx, cfg)
+	var ctx = context.TODO()
+	var az, err = newAzureBlobStore(ctx, cfg)
 
 	require.NoError(t, err)
 	require.NotNil(t, az)
 
-	obj := filesource.ObjectInfo{
+	var obj = filesource.ObjectInfo{
 		Path: "l00cmqdvppy01-4060447306.jpg",
 	}
 
 	reader, info, err := az.Read(ctx, obj)
 	require.NoError(t, err)
 	require.NotNil(t, reader)
-	downloadedData := bytes.Buffer{}
+	var downloadedData = bytes.Buffer{}
 
 	_, err = downloadedData.ReadFrom(reader)
 	require.NoError(t, err)

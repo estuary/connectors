@@ -85,7 +85,7 @@ func (c config) PathRegex() string {
 }
 
 func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error) {
-	blobUrl := fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.Credentials.StorageAccountName)
+	var blobUrl = fmt.Sprintf("https://%s.blob.core.windows.net/", cfg.Credentials.StorageAccountName)
 	var client *azblob.Client
 	var err error
 
@@ -95,7 +95,7 @@ func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error)
 			return nil, err
 		}
 	} else {
-		credential, err := azidentity.NewClientSecretCredential(cfg.Credentials.AzureTenantID, cfg.Credentials.AzureClientID, cfg.Credentials.AzureClientSecret, nil)
+		var credential, err = azidentity.NewClientSecretCredential(cfg.Credentials.AzureTenantID, cfg.Credentials.AzureClientID, cfg.Credentials.AzureClientSecret, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +106,7 @@ func newAzureBlobStore(ctx context.Context, cfg config) (*azureBlobStore, error)
 		}
 	}
 
-	store := &azureBlobStore{client: *client, cfg: cfg}
+	var store = &azureBlobStore{client: *client, cfg: cfg}
 
 	if err = store.check(ctx); err != nil {
 		return nil, err
@@ -126,14 +126,14 @@ type azureBlobStore struct {
 func (az *azureBlobStore) check(ctx context.Context) error {
 	// All we care about is a successful listing rather than iterating on all objects
 
-	maxResults := int32(1)
-	listingOptions := azblob.ListBlobsFlatOptions{MaxResults: &maxResults}
+	var maxResults = int32(1)
+	var listingOptions = azblob.ListBlobsFlatOptions{MaxResults: &maxResults}
 
-	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &listingOptions)
+	var pager = az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &listingOptions)
 	if !pager.More() {
 		return nil
 	}
-	_, err := pager.NextPage(ctx)
+	var _, err = pager.NextPage(ctx)
 	if bloberror.HasCode(err, bloberror.AccountIsDisabled) {
 		return fmt.Errorf("account is disabled: %w", err)
 	} else if bloberror.HasCode(err, bloberror.AuthorizationFailure) {
@@ -159,7 +159,7 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
 	var container, prefix = filesource.PathToParts(query.Prefix)
 
-	listOptions := &azblob.ListBlobsFlatOptions{
+	var listOptions = &azblob.ListBlobsFlatOptions{
 		Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
 	}
 
@@ -167,8 +167,8 @@ func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (fil
 		listOptions.Prefix = &prefix
 	}
 
-	pager := az.client.NewListBlobsFlatPager(container, listOptions)
-	page, err := pager.NextPage(ctx)
+	var pager = az.client.NewListBlobsFlatPager(container, listOptions)
+	var page, err = pager.NextPage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -187,11 +187,11 @@ func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (fil
 
 func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	var container, key = filesource.PathToParts(obj.Path)
-	resp, err := s.client.DownloadStream(ctx, container, key, nil)
+	var resp, err = s.client.DownloadStream(ctx, container, key, nil)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
-	retryReader := resp.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
+	var retryReader = resp.NewRetryReader(ctx, &azblob.RetryReaderOptions{})
 
 	obj.ModTime = *resp.LastModified
 	obj.ContentType = *resp.ContentType
@@ -217,7 +217,7 @@ type azureBlobListing struct {
 
 func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 	for {
-		page, err := l.getPage()
+		var page, err = l.getPage()
 
 		if err != nil {
 			return filesource.ObjectInfo{}, err
@@ -236,10 +236,10 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 			continue
 		}
 
-		blob := page.Segment.BlobItems[l.index]
+		var blob = page.Segment.BlobItems[l.index]
 		l.index++
 
-		obj := filesource.ObjectInfo{}
+		var obj = filesource.ObjectInfo{}
 
 		obj.Path = filesource.PartsToPath(l.container, *blob.Name)
 		obj.ModTime = *blob.Properties.LastModified
@@ -266,7 +266,7 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 		return nil, nil
 	}
 	log.Debug("Fetching next page")
-	page, err := l.pager.NextPage(l.ctx)
+	var page, err = l.pager.NextPage(l.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -280,13 +280,13 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 
 func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
 	var parserOrderSchema map[string]any
-	err := json.Unmarshal(parserSchema, &parserOrderSchema)
+	var err = json.Unmarshal(parserSchema, &parserOrderSchema)
 	if err != nil {
 		panic(fmt.Errorf("unable to parse parser schema: %w", err))
 	}
 	parserOrderSchema["order"] = 4
 
-	schema := map[string]any{
+	var schema = map[string]any{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"title":   "Azure Blob Storage Source",
 		"type":    "object",
