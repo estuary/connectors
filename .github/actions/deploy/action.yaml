@@ -33,22 +33,39 @@ runs:
   using: "composite"
   steps:
 
+    # Each image is pushed with an SBOM and provenance attestation, which only
+    # survive when BuildKit pushes the image itself. The builder that
+    # setup-buildx-action selected runs BuildKit in a container, which can't
+    # see the :local image in Docker's image store, and Docker's own builder,
+    # which can, attaches no attestations on the classic image store. So :local
+    # reaches the build as an OCI layout, named after the image it stands in
+    # for. `docker save` writes the layers uncompressed, and the push gzips them
+    # again, into the same layers `docker image push` produced.
     - name: Push ${{ inputs.connector }} ${{ inputs.variants }} image(s) with commit SHA tag
       shell: bash
       run: |
+        BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local
+        LAYOUT="${RUNNER_TEMP}/${{ inputs.connector }}-local"
+        mkdir -p "$LAYOUT"
+        docker image save "$BASE_CONNECTOR" | tar -x -C "$LAYOUT"
+
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
-          echo "Building and pushing ${VARIANT}:${{ inputs.tag }}...";
+          echo "Building and pushing ${VARIANT}:${{ inputs.tag_sha }}...";
           NAME_ARG=()
           if [ "${{ inputs.name_variants }}" = true ]; then
             NAME_ARG=(--build-arg "CONNECTOR_NAME=${VARIANT}")
           fi
-          docker build --build-arg BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local \
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
+            docker buildx build --build-context "${BASE_CONNECTOR}=oci-layout://${LAYOUT}:local" \
+                       --build-arg BASE_CONNECTOR=${BASE_CONNECTOR} \
                        --label org.opencontainers.image.revision=${{ github.sha }} \
                        --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                        "${NAME_ARG[@]}" \
-                       --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
+                       --sbom=true \
+                       --provenance=mode=min \
+                       --metadata-file "${RUNNER_TEMP}/${VARIANT}.metadata.json" \
+                       --output type=image,name=ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }},push=true,compression=gzip,force-compression=true \
                        --file connector-variant.Dockerfile .;
-          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }};
         done
 
     # Re-running an old run would otherwise move `dev` and the version tag back
@@ -111,12 +128,16 @@ runs:
       if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.guard.outputs.latest == 'true'
       shell: bash
       run: |
+        # Each tag is moved in the registry to the index the step above pushed,
+        # which keeps the image's attestations with it.
         for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
-          docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:dev;
-          docker image tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
+          DIGEST=$(jq -er '."containerimage.digest"' "${RUNNER_TEMP}/${VARIANT}.metadata.json")
+          PUSHED=ghcr.io/estuary/${VARIANT}@${DIGEST}
 
-          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:dev;
-          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }};
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:dev \
+            docker buildx imagetools create --tag ghcr.io/estuary/${VARIANT}:dev "$PUSHED";
+          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }} \
+            docker buildx imagetools create --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }} "$PUSHED";
         done
 
     # Requeue is for connectors a push changed; scheduled and manual runs
