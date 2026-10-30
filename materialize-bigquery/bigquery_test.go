@@ -74,8 +74,7 @@ func TestIntegration(t *testing.T) {
 						continue
 					}
 					md, err := tbl.Metadata(t.Context(), bigquery.WithMetadataView(bigquery.BasicMetadataView))
-					var gErr *googleapi.Error
-					if errors.As(err, &gErr) && gErr.Code == 404 {
+					if gErr, ok := errors.AsType[*googleapi.Error](err); ok && gErr.Code == 404 {
 						continue // Deleted after the listing returned it.
 					}
 					require.NoError(t, err)
