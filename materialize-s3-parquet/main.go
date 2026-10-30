@@ -74,7 +74,7 @@ var driver = filesink.FileDriver[*filesink.S3MultipartUpload, filesink.S3Resourc
 		return "https://go.estuary.dev/materialize-s3-parquet"
 	},
 	ConfigSchema: func() ([]byte, error) {
-		endpointSchema, err := schemagen.GenerateSchema("EndpointConfig", config{}).MarshalJSON()
+		var endpointSchema, err = schemagen.GenerateSchema("EndpointConfig", config{}).MarshalJSON()
 		if err != nil {
 			return nil, err
 		}

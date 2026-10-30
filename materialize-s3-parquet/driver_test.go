@@ -26,16 +26,16 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
+	var out, err = exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
 	require.NoError(t, err, "docker compose up failed: %s", string(out))
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	// Create the test bucket.
-	s3Client := newS3Client(t, ctx)
+	var s3Client = newS3Client(t, ctx)
 	_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String("test-bucket"),
 	})
@@ -51,12 +51,12 @@ func TestIntegration(t *testing.T) {
 	)
 
 	// Download parquet files from S3 to a temp dir and read them with parquet-tools.
-	tmpDir := t.TempDir()
+	var tmpDir = t.TempDir()
 
 	var snap strings.Builder
 	for _, prefix := range []string{"simple/", "multiple-data-types/"} {
 		snap.WriteString(fmt.Sprintf("=== %s ===\n", prefix))
-		rows := downloadAndReadParquet(t, ctx, s3Client, "test-bucket", prefix, tmpDir)
+		var rows = downloadAndReadParquet(t, ctx, s3Client, "test-bucket", prefix, tmpDir)
 		for _, row := range rows {
 			snap.WriteString(row)
 			snap.WriteString("\n")
@@ -70,7 +70,7 @@ func TestIntegration(t *testing.T) {
 func newS3Client(t *testing.T, ctx context.Context) *s3.Client {
 	t.Helper()
 
-	cfg, err := awsConfig.LoadDefaultConfig(ctx,
+	var cfg, err = awsConfig.LoadDefaultConfig(ctx,
 		awsConfig.WithRegion("us-east-1"),
 		awsConfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test_key", "test_secret", "")),
 	)
@@ -86,7 +86,7 @@ func downloadAndReadParquet(t *testing.T, ctx context.Context, client *s3.Client
 	t.Helper()
 
 	// List all parquet files under the prefix.
-	listOut, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+	var listOut, err = client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(prefix),
 	})
@@ -101,12 +101,12 @@ func downloadAndReadParquet(t *testing.T, ctx context.Context, client *s3.Client
 	sort.Strings(keys)
 
 	// Download each parquet file.
-	localDir := filepath.Join(tmpDir, prefix)
+	var localDir = filepath.Join(tmpDir, prefix)
 	require.NoError(t, os.MkdirAll(localDir, 0o755))
 
 	var localFiles []string
 	for _, key := range keys {
-		getOut, err := client.GetObject(ctx, &s3.GetObjectInput{
+		var getOut, err = client.GetObject(ctx, &s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(key),
 		})
@@ -116,7 +116,7 @@ func downloadAndReadParquet(t *testing.T, ctx context.Context, client *s3.Client
 		getOut.Body.Close()
 		require.NoError(t, err)
 
-		localPath := filepath.Join(localDir, filepath.Base(key))
+		var localPath = filepath.Join(localDir, filepath.Base(key))
 		require.NoError(t, os.WriteFile(localPath, data, 0o644))
 		localFiles = append(localFiles, localPath)
 	}
@@ -124,7 +124,7 @@ func downloadAndReadParquet(t *testing.T, ctx context.Context, client *s3.Client
 	// Read parquet files using parquet-tools docker image.
 	var allRows []string
 	for _, f := range localFiles {
-		out, err := exec.Command(
+		var out, err = exec.Command(
 			"docker", "run", "--rm",
 			"-v", fmt.Sprintf("%s:/data", filepath.Dir(f)),
 			"nathanhowell/parquet-tools",
@@ -139,7 +139,7 @@ func downloadAndReadParquet(t *testing.T, ctx context.Context, client *s3.Client
 			}
 			var row map[string]any
 			require.NoError(t, json.Unmarshal([]byte(line), &row))
-			sorted, err := json.Marshal(row)
+			var sorted, err = json.Marshal(row)
 			require.NoError(t, err)
 			allRows = append(allRows, string(sorted))
 		}
