@@ -140,6 +140,11 @@ func TestPropertyName(t *testing.T) {
 			expected: "metaop",
 		},
 		{
+			name:     "multiple leading underscore",
+			field:    "__foo",
+			expected: "foo",
+		},
+		{
 			name:     "basic property",
 			field:    "properties/domain",
 			expected: "domain",
@@ -186,6 +191,62 @@ func TestPropertyName(t *testing.T) {
 			require.Equal(t, tt.expected, actual)
 			if tt.expectedErr {
 				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCustomObjectName(t *testing.T) {
+	tests := []struct {
+		name        string
+		objectName  string
+		expected    string
+		expectedErr bool
+	}{
+		{
+			name:       "basic",
+			objectName: "pets",
+			expected:   "pets",
+		},
+		{
+			name:       "multiple leading underscore",
+			objectName: "__pets",
+			expected:   "pets",
+		},
+		{
+			name:       "has uppercase",
+			objectName: "Pets",
+			expected:   "pets",
+		},
+		{
+			name:       "symbols dash",
+			objectName: "my-pets",
+			expected:   "mypets",
+		},
+		{
+			name:       "starts with number",
+			objectName: "22pets",
+			expected:   "n22pets",
+		},
+		{
+			name:        "too long",
+			objectName:  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+			expectedErr: true,
+		},
+		{
+			name:        "empty after sanitization",
+			objectName:  "___",
+			expectedErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := CustomObjectName(tt.objectName)
+			if tt.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected, string(actual))
 			}
 		})
 	}

@@ -250,7 +250,7 @@ func PropertyName(fieldName string) (string, error) {
 	name := strings.TrimPrefix(fieldName, "properties/")
 	name = strings.ToLower(name)
 	// Underscore is allowed but not as a leading character.
-	name = strings.TrimPrefix(name, "_")
+	name = strings.TrimLeft(name, "_")
 	name = validPropertyChars.ReplaceAllString(name, "")
 	name = startsNumber.ReplaceAllString(name, "n$0")
 
@@ -262,4 +262,21 @@ func PropertyName(fieldName string) (string, error) {
 		return "", fmt.Errorf("unable to convert to a valid property name: %q", fieldName)
 	}
 	return name, nil
+}
+
+// CustomObjectName is the objectName for a CustomObject.
+func CustomObjectName(objectName string) (ObjectName, error) {
+	name := strings.ToLower(objectName)
+	// Underscore is allowed but not as a leading character.
+	name = strings.TrimLeft(name, "_")
+	name = validPropertyChars.ReplaceAllString(name, "")
+	name = startsNumber.ReplaceAllString(name, "n$0")
+
+	if len(name) > MaxCustomObjectNameLength {
+		return "", fmt.Errorf("custom object name cannot be more than %d characters", MaxCustomObjectNameLength)
+	}
+	if name == "" {
+		return "", fmt.Errorf("unable to convert to a valid custom object name: %q", objectName)
+	}
+	return ObjectName(name), nil
 }

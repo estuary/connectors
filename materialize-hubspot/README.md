@@ -130,6 +130,11 @@ project must agree on the scopes.
 Add the OAuth Client ID and OAuth Client Secret to the `connectors` table of the
 Estuary database.
 
+Finally, upload the project to HubSpot.
+```
+$ hs project upload
+```
+
 [hs-cli]: https://developers.hubspot.com/docs/apps/developer-platform/build-apps/create-an-app
 
 ## Test Account
