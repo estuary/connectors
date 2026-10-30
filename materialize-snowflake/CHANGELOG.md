@@ -1,5 +1,16 @@
 # materialize-snowflake
 
+## 2026-10-26
+
+### Changed
+- The `snowpipe_streaming_v2` write path now calls the Snowpipe Streaming REST
+  API directly from the connector. The Python sidecar holding Snowflake's SDK,
+  and its memory, are gone. Rows are written to local batch files as
+  gzip-compressed NDJSON, and each file of up to 256 MiB of rows before
+  compression is appended straight from disk. A batch that compresses to more
+  than 4 MiB travels through the pipe's stage bucket instead, encrypted under
+  the pipe's key.
+
 ## 2026-10-22
 
 ### Added

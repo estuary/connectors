@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -40,20 +40,19 @@ func decodedJSON(t *testing.T, encoded []byte) any {
 	return out
 }
 
-// requireEquivalent asserts the encoder and the map-and-marshal path encode
-// the same row to the same *values*.
+// requireEquivalent asserts a batch and the map-and-marshal path encode the same
+// row to the same *values*.
 //
 // Byte equality is deliberately not the claim: encoding/json escapes `<`, `>` and
-// `&` for the benefit of HTML embedding, and writes an invalid UTF-8 byte as the
-// escape sequence `\ufffd` where the direct writer writes the replacement
-// character itself. Those differ as bytes and agree as JSON.
+// `&` for the benefit of HTML embedding, and the two escape U+2028, U+2029 and
+// invalid UTF-8 differently. Those differ as bytes and agree as JSON.
 func requireEquivalent(t *testing.T, names []string, converted []any) []byte {
 	t.Helper()
 
 	var want, err = rowViaMap(names, converted)
 	require.NoError(t, err)
 
-	got, err := newStreamV2RowEncoder(names).appendRow(nil, converted)
+	got, err := encodeTestRows(t, names, converted)
 	require.NoError(t, err)
 
 	require.Equal(t, decodedJSON(t, want), decodedJSON(t, got))
@@ -151,23 +150,21 @@ func TestStreamV2RowOmitsNilColumns(t *testing.T) {
 		// null, which answers IS NULL and TYPEOF differently from the SQL NULL an
 		// omitted column defaults to.
 		var got = requireEquivalent(t, names, []any{"a", nil, json.RawMessage(`{"x":1}`), nil})
-		require.Equal(t, `{"A":"a","C":{"x":1}}`, string(got))
+		require.Equal(t, `{"A":"a","C":{"x":1}}`+"\n", string(got))
 	})
 
 	t.Run("a row of nils is an empty object", func(t *testing.T) {
 		var got = requireEquivalent(t, names, []any{nil, nil, nil, nil})
-		require.Equal(t, `{}`, string(got))
+		require.Equal(t, "{}\n", string(got))
 	})
 
 	t.Run("a nil leading column does not leave a separator", func(t *testing.T) {
 		var got = requireEquivalent(t, names, []any{nil, int64(2), int64(3), nil})
-		require.Equal(t, `{"B":2,"C":3}`, string(got))
+		require.Equal(t, `{"B":2,"C":3}`+"\n", string(got))
 	})
 }
 
 func TestStreamV2RowRejectsUnrepresentableFloats(t *testing.T) {
-	var enc = newStreamV2RowEncoder([]string{"A", "B"})
-
 	for _, tc := range []struct {
 		name  string
 		value float64
@@ -178,30 +175,24 @@ func TestStreamV2RowRejectsUnrepresentableFloats(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// The standard encoder rejects these, so such a row fails the
-			// transaction today. Writing the value out literally instead would put
-			// bare NaN into the payload — invalid JSON, which Snowflake's decode of
-			// the append rejects in full, failing every row batched alongside it.
-			var prior = append([]byte(nil), `[{"A":1}`...)
-
-			var got, err = enc.appendRow(prior, []any{"a", tc.value})
-			require.ErrorContains(t, err, "column B")
-			require.ErrorContains(t, err, "as JSON")
-
-			// The rows already batched are left exactly as they were.
-			require.Equal(t, `[{"A":1}`, string(got))
+			// transaction. Writing the value out literally instead would put bare
+			// NaN into the batch — invalid JSON, which Snowflake's decode of the
+			// append rejects in full, failing every row batched alongside it.
+			var _, err = encodeTestRows(t, []string{"A", "B"}, []any{"a", tc.value})
+			require.ErrorContains(t, err, `field "B"`)
+			require.ErrorContains(t, err, "unsupported value")
 		})
 	}
 }
 
 func TestStreamV2RowPreEncodedLineBreaks(t *testing.T) {
-	var enc = newStreamV2RowEncoder([]string{"DOC"})
-
 	t.Run("a line break is compacted away", func(t *testing.T) {
 		var raw = json.RawMessage("{\"a\": 1,\n  \"b\": \"text\\nwith an escaped break\"\r\n}")
 
-		var got, err = enc.appendRow(nil, []any{raw})
+		var got, err = encodeTestRows(t, []string{"DOC"}, []any{raw})
 		require.NoError(t, err)
-		require.NotContains(t, string(got), "\n")
+		// The row's only line break is the one that terminates it.
+		require.Equal(t, len(got)-1, bytes.IndexByte(got, '\n'))
 		require.NotContains(t, string(got), "\r")
 		// The escaped break within a string survives, being no threat to framing.
 		require.Contains(t, string(got), `with an escaped break`)
@@ -215,104 +206,85 @@ func TestStreamV2RowPreEncodedLineBreaks(t *testing.T) {
 		// common case free.
 		var raw = json.RawMessage(`{"a": 1,  "b": [ 2 ]}`)
 
-		var got, err = enc.appendRow(nil, []any{raw})
+		var got, err = encodeTestRows(t, []string{"DOC"}, []any{raw})
 		require.NoError(t, err)
-		require.Equal(t, `{"DOC":`+string(raw)+`}`, string(got))
+		require.Equal(t, `{"DOC":`+string(raw)+"}\n", string(got))
 	})
 
 	t.Run("an unparseable value with one fails the row", func(t *testing.T) {
-		var got, err = enc.appendRow([]byte("{"), []any{json.RawMessage("{\n")})
-		require.ErrorContains(t, err, "column DOC")
-		require.Equal(t, "{", string(got))
+		var _, err = encodeTestRows(t, []string{"DOC"}, []any{json.RawMessage("{\n")})
+		require.ErrorContains(t, err, `field "DOC"`)
+	})
+
+	t.Run("an empty value fails the row", func(t *testing.T) {
+		var _, err = encodeTestRows(t, []string{"DOC"}, []any{json.RawMessage{}})
+		require.ErrorContains(t, err, `field "DOC"`)
 	})
 }
 
-func TestStreamV2BatchPayload(t *testing.T) {
-	var enc = newStreamV2RowEncoder([]string{"KEY", "VAL", "DOC"})
+func TestStreamV2BatchFile(t *testing.T) {
+	var names = []string{"KEY", "VAL", "DOC"}
 
-	t.Run("rows accumulate into one framed payload", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+	t.Run("rows accumulate into one framed file", func(t *testing.T) {
+		var b = streamV2Batch{columns: names}
 
-		var total int
 		for i, row := range [][]any{
 			{"one", int64(1), json.RawMessage(`{"a":1}`)},
 			{"two", nil, json.RawMessage(`{"a":2}`)},
 			{"three", int64(3), nil},
 		} {
-			// Documents are indexed from the channel's first, so this batch begins
-			// partway through one.
-			var grew, err = b.addRow(int64(100+i), row)
-			require.NoError(t, err)
+			require.NoError(t, b.writeRow(row))
 			require.Equal(t, i+1, b.rows)
-			total += grew
 		}
 
-		// The batch's own first offset, which its offset token is rendered
-		// from, is the one the batch's first row was buffered under.
-		require.Equal(t, int64(100), b.firstOffset)
+		var file = finishTestBatch(t, &b)
+		require.Equal(t, 3, file.rows)
+		// Keys are written in name order.
+		var want = "{\"DOC\":{\"a\":1},\"KEY\":\"one\",\"VAL\":1}\n{\"DOC\":{\"a\":2},\"KEY\":\"two\"}\n{\"KEY\":\"three\",\"VAL\":3}\n"
+		require.Equal(t, want, string(readTestBatchFile(t, file)))
+		require.Equal(t, len(want), file.uncompressedBytes)
 
-		// The payload wants only its closing bracket, which finish adds as it
-		// gives the payload up.
-		require.Equal(t,
-			`[{"KEY":"one","VAL":1,"DOC":{"a":1}},{"KEY":"two","DOC":{"a":2}},{"KEY":"three","VAL":3}`,
-			string(b.payload))
-		require.Equal(t, b.size(), total, "the reported growth must account for every buffered byte")
+		var info, err = os.Stat(file.path)
+		require.NoError(t, err)
+		require.Equal(t, int(info.Size()), file.compressedBytes)
 	})
 
-	t.Run("a rejected row leaves the rows before it buffered", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+	t.Run("a rejected row leaves the rows before it", func(t *testing.T) {
+		var b = streamV2Batch{columns: names}
 
-		var _, err = b.addRow(1, []any{"one", int64(1), nil})
-		require.NoError(t, err)
-
-		grew, err := b.addRow(1, []any{"two", math.NaN(), nil})
-		require.ErrorContains(t, err, "column VAL")
-		require.Zero(t, grew)
+		require.NoError(t, b.writeRow([]any{"one", int64(1), nil}))
+		require.ErrorContains(t, b.writeRow([]any{"two", math.NaN(), nil}), `field "VAL"`)
 		require.Equal(t, 1, b.rows)
-		require.Equal(t, `[{"KEY":"one","VAL":1}`, string(b.payload))
+
+		var file = finishTestBatch(t, &b)
+		require.Equal(t, "{\"KEY\":\"one\",\"VAL\":1}\n", string(readTestBatchFile(t, file)))
 	})
 
-	t.Run("a rejected first row leaves no batch started", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
+	t.Run("a rejected first row leaves the batch empty", func(t *testing.T) {
+		var b = streamV2Batch{columns: names}
 
-		var _, err = b.addRow(1, []any{"one", math.Inf(1), nil})
-		require.ErrorContains(t, err, "column VAL")
+		require.ErrorContains(t, b.writeRow([]any{"one", math.Inf(1), nil}), `field "VAL"`)
 		require.True(t, b.empty())
-		require.Empty(t, b.payload)
+		finishTestBatch(t, &b)
 	})
 
-	t.Run("a batch releases every byte it reported buffering", func(t *testing.T) {
-		// The manager tracks buffered bytes as a running total across bindings, so a
-		// batch which reports more or fewer bytes than it releases drifts that total
-		// for the life of the session, and with it the ceiling which bounds how much
-		// a wide materialization holds in memory at once.
-		var b = newStreamV2Batch(enc)
-
-		var reported int
+	t.Run("finishing closes the file and empties the batch", func(t *testing.T) {
+		var b = streamV2Batch{columns: names}
 		for i := range 3 {
-			var grew, err = b.addRow(1, []any{fmt.Sprintf("key-%d", i), int64(i), nil})
-			require.NoError(t, err)
-			reported += grew
+			require.NoError(t, b.writeRow([]any{fmt.Sprintf("key-%d", i), int64(i), nil}))
 		}
 
-		var payload, rows, released = b.finish()
-		require.Equal(t, reported, released)
-		require.Equal(t, 3, rows)
-		require.Equal(t, byte(']'), payload[len(payload)-1])
+		var file = finishTestBatch(t, &b)
+		require.Equal(t, 3, file.rows)
 		require.True(t, b.empty())
-		require.Empty(t, b.payload)
-	})
+		require.Nil(t, b.writer)
+		require.Zero(t, b.size())
 
-	t.Run("the next batch's payload is sized from the last", func(t *testing.T) {
-		var b = newStreamV2Batch(enc)
-
-		var _, err = b.addRow(1, []any{strings.Repeat("k", 32*1024), nil, nil})
-		require.NoError(t, err)
-		var payload, _, _ = b.finish()
-
-		_, err = b.addRow(1, []any{"small", nil, nil})
-		require.NoError(t, err)
-		require.GreaterOrEqual(t, cap(b.payload), len(payload))
+		// The next row starts a file of its own.
+		require.NoError(t, b.writeRow([]any{"next", nil, nil}))
+		var next = finishTestBatch(t, &b)
+		require.NotEqual(t, file.path, next.path)
+		require.Equal(t, "{\"KEY\":\"next\"}\n", string(readTestBatchFile(t, next)))
 	})
 }
 
@@ -340,15 +312,9 @@ func benchmarkRow(i int) ([]string, []any) {
 	return names, converted
 }
 
-// BenchmarkStreamV2RowEncoding measures a full batch's encoding both ways: the
-// encoder against the map-and-marshal path it replaced, which paid a second
-// scan of every row to frame the batch. The direct writer runs in roughly an
-// eighth of the CPU and a twentieth of the allocations — about 8 ms against 70 ms
-// for 10k rows on a Xeon 8581C.
-//
-// Its allocations are the growth of the one payload buffer, plus two a row for the
-// decimal conversion of the *big.Int column: with no such column a whole batch
-// encodes in three allocations.
+// BenchmarkStreamV2RowEncoding measures a full batch both ways: written to its
+// compressed file as the write path does, against encoding by the map-and-marshal
+// path, which paid a second scan of every row to frame the batch.
 func BenchmarkStreamV2RowEncoding(b *testing.B) {
 	const batchRows = 10_000
 
@@ -357,21 +323,21 @@ func BenchmarkStreamV2RowEncoding(b *testing.B) {
 	for i := range rows {
 		_, rows[i] = benchmarkRow(i)
 	}
-	var enc = newStreamV2RowEncoder(names)
 
-	b.Run("direct", func(b *testing.B) {
+	b.Run("batch", func(b *testing.B) {
 		b.ReportAllocs()
-		// The batch is built and framed exactly as the write path has it done, so
-		// what this measures is what ships — including the payload each batch is
-		// sized into.
-		var batch = newStreamV2Batch(enc)
+		var batch = streamV2Batch{columns: names}
 		for b.Loop() {
-			for i, row := range rows {
-				if _, err := batch.addRow(int64(i), row); err != nil {
+			for _, row := range rows {
+				if err := batch.writeRow(row); err != nil {
 					b.Fatal(err)
 				}
 			}
-			batch.finish()
+			var file, err = batch.finish()
+			if err != nil {
+				b.Fatal(err)
+			}
+			os.Remove(file.path)
 		}
 	})
 
@@ -387,20 +353,52 @@ func BenchmarkStreamV2RowEncoding(b *testing.B) {
 				encoded = append(encoded, data)
 			}
 			// The batch's rows were then scanned a second time to frame them.
-			var size = 2
+			var size = 0
 			for _, row := range encoded {
 				size += len(row) + 1
 			}
 			var payload = make([]byte, 0, size)
-			payload = append(payload, '[')
-			for i, row := range encoded {
-				if i > 0 {
-					payload = append(payload, ',')
-				}
+			for _, row := range encoded {
 				payload = append(payload, row...)
+				payload = append(payload, '\n')
 			}
-			payload = append(payload, ']')
 			_ = payload
 		}
 	})
+}
+
+// encodeTestRows writes rows through a batch and returns the rows its file holds.
+func encodeTestRows(t *testing.T, names []string, rows ...[]any) ([]byte, error) {
+	t.Helper()
+
+	var b = streamV2Batch{columns: names}
+	for _, row := range rows {
+		if err := b.writeRow(row); err != nil {
+			finishTestBatch(t, &b)
+			return nil, err
+		}
+	}
+	return readTestBatchFile(t, finishTestBatch(t, &b)), nil
+}
+
+// finishTestBatch finishes a batch that has a file open, and removes the file
+// once the test ends.
+func finishTestBatch(t *testing.T, b *streamV2Batch) streamV2BatchFile {
+	t.Helper()
+
+	var file, err = b.finish()
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(file.path) })
+	return file
+}
+
+// readTestBatchFile returns the decompressed rows of a finished batch's file.
+func readTestBatchFile(t *testing.T, file streamV2BatchFile) []byte {
+	t.Helper()
+
+	var compressed, err = os.ReadFile(file.path)
+	require.NoError(t, err)
+	rows, err := fakeSnowpipeGunzip(compressed)
+	require.NoError(t, err)
+	return rows
 }

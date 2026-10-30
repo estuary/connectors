@@ -12,7 +12,7 @@ import (
 // keys shard, fields, spans, ts and message have fixed shapes. A logrus field
 // carrying one of those names lands at the top level of the line, and a line the
 // runtime cannot decode is re-logged as a raw string at warn level. The fake
-// sidecar suffices: the field names do not depend on Snowflake.
+// fake Snowpipe suffices: the field names do not depend on Snowflake.
 func TestStreamV2LogFieldsAvoidRuntimeKeys(t *testing.T) {
 	var hook = logtest.NewGlobal()
 	defer hook.Reset()
