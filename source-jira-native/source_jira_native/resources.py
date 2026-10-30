@@ -6,11 +6,13 @@ from zoneinfo import ZoneInfo
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
+from estuary_cdk.capture.backfill_signals import BackfillCoverage
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
     BoardChildStream,
     ConnectorState,
+    EPOCH,
     EndpointConfig,
     Epics,
     FilterSharing,
@@ -345,6 +347,14 @@ def full_refresh_resources(
     return resources
 
 
+# start_date and projects are the only settings that limit which issues the
+# backfills read.
+def issues_backfill_coverage(config: EndpointConfig) -> BackfillCoverage:
+    if config.start_date == EPOCH and not config.advanced.projects:
+        return BackfillCoverage.FULL
+    return BackfillCoverage.BOUNDED_BY_CONFIG
+
+
 def issues(
         log: Logger, http: HTTPMixin, config: EndpointConfig, timezone: ZoneInfo
 ) -> common.Resource:
@@ -405,6 +415,7 @@ def issues(
         ),
         schema_inference=True,
         disable=False,
+        backfill_coverage=issues_backfill_coverage(config),
     )
 
 
@@ -474,6 +485,7 @@ def issue_child_resources(
                 ),
                 schema_inference=True,
                 disable=stream.disable,
+                backfill_coverage=issues_backfill_coverage(config),
             )
         )
 
