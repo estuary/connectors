@@ -22,14 +22,14 @@ const (
 var scopes = []string{"Files.Read.All", "offline_access", "User.Read"}
 
 func oauth2Spec() *pf.OAuth2 {
-	authURLTemplateFormatStr := (authURL +
+	var authURLTemplateFormatStr = (authURL +
 		"?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}" +
 		"&response_type=code" +
 		"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}" +
 		"&state={{{ state }}}" +
 		"&scope={{#urlencode}}%s{{/urlencode}}")
 
-	spec := pf.OAuth2{
+	var spec = pf.OAuth2{
 		Provider: "microsoft",
 		AuthUrlTemplate: fmt.Sprintf(
 			authURLTemplateFormatStr, strings.Join(scopes, " ")),
@@ -57,7 +57,7 @@ type credentials struct {
 }
 
 func (c *credentials) validate() error {
-	requiredProperties := [][]string{
+	var requiredProperties = [][]string{
 		{"client_id", c.ClientID},
 		{"client_secret", c.ClientSecret},
 		{"refresh_token", c.RefreshToken},
@@ -77,7 +77,7 @@ type tokenCredential struct {
 func (c *tokenCredential) GetToken(
 	ctx context.Context, opts policy.TokenRequestOptions,
 ) (azcore.AccessToken, error) {
-	token, err := c.tokenSource.Token()
+	var token, err = c.tokenSource.Token()
 	if err != nil {
 		return azcore.AccessToken{}, fmt.Errorf("error getting token: %w", err)
 	}
@@ -89,20 +89,20 @@ func (c *tokenCredential) GetToken(
 }
 
 func (c *credentials) getTokenSource(ctx context.Context) oauth2.TokenSource {
-	azureEndpoint := oauth2.Endpoint{
+	var azureEndpoint = oauth2.Endpoint{
 		AuthURL:   authURL,
 		TokenURL:  tokenURL,
 		AuthStyle: oauth2.AuthStyleInParams,
 	}
 
-	oauthConfig := &oauth2.Config{
+	var oauthConfig = &oauth2.Config{
 		ClientID:     c.ClientID,
 		ClientSecret: c.ClientSecret,
 		Endpoint:     azureEndpoint,
 		Scopes:       scopes,
 	}
 
-	token := &oauth2.Token{
+	var token = &oauth2.Token{
 		RefreshToken: c.RefreshToken,
 		Expiry:       time.Now(), // Require a new access token to be obtained.
 	}
@@ -113,13 +113,13 @@ func (c *credentials) getTokenSource(ctx context.Context) oauth2.TokenSource {
 func (c *credentials) getAuthProvider(ctx context.Context) (
 	*auth.AzureIdentityAuthenticationProvider, error,
 ) {
-	tokenSource := c.getTokenSource(ctx)
+	var tokenSource = c.getTokenSource(ctx)
 
-	cred := &tokenCredential{
+	var cred = &tokenCredential{
 		tokenSource: tokenSource,
 	}
 
-	authProvider, err := auth.
+	var authProvider, err = auth.
 		NewAzureIdentityAuthenticationProviderWithScopes(cred, scopes)
 	if err != nil {
 		return nil, fmt.Errorf("error creating auth provider: %w", err)

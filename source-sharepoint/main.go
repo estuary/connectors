@@ -123,8 +123,8 @@ func parseSharePointURL(
 		return "", "", "", "", fmt.Errorf("URL must include a hostname")
 	}
 
-	urlPath := strings.TrimPrefix(parsedURL.Path, "/")
-	pathParts := strings.Split(urlPath, "/")
+	var urlPath = strings.TrimPrefix(parsedURL.Path, "/")
+	var pathParts = strings.Split(urlPath, "/")
 
 	if len(pathParts) < 2 {
 		return "",
@@ -157,7 +157,7 @@ func parseSharePointURL(
 
 		for _, part := range pathParts[3:] {
 			if part != "" {
-				unescaped, err := url.PathUnescape(part)
+				var unescaped, err = url.PathUnescape(part)
 				if err != nil {
 					return "", "", "", "", fmt.Errorf("invalid folder path encoding: %w", err)
 				}
@@ -185,9 +185,9 @@ func getSiteIDFromPath(
 ) (string, error) {
 	// The Graph API uses the format: /sites/{hostname}:{sitePath}
 	// For example: /sites/contoso.sharepoint.com:/sites/Marketing
-	siteIdentifier := hostname + ":" + sitePath
+	var siteIdentifier = hostname + ":" + sitePath
 
-	site, err := graphClient.
+	var site, err = graphClient.
 		Sites().
 		BySiteId(siteIdentifier).
 		Get(ctx, nil)
@@ -206,7 +206,7 @@ func getSiteIDFromPath(
 func getDriveByLibraryName(
 	ctx context.Context, graphClient *msgraphsdk.GraphServiceClient, siteID, libraryName string,
 ) (string, error) {
-	drives, err := graphClient.
+	var drives, err = graphClient.
 		Sites().
 		BySiteId(siteID).
 		Drives().
@@ -230,7 +230,7 @@ func getDriveByLibraryName(
 func getDefaultSiteDrive(
 	ctx context.Context, graphClient *msgraphsdk.GraphServiceClient, siteID string,
 ) (string, error) {
-	drive, err := graphClient.
+	var drive, err = graphClient.
 		Sites().
 		BySiteId(siteID).
 		Drive().
@@ -247,7 +247,7 @@ func getDefaultSiteDrive(
 }
 
 func newSharePointStore(ctx context.Context, cfg config) (*sharePointStore, error) {
-	authProvider, err := cfg.
+	var authProvider, err = cfg.
 		Credentials.getAuthProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error creating auth provider: %w", err)
@@ -259,18 +259,18 @@ func newSharePointStore(ctx context.Context, cfg config) (*sharePointStore, erro
 		return nil, fmt.Errorf("error creating Graph adapter: %w", err)
 	}
 
-	httpClient := &http.Client{}
-	graphClient := msgraphsdk.NewGraphServiceClient(adapter)
+	var httpClient = &http.Client{}
+	var graphClient = msgraphsdk.NewGraphServiceClient(adapter)
 
 	var libraryName string
 
 	// If using URL method, parse and resolve to components
 	if cfg.SiteConfiguration.Method == "url" {
-		hostname,
+		var hostname,
 			sitePath,
 			parsedLibraryName,
 			folderPath,
-			err := parseSharePointURL(cfg.SiteConfiguration.SiteURL)
+			err = parseSharePointURL(cfg.SiteConfiguration.SiteURL)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing site URL: %w", err)
 		}
@@ -306,9 +306,9 @@ func newSharePointStore(ctx context.Context, cfg config) (*sharePointStore, erro
 		cfg.SiteConfiguration.Path = "/"
 	}
 
-	tokenSource := cfg.Credentials.getTokenSource(ctx)
+	var tokenSource = cfg.Credentials.getTokenSource(ctx)
 
-	store := sharePointStore{
+	var store = sharePointStore{
 		httpClient:  httpClient,
 		graphClient: graphClient,
 		config:      cfg,
@@ -335,7 +335,7 @@ type folderEntry struct {
 }
 
 func (spStore *sharePointStore) check(ctx context.Context) error {
-	_, err := spStore.
+	var _, err = spStore.
 		graphClient.
 		Drives().
 		ByDriveId(spStore.config.SiteConfiguration.DriveID).
@@ -352,14 +352,14 @@ func (spStore *sharePointStore) check(ctx context.Context) error {
 func (spStore *sharePointStore) listFolderDirectChildren(
 	ctx context.Context, folderPath string,
 ) ([]models.DriveItemable, error) {
-	requestConfig := &drives.
+	var requestConfig = &drives.
 		ItemItemsItemChildrenRequestBuilderGetRequestConfiguration{
 		QueryParameters: &drives.ItemItemsItemChildrenRequestBuilderGetQueryParameters{
 			Orderby: []string{"name"},
 		},
 	}
 
-	items, err := spStore.
+	var items, err = spStore.
 		graphClient.
 		Drives().
 		ByDriveId(spStore.config.SiteConfiguration.DriveID).
@@ -397,13 +397,13 @@ func (spStore *sharePointStore) listFolderDirectChildren(
 func (spStore *sharePointStore) List(
 	ctx context.Context, query filesource.Query,
 ) (filesource.Listing, error) {
-	rootItems, err := spStore.
+	var rootItems, err = spStore.
 		listFolderDirectChildren(ctx, query.Prefix)
 	if err != nil {
 		return nil, fmt.Errorf("listing root folder: %w", err)
 	}
 
-	listing := &sharePointListing{
+	var listing = &sharePointListing{
 		store:     spStore,
 		ctx:       ctx,
 		stack:     []folderEntry{{path: query.Prefix, items: rootItems}},
@@ -417,7 +417,7 @@ func (spStore *sharePointStore) List(
 func (spStore *sharePointStore) Read(
 	ctx context.Context, obj filesource.ObjectInfo,
 ) (io.ReadCloser, filesource.ObjectInfo, error) {
-	token, err := spStore.tokenSource.Token()
+	var token, err = spStore.tokenSource.Token()
 	if err != nil {
 		return nil,
 			filesource.ObjectInfo{},
@@ -448,7 +448,7 @@ func (spStore *sharePointStore) Read(
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		var body, _ = io.ReadAll(resp.Body)
 		resp.Body.Close()
 		return nil, filesource.ObjectInfo{}, fmt.Errorf(
 			"unexpected status %d: %s, body: %s",
@@ -471,18 +471,18 @@ type sharePointListing struct {
 
 func (listing *sharePointListing) Next() (filesource.ObjectInfo, error) {
 	for {
-		stackSize := len(listing.stack)
+		var stackSize = len(listing.stack)
 		if stackSize == 0 {
 			return filesource.ObjectInfo{}, io.EOF
 		}
 
-		folder := &listing.stack[stackSize-1]
+		var folder = &listing.stack[stackSize-1]
 		if len(folder.items) == 0 {
 			listing.stack = listing.stack[:stackSize-1] // Pop up stack to parent folder.
 			continue
 		}
 
-		firstUnprocessedItem := folder.items[0]
+		var firstUnprocessedItem = folder.items[0]
 		folder.items = folder.items[1:]
 
 		var fullItemPath string
@@ -516,7 +516,7 @@ func (listing *sharePointListing) Next() (filesource.ObjectInfo, error) {
 				}, nil
 			}
 
-			childItems, err := listing.
+			var childItems, err = listing.
 				store.
 				listFolderDirectChildren(listing.ctx, fullItemPath)
 			if err != nil {
@@ -686,7 +686,7 @@ func configSchema(parserSchema json.RawMessage) json.RawMessage {
 }
 
 func main() {
-	src := filesource.Source{
+	var src = filesource.Source{
 		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
 			var cfg config
 			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {

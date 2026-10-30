@@ -10,7 +10,7 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	parserSpec, err := os.ReadFile("tests/parser_spec.json")
+	var parserSpec, err = os.ReadFile("tests/parser_spec.json")
 	require.NoError(t, err)
 
 	formatted, err := json.
@@ -21,7 +21,7 @@ func TestSpec(t *testing.T) {
 }
 
 func TestParseSharePointURL(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name            string
 		url             string
 		wantHostname    string
@@ -146,7 +146,7 @@ func TestParseSharePointURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hostname, sitePath, libraryName, folderPath, err := parseSharePointURL(tt.url)
+			var hostname, sitePath, libraryName, folderPath, err = parseSharePointURL(tt.url)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -165,13 +165,13 @@ func TestParseSharePointURL(t *testing.T) {
 }
 
 func TestConfigValidation(t *testing.T) {
-	validCreds := credentials{
+	var validCreds = credentials{
 		ClientID:     "test-client-id",
 		ClientSecret: "test-client-secret",
 		RefreshToken: "test-refresh-token",
 	}
 
-	tests := []struct {
+	var tests = []struct {
 		name        string
 		cfg         config
 		wantErr     bool
@@ -321,7 +321,7 @@ func TestConfigValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.cfg.Validate()
+			var err = tt.cfg.Validate()
 
 			if tt.wantErr {
 				require.Error(t, err)
