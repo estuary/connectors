@@ -112,7 +112,7 @@ func TestInfileRoundTrip(t *testing.T) {
 			}
 			buf.WriteByte('\n')
 
-			got := parseLoadDataLine(t, buf.Bytes())
+			var got = parseLoadDataLine(t, buf.Bytes())
 			require.Equal(t, tc.want, got)
 		})
 	}
@@ -131,8 +131,8 @@ func parseLoadDataLine(t *testing.T, line []byte) []string {
 
 	var fields []string
 	var cur bytes.Buffer
-	isNull := false
-	flush := func() {
+	var isNull = false
+	var flush = func() {
 		if isNull {
 			fields = append(fields, "\x00NULL\x00")
 		} else {
@@ -143,11 +143,11 @@ func parseLoadDataLine(t *testing.T, line []byte) []string {
 	}
 
 	for i := 0; i < len(line); i++ {
-		c := line[i]
+		var c = line[i]
 		switch c {
 		case '\\':
 			require.Less(t, i+1, len(line), "dangling escape")
-			next := line[i+1]
+			var next = line[i+1]
 			i++
 			switch next {
 			case 'N':

@@ -138,11 +138,11 @@ func registerCustomSSL(c config) error {
 
 	if c.Advanced.SSLMode == "verify_ca" {
 		customVerify = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-			opts := x509.VerifyOptions{
+			var opts = x509.VerifyOptions{
 				Roots: rootCertPool,
 			}
 			for _, rawCert := range rawCerts {
-				cert, _ := x509.ParseCertificate(rawCert)
+				var cert, _ = x509.ParseCertificate(rawCert)
 				if _, err := cert.Verify(opts); err != nil {
 					return err
 				}
@@ -155,7 +155,7 @@ func registerCustomSSL(c config) error {
 	if c.Advanced.SSLClientCert != "" {
 		var rawClientCert = []byte(c.Advanced.SSLClientCert)
 		var rawClientKey = []byte(c.Advanced.SSLClientKey)
-		certs, err := tls.X509KeyPair(rawClientCert, rawClientKey)
+		var certs, err = tls.X509KeyPair(rawClientCert, rawClientKey)
 		if err != nil {
 			return fmt.Errorf("creating certificate from provided input: %w", err)
 		}
@@ -188,7 +188,7 @@ func (c config) ToURI() string {
 		address = address + ":3306"
 	}
 
-	mysqlCfg := mysql.NewConfig()
+	var mysqlCfg = mysql.NewConfig()
 	mysqlCfg.Net = "tcp"
 	mysqlCfg.Addr = address
 	mysqlCfg.User = c.User
@@ -242,7 +242,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(cfg.Address)
+				var host, port, err = net.SplitHostPort(cfg.Address)
 				if err != nil {
 					return fmt.Errorf("splitting address to host and port: %w", err)
 				}
@@ -278,7 +278,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				}
 			}
 
-			db, err := stdsql.Open("mysql", cfg.ToURI())
+			var db, err = stdsql.Open("mysql", cfg.ToURI())
 			if err != nil {
 				return nil, fmt.Errorf("opening database: %w", err)
 			}
@@ -636,15 +636,15 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	// Retain column metadata information for this binding as a snapshot of the table configuration
 	// when the connector started, indexed in the same order as values will be received from the
 	// runtime for Store requests. Only VARCHAR columns will have non-zero-valued varcharColumnMeta.
-	allColumns := target.Columns()
-	columnMetas := make([]varcharColumnMeta, len(allColumns))
+	var allColumns = target.Columns()
+	var columnMetas = make([]varcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
-		existingResource := is.GetResource(target.Path)
+		var existingResource = is.GetResource(target.Path)
 		if existingResource == nil {
 			return fmt.Errorf("failed to find existing table for resource %q in info schema (possible permissions problem?)", target.Path)
 		}
 
-		existingField := existingResource.GetField(col.Field)
+		var existingField = existingResource.GetField(col.Field)
 		if existingField.Type == "varchar" {
 			columnMetas[idx] = varcharColumnMeta{
 				identifier: col.Identifier,
@@ -683,7 +683,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		return fmt.Errorf("Exec(%s): %w", b.createDeleteTableSQL, err)
 	}
 
-	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
+	var tempColumnMetas = make([]varcharColumnMeta, len(allColumns))
 	for idx, key := range target.Keys {
 		if strings.Contains(key.DDL, "VARCHAR(256)") {
 			tempColumnMetas[idx] = varcharColumnMeta{
@@ -710,7 +710,7 @@ func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) erro
 	if existing == nil {
 		return fmt.Errorf("column %s was not found in the table", col.Identifier)
 	}
-	meta, ok := existing.Meta.(datetimeFieldMeta)
+	var meta, ok = existing.Meta.(datetimeFieldMeta)
 	if !ok {
 		return fmt.Errorf("column %s is not a DATETIME", col.Identifier)
 	}
@@ -749,16 +749,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		var b = d.bindings[it.Binding]
 
-		converted, err := b.target.ConvertKey(it.Key)
+		var converted, err = b.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		}
 
 		// See if we need to increase any VARCHAR column lengths
 		for idx, c := range converted {
-			varcharMeta := b.tempVarcharMetas[idx]
+			var varcharMeta = b.tempVarcharMetas[idx]
 			if varcharMeta.identifier != "" && c != nil {
-				l := len(c.(string))
+				var l = len(c.(string))
 
 				if l > varcharMeta.maxLength {
 					log.WithFields(log.Fields{
@@ -811,7 +811,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("scanning Load document: %w", err)
 		}
 
-		doc := json.RawMessage(document)
+		var doc = json.RawMessage(document)
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -840,7 +840,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	ctx := it.Context()
+	var ctx = it.Context()
 	txn, err := d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
@@ -848,11 +848,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	// If a Tx is open and you attempt to close the connection, msqldb will
 	// deadlock.  This handles the case of both an error or a panic occurring.
-	defuser := sql.NewTxDefuser(txn)
+	var defuser = sql.NewTxDefuser(txn)
 	defer defuser.MaybeRollback()
 
-	drainBinding := func(b *binding) error {
-		n, err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL)
+	var drainBinding = func(b *binding) error {
+		var n, err = d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL)
 		if err != nil {
 			return fmt.Errorf("store writing to insert infile for %q: %w", b.target.Identifier, err)
 		}
@@ -867,7 +867,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		return nil
 	}
 
-	round := it.Round
+	var round = it.Round
 	var truncations = d.truncations
 
 	// The StoreIterator iterates over documents ordered by their binding, so we
@@ -908,10 +908,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		// See if we need to increase any VARCHAR column lengths
 		for idx, c := range converted {
-			varcharMeta := b.varcharColumnMetas[idx]
+			var varcharMeta = b.varcharColumnMetas[idx]
 			if varcharMeta.identifier != "" {
 				if v, ok := c.(string); ok {
-					l := len(v)
+					var l = len(v)
 
 					if l > varcharMeta.maxLength {
 						log.WithFields(log.Fields{
@@ -975,7 +975,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// that did not exist, so subtracting the staged rows leaves the
 			// rows that were actually updated. None of these counts depend
 			// on CLIENT_FOUND_ROWS (which the DSN sets regardless).
-			affected := b.insertRows
+			var affected = b.insertRows
 			if b.mustDelete {
 				// Apply any deletions
 				if res, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {

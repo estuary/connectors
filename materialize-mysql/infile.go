@@ -61,7 +61,7 @@ func (i *infile) write(ctx context.Context, converted []any, txn *stdsql.Tx, dra
 	i.buff.WriteByte('\n')
 
 	if i.buff.Len() > batchSizeThreshold {
-		n, err := i.drain(ctx, txn, drainQuery)
+		var n, err = i.drain(ctx, txn, drainQuery)
 		if err != nil {
 			return 0, fmt.Errorf("draining infile after write: %w", err)
 		}
@@ -79,11 +79,11 @@ func (i *infile) drain(ctx context.Context, txn *stdsql.Tx, drainQuery string) (
 		return 0, nil
 	}
 
-	res, err := txn.ExecContext(ctx, drainQuery)
+	var res, err = txn.ExecContext(ctx, drainQuery)
 	if err != nil {
 		return 0, fmt.Errorf("executing infile drain query: %w", err)
 	}
-	n, _ := res.RowsAffected()
+	var n, _ = res.RowsAffected()
 	return n, nil
 }
 
@@ -107,7 +107,7 @@ func writeInfileField(buf *bytes.Buffer, v any) error {
 		}
 		return nil
 	default:
-		b, err := json.Marshal(value)
+		var b, err = json.Marshal(value)
 		if err != nil {
 			return fmt.Errorf("encoding value as json: %w", err)
 		}

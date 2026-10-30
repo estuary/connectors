@@ -21,13 +21,13 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGeneration_Singlestore(t *testing.T) {
-	dialect := mysqlDialect(time.UTC, "flow", "singlestore", common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
-	tpls := renderTemplates(dialect, "singlestore")
+	var dialect = mysqlDialect(time.UTC, "flow", "singlestore", common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	var tpls = renderTemplates(dialect, "singlestore")
 	runSQLGen(t, dialect, tpls)
 }
 
 func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
-	snap, _ := sql.RunSqlGenTests(
+	var snap, _ = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -73,7 +73,7 @@ func TestDateTimeColumn(t *testing.T) {
 	}, sql.FieldConfig{})
 	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 
-	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
+	var parsed, err = mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04 10:09:08.234567", parsed)
 	require.NoError(t, err)
 
@@ -115,7 +115,7 @@ func TestSingleStoreClampDatetime(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := SingleStoreClampDatetime(tt.input)
+			var got, err = SingleStoreClampDatetime(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -150,7 +150,7 @@ func TestSingleStoreClampDate(t *testing.T) {
 		},
 	} {
 		t.Run(tt.input, func(t *testing.T) {
-			got, err := SingleStoreClampDate(tt.input)
+			var got, err = SingleStoreClampDate(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -187,7 +187,7 @@ func TestTimeColumn(t *testing.T) {
 	}, sql.FieldConfig{})
 	require.Equal(t, "TIME(6) NOT NULL", mapped.DDL)
 
-	parsed, err := mapped.Converter("10:09:08.234567Z")
+	var parsed, err = mapped.Converter("10:09:08.234567Z")
 	require.Equal(t, "10:09:08.234567", parsed)
 	require.NoError(t, err)
 }

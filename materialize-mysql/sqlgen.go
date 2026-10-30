@@ -15,12 +15,12 @@ import (
 // characters will be sanitized with an underscore.
 func translateFlowIdentifier(f string) string {
 	var out string
-	onlySpaces := true
+	var onlySpaces = true
 
 	// Build the output string from the reversed input, since we need to account for trailing
 	// spaces.
 	for idx := len(f) - 1; idx >= 0; idx-- {
-		c := f[idx]
+		var c = f[idx]
 
 		if c != ' ' {
 			onlySpaces = false
@@ -48,7 +48,7 @@ const (
 )
 
 var SingleStoreClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
-	parsed, canonical, err := sql.ParseRFC3339Nano(str)
+	var parsed, canonical, err = sql.ParseRFC3339Nano(str)
 	if err != nil {
 		return nil, err
 	} else if parsed.Year() < 1000 {
@@ -74,7 +74,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		jsonMapper = sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToJsonString))
 	}
 
-	primaryKeyTextType := sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar"))
+	var primaryKeyTextType = sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar"))
 	if product == "singlestore" {
 		primaryKeyTextType = sql.MapStatic("TEXT", sql.AlsoCompatibleWith("varchar"))
 	}
@@ -87,9 +87,9 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		dateOpts = []sql.MapStaticOption{sql.UsingConverter(SingleStoreClampDate)}
 		datetimeOpts = []sql.MapStaticOption{sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation, true))}
 	}
-	dateMapping := sql.MapStatic("DATE", dateOpts...)
-	datetimeMapping := sql.MapStatic("DATETIME(6)", datetimeOpts...)
-	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation)))
+	var dateMapping = sql.MapStatic("DATE", dateOpts...)
+	var datetimeMapping = sql.MapStatic("DATETIME(6)", datetimeOpts...)
+	var timeMapping = sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation)))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -98,7 +98,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
-	binaryMapping := sql.MapPrimaryKey(
+	var binaryMapping = sql.MapPrimaryKey(
 		sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
 		sql.MapStatic("LONGTEXT"),
 	)
@@ -109,7 +109,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		)
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT"),
@@ -211,16 +211,16 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 }
 
 func formatOffset(loc *time.Location) string {
-	now := time.Now().In(loc)
-	_, offset := now.Zone()
+	var now = time.Now().In(loc)
+	var _, offset = now.Zone()
 
-	sign := "+"
+	var sign = "+"
 	if offset < 0 {
 		sign = "-"
 		offset = -offset
 	}
-	hours := offset / 3600
-	minutes := (offset % 3600) / 60
+	var hours = offset / 3600
+	var minutes = (offset % 3600) / 60
 	return fmt.Sprintf("%s%02d:%02d", sign, hours, minutes)
 }
 
@@ -295,8 +295,8 @@ func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
 			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize time field: Consider setting a timezone in your database or in the connector configuration to continue")
 		}
 
-		normalized := strings.ReplaceAll(str, "z", "Z")
-		formats := []string{
+		var normalized = strings.ReplaceAll(str, "z", "Z")
+		var formats = []string{
 			"15:04:05.999999999Z07:00",
 			"15:04:05.999999999Z",
 			"15:04:05Z",

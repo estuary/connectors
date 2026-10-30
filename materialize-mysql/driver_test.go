@@ -39,7 +39,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table: table,
 			Delta: delta,
@@ -63,7 +63,7 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				var ctx = context.Background()
-				db, err := stdsql.Open("mysql", cfg.ToURI())
+				var db, err = stdsql.Open("mysql", cfg.ToURI())
 				require.NoError(t, err)
 				defer db.Close()
 
@@ -142,23 +142,23 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("additional table create sql", func(t *testing.T) {
-		ctx := context.Background()
-		cfg := testConfig()
+		var ctx = context.Background()
+		var cfg = testConfig()
 
-		db, err := stdsql.Open("mysql", cfg.ToURI())
+		var db, err = stdsql.Open("mysql", cfg.ToURI())
 		require.NoError(t, err)
 		defer db.Close()
 
-		c := &client{db: db}
+		var c = &client{db: db}
 
-		tableName := "test_additional_sql"
-		indexName := "idx_extra"
+		var tableName = "test_additional_sql"
+		var indexName = "idx_extra"
 
-		cleanup := func() { db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(tableName))) }
+		var cleanup = func() { db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(tableName))) }
 		cleanup()
 		t.Cleanup(cleanup)
 
-		tc := sql.TableCreate{
+		var tc = sql.TableCreate{
 			Table: sql.Table{Identifier: testDialect.Identifier(tableName)},
 			TableCreateSql: fmt.Sprintf(
 				"CREATE TABLE %s (id INT NOT NULL, val VARCHAR(64) NOT NULL);",
@@ -195,15 +195,15 @@ func TestIntegration(t *testing.T) {
 	t.Run("apply changes", func(t *testing.T) {
 		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
-				ctx := context.Background()
+				var ctx = context.Background()
 
-				db, err := stdsql.Open("mysql", cfg.ToURI())
+				var db, err = stdsql.Open("mysql", cfg.ToURI())
 				require.NoError(t, err)
 				defer db.Close()
 
-				tableName := "testing"
+				var tableName = "testing"
 
-				cleanup := func() { db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(tableName))) }
+				var cleanup = func() { db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(tableName))) }
 				cleanup()
 				t.Cleanup(cleanup)
 
@@ -211,7 +211,7 @@ func TestIntegration(t *testing.T) {
 				// we don't lose anything about them when dropping nullability
 				// constraints, since we must re-state the column definition when doing
 				// that.
-				q := fmt.Sprintf(`
+				var q = fmt.Sprintf(`
 			CREATE TABLE %s(
 				vc123 VARCHAR(123) NOT NULL,
 				vc256 VARCHAR(256) NOT NULL,
@@ -268,9 +268,9 @@ func TestPrereqs(t *testing.T) {
 
 	t.Skip("todo: fix pre-reqs tests")
 
-	cfg := testConfig()
+	var cfg = testConfig()
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		cfg  func(config) config
 		want []string
@@ -314,7 +314,7 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -329,7 +329,7 @@ func TestPrereqs(t *testing.T) {
 }
 
 func snapshotTable(ctx context.Context, db *stdsql.DB, catalog string, schema string, name string) (string, error) {
-	q := fmt.Sprintf(`
+	var q = fmt.Sprintf(`
 	select column_name, is_nullable, data_type, column_type
 	from information_schema.columns
 	where 
@@ -342,7 +342,7 @@ func snapshotTable(ctx context.Context, db *stdsql.DB, catalog string, schema st
 		name,
 	)
 
-	rows, err := db.QueryContext(ctx, q)
+	var rows, err = db.QueryContext(ctx, q)
 	if err != nil {
 		return "", err
 	}
@@ -355,7 +355,7 @@ func snapshotTable(ctx context.Context, db *stdsql.DB, catalog string, schema st
 		ColumnType string
 	}
 
-	cols := []foundColumn{}
+	var cols = []foundColumn{}
 	for rows.Next() {
 		var c foundColumn
 		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type, &c.ColumnType); err != nil {
@@ -372,7 +372,7 @@ func snapshotTable(ctx context.Context, db *stdsql.DB, catalog string, schema st
 	})
 
 	var out strings.Builder
-	enc := json.NewEncoder(&out)
+	var enc = json.NewEncoder(&out)
 	for _, c := range cols {
 		if err := enc.Encode(c); err != nil {
 			return "", err

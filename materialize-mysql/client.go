@@ -27,7 +27,7 @@ type client struct {
 
 func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	return func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
-		db, err := stdsql.Open("mysql", ep.Config.ToURI())
+		var db, err = stdsql.Open("mysql", ep.Config.ToURI())
 		if err != nil {
 			return nil, err
 		}
@@ -41,9 +41,9 @@ func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, _ str
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	db, err := stdsql.Open("mysql", cfg.ToURI())
+	var db, err = stdsql.Open("mysql", cfg.ToURI())
 	if err != nil {
 		errs.Err(err)
 		return errs
@@ -109,15 +109,15 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		return nil
 	}
 
-	schemas := make([]string, 0, len(resourcePaths))
+	var schemas = make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
+		var loc = c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
 	}
 	slices.Sort(schemas)
 	schemas = slices.Compact(schemas)
 
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+	var rows, err = c.db.QueryContext(ctx, fmt.Sprintf(`
 		SELECT table_name, column_name, datetime_precision
 		FROM information_schema.columns
 		WHERE table_catalog = 'def' AND table_schema IN (%s) AND data_type = 'datetime'`,
@@ -191,9 +191,9 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		// without the NOT NULL part. There may be columns that aren't and/or never were part of our
 		// collection specification, so we must determine what appropriate DDL for columns that will
 		// be made nullable dynamically.
-		colDDL := make(map[string]string)
+		var colDDL = make(map[string]string)
 
-		rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		var rows, err = c.db.QueryContext(ctx, fmt.Sprintf(
 			"select column_name, column_type from information_schema.columns where table_schema=%s and table_name=%s;",
 			c.ep.Dialect.Literal(ta.InfoLocation.TableSchema),
 			c.ep.Dialect.Literal(ta.InfoLocation.TableName),
@@ -215,8 +215,8 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 
 		for idx := range ta.DropNotNulls {
-			col := ta.DropNotNulls[idx].Name
-			ddl, ok := colDDL[col]
+			var col = ta.DropNotNulls[idx].Name
+			var ddl, ok = colDDL[col]
 			if !ok {
 				return "", nil, fmt.Errorf("could not determine DDL for column %q", col)
 			}
@@ -241,7 +241,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := renderTemplates(c.ep.Dialect, product).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		alterColumnStmt := alterColumnStmtBuilder.String()
+		var alterColumnStmt = alterColumnStmtBuilder.String()
 
 		stmts = append(stmts, alterColumnStmt)
 	}
@@ -281,7 +281,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	if res.AdditionalSql != "" {
 		// In case these user-provided SQL statements are transactional, we
 		// apply them in the context of a transaction.
-		tx, err := c.db.BeginTx(ctx, nil)
+		var tx, err = c.db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("beginning transaction for additional SQL statements: %w", err)
 		}
@@ -303,19 +303,19 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
