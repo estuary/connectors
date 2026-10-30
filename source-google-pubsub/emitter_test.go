@@ -16,35 +16,35 @@ import (
 )
 
 func TestEmitter(t *testing.T) {
-	testSrv := &TestCaptureServer{
+	var testSrv = &TestCaptureServer{
 		msgsTo: make(chan *pc.Request),
 	}
 
-	stream := boilerplate.PullOutput{
+	var stream = boilerplate.PullOutput{
 		Connector_CaptureServer: testSrv,
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	// Start up the emitter.
-	emitter := newEmitter(&stream)
-	group, groupCtx := errgroup.WithContext(ctx)
+	var emitter = newEmitter(&stream)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.Go(func() error {
 		return emitter.runtimeAckWorker(groupCtx)
 	})
 
 	// Emit some messages concurrently with many goroutines.
-	numMessages := 50_000
-	half := numMessages / 2
-	ackdMsgs := make(chan string, numMessages)
+	var numMessages = 50_000
+	var half = numMessages / 2
+	var ackdMsgs = make(chan string, numMessages)
 	var sent sync.WaitGroup
 
 	for idx := 0; idx < numMessages; idx++ {
-		idx := idx
+		var idx = idx
 		sent.Add(1)
 
 		go func() {
-			m := emitMessage{
+			var m = emitMessage{
 				m: &pubsub.Message{
 					ID:   strconv.Itoa(idx),
 					Data: []byte("{}"),
@@ -53,7 +53,7 @@ func TestEmitter(t *testing.T) {
 				topic:       "topic",
 			}
 
-			runtimeAck, err := emitter.emit(ctx, m)
+			var runtimeAck, err = emitter.emit(ctx, m)
 			require.NoError(t, err)
 
 			sent.Done()
@@ -67,7 +67,7 @@ func TestEmitter(t *testing.T) {
 
 	// Get the set of documents that were output from the connector referenced
 	// by their IDs.
-	gotDocuments := []string{}
+	var gotDocuments = []string{}
 
 	type capturedDoc struct {
 		Meta map[string]string `json:"_meta"`
@@ -92,8 +92,8 @@ func TestEmitter(t *testing.T) {
 
 	// Make sure the acknowledged messages match up to the acknowledged runtime
 	// commits for just the first half.
-	doneCount := 0
-	gotDocs := []string{}
+	var doneCount = 0
+	var gotDocs = []string{}
 	for id := range ackdMsgs {
 		doneCount += 1
 		gotDocs = append(gotDocs, id)

@@ -30,7 +30,7 @@ func (c *config) Validate() error {
 }
 
 func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
-	creds, err := google.CredentialsFromJSON(ctx, []byte(c.CredentialsJSON), pubsub.ScopePubSub)
+	var creds, err = google.CredentialsFromJSON(ctx, []byte(c.CredentialsJSON), pubsub.ScopePubSub)
 	if err != nil {
 		return nil, fmt.Errorf("creating credentials: %w", err)
 	}

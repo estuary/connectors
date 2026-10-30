@@ -19,15 +19,15 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.client(ctx)
+	var client, err = cfg.client(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting client from config: %w", err)
 	}
 
-	discoveredTopics := []string{}
-	topicIter := client.Topics(ctx)
+	var discoveredTopics = []string{}
+	var topicIter = client.Topics(ctx)
 	for {
-		topic, err := topicIter.Next()
+		var topic, err = topicIter.Next()
 		if err == iterator.Done {
 			break
 		} else if err != nil {
@@ -37,10 +37,10 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		discoveredTopics = append(discoveredTopics, topic.ID())
 	}
 
-	bindings := make([]*pc.Response_Discovered_Binding, 0, len(discoveredTopics))
+	var bindings = make([]*pc.Response_Discovered_Binding, 0, len(discoveredTopics))
 
 	for _, topic := range discoveredTopics {
-		resourceJson, err := json.Marshal(resource{Topic: topic})
+		var resourceJson, err = json.Marshal(resource{Topic: topic})
 		if err != nil {
 			return nil, fmt.Errorf("marshalling resource: %w", err)
 		}
@@ -109,7 +109,7 @@ func generateMinimalSchema() json.RawMessage {
 		},
 	}
 
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		panic(fmt.Errorf("error generating schema: %v", err))
 	}

@@ -63,7 +63,7 @@ func (e *emitter) emit(ctx context.Context, m emitMessage) (runtimeAck, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	ack := make(runtimeAck)
+	var ack = make(runtimeAck)
 
 	// Add the runtime acknowledgement signal channel to the `pendingAcks`
 	// channel first. it will be closed when the runtime has acknowledged the
@@ -89,7 +89,7 @@ func (e *emitter) emit(ctx context.Context, m emitMessage) (runtimeAck, error) {
 // closing the pending `runtimeAck` channel corresponding to that message.
 func (e *emitter) runtimeAckWorker(ctx context.Context) error {
 	for {
-		request, err := e.stream.Recv()
+		var request, err = e.stream.Recv()
 		if err == io.EOF {
 			return nil
 		} else if err != nil {
@@ -100,7 +100,7 @@ func (e *emitter) runtimeAckWorker(ctx context.Context) error {
 			return fmt.Errorf("unexpected message %#v", request)
 		}
 
-		n := request.Acknowledge.Checkpoints
+		var n = request.Acknowledge.Checkpoints
 		for idx := 0; idx < int(n); idx++ {
 			select {
 			case <-ctx.Done():
@@ -116,9 +116,9 @@ func (e *emitter) runtimeAckWorker(ctx context.Context) error {
 }
 
 func makeDoc(m emitMessage) (json.RawMessage, error) {
-	msg := m.m
+	var msg = m.m
 
-	meta := documentMetadata{
+	var meta = documentMetadata{
 		ID:          msg.ID,
 		Subcription: m.subcription,
 		Topic:       m.topic,

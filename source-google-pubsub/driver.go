@@ -70,11 +70,11 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 func subscriptionName(prefix, topic, captureName string) string {
 	// Use a digest of the topic and capture name, since there are restrictions
 	// on the length of the subscription name and the characters it may contain.
-	hsh := md5.New()
+	var hsh = md5.New()
 	hsh.Write([]byte(fmt.Sprintf("%s%s", topic, captureName)))
-	digest := hex.EncodeToString(hsh.Sum(nil))
+	var digest = hex.EncodeToString(hsh.Sum(nil))
 
-	out := fmt.Sprintf("EstuaryFlow_%s", digest)
+	var out = fmt.Sprintf("EstuaryFlow_%s", digest)
 
 	if prefix != "" {
 		out = fmt.Sprintf("%s_%s", prefix, out)
@@ -89,7 +89,7 @@ func (driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Ap
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.client(ctx)
+	var client, err = cfg.client(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting client from config: %w", err)
 	}
@@ -101,8 +101,8 @@ func (driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Ap
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		sub := subscriptionName(cfg.SubscriptionPrefix, res.Topic, req.Capture.Name.String())
-		exists, err := client.Subscription(sub).Exists(ctx)
+		var sub = subscriptionName(cfg.SubscriptionPrefix, res.Topic, req.Capture.Name.String())
+		var exists, err = client.Subscription(sub).Exists(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("checking if subscription exists: %w", err)
 		}
@@ -132,14 +132,14 @@ func (driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Ap
 }
 
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	ctx := stream.Context()
+	var ctx = stream.Context()
 
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	client, err := cfg.client(ctx)
+	var client, err = cfg.client(ctx)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
@@ -148,24 +148,24 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		return err
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	// Arrange for reading of runtime acknowledgements and serialized output of
 	// documents corresponding to received PubSub messages.
-	e := newEmitter(stream)
+	var e = newEmitter(stream)
 	group.Go(func() error {
 		return e.runtimeAckWorker(groupCtx)
 	})
 
 	for idx, binding := range open.Capture.Bindings {
-		idx := idx
+		var idx = idx
 
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		sub := subscriptionName(cfg.SubscriptionPrefix, res.Topic, open.Capture.Name.String())
+		var sub = subscriptionName(cfg.SubscriptionPrefix, res.Topic, open.Capture.Name.String())
 		group.Go(func() error {
 			return captureResource(groupCtx, e, client, res.Topic, sub, idx)
 		})
@@ -182,7 +182,7 @@ func captureResource(
 	subscription string,
 	binding int,
 ) error {
-	sub := client.Subscription(subscription)
+	var sub = client.Subscription(subscription)
 
 	// This setting prevents a large amount of messages to be buffered by the
 	// PubSub library for this topic before they can be output by the connector.
@@ -194,7 +194,7 @@ func captureResource(
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	return sub.Receive(ctx, func(ctx context.Context, m *pubsub.Message) {
-		rtAck, err := emitter.emit(ctx, emitMessage{
+		var rtAck, err = emitter.emit(ctx, emitMessage{
 			m:           m,
 			binding:     binding,
 			subcription: subscription,
