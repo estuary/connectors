@@ -141,7 +141,7 @@ func main() {
 	)
 	flag.Parse()
 
-	lvl, err := log.ParseLevel(*logLevel)
+	var lvl, err = log.ParseLevel(*logLevel)
 	if err != nil {
 		log.WithFields(log.Fields{"level": *logLevel, "error": err}).Fatal("unrecognized log level")
 	}
@@ -149,7 +149,7 @@ func main() {
 	// Logging goes to stderr, leaving stdout to carry snapshot output alone.
 	log.SetOutput(os.Stderr)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	var ctx, cancel = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
 	if err := run(ctx, *connector, *config, *resource, *mode, *taskName, *runSuffix, *dryRun); err != nil {
@@ -158,7 +158,7 @@ func main() {
 }
 
 func run(ctx context.Context, connector, configPath, resourcePath, mode, taskName, runSuffix string, dryRun bool) error {
-	openConnector, ok := connectors[connector]
+	var openConnector, ok = connectors[connector]
 	if !ok {
 		return fmt.Errorf("unknown connector %q: expected one of %s", connector, strings.Join(slices.Sorted(maps.Keys(connectors)), ", "))
 	} else if configPath == "" || resourcePath == "" {
@@ -167,7 +167,7 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 		return fmt.Errorf("unknown -mode %q: expected snapshot, drop, or sweep", mode)
 	}
 
-	endpointConfig, err := testutil.ReadConfigFile(configPath)
+	var endpointConfig, err = testutil.ReadConfigFile(configPath)
 	if err != nil {
 		return err
 	}
@@ -184,14 +184,14 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 
 	switch mode {
 	case "snapshot":
-		rows, err := testutil.SnapshotResource(ctx, m, path)
+		var rows, err = testutil.SnapshotResource(ctx, m, path)
 		if err != nil {
 			return err
 		}
 		_, err = os.Stdout.WriteString(rows)
 		return err
 	case "drop":
-		description, err := testutil.DropResource(ctx, m, path)
+		var description, err = testutil.DropResource(ctx, m, path)
 		if err != nil {
 			return err
 		}
@@ -213,8 +213,8 @@ func run(ctx context.Context, connector, configPath, resourcePath, mode, taskNam
 // explicitly, the cleanup ignores the age check and cleans up everything under
 // that suffix
 func sweep(ctx context.Context, m materializer, path []string, runSuffix string, dryRun bool) error {
-	resources, resourcesErr := testutil.SweepTestResources(ctx, m, [][]string{path}, runSuffix, dryRun)
-	tasks, tasksErr := testutil.SweepTestTasks(ctx, m, runSuffix, dryRun)
+	var resources, resourcesErr = testutil.SweepTestResources(ctx, m, [][]string{path}, runSuffix, dryRun)
+	var tasks, tasksErr = testutil.SweepTestTasks(ctx, m, runSuffix, dryRun)
 
 	var errs = []error{resourcesErr, tasksErr}
 	for _, swept := range []struct {
@@ -223,7 +223,7 @@ func sweep(ctx context.Context, m materializer, path []string, runSuffix string,
 	}{{"resource", resources}, {"task", tasks}} {
 		var kind = swept.kind
 		for _, o := range swept.outcomes {
-			entry := log.WithFields(log.Fields{kind: o.Item, "reason": o.Reason})
+			var entry = log.WithFields(log.Fields{kind: o.Item, "reason": o.Reason})
 			if o.Err != nil {
 				errs = append(errs, fmt.Errorf("sweeping %s %s: %w", kind, o.Item, o.Err))
 			} else if o.Swept {

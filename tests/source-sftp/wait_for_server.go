@@ -32,7 +32,7 @@ func main() {
 	}
 
 	var hostKey ssh.PublicKey
-	sshConfig := ssh.ClientConfig{
+	var sshConfig = ssh.ClientConfig{
 		User: *username,
 		Auth: []ssh.AuthMethod{ssh.Password(*password)},
 		// The prober's job is to learn the key, not verify it: this is the trusted CI network,
