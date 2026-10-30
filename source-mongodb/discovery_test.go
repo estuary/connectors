@@ -11,15 +11,15 @@ import (
 )
 
 func TestDiscover(t *testing.T) {
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
 	var database = "test"
 	var col1 = "collection1"
 	var col2 = "collection2"
 	var view = "testView"
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
@@ -33,7 +33,7 @@ func TestDiscover(t *testing.T) {
 	// discovered results
 	require.NoError(t, db.CreateView(ctx, view, col1, mongo.Pipeline{}))
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -45,15 +45,15 @@ func TestDiscover(t *testing.T) {
 }
 
 func TestDiscoverMultipleDatabases(t *testing.T) {
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
 	var databases = []string{"foo", "bar", "baz"}
 	var col1 = "collection1"
 	var col2 = "collection2"
 	var view = "testView"
 
-	cleanup := func() {
+	var cleanup = func() {
 		for _, d := range databases {
 			require.NoError(t, client.Database(d).Drop(ctx))
 		}
@@ -70,7 +70,7 @@ func TestDiscoverMultipleDatabases(t *testing.T) {
 
 	cfg.Database = " foo, bar "
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -82,15 +82,15 @@ func TestDiscoverMultipleDatabases(t *testing.T) {
 }
 
 func TestDiscoverAllDatabases(t *testing.T) {
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
 	var databases = []string{"foo", "bar", "baz"}
 	var col1 = "collection1"
 	var col2 = "collection2"
 	var view = "testView"
 
-	cleanup := func() {
+	var cleanup = func() {
 		for _, d := range databases {
 			require.NoError(t, client.Database(d).Drop(ctx))
 		}
@@ -107,7 +107,7 @@ func TestDiscoverAllDatabases(t *testing.T) {
 
 	cfg.Database = ""
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -119,8 +119,8 @@ func TestDiscoverAllDatabases(t *testing.T) {
 }
 
 func TestDiscoverBatchCollections(t *testing.T) {
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 	cfg.Database = ""
 	cfg.BatchAndChangeStream = true
 
@@ -129,7 +129,7 @@ func TestDiscoverBatchCollections(t *testing.T) {
 	var view = "view"
 	var timeseries = "timeseries"
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(db).Drop(ctx))
 	}
 	cleanup()
@@ -139,7 +139,7 @@ func TestDiscoverBatchCollections(t *testing.T) {
 	require.NoError(t, client.Database(db).CreateView(ctx, view, col, mongo.Pipeline{}))
 	require.NoError(t, client.Database(db).CreateCollection(ctx, timeseries, &options.CreateCollectionOptions{TimeSeriesOptions: &options.TimeSeriesOptions{TimeField: "ts"}}))
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),

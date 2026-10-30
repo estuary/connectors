@@ -18,14 +18,14 @@ import (
 // since they can combine _id fields from multiple underlying collections.
 // Note: Views do not support change streams, so only snapshot and incremental modes are valid.
 func TestCaptureFromView(t *testing.T) {
-	database := "testDb"
-	sourceCollection := "sourceCollection"
-	viewName := "testView"
+	var database = "testDb"
+	var sourceCollection = "sourceCollection"
+	var viewName = "testView"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		// Drop the view first (views must be dropped before the underlying collection)
 		_ = client.Database(database).Collection(viewName).Drop(ctx)
 		require.NoError(t, client.Database(database).Drop(ctx))
@@ -37,7 +37,7 @@ func TestCaptureFromView(t *testing.T) {
 	addTestTableData(ctx, t, client, database, sourceCollection, 5, 0, stringPkVals, "onlyColumn")
 
 	// Create a view based on the source collection
-	err := client.Database(database).RunCommand(ctx, bson.D{
+	var err = client.Database(database).RunCommand(ctx, bson.D{
 		{Key: "create", Value: viewName},
 		{Key: "viewOn", Value: sourceCollection},
 		{Key: "pipeline", Value: bson.A{
@@ -50,8 +50,8 @@ func TestCaptureFromView(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test capturing from the view in snapshot mode
-	binding := makeBinding(t, database, viewName, captureModeSnapshot, "_id")
-	cs := &st.CaptureSpec{
+	var binding = makeBinding(t, database, viewName, captureModeSnapshot, "_id")
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -75,14 +75,14 @@ func TestCaptureFromView(t *testing.T) {
 
 // TestCaptureFromViewIncremental tests capturing from a view in incremental mode.
 func TestCaptureFromViewIncremental(t *testing.T) {
-	database := "testDb"
-	sourceCollection := "incrementalSource"
-	viewName := "incrementalView"
+	var database = "testDb"
+	var sourceCollection = "incrementalSource"
+	var viewName = "incrementalView"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		_ = client.Database(database).Collection(viewName).Drop(ctx)
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
@@ -90,9 +90,9 @@ func TestCaptureFromViewIncremental(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	// Create a source collection with data
-	col := client.Database(database).Collection(sourceCollection)
+	var col = client.Database(database).Collection(sourceCollection)
 	for idx := 0; idx < 5; idx++ {
-		_, err := col.InsertOne(ctx, map[string]any{
+		var _, err = col.InsertOne(ctx, map[string]any{
 			"_id":   idx,
 			"value": fmt.Sprintf("value %d", idx),
 		})
@@ -100,7 +100,7 @@ func TestCaptureFromViewIncremental(t *testing.T) {
 	}
 
 	// Create a view based on the source collection
-	err := client.Database(database).RunCommand(ctx, bson.D{
+	var err = client.Database(database).RunCommand(ctx, bson.D{
 		{Key: "create", Value: viewName},
 		{Key: "viewOn", Value: sourceCollection},
 		{Key: "pipeline", Value: bson.A{
@@ -112,8 +112,8 @@ func TestCaptureFromViewIncremental(t *testing.T) {
 	}).Err()
 	require.NoError(t, err)
 
-	binding := makeBinding(t, database, viewName, captureModeIncremental, "_id")
-	cs := &st.CaptureSpec{
+	var binding = makeBinding(t, database, viewName, captureModeIncremental, "_id")
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -131,7 +131,7 @@ func TestCaptureFromViewIncremental(t *testing.T) {
 
 	// Add more incremental data
 	for idx := 5; idx < 10; idx++ {
-		_, err := col.InsertOne(ctx, map[string]any{
+		var _, err = col.InsertOne(ctx, map[string]any{
 			"_id":   idx,
 			"value": fmt.Sprintf("value %d", idx),
 		})
@@ -153,15 +153,15 @@ func TestCaptureFromViewIncremental(t *testing.T) {
 // treating views as sharded is important, since _id values may come from
 // different underlying collections.
 func TestCaptureFromViewWithMultipleSources(t *testing.T) {
-	database := "testDb"
-	collection1 := "collection1"
-	collection2 := "collection2"
-	viewName := "unionView"
+	var database = "testDb"
+	var collection1 = "collection1"
+	var collection2 = "collection2"
+	var viewName = "unionView"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		_ = client.Database(database).Collection(viewName).Drop(ctx)
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
@@ -169,11 +169,11 @@ func TestCaptureFromViewWithMultipleSources(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	// Create two collections with data
-	col1 := client.Database(database).Collection(collection1)
-	col2 := client.Database(database).Collection(collection2)
+	var col1 = client.Database(database).Collection(collection1)
+	var col2 = client.Database(database).Collection(collection2)
 
 	for idx := 0; idx < 5; idx++ {
-		_, err := col1.InsertOne(ctx, map[string]any{
+		var _, err = col1.InsertOne(ctx, map[string]any{
 			"_id":    fmt.Sprintf("col1_%d", idx),
 			"source": "collection1",
 			"value":  fmt.Sprintf("value from col1: %d", idx),
@@ -189,7 +189,7 @@ func TestCaptureFromViewWithMultipleSources(t *testing.T) {
 	}
 
 	// Create a view that unions both collections
-	err := client.Database(database).RunCommand(ctx, bson.D{
+	var err = client.Database(database).RunCommand(ctx, bson.D{
 		{Key: "create", Value: viewName},
 		{Key: "viewOn", Value: collection1},
 		{Key: "pipeline", Value: bson.A{
@@ -206,8 +206,8 @@ func TestCaptureFromViewWithMultipleSources(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test capturing from the view in snapshot mode
-	binding := makeBinding(t, database, viewName, captureModeSnapshot, "_id")
-	cs := &st.CaptureSpec{
+	var binding = makeBinding(t, database, viewName, captureModeSnapshot, "_id")
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -221,7 +221,7 @@ func TestCaptureFromViewWithMultipleSources(t *testing.T) {
 
 	// Add more data to both underlying collections
 	for idx := 5; idx < 10; idx++ {
-		_, err := col1.InsertOne(ctx, map[string]any{
+		var _, err = col1.InsertOne(ctx, map[string]any{
 			"_id":    fmt.Sprintf("col1_%d", idx),
 			"source": "collection1",
 			"value":  fmt.Sprintf("value from col1: %d", idx),
@@ -246,14 +246,14 @@ func TestCaptureFromViewWithMultipleSources(t *testing.T) {
 // TestIsShardedCollectionWithView tests that the isShardedCollection function
 // correctly handles views by treating them as sharded.
 func TestIsShardedCollectionWithView(t *testing.T) {
-	database := "testDb"
-	sourceCollection := "sourceForView"
-	viewName := "testViewForShardCheck"
+	var database = "testDb"
+	var sourceCollection = "sourceForView"
+	var viewName = "testViewForShardCheck"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		_ = client.Database(database).Collection(viewName).Drop(ctx)
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
@@ -261,7 +261,7 @@ func TestIsShardedCollectionWithView(t *testing.T) {
 	t.Cleanup(cleanup)
 
 	// Create a source collection
-	_, err := client.Database(database).Collection(sourceCollection).InsertOne(ctx, bson.M{"test": "data"})
+	var _, err = client.Database(database).Collection(sourceCollection).InsertOne(ctx, bson.M{"test": "data"})
 	require.NoError(t, err)
 
 	// Create a view
@@ -275,12 +275,12 @@ func TestIsShardedCollectionWithView(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a capture instance to test isShardedCollection
-	d := &driver{}
+	var d = &driver{}
 	mongoClient, err := d.Connect(ctx, cfg)
 	require.NoError(t, err)
 	defer mongoClient.Disconnect(ctx)
 
-	capture := &capture{client: mongoClient}
+	var capture = &capture{client: mongoClient}
 
 	// Test that a regular collection is not considered sharded (in a non-sharded cluster)
 	isSharded, err := capture.isShardedCollection(ctx, database, sourceCollection)
@@ -296,25 +296,25 @@ func TestIsShardedCollectionWithView(t *testing.T) {
 // TestIsShardedCollectionWithNonExistentCollection tests that isShardedCollection
 // handles non-existent collections gracefully.
 func TestIsShardedCollectionWithNonExistentCollection(t *testing.T) {
-	database := "testDb"
-	nonExistentCollection := "doesNotExist"
+	var database = "testDb"
+	var nonExistentCollection = "doesNotExist"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
 	// Create a capture instance to test isShardedCollection
-	d := &driver{}
-	mongoClient, err := d.Connect(ctx, cfg)
+	var d = &driver{}
+	var mongoClient, err = d.Connect(ctx, cfg)
 	require.NoError(t, err)
 	defer mongoClient.Disconnect(ctx)
 
-	capture := &capture{client: mongoClient}
+	var capture = &capture{client: mongoClient}
 
 	// Test that a non-existent collection returns false without error
 	isSharded, err := capture.isShardedCollection(ctx, database, nonExistentCollection)

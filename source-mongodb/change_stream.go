@@ -78,14 +78,14 @@ func (c *capture) initializeStreams(
 	}
 
 	for _, db := range databasesForBindings(changeStreamBindings) {
-		logEntry := log.WithField("db", db)
+		var logEntry = log.WithField("db", db)
 
 		// Use a pipeline to project the fields we need from the change stream. Importantly, this
 		// suppresses fields like `updateDescription`, which contain a list of fields in the document
 		// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
 		// `updateDescription`, which can cause the change stream total BSON document size to exceed the
 		// 16MB limit.
-		pl := mongo.Pipeline{
+		var pl = mongo.Pipeline{
 			{{Key: "$project", Value: bson.M{
 				"documentKey":              1,
 				"operationType":            1,
@@ -120,13 +120,13 @@ func (c *capture) initializeStreams(
 			}}}})
 		}
 
-		fullDocOpt := options.UpdateLookup
+		var fullDocOpt = options.UpdateLookup
 		if fullDocRequired[db] {
 			logEntry.Info("using fullDocument 'whenAvailable' mode (changeStreamPreAndPostImages enabled on all collections)")
 			fullDocOpt = options.WhenAvailable
 		}
-		baseOpts := func() *options.ChangeStreamOptions {
-			opts := options.ChangeStream().SetFullDocument(fullDocOpt)
+		var baseOpts = func() *options.ChangeStreamOptions {
+			var opts = options.ChangeStream().SetFullDocument(fullDocOpt)
 			if maxAwaitTime != nil {
 				opts = opts.SetMaxAwaitTime(*maxAwaitTime)
 			}
@@ -139,7 +139,7 @@ func (c *capture) initializeStreams(
 		if requestPreImages {
 			pl = append(pl, bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}) // must be the last stage in the pipeline
 		}
-		opts := baseOpts()
+		var opts = baseOpts()
 
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
 			logEntry = logEntry.WithField("resumeToken", t)
@@ -150,7 +150,7 @@ func (c *capture) initializeStreams(
 			}
 		}
 
-		ms, err := c.client.Database(db).Watch(ctx, pl, opts)
+		var ms, err = c.client.Database(db).Watch(ctx, pl, opts)
 		if err != nil {
 			return nil, fmt.Errorf("initializing change stream on database %q: %w", db, err)
 		}
@@ -196,7 +196,7 @@ func (c *capture) streamChanges(
 	streams []*changeStream,
 	catchup bool,
 ) error {
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	for _, s := range streams {
 		group.Go(func() error {
@@ -204,12 +204,12 @@ func (c *capture) streamChanges(
 
 			// Channel for batches with buffer size 4. This allows prefetching up to 4
 			// MongoDB batches while the consumer processes.
-			batches := make(chan streamBatch, 4)
+			var batches = make(chan streamBatch, 4)
 
-			producerCtx, cancelProducer := context.WithCancel(groupCtx)
+			var producerCtx, cancelProducer = context.WithCancel(groupCtx)
 			defer cancelProducer()
 
-			producerDone := make(chan struct{})
+			var producerDone = make(chan struct{})
 			go func() {
 				defer close(producerDone)
 				c.produceStreamBatches(producerCtx, s, batches)
@@ -220,7 +220,7 @@ func (c *capture) streamChanges(
 					return fmt.Errorf("change stream for %q: %w", s.db, batch.err)
 				}
 
-				opTime, err := c.processBatch(groupCtx, s, batch)
+				var opTime, err = c.processBatch(groupCtx, s, batch)
 				if err != nil {
 					return fmt.Errorf("processing batch for %q: %w", s.db, err)
 				}
@@ -237,22 +237,22 @@ func (c *capture) streamChanges(
 		})
 	}
 
-	streamsDone := m.RunAsyncOperation(func() error { return group.Wait() })
+	var streamsDone = m.RunAsyncOperation(func() error { return group.Wait() })
 
 	// Log progress while the change streams are running.
-	initialProcessed, initialEmitted, _ := c.changeStreamProgress()
-	logProgress := func() error {
-		nextProcessed, nextEmitted, clusterTimes := c.changeStreamProgress()
-		currentOpTime, err := getClusterOpTime(ctx, c.client)
+	var initialProcessed, initialEmitted, _ = c.changeStreamProgress()
+	var logProgress = func() error {
+		var nextProcessed, nextEmitted, clusterTimes = c.changeStreamProgress()
+		var currentOpTime, err = getClusterOpTime(ctx, c.client)
 		if err != nil {
 			return fmt.Errorf("getting cluster op time: %w", err)
 		}
 
 		// Get and reset throughput metrics
 		c.mu.Lock()
-		mongoReadTime := c.totalMongoReadTime
-		transcodeTime := c.totalTranscodeTime
-		bytesRead := c.totalBytesRead
+		var mongoReadTime = c.totalMongoReadTime
+		var transcodeTime = c.totalTranscodeTime
+		var bytesRead = c.totalBytesRead
 		c.totalMongoReadTime = 0
 		c.totalTranscodeTime = 0
 		c.totalBytesRead = 0
@@ -260,14 +260,14 @@ func (c *capture) streamChanges(
 
 		// "lag" is an estimate of how far behind we are on reading change
 		// streams event for each database change stream.
-		lag := make(map[string]string)
+		var lag = make(map[string]string)
 		for db, latestEventTs := range clusterTimes {
 			lag[db] = (time.Duration(currentOpTime.T-latestEventTs.T) * time.Second).String()
 		}
 
 		if nextProcessed != initialProcessed {
-			mbRead := float64(bytesRead) / (1024 * 1024)
-			throughputMBps := mbRead / streamLoggerInterval.Seconds()
+			var mbRead = float64(bytesRead) / (1024 * 1024)
+			var throughputMBps = mbRead / streamLoggerInterval.Seconds()
 
 			log.WithFields(log.Fields{
 				"events":                nextProcessed - initialProcessed,
@@ -337,7 +337,7 @@ func (c *capture) rewindToSplitEvent(ctx context.Context, s *changeStream) (bool
 		return false, nil
 	}
 
-	at, err := extractTimestamp(getToken(s))
+	var at, err = extractTimestamp(getToken(s))
 	if err != nil {
 		return false, fmt.Errorf("reading the cluster time of a split event which resumed partway through, for %q: %w", s.db, err)
 	}
@@ -374,13 +374,13 @@ func (s *changeStream) closeStream(ctx context.Context) error {
 func (s *changeStream) replaceStream(ms *mongo.ChangeStream) *mongo.ChangeStream {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	previous := s.ms
+	var previous = s.ms
 	s.ms = ms
 	return previous
 }
 
 func getToken(s *changeStream) bson.Raw {
-	tok := s.ms.ResumeToken()
+	var tok = s.ms.ResumeToken()
 	if tok == nil {
 		// This should never happen. But if it did it would be very
 		// difficult to debug.
@@ -415,12 +415,12 @@ outer:
 		// Collect all events from the current MongoDB batch. We break when
 		// RemainingBatchLength() == 0 to ensure each streamBatch corresponds
 		// to exactly one MongoDB cursor batch.
-		readStart := time.Now()
+		var readStart = time.Now()
 		for s.ms.TryNext(ctx) {
 			if !checkedResumePosition {
 				checkedResumePosition = true
 				if fragment, _, ok := splitEventFragment(s.ms.Current); ok && fragment > 1 {
-					rewound, err := c.rewindToSplitEvent(ctx, s)
+					var rewound, err = c.rewindToSplitEvent(ctx, s)
 					if err != nil {
 						select {
 						case batches <- streamBatch{err: err}:
@@ -433,11 +433,11 @@ outer:
 				}
 			}
 
-			rawCopy := make(bson.Raw, len(s.ms.Current))
+			var rawCopy = make(bson.Raw, len(s.ms.Current))
 			copy(rawCopy, s.ms.Current)
 			batchBytes += int64(len(rawCopy))
 
-			tokenCopy := make(bson.Raw, len(getToken(s)))
+			var tokenCopy = make(bson.Raw, len(getToken(s)))
 			copy(tokenCopy, getToken(s))
 
 			events = append(events, streamEvent{
@@ -449,7 +449,7 @@ outer:
 				break
 			}
 		}
-		readDuration := time.Since(readStart)
+		var readDuration = time.Since(readStart)
 
 		c.mu.Lock()
 		c.totalMongoReadTime += readDuration
@@ -466,7 +466,7 @@ outer:
 		}
 
 		// Get the current resume token for the batch
-		tokenCopy := make(bson.Raw, len(getToken(s)))
+		var tokenCopy = make(bson.Raw, len(getToken(s)))
 		copy(tokenCopy, getToken(s))
 
 		select {
@@ -501,7 +501,7 @@ func (c *capture) handleIdleBatch(s *changeStream, token bson.Raw) (primitive.Ti
 			return primitive.Timestamp{}, err
 		}
 	}
-	opTime, err := extractTimestamp(token)
+	var opTime, err = extractTimestamp(token)
 	if err != nil {
 		log.WithError(err).Debug("failed to extract timestamp from idle signal resume token")
 		return primitive.Timestamp{}, nil
@@ -523,18 +523,18 @@ func (c *capture) processBatch(
 
 	var lastOpTime primitive.Timestamp
 
-	docsByBinding := make(map[int][]json.RawMessage)
+	var docsByBinding = make(map[int][]json.RawMessage)
 	var lastResumeToken bson.Raw
 	var emittedCount int
 
-	rawDocs := make([]bson.Raw, len(batch.events))
+	var rawDocs = make([]bson.Raw, len(batch.events))
 	for i, ev := range batch.events {
 		rawDocs[i] = ev.raw
 	}
 
-	transcodeStart := time.Now()
-	responses, err := c.transcoder.TranscodeBatch(rawDocs)
-	transcodeDuration := time.Since(transcodeStart)
+	var transcodeStart = time.Now()
+	var responses, err = c.transcoder.TranscodeBatch(rawDocs)
+	var transcodeDuration = time.Since(transcodeStart)
 	if err != nil {
 		return primitive.Timestamp{}, fmt.Errorf("transcoding batch: %w", err)
 	}
@@ -544,7 +544,7 @@ func (c *capture) processBatch(
 	c.mu.Unlock()
 
 	for i, resp := range responses {
-		ev := batch.events[i]
+		var ev = batch.events[i]
 
 		s.midSplit = isMidSplitEvent(ev.raw)
 
@@ -559,8 +559,8 @@ func (c *capture) processBatch(
 		}
 
 		if resp.IsSkip && resp.FullDocumentMissing {
-			rid := resourceId(resp.Database, resp.Collection)
-			_, tracked := c.trackedChangeStreamBindings[rid]
+			var rid = resourceId(resp.Database, resp.Collection)
+			var _, tracked = c.trackedChangeStreamBindings[rid]
 			if tracked && c.fullDocRequired[resp.Database] {
 				return primitive.Timestamp{}, fmt.Errorf(
 					"fullDocument was missing for a change event on %s.%s: the collection must have changeStreamPreAndPostImages enabled",
@@ -576,7 +576,7 @@ func (c *capture) processBatch(
 			// event can be correlated against a reported missing document. Limited
 			// to tracked bindings to avoid noise from collections that are not being captured.
 			if tracked {
-				opType, _ := ev.raw.Lookup("operationType").StringValueOK()
+				var opType, _ = ev.raw.Lookup("operationType").StringValueOK()
 				log.WithFields(log.Fields{
 					"database":      resp.Database,
 					"collection":    resp.Collection,
@@ -592,7 +592,7 @@ func (c *capture) processBatch(
 			continue
 		}
 
-		binding, tracked := c.trackedChangeStreamBindings[resourceId(resp.Database, resp.Collection)]
+		var binding, tracked = c.trackedChangeStreamBindings[resourceId(resp.Database, resp.Collection)]
 		if !tracked {
 			continue
 		}
@@ -610,10 +610,10 @@ func (c *capture) processBatch(
 			}
 		}
 
-		stateUpdate := captureState{
+		var stateUpdate = captureState{
 			DatabaseResumeTokens: map[string]bson.Raw{s.db: lastResumeToken},
 		}
-		cpJson, err := json.Marshal(stateUpdate)
+		var cpJson, err = json.Marshal(stateUpdate)
 		if err != nil {
 			return primitive.Timestamp{}, fmt.Errorf("serializing batch checkpoint: %w", err)
 		}
@@ -630,7 +630,7 @@ func (c *capture) processBatch(
 		c.mu.Unlock()
 	} else if !s.midSplit && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		// No documents emitted, but we can still emit a PBRT checkpoint
-		lastEvent := batch.events[len(batch.events)-1]
+		var lastEvent = batch.events[len(batch.events)-1]
 		if err := c.emitPbrtCheckpoint(s, lastEvent.resumeToken); err != nil {
 			return primitive.Timestamp{}, err
 		}
@@ -641,10 +641,10 @@ func (c *capture) processBatch(
 
 // emitPbrtCheckpoint emits a post-batch resume token checkpoint.
 func (c *capture) emitPbrtCheckpoint(s *changeStream, token bson.Raw) error {
-	stateUpdate := captureState{
+	var stateUpdate = captureState{
 		DatabaseResumeTokens: map[string]bson.Raw{s.db: token},
 	}
-	cpJson, err := json.Marshal(stateUpdate)
+	var cpJson, err = json.Marshal(stateUpdate)
 	if err != nil {
 		return fmt.Errorf("serializing pbrt stream checkpoint: %w", err)
 	}
@@ -678,12 +678,12 @@ func resourceId(database string, collection string) string {
 // When sorted, MongoDB resume tokens are in timestamp order, so this structure
 // is expected to stay stable.
 func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
-	dataValue, err := token.LookupErr("_data")
+	var dataValue, err = token.LookupErr("_data")
 	if err != nil {
 		return primitive.Timestamp{}, fmt.Errorf("_data field not found in resume token")
 	}
 
-	dataString, ok := dataValue.StringValueOK()
+	var dataString, ok = dataValue.StringValueOK()
 	if !ok {
 		return primitive.Timestamp{}, fmt.Errorf("_data field of type %q was not a string", dataValue.Type.String())
 	}
@@ -698,8 +698,8 @@ func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
 	}
 
 	// Extract timestamp (bytes 1-4) and increment (bytes 5-8).
-	timestampSeconds := binary.BigEndian.Uint32(payloadBytes[1:5])
-	increment := binary.BigEndian.Uint32(payloadBytes[5:9])
+	var timestampSeconds = binary.BigEndian.Uint32(payloadBytes[1:5])
+	var increment = binary.BigEndian.Uint32(payloadBytes[5:9])
 
 	return primitive.Timestamp{T: timestampSeconds, I: increment}, nil
 }
@@ -719,7 +719,7 @@ func isMidSplitEvent(raw bson.Raw) bool {
 		return false
 	}
 
-	fragment, of, ok := splitEventFragment(raw)
+	var fragment, of, ok = splitEventFragment(raw)
 	if !ok {
 		return true
 	}

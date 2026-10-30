@@ -148,7 +148,7 @@ func TestShouldBackfill(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config{Advanced: advancedConfig{SkipBackfills: tt.skipBackfills}}
+			var cfg = config{Advanced: advancedConfig{SkipBackfills: tt.skipBackfills}}
 			for _, e := range tt.expect {
 				require.Equalf(t, e.want, cfg.shouldBackfill(e.database, e.collection),
 					"database %q collection %q", e.database, e.collection)
@@ -218,14 +218,14 @@ func TestValidateSkipBackfills(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config{
+			var cfg = config{
 				Address:  "mongodb://localhost:27017",
 				User:     "user",
 				Password: "password",
 				Advanced: advancedConfig{SkipBackfills: tt.skipBackfills},
 			}
 
-			err := cfg.Validate()
+			var err = cfg.Validate()
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 			} else {
@@ -236,8 +236,8 @@ func TestValidateSkipBackfills(t *testing.T) {
 }
 
 func TestSpec(t *testing.T) {
-	driver := driver{}
-	response, err := driver.Spec(context.Background(), &pc.Request_Spec{})
+	var driver = driver{}
+	var response, err = driver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
@@ -264,7 +264,7 @@ func TestUnmarshalConfig(t *testing.T) {
 		{name: "unparseable", address: "mongodb://fake-user:fake-password@my-mongo.test:bad", want: "mongodb://my-mongo.test:bad"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			raw, err := json.Marshal(map[string]string{"user": "user", "password": "password", "address": tt.address})
+			var raw, err = json.Marshal(map[string]string{"user": "user", "password": "password", "address": tt.address})
 			require.NoError(t, err)
 
 			var cfg config

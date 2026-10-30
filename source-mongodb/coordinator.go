@@ -35,7 +35,7 @@ type streamBackfillCoordinator struct {
 //     will be paused until all change streams are fully caught up to mitigate
 //     potential resource contention issues.
 func newBatchStreamCoordinator(changeStreamBindings []bindingInfo, getOpTime getOpTimeFn) *streamBackfillCoordinator {
-	out := &streamBackfillCoordinator{
+	var out = &streamBackfillCoordinator{
 		opTimeWatermark:  primitive.Timestamp{},
 		streamsInCatchup: map[string]bool{},
 		started:          false,
@@ -59,7 +59,7 @@ func (b *streamBackfillCoordinator) startCatchingUp(ctx context.Context) error {
 		return nil
 	}
 
-	latestOpTime, err := b.getClusterOpTime(ctx)
+	var latestOpTime, err = b.getClusterOpTime(ctx)
 	if err != nil {
 		return fmt.Errorf("getting cluster op time: %w", err)
 	}
@@ -101,7 +101,7 @@ func (b *streamBackfillCoordinator) gotCaughtUp(db string, latest primitive.Time
 	// This stream is caught up. If all streams are now caught up, signal the
 	// catchupDone channel.
 	b.streamsInCatchup[db] = false
-	allStreamsCaughtUp := true
+	var allStreamsCaughtUp = true
 	for _, stillCatchingUp := range b.streamsInCatchup {
 		if stillCatchingUp {
 			allStreamsCaughtUp = false
@@ -123,7 +123,7 @@ func (b *streamBackfillCoordinator) gotCaughtUp(db string, latest primitive.Time
 
 func (b *streamBackfillCoordinator) streamsCaughtUp() <-chan struct{} {
 	b.mu.Lock()
-	waiter := make(chan struct{})
+	var waiter = make(chan struct{})
 	if b.started {
 		b.waiters = append(b.waiters, waiter)
 	} else {
@@ -134,7 +134,7 @@ func (b *streamBackfillCoordinator) streamsCaughtUp() <-chan struct{} {
 }
 
 func (b *streamBackfillCoordinator) startRepeatingStreamCatchups(ctx context.Context) error {
-	ticker := time.NewTicker(backfillFor)
+	var ticker = time.NewTicker(backfillFor)
 
 	for {
 		select {
@@ -147,7 +147,7 @@ func (b *streamBackfillCoordinator) startRepeatingStreamCatchups(ctx context.Con
 }
 
 func databasesForBindings(bindings []bindingInfo) []string {
-	out := []string{}
+	var out = []string{}
 
 	for _, b := range bindings {
 		out = append(out, b.resource.Database)

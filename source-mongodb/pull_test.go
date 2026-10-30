@@ -10,7 +10,7 @@ import (
 
 func TestSkipConfiguredBackfills(t *testing.T) {
 	// sk1 has never been backfilled, sk2 is partway through, and sk3 is finished.
-	initialState := func() captureState {
+	var initialState = func() captureState {
 		return captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				"sk2": {Backfill: backfillState{Done: makePtr(false), LastCursorValue: &bson.RawValue{Value: []byte("second")}, BackfilledDocs: 100}},
@@ -20,52 +20,52 @@ func TestSkipConfiguredBackfills(t *testing.T) {
 		}
 	}
 
-	changeStreamBindings := []bindingInfo{
+	var changeStreamBindings = []bindingInfo{
 		{index: 0, stateKey: "sk1", resource: resource{Database: "db", Collection: "one"}},
 		{index: 1, stateKey: "sk2", resource: resource{Database: "db", Collection: "two"}},
 		{index: 2, stateKey: "sk3", resource: resource{Database: "db", Collection: "three"}},
 	}
 
 	t.Run("unset leaves state untouched", func(t *testing.T) {
-		state := initialState()
+		var state = initialState()
 		skipConfiguredBackfills(&state, changeStreamBindings, &config{})
 		require.Equal(t, initialState(), state)
 	})
 
 	t.Run("a never-started backfill is marked done", func(t *testing.T) {
-		state := initialState()
-		cfg := &config{Advanced: advancedConfig{SkipBackfills: "db:one"}}
+		var state = initialState()
+		var cfg = &config{Advanced: advancedConfig{SkipBackfills: "db:one"}}
 		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
 
-		want := initialState()
+		var want = initialState()
 		want.Resources["sk1"] = resourceState{Backfill: backfillState{Done: makePtr(true)}}
 		require.Equal(t, want, state)
 	})
 
 	t.Run("an in-progress backfill is terminated and its resume position discarded", func(t *testing.T) {
-		state := initialState()
-		cfg := &config{Advanced: advancedConfig{SkipBackfills: "db:two"}}
+		var state = initialState()
+		var cfg = &config{Advanced: advancedConfig{SkipBackfills: "db:two"}}
 		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
 
-		want := initialState()
+		var want = initialState()
 		// BackfilledDocs is retained as a record of what was already emitted.
 		want.Resources["sk2"] = resourceState{Backfill: backfillState{Done: makePtr(true), BackfilledDocs: 100}}
 		require.Equal(t, want, state)
 	})
 
 	t.Run("a completed backfill keeps its resume position", func(t *testing.T) {
-		state := initialState()
-		cfg := &config{Advanced: advancedConfig{SkipBackfills: "db:three"}}
+		var state = initialState()
+		var cfg = &config{Advanced: advancedConfig{SkipBackfills: "db:three"}}
 		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
 		require.Equal(t, initialState(), state)
 	})
 
 	t.Run("the wildcard skips every binding", func(t *testing.T) {
-		state := initialState()
-		cfg := &config{Advanced: advancedConfig{SkipBackfills: skipAllBackfills}}
+		var state = initialState()
+		var cfg = &config{Advanced: advancedConfig{SkipBackfills: skipAllBackfills}}
 		skipConfiguredBackfills(&state, changeStreamBindings, cfg)
 
-		want := initialState()
+		var want = initialState()
 		want.Resources["sk1"] = resourceState{Backfill: backfillState{Done: makePtr(true)}}
 		want.Resources["sk2"] = resourceState{Backfill: backfillState{Done: makePtr(true), BackfilledDocs: 100}}
 		require.Equal(t, want, state)
@@ -73,12 +73,12 @@ func TestSkipConfiguredBackfills(t *testing.T) {
 	})
 
 	t.Run("batch bindings are never skipped", func(t *testing.T) {
-		state := captureState{
+		var state = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				"sk4": {Backfill: backfillState{Done: makePtr(false), LastCursorValue: &bson.RawValue{Value: []byte("fourth")}}},
 			},
 		}
-		cfg := &config{Advanced: advancedConfig{SkipBackfills: skipAllBackfills}}
+		var cfg = &config{Advanced: advancedConfig{SkipBackfills: skipAllBackfills}}
 		skipConfiguredBackfills(&state, nil, cfg)
 
 		require.Equal(t, captureState{
@@ -90,7 +90,7 @@ func TestSkipConfiguredBackfills(t *testing.T) {
 }
 
 func TestUpdateResourceStates(t *testing.T) {
-	prevState := captureState{
+	var prevState = captureState{
 		Resources: map[boilerplate.StateKey]resourceState{
 			"sk1": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("first")}}},
 			"sk2": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("second")}}},
@@ -104,23 +104,23 @@ func TestUpdateResourceStates(t *testing.T) {
 		},
 	}
 
-	binding1 := bindingInfo{index: 0, stateKey: "sk1", resource: resource{Database: "firstDb", Collection: "firstDbCollection1"}}
-	binding2 := bindingInfo{index: 1, stateKey: "sk2", resource: resource{Database: "firstDb", Collection: "firstDbCollection2"}}
-	binding3 := bindingInfo{index: 2, stateKey: "sk3", resource: resource{Database: "secondDb", Collection: "secondDbCollection1"}}
-	binding4 := bindingInfo{index: 3, stateKey: "sk4", resource: resource{Database: "firstDb", Collection: "firstDbBatchCollection", Mode: captureModeSnapshot}}
-	binding5 := bindingInfo{index: 4, stateKey: "sk5", resource: resource{Database: "secondDb", Collection: "secondDbBatchCollection", Mode: captureModeIncremental}}
+	var binding1 = bindingInfo{index: 0, stateKey: "sk1", resource: resource{Database: "firstDb", Collection: "firstDbCollection1"}}
+	var binding2 = bindingInfo{index: 1, stateKey: "sk2", resource: resource{Database: "firstDb", Collection: "firstDbCollection2"}}
+	var binding3 = bindingInfo{index: 2, stateKey: "sk3", resource: resource{Database: "secondDb", Collection: "secondDbCollection1"}}
+	var binding4 = bindingInfo{index: 3, stateKey: "sk4", resource: resource{Database: "firstDb", Collection: "firstDbBatchCollection", Mode: captureModeSnapshot}}
+	var binding5 = bindingInfo{index: 4, stateKey: "sk5", resource: resource{Database: "secondDb", Collection: "secondDbBatchCollection", Mode: captureModeIncremental}}
 
 	t.Run("all bindings are included", func(t *testing.T) {
-		bindings := []bindingInfo{binding1, binding2, binding3, binding4, binding5}
-		got, err := updateResourceStates(prevState, bindings)
+		var bindings = []bindingInfo{binding1, binding2, binding3, binding4, binding5}
+		var got, err = updateResourceStates(prevState, bindings)
 		require.NoError(t, err)
 		require.Equal(t, prevState, got)
 	})
 
 	t.Run("first database change stream bindings are excluded", func(t *testing.T) {
-		bindings := []bindingInfo{binding3, binding4, binding5}
+		var bindings = []bindingInfo{binding3, binding4, binding5}
 
-		want := captureState{
+		var want = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				"sk3": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("third")}}},
 				"sk4": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("fourth")}}},
@@ -131,7 +131,7 @@ func TestUpdateResourceStates(t *testing.T) {
 			},
 		}
 
-		got, err := updateResourceStates(prevState, bindings)
+		var got, err = updateResourceStates(prevState, bindings)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
 	})
@@ -141,9 +141,9 @@ func TestUpdateResourceStates(t *testing.T) {
 		// excluded, but this is how other batch captures work, and it makes the
 		// connector code more simple. We could reconsider this behavior in the
 		// future if there is a need to.
-		bindings := []bindingInfo{binding1, binding2, binding3}
+		var bindings = []bindingInfo{binding1, binding2, binding3}
 
-		want := captureState{
+		var want = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				"sk1": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("first")}}},
 				"sk2": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("second")}}},
@@ -155,17 +155,17 @@ func TestUpdateResourceStates(t *testing.T) {
 			},
 		}
 
-		got, err := updateResourceStates(prevState, bindings)
+		var got, err = updateResourceStates(prevState, bindings)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
 	})
 
 	t.Run("reset one database via state key updates", func(t *testing.T) {
-		bindings := []bindingInfo{binding1, binding2, binding3, binding4, binding5}
+		var bindings = []bindingInfo{binding1, binding2, binding3, binding4, binding5}
 		bindings[0].stateKey = "sk1.v1"
 		bindings[1].stateKey = "sk2.v1"
 
-		want := captureState{
+		var want = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				"sk3": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("third")}}},
 				"sk4": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("fourth")}}},
@@ -176,18 +176,18 @@ func TestUpdateResourceStates(t *testing.T) {
 			},
 		}
 
-		got, err := updateResourceStates(prevState, bindings)
+		var got, err = updateResourceStates(prevState, bindings)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
 	})
 
 	t.Run("reset all databases via state key updates", func(t *testing.T) {
-		bindings := []bindingInfo{binding1, binding2, binding3, binding4, binding5}
+		var bindings = []bindingInfo{binding1, binding2, binding3, binding4, binding5}
 		bindings[0].stateKey = "sk1.v1"
 		bindings[1].stateKey = "sk2.v1"
 		bindings[2].stateKey = "sk3.v1"
 
-		want := captureState{
+		var want = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				"sk4": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("fourth")}}},
 				"sk5": {Backfill: backfillState{Done: makePtr(true), LastCursorValue: &bson.RawValue{Value: []byte("fifth")}}},
@@ -195,7 +195,7 @@ func TestUpdateResourceStates(t *testing.T) {
 			DatabaseResumeTokens: map[string]bson.Raw{},
 		}
 
-		got, err := updateResourceStates(prevState, bindings)
+		var got, err = updateResourceStates(prevState, bindings)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
 	})

@@ -142,7 +142,7 @@ func (c *config) skipsAllBackfills() bool {
 }
 
 func (c *config) skipBackfillsNamespaces() []string {
-	namespaces := strings.Split(c.Advanced.SkipBackfills, ",")
+	var namespaces = strings.Split(c.Advanced.SkipBackfills, ",")
 	for idx, ns := range namespaces {
 		namespaces[idx] = strings.TrimSpace(ns)
 	}
@@ -169,14 +169,14 @@ func (c *config) shouldBackfill(database, collection string) bool {
 }
 
 func parseExcludeCollections(excludeCollections string) (map[string][]string, error) {
-	out := make(map[string][]string)
+	var out = make(map[string][]string)
 
 	if excludeCollections == "" {
 		return out, nil
 	}
 
 	for _, collection := range strings.Split(excludeCollections, ",") {
-		parts := strings.Split(collection, ":")
+		var parts = strings.Split(collection, ":")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("invalid exclude collection: %s", collection)
 		}
@@ -258,14 +258,14 @@ func (c *config) UnmarshalJSON(data []byte) error {
 // contain one, but users sometimes paste a full connection string, and the
 // configured user and password replace it when connecting anyway.
 func withoutCredentials(address string) string {
-	uri, err := url.Parse(address)
+	var uri, err = url.Parse(address)
 	if err == nil && uri.Scheme != "" && uri.Host != "" {
 		uri.User = nil
 		return uri.String()
 	}
 	// ToURI treats anything else as a bare host, so everything up to the last
 	// '@' can only be a login.
-	scheme, rest, ok := strings.Cut(address, "://")
+	var scheme, rest, ok = strings.Cut(address, "://")
 	if !ok {
 		scheme, rest = "", address
 	}
@@ -306,7 +306,7 @@ func (c *config) ToURI() *url.URL {
 // address shouldn't contain credentials, but users sometimes paste a full
 // connection string.
 func redactedAddress(address string) string {
-	uri, err := url.Parse(address)
+	var uri, err = url.Parse(address)
 	if err != nil {
 		return "<unparseable address>"
 	}
@@ -316,7 +316,7 @@ func redactedAddress(address string) string {
 type driver struct{}
 
 func isDocumentDB(address string) (bool, error) {
-	uri, err := url.Parse(address)
+	var uri, err = url.Parse(address)
 	if err != nil {
 		// A *url.Error repeats its input, which may contain a password, so unwrap it
 		// to get the actual error.
@@ -342,14 +342,14 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas SQL Interface', which is not supported by this connector. Please use the regular cluster URL instead")
 	}
 
-	isDocDB, err := isDocumentDB(cfg.Address)
+	var isDocDB, err = isDocumentDB(cfg.Address)
 	if err != nil {
 		return nil, err
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		uri, err := url.Parse(cfg.Address)
+		var uri, err = url.Parse(cfg.Address)
 		if err != nil {
 			// A *url.Error repeats its input, which may contain a password, so unwrap it
 			// to get the actual error.
@@ -372,7 +372,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", redactedAddress(cfg.Address))
 	}
 
-	poolMonitor := &event.PoolMonitor{
+	var poolMonitor = &event.PoolMonitor{
 		Event: func(evt *event.PoolEvent) {
 			switch evt.Type {
 			case event.GetStarted, event.GetSucceeded, event.ConnectionReturned:
@@ -408,7 +408,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		// connection.  DocumentDB connections are always over a network tunnel
 		// so this is safe.
 		if uri.Query().Get("tls") != "false" {
-			tlsConfig, err := documentDBTLSConfig()
+			var tlsConfig, err = documentDBTLSConfig()
 			if err != nil {
 				return nil, fmt.Errorf("tlsConfig for documentDB: %w", err)
 			}
@@ -430,7 +430,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// times out due to the way the mongo client handles retries. The flow control plane will pingCancel
 	// any RPC after ~30 seconds, so we'll timeout ahead of that in order to produce a more useful
 	// error message.
-	pingCtx, pingCancel := context.WithTimeout(ctx, 15*time.Second)
+	var pingCtx, pingCancel = context.WithTimeout(ctx, 15*time.Second)
 	defer pingCancel()
 
 	// Ping the primary
@@ -573,22 +573,22 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 		var db = res.Database
 		if _, ok := dbCollectionSpecs[db]; !ok {
-			specs, err := client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
+			var specs, err = client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
 			if err != nil {
 				return nil, fmt.Errorf("listing collections in database %s: %w", db, err)
 			}
 			dbCollectionSpecs[db] = specs
 		}
-		specs := dbCollectionSpecs[db]
+		var specs = dbCollectionSpecs[db]
 
-		specIdx := slices.IndexFunc(specs, func(spec *mongo.CollectionSpecification) bool {
+		var specIdx = slices.IndexFunc(specs, func(spec *mongo.CollectionSpecification) bool {
 			return spec.Name == res.Collection
 		})
 		if specIdx == -1 {
 			return nil, fmt.Errorf("could not find collection %s in database %s", res.Collection, db)
 		}
-		collection := specs[specIdx]
-		collectionType := mongoCollectionType(collection.Type)
+		var collection = specs[specIdx]
+		var collectionType = mongoCollectionType(collection.Type)
 		if err := collectionType.validate(); err != nil {
 			return nil, fmt.Errorf("unsupported collection type: %w", err)
 		}
@@ -620,7 +620,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 	for db, excludeColls := range excludeCollections {
 		for _, coll := range excludeColls {
-			rp := []string{db, coll}
+			var rp = []string{db, coll}
 			if slices.ContainsFunc(bindings, func(b *pc.Response_Validated_Binding) bool { return slices.Equal(rp, b.ResourcePath) }) {
 				return nil, fmt.Errorf("excludeCollections collection %s of database %s is an enabled binding", coll, db)
 			}

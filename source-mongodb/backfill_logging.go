@@ -22,7 +22,7 @@ type backfillExplainKey struct {
 
 // Explain the first initial and resumed query per binding per invocation.
 func (c *capture) explainBackfill(ctx context.Context, binding bindingInfo, query bson.D, resumed bool, ll *log.Entry) {
-	key := backfillExplainKey{stateKey: binding.stateKey, resumed: resumed}
+	var key = backfillExplainKey{stateKey: binding.stateKey, resumed: resumed}
 	c.mu.Lock()
 	if _, ok := c.explainedBackfills[key]; ok {
 		c.mu.Unlock()
@@ -36,8 +36,8 @@ func (c *capture) explainBackfill(ctx context.Context, binding bindingInfo, quer
 
 	ctx, cancel := context.WithTimeout(ctx, backfillExplainTimeout)
 	defer cancel()
-	database := c.client.Database(binding.resource.Database)
-	command := bson.D{
+	var database = c.client.Database(binding.resource.Database)
+	var command = bson.D{
 		{Key: "explain", Value: query},
 		// The raw explain command defaults to allPlansExecution, which runs the query to completion.
 		{Key: "verbosity", Value: "queryPlanner"},
@@ -47,8 +47,8 @@ func (c *capture) explainBackfill(ctx context.Context, binding bindingInfo, quer
 		command = append(command, bson.E{Key: "maxTimeMS", Value: backfillExplainTimeout.Milliseconds()})
 	}
 	ll.Info("explaining backfill query")
-	started := time.Now()
-	response, err := database.RunCommand(ctx, command, options.RunCmd().SetReadPreference(database.ReadPreference())).Raw()
+	var started = time.Now()
+	var response, err = database.RunCommand(ctx, command, options.RunCmd().SetReadPreference(database.ReadPreference())).Raw()
 	ll = ll.WithField("elapsed", time.Since(started).String())
 	if err != nil {
 		ll.WithError(err).Warn("failed to explain backfill query")
@@ -75,8 +75,8 @@ type backfillProgress struct {
 }
 
 func startBackfillProgress(ll *log.Entry, stopBackfill <-chan struct{}, interval time.Duration) *backfillProgress {
-	now := time.Now()
-	p := &backfillProgress{
+	var now = time.Now()
+	var p = &backfillProgress{
 		log:              ll,
 		started:          now,
 		done:             make(chan struct{}),
@@ -87,7 +87,7 @@ func startBackfillProgress(ll *log.Entry, stopBackfill <-chan struct{}, interval
 	}
 	go func() {
 		defer close(p.stopped)
-		ticker := time.NewTicker(interval)
+		var ticker = time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -149,7 +149,7 @@ func (p *backfillProgress) entry() *log.Entry {
 func (p *backfillProgress) finish(outcome string, err error) {
 	close(p.done)
 	<-p.stopped
-	ll := p.entry()
+	var ll = p.entry()
 	if err != nil {
 		outcome = "failed"
 		if errors.Is(err, context.Canceled) {

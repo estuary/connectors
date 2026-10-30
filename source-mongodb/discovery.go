@@ -114,7 +114,7 @@ func generateMinimalSchema() json.RawMessage {
 	}
 
 	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
+	var bs, err = json.Marshal(schema)
 	if err != nil {
 		panic(fmt.Errorf("error generating schema: %v", err))
 	}
@@ -144,7 +144,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	var databaseNames []string
 	// If no databases are provided in config, we discover across all databases
 	if cfg.Database == "" {
-		rawNames, err := client.ListDatabaseNames(ctx, bson.D{})
+		var rawNames, err = client.ListDatabaseNames(ctx, bson.D{})
 		if err != nil {
 			return nil, fmt.Errorf("getting list of databases: %w", err)
 		}
@@ -176,13 +176,13 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	for _, dbName := range databaseNames {
 		var db = client.Database(dbName)
 
-		collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
+		var collections, err = db.ListCollectionSpecifications(ctx, bson.D{})
 		if err != nil {
 			return nil, fmt.Errorf("listing collections: %w", err)
 		}
 
 		for _, collection := range collections {
-			collectionType := mongoCollectionType(collection.Type)
+			var collectionType = mongoCollectionType(collection.Type)
 			if err := collectionType.validate(); err != nil {
 				return nil, fmt.Errorf("unsupported discovered collection type: %w", err)
 			}
@@ -202,7 +202,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 			}
 
 			if collectionType == mongoCollectionTypeTimeseries {
-				tfRaw, err := collection.Options.LookupErr("timeseries", "timeField")
+				var tfRaw, err = collection.Options.LookupErr("timeseries", "timeField")
 				if err != nil {
 					return nil, fmt.Errorf("looking up timeField: %w", err)
 				}
@@ -211,7 +211,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 				pollSchedule = "5m"
 			}
 
-			resourceJSON, err := json.Marshal(resource{
+			var resourceJSON, err = json.Marshal(resource{
 				Database:     db.Name(),
 				Collection:   collection.Name,
 				Mode:         mode,

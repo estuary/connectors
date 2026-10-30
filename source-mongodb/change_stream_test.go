@@ -20,41 +20,41 @@ import (
 )
 
 func TestPullStream(t *testing.T) {
-	ctx := context.Background()
-	client, _ := testClient(t)
+	var ctx = context.Background()
+	var client, _ = testClient(t)
 
-	testDb := "testDb"
-	testColl1 := "testColl1"
-	testColl2 := "testColl2"
-	testColl3 := "testColl3"
+	var testDb = "testDb"
+	var testColl1 = "testColl1"
+	var testColl2 = "testColl2"
+	var testColl3 = "testColl3"
 
-	cp := "checkpoint"
-	testChangeStreamBatchSize := int32(5)
+	var cp = "checkpoint"
+	var testChangeStreamBatchSize = int32(5)
 
-	bindings := []bindingInfo{
+	var bindings = []bindingInfo{
 		{resource: resource{Database: testDb, Collection: testColl1}, index: 0},
 		{resource: resource{Database: testDb, Collection: testColl2}, index: 1},
 	}
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(testDb).Drop(ctx))
 	}
 
-	insertDoc := func(t *testing.T, collection string, id int) {
-		_, err := client.Database(testDb).Collection(collection).InsertOne(ctx, bson.D{{Key: "_id", Value: id}})
+	var insertDoc = func(t *testing.T, collection string, id int) {
+		var _, err = client.Database(testDb).Collection(collection).InsertOne(ctx, bson.D{{Key: "_id", Value: id}})
 		require.NoError(t, err)
 	}
 
-	insertDocs := func(t *testing.T, collection string, ids ...int) {
-		docs := make([]interface{}, len(ids))
+	var insertDocs = func(t *testing.T, collection string, ids ...int) {
+		var docs = make([]interface{}, len(ids))
 		for i, id := range ids {
 			docs[i] = bson.D{{Key: "_id", Value: id}}
 		}
-		_, err := client.Database(testDb).Collection(collection).InsertMany(ctx, docs)
+		var _, err = client.Database(testDb).Collection(collection).InsertMany(ctx, docs)
 		require.NoError(t, err)
 	}
 
-	tests := []struct {
+	var tests = []struct {
 		name            string
 		setup           func(t *testing.T)
 		fullDocRequired map[string]bool
@@ -106,7 +106,7 @@ func TestPullStream(t *testing.T) {
 			setup: func(t *testing.T) {
 				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
 				insertDoc(t, testColl1, 1)
-				_, err := client.Database(testDb).Collection(testColl1).UpdateOne(ctx, bson.D{{Key: "_id", Value: 1}}, bson.D{{Key: "$set", Value: bson.D{{Key: "updated", Value: true}}}})
+				var _, err = client.Database(testDb).Collection(testColl1).UpdateOne(ctx, bson.D{{Key: "_id", Value: 1}}, bson.D{{Key: "$set", Value: bson.D{{Key: "updated", Value: true}}}})
 				require.NoError(t, err)
 			},
 			fullDocRequired: map[string]bool{testDb: true},
@@ -121,7 +121,7 @@ func TestPullStream(t *testing.T) {
 				// With whenAvailable, update events on collections without the flag will have
 				// null fullDocument since there is no stored post-image to return.
 				insertDoc(t, testColl1, 1)
-				_, err := client.Database(testDb).Collection(testColl1).UpdateOne(ctx,
+				var _, err = client.Database(testDb).Collection(testColl1).UpdateOne(ctx,
 					bson.D{{Key: "_id", Value: 1}},
 					bson.D{{Key: "$set", Value: bson.D{{Key: "v", Value: true}}}})
 				require.NoError(t, err)
@@ -140,7 +140,7 @@ func TestPullStream(t *testing.T) {
 				// testColl3 is not a tracked binding.
 				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
 				insertDoc(t, testColl3, 1)
-				_, err := client.Database(testDb).Collection(testColl3).UpdateOne(ctx,
+				var _, err = client.Database(testDb).Collection(testColl3).UpdateOne(ctx,
 					bson.D{{Key: "_id", Value: 1}},
 					bson.D{{Key: "$set", Value: bson.D{{Key: "v", Value: true}}}})
 				require.NoError(t, err)
@@ -156,7 +156,7 @@ func TestPullStream(t *testing.T) {
 			setup: func(t *testing.T) {
 				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
 
-				val := map[string]string{
+				var val = map[string]string{
 					"_id":  "hugeDocument",
 					"key1": strings.Repeat("value1", 200000),
 					"key2": strings.Repeat("value2", 200000),
@@ -168,7 +168,7 @@ func TestPullStream(t *testing.T) {
 					"key8": strings.Repeat("value8", 200000),
 					"key9": strings.Repeat("value9", 200000),
 				}
-				_, err := client.Database(testDb).Collection(testColl1).InsertOne(ctx, val)
+				var _, err = client.Database(testDb).Collection(testColl1).InsertOne(ctx, val)
 				require.NoError(t, err)
 
 				val["key1"] = "updated"
@@ -190,18 +190,18 @@ func TestPullStream(t *testing.T) {
 			cleanup()
 			t.Cleanup(cleanup)
 
-			transcoder, err := NewTranscoder(ctx)
+			var transcoder, err = NewTranscoder(ctx)
 			require.NoError(t, err)
 			t.Cleanup(func() { transcoder.Stop() })
 
-			srv := &testServer{}
+			var srv = &testServer{}
 
-			fullDocRequired := tt.fullDocRequired
+			var fullDocRequired = tt.fullDocRequired
 			if fullDocRequired == nil {
 				fullDocRequired = map[string]bool{}
 			}
 
-			c := capture{
+			var c = capture{
 				client:     client,
 				output:     &boilerplate.PullOutput{Connector_CaptureServer: srv},
 				transcoder: transcoder,
@@ -217,17 +217,17 @@ func TestPullStream(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(streams))
 
-			stream := streams[0]
+			var stream = streams[0]
 			stream.ms.SetBatchSize(testChangeStreamBatchSize)
 
 			// Create channel for batches with buffer size 4
-			batches := make(chan streamBatch, 4)
+			var batches = make(chan streamBatch, 4)
 
 			// Start producer
-			producerCtx, cancelProducer := context.WithCancel(ctx)
+			var producerCtx, cancelProducer = context.WithCancel(ctx)
 			defer cancelProducer()
 
-			producerDone := make(chan struct{})
+			var producerDone = make(chan struct{})
 			go func() {
 				defer close(producerDone)
 				c.produceStreamBatches(producerCtx, stream, batches)
@@ -236,7 +236,7 @@ func TestPullStream(t *testing.T) {
 			// Wait for initial batch to complete (establishes resume token).
 			for batch := range batches {
 				require.NoError(t, batch.err)
-				_, err := c.processBatch(ctx, stream, batch)
+				var _, err = c.processBatch(ctx, stream, batch)
 				require.NoError(t, err)
 				break // First batch establishes resume token
 			}
@@ -249,11 +249,11 @@ func TestPullStream(t *testing.T) {
 
 			// Pull and process batches until we've seen pullTimes batch completions.
 			var processErr error
-			batchesCompleted := 0
+			var batchesCompleted = 0
 			for batch := range batches {
 				require.NoError(t, batch.err)
 
-				_, err := c.processBatch(ctx, stream, batch)
+				var _, err = c.processBatch(ctx, stream, batch)
 				if err != nil {
 					processErr = err
 					break
@@ -282,8 +282,8 @@ func TestPullStream(t *testing.T) {
 			// fall back to verifying we got the right documents regardless of order.
 			if !slices.Equal(tt.wantSent, srv.sent) {
 				// Fall back to checking sorted doc IDs when batching is non-deterministic.
-				wantDocs := filterDocs(tt.wantSent)
-				gotDocs := filterDocs(srv.sent)
+				var wantDocs = filterDocs(tt.wantSent)
+				var gotDocs = filterDocs(srv.sent)
 				slices.Sort(wantDocs)
 				slices.Sort(gotDocs)
 				require.Equal(t, wantDocs, gotDocs, "sent docs mismatch (exact was: %v)", srv.sent)
@@ -340,14 +340,14 @@ func filterDocs(sent []string) []string {
 }
 
 func TestIsMidSplitEvent(t *testing.T) {
-	splitEvent := func(v any) bson.D {
+	var splitEvent = func(v any) bson.D {
 		return bson.D{
 			{Key: "operationType", Value: "update"},
 			{Key: "splitEvent", Value: v},
 		}
 	}
 
-	tests := []struct {
+	var tests = []struct {
 		name  string
 		event bson.D
 		want  bool
@@ -391,7 +391,7 @@ func TestIsMidSplitEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			raw, err := bson.Marshal(tt.event)
+			var raw, err = bson.Marshal(tt.event)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, isMidSplitEvent(bson.Raw(raw)))
 		})
@@ -404,30 +404,30 @@ func TestIsMidSplitEvent(t *testing.T) {
 // already consumed live only in the transcoder's memory, so a restart from that
 // position leaves the transcoder unable to reassemble the event.
 func TestSplitEventCheckpointSafety(t *testing.T) {
-	ctx := context.Background()
-	client, _ := testClient(t)
+	var ctx = context.Background()
+	var client, _ = testClient(t)
 
-	testDb := "testDb"
-	testColl1 := "testColl1"
+	var testDb = "testDb"
+	var testColl1 = "testColl1"
 
 	// Force the PBRT checkpoint branch to be eligible on every batch, which is
 	// the path that used to checkpoint a mid-split token.
-	prevInterval := pbrtCheckpointInterval
+	var prevInterval = pbrtCheckpointInterval
 	pbrtCheckpointInterval = 0
 	t.Cleanup(func() { pbrtCheckpointInterval = prevInterval })
 
 	require.NoError(t, client.Database(testDb).Drop(ctx))
 	t.Cleanup(func() { require.NoError(t, client.Database(testDb).Drop(ctx)) })
 
-	bindings := []bindingInfo{
+	var bindings = []bindingInfo{
 		{resource: resource{Database: testDb, Collection: testColl1}, index: 0},
 	}
 
-	transcoder, err := NewTranscoder(ctx)
+	var transcoder, err = NewTranscoder(ctx)
 	require.NoError(t, err)
 	t.Cleanup(func() { transcoder.Stop() })
 
-	c := capture{
+	var c = capture{
 		client:     client,
 		output:     &boilerplate.PullOutput{Connector_CaptureServer: &testServer{}},
 		transcoder: transcoder,
@@ -445,13 +445,13 @@ func TestSplitEventCheckpointSafety(t *testing.T) {
 	streams, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(streams))
-	stream := streams[0]
+	var stream = streams[0]
 
-	batches := make(chan streamBatch, 4)
-	producerCtx, cancelProducer := context.WithCancel(ctx)
+	var batches = make(chan streamBatch, 4)
+	var producerCtx, cancelProducer = context.WithCancel(ctx)
 	defer cancelProducer()
 
-	producerDone := make(chan struct{})
+	var producerDone = make(chan struct{})
 	go func() {
 		defer close(producerDone)
 		c.produceStreamBatches(producerCtx, stream, batches)
@@ -464,14 +464,14 @@ func TestSplitEventCheckpointSafety(t *testing.T) {
 	// First batch establishes the resume token.
 	for batch := range batches {
 		require.NoError(t, batch.err)
-		_, err := c.processBatch(ctx, stream, batch)
+		var _, err = c.processBatch(ctx, stream, batch)
 		require.NoError(t, err)
 		break
 	}
 
 	// A document large enough that an update carrying both fullDocument and
 	// fullDocumentBeforeChange exceeds the 16MB event limit and is split.
-	val := map[string]string{"_id": "hugeDocument"}
+	var val = map[string]string{"_id": "hugeDocument"}
 	for i := 1; i <= 9; i++ {
 		val[fmt.Sprintf("key%d", i)] = strings.Repeat(fmt.Sprintf("value%d", i), 200000)
 	}
@@ -488,15 +488,15 @@ func TestSplitEventCheckpointSafety(t *testing.T) {
 	// actually was. The fragment position is deliberately re-derived from the
 	// raw event here rather than by calling isMidSplitEvent, so that a wrong
 	// predicate cannot make this assertion agree with it.
-	unsafeTokens := make(map[string]bool)
-	checkpointedTokens := make(map[string]bool)
+	var unsafeTokens = make(map[string]bool)
+	var checkpointedTokens = make(map[string]bool)
 	var sawCompletedSplit bool
 	var batchesAfterSplit int
 
 	// produceStreamBatches never closes its channel, so the loop needs its own
 	// deadline: without one, a change stream which never splits would block here
 	// until the package-wide test timeout took down every test in the package.
-	loopCtx, cancelLoop := context.WithTimeout(ctx, 60*time.Second)
+	var loopCtx, cancelLoop = context.WithTimeout(ctx, 60*time.Second)
 	defer cancelLoop()
 
 collect:
@@ -511,8 +511,8 @@ collect:
 		require.NoError(t, batch.err)
 
 		for _, ev := range batch.events {
-			fragment, fragmentOk := ev.raw.Lookup("splitEvent", "fragment").Int32OK()
-			of, ofOk := ev.raw.Lookup("splitEvent", "of").Int32OK()
+			var fragment, fragmentOk = ev.raw.Lookup("splitEvent", "fragment").Int32OK()
+			var of, ofOk = ev.raw.Lookup("splitEvent", "of").Int32OK()
 			if !fragmentOk || !ofOk {
 				continue
 			}
@@ -523,7 +523,7 @@ collect:
 			}
 		}
 
-		_, err := c.processBatch(ctx, stream, batch)
+		var _, err = c.processBatch(ctx, stream, batch)
 		require.NoError(t, err)
 
 		if tok, ok := c.state.DatabaseResumeTokens[testDb]; ok {
@@ -557,25 +557,25 @@ collect:
 // whole. A reopen which fails, for any reason, fails the capture rather than
 // skipping the event.
 func TestSplitEventResumedPartway(t *testing.T) {
-	ctx := context.Background()
-	client, _ := testClient(t)
+	var ctx = context.Background()
+	var client, _ = testClient(t)
 
-	testDb := "testDb"
-	testColl1 := "testColl1"
+	var testDb = "testDb"
+	var testColl1 = "testColl1"
 
-	prevInterval := pbrtCheckpointInterval
+	var prevInterval = pbrtCheckpointInterval
 	pbrtCheckpointInterval = 0
 	t.Cleanup(func() { pbrtCheckpointInterval = prevInterval })
 
 	require.NoError(t, client.Database(testDb).Drop(ctx))
 	t.Cleanup(func() { require.NoError(t, client.Database(testDb).Drop(ctx)) })
 
-	bindings := []bindingInfo{
+	var bindings = []bindingInfo{
 		{resource: resource{Database: testDb, Collection: testColl1}, index: 0},
 	}
 
-	newCapture := func(srv *testServer, tokens map[string]bson.Raw) capture {
-		transcoder, err := NewTranscoder(ctx)
+	var newCapture = func(srv *testServer, tokens map[string]bson.Raw) capture {
+		var transcoder, err = NewTranscoder(ctx)
 		require.NoError(t, err)
 		t.Cleanup(func() { transcoder.Stop() })
 
@@ -595,10 +595,10 @@ func TestSplitEventResumedPartway(t *testing.T) {
 	// Collects batches from a stream until stop says to finish, or the deadline
 	// passes. produceStreamBatches never closes its channel, so a deadline is
 	// what keeps a stream which does not split from hanging the package.
-	collect := func(c *capture, stream *changeStream, stop func(streamBatch) bool) error {
-		batches := make(chan streamBatch, 4)
-		producerCtx, cancelProducer := context.WithCancel(ctx)
-		producerDone := make(chan struct{})
+	var collect = func(c *capture, stream *changeStream, stop func(streamBatch) bool) error {
+		var batches = make(chan streamBatch, 4)
+		var producerCtx, cancelProducer = context.WithCancel(ctx)
+		var producerDone = make(chan struct{})
 		go func() {
 			defer close(producerDone)
 			c.produceStreamBatches(producerCtx, stream, batches)
@@ -608,7 +608,7 @@ func TestSplitEventResumedPartway(t *testing.T) {
 			<-producerDone
 		}()
 
-		deadline, cancelDeadline := context.WithTimeout(ctx, 60*time.Second)
+		var deadline, cancelDeadline = context.WithTimeout(ctx, 60*time.Second)
 		defer cancelDeadline()
 
 		for {
@@ -632,12 +632,12 @@ func TestSplitEventResumedPartway(t *testing.T) {
 	// Observe a split event, and remember the resume token of its first
 	// fragment: that is the poisoned position a capture could previously
 	// persist. Events are only inspected here, never transcoded.
-	observer := newCapture(&testServer{}, map[string]bson.Raw{})
-	streams, err := observer.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
+	var observer = newCapture(&testServer{}, map[string]bson.Raw{})
+	var streams, err = observer.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
 	require.NoError(t, err)
 	require.Equal(t, 1, len(streams))
 
-	val := map[string]string{"_id": "hugeDocument"}
+	var val = map[string]string{"_id": "hugeDocument"}
 	for i := 1; i <= 9; i++ {
 		val[fmt.Sprintf("key%d", i)] = strings.Repeat(fmt.Sprintf("value%d", i), 200000)
 	}
@@ -656,7 +656,7 @@ func TestSplitEventResumedPartway(t *testing.T) {
 	var firstFragmentToken bson.Raw
 	require.NoError(t, collect(&observer, streams[0], func(batch streamBatch) bool {
 		for _, ev := range batch.events {
-			fragment, of, ok := splitEventFragment(ev.raw)
+			var fragment, of, ok = splitEventFragment(ev.raw)
 			if ok && fragment == 1 && of > 1 {
 				firstFragmentToken = ev.resumeToken
 				return true
@@ -669,17 +669,17 @@ func TestSplitEventResumedPartway(t *testing.T) {
 	// resumePartway resumes from partway through that split event with a
 	// transcoder which has never seen its first fragment. A non-nil reopen
 	// replaces the stream's own, standing in for a reopen which fails.
-	resumePartway := func(t *testing.T, reopen func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error)) (*testServer, error) {
-		srv := &testServer{}
-		c := newCapture(srv, map[string]bson.Raw{testDb: firstFragmentToken})
-		resumed, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
+	var resumePartway = func(t *testing.T, reopen func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error)) (*testServer, error) {
+		var srv = &testServer{}
+		var c = newCapture(srv, map[string]bson.Raw{testDb: firstFragmentToken})
+		var resumed, err = c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, map[string]bool{})
 		require.NoError(t, err)
 		if reopen != nil {
 			resumed[0].reopenAt = reopen
 		}
 
-		collectErr := collect(&c, resumed[0], func(batch streamBatch) bool {
-			_, err := c.processBatch(ctx, resumed[0], batch)
+		var collectErr = collect(&c, resumed[0], func(batch streamBatch) bool {
+			var _, err = c.processBatch(ctx, resumed[0], batch)
 			require.NoError(t, err, "capture failed on a split event it could not reassemble")
 			return slices.Contains(srv.sent, "afterTheSplit")
 		})
@@ -688,7 +688,7 @@ func TestSplitEventResumedPartway(t *testing.T) {
 	}
 
 	t.Run("repositioned to recover the event", func(t *testing.T) {
-		srv, err := resumePartway(t, nil)
+		var srv, err = resumePartway(t, nil)
 		require.NoError(t, err)
 		require.Contains(t, srv.sent, "hugeDocument", "the split event was not recovered")
 		require.Contains(t, srv.sent, "afterTheSplit", "capture did not carry on past the split event")
@@ -726,11 +726,11 @@ func TestSplitEventResumedPartway(t *testing.T) {
 	t.Run("fails when the oplog no longer reaches the event", func(t *testing.T) {
 		// Skipping the event would be silent data loss. Failing is consistent
 		// with how any other position the oplog no longer reaches is handled.
-		historyLost := func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error) {
+		var historyLost = func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error) {
 			return nil, mongo.CommandError{Code: 286, Name: "ChangeStreamHistoryLost", Message: "Resume of change stream was not possible"}
 		}
 
-		srv, err := resumePartway(t, historyLost)
+		var srv, err = resumePartway(t, historyLost)
 		require.Error(t, err, "expected the capture to fail rather than skip the event")
 		require.Contains(t, err.Error(), "repositioning change stream")
 		require.NotContains(t, srv.sent, "hugeDocument")
@@ -741,11 +741,11 @@ func TestSplitEventResumedPartway(t *testing.T) {
 		// restart re-runs this recovery from the same checkpoint. Skipping here
 		// would discard a real change event over an election or a dropped
 		// connection.
-		notPrimary := func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error) {
+		var notPrimary = func(context.Context, primitive.Timestamp) (*mongo.ChangeStream, error) {
 			return nil, mongo.CommandError{Code: 189, Message: "PrimarySteppedDown"}
 		}
 
-		srv, err := resumePartway(t, notPrimary)
+		var srv, err = resumePartway(t, notPrimary)
 		require.Error(t, err, "expected the capture to fail rather than skip the event")
 		require.Contains(t, err.Error(), "repositioning change stream")
 		require.NotContains(t, srv.sent, "hugeDocument")

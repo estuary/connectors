@@ -58,7 +58,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if cfg.PollSchedule == "" {
 		cfg.PollSchedule = defualtBatchPollingSchedule
 	}
-	defaultSched, err := schedule.Parse(cfg.PollSchedule)
+	var defaultSched, err = schedule.Parse(cfg.PollSchedule)
 	if err != nil {
 		return fmt.Errorf("invalid default poll schedule: %w", err)
 	}
@@ -94,7 +94,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var timeseriesCollections = make(map[string]bool)
 	var preAndPostImagesCollections = make(map[string]bool)
 	for db := range databaseNames {
-		collections, err := client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
+		var collections, err = client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
 		if err != nil {
 			return fmt.Errorf("listing collections: %w", err)
 		}
@@ -122,7 +122,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		info := bindingInfo{
+		var info = bindingInfo{
 			resource:     res,
 			index:        idx,
 			stateKey:     boilerplate.StateKey(binding.StateKey),
@@ -145,7 +145,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 	var fullDocRequired = make(map[string]bool)
 	for _, db := range databasesForBindings(changeStreamBindings) {
-		allEnabled := true
+		var allEnabled = true
 		for _, b := range changeStreamBindings {
 			if b.resource.Database == db && !preAndPostImagesCollections[resourceId(b.resource.Database, b.resource.Collection)] {
 				allEnabled = false
@@ -156,7 +156,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 	log.WithField("fullDocRequired", fullDocRequired).Info("determined fullDocument mode per database")
 
-	allBindings := append(changeStreamBindings, batchBindings...)
+	var allBindings = append(changeStreamBindings, batchBindings...)
 
 	var prevState captureState
 	if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
@@ -170,7 +170,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	skipConfiguredBackfills(&prevState, changeStreamBindings, &cfg)
 	for _, binding := range allBindings {
-		state := prevState.Resources[binding.stateKey].Backfill
+		var state = prevState.Resources[binding.stateKey].Backfill
 		var resumeAfter any
 		if state.LastCursorValue != nil {
 			resumeAfter = state.LastCursorValue.String()
@@ -197,7 +197,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	// Start transcoder for processing BSON documents.
 	// This is needed for both change stream events and backfill documents.
 	if len(allBindings) > 0 {
-		transcoder, err := NewTranscoder(ctx)
+		var transcoder, err = NewTranscoder(ctx)
 		if err != nil {
 			return fmt.Errorf("starting transcoder: %w", err)
 		}
@@ -235,23 +235,23 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		"supportsStartAfter":    serverInfo.supportsStartAfter,
 	}).Info("checked database capabilities")
 
-	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
+	var coordinator = newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
 		return getClusterOpTime(ctx, client)
 	})
 
 	var maxAwaitTime *time.Duration
 	if cfg.Advanced.MaxAwaitTime != "" {
-		dur, err := time.ParseDuration(cfg.Advanced.MaxAwaitTime)
+		var dur, err = time.ParseDuration(cfg.Advanced.MaxAwaitTime)
 		if err != nil {
 			return fmt.Errorf("parsing maxAwaitTime: %w", err)
 		}
 		maxAwaitTime = &dur
 	}
 
-	requestPreImages := serverInfo.supportsPreImages && !cfg.Advanced.DisablePreImages
+	var requestPreImages = serverInfo.supportsPreImages && !cfg.Advanced.DisablePreImages
 
 	// Helper for (re-)initializing change streams with their various options.
-	initStreamsFn := func(ctx context.Context) ([]*changeStream, error) {
+	var initStreamsFn = func(ctx context.Context) ([]*changeStream, error) {
 		return c.initializeStreams(
 			ctx,
 			changeStreamBindings,
@@ -264,7 +264,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		)
 	}
 
-	didBackfill := false
+	var didBackfill = false
 	for !prevState.isChangeStreamBackfillComplete(changeStreamBindings) {
 		if !didBackfill {
 			log.Info("backfilling incremental change stream collections")
@@ -288,11 +288,11 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if didBackfill {
 		log.Info("finished backfill of incremental change stream collections")
 	}
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	if len(changeStreamBindings) > 0 {
 		log.Info("streaming change events indefinitely")
-		streams, err := initStreamsFn(groupCtx)
+		var streams, err = initStreamsFn(groupCtx)
 		if err != nil {
 			return err
 		}
@@ -378,7 +378,7 @@ func updateResourceStates(prevState captureState, allBindings []bindingInfo) (ca
 		DatabaseResumeTokens: make(map[string]bson.Raw),
 	}
 
-	trackedDatabases := make(map[string]struct{})
+	var trackedDatabases = make(map[string]struct{})
 
 	// Only include bindings in the state that are currently active bindings.
 	// This is necessary because the Flow runtime does not yet automatically
@@ -429,12 +429,12 @@ func skipConfiguredBackfills(state *captureState, changeStreamBindings []binding
 			continue
 		}
 
-		resState := state.Resources[b.stateKey]
+		var resState = state.Resources[b.stateKey]
 		if resState.Backfill.done() {
 			continue
 		}
 
-		fields := log.Fields{
+		var fields = log.Fields{
 			"database":       b.resource.Database,
 			"collection":     b.resource.Collection,
 			"backfilledDocs": resState.Backfill.BackfilledDocs,
@@ -527,7 +527,7 @@ func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, databa
 		}, nil
 	}
 
-	changeStreams, err := supportsChangeStreams(ctx, client, database)
+	var changeStreams, err = supportsChangeStreams(ctx, client, database)
 	if err != nil {
 		return nil, fmt.Errorf("checking change stream support: %w", err)
 	}
@@ -535,7 +535,7 @@ func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, databa
 	var preImages bool
 	var startAfter bool
 	if changeStreams {
-		support, err := probeChangeStreamSupport(ctx, client, database)
+		var support, err = probeChangeStreamSupport(ctx, client, database)
 		if err != nil {
 			return nil, fmt.Errorf("probing change stream support: %w", err)
 		}
@@ -599,11 +599,11 @@ func probeChangeStreamSupport(ctx context.Context, client *mongo.Client, databas
 	// Open a change stream to obtain a post-batch resume token. MongoDB returns
 	// one in the initial aggregate response, so it is available without
 	// iterating.
-	probe, err := client.Database(database).Watch(ctx, mongo.Pipeline{})
+	var probe, err = client.Database(database).Watch(ctx, mongo.Pipeline{})
 	if err != nil {
 		return out, fmt.Errorf("opening change stream: %w", err)
 	}
-	token := probe.ResumeToken()
+	var token = probe.ResumeToken()
 	if err := probe.Close(ctx); err != nil {
 		return out, fmt.Errorf("closing change stream: %w", err)
 	}
@@ -646,17 +646,17 @@ func probeChangeStreamSupport(ctx context.Context, client *mongo.Client, databas
 // key) is to just try opening a change stream with the option enabled and
 // seeing if it works or not.
 func supportsPreImages(ctx context.Context, client *mongo.Client, database string, b buildInfo) (bool, error) {
-	ll := log.WithField("version", b.Version)
+	var ll = log.WithField("version", b.Version)
 
 	if len(b.VersionArray) < 3 {
 		ll.WithField("VersionArray", b.VersionArray).Info("not requesting pre-images due to insufficient version information")
 		return false, nil
 	}
 
-	major := b.VersionArray[0]
-	minor := b.VersionArray[1]
-	patch := b.VersionArray[2]
-	sufficientVersion := major >= 7 || (major == 6 && patch >= 9) || (major == 6 && minor >= 1)
+	var major = b.VersionArray[0]
+	var minor = b.VersionArray[1]
+	var patch = b.VersionArray[2]
+	var sufficientVersion = major >= 7 || (major == 6 && patch >= 9) || (major == 6 && minor >= 1)
 
 	if !sufficientVersion {
 		ll.Info("not requesting pre-images because this MongoDB server version is too old")
@@ -665,7 +665,7 @@ func supportsPreImages(ctx context.Context, client *mongo.Client, database strin
 
 	// Try opening a change stream with the $changeStreamSplitLargeEvent
 	// pipeline stage.
-	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}})
+	var cs, err = client.Database(database).Watch(ctx, mongo.Pipeline{bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}})
 	if err != nil {
 		// Servers reject the stage with varying wording. Treat any command
 		// error naming the stage as meaning the server won't run it, and

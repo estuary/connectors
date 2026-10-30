@@ -27,9 +27,9 @@ func testClient(t *testing.T) (*mongo.Client, config) {
 		return nil, config{}
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	config := config{
+	var config = config{
 		Address:  *address,
 		User:     *user,
 		Password: *password,
@@ -37,7 +37,7 @@ func testClient(t *testing.T) (*mongo.Client, config) {
 	}
 
 	var d = driver{}
-	client, err := d.Connect(ctx, config)
+	var client, err = d.Connect(ctx, config)
 	require.NoError(t, err)
 
 	return client, config
@@ -58,7 +58,7 @@ func addTestTableData(
 	var col = db.Collection(collection)
 
 	for idx := startAtItem; idx < startAtItem+numItems; idx++ {
-		item := make(map[string]any)
+		var item = make(map[string]any)
 		item["_id"] = pkData(idx)
 
 		for _, col := range cols {
@@ -74,7 +74,7 @@ func addTestTableData(
 		}
 
 		log.WithField("data", item).WithField("col", collection).Debug("inserting data")
-		_, err := col.InsertOne(ctx, item)
+		var _, err = col.InsertOne(ctx, item)
 		require.NoError(t, err)
 	}
 }
@@ -90,7 +90,7 @@ func deleteData(
 	var db = c.Database(database)
 	var col = db.Collection(collection)
 
-	_, err := col.DeleteOne(ctx, map[string]any{"_id": id})
+	var _, err = col.DeleteOne(ctx, map[string]any{"_id": id})
 
 	require.NoError(t, err)
 }
@@ -112,7 +112,7 @@ func updateData(
 		item[col] = fmt.Sprintf("%s val %d", col, 0)
 	}
 
-	_, err := col.UpdateOne(ctx, map[string]any{"_id": id}, map[string]any{"$set": item})
+	var _, err = col.UpdateOne(ctx, map[string]any{"_id": id}, map[string]any{"$set": item})
 
 	require.NoError(t, err)
 }

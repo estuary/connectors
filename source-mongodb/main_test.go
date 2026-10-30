@@ -27,18 +27,18 @@ import (
 )
 
 func TestCapture(t *testing.T) {
-	database1 := "testDb1"
-	database2 := "testDb2"
-	col1 := "collectionOne"
-	col2 := "collectionTwo"
-	col3 := "collectionThree"
-	batchCol1 := "batchCollection1"
-	batchCol2 := "batchCollection2"
+	var database1 = "testDb1"
+	var database2 = "testDb2"
+	var col1 = "collectionOne"
+	var col2 = "collectionTwo"
+	var col3 = "collectionThree"
+	var batchCol1 = "batchCollection1"
+	var batchCol2 = "batchCollection2"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database1).Drop(ctx))
 		require.NoError(t, client.Database(database2).Drop(ctx))
 	}
@@ -51,7 +51,7 @@ func TestCapture(t *testing.T) {
 	addTestTableData(ctx, t, client, database1, batchCol1, 5, 0, stringPkVals, "batchColDb1")
 	addTestTableData(ctx, t, client, database2, batchCol2, 5, 0, stringPkVals, "batchColDb2")
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -67,8 +67,8 @@ func TestCapture(t *testing.T) {
 	}
 
 	// Run the capture, stopping it before it has completed the entire backfill.
-	count := 0
-	captureCtx, cancel := context.WithCancel(context.Background())
+	var count = 0
+	var captureCtx, cancel = context.WithCancel(context.Background())
 	cs.Capture(captureCtx, t, func(msg json.RawMessage) {
 		count++
 		if count == 10 {
@@ -114,13 +114,13 @@ func TestCapture(t *testing.T) {
 // must resume across the type boundaries rather than silently dropping every
 // document of a later-sorting type.
 func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
-	database := "testDb"
-	collection := "mixedIdCollection"
+	var database = "testDb"
+	var collection = "mixedIdCollection"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
@@ -130,12 +130,12 @@ func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
 	// sort number < string < binData < objectId, so the _id-ordered backfill scan emits them in that
 	// order. Resuming from a checkpoint partway through the numbers has to cross three
 	// type boundaries.
-	col := client.Database(database).Collection(collection)
+	var col = client.Database(database).Collection(collection)
 	const perType = 30
 	for idx := 0; idx < perType; idx++ {
-		uuid := make([]byte, 16)
+		var uuid = make([]byte, 16)
 		uuid[15] = byte(idx)
-		oid, err := primitive.ObjectIDFromHex(fmt.Sprintf("%024x", idx))
+		var oid, err = primitive.ObjectIDFromHex(fmt.Sprintf("%024x", idx))
 		require.NoError(t, err)
 		for _, id := range []any{
 			idx,                          // number
@@ -143,17 +143,17 @@ func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
 			primitive.Binary{Subtype: 0x04, Data: uuid}, // binData (UUID)
 			oid, // objectId
 		} {
-			_, err := col.InsertOne(ctx, bson.M{"_id": id, "value": idx})
+			var _, err = col.InsertOne(ctx, bson.M{"_id": id, "value": idx})
 			require.NoError(t, err)
 		}
 	}
 
-	binding := makeBinding(t, database, collection, captureModeChangeStream, "")
+	var binding = makeBinding(t, database, collection, captureModeChangeStream, "")
 
 	// Start from a checkpoint representing a backfill interrupted partway through the numbers. The
 	// resume must capture the remaining numbers plus the entire string, binData, and objectId
 	// cohorts.
-	resumeState := captureState{
+	var resumeState = captureState{
 		Resources: map[boilerplate.StateKey]resourceState{
 			boilerplate.StateKey(binding.StateKey): {Backfill: backfillState{
 				Done:            makePtr(false),
@@ -162,10 +162,10 @@ func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
 			}},
 		},
 	}
-	checkpoint, err := json.Marshal(resumeState)
+	var checkpoint, err = json.Marshal(resumeState)
 	require.NoError(t, err)
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   checkpoint,
@@ -180,20 +180,20 @@ func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
 }
 
 func TestCaptureBatchSnapshotResumption(t *testing.T) {
-	database := "testDb"
-	collection := "collection"
+	var database = "testDb"
+	var collection = "collection"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	binding := makeBinding(t, database, collection, captureModeSnapshot, "_id")
-	cs := &st.CaptureSpec{
+	var binding = makeBinding(t, database, collection, captureModeSnapshot, "_id")
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -220,25 +220,25 @@ func TestCaptureBatchSnapshotResumption(t *testing.T) {
 }
 
 func TestBatchIncrementalResumption(t *testing.T) {
-	database := "testDb"
-	defaultCursorCollection := "defaultCursorCollection"
-	customCursorCollection := "customCursorCollection"
-	timeseriesCollection := "timeseries"
-	refTime := time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
+	var database = "testDb"
+	var defaultCursorCollection = "defaultCursorCollection"
+	var customCursorCollection = "customCursorCollection"
+	var timeseriesCollection = "timeseries"
+	var refTime = time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	defaultBinding := makeBinding(t, database, defaultCursorCollection, captureModeIncremental, "_id")
-	customBinding := makeBinding(t, database, customCursorCollection, captureModeIncremental, "updatedAt")
-	timeseriesBinding := makeBinding(t, database, timeseriesCollection, captureModeIncremental, "ts")
-	cs := &st.CaptureSpec{
+	var defaultBinding = makeBinding(t, database, defaultCursorCollection, captureModeIncremental, "_id")
+	var customBinding = makeBinding(t, database, customCursorCollection, captureModeIncremental, "updatedAt")
+	var timeseriesBinding = makeBinding(t, database, timeseriesCollection, captureModeIncremental, "ts")
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -258,7 +258,7 @@ func TestBatchIncrementalResumption(t *testing.T) {
 
 	// Add some data and capture it.
 	for idx := 0; idx < 5; idx++ {
-		_, err := client.Database(database).Collection(defaultCursorCollection).InsertOne(ctx, map[string]any{
+		var _, err = client.Database(database).Collection(defaultCursorCollection).InsertOne(ctx, map[string]any{
 			"_id":   idx,
 			"value": fmt.Sprintf("value %d", idx),
 		})
@@ -293,7 +293,7 @@ func TestBatchIncrementalResumption(t *testing.T) {
 	// Deletions and updates "earlier" than the cursor are not captured.
 	// Timeseries collections do not support updates in the conventional sense, so that is not tested here.
 	for _, col := range []string{defaultCursorCollection, customCursorCollection} {
-		res, err := client.Database(database).Collection(col).DeleteOne(ctx, bson.M{"_id": 0})
+		var res, err = client.Database(database).Collection(col).DeleteOne(ctx, bson.M{"_id": 0})
 		require.NoError(t, err)
 		require.Equal(t, int64(1), res.DeletedCount)
 		_, err = client.Database(database).Collection(col).UpdateOne(ctx, bson.M{"_id": 1}, bson.M{"$set": bson.M{"value": "new value"}})
@@ -306,7 +306,7 @@ func TestBatchIncrementalResumption(t *testing.T) {
 
 	// Add some new incremental data.
 	for idx := 5; idx < 10; idx++ {
-		_, err := client.Database(database).Collection(defaultCursorCollection).InsertOne(ctx, map[string]any{
+		var _, err = client.Database(database).Collection(defaultCursorCollection).InsertOne(ctx, map[string]any{
 			"_id":   idx,
 			"value": fmt.Sprintf("value %d", idx),
 		})
@@ -338,13 +338,13 @@ func TestBatchIncrementalResumption(t *testing.T) {
 }
 
 func TestCaptureSplitLargeDocuments(t *testing.T) {
-	database := "testDb"
-	col := "testCollection"
+	var database = "testDb"
+	var col = "testCollection"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
@@ -352,7 +352,7 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 
 	require.NoError(t, client.Database(database).CreateCollection(ctx, col, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -361,14 +361,14 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col, captureModeChangeStream, "")},
 	}
 
-	collection := client.Database(database).Collection(col)
+	var collection = client.Database(database).Collection(col)
 
 	// Do the initial backfill to get into "streaming mode" to start capturing changes.
 	advanceCapture(ctx, t, cs)
 
 	// Insert a small document and update it.
-	val := map[string]string{"_id": "smallDocument", "foo": "bar", "baz": "qux"}
-	_, err := collection.InsertOne(ctx, val)
+	var val = map[string]string{"_id": "smallDocument", "foo": "bar", "baz": "qux"}
+	var _, err = collection.InsertOne(ctx, val)
 	require.NoError(t, err)
 	val["foo"] = "bar_updated"
 	res, err := collection.UpdateOne(ctx, bson.D{{Key: "_id", Value: val["_id"]}}, bson.D{{Key: "$set", Value: val}})
@@ -411,8 +411,8 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 	// expected change stream documents, not counting checkpoints. Reading the
 	// huge document and its updates from the change stream takes a non-trivial
 	// amount of time.
-	count := 0
-	captureCtx, cancel := context.WithCancel(context.Background())
+	var count = 0
+	var captureCtx, cancel = context.WithCancel(context.Background())
 	time.AfterFunc(5*time.Second, cancel) // don't wait forever though
 	cs.Capture(captureCtx, t, func(msg json.RawMessage) {
 		if !strings.Contains(string(msg), "bindingStateV1") {
@@ -427,16 +427,16 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 }
 
 func TestCaptureExclusiveCollectionFilter(t *testing.T) {
-	database1 := "testDb1"
-	database2 := "testDb2"
-	col1 := "collectionOne"
-	col2 := "collectionTwo"
-	col3 := "collectionThree"
+	var database1 = "testDb1"
+	var database2 = "testDb2"
+	var col1 = "collectionOne"
+	var col2 = "collectionTwo"
+	var col3 = "collectionThree"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database1).Drop(ctx))
 		require.NoError(t, client.Database(database2).Drop(ctx))
 	}
@@ -447,7 +447,7 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 	addTestTableData(ctx, t, client, database1, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
 	addTestTableData(ctx, t, client, database2, col3, 5, 0, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -477,14 +477,14 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 // A collection named by the `skipBackfills` advanced option must capture only
 // its change events, while its unnamed siblings are backfilled as usual.
 func TestCaptureSkipBackfills(t *testing.T) {
-	database := "testDb"
-	skippedCol := "skippedCollection"
-	backfilledCol := "backfilledCollection"
+	var database = "testDb"
+	var skippedCol = "skippedCollection"
+	var backfilledCol = "backfilledCollection"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
@@ -496,7 +496,7 @@ func TestCaptureSkipBackfills(t *testing.T) {
 	addTestTableData(ctx, t, client, database, skippedCol, 5, 0, stringPkVals, "onlyColumn")
 	addTestTableData(ctx, t, client, database, backfilledCol, 5, 0, stringPkVals, "onlyColumn")
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -522,13 +522,13 @@ func TestCaptureSkipBackfills(t *testing.T) {
 // A backfill which is already partway through must be abandoned when the
 // collection is added to `skipBackfills` and the capture restarted.
 func TestCaptureSkipBackfillsMidBackfill(t *testing.T) {
-	database := "testDb"
-	collection := "largeCollection"
+	var database = "testDb"
+	var collection = "largeCollection"
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
@@ -536,11 +536,11 @@ func TestCaptureSkipBackfillsMidBackfill(t *testing.T) {
 
 	addTestTableData(ctx, t, client, database, collection, 10, 0, stringPkVals, "onlyColumn")
 
-	binding := makeBinding(t, database, collection, captureModeChangeStream, "")
-	sk := boilerplate.StateKey(binding.StateKey)
+	var binding = makeBinding(t, database, collection, captureModeChangeStream, "")
+	var sk = boilerplate.StateKey(binding.StateKey)
 
 	// Start from a checkpoint representing a backfill which is halfway through.
-	resumeState := captureState{
+	var resumeState = captureState{
 		Resources: map[boilerplate.StateKey]resourceState{
 			sk: {Backfill: backfillState{
 				Done:            makePtr(false),
@@ -549,13 +549,13 @@ func TestCaptureSkipBackfillsMidBackfill(t *testing.T) {
 			}},
 		},
 	}
-	checkpoint, err := json.Marshal(resumeState)
+	var checkpoint, err = json.Marshal(resumeState)
 	require.NoError(t, err)
 
 	// Skip the rest of the backfill
 	cfg.Advanced.SkipBackfills = database + ":" + collection
 
-	cs := &st.CaptureSpec{
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   checkpoint,
@@ -605,7 +605,7 @@ func TestCaptureStressChangeStreamCorrectness(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	dbsAndCollections := [][]string{
+	var dbsAndCollections = [][]string{
 		{"stressdb1", "stressdb1collection1"},
 		{"stressdb1", "stressdb1collection2"},
 		{"stressdb2", "stressdb2collection1"},
@@ -613,10 +613,10 @@ func TestCaptureStressChangeStreamCorrectness(t *testing.T) {
 		{"stressdb3", "stressdb3collection1"},
 	}
 
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		for _, dbcol := range dbsAndCollections {
 			require.NoError(t, client.Database(dbcol[0]).Collection(dbcol[1]).Drop(ctx))
 		}
@@ -635,13 +635,13 @@ func TestCaptureStressChangeStreamCorrectness(t *testing.T) {
 		)
 	}
 
-	bindings := make([]*flow.CaptureSpec_Binding, 0, len(dbsAndCollections))
+	var bindings = make([]*flow.CaptureSpec_Binding, 0, len(dbsAndCollections))
 	for _, dbcol := range dbsAndCollections {
 		bindings = append(bindings, makeBinding(t, dbcol[0], dbcol[1], captureModeChangeStream, ""))
 	}
 
-	validator := &correctnessInvariantsCaptureValidator{}
-	cs := &st.CaptureSpec{
+	var validator = &correctnessInvariantsCaptureValidator{}
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -657,16 +657,16 @@ func TestCaptureStressChangeStreamCorrectness(t *testing.T) {
 	var loadgenDeadline = time.Now().Add(loadGenTime)
 
 	var mu sync.Mutex
-	bindingExpectedIDs := make(map[string]int) // updated concurrently by the goroutines below
+	var bindingExpectedIDs = make(map[string]int) // updated concurrently by the goroutines below
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	for _, dbcol := range dbsAndCollections {
-		dbcol := dbcol
-		col := client.Database(dbcol[0]).Collection(dbcol[1])
+		var dbcol = dbcol
+		var col = client.Database(dbcol[0]).Collection(dbcol[1])
 
 		group.Go(func() error {
-			ll := log.WithFields(log.Fields{"db": dbcol[0], "collection": dbcol[1]})
+			var ll = log.WithFields(log.Fields{"db": dbcol[0], "collection": dbcol[1]})
 
 			ll.WithField("runtime", loadGenTime.String()).Info("load generator started")
 			var eventCount int
@@ -700,13 +700,13 @@ func TestCaptureStressChangeStreamCorrectness(t *testing.T) {
 				// Issue an update/insert/delete depending on the counter value
 				switch counter {
 				case 1, 6:
-					_, err := col.InsertOne(groupCtx, map[string]any{"_id": selected, "counter": counter})
+					var _, err = col.InsertOne(groupCtx, map[string]any{"_id": selected, "counter": counter})
 					require.NoError(t, err)
 				case 5:
-					_, err := col.DeleteOne(groupCtx, bson.D{{Key: "_id", Value: selected}})
+					var _, err = col.DeleteOne(groupCtx, bson.D{{Key: "_id", Value: selected}})
 					require.NoError(t, err)
 				default:
-					_, err := col.UpdateOne(groupCtx, bson.D{{Key: "_id", Value: selected}}, bson.D{{Key: "$set", Value: bson.D{{Key: "counter", Value: counter}}}})
+					var _, err = col.UpdateOne(groupCtx, bson.D{{Key: "_id", Value: selected}}, bson.D{{Key: "$set", Value: bson.D{{Key: "counter", Value: counter}}}})
 					require.NoError(t, err)
 				}
 				eventCount++
@@ -760,7 +760,7 @@ loop:
 }
 
 func commonSanitizers() map[string]*regexp.Regexp {
-	sanitizers := make(map[string]*regexp.Regexp)
+	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"<TOKEN>"`] = regexp.MustCompile(`"[A-Za-z0-9+/=]{32,}"`)
 	sanitizers[`"last_poll_start":"<LAST_POLLED_TS>"`] = regexp.MustCompile(`"last_poll_start":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z"`)
 
@@ -770,7 +770,7 @@ func commonSanitizers() map[string]*regexp.Regexp {
 func resourceSpecJson(t *testing.T, r resource) json.RawMessage {
 	t.Helper()
 
-	out, err := json.Marshal(r)
+	var out, err = json.Marshal(r)
 	require.NoError(t, err)
 
 	return out
@@ -789,7 +789,7 @@ func makeBinding(t *testing.T, database string, collection string, mode captureM
 
 func advanceCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
-	captureCtx, cancelCapture := context.WithCancel(ctx)
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
 
 	const shutdownDelay = 100 * time.Millisecond
 	var shutdownWatchdog *time.Timer
@@ -829,11 +829,11 @@ func backdateState(t *testing.T, cs *st.CaptureSpec, sk boilerplate.StateKey) {
 	// checkpoint to have a "last polled time" more than 24 hours in the past.
 	var state captureState
 	require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
-	resState := state.Resources[boilerplate.StateKey(sk)]
-	backDate := resState.Backfill.LastPollStart.Add(-48 * time.Hour)
+	var resState = state.Resources[boilerplate.StateKey(sk)]
+	var backDate = resState.Backfill.LastPollStart.Add(-48 * time.Hour)
 	resState.Backfill.LastPollStart = &backDate
 	state.Resources[boilerplate.StateKey(sk)] = resState
-	cp, err := json.Marshal(state)
+	var cp, err = json.Marshal(state)
 	require.NoError(t, err)
 	cs.Checkpoint = cp
 }
@@ -956,7 +956,7 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 
 	for binding, numExpectedIDs := range v.BindingExpectedIDs {
 		for id := 0; id < numExpectedIDs; id++ {
-			id := strconv.Itoa(id)
+			var id = strconv.Itoa(id)
 			var state = v.states[binding][id]
 			log.WithFields(log.Fields{
 				"binding": binding,
@@ -987,17 +987,17 @@ func TestNestedCursorFields(t *testing.T) {
 		database   = "testDb"
 		collection = "nestedCursorCollection"
 	)
-	ctx := context.Background()
-	client, cfg := testClient(t)
+	var ctx = context.Background()
+	var client, cfg = testClient(t)
 
-	cleanup := func() {
+	var cleanup = func() {
 		require.NoError(t, client.Database(database).Drop(ctx))
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	binding := makeBinding(t, database, collection, captureModeIncremental, "a.b")
-	cs := &st.CaptureSpec{
+	var binding = makeBinding(t, database, collection, captureModeIncremental, "a.b")
+	var cs = &st.CaptureSpec{
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
@@ -1006,19 +1006,19 @@ func TestNestedCursorFields(t *testing.T) {
 		Bindings:     []*flow.CaptureSpec_Binding{binding},
 	}
 
-	col := client.Database(database).Collection(collection)
+	var col = client.Database(database).Collection(collection)
 
 	advanceCapture(ctx, t, cs)
 
 	for idx := 0; idx < 5; idx++ {
-		doc := map[string]any{
+		var doc = map[string]any{
 			"_id": fmt.Sprintf("%d", idx),
 			"a": map[string]any{
 				"b": idx,
 			},
 			"data": fmt.Sprintf("test data %d", idx),
 		}
-		_, err := col.InsertOne(ctx, doc)
+		var _, err = col.InsertOne(ctx, doc)
 		require.NoError(t, err)
 	}
 
@@ -1026,14 +1026,14 @@ func TestNestedCursorFields(t *testing.T) {
 	advanceCapture(ctx, t, cs)
 
 	for idx := 5; idx < 10; idx++ {
-		doc := map[string]any{
+		var doc = map[string]any{
 			"_id": fmt.Sprintf("%d", idx),
 			"a": map[string]any{
 				"b": idx,
 			},
 			"data": fmt.Sprintf("test data %d", idx),
 		}
-		_, err := col.InsertOne(ctx, doc)
+		var _, err = col.InsertOne(ctx, doc)
 		require.NoError(t, err)
 	}
 

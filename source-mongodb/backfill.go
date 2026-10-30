@@ -39,31 +39,31 @@ func (c *capture) backfillChangeStreamCollections(
 	changeStreamBindings []bindingInfo,
 	backfillFor time.Duration,
 ) (retErr error) {
-	ts := time.Now()
+	var ts = time.Now()
 	log.WithField("backfillFor", backfillFor.String()).Info("backfilling collections")
 	defer func() {
-		ll := log.WithField("took", time.Since(ts).String())
+		var ll = log.WithField("took", time.Since(ts).String())
 		if retErr != nil {
 			ll = ll.WithError(retErr)
 		}
 		ll.Info("finished backfill round")
 	}()
 
-	shuffledBindings := make([]bindingInfo, len(changeStreamBindings))
+	var shuffledBindings = make([]bindingInfo, len(changeStreamBindings))
 	copy(shuffledBindings, changeStreamBindings)
 	rand.Shuffle(len(shuffledBindings), func(i, j int) {
 		shuffledBindings[i], shuffledBindings[j] = shuffledBindings[j], shuffledBindings[i]
 	})
 
-	backfillBindings := make(chan backfillBinding)
-	stopBackfill := make(chan struct{})
+	var backfillBindings = make(chan backfillBinding)
+	var stopBackfill = make(chan struct{})
 
 	go func() {
 		<-time.After(backfillFor)
 		close(stopBackfill)
 	}()
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 
 	for idx := 0; idx < concurrentBackfillLimit; idx++ {
 		group.Go(func() error {
@@ -75,7 +75,7 @@ func (c *capture) backfillChangeStreamCollections(
 	// a single binding until it is done backfilling, and is then able to start working on another.
 	for _, b := range shuffledBindings {
 		c.mu.Lock()
-		done := c.state.Resources[b.stateKey].Backfill.done()
+		var done = c.state.Resources[b.stateKey].Backfill.done()
 		c.mu.Unlock()
 		if done {
 			continue
@@ -103,8 +103,8 @@ func (c *capture) backfillBatchCollections(
 	coordinator *streamBackfillCoordinator,
 	batchBindings []bindingInfo,
 ) error {
-	backfillBindings := make(chan backfillBinding)
-	group, groupCtx := errgroup.WithContext(ctx)
+	var backfillBindings = make(chan backfillBinding)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	for idx := 0; idx < concurrentBackfillLimit; idx++ {
 		group.Go(func() error {
 			return c.backfillWorker(groupCtx, coordinator, backfillBindings, make(chan struct{}))
@@ -112,16 +112,16 @@ func (c *capture) backfillBatchCollections(
 	}
 
 	for _, binding := range batchBindings {
-		binding := binding
+		var binding = binding
 
 		group.Go(func() error {
 			for {
 				c.mu.Lock()
-				backfillState := c.state.Resources[binding.stateKey].Backfill
+				var backfillState = c.state.Resources[binding.stateKey].Backfill
 				c.mu.Unlock()
 
 				if backfillState.done() {
-					next := binding.schedule.Next(*backfillState.LastPollStart)
+					var next = binding.schedule.Next(*backfillState.LastPollStart)
 					if time.Until(next) > 0 {
 						log.WithFields(log.Fields{
 							"database":   binding.resource.Database,
@@ -135,7 +135,7 @@ func (c *capture) backfillBatchCollections(
 					}
 				}
 
-				doneCh := make(chan struct{})
+				var doneCh = make(chan struct{})
 				select {
 				case backfillBindings <- backfillBinding{binding: binding, backfillDone: doneCh}:
 					select {
@@ -234,7 +234,7 @@ func buildResumeFilter(cursorField string, last *bson.RawValue) (bson.D, error) 
 		return bson.D{}, nil
 	}
 
-	idx := bracketIndex(last.Type)
+	var idx = bracketIndex(last.Type)
 	if idx < 0 {
 		// Regex, JavaScript/code/symbol, Array, and MinKey/MaxKey have no place in a value-range
 		// resume: a regex operand is rejected by comparison operators, arrays carry multikey
@@ -250,13 +250,13 @@ func buildResumeFilter(cursorField string, last *bson.RawValue) (bson.D, error) 
 
 	// The remainder of last's own bracket. This is the complete filter when last is already in
 	// the highest bracket and there are no later brackets to union.
-	gt := bson.D{{Key: cursorField, Value: bson.D{{Key: "$gt", Value: v}}}}
-	later := bsonOrder[idx+1:]
+	var gt = bson.D{{Key: cursorField, Value: bson.D{{Key: "$gt", Value: v}}}}
+	var later = bsonOrder[idx+1:]
 	if len(later) == 0 {
 		return gt, nil
 	}
 
-	clauses := bson.A{gt}
+	var clauses = bson.A{gt}
 	for _, b := range later {
 		clauses = append(clauses, bson.D{{Key: cursorField, Value: bson.D{{Key: "$gte", Value: b.min}}}})
 	}
@@ -275,26 +275,26 @@ func (c *capture) doBackfill(
 	stopBackfill <-chan struct{},
 ) (retErr error) {
 	c.mu.Lock()
-	backfillState := c.state.Resources[binding.stateKey].Backfill
+	var backfillState = c.state.Resources[binding.stateKey].Backfill
 	c.backfillAttempt++
-	attempt := c.backfillAttempt
+	var attempt = c.backfillAttempt
 	c.mu.Unlock()
 
-	lastCursorValue := backfillState.LastCursorValue
-	initialDocsCaptured := backfillState.BackfilledDocs
+	var lastCursorValue = backfillState.LastCursorValue
+	var initialDocsCaptured = backfillState.BackfilledDocs
 	if backfillState.done() && binding.resource.getMode() == captureModeSnapshot {
 		// Starting the snapshot backfill over.
 		lastCursorValue = nil
 		initialDocsCaptured = 0
 	}
 
-	collection := c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
+	var collection = c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
 
 	var resumeAfter any
 	if lastCursorValue != nil {
 		resumeAfter = lastCursorValue.String()
 	}
-	logEntry := log.WithFields(log.Fields{
+	var logEntry = log.WithFields(log.Fields{
 		"database":              binding.resource.Database,
 		"collection":            binding.resource.Collection,
 		"mode":                  binding.resource.getMode(),
@@ -303,8 +303,8 @@ func (c *capture) doBackfill(
 		"initialBackfilledDocs": initialDocsCaptured,
 	})
 	logEntry.Info("starting backfill for collection")
-	progress := startBackfillProgress(logEntry, stopBackfill, backfillLoggerInterval)
-	outcome := "stopped"
+	var progress = startBackfillProgress(logEntry, stopBackfill, backfillLoggerInterval)
+	var outcome = "stopped"
 	defer func() { progress.finish(outcome, retErr) }()
 
 	var err error
@@ -325,7 +325,7 @@ func (c *capture) doBackfill(
 		logEntry = logEntry.WithField("estimatedTotalDocs", estimatedTotalDocs)
 	}
 
-	cursorField := binding.resource.getCursorField()
+	var cursorField = binding.resource.getCursorField()
 
 	// Check if the collection is sharded. For sharded collections, we must use explicit sort
 	// to ensure consistent ordering across rounds, as natural order is non-deterministic
@@ -359,7 +359,7 @@ func (c *capture) doBackfill(
 		return err
 	}
 
-	query := bson.D{{Key: "find", Value: binding.resource.Collection}, {Key: "filter", Value: filter}, {Key: "sort", Value: opts.Sort}}
+	var query = bson.D{{Key: "find", Value: binding.resource.Collection}, {Key: "filter", Value: filter}, {Key: "sort", Value: opts.Sort}}
 	if opts.Hint != nil {
 		query = append(query, bson.E{Key: "hint", Value: opts.Hint})
 	}
@@ -374,7 +374,7 @@ func (c *capture) doBackfill(
 	c.explainBackfill(ctx, binding, query, lastCursorValue != nil, logEntry)
 	progress.setOperation("find")
 	logEntry.WithField("query", string(queryJSON)).Info("querying backfill documents")
-	findStarted := time.Now()
+	var findStarted = time.Now()
 	cursor, err := collection.Find(ctx, filter, opts)
 	if err != nil {
 		return fmt.Errorf("collection.Find: %w", err)
@@ -404,7 +404,7 @@ func (c *capture) doBackfill(
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-coordinator.streamsCaughtUp():
-			docCount, err := c.pullCursor(ctx, cursor, binding, progress)
+			var docCount, err = c.pullCursor(ctx, cursor, binding, progress)
 			if err != nil {
 				return fmt.Errorf("pullCursor: %w", err)
 			}
@@ -442,7 +442,7 @@ func (c *capture) pullCursor(
 	var docsRead int
 
 	c.mu.Lock()
-	state := c.state.Resources[sk]
+	var state = c.state.Resources[sk]
 	if state.Backfill.LastPollStart == nil || state.Backfill.done() {
 		// First time ever polling this collection, or doing a scheduled re-poll
 		// of a previously completed collection.
@@ -455,16 +455,16 @@ func (c *capture) pullCursor(
 	c.state.Resources[sk] = state
 	c.mu.Unlock()
 
-	emitDocs := func() error {
+	var emitDocs = func() error {
 		progress.setOperation("transcoding documents")
 		// Transcode all raw documents through the transcoder
-		responses, err := c.transcoder.TranscodeRawDocuments(rawDocBatch)
+		var responses, err = c.transcoder.TranscodeRawDocuments(rawDocBatch)
 		if err != nil {
 			return fmt.Errorf("transcoding backfill documents: %w", err)
 		}
 
 		// Convert responses to json.RawMessage slice
-		docBatch := make([]json.RawMessage, 0, len(responses))
+		var docBatch = make([]json.RawMessage, 0, len(responses))
 		for _, resp := range responses {
 			if !resp.IsSkip {
 				docBatch = append(docBatch, resp.Document)
@@ -472,11 +472,11 @@ func (c *capture) pullCursor(
 		}
 
 		c.mu.Lock()
-		state := c.state.Resources[sk]
+		var state = c.state.Resources[sk]
 		state.Backfill.LastCursorValue = &lastCursor
 		state.Backfill.BackfilledDocs += len(docBatch)
 		c.state.Resources[sk] = state
-		checkpoint := captureState{
+		var checkpoint = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{
 				sk: {Backfill: state.Backfill},
 			},
@@ -501,8 +501,8 @@ func (c *capture) pullCursor(
 		return nil
 	}
 
-	done := true
-	gettingMore := cursor.RemainingBatchLength() == 0 && cursor.ID() != 0
+	var done = true
+	var gettingMore = cursor.RemainingBatchLength() == 0 && cursor.ID() != 0
 	if gettingMore {
 		progress.setOperation("getMore")
 	} else {
@@ -520,7 +520,7 @@ func (c *capture) pullCursor(
 		}
 
 		// Copy cursor.Current since it's reused by the cursor
-		rawCopy := make(bson.Raw, len(cursor.Current))
+		var rawCopy = make(bson.Raw, len(cursor.Current))
 		copy(rawCopy, cursor.Current)
 
 		rawDocBatch = append(rawDocBatch, RawDocumentInput{
@@ -558,12 +558,12 @@ func (c *capture) pullCursor(
 	if done {
 		progress.setOperation("emitting completion checkpoint")
 		c.mu.Lock()
-		state := c.state.Resources[sk]
+		var state = c.state.Resources[sk]
 		state.Backfill.Done = makePtr(true)
 		c.state.Resources[sk] = state
 		c.mu.Unlock()
 
-		checkpoint := captureState{
+		var checkpoint = captureState{
 			Resources: map[boilerplate.StateKey]resourceState{sk: state},
 		}
 
@@ -580,11 +580,11 @@ func (c *capture) pullCursor(
 // isShardedCollection checks if a collection is sharded by running a $collStats aggregation.
 // For sharded collections, $collStats returns one document per shard.
 func (c *capture) isShardedCollection(ctx context.Context, database, collection string) (bool, error) {
-	pipeline := mongo.Pipeline{
+	var pipeline = mongo.Pipeline{
 		{{Key: "$collStats", Value: bson.D{{Key: "count", Value: bson.D{}}}}},
 	}
 
-	cursor, err := c.client.Database(database).Collection(collection).Aggregate(ctx, pipeline)
+	var cursor, err = c.client.Database(database).Collection(collection).Aggregate(ctx, pipeline)
 	if err != nil {
 		var cmdErr mongo.CommandError
 		if errors.As(err, &cmdErr) {
@@ -612,7 +612,7 @@ func (c *capture) isShardedCollection(ctx context.Context, database, collection 
 	defer cursor.Close(ctx)
 
 	// If there are two or more documents, the collection is sharded (one doc per shard)
-	hasShards := cursor.Next(ctx) && cursor.Next(ctx)
+	var hasShards = cursor.Next(ctx) && cursor.Next(ctx)
 
 	if err := cursor.Err(); err != nil {
 		return false, fmt.Errorf("iterating $collStats results: %w", err)

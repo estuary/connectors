@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseDocumentMessage(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name           string
 		payload        []byte
 		wantDoc        string
@@ -101,7 +101,7 @@ func TestParseDocumentMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			doc, split, db, coll, err := parseDocumentMessage(tt.payload)
+			var doc, split, db, coll, err = parseDocumentMessage(tt.payload)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -122,13 +122,13 @@ func TestParseDocumentMessage(t *testing.T) {
 
 func TestParseDocumentMessageRoundTrip(t *testing.T) {
 	// Simulate what Rust would send
-	db := "testDatabase"
-	coll := "testCollection"
-	jsonDoc := `{"_id":"abc123","name":"test","_meta":{"source":{"db":"testDatabase","collection":"testCollection"}}}`
+	var db = "testDatabase"
+	var coll = "testCollection"
+	var jsonDoc = `{"_id":"abc123","name":"test","_meta":{"source":{"db":"testDatabase","collection":"testCollection"}}}`
 
-	payload := buildPayload(msgTypeDocument, 0, db, coll, jsonDoc)
+	var payload = buildPayload(msgTypeDocument, 0, db, coll, jsonDoc)
 
-	doc, split, parsedDB, parsedColl, err := parseDocumentMessage(payload)
+	var doc, split, parsedDB, parsedColl, err = parseDocumentMessage(payload)
 	require.NoError(t, err)
 	require.False(t, split)
 	require.Equal(t, db, parsedDB)
@@ -138,7 +138,7 @@ func TestParseDocumentMessageRoundTrip(t *testing.T) {
 
 // buildPayload constructs a binary protocol payload for testing
 func buildPayload(msgType, flags uint8, db, coll, jsonDoc string) []byte {
-	payload := []byte{msgType, flags}
+	var payload = []byte{msgType, flags}
 
 	// Database
 	payload = append(payload, uint8(len(db)))

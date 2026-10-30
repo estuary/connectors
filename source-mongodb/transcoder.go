@@ -51,10 +51,10 @@ type Transcoder struct {
 func NewTranscoder(ctx context.Context) (*Transcoder, error) {
 	ctx, cancel := context.WithCancel(ctx)
 
-	cmd := exec.CommandContext(ctx, "bson-transcoder")
+	var cmd = exec.CommandContext(ctx, "bson-transcoder")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	stdin, err := cmd.StdinPipe()
+	var stdin, err = cmd.StdinPipe()
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("getting stdin pipe: %w", err)
@@ -74,7 +74,7 @@ func NewTranscoder(ctx context.Context) (*Transcoder, error) {
 
 	// Copy stderr to the connector's stderr for logging.
 	go func() {
-		_, err := io.Copy(os.Stderr, stderr)
+		var _, err = io.Copy(os.Stderr, stderr)
 		if err != nil && err != io.EOF {
 			log.WithError(err).Debug("error copying transcoder stderr")
 		}
@@ -104,7 +104,7 @@ var flushSignal = []byte{0, 0, 0, 0}
 // Format: [length: u32 LE][type: u8 = 0x01][bson_doc]
 func (t *Transcoder) writeChangeEvent(raw bson.Raw) error {
 	// Message length = 1 (type byte) + len(bson)
-	msgLen := uint32(1 + len(raw))
+	var msgLen = uint32(1 + len(raw))
 	var lenBuf [4]byte
 	binary.LittleEndian.PutUint32(lenBuf[:], msgLen)
 
@@ -126,11 +126,11 @@ func (t *Transcoder) writeChangeEvent(raw bson.Raw) error {
 // writeRawDocument writes a raw document message to the transcoder.
 // Format: [length: u32 LE][type: u8 = 0x02][db_len: u8][db][coll_len: u8][coll][bson_doc]
 func (t *Transcoder) writeRawDocument(raw bson.Raw, database, collection string) error {
-	dbBytes := []byte(database)
-	collBytes := []byte(collection)
+	var dbBytes = []byte(database)
+	var collBytes = []byte(collection)
 
 	// Message length = 1 (type) + 1 (db_len) + len(db) + 1 (coll_len) + len(coll) + len(bson)
-	msgLen := uint32(1 + 1 + len(dbBytes) + 1 + len(collBytes) + len(raw))
+	var msgLen = uint32(1 + 1 + len(dbBytes) + 1 + len(collBytes) + len(raw))
 	var lenBuf [4]byte
 	binary.LittleEndian.PutUint32(lenBuf[:], msgLen)
 
@@ -174,7 +174,7 @@ func (t *Transcoder) transcodeBatch(count int, writeAll func() error) ([]*Transc
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	writeErr := make(chan error, 1)
+	var writeErr = make(chan error, 1)
 	go func() {
 		var err error
 		defer func() { writeErr <- err }()
@@ -191,9 +191,9 @@ func (t *Transcoder) transcodeBatch(count int, writeAll func() error) ([]*Transc
 		}
 	}()
 
-	responses := make([]*TranscoderResponse, count)
+	var responses = make([]*TranscoderResponse, count)
 	for i := 0; i < count; i++ {
-		resp, err := t.readResponse()
+		var resp, err = t.readResponse()
 		if err != nil {
 			// Pipe reads aren't context-aware, so an EOF here is ambiguous. It's
 			// either a real transcoder failure, or during shutdown the result
@@ -286,7 +286,7 @@ func (t *Transcoder) readFrame() ([]byte, error) {
 		return nil, fmt.Errorf("reading frame length: %w", err)
 	}
 
-	length := binary.LittleEndian.Uint32(lenBuf[:])
+	var length = binary.LittleEndian.Uint32(lenBuf[:])
 
 	// Sanity check: reject unreasonably large frames (> 100MB)
 	if length > 100*1024*1024 {
@@ -294,7 +294,7 @@ func (t *Transcoder) readFrame() ([]byte, error) {
 	}
 
 	// Read payload
-	payload := make([]byte, length)
+	var payload = make([]byte, length)
 	if _, err := io.ReadFull(t.stdout, payload); err != nil {
 		return nil, fmt.Errorf("reading frame payload: %w", err)
 	}
@@ -316,15 +316,15 @@ func parseDocumentMessage(payload []byte) (
 		return nil, false, "", "", fmt.Errorf("document message too short: %d bytes", len(payload))
 	}
 
-	offset := 1 // Skip message type (already validated by caller)
+	var offset = 1 // Skip message type (already validated by caller)
 
 	// Parse flags
-	flags := payload[offset]
+	var flags = payload[offset]
 	completedSplit = (flags & flagCompletedSplitEvent) != 0
 	offset++
 
 	// Parse database (length-prefixed string)
-	dbLen := int(payload[offset])
+	var dbLen = int(payload[offset])
 	offset++
 
 	if offset+dbLen > len(payload) {
@@ -339,7 +339,7 @@ func parseDocumentMessage(payload []byte) (
 		return nil, false, "", "", fmt.Errorf("no collection length byte at offset %d", offset)
 	}
 
-	collLen := int(payload[offset])
+	var collLen = int(payload[offset])
 	offset++
 
 	if offset+collLen > len(payload) {
@@ -363,7 +363,7 @@ func parseDocumentMessage(payload []byte) (
 // This is an internal method - callers should use Transcode or TranscodeBatch instead.
 func (t *Transcoder) readResponse() (*TranscoderResponse, error) {
 	// Read length-prefixed frame
-	payload, err := t.readFrame()
+	var payload, err = t.readFrame()
 	if err != nil {
 		return nil, fmt.Errorf("reading frame from transcoder: %w", err)
 	}
@@ -373,7 +373,7 @@ func (t *Transcoder) readResponse() (*TranscoderResponse, error) {
 	}
 
 	// Dispatch based on message type
-	msgType := payload[0]
+	var msgType = payload[0]
 
 	switch msgType {
 	case msgTypeSkip:
@@ -385,26 +385,26 @@ func (t *Transcoder) readResponse() (*TranscoderResponse, error) {
 	case msgTypeSkipNoFullDocument:
 		// Skip due to missing fullDocument on a non-delete event.
 		// Payload format: [type: u8][db_len: u8][db][coll_len: u8][coll]
-		offset := 1 // skip type byte
+		var offset = 1 // skip type byte
 		if offset >= len(payload) {
 			return nil, fmt.Errorf("skipNoFullDocument message too short for db_len")
 		}
-		dbLen := int(payload[offset])
+		var dbLen = int(payload[offset])
 		offset++
 		if offset+dbLen > len(payload) {
 			return nil, fmt.Errorf("skipNoFullDocument db length exceeds payload")
 		}
-		database := string(payload[offset : offset+dbLen])
+		var database = string(payload[offset : offset+dbLen])
 		offset += dbLen
 		if offset >= len(payload) {
 			return nil, fmt.Errorf("skipNoFullDocument message too short for coll_len")
 		}
-		collLen := int(payload[offset])
+		var collLen = int(payload[offset])
 		offset++
 		if offset+collLen > len(payload) {
 			return nil, fmt.Errorf("skipNoFullDocument collection length exceeds payload")
 		}
-		collection := string(payload[offset : offset+collLen])
+		var collection = string(payload[offset : offset+collLen])
 		return &TranscoderResponse{
 			IsSkip:              true,
 			FullDocumentMissing: true,
@@ -413,14 +413,14 @@ func (t *Transcoder) readResponse() (*TranscoderResponse, error) {
 		}, nil
 
 	case msgTypeDocument:
-		doc, completedSplit, database, collection, err := parseDocumentMessage(payload)
+		var doc, completedSplit, database, collection, err = parseDocumentMessage(payload)
 		if err != nil {
 			return nil, fmt.Errorf("parsing document message: %w", err)
 		}
 
 		// Database and collection now come from binary protocol header
 		// No JSON parsing needed - this is the optimization!
-		resp := &TranscoderResponse{
+		var resp = &TranscoderResponse{
 			IsSkip:              false,
 			Document:            doc,
 			CompletedSplitEvent: completedSplit,
