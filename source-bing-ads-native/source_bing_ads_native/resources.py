@@ -19,11 +19,11 @@ from .api import (
     snapshot_campaigns,
     token_exchange_scope,
 )
+from .builtin_reports import REPORTS
 from .errors import INVALID_CREDENTIALS, fault_of
 from .http import BingAdsHTTPMixin
 from .models import ConnectorState, EndpointConfig, OAUTH2_SPEC, utc_now
 from .reports import (
-    REPORTS,
     ReportDefinition,
     TICK,
     backfill_report,

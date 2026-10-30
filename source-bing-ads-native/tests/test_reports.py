@@ -18,8 +18,8 @@ from estuary_cdk.http import HTTPError, HTTPSession
 from source_bing_ads_native import reports
 from source_bing_ads_native.api import AccountContext
 from source_bing_ads_native.models import Account
+from source_bing_ads_native.builtin_reports import REPORTS
 from source_bing_ads_native.reports import (
-    REPORTS,
     backfill_report,
     earliest_day,
     fetch_report,
