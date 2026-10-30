@@ -184,30 +184,11 @@ class AdGroup(StampedDocument):
     CampaignId: str
 
 
-def _drop_asset_performance_labels(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            k: _drop_asset_performance_labels(v)
-            for k, v in value.items()
-            if k != "AssetPerformanceLabel"
-        }
-    if isinstance(value, list):
-        return [_drop_asset_performance_labels(v) for v in value]
-    return value
-
-
 class Ad(StampedDocument):
     Id: str
     AccountId: str
     CampaignId: str
     AdGroupId: str
-
-    # An asset's performance label is recomputed by Microsoft without anyone
-    # editing the ad, so keeping it would rewrite every ad on most snapshots.
-    @model_validator(mode="before")
-    @classmethod
-    def _drop_volatile_fields(cls, data: Any) -> Any:
-        return _drop_asset_performance_labels(data)
 
 
 # Performance Max campaigns have asset groups instead of ad groups and ads.
@@ -215,9 +196,3 @@ class AssetGroup(StampedDocument):
     Id: str
     AccountId: str
     CampaignId: str
-
-    # Same reason as Ad: asset links carry performance labels.
-    @model_validator(mode="before")
-    @classmethod
-    def _drop_volatile_fields(cls, data: Any) -> Any:
-        return _drop_asset_performance_labels(data)
