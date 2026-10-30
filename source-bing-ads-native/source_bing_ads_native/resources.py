@@ -44,11 +44,12 @@ def _configure_http(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig)
         update={"additionalTokenExchangeBody": {"scope": token_exchange_scope()}}
     )
     http.token_source = TokenSource(oauth_spec=oauth_spec, credentials=config.credentials)
-    http.developer_token = config.developer_token
+    developer_token = config.credentials.developer_token
+    http.developer_token = developer_token
     # Never log the token itself.
     log.info(
         "developer token configured",
-        {"is_sandbox_token": config.developer_token == SANDBOX_DEVELOPER_TOKEN},
+        {"is_sandbox_token": developer_token == SANDBOX_DEVELOPER_TOKEN},
     )
 
 
@@ -68,9 +69,8 @@ async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: Endp
         if fault is not None and INVALID_CREDENTIALS in fault.codes():
             raise ValidationError(
                 [
-                    "Microsoft rejected the credentials or the developer token. "
-                    "Re-authenticate with Microsoft, and confirm the developer token "
-                    f"is correct and is a production token.\n\n{fault.describe()}"
+                    "Microsoft rejected the credentials. Please re-authenticate "
+                    f"with Microsoft.\n\n{fault.describe()}"
                 ]
             )
         raise

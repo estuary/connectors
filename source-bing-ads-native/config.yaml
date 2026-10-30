@@ -8,7 +8,7 @@ credentials:
     client_id_sops: ENC[AES256_GCM,data:3uA07ZbmvEKeBWzOhfs6Wqg7KwIOluImHDGspDsh3eQO+Xme,iv:stG9/8qaW0iZQvKO2r5TZtAlv5wFULJALzfU1FsftGw=,tag:T1MlpTu+2TFrffyKEoSAhg==,type:str]
     client_secret_sops: ENC[AES256_GCM,data:B/zrVMqpySfRE6K/H2f+/0DMd3TPog/KvlI74tXCNMgAZE+EK8LleQ==,iv:+c20wzqR3ONeZy7W7WH8ieTTAh7xExpr3gOGq+M3VDg=,tag:zCt4hjkrenmDbg4K669Z4g==,type:str]
     refresh_token_sops: ENC[AES256_GCM,data:vvHWOZ1b4yRA/BSxcv8sqCWv+7OLKH78k7VN43ijTF9ue6E/J4esOIIAQbP6GDOIHq+JuETffcq3Sc3FAXTZ+e1rK+Y6WUrLTk0k4YLHPUebmBI2hfGnstBP/ZWhsdkCZQwmiFiYJ7t9fvM7mlIiRWhzO/ix/T7AAOiGdg9i5LStwXthAaLh54HOgCSL9cKvcrQ0GiR6B7lsDxFVoQ5bDJs92O7NOIO1n4ZpmnSbGstleNwSkrmFfdG2h+jt3oYaoFvdJIX0euViRZ9EMi59j05qse5UUItRRCUDl+h1isuOhJJOC9q6xjKh0XO/3uBBsckE17o8ZCPaxhytXmratt2yX3PDsU9geDjeOlZPvi8yPRXojww631LKkb041rU4lSkR9rmv7a7W+Rvpq5R/PYgdmDFsDE4kCeuZPrDvk5ZvkrgZVs4TfbelCZEXdZVuZ40mI+fdVJHh9TIXKMqW5stERofd2srcJvYKx98vCbvDSdh7oWjJzLU6sCMWT3E+ySRr4Im9O0DW92tWTwvGRYqN2a3zFKa9sjgdznzMR72IVfjghoCKyNPB7Aho7Ze8nV3VAPuh5c+GXq2oC95Z3niyZW3aewwpDYipH2CcU9BmysbYryJAw0a9cSRxfrgByy4Ua3HFu5mMwmkO7hBu+EbXJyuQ,iv:+iPFprPMWo07dJ/c7J57Sw/6i9qV9pF4DjU71Ds8oY8=,tag:D7dVE358UGNU71TL+uCm3Q==,type:str]
-developer_token_sops: ENC[AES256_GCM,data:l7ptdOpIBoHU,iv:4tNJzTXRfefYmAPPDViI8nBez5X3fD8IRgmy6DgxVOw=,tag:IuDiwBBOMIyMh/UhxCU5PA==,type:str]
+    developer_token_sops: ENC[AES256_GCM,data:o4VP7SFIOFFy,iv:OUur25NHm3jfrhUyYCYhzvEkO3QmpMLlwVehmhBPHpM=,tag:2K3w1n3L142+b2GkXjWbVA==,type:str]
 start_date: "2026-01-01T00:00:00Z"
 sops:
     encrypted_suffix: _sops
@@ -16,6 +16,6 @@ sops:
         - created_at: "2026-10-29T15:47:26Z"
           enc: CiUAdmEdwtxtepVWHFALINf3jQhBwWupEJej0cF5raogQk+0zcsLEkkAvE+nkyMJ1u3mo7vmF/0WfX+Jc5HkYrbQQ4+LjzYXtKOoIKXWP/DOQocSLmYlsCx4O13Xk5upOXlDqufv1cndrVJU4xg1fkAd
           resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-    lastmodified: "2026-10-29T17:02:13Z"
-    mac: ENC[AES256_GCM,data:cj+O3ry2+krpLvZhaDCbkdBqhNvZc5AAAPfu8PX6bkBLKPlq9EpAHW/WEskrnqyw0Tq9hEmxGrwUCJzL8Ez3TneOQa7/Prh51miuNcdgRQZ36V5ch0yUu6KKDiI/fza2d1X6EHjKXGJECoHJka7/HXKOBPDjt9+s/i7z60GQ5xM=,iv:84eRiZ/r2NBWI7wyqoa3ss/Avuf1cEbkLun+mAuZG7A=,tag:/Q+jl7TjYtZ4oyGFl7vYIg==,type:str]
+    lastmodified: "2026-10-30T01:05:13Z"
+    mac: ENC[AES256_GCM,data:Nrvzke4yHPhkcuH6A6IWJ2Ha31l30EzEAk9mPO69xKbFWfDuCj9xO2uZzoS9xM+LONEoLkuMg2cqFp9LD4+rohRsJ/oKKKkwtZu788DASKuJSUWWFiWvY20RoI8nxeeDCAejPg2KxWK+W2nYDEyOchJk2Qn1uVwhEwDXnZqcIqg=,iv:u4R4ib1K+LShSXgwLeDsFFYS8F+Qc6NxEetJaSugeEw=,tag:Ca8bnAz7OIGQHPjQ73if/A==,type:str]
     version: 3.13.3

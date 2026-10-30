@@ -17,7 +17,7 @@
           "title": "Advanced",
           "type": "object"
         },
-        "BaseOAuth2Credentials": {
+        "BingAdsOAuth2Credentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -39,12 +39,20 @@
               "secret": true,
               "title": "Refresh Token",
               "type": "string"
+            },
+            "developer_token": {
+              "description": "Injected by Flow.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Developer Token",
+              "type": "string"
             }
           },
           "required": [
             "client_id",
             "client_secret",
-            "refresh_token"
+            "refresh_token",
+            "developer_token"
           ],
           "title": "OAuth",
           "type": "object",
@@ -55,23 +63,16 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "OAuth Credentials": "#/$defs/BaseOAuth2Credentials"
+              "OAuth Credentials": "#/$defs/BingAdsOAuth2Credentials"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/BaseOAuth2Credentials"
+              "$ref": "#/$defs/BingAdsOAuth2Credentials"
             }
           ],
           "title": "Authentication"
-        },
-        "developer_token": {
-          "description": "The Microsoft Advertising developer token sent with every API request.",
-          "minLength": 1,
-          "secret": true,
-          "title": "Developer Token",
-          "type": "string"
         },
         "start_date": {
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
@@ -97,8 +98,7 @@
         }
       },
       "required": [
-        "credentials",
-        "developer_token"
+        "credentials"
       ],
       "title": "EndpointConfig",
       "type": "object"
