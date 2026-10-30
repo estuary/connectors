@@ -17,14 +17,14 @@ import (
 )
 
 // TestStreamV2BatchCutAtTheSizeLimit covers the size cap: a batch is sent once
-// its rows hold streamV2BatchFileSizeLimit bytes before compression, checked after
+// its rows hold streamV2BatchSizeLimit bytes before compression, checked after
 // each row. The rows compress well, so their compressed size stays far below the
 // limit.
 func TestStreamV2BatchCutAtTheSizeLimit(t *testing.T) {
 	var ctx = context.Background()
 	singleChannelLayout(t)
-	defer func(n int) { streamV2BatchFileSizeLimit = n }(streamV2BatchFileSizeLimit)
-	streamV2BatchFileSizeLimit = 1000
+	defer func(n int) { streamV2BatchSizeLimit = n }(streamV2BatchSizeLimit)
+	streamV2BatchSizeLimit = 1000
 
 	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/cap",
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
@@ -40,7 +40,7 @@ func TestStreamV2BatchCutAtTheSizeLimit(t *testing.T) {
 	// brings it to the limit.
 	var val = strings.Repeat("a", 300)
 	var rowBytes = len(fmt.Sprintf(`{"KEY":"k0","VAL":"%s"}`+"\n", val))
-	var cutRow = (streamV2BatchFileSizeLimit + rowBytes - 1) / rowBytes
+	var cutRow = (streamV2BatchSizeLimit + rowBytes - 1) / rowBytes
 
 	for i := 1; i <= cutRow; i++ {
 		require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("k%d", i%10), val}))

@@ -80,7 +80,7 @@ each shard four times the single-channel ceiling.
    │  materialize-snowflake (Go)             │
    │                                         │
    │    convert ──► batch file ──► append    │
-   │           (250 MiB after compression)   │
+   │      (256 MiB before compression)       │
    └────────────────────┬────────────────────┘
                         │  one append at a time, per channel,
                         │  HTTPS, gzip-compressed NDJSON
@@ -90,10 +90,10 @@ each shard four times the single-channel ceiling.
 
 The connector converts each document to a JSON row and writes it, gzip-compressed,
 to a local batch file for its channel. It appends the file to the channel once the
-file holds 250 MiB after compression, and at the end of the transaction. When
-documents switch to a different binding, it also appends the files of the binding
-before, so a binding that has stopped receiving documents holds no open file or
-compressor.
+file holds 256 MiB of rows before compression, and at the end of the transaction.
+When documents switch to a different binding, it also appends the files of the
+binding before, so a binding that has stopped receiving documents holds no open
+file or compressor.
 
 The API caps one append request at 4 MiB after compression. A batch over that
 cap takes the stage path instead. The connector asks the pipe for a stage bucket

@@ -44,12 +44,13 @@ func (b *streamV2Batch) empty() bool {
 	return b.rows == 0
 }
 
-// size is the number of compressed bytes written to the current file.
+// size is the number of bytes of rows written to the current file, before
+// compression.
 func (b *streamV2Batch) size() int {
 	if b.writer == nil {
 		return 0
 	}
-	return b.writer.Written()
+	return b.writer.WrittenUncompressed()
 }
 
 func (b *streamV2Batch) writeRow(row []any) error {
