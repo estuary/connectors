@@ -29,7 +29,7 @@ func TestCaptureWithUpdatedAtCursor(t *testing.T) {
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
-		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		var baseTime = time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
 
 		for i := 0; i < 10; i++ {
 			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (@p1, @p2, @p3)", tableName),
@@ -168,7 +168,7 @@ func TestDatetimeCursorRoundTrip(t *testing.T) {
 			setResourceCursor(t, cs.Bindings[0], "updated_at")
 
 			setShutdownAfterQuery(t, true)
-			baseTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+			var baseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 			// Clear the table before each timezone test
 			executeControlQuery(t, control, fmt.Sprintf("DELETE FROM %s", tableName))
@@ -216,7 +216,7 @@ func TestSmallDatetimeCursorRoundTrip(t *testing.T) {
 			setResourceCursor(t, cs.Bindings[0], "updated_at")
 
 			setShutdownAfterQuery(t, true)
-			baseTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+			var baseTime = time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
 
 			// Clear the table before each timezone test
 			executeControlQuery(t, control, fmt.Sprintf("DELETE FROM %s", tableName))

@@ -157,7 +157,7 @@ func connectSQLServer(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		"database": cfg.Database,
 	}).Info("connecting to database")
 
-	connector, err := mssqldb.NewConnector(cfg.ToURI())
+	var connector, err = mssqldb.NewConnector(cfg.ToURI())
 	if err != nil {
 		return nil, fmt.Errorf("error creating connector: %w", err)
 	}
