@@ -34,10 +34,10 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	seedPending func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage,
 	verifyDrained func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any),
 ) {
-	ctx := context.Background()
-	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
+	var ctx = context.Background()
+	var configJson, resourceConfigJson = rawJson(t, cfg), rawJson(t, res)
 
-	materializer, err := newMaterializer(ctx, "apply-drain-test", cfg, harnessFlags(t, cfg))
+	var materializer, err = newMaterializer(ctx, "apply-drain-test", cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	resourcePath, _, err := res.Parameters()
@@ -48,20 +48,20 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 		}
 	})
 
-	initial := loadSpec(t, "base.flow.proto")
-	updated := loadSpec(t, "add-single-optional.flow.proto")
+	var initial = loadSpec(t, "base.flow.proto")
+	var updated = loadSpec(t, "add-single-optional.flow.proto")
 
 	validateRes, err := driver.Validate(ctx, validateReq(initial, nil, configJson, resourceConfigJson))
 	require.NoError(t, err)
 	_, err = driver.Apply(ctx, applyReq(initial, nil, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 
-	baseSchema := dumpSchema(t, ctx, materializer, res)
-	stateJson := seedPending(t, initial)
+	var baseSchema = dumpSchema(t, ctx, materializer, res)
+	var stateJson = seedPending(t, initial)
 
 	validateRes, err = driver.Validate(ctx, validateReq(updated, initial, configJson, resourceConfigJson))
 	require.NoError(t, err)
-	req := applyReq(updated, initial, configJson, resourceConfigJson, validateRes, true)
+	var req = applyReq(updated, initial, configJson, resourceConfigJson, validateRes, true)
 	req.LastVersion = "priorVersion"
 	req.StateJson = stateJson
 
@@ -107,7 +107,7 @@ func reduceConnectorState(t *testing.T, prior json.RawMessage, update *pf.Connec
 	var before, patch any
 	require.NoError(t, json.Unmarshal(prior, &before))
 	require.NoError(t, json.Unmarshal(update.UpdatedJson, &patch))
-	reduced, err := json.Marshal(boilerplate.ApplyMergePatch(before, patch))
+	var reduced, err = json.Marshal(boilerplate.ApplyMergePatch(before, patch))
 	require.NoError(t, err)
 
 	return reduced

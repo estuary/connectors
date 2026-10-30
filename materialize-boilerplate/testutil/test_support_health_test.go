@@ -33,7 +33,7 @@ const (
 )
 
 func TestParseHealthLines(t *testing.T) {
-	stderr := strings.Join([]string{
+	var stderr = strings.Join([]string{
 		`INFO flowctl: some text log line`,
 		`{"ts":"2026-09-05T00:00:00Z","level":"info","message":"finished materialization commit","fields":{"round":1}}`,
 		healthLog(okTotal),
@@ -42,7 +42,7 @@ func TestParseHealthLines(t *testing.T) {
 		"",
 	}, "\n")
 
-	lines := ParseHealthLines([]byte(stderr))
+	var lines = ParseHealthLines([]byte(stderr))
 	require.Len(t, lines, 2)
 	require.Equal(t, "ok", lines[0].Verdict)
 	require.Equal(t, "total", lines[0].Fidelity)
@@ -52,7 +52,7 @@ func TestParseHealthLines(t *testing.T) {
 }
 
 func TestAssertTransactionHealth(t *testing.T) {
-	parse := func(entries ...string) []HealthLine {
+	var parse = func(entries ...string) []HealthLine {
 		var b strings.Builder
 		for _, e := range entries {
 			b.WriteString(healthLog(e) + "\n")
@@ -89,7 +89,7 @@ func TestAssertTransactionHealth(t *testing.T) {
 		{name: "unsharded line in sharded run", lines: parse(okTotal), shards: 2, declared: m.FidelityTotal, wantFail: "unsharded"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkTransactionHealth(tt.lines, tt.shards, tt.declared)
+			var err = checkTransactionHealth(tt.lines, tt.shards, tt.declared)
 			if tt.wantFail == "" {
 				require.NoError(t, err)
 			} else {

@@ -132,10 +132,10 @@ func (m TypeMigrations[T]) CanMigrate(from string, to T) bool {
 // MapProjection lifts a pf.Projection into a Projection with its FlatType
 // resolved.
 func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
-	mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
-	typesWithoutNull := getTypesWithoutNull(p.Inference.Types)
+	var mustExist = p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
+	var typesWithoutNull = getTypesWithoutNull(p.Inference.Types)
 
-	out := Projection{
+	var out = Projection{
 		Projection: p,
 		MustExist:  mustExist,
 	}
@@ -153,7 +153,7 @@ func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
 	if format, ok := m.AsFormattedNumeric(&p); ok {
 		switch format {
 		case m.StringFormatInteger:
-			flat := FlatTypeStringFormatInteger{}
+			var flat = FlatTypeStringFormatInteger{}
 			if inf := p.Inference.String_; inf != nil {
 				flat.InferenceString = *inf
 			}
@@ -162,7 +162,7 @@ func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
 			}
 			out.FlatType = flat
 		case m.StringFormatNumber:
-			flat := FlatTypeStringFormatNumber{}
+			var flat = FlatTypeStringFormatNumber{}
 			if inf := p.Inference.String_; inf != nil {
 				flat.InferenceString = *inf
 			}
@@ -183,13 +183,13 @@ func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
 
 	switch typesWithoutNull[0] {
 	case "integer":
-		flat := FlatTypeInteger{}
+		var flat = FlatTypeInteger{}
 		if inf := p.Inference.Numeric; inf != nil {
 			flat.InferenceNumeric = *inf
 		}
 		out.FlatType = flat
 	case "number":
-		flat := FlatTypeNumber{}
+		var flat = FlatTypeNumber{}
 		if inf := p.Inference.Numeric; inf != nil {
 			flat.InferenceNumeric = *inf
 		}
@@ -197,7 +197,7 @@ func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
 	case "boolean":
 		out.FlatType = FlatTypeBoolean{}
 	case "string":
-		flat := FlatTypeString{}
+		var flat = FlatTypeString{}
 		if inf := p.Inference.String_; inf != nil {
 			flat.InferenceString = *inf
 		}
@@ -210,7 +210,7 @@ func MapProjection(p pf.Projection, fc FieldConfiger) Projection {
 	case "object":
 		out.FlatType = FlatTypeObject{}
 	case "array":
-		flat := FlatTypeArray{}
+		var flat = FlatTypeArray{}
 		if inf := p.Inference.Array; inf != nil {
 			flat.InferenceArray = *inf
 			flat.NullableItems = !slices.Contains(p.Inference.Array.ItemTypes, "null")

@@ -75,8 +75,8 @@ func (v Validator) ValidateBinding(
 	fieldConfigJsonMap map[string]json.RawMessage,
 	lastSpec *pf.MaterializationSpec,
 ) (map[string][]*pm.Response_Validated_Constraint, error) {
-	lastBinding := FindLastBinding(path, lastSpec)
-	existingResource := v.is.GetResource(path)
+	var lastBinding = FindLastBinding(path, lastSpec)
+	var existingResource = v.is.GetResource(path)
 
 	for _, p := range boundCollection.Projections {
 		// Don't allow collection keys to be nullable unless they have a default value set. If a
@@ -86,8 +86,8 @@ func (v Validator) ValidateBinding(
 			continue
 		}
 
-		mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
-		hasDefault := p.Inference.DefaultJson != nil
+		var mustExist = p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
+		var hasDefault = p.Inference.DefaultJson != nil
 
 		if !mustExist && !hasDefault {
 			return nil, fmt.Errorf("cannot materialize collection '%s' with nullable key field '%s' unless it has a default value annotation", boundCollection.Name.String(), p.Field)
@@ -115,7 +115,7 @@ func (v Validator) ValidateBinding(
 		// Always validate as a new table if the existing table doesn't exist, since there is no
 		// existing table to be incompatible with. Also validate as a new table if we are going to
 		// be replacing the table.
-		newConstraints, err := v.validateNewBinding(boundCollection, deltaUpdates, fieldConfigJsonMap)
+		var newConstraints, err = v.validateNewBinding(boundCollection, deltaUpdates, fieldConfigJsonMap)
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +154,7 @@ func (v Validator) ValidateBinding(
 func ValidatedConstraints(
 	constraints map[string][]*pm.Response_Validated_Constraint,
 ) []*pm.Response_Validated_ProjectionConstraint {
-	list := make([]*pm.Response_Validated_ProjectionConstraint, 0, len(constraints))
+	var list = make([]*pm.Response_Validated_ProjectionConstraint, 0, len(constraints))
 
 	for _, field := range slices.Sorted(maps.Keys(constraints)) {
 		for _, c := range constraints[field] {
@@ -170,12 +170,12 @@ func (v Validator) validateNewBinding(
 	deltaUpdates bool,
 	fieldConfigJsonMap map[string]json.RawMessage,
 ) (map[string]*pm.Response_Validated_Constraint, error) {
-	constraints := make(map[string]*pm.Response_Validated_Constraint)
+	var constraints = make(map[string]*pm.Response_Validated_Constraint)
 
-	sawRoot := false
+	var sawRoot = false
 
 	for _, p := range boundCollection.Projections {
-		c, err := v.c.NewConstraints(&p, deltaUpdates, fieldConfigJsonMap[p.Field])
+		var c, err = v.c.NewConstraints(&p, deltaUpdates, fieldConfigJsonMap[p.Field])
 		if err != nil {
 			return nil, err
 		}
@@ -230,9 +230,9 @@ func (v Validator) validateMatchesExistingResource(
 		return nil, fmt.Errorf("collection %q has no root document projection, which is required for a standard-updates materialization", boundCollection.Name.String())
 	}
 
-	constraints := make(map[string][]*pm.Response_Validated_Constraint)
+	var constraints = make(map[string][]*pm.Response_Validated_Constraint)
 	for _, p := range boundCollection.Projections {
-		cs, err := v.projectionConstraints(p, existingResource, lastBinding, boundCollection, deltaUpdates, docFields, fieldConfigJsonMap)
+		var cs, err = v.projectionConstraints(p, existingResource, lastBinding, boundCollection, deltaUpdates, docFields, fieldConfigJsonMap)
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +278,7 @@ func (v Validator) projectionConstraints(
 	fieldConfigJsonMap map[string]json.RawMessage,
 ) ([]*pm.Response_Validated_Constraint, error) {
 	// Base constraint, the connector's opinion of the projection on its own.
-	base, err := v.c.NewConstraints(&p, deltaUpdates, fieldConfigJsonMap[p.Field])
+	var base, err = v.c.NewConstraints(&p, deltaUpdates, fieldConfigJsonMap[p.Field])
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +298,7 @@ func (v Validator) projectionConstraints(
 
 	case existingResource.GetField(p.Field) != nil:
 		// An already-materialized field: validate against its existing column.
-		c, err := v.constraintForExistingField(boundCollection, p, *existingResource.GetField(p.Field), fieldConfigJsonMap)
+		var c, err = v.constraintForExistingField(boundCollection, p, *existingResource.GetField(p.Field), fieldConfigJsonMap)
 		if err != nil {
 			return nil, err
 		}
@@ -335,23 +335,23 @@ func (v Validator) rootDocumentConstraints(
 	// Only the originally selected root document projection is allowed to be
 	// selected. If there is no prior spec, the first root document projection is
 	// the document.
-	selectedDoc := (lastBinding != nil && p.Field == lastBinding.FieldSelection.Document) ||
+	var selectedDoc = (lastBinding != nil && p.Field == lastBinding.FieldSelection.Document) ||
 		(lastBinding == nil && p.Field == docFields[0])
 
 	switch {
 	case selectedDoc:
-		docConstraint := &pm.Response_Validated_Constraint{
+		var docConstraint = &pm.Response_Validated_Constraint{
 			Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 			Reason: "This field is the document in the current materialization",
 		}
 
 		// Mark this field as the document, unless it is already materialized with
 		// an incompatible type, in which case surface the incompatibility.
-		existingField := existingResource.GetField(p.Field)
+		var existingField = existingResource.GetField(p.Field)
 		if existingField == nil {
 			return []*pm.Response_Validated_Constraint{docConstraint}, nil
 		}
-		c, err := v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
+		var c, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
 		if err != nil {
 			return nil, err
 		}
@@ -368,7 +368,7 @@ func (v Validator) rootDocumentConstraints(
 
 	default:
 		// Another root document projection when one is already materialized.
-		materializedAs := docFields[0]
+		var materializedAs = docFields[0]
 		if lastBinding != nil {
 			materializedAs = lastBinding.FieldSelection.Document
 		}
@@ -403,14 +403,14 @@ func (v Validator) addedKeyConstraints(
 	// The key location was already part of the selection: validate it against
 	// its existing column, or mark it optional if the destination doesn't report
 	// columns.
-	existingField := existingResource.GetField(p.Field)
+	var existingField = existingResource.GetField(p.Field)
 	if existingField == nil {
 		return []*pm.Response_Validated_Constraint{{
 			Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
 			Reason: "This location is part of the current materialization",
 		}}, nil
 	}
-	c, err := v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
+	var c, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating constraint for existing field: %w", err)
 	}
@@ -425,7 +425,7 @@ func (v Validator) constraintForExistingField(
 ) (*pm.Response_Validated_Constraint, error) {
 	var out *pm.Response_Validated_Constraint
 
-	rawConfig := fieldConfigJsonMap[p.Field]
+	var rawConfig = fieldConfigJsonMap[p.Field]
 	if compatible, err := v.c.Compatible(existingField, &p, rawConfig); err != nil {
 		return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", existingField.Name, p.Field, err)
 	} else if compatible {
@@ -441,12 +441,12 @@ func (v Validator) constraintForExistingField(
 			}
 		}
 	} else {
-		newDesc, err := v.c.DescriptionForType(&p, rawConfig)
+		var newDesc, err = v.c.DescriptionForType(&p, rawConfig)
 		if err != nil {
 			return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
 		}
 
-		existingType := strings.ToUpper(existingField.Type)
+		var existingType = strings.ToUpper(existingField.Type)
 		if existingField.CharacterMaxLength > 0 {
 			existingType += fmt.Sprintf("(%d)", existingField.CharacterMaxLength)
 		}
@@ -504,17 +504,17 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 		return constraints, nil
 	}
 
-	hasType := func(cs []*pm.Response_Validated_Constraint, t pm.Response_Validated_Constraint_Type) bool {
+	var hasType = func(cs []*pm.Response_Validated_Constraint, t pm.Response_Validated_Constraint_Type) bool {
 		return slices.ContainsFunc(cs, func(c *pm.Response_Validated_Constraint) bool {
 			return c.Type == t
 		})
 	}
 
-	requiredLocations := make(map[string]bool)
+	var requiredLocations = make(map[string]bool)
 	for field, cs := range constraints {
-		tooLong := len([]rune(field)) > maxLength
+		var tooLong = len([]rune(field)) > maxLength
 
-		p := collection.GetProjection(field)
+		var p = collection.GetProjection(field)
 
 		if hasType(cs, pm.Response_Validated_Constraint_LOCATION_REQUIRED) {
 			if _, ok := requiredLocations[p.Ptr]; !ok {

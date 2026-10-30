@@ -9,11 +9,11 @@ import (
 )
 
 func TestInfoSchema(t *testing.T) {
-	transform := func(in string) string {
+	var transform = func(in string) string {
 		return in + "_transformed"
 	}
-	transformPath := func(in []string) []string {
-		out := make([]string, 0, len(in))
+	var transformPath = func(in []string) []string {
+		var out = make([]string, 0, len(in))
 		for _, p := range in {
 			out = append(out, transform(p))
 		}
@@ -22,31 +22,31 @@ func TestInfoSchema(t *testing.T) {
 
 	// This is a convenience for testing - typically these endpoint-specific transformations are
 	// lossy and one-way.
-	untransform := func(in string) string {
+	var untransform = func(in string) string {
 		return strings.TrimSuffix(in, "_transformed")
 	}
 
-	is := NewInfoSchema(transformPath, transform, transform, true, false)
+	var is = NewInfoSchema(transformPath, transform, transform, true, false)
 
-	nullableField := ExistingField{
+	var nullableField = ExistingField{
 		Name:               transform("nullableField"),
 		Nullable:           true,
 		Type:               transform("string"),
 		CharacterMaxLength: 0,
 	}
-	loc1 := []string{"first", "location"}
-	res1 := is.PushResource(transformPath(loc1)...)
+	var loc1 = []string{"first", "location"}
+	var res1 = is.PushResource(transformPath(loc1)...)
 	// Idempotent resource pushing.
 	require.Equal(t, res1, is.PushResource(transformPath(loc1)...))
 
-	nonNullableField := ExistingField{
+	var nonNullableField = ExistingField{
 		Name:               transform("nonNullableField"),
 		Nullable:           false,
 		Type:               transform("integer"),
 		CharacterMaxLength: 0,
 	}
-	loc2 := []string{"second", "location"}
-	res2 := is.PushResource(transformPath(loc2)...)
+	var loc2 = []string{"second", "location"}
+	var res2 = is.PushResource(transformPath(loc2)...)
 
 	res1.PushField(nullableField)
 	res2.PushField(nonNullableField)
@@ -57,7 +57,7 @@ func TestInfoSchema(t *testing.T) {
 
 	t.Run("GetField", func(t *testing.T) {
 		// Gets the first field alright.
-		got := res1.GetField(untransform(nullableField.Name))
+		var got = res1.GetField(untransform(nullableField.Name))
 		require.Equal(t, nullableField, *got)
 
 		// Also gets the second field.
@@ -74,17 +74,17 @@ func TestInfoSchema(t *testing.T) {
 	})
 
 	t.Run("AllFields", func(t *testing.T) {
-		got := res1.AllFields()
+		var got = res1.AllFields()
 		require.Len(t, got, 1)
 	})
 
 	t.Run("InSelectedFields", func(t *testing.T) {
-		fs := pf.FieldSelection{
+		var fs = pf.FieldSelection{
 			Values: []string{untransform(nullableField.Name)},
 		}
 
 		// Is in the selected fields.
-		got, err := is.inSelectedFields(nullableField.Name, fs)
+		var got, err = is.inSelectedFields(nullableField.Name, fs)
 		require.NoError(t, err)
 		require.True(t, got)
 
@@ -103,13 +103,13 @@ func TestInfoSchema(t *testing.T) {
 	})
 
 	t.Run("AmbiguousResourcePaths", func(t *testing.T) {
-		translate := func(in string) string {
+		var translate = func(in string) string {
 			return strings.ToLower(in)
 		}
 
-		is := NewInfoSchema(
+		var is = NewInfoSchema(
 			func(in []string) []string {
-				out := make([]string, 0, len(in))
+				var out = make([]string, 0, len(in))
 				for _, i := range in {
 					out = append(out, translate(i))
 				}
@@ -121,7 +121,7 @@ func TestInfoSchema(t *testing.T) {
 			false,
 		)
 
-		paths := [][]string{
+		var paths = [][]string{
 			{"schema", "table"},
 			{"Schema", "table"},
 			{"schema", "TABLE"},
@@ -132,7 +132,7 @@ func TestInfoSchema(t *testing.T) {
 			{"ALT", "table"},
 		}
 
-		want := [][]string{
+		var want = [][]string{
 			{"alt", "TABLE"},
 			{"ALT", "table"},
 			{"schema", "table"},
@@ -144,13 +144,13 @@ func TestInfoSchema(t *testing.T) {
 	})
 
 	t.Run("namespaces", func(t *testing.T) {
-		translate := func(in string) string {
+		var translate = func(in string) string {
 			return strings.ToLower(in)
 		}
 
-		is := NewInfoSchema(
+		var is = NewInfoSchema(
 			func(in []string) []string {
-				out := make([]string, 0, len(in))
+				var out = make([]string, 0, len(in))
 				for _, i := range in {
 					out = append(out, translate(i))
 				}

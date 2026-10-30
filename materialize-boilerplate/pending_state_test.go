@@ -9,7 +9,7 @@ import (
 )
 
 func TestStateUnchanged(t *testing.T) {
-	prior := json.RawMessage(`{"a":{"q":"Q1"},"b":{"q":"Q2"}}`)
+	var prior = json.RawMessage(`{"a":{"q":"Q1"},"b":{"q":"Q2"}}`)
 
 	for _, tt := range []struct {
 		name   string

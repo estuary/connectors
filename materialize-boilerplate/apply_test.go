@@ -24,7 +24,7 @@ var applyFS embed.FS
 func loadApplySpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := applyFS.ReadFile(filepath.Join("testdata/apply/generated_specs", path))
+	var specBytes, err = applyFS.ReadFile(filepath.Join("testdata/apply/generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -40,7 +40,7 @@ func TestComputeCommonUpdates(t *testing.T) {
 		want         *computedUpdates
 	}
 
-	tests := []testCase{
+	var tests = []testCase{
 		{
 			name:         "new materialization",
 			originalSpec: nil,
@@ -137,8 +137,8 @@ func TestComputeCommonUpdates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			is := testInfoSchemaFromSpec(t, tt.originalSpec, simpleTestTransform)
-			got, err := computeCommonUpdates(tt.originalSpec, tt.newSpec, is)
+			var is = testInfoSchemaFromSpec(t, tt.originalSpec, simpleTestTransform)
+			var got, err = computeCommonUpdates(tt.originalSpec, tt.newSpec, is)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
@@ -150,24 +150,24 @@ func TestComputeCommonUpdates(t *testing.T) {
 func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform func(string) string) *InfoSchema {
 	t.Helper()
 
-	transformPath := func(in []string) []string {
-		out := make([]string, 0, len(in))
+	var transformPath = func(in []string) []string {
+		var out = make([]string, 0, len(in))
 		for _, p := range in {
 			out = append(out, transform(p))
 		}
 		return out
 	}
 
-	is := NewInfoSchema(transformPath, transform, transform, false, false)
+	var is = NewInfoSchema(transformPath, transform, transform, false, false)
 
 	if s == nil || len(s.Bindings)+len(s.InactiveBindings) == 0 {
 		return is
 	}
 
 	for _, b := range append(s.Bindings, s.InactiveBindings...) {
-		res := is.PushResource(transformPath(b.ResourcePath)...)
+		var res = is.PushResource(transformPath(b.ResourcePath)...)
 		for _, f := range b.FieldSelection.AllFields() {
-			proj := *b.Collection.GetProjection(f)
+			var proj = *b.Collection.GetProjection(f)
 
 			res.PushField(ExistingField{
 				Name:     transform(f),

@@ -32,7 +32,7 @@ type computedUpdates struct {
 }
 
 func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*computedUpdates, error) {
-	out := computedUpdates{
+	var out = computedUpdates{
 		updatedBindings: make(map[int]updateBinding),
 	}
 
@@ -40,7 +40,7 @@ func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*
 		// The existing binding spec is used to extract various properties that can't be learned
 		// from introspecting the destination system, such as the backfill counter and if the
 		// materialization was previously delta updates.
-		lastBinding := FindLastBinding(nextBinding.ResourcePath, last)
+		var lastBinding = FindLastBinding(nextBinding.ResourcePath, last)
 		if existingResource := is.GetResource(nextBinding.ResourcePath); existingResource == nil {
 			// Resource does not yet exist, and must be created.
 			out.newBindings = append(out.newBindings, bindingIdx)
@@ -50,7 +50,7 @@ func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*
 			out.backfillBindings = append(out.backfillBindings, bindingIdx)
 		} else {
 			// Resource does exist and may need updated for changes in the binding specification.
-			u, err := computeBindingUpdate(is, existingResource, lastBinding, nextBinding)
+			var u, err = computeBindingUpdate(is, existingResource, lastBinding, nextBinding)
 			if err != nil {
 				return nil, err
 			}
@@ -62,17 +62,17 @@ func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*
 }
 
 func computeBindingUpdate(is *InfoSchema, existing *ExistingResource, last, next *pf.MaterializationSpec_Binding) (*updateBinding, error) {
-	update := updateBinding{
+	var update = updateBinding{
 		newlyDeltaUpdates: last != nil && !last.DeltaUpdates && next.DeltaUpdates,
 	}
 
 	for _, field := range next.FieldSelection.AllFields() {
-		projection := *next.Collection.GetProjection(field)
+		var projection = *next.Collection.GetProjection(field)
 
 		if existingField := existing.GetField(field); existingField != nil {
-			newRequired := projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
-			newlyNullable := !existingField.Nullable && !newRequired
-			projectionHasDefault := projection.Inference.DefaultJson != nil
+			var newRequired = projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
+			var newlyNullable = !existingField.Nullable && !newRequired
+			var projectionHasDefault = projection.Inference.DefaultJson != nil
 			if newlyNullable && !existingField.HasDefault && !projectionHasDefault {
 				// The field has newly been made nullable and neither the existing field nor
 				// the projection has a default value. The existing field will need to be
@@ -89,7 +89,7 @@ func computeBindingUpdate(is *InfoSchema, existing *ExistingResource, last, next
 	// Fields that exist in the endpoint as non-nullable but aren't in the field selection
 	// need to be made nullable too.
 	for _, existingField := range existing.AllFields() {
-		inFieldSelection, err := is.inSelectedFields(existingField.Name, next.FieldSelection)
+		var inFieldSelection, err = is.inSelectedFields(existingField.Name, next.FieldSelection)
 		if err != nil {
 			return nil, fmt.Errorf("determining if existing field %q is in field selection for resource %q: %w", existingField.Name, next.ResourcePath, err)
 		}
@@ -104,7 +104,7 @@ func computeBindingUpdate(is *InfoSchema, existing *ExistingResource, last, next
 
 func runActions(ctx context.Context, actions []ActionApplyFn, descriptions []string, concurrent bool) error {
 	if concurrent {
-		group, groupCtx := errgroup.WithContext(ctx)
+		var group, groupCtx = errgroup.WithContext(ctx)
 		group.SetLimit(maxConcurrentUpdateActions)
 
 		for i, a := range actions {

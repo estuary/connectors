@@ -28,9 +28,9 @@ func drainPendingState[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 	is *InfoSchema,
 	stateKeys []string,
 ) (*pf.ConnectorState, error) {
-	lastSpec := req.LastMaterialization
+	var lastSpec = req.LastMaterialization
 
-	mapped := make([]MappedBinding[EC, RC, MT], 0, len(lastSpec.Bindings))
+	var mapped = make([]MappedBinding[EC, RC, MT], 0, len(lastSpec.Bindings))
 	for idx := range lastSpec.Bindings {
 		if mb, err := buildMappedBinding(endpointCfg, materializer, *lastSpec, idx); err != nil {
 			return nil, fmt.Errorf("building mapped binding %d of the last-applied specification: %w", idx, err)
@@ -41,7 +41,7 @@ func drainPendingState[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 
 	// The Apply RPC runs on shard zero before any transactions session opens,
 	// so the transactor stands in for the task's entire key range.
-	open := pm.Request_Open{
+	var open = pm.Request_Open{
 		Materialization: lastSpec,
 		Version:         req.LastVersion,
 		Range: &pf.RangeSpec{
@@ -51,7 +51,7 @@ func drainPendingState[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 		StateJson: req.StateJson,
 	}
 
-	transactor, err := materializer.NewTransactor(ctx, open, *is, mapped, m.NewBindingEvents())
+	var transactor, err = materializer.NewTransactor(ctx, open, *is, mapped, m.NewBindingEvents())
 	if err != nil {
 		return nil, fmt.Errorf("building transactor: %w", err)
 	}
@@ -100,7 +100,7 @@ func stateUnchanged(prior json.RawMessage, update *pf.ConnectorState) bool {
 // ApplyMergePatch applies an RFC 7396 JSON merge patch to target, returning
 // the patched value without modifying target.
 func ApplyMergePatch(target, patch any) any {
-	patchObj, ok := patch.(map[string]any)
+	var patchObj, ok = patch.(map[string]any)
 	if !ok {
 		return patch
 	}
@@ -110,7 +110,7 @@ func ApplyMergePatch(target, patch any) any {
 		targetObj = nil // a non-object target is replaced by the patched object
 	}
 
-	out := make(map[string]any, len(targetObj)+len(patchObj))
+	var out = make(map[string]any, len(targetObj)+len(patchObj))
 	for k, v := range targetObj {
 		out[k] = v
 	}

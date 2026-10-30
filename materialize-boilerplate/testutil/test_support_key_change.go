@@ -39,11 +39,11 @@ func RunKeyChangeMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.F
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	ctx := context.Background()
+	var ctx = context.Background()
 	var snap strings.Builder
 
-	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
-	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var bundled = RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	var suffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	for _, taskName := range taskNames(bundled) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
@@ -66,16 +66,16 @@ func runKeyChangeMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplat
 ) string {
 	var snap strings.Builder
 
-	rndSuffix := "_" + uuid.NewString()[:8] + suffix
-	workingTableName := "key_change_test" + rndSuffix
-	workingTaskName := taskName + rndSuffix
+	var rndSuffix = "_" + uuid.NewString()[:8] + suffix
+	var workingTableName = "key_change_test" + rndSuffix
+	var workingTaskName = taskName + rndSuffix
 
-	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	var cfg = decryptConfig[EC](t, bundled, taskName)
+	var materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
-	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
-	resCfgRaw := rawJson(t, res)
+	var res = makeResourceFn(workingTableName, false).WithDefaults(cfg)
+	var resCfgRaw = rawJson(t, res)
 
 	bundled, err = sjson.SetRawBytes(bundled, fmt.Sprintf("materializations.%s.bindings.0.resource", taskName), resCfgRaw)
 	require.NoError(t, err)
@@ -86,8 +86,8 @@ func runKeyChangeMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplat
 	)
 	require.NoError(t, err)
 
-	rawCfg := decryptConfigRaw(t, bundled, workingTaskName)
-	flags := "retain_existing_data_on_backfill"
+	var rawCfg = decryptConfigRaw(t, bundled, workingTaskName)
+	var flags = "retain_existing_data_on_backfill"
 	if base := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); base != "" {
 		flags = base + "," + flags
 	}
@@ -104,8 +104,8 @@ func runKeyChangeMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplat
 		cleanupTestTasks(t, ctx, materializer, suffix)
 	})
 
-	preview := func(source []byte, fixture string) []byte {
-		sourcePath := filepath.Join(t.TempDir(), "source.flow.yaml")
+	var preview = func(source []byte, fixture string) []byte {
+		var sourcePath = filepath.Join(t.TempDir(), "source.flow.yaml")
 		require.NoError(t, os.WriteFile(sourcePath, source, 0o600))
 
 		return RunFlowctl(
@@ -118,7 +118,7 @@ func runKeyChangeMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplat
 			"--output-apply",
 		)
 	}
-	sanitize := func(desc []byte) []byte {
+	var sanitize = func(desc []byte) []byte {
 		for _, s := range actionDescSanitizers {
 			desc = []byte(s(string(desc)))
 		}
@@ -130,18 +130,18 @@ func runKeyChangeMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplat
 
 	// flowctl can't present a previously applied spec, so the backfill is
 	// applied directly against the live base spec.
-	initial := loadSpec(t, "key-change-base.flow.proto")
-	updated := loadSpec(t, "key-change-group-by.flow.proto")
+	var initial = loadSpec(t, "key-change-base.flow.proto")
+	var updated = loadSpec(t, "key-change-group-by.flow.proto")
 
 	// Both selections are limited to the fields the base phase materialized,
 	// so that the backfill differs from it only by its group-by.
-	is := boilerplate.InitInfoSchema(materializer.Config())
+	var is = boilerplate.InitInfoSchema(materializer.Config())
 	require.NoError(t, materializer.PopulateInfoSchema(ctx, is, [][]string{path}))
-	existing := is.GetResource(path)
-	materialized := func(fields []string) []string {
+	var existing = is.GetResource(path)
+	var materialized = func(fields []string) []string {
 		return slices.DeleteFunc(fields, func(f string) bool { return existing.GetField(f) == nil })
 	}
-	limitSelection := func(sel *pf.FieldSelection) {
+	var limitSelection = func(sel *pf.FieldSelection) {
 		sel.Keys, sel.Values = materialized(sel.Keys), materialized(sel.Values)
 		if existing.GetField(sel.Document) == nil {
 			sel.Document = ""
@@ -155,7 +155,7 @@ func runKeyChangeMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplat
 
 	validateRes, err = driver.Validate(ctx, validateReq(updated, initial, rawCfg, resCfgRaw))
 	require.NoError(t, err)
-	req := applyReq(updated, initial, rawCfg, resCfgRaw, validateRes, true)
+	var req = applyReq(updated, initial, rawCfg, resCfgRaw, validateRes, true)
 	limitSelection(&req.Materialization.Bindings[0].FieldSelection)
 	applied, err := driver.Apply(ctx, req)
 	require.NoError(t, err)

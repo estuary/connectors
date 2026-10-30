@@ -32,7 +32,7 @@ import (
 func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := os.ReadFile(testdataPath("validate_apply_test_cases", "generated_specs", path))
+	var specBytes, err = os.ReadFile(testdataPath("validate_apply_test_cases", "generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -50,17 +50,17 @@ const testItemIdentifier = "_flow_test_"
 const flowCheckpointsTableName = "flow_checkpoints_v1"
 
 func testdataPath(parts ...string) string {
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(filename)
+	var _, filename, _, _ = runtime.Caller(0)
+	var dir = filepath.Dir(filename)
 
-	elems := append([]string{dir, "..", "testdata"}, parts...)
+	var elems = append([]string{dir, "..", "testdata"}, parts...)
 	return filepath.Join(elems...)
 }
 
 func relativePath(t *testing.T, file string) string {
-	_, filename, _, ok := runtime.Caller(0)
+	var _, filename, _, ok = runtime.Caller(0)
 	require.True(t, ok)
-	dir := filepath.Dir(filename)
+	var dir = filepath.Dir(filename)
 
 	return filepath.Join(dir, "..", file)
 }
@@ -83,8 +83,8 @@ func taskNames(bundled []byte) []string {
 func snapshotT(t *testing.T, got string) {
 	t.Helper()
 
-	name := strings.ReplaceAll(t.Name(), "/", "-")
-	path := filepath.Join(".snapshots", name)
+	var name = strings.ReplaceAll(t.Name(), "/", "-")
+	var path = filepath.Join(".snapshots", name)
 
 	// cupaloy writes a lone string verbatim with a trailing newline, so this
 	// reproduces exactly what it would compare against.
@@ -107,10 +107,10 @@ func snapshotT(t *testing.T, got string) {
 func snapshotNamed(t *testing.T, name string, got string) {
 	t.Helper()
 
-	path := filepath.Join(".snapshots", name)
-	want := got + "\n"
+	var path = filepath.Join(".snapshots", name)
+	var want = got + "\n"
 
-	prev, err := os.ReadFile(path)
+	var prev, err = os.ReadFile(path)
 	if err == nil && string(prev) == want {
 		return
 	}
@@ -169,11 +169,11 @@ func stripRuntimeNextOutput(snapshot string) string {
 func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
 	t.Helper()
 
-	path := filepath.Join(".snapshots", strings.ReplaceAll(t.Name(), "/", "-"))
-	golden, err := os.ReadFile(path)
+	var path = filepath.Join(".snapshots", strings.ReplaceAll(t.Name(), "/", "-"))
+	var golden, err = os.ReadFile(path)
 	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
 
-	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
+	var want = strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
 	if want == got {
 		return
 	}
@@ -191,10 +191,10 @@ func RunTestAllTasks[EC boilerplate.EndpointConfiger](
 	sourcePath string,
 	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC),
 ) {
-	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	var bundled = RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
 	for _, taskName := range taskNames(bundled) {
 		t.Log("running test for", taskName)
-		cfg := decryptConfig[EC](t, bundled, taskName)
+		var cfg = decryptConfig[EC](t, bundled, taskName)
 		testFn(t, bundled, taskName, cfg)
 	}
 }
@@ -213,12 +213,12 @@ func RunTestAllTasksParallel[EC boilerplate.EndpointConfiger](
 	sourcePath string,
 	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC) string,
 ) ([]string, map[string]string) {
-	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
-	names := taskNames(bundled)
+	var bundled = RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	var names = taskNames(bundled)
 
-	results := make(map[string]string, len(names))
+	var results = make(map[string]string, len(names))
 	var mu sync.Mutex
-	sem := make(chan struct{}, maxParallelTasks)
+	var sem = make(chan struct{}, maxParallelTasks)
 
 	// Use a group subtest so that t.Run blocks until all parallel subtests complete.
 	t.Run("tasks", func(t *testing.T) {
@@ -228,8 +228,8 @@ func RunTestAllTasksParallel[EC boilerplate.EndpointConfiger](
 				sem <- struct{}{}
 				defer func() { <-sem }()
 				t.Log("running test for", taskName)
-				cfg := decryptConfig[EC](t, bundled, taskName)
-				result := testFn(t, bundled, taskName, cfg)
+				var cfg = decryptConfig[EC](t, bundled, taskName)
+				var result = testFn(t, bundled, taskName, cfg)
 				mu.Lock()
 				results[taskName] = result
 				mu.Unlock()
@@ -257,9 +257,9 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	actionDescSanitizers []func(string) string,
 	runtime RuntimeConfig,
 ) {
-	ctx := context.Background()
+	var ctx = context.Background()
 	var snap strings.Builder
-	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var tsSuffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
@@ -287,10 +287,10 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	actionDescSanitizers []func(string) string,
 	runtime RuntimeConfig,
 ) {
-	ctx := context.Background()
-	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var ctx = context.Background()
+	var tsSuffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+	var names, results = RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
 		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime)
 	})
 
@@ -329,15 +329,15 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
-	ctx := context.Background()
+	var ctx = context.Background()
 	var snap strings.Builder
 
-	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
-	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var bundled = RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	var tsSuffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	for _, taskName := range taskNames(bundled) {
-		cfg := decryptConfig[EC](t, bundled, taskName)
-		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+		var cfg = decryptConfig[EC](t, bundled, taskName)
+		var materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -368,9 +368,9 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 				},
 			},
 		} {
-			tableName := tc.tableStartsWith + uuid.NewString()[:8] + tsSuffix
-			res := makeResourceFn(tableName, false).WithDefaults(cfg)
-			resourcePath, _, err := res.Parameters()
+			var tableName = tc.tableStartsWith + uuid.NewString()[:8] + tsSuffix
+			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
+			var resourcePath, _, err = res.Parameters()
 			require.NoError(t, err)
 			testResourcePaths = append(testResourcePaths, resourcePath)
 			tc.do(res)
@@ -390,11 +390,11 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
-	ctx := context.Background()
-	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var ctx = context.Background()
+	var tsSuffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	var names, results = RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+		var materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -425,9 +425,9 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 				},
 			},
 		} {
-			tableName := tc.tableStartsWith + uuid.NewString()[:8] + tsSuffix
-			res := makeResourceFn(tableName, false).WithDefaults(cfg)
-			resourcePath, _, err := res.Parameters()
+			var tableName = tc.tableStartsWith + uuid.NewString()[:8] + tsSuffix
+			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
+			var resourcePath, _, err = res.Parameters()
 			require.NoError(t, err)
 			testResourcePaths = append(testResourcePaths, resourcePath)
 			tc.do(res)
@@ -466,11 +466,11 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	ctx := context.Background()
+	var ctx = context.Background()
 	var snap strings.Builder
 
-	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
-	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var bundled = RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	var suffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	for _, taskName := range taskNames(bundled) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
@@ -511,11 +511,11 @@ func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate
 	phases []FeatureFlagMigrationPhase,
 	actionDescSanitizers []func(string) string,
 ) {
-	ctx := context.Background()
+	var ctx = context.Background()
 	var snap strings.Builder
 
-	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
-	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var bundled = RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	var suffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	for _, taskName := range taskNames(bundled) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
@@ -538,15 +538,15 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 ) string {
 	var snap strings.Builder
 
-	rndSuffix := "_" + uuid.NewString()[:8] + suffix
-	workingTableName := "migration_test" + rndSuffix
-	workingTaskName := taskName + rndSuffix
+	var rndSuffix = "_" + uuid.NewString()[:8] + suffix
+	var workingTableName = "migration_test" + rndSuffix
+	var workingTaskName = taskName + rndSuffix
 
-	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	var cfg = decryptConfig[EC](t, bundled, taskName)
+	var materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
-	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
+	var res = makeResourceFn(workingTableName, false).WithDefaults(cfg)
 	resCfgRaw, err := json.Marshal(res)
 	require.NoError(t, err)
 
@@ -567,13 +567,13 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 	// The config is decrypted once so that each phase can override its feature
 	// flags. flowctl passes a plaintext (non-sops) config to the connector
 	// unchanged, so writing the decrypted config back inline is sufficient.
-	rawCfg := decryptConfigRaw(t, bundled, workingTaskName)
+	var rawCfg = decryptConfigRaw(t, bundled, workingTaskName)
 
 	// The phase's flags are appended to whatever the source config already sets
 	// (later entries win in ParseFeatureFlags), so that flags the test relies on
 	// - notably allow_existing_tables_for_new_bindings, which lets each phase
 	// re-apply to the table created by the previous phase - are preserved.
-	baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String()
+	var baseFlags = gjson.GetBytes(rawCfg, "advanced.feature_flags").String()
 
 	path, _, err := res.Parameters()
 	require.NoError(t, err)
@@ -588,11 +588,11 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
 		}
 
-		phaseFlags := phase.FeatureFlags
+		var phaseFlags = phase.FeatureFlags
 		if baseFlags != "" {
 			phaseFlags = baseFlags + "," + phaseFlags
 		}
-		phaseCfg, err := sjson.SetBytes(rawCfg, "advanced.feature_flags", phaseFlags)
+		var phaseCfg, err = sjson.SetBytes(rawCfg, "advanced.feature_flags", phaseFlags)
 		require.NoError(t, err)
 
 		phaseBundled, err := sjson.SetRawBytes(
@@ -602,10 +602,10 @@ func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerpl
 		)
 		require.NoError(t, err)
 
-		source := filepath.Join(t.TempDir(), "source.flow.yaml")
+		var source = filepath.Join(t.TempDir(), "source.flow.yaml")
 		require.NoError(t, os.WriteFile(source, phaseBundled, 0o600))
 
-		actionDescription := RunFlowctl(
+		var actionDescription = RunFlowctl(
 			t,
 			"raw", "preview-next",
 			"--name", workingTaskName,
@@ -635,10 +635,10 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	ctx := context.Background()
-	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	var ctx = context.Background()
+	var suffix = testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+	var names, results = RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
 		return runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers)
 	})
 
@@ -664,12 +664,12 @@ func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 
 	var snap strings.Builder
 
-	path, _, err := res.Parameters()
+	var path, _, err = res.Parameters()
 	require.NoError(t, err)
 
-	schema := dumpSchema(t, ctx, m, res)
+	var schema = dumpSchema(t, ctx, m, res)
 
-	action := strings.ReplaceAll(string(actionDescription), rndSuffix, "")
+	var action = strings.ReplaceAll(string(actionDescription), rndSuffix, "")
 	action = strings.ReplaceAll(string(action), strings.ToUpper(rndSuffix), "") // a convenience for Snowflake, which uppercases table identifiers
 
 	snap.WriteString("Resource: " + strings.TrimSuffix(strings.Join(path, "."), rndSuffix))
@@ -679,7 +679,7 @@ func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	snap.WriteString(schema)
 	snap.WriteString("\n")
 	if withTableData {
-		data, err := SnapshotResource(ctx, m, path)
+		var data, err = SnapshotResource(ctx, m, path)
 		require.NoError(t, err)
 		snap.WriteString("Table Data:\n")
 		snap.WriteString(data)
@@ -697,11 +697,11 @@ func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 func decryptConfigRaw(t *testing.T, bundled []byte, taskName string) json.RawMessage {
 	t.Helper()
 
-	raw := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
+	var raw = json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
 	if gjson.GetBytes(raw, "sops").Exists() {
 		// Decrypt with sops and strip _sops suffixes.
-		sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
-		jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+		var sopsCmd = exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
+		var jqCmd = exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
 		sopsCmd.Stdin = bytes.NewReader(raw)
 		var err error
 		jqCmd.Stdin, err = sopsCmd.StdoutPipe()
@@ -733,11 +733,11 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	cfg EC,
 	res RC,
 ) {
-	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
-	fixture := loadSpec(t, "big-schema.flow.proto")
+	var configJson, resourceConfigJson = rawJson(t, cfg), rawJson(t, res)
+	var fixture = loadSpec(t, "big-schema.flow.proto")
 
 	// Initial validation with no previously existing table.
-	validateRes, err := driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
+	var validateRes, err = driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
 	snap.WriteString("Big Schema Initial Constraints:\n")
@@ -747,7 +747,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 
-	sch := dumpSchema(t, ctx, m, res)
+	var sch = dumpSchema(t, ctx, m, res)
 
 	// Validate again.
 	validateRes, err = driver.Validate(ctx, validateReq(fixture, fixture, configJson, resourceConfigJson))
@@ -762,7 +762,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.Equal(t, sch, dumpSchema(t, ctx, m, res))
 
 	// Validate with most of the field types changed somewhat randomly.
-	changed := loadSpec(t, "big-schema-changed.flow.proto")
+	var changed = loadSpec(t, "big-schema-changed.flow.proto")
 	validateRes, err = driver.Validate(ctx, validateReq(changed, fixture, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
@@ -774,7 +774,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 
 	// Validate and apply the schema with all fields removed from required and snapshot the
 	// table output.
-	nullable := loadSpec(t, "big-schema-nullable.flow.proto")
+	var nullable = loadSpec(t, "big-schema-nullable.flow.proto")
 	validateRes, err = driver.Validate(ctx, validateReq(nullable, fixture, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
@@ -813,7 +813,7 @@ func runAddAndRemoveFieldsApplyTests[EC boilerplate.EndpointConfiger, FC boilerp
 	cfg EC,
 	res RC,
 ) {
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		newSpec *pf.MaterializationSpec
 	}{
@@ -835,15 +835,15 @@ func runAddAndRemoveFieldsApplyTests[EC boilerplate.EndpointConfiger, FC boilerp
 		},
 	}
 
-	resourcePath, _, err := res.Parameters()
+	var resourcePath, _, err = res.Parameters()
 	require.NoError(t, err)
-	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
+	var configJson, resourceConfigJson = rawJson(t, cfg), rawJson(t, res)
 
 	for _, tt := range tests {
-		initial := loadSpec(t, "base.flow.proto")
+		var initial = loadSpec(t, "base.flow.proto")
 
 		// Validate and Apply the base spec.
-		validateRes, err := driver.Validate(ctx, validateReq(initial, nil, configJson, resourceConfigJson))
+		var validateRes, err = driver.Validate(ctx, validateReq(initial, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
 		_, err = driver.Apply(ctx, applyReq(initial, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
@@ -871,15 +871,15 @@ func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerpla
 	cfg EC,
 	res RC,
 ) {
-	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
-	fixture := loadSpec(t, "challenging-fields.flow.proto")
+	var configJson, resourceConfigJson = rawJson(t, cfg), rawJson(t, res)
+	var fixture = loadSpec(t, "challenging-fields.flow.proto")
 
 	// Validate and apply twice to make sure that a re-application does not attempt to re-create
 	// any columns. This makes sure we are able to read back the schema we have created
 	// correctly. Optionals are included so the challenging-named fields are
 	// materialized: recommended/optional fields are not selected by name alone.
 	for range 2 {
-		validateRes, err := driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
+		var validateRes, err = driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
 		_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
@@ -920,20 +920,20 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 ) string {
 	var snap strings.Builder
 
-	rndSuffix := "_" + uuid.NewString()[:8] + suffix
-	workingTableName := "migration_test" + rndSuffix
-	workingTaskName := taskName + rndSuffix
+	var rndSuffix = "_" + uuid.NewString()[:8] + suffix
+	var workingTableName = "migration_test" + rndSuffix
+	var workingTaskName = taskName + rndSuffix
 
-	bundledMigratedCollection := RunFlowctl(t, "raw", "bundle", "--source", relativePath(t, "testdata/integration/collections.migrate-migrated.flow.yaml"))
+	var bundledMigratedCollection = RunFlowctl(t, "raw", "bundle", "--source", relativePath(t, "testdata/integration/collections.migrate-migrated.flow.yaml"))
 
-	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	var cfg = decryptConfig[EC](t, bundled, taskName)
+	var materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
-	bindings := gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
+	var bindings = gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
 	require.Equal(t, 1, len(bindings))
 
-	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
+	var res = makeResourceFn(workingTableName, false).WithDefaults(cfg)
 	resCfgRaw, err := json.Marshal(res)
 	require.NoError(t, err)
 
@@ -950,10 +950,10 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	)
 	require.NoError(t, err)
 
-	initialSource := filepath.Join(t.TempDir(), "test-migration-initial.flow.yaml")
+	var initialSource = filepath.Join(t.TempDir(), "test-migration-initial.flow.yaml")
 	require.NoError(t, os.WriteFile(initialSource, bundled, 0o600))
 
-	collections := gjson.GetBytes(bundledMigratedCollection, "collections")
+	var collections = gjson.GetBytes(bundledMigratedCollection, "collections")
 	require.Len(t, collections.Map(), 1)
 	collections.ForEach(func(collectionName, spec gjson.Result) bool {
 		bundled, err = sjson.SetBytes(bundled, fmt.Sprintf("collections.%s", collectionName.String()), json.RawMessage(spec.Raw))
@@ -961,7 +961,7 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 		return false
 	})
 
-	migratedSource := filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
+	var migratedSource = filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
 	require.NoError(t, os.WriteFile(migratedSource, bundled, 0o600))
 
 	path, _, err := res.Parameters()
@@ -985,7 +985,7 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
 		}
 
-		actionDescription := RunFlowctl(
+		var actionDescription = RunFlowctl(
 			t,
 			"raw", "preview-next",
 			"--name", workingTaskName,
@@ -1007,7 +1007,7 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 // validateReq makes a mock Validate request object from a built spec fixture. It only works with a
 // single binding.
 func validateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
-	req := &pm.Request_Validate{
+	var req = &pm.Request_Validate{
 		Name:          spec.Name,
 		ConnectorType: spec.ConnectorType,
 		ConfigJson:    config,
@@ -1038,7 +1038,7 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 	}
 	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, live, includeOptional)
 
-	req := &pm.Request_Apply{
+	var req = &pm.Request_Apply{
 		Materialization:     spec,
 		Version:             "someVersion",
 		LastMaterialization: lastSpec,
@@ -1064,12 +1064,12 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 // rejects a field unless it is independently (hard-)wanted, in which case the
 // field is selected presuming a backfill.
 func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, live pf.FieldSelection, includeOptional bool) pf.FieldSelection {
-	out := pf.FieldSelection{}
+	var out = pf.FieldSelection{}
 
 	// Group the binding's projection_constraints by field, preserving order so
 	// the folded field is taken from the first constraint, as the control plane
 	// does.
-	byField := make(map[string][]*pm.Response_Validated_Constraint)
+	var byField = make(map[string][]*pm.Response_Validated_Constraint)
 	var fieldOrder []string
 	for _, pc := range binding.ProjectionConstraints {
 		if _, ok := byField[pc.Field]; !ok {
@@ -1078,7 +1078,7 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 		byField[pc.Field] = append(byField[pc.Field], pc.Constraint)
 	}
 
-	liveFields := make(map[string]struct{})
+	var liveFields = make(map[string]struct{})
 	for _, f := range live.AllFields() {
 		liveFields[f] = struct{}{}
 	}
@@ -1086,7 +1086,7 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 	var foldedFieldMap = make(map[string]struct{})
 
 	for _, field := range fieldOrder {
-		constraints := byField[field]
+		var constraints = byField[field]
 
 		var forbidden, incompatible, required bool
 		for _, c := range constraints {
@@ -1106,11 +1106,11 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 			}
 		}
 
-		proj := collection.GetProjection(field)
-		_, inLive := liveFields[field]
-		isKey := proj != nil && proj.IsPrimaryKey
-		isDoc := proj != nil && proj.IsRootDocumentProjection()
-		hardWanted := required || isKey || isDoc || inLive
+		var proj = collection.GetProjection(field)
+		var _, inLive = liveFields[field]
+		var isKey = proj != nil && proj.IsPrimaryKey
+		var isDoc = proj != nil && proj.IsRootDocumentProjection()
+		var hardWanted = required || isKey || isDoc || inLive
 
 		switch {
 		case forbidden:
@@ -1173,7 +1173,7 @@ func snapshotConstraints(t *testing.T, pcs []*pm.Response_Validated_ProjectionCo
 		Reason     string
 	}
 
-	rows := make([]constraintRow, 0, len(pcs))
+	var rows = make([]constraintRow, 0, len(pcs))
 	for _, pc := range pcs {
 		rows = append(rows, constraintRow{
 			Field:      pc.Field,
@@ -1188,7 +1188,7 @@ func snapshotConstraints(t *testing.T, pcs []*pm.Response_Validated_ProjectionCo
 	})
 
 	var out strings.Builder
-	enc := json.NewEncoder(&out)
+	var enc = json.NewEncoder(&out)
 	for _, r := range rows {
 		require.NoError(t, enc.Encode(r))
 	}
@@ -1204,7 +1204,7 @@ func cleanupTestTasks[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 ) {
 	t.Helper()
 
-	outcomes, err := SweepTestTasks(ctx, m, tsSuffix, false)
+	var outcomes, err = SweepTestTasks(ctx, m, tsSuffix, false)
 	require.NoError(t, err)
 	logSweep(t, "task", outcomes)
 }
@@ -1218,7 +1218,7 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 ) {
 	t.Helper()
 
-	outcomes, err := SweepTestResources(ctx, m, paths, tsSuffix, false)
+	var outcomes, err = SweepTestResources(ctx, m, paths, tsSuffix, false)
 	require.NoError(t, err)
 	logSweep(t, "resource", outcomes)
 }
@@ -1279,11 +1279,11 @@ func flowctlCommand(args ...string) *exec.Cmd {
 	// FLOW_TEST_FLOWCTL names the flowctl binary to drive tests with; CI points
 	// the runtime v1 pass at a pinned release whose `flowctl preview` is still
 	// the legacy runtime (see fetch-flow.sh).
-	flowctl := os.Getenv("FLOW_TEST_FLOWCTL")
+	var flowctl = os.Getenv("FLOW_TEST_FLOWCTL")
 	if flowctl == "" {
 		flowctl = "flowctl"
 	}
-	cmd := exec.Command(flowctl, args...)
+	var cmd = exec.Command(flowctl, args...)
 	cmd.Env = append(cmd.Environ(),
 		// Set the LOG_FORMAT to text instead of color for better to avoid
 		// escaping of ansi control characters and better compatibility with
@@ -1299,7 +1299,7 @@ func flowctlCommand(args ...string) *exec.Cmd {
 // logged to the test log.
 func RunFlowctl(t *testing.T, args ...string) []byte {
 	t.Helper()
-	stdout, _ := runFlowctl(t, args...)
+	var stdout, _ = runFlowctl(t, args...)
 	return stdout
 }
 
@@ -1309,9 +1309,9 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 func runFlowctl(t *testing.T, args ...string) (stdout, stderr []byte) {
 	t.Helper()
 
-	cmd := flowctlCommand(args...)
+	var cmd = flowctlCommand(args...)
 
-	stdoutPipe, err := cmd.StdoutPipe()
+	var stdoutPipe, err = cmd.StdoutPipe()
 	require.NoError(t, err)
 	stderrPipe, err := cmd.StderrPipe()
 	require.NoError(t, err)
@@ -1322,7 +1322,7 @@ func runFlowctl(t *testing.T, args ...string) (stdout, stderr []byte) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stderrPipe)
+		var scanner = bufio.NewScanner(stderrPipe)
 		scanner.Buffer(make([]byte, 0, 1<<20), 1<<24)
 		for scanner.Scan() {
 			t.Log(scanner.Text())
@@ -1349,10 +1349,10 @@ func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, R
 ) string {
 	t.Helper()
 
-	path, _, err := res.Parameters()
+	var path, _, err = res.Parameters()
 	require.NoError(t, err)
 
-	is := boilerplate.InitInfoSchema(m.Config())
+	var is = boilerplate.InitInfoSchema(m.Config())
 	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{path}))
 
 	type field struct {
@@ -1362,8 +1362,8 @@ func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, R
 	}
 
 	var out strings.Builder
-	enc := json.NewEncoder(&out)
-	fields := slices.Clone(is.GetResource(path).AllFields())
+	var enc = json.NewEncoder(&out)
+	var fields = slices.Clone(is.GetResource(path).AllFields())
 	slices.SortFunc(fields, func(a, b boilerplate.ExistingField) int {
 		return strings.Compare(a.Name, b.Name)
 	})
@@ -1382,7 +1382,7 @@ func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, R
 func rawJson(t *testing.T, v any) json.RawMessage {
 	t.Helper()
 
-	b, err := json.Marshal(v)
+	var b, err = json.Marshal(v)
 	require.NoError(t, err)
 
 	return b
@@ -1395,7 +1395,7 @@ func rawJson(t *testing.T, v any) json.RawMessage {
 func harnessFlags[EC boilerplate.EndpointConfiger](t *testing.T, cfg EC) map[string]bool {
 	t.Helper()
 
-	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	var flags, err = boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
 	require.NoError(t, err)
 
 	return flags

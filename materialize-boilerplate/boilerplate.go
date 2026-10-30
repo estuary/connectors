@@ -46,7 +46,7 @@ func RunMain(connector Connector) {
 		log.WithField("format", format).Fatal("invalid LOG_FORMAT (expected 'json', 'text', or 'color')")
 	}
 
-	lvl, err := log.ParseLevel(getEnvDefault("LOG_LEVEL", "info"))
+	var lvl, err = log.ParseLevel(getEnvDefault("LOG_LEVEL", "info"))
 	if err != nil {
 		log.WithFields(log.Fields{"level": lvl, "error": err}).Fatal("unrecognized log level")
 	} else {

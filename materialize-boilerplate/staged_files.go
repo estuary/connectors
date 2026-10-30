@@ -121,7 +121,7 @@ func (sf *StagedFiles) Flush(binding int) ([]string, error) {
 func (sf *StagedFiles) CleanupCurrentTransaction(ctx context.Context) error {
 	var uris []string
 	for i := range sf.stagedFiles {
-		f := &sf.stagedFiles[i]
+		var f = &sf.stagedFiles[i]
 		if len(f.uploaded) == 0 {
 			continue
 		}
@@ -213,7 +213,7 @@ func (f *stagedFile) newFile(ctx context.Context) {
 	}
 	nameParts = append(nameParts, uuid.NewString())
 
-	key := f.client.NewKey(nameParts)
+	var key = f.client.NewKey(nameParts)
 	f.uploaded = append(f.uploaded, key)
 	f.writer = f.client.NewWriter(f.bucket.NewWriter(ctx, key), f.fields)
 }
@@ -223,7 +223,7 @@ func (f *stagedFile) flushFile() error {
 		return nil
 	}
 
-	fileSize := f.writer.Written()
+	var fileSize = f.writer.Written()
 	if err := f.writer.Close(); err != nil {
 		return fmt.Errorf("closing writer: %w", err)
 	}

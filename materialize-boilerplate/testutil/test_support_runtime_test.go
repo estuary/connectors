@@ -7,7 +7,7 @@ import (
 )
 
 func TestSanitizeCheckpointHashes(t *testing.T) {
-	sanitize := SanitizeCheckpointHashes(`"(?:previous|current)Checkpoint":"([0-9a-f]{16})"`, "checkpoint")
+	var sanitize = SanitizeCheckpointHashes(`"(?:previous|current)Checkpoint":"([0-9a-f]{16})"`, "checkpoint")
 
 	for _, tt := range []struct {
 		name string
@@ -51,7 +51,7 @@ func TestSanitizeCheckpointHashes(t *testing.T) {
 // materialize-snowflake's offset tokens carry a deterministic ":N" suffix within
 // a transaction, which must survive sanitization.
 func TestSanitizeCheckpointHashesKeepsTrailingSuffix(t *testing.T) {
-	sanitize := SanitizeCheckpointHashes(`"offset_token":"([0-9a-f]{16}):\d+"`, "offset-token")
+	var sanitize = SanitizeCheckpointHashes(`"offset_token":"([0-9a-f]{16}):\d+"`, "offset-token")
 
 	require.Equal(t,
 		`"offset_token":"<offset-token-1>:0" "offset_token":"<offset-token-1>:1" "offset_token":"<offset-token-2>:0"`,

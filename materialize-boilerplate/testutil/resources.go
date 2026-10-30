@@ -63,7 +63,7 @@ type ResourceSweeper interface {
 // the destination returns them in, so a caller that needs a stable ordering must
 // sort.
 func SnapshotResource(ctx context.Context, m ResourceSnapshotter, path []string) (string, error) {
-	columnNames, rows, err := m.SnapshotTestResource(ctx, path)
+	var columnNames, rows, err = m.SnapshotTestResource(ctx, path)
 	if err != nil {
 		return "", fmt.Errorf("snapshotting %s: %w", strings.Join(path, "."), err)
 	}
@@ -76,9 +76,9 @@ func SnapshotResource(ctx context.Context, m ResourceSnapshotter, path []string)
 // snapshots and an external harness compare against.
 func RenderRows(columnNames []string, rows [][]any) (string, error) {
 	var out strings.Builder
-	enc := json.NewEncoder(&out)
+	var enc = json.NewEncoder(&out)
 	for _, r := range rows {
-		doc := make(map[string]any, len(columnNames))
+		var doc = make(map[string]any, len(columnNames))
 		for i, col := range columnNames {
 			doc[col] = r[i]
 		}
@@ -102,7 +102,7 @@ func RenderRows(columnNames []string, rows [][]any) (string, error) {
 // every run, and without a way to remove them accumulates them forever in a
 // warehouse someone else is paying for.
 func DropResource(ctx context.Context, m ResourceDeleter, path []string) (string, error) {
-	desc, action, err := m.DeleteResource(ctx, path)
+	var desc, action, err = m.DeleteResource(ctx, path)
 	if err != nil {
 		return "", fmt.Errorf("preparing to delete %s: %w", strings.Join(path, "."), err)
 	} else if action != nil {
@@ -150,7 +150,7 @@ func OpenResource[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	if err := boilerplate.UnmarshalStrict(resourceConfig, &resCfg); err != nil {
 		return nil, nil, fmt.Errorf("parsing resource config: %w", err)
 	}
-	path, _, err := resCfg.WithDefaults(cfg).Parameters()
+	var path, _, err = resCfg.WithDefaults(cfg).Parameters()
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting resource parameters: %w", err)
 	}
@@ -212,17 +212,17 @@ func SweepTestResources(
 	tsSuffix string,
 	dryRun bool,
 ) ([]SweepOutcome, error) {
-	is := boilerplate.InitInfoSchema(m.Config())
+	var is = boilerplate.InitInfoSchema(m.Config())
 	if err := m.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, fmt.Errorf("populating info schema: %w", err)
 	}
 
-	now := time.Now()
+	var now = time.Now()
 	var outcomes []SweepOutcome
 	for _, r := range is.Resources() {
-		location := r.Location()
-		selected, reason := shouldCleanup(now, location[len(location)-1], tsSuffix)
-		outcome := SweepOutcome{Item: strings.Join(location, "."), Selected: selected, Reason: reason}
+		var location = r.Location()
+		var selected, reason = shouldCleanup(now, location[len(location)-1], tsSuffix)
+		var outcome = SweepOutcome{Item: strings.Join(location, "."), Selected: selected, Reason: reason}
 		if selected && !dryRun {
 			if _, err := DropResource(ctx, m, location); err != nil {
 				outcome.Err = err
@@ -240,16 +240,16 @@ func SweepTestResources(
 // selecting tasks on the same basis as SweepTestResources selects resources,
 // tsSuffix and dryRun included.
 func SweepTestTasks(ctx context.Context, m TestTaskCleaner, tsSuffix string, dryRun bool) ([]SweepOutcome, error) {
-	tasks, err := m.ListTestTasks(ctx)
+	var tasks, err = m.ListTestTasks(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("listing test tasks: %w", err)
 	}
 
-	now := time.Now()
+	var now = time.Now()
 	var outcomes []SweepOutcome
 	for _, task := range tasks {
-		selected, reason := shouldCleanup(now, task, tsSuffix)
-		outcome := SweepOutcome{Item: task, Selected: selected, Reason: reason}
+		var selected, reason = shouldCleanup(now, task, tsSuffix)
+		var outcome = SweepOutcome{Item: task, Selected: selected, Reason: reason}
 		if selected && !dryRun {
 			if err := m.CleanupTestTask(ctx, task); err != nil {
 				outcome.Err = err
@@ -271,7 +271,7 @@ func SweepTestTasks(ctx context.Context, m TestTaskCleaner, tsSuffix string, dry
 // processes. Parsed as YAML, which is how these configurations are written in
 // this repository, and which subsumes JSON.
 func ReadConfigFile(path string) (json.RawMessage, error) {
-	raw, err := os.ReadFile(path)
+	var raw, err = os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
@@ -280,10 +280,10 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	} else if encrypted {
 		var sopsStderr bytes.Buffer
-		sopsCmd := exec.Command("sops", "--decrypt", "--output-type", "json", path)
+		var sopsCmd = exec.Command("sops", "--decrypt", "--output-type", "json", path)
 		sopsCmd.Stderr = &sopsStderr
 
-		jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+		var jqCmd = exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
 
 		jqCmd.Stdin, err = sopsCmd.StdoutPipe()
 		if err != nil {
@@ -292,7 +292,7 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 		if err := sopsCmd.Start(); err != nil {
 			return nil, err
 		}
-		out, err := jqCmd.Output()
+		var out, err = jqCmd.Output()
 		if err != nil {
 			return nil, err
 		}

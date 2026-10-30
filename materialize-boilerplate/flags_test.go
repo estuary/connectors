@@ -61,9 +61,9 @@ func TestResolveFlags(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			createdAt, err := common.ParseCreatedAt(tt.createdAt)
+			var createdAt, err = common.ParseCreatedAt(tt.createdAt)
 			require.NoError(t, err)
-			flags := resolveFlags(tt.cfg, createdAt)
+			var flags = resolveFlags(tt.cfg, createdAt)
 			require.Equal(t, tt.wantGated, flags["gated"])
 			require.True(t, flags["fixed_on"])
 			require.False(t, flags["fixed_off"])
@@ -73,12 +73,12 @@ func TestResolveFlags(t *testing.T) {
 
 func TestSpecCreatedAt(t *testing.T) {
 	for _, spec := range []*pf.MaterializationSpec{nil, {}} {
-		createdAt, err := specCreatedAt(spec)
+		var createdAt, err = specCreatedAt(spec)
 		require.NoError(t, err)
 		require.True(t, createdAt.IsBrandNew())
 	}
 
-	createdAt, err := specCreatedAt(&pf.MaterializationSpec{CreatedAt: "2026-07-01"})
+	var createdAt, err = specCreatedAt(&pf.MaterializationSpec{CreatedAt: "2026-07-01"})
 	require.NoError(t, err)
 	require.Equal(t, "2026-07-01", createdAt.String())
 
@@ -92,13 +92,13 @@ func TestSpecCreatedAt(t *testing.T) {
 // date the connector cannot parse fails the RPC, rather than being resolved
 // around and silently giving the task the behavior of the wrong era.
 func TestUnparseableCreatedAtFailsRPCs(t *testing.T) {
-	ctx := context.Background()
-	spec := loadMaterializerSpec(t, "base.flow.proto")
+	var ctx = context.Background()
+	var spec = loadMaterializerSpec(t, "base.flow.proto")
 	spec.CreatedAt = "6/10/2026"
-	is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
-	fn := makeTestMaterializerFn(&testCalls{}, is)
+	var is = testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+	var fn = makeTestMaterializerFn(&testCalls{}, is)
 
-	_, err := RunValidate(ctx, &pm.Request_Validate{
+	var _, err = RunValidate(ctx, &pm.Request_Validate{
 		Name:                spec.Name,
 		ConnectorType:       spec.ConnectorType,
 		ConfigJson:          spec.ConfigJson,
@@ -128,12 +128,12 @@ const sealedTestConfig = `{"config":{"address":"db:5432"},"sops":{"encrypted_suf
 // cutoff-gated flag made explicit, and that the recorded value matches how the
 // connector itself resolved the flag from the task's creation date.
 func TestRunNewTransactorRecordsFlagPinsInConfig(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	// Connector events are only emitted with the runtime's JSON log format.
 	var logs bytes.Buffer
-	logger := log.StandardLogger()
-	priorFormatter, priorOut := logger.Formatter, logger.Out
+	var logger = log.StandardLogger()
+	var priorFormatter, priorOut = logger.Formatter, logger.Out
 	logger.SetFormatter(&log.JSONFormatter{})
 	logger.SetOutput(&logs)
 	t.Cleanup(func() { logger.SetFormatter(priorFormatter); logger.SetOutput(priorOut) })
@@ -149,12 +149,12 @@ func TestRunNewTransactorRecordsFlagPinsInConfig(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			logs.Reset()
-			spec := loadMaterializerSpec(t, "base.flow.proto")
+			var spec = loadMaterializerSpec(t, "base.flow.proto")
 			spec.CreatedAt = tt.createdAt
-			is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+			var is = testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
 
 			var gotFlags map[string]bool
-			capturingFn := func(
+			var capturingFn = func(
 				ctx context.Context,
 				materializationName string,
 				endpointConfig testEndpointConfiger,
@@ -164,10 +164,10 @@ func TestRunNewTransactorRecordsFlagPinsInConfig(t *testing.T) {
 				return &testMaterializer{calls: &testCalls{}, is: is}, nil
 			}
 
-			_, _, _, err := runTestTransactor(ctx, spec, json.RawMessage(sealedTestConfig), capturingFn)
+			var _, _, _, err = runTestTransactor(ctx, spec, json.RawMessage(sealedTestConfig), capturingFn)
 			require.NoError(t, err)
 
-			recorded := overlaidFeatureFlags(t, logs.Bytes())
+			var recorded = overlaidFeatureFlags(t, logs.Bytes())
 			require.Equal(t, tt.want, recorded, "recorded feature flags")
 			// The recorded value must agree with the behavior of this very Open.
 			require.Equal(t, gotFlags["test_gated"], recorded == "test_gated")
@@ -176,14 +176,14 @@ func TestRunNewTransactorRecordsFlagPinsInConfig(t *testing.T) {
 
 	t.Run("an unencrypted config is restated without an overlay", func(t *testing.T) {
 		logs.Reset()
-		spec := loadMaterializerSpec(t, "base.flow.proto")
+		var spec = loadMaterializerSpec(t, "base.flow.proto")
 		spec.CreatedAt = "2030-01-01"
-		is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+		var is = testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
 
 		// A config with no `sops` stanza has no ciphertext to preserve, so the
 		// property is set in the document itself. Adding an overlay would send
 		// the runtime looking for ciphertext that isn't there.
-		_, _, _, err := runTestTransactor(ctx, spec, spec.ConfigJson, makeTestMaterializerFn(&testCalls{}, is))
+		var _, _, _, err = runTestTransactor(ctx, spec, spec.ConfigJson, makeTestMaterializerFn(&testCalls{}, is))
 		require.NoError(t, err)
 
 		require.Empty(t, overlaidFeatureFlags(t, logs.Bytes()), "an unencrypted config has no overlay")
@@ -192,12 +192,12 @@ func TestRunNewTransactorRecordsFlagPinsInConfig(t *testing.T) {
 
 	t.Run("a flag already present in the config is not re-recorded", func(t *testing.T) {
 		logs.Reset()
-		spec := loadMaterializerSpec(t, "base.flow.proto")
+		var spec = loadMaterializerSpec(t, "base.flow.proto")
 		spec.CreatedAt = "2030-01-01"
-		cfg, err := common.SetJSONProperty(spec.ConfigJson, []string{"config", "advanced", "feature_flags"}, "no_test_gated")
+		var cfg, err = common.SetJSONProperty(spec.ConfigJson, []string{"config", "advanced", "feature_flags"}, "no_test_gated")
 		require.NoError(t, err)
 		spec.ConfigJson = cfg
-		is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+		var is = testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
 
 		_, _, _, err = runTestTransactor(ctx, spec, json.RawMessage(sealedTestConfig), makeTestMaterializerFn(&testCalls{}, is))
 		require.NoError(t, err)
@@ -206,13 +206,13 @@ func TestRunNewTransactorRecordsFlagPinsInConfig(t *testing.T) {
 
 	t.Run("nothing is recorded without the sealed config", func(t *testing.T) {
 		logs.Reset()
-		spec := loadMaterializerSpec(t, "base.flow.proto")
+		var spec = loadMaterializerSpec(t, "base.flow.proto")
 		spec.CreatedAt = "2030-01-01"
-		is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+		var is = testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
 
 		// Runtimes predating `sealed_config_json` send nothing, and an encrypted
 		// config cannot be restated without it.
-		_, _, _, err := runTestTransactor(ctx, spec, nil, makeTestMaterializerFn(&testCalls{}, is))
+		var _, _, _, err = runTestTransactor(ctx, spec, nil, makeTestMaterializerFn(&testCalls{}, is))
 		require.NoError(t, err)
 		require.Nil(t, recordedConfigUpdate(t, logs.Bytes()), "no configUpdate should be emitted")
 	})
@@ -305,7 +305,7 @@ func directFeatureFlags(t *testing.T, logs []byte) string {
 // implement the materialization RPCs themselves: flags come from the spec's
 // creation date, and a date it cannot parse fails rather than resolving around.
 func TestResolveFlagsFromSpec(t *testing.T) {
-	before, err := ResolveFlags(flagsTestConfig{}, &pf.MaterializationSpec{CreatedAt: "2026-01-01"})
+	var before, err = ResolveFlags(flagsTestConfig{}, &pf.MaterializationSpec{CreatedAt: "2026-01-01"})
 	require.NoError(t, err)
 	require.False(t, before["gated"])
 

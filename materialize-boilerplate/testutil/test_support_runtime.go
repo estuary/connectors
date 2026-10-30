@@ -42,8 +42,8 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 ) rewrittenTask[RC] {
 	t.Helper()
 
-	rndSuffix := "_" + uuid.NewString()[:8] + tsSuffix
-	workingTaskName := taskName + rndSuffix
+	var rndSuffix = "_" + uuid.NewString()[:8] + tsSuffix
+	var workingTaskName = taskName + rndSuffix
 
 	var snapshotResources []RC
 	var testResourcePaths [][]string
@@ -53,9 +53,9 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 		// each other.
 		var res RC
 		require.NoError(t, boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
-		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
+		var path, deltaUpdates, err = res.WithDefaults(cfg).Parameters()
 		require.NoError(t, err)
-		lastPathPart := path[len(path)-1] + rndSuffix
+		var lastPathPart = path[len(path)-1] + rndSuffix
 
 		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
 		path, _, err = res.WithDefaults(cfg).Parameters()
@@ -86,7 +86,7 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 	)
 	require.NoError(t, err)
 
-	source := filepath.Join(t.TempDir(), "test.flow.yaml")
+	var source = filepath.Join(t.TempDir(), "test.flow.yaml")
 	require.NoError(t, os.WriteFile(source, bundled, 0o600))
 
 	return rewrittenTask[RC]{
@@ -141,8 +141,8 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 ) string {
 	var snap strings.Builder
 
-	shards := max(runtime.Shards, 1)
-	timeout := runtime.Timeout
+	var shards = max(runtime.Shards, 1)
+	var timeout = runtime.Timeout
 	if timeout == 0 {
 		timeout = 10 * time.Minute
 	}
@@ -162,8 +162,8 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// plaintext (non-sops) config to the connector unchanged, so writing the
 	// decrypted config back inline is sufficient.
 	if len(runtime.ExtraFeatureFlags) > 0 {
-		rawCfg := decryptConfigRaw(t, bundled, taskName)
-		flags := strings.Join(runtime.ExtraFeatureFlags, ",")
+		var rawCfg = decryptConfigRaw(t, bundled, taskName)
+		var flags = strings.Join(runtime.ExtraFeatureFlags, ",")
 		if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
 			flags = baseFlags + "," + flags
 		}
@@ -173,10 +173,10 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		require.NoError(t, err)
 	}
 
-	cfg := decryptConfig[EC](t, bundled, taskName)
-	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
+	var cfg = decryptConfig[EC](t, bundled, taskName)
+	var rt = rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
 
-	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	var materializer, err = newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -269,7 +269,7 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 // token is distinct, and a "previous" token equals the prior transaction's
 // "current" -- without the run-specific bytes.
 func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
-	re := regexp.MustCompile(pattern)
+	var re = regexp.MustCompile(pattern)
 
 	return func(s string) string {
 		var (
@@ -283,8 +283,8 @@ func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
 				continue // pattern matched, but its capture group did not
 			}
 
-			hash := s[m[2]:m[3]]
-			repl, ok := seen[hash]
+			var hash = s[m[2]:m[3]]
+			var repl, ok = seen[hash]
 			if !ok {
 				repl = fmt.Sprintf("<%s-%d>", placeholder, len(seen)+1)
 				seen[hash] = repl
@@ -333,7 +333,7 @@ func runtimeV1Liveness[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	)
 
 	for _, path := range rt.resourcePaths {
-		columns, rows, err := materializer.SnapshotTestResource(ctx, path)
+		var columns, rows, err = materializer.SnapshotTestResource(ctx, path)
 		require.NoError(t, err)
 		if columns == nil && rows == nil {
 			t.Logf("runtime v1: %v cannot be read back (SnapshotTestResource is not implemented); liveness not checked", path)

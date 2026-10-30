@@ -35,7 +35,7 @@ var materializerFS embed.FS
 func loadMaterializerSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := materializerFS.ReadFile(filepath.Join("testdata/materializer/generated_specs", path))
+	var specBytes, err = materializerFS.ReadFile(filepath.Join("testdata/materializer/generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -44,7 +44,7 @@ func loadMaterializerSpec(t *testing.T, path string) *pf.MaterializationSpec {
 }
 
 func TestRunApply(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	for _, tt := range []struct {
 		name         string
@@ -150,17 +150,17 @@ func TestRunApply(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			req := &pm.Request_Apply{
+			var req = &pm.Request_Apply{
 				Materialization:     tt.newSpec,
 				Version:             "thisone",
 				LastMaterialization: tt.originalSpec,
 				LastVersion:         "oldone",
 			}
 
-			is := testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
-			got := &testCalls{}
+			var is = testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
+			var got = &testCalls{}
 
-			_, err := RunApply(ctx, req, makeTestMaterializerFn(got, is))
+			var _, err = RunApply(ctx, req, makeTestMaterializerFn(got, is))
 			require.NoError(t, err)
 			require.Equal(t, tt.want, *got)
 		})
@@ -168,7 +168,7 @@ func TestRunApply(t *testing.T) {
 }
 
 func TestRunApplyRetainExistingDataOnBackfill(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	for _, tt := range []struct {
 		name         string
@@ -198,7 +198,7 @@ func TestRunApplyRetainExistingDataOnBackfill(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			req := &pm.Request_Apply{
+			var req = &pm.Request_Apply{
 				Materialization:     tt.newSpec,
 				Version:             "thisone",
 				LastMaterialization: tt.originalSpec,
@@ -216,12 +216,12 @@ func TestRunApplyRetainExistingDataOnBackfill(t *testing.T) {
 				},
 			}
 
-			modifiedConfigJson, err := json.Marshal(config)
+			var modifiedConfigJson, err = json.Marshal(config)
 			require.NoError(t, err)
 			req.Materialization.ConfigJson = modifiedConfigJson
 
-			is := testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
-			got := &testCalls{}
+			var is = testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
+			var got = &testCalls{}
 
 			_, err = RunApply(ctx, req, makeTestMaterializerFn(got, is))
 
@@ -237,10 +237,10 @@ func TestRunApplyRetainExistingDataOnBackfill(t *testing.T) {
 }
 
 func TestRunApplyDrainsPendingState(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	pendingState := json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
-	clearingPatch := &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
+	var pendingState = json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
+	var clearingPatch = &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
 
 	for _, tt := range []struct {
 		name         string
@@ -318,9 +318,9 @@ func TestRunApplyDrainsPendingState(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			originalSpec := loadMaterializerSpec(t, "base.flow.proto")
+			var originalSpec = loadMaterializerSpec(t, "base.flow.proto")
 
-			req := &pm.Request_Apply{
+			var req = &pm.Request_Apply{
 				Materialization:     tt.newSpec,
 				Version:             "thisone",
 				LastMaterialization: originalSpec,
@@ -334,15 +334,15 @@ func TestRunApplyDrainsPendingState(t *testing.T) {
 				config.Config = map[string]any{
 					"advanced": map[string]any{"feature_flags": tt.featureFlags},
 				}
-				modifiedConfigJson, err := json.Marshal(config)
+				var modifiedConfigJson, err = json.Marshal(config)
 				require.NoError(t, err)
 				req.Materialization.ConfigJson = modifiedConfigJson
 			}
 
-			is := testInfoSchemaFromSpec(t, originalSpec, func(in string) string { return in })
-			rec := &drainRecorder{ackPatch: tt.ackPatch}
+			var is = testInfoSchemaFromSpec(t, originalSpec, func(in string) string { return in })
+			var rec = &drainRecorder{ackPatch: tt.ackPatch}
 
-			applied, err := RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
+			var applied, err = RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
 			require.NoError(t, err)
 
 			require.Equal(t, tt.wantAckKeys, rec.ackKeys)
@@ -371,10 +371,10 @@ func TestRunApplyDrainsPendingState(t *testing.T) {
 // state when a binding's field selection changes but its resource needs no
 // action, because every selected column already exists.
 func TestRunApplyDrainsOnFieldSelectionChange(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	pendingState := json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
-	clearingPatch := &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
+	var pendingState = json.RawMessage(`{"key_value":{"query":"MERGE INTO ..."}}`)
+	var clearingPatch = &pf.ConnectorState{UpdatedJson: json.RawMessage(`{"key_value":null}`), MergePatch: true}
 
 	for _, tt := range []struct {
 		name        string
@@ -395,7 +395,7 @@ func TestRunApplyDrainsOnFieldSelectionChange(t *testing.T) {
 		{
 			name: "reordering the selected values drains pending state",
 			lastSpec: func(s *pf.MaterializationSpec) {
-				vals := s.Bindings[0].FieldSelection.Values
+				var vals = s.Bindings[0].FieldSelection.Values
 				require.Greater(t, len(vals), 1)
 				vals[0], vals[1] = vals[1], vals[0]
 			},
@@ -410,11 +410,11 @@ func TestRunApplyDrainsOnFieldSelectionChange(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			newSpec := loadMaterializerSpec(t, "base.flow.proto")
-			lastSpec := loadMaterializerSpec(t, "base.flow.proto")
+			var newSpec = loadMaterializerSpec(t, "base.flow.proto")
+			var lastSpec = loadMaterializerSpec(t, "base.flow.proto")
 			tt.lastSpec(lastSpec)
 
-			req := &pm.Request_Apply{
+			var req = &pm.Request_Apply{
 				Materialization:     newSpec,
 				Version:             "thisone",
 				LastMaterialization: lastSpec,
@@ -424,10 +424,10 @@ func TestRunApplyDrainsOnFieldSelectionChange(t *testing.T) {
 
 			// Every column of the new selection already exists, so the
 			// binding's update is empty and yields no action.
-			is := testInfoSchemaFromSpec(t, newSpec, func(in string) string { return in })
-			rec := &drainRecorder{ackPatch: clearingPatch, noopUpdates: true}
+			var is = testInfoSchemaFromSpec(t, newSpec, func(in string) string { return in })
+			var rec = &drainRecorder{ackPatch: clearingPatch, noopUpdates: true}
 
-			applied, err := RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
+			var applied, err = RunApply(ctx, req, makeDrainTestMaterializerFn(rec, is))
 			require.NoError(t, err)
 
 			require.Equal(t, tt.wantAckKeys, rec.ackKeys)
@@ -463,7 +463,7 @@ type testMaterializer struct {
 // with no dependence on connector state or on whether the task is being applied
 // for the first time.
 func TestRunApplyResolvesFlagsFromCreatedAt(t *testing.T) {
-	ctx := context.Background()
+	var ctx = context.Background()
 
 	for _, tt := range []struct {
 		name      string
@@ -475,12 +475,12 @@ func TestRunApplyResolvesFlagsFromCreatedAt(t *testing.T) {
 		{"brand new task, creation not yet committed", "", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			spec := loadMaterializerSpec(t, "base.flow.proto")
+			var spec = loadMaterializerSpec(t, "base.flow.proto")
 			spec.CreatedAt = tt.createdAt
-			is := testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
+			var is = testInfoSchemaFromSpec(t, spec, func(in string) string { return in })
 
 			var gotFlags map[string]bool
-			capturingFn := func(
+			var capturingFn = func(
 				ctx context.Context,
 				materializationName string,
 				endpointConfig testEndpointConfiger,
@@ -490,7 +490,7 @@ func TestRunApplyResolvesFlagsFromCreatedAt(t *testing.T) {
 				return &testMaterializer{calls: &testCalls{}, is: is}, nil
 			}
 
-			_, err := RunApply(ctx, &pm.Request_Apply{
+			var _, err = RunApply(ctx, &pm.Request_Apply{
 				Materialization:     spec,
 				LastMaterialization: spec,
 			}, capturingFn)
@@ -592,7 +592,7 @@ func (c testEndpointConfiger) DefaultNamespace() string {
 }
 
 func (c testEndpointConfiger) FeatureFlags() (string, map[string]common.FlagDefault) {
-	featureFlags := ""
+	var featureFlags = ""
 	if advanced, ok := c.Config["advanced"].(map[string]any); ok {
 		if ff, ok := advanced["feature_flags"].(string); ok {
 			featureFlags = ff

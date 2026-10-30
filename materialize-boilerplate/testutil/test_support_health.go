@@ -51,7 +51,7 @@ func (l HealthLine) stores() int64 {
 }
 
 func (l HealthLine) String() string {
-	raw, _ := json.Marshal(l)
+	var raw, _ = json.Marshal(l)
 	return string(raw)
 }
 
@@ -60,10 +60,10 @@ func (l HealthLine) String() string {
 // logs are skipped.
 func ParseHealthLines(stderr []byte) []HealthLine {
 	var out []HealthLine
-	scanner := bufio.NewScanner(bytes.NewReader(stderr))
+	var scanner = bufio.NewScanner(bytes.NewReader(stderr))
 	scanner.Buffer(make([]byte, 0, 1<<20), 1<<24)
 	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
+		var line = bytes.TrimSpace(scanner.Bytes())
 		if len(line) == 0 || line[0] != '{' {
 			continue
 		}

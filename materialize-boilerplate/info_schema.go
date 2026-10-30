@@ -67,7 +67,7 @@ func (r *ExistingResource) PushField(field ExistingField) {
 // GetField returns the ExistingField for a given Flow field name, or nil if it
 // is not found.
 func (r *ExistingResource) GetField(name string) *ExistingField {
-	translated := r.translateField(name)
+	var translated = r.translateField(name)
 	for i := range r.fields {
 		if r.caseInsensitiveFields && strings.EqualFold(r.fields[i].Name, translated) {
 			return &r.fields[i]
@@ -171,7 +171,7 @@ func (i *InfoSchema) PushResource(location ...string) *ExistingResource {
 		}
 	}
 
-	res := &ExistingResource{
+	var res = &ExistingResource{
 		location:              location,
 		translateField:        i.translateField,
 		caseInsensitiveFields: i.caseInsensitiveFields,
@@ -184,7 +184,7 @@ func (i *InfoSchema) PushResource(location ...string) *ExistingResource {
 // GetResource returns the ExistingResource for a given Flow resource path, or
 // nil if it is not found.
 func (i *InfoSchema) GetResource(resourcePath []string) *ExistingResource {
-	located := i.locatePath(resourcePath)
+	var located = i.locatePath(resourcePath)
 	for _, r := range i.resources {
 		if i.caseInsensitiveResources && slices.EqualFunc(r.location, located, strings.EqualFold) {
 			return r
@@ -200,7 +200,7 @@ func (i *InfoSchema) GetResource(resourcePath []string) *ExistingResource {
 // exists in the field selection for a materialization.
 func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelection) (bool, error) {
 	for _, f := range fs.AllFields() {
-		translated := i.translateField(f)
+		var translated = i.translateField(f)
 		if i.caseInsensitiveFields && strings.EqualFold(translated, endpointFieldName) {
 			return true, nil
 		} else if translated == endpointFieldName {
@@ -217,10 +217,10 @@ func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelec
 // the connector should take this into consideration when producing the resource path with its
 // `Validate` response, but we haven't always done a good job with that.
 func (i *InfoSchema) AmbiguousResourcePaths(resourcePaths [][]string) [][]string {
-	seenPaths := make(map[string][][]string)
+	var seenPaths = make(map[string][][]string)
 
 	for _, rp := range resourcePaths {
-		rk := strings.Join(i.locatePath(rp), ".")
+		var rk = strings.Join(i.locatePath(rp), ".")
 		seenPaths[rk] = append(seenPaths[rk], rp)
 	}
 

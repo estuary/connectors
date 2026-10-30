@@ -134,7 +134,7 @@ func (mb *MappedBinding[EC, RC, MT]) ConvertKey(key tuple.Tuple) ([]any, error) 
 
 func (mb *MappedBinding[EC, RC, MT]) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) ([]any, error) {
 	var err error
-	out := make([]any, 0, len(mb.Keys)+len(mb.Values)+1)
+	var out = make([]any, 0, len(mb.Keys)+len(mb.Values)+1)
 
 	if out, err = mb.convertTuple(key, 0, out); err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (mb *MappedBinding[EC, RC, MT]) ConvertAll(key, values tuple.Tuple, doc jso
 
 func (mb *MappedBinding[EC, RC, MT]) convertTuple(in tuple.Tuple, offset int, out []any) ([]any, error) {
 	for idx, val := range in {
-		converted := val
+		var converted = val
 		if converter := mb.converters[idx+offset]; converter != nil {
 			var err error
 			if converted, err = converter(val); err != nil {
@@ -363,33 +363,33 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	// Validate carries no spec for the task being validated, only the last
 	// published one; a task with no last spec is brand new and has no creation
 	// date yet.
-	createdAt, err := specCreatedAt(req.LastMaterialization)
+	var createdAt, err = specCreatedAt(req.LastMaterialization)
 	if err != nil {
 		return nil, err
 	}
-	parsedFlags := resolveFlags(cfg, createdAt)
+	var parsedFlags = resolveFlags(cfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
 	defer materializer.Close(ctx)
 
-	mCfg := materializer.Config()
+	var mCfg = materializer.Config()
 
-	prereqErrs := materializer.CheckPrerequisites(ctx)
+	var prereqErrs = materializer.CheckPrerequisites(ctx)
 	if prereqErrs != nil && prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	}
 
-	paths := make([][]string, 0, len(req.Bindings))
-	deltaUpdates := make([]bool, 0, len(req.Bindings))
+	var paths = make([][]string, 0, len(req.Bindings))
+	var deltaUpdates = make([]bool, 0, len(req.Bindings))
 	for _, b := range req.Bindings {
 		var resCfg RC
 		if err := UnmarshalStrict(b.ResourceConfigJson, &resCfg); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		res := resCfg.WithDefaults(cfg)
+		var res = resCfg.WithDefaults(cfg)
 		if path, delta, err := res.Parameters(); err != nil {
 			return nil, err
 		} else {
@@ -398,16 +398,16 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		}
 	}
 
-	is := InitInfoSchema(mCfg)
+	var is = InitInfoSchema(mCfg)
 	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, err
 	}
 
-	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
+	var validator = NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
 	var out []*pm.Response_Validated_Binding
 	for idx, b := range req.Bindings {
-		path := paths[idx]
-		delta := deltaUpdates[idx]
+		var path = paths[idx]
+		var delta = deltaUpdates[idx]
 		if constraints, err := validator.ValidateBinding(path, delta, b.Backfill, b.Collection, b.FieldConfigJsonMap, req.LastMaterialization); err != nil {
 			return nil, fmt.Errorf("validating binding: %w", err)
 		} else {
@@ -464,25 +464,25 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	createdAt, err := specCreatedAt(req.Materialization)
+	var createdAt, err = specCreatedAt(req.Materialization)
 	if err != nil {
 		return nil, err
 	}
-	parsedFlags := resolveFlags(endpointCfg, createdAt)
+	var parsedFlags = resolveFlags(endpointCfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
 	defer materializer.Close(ctx)
 
-	mCfg := materializer.Config()
+	var mCfg = materializer.Config()
 
-	paths := make([][]string, 0, len(req.Materialization.Bindings))
+	var paths = make([][]string, 0, len(req.Materialization.Bindings))
 	for _, b := range req.Materialization.Bindings {
 		paths = append(paths, b.ResourcePath)
 	}
 
-	is := InitInfoSchema(mCfg)
+	var is = InitInfoSchema(mCfg)
 	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, err
 	}
@@ -510,7 +510,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		resourceActions              []ActionApplyFn // also may be run concurrently, but not concurrent with truncations
 	)
 
-	addResourceAction := func(desc string, a ActionApplyFn) {
+	var addResourceAction = func(desc string, a ActionApplyFn) {
 		if a != nil { // Convenience for handling endpoints that return `nil` for a no-op action.
 			resourceActionDescriptions = append(resourceActionDescriptions, desc)
 			resourceActions = append(resourceActions, a)
@@ -521,7 +521,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// Create any required namespaces before other actions, which may
 		// include resource creation. Otherwise resources creation may fail due
 		// to namespaces not yet existing.
-		requiredNamespaces := make(map[string]struct{})
+		var requiredNamespaces = make(map[string]struct{})
 		if ns := endpointCfg.DefaultNamespace(); ns != "" {
 			requiredNamespaces[ns] = struct{}{}
 		}
@@ -561,8 +561,8 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	// bindings which retain their materialized data while their binding
 	// changes: any transaction previously staged for them must be committed
 	// before this Apply's actions run (see the drain below).
-	destructiveBindings := make(map[int]bool)
-	drainBindings := make(map[int]bool)
+	var destructiveBindings = make(map[int]bool)
+	var drainBindings = make(map[int]bool)
 
 	for _, bindingIdx := range updates.newBindings {
 		if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
@@ -574,9 +574,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
-	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
+	var validator = NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
 	for _, bindingIdx := range updates.backfillBindings {
-		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
+		var mapped, err = buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
 		}
@@ -595,9 +595,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// without incrementing the backfill counter, it only needs to be
 		// truncated rather than fully dropping and re-creating the table.
 		var doTruncate bool
-		thisBinding := req.Materialization.Bindings[bindingIdx]
-		lastBinding := FindLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
-		existing := is.GetResource(thisBinding.ResourcePath)
+		var thisBinding = req.Materialization.Bindings[bindingIdx]
+		var lastBinding = FindLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
+		var existing = is.GetResource(thisBinding.ResourcePath)
 		if _, err := validator.ValidateBinding(
 			thisBinding.ResourcePath,
 			thisBinding.DeltaUpdates,
@@ -648,7 +648,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			}
 
 			// A resource may be truncated, but require other updates as well.
-			upd, err := computeBindingUpdate(is, existing, lastBinding, thisBinding)
+			var upd, err = computeBindingUpdate(is, existing, lastBinding, thisBinding)
 			if err != nil {
 				return nil, err
 			}
@@ -665,14 +665,14 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
 			} else {
 				destructiveBindings[bindingIdx] = true
-				descs := make([]string, 2)
+				var descs = make([]string, 2)
 				if deleteAction != nil {
 					descs = append(descs, deleteDesc)
 				}
 				if createAction != nil {
 					descs = append(descs, createDesc)
 				}
-				desc := strings.Join(descs, "\n")
+				var desc = strings.Join(descs, "\n")
 				addResourceAction(desc, func(ctx context.Context) error {
 					if deleteAction != nil {
 						if err := deleteAction(ctx); err != nil {
@@ -691,32 +691,32 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	for bindingIdx, commonUpdates := range updates.updatedBindings {
-		mb, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
+		var mb, err = buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
 		}
 
-		update := BindingUpdate[EC, RC, MT]{
+		var update = BindingUpdate[EC, RC, MT]{
 			Binding:             *mb,
 			NewlyNullableFields: commonUpdates.newlyNullableFields,
 			NewlyDeltaUpdates:   commonUpdates.newlyDeltaUpdates,
 		}
 
-		ps := mb.SelectedProjections()
+		var ps = mb.SelectedProjections()
 		for _, p := range commonUpdates.newProjections {
-			i := slices.IndexFunc(ps, func(pp MappedProjection[MT]) bool {
+			var i = slices.IndexFunc(ps, func(pp MappedProjection[MT]) bool {
 				return pp.Field == p.Field
 			})
 			update.NewProjections = append(update.NewProjections, ps[i])
 		}
 
-		existingResource := is.GetResource(mb.ResourcePath)
+		var existingResource = is.GetResource(mb.ResourcePath)
 		// The root document column is migratable in the same way value columns
 		// are (see mustRecreateTypeChange): e.g. disabling
 		// objects_and_arrays_as_json converts its JSON column to text in place.
 		// Keys are intentionally excluded, since a key type change requires a
 		// backfill rather than an in-place migration.
-		migratable := mb.Values
+		var migratable = mb.Values
 		if mb.Document != nil {
 			migratable = append(slices.Clone(mb.Values), *mb.Document)
 		}
@@ -825,7 +825,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
-	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)
+	var allActions = append(namespaceActionDesciptions, setupActionDescriptions...)
 	allActions = append(allActions, truncationActionDescriptions...)
 	allActions = append(allActions, resourceActionDescriptions...)
 
@@ -859,8 +859,8 @@ func pinFeatureFlags[EC EndpointConfiger](
 	createdAt common.CreatedAt,
 	openOpts openOptions,
 ) {
-	rawFlags, defaultFlags := endpointCfg.FeatureFlags()
-	toPin := common.PendingFlagPins(rawFlags, defaultFlags, createdAt)
+	var rawFlags, defaultFlags = endpointCfg.FeatureFlags()
+	var toPin = common.PendingFlagPins(rawFlags, defaultFlags, createdAt)
 	if len(toPin) == 0 {
 		return
 	}
@@ -872,7 +872,7 @@ func pinFeatureFlags[EC EndpointConfiger](
 		return
 	}
 
-	pinned, err := common.SetSealedConfigProperty(sealedConfig, openOpts.featureFlagsPath, common.PinnedFlagsString(rawFlags, toPin))
+	var pinned, err = common.SetSealedConfigProperty(sealedConfig, openOpts.featureFlagsPath, common.PinnedFlagsString(rawFlags, toPin))
 	if err != nil {
 		log.WithError(err).Warn("failed to record feature flag defaults in endpoint config")
 		return
@@ -904,28 +904,28 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 
-	createdAt, err := specCreatedAt(req.Materialization)
+	var createdAt, err = specCreatedAt(req.Materialization)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	featureFlags := resolveFlags(epCfg, createdAt)
+	var featureFlags = resolveFlags(epCfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	mCfg := materializer.Config()
+	var mCfg = materializer.Config()
 
-	paths := make([][]string, 0, len(req.Materialization.Bindings))
+	var paths = make([][]string, 0, len(req.Materialization.Bindings))
 	for _, b := range req.Materialization.Bindings {
 		paths = append(paths, b.ResourcePath)
 	}
 
-	is := InitInfoSchema(mCfg)
+	var is = InitInfoSchema(mCfg)
 	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, nil, nil, err
 	}
 
-	mapped := make([]MappedBinding[EC, RC, MT], 0, len(req.Materialization.Bindings))
+	var mapped = make([]MappedBinding[EC, RC, MT], 0, len(req.Materialization.Bindings))
 	for bindingIdx := range req.Materialization.Bindings {
 		if m, err := buildMappedBinding(epCfg, materializer, *req.Materialization, bindingIdx); err != nil {
 			return nil, nil, nil, err
@@ -970,9 +970,9 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 }
 
 func InitInfoSchema(cfg MaterializeCfg) *InfoSchema {
-	locatePath := func(rp []string) []string { return rp }
-	translateNamespace := func(f string) string { return f }
-	translateField := func(f string) string { return f }
+	var locatePath = func(rp []string) []string { return rp }
+	var translateNamespace = func(f string) string { return f }
+	var translateField = func(f string) string { return f }
 	if cfg.Locate != nil {
 		locatePath = cfg.Locate
 	}
@@ -992,14 +992,14 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 	spec pf.MaterializationSpec,
 	idx int,
 ) (*MappedBinding[EC, RC, MT], error) {
-	binding := *spec.Bindings[idx]
+	var binding = *spec.Bindings[idx]
 
 	var resCfg RC
 	if err := UnmarshalStrict(binding.ResourceConfigJson, &resCfg); err != nil {
 		return nil, fmt.Errorf("parsing resource config: %w", err)
 	}
 
-	mapped := &MappedBinding[EC, RC, MT]{
+	var mapped = &MappedBinding[EC, RC, MT]{
 		MaterializationSpec_Binding: binding,
 		Index:                       idx,
 		Config:                      resCfg.WithDefaults(endpointCfg),
@@ -1007,7 +1007,7 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 
 	var do = func(dst *[]MappedProjection[MT], fields []string) error {
 		for _, f := range fields {
-			p := binding.Collection.GetProjection(f)
+			var p = binding.Collection.GetProjection(f)
 
 			var fieldCfg FC
 			if raw := binding.FieldSelection.FieldConfigJsonMap[f]; raw != nil {
@@ -1016,8 +1016,8 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 				}
 			}
 
-			mp := MapProjection(*p, fieldCfg)
-			mt, converter := materializer.MapType(mp, fieldCfg)
+			var mp = MapProjection(*p, fieldCfg)
+			var mt, converter = materializer.MapType(mp, fieldCfg)
 			*dst = append(*dst, MappedProjection[MT]{
 				Projection: mp,
 				Comment:    commentForProjection(*p),
@@ -1085,7 +1085,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) NewConstraints(p *pf.Projection, d
 		}
 	}
 
-	cc := c.m.NewConstraint(*p, deltaUpdates, fieldCfg)
+	var cc = c.m.NewConstraint(*p, deltaUpdates, fieldCfg)
 	return &cc, nil
 }
 
@@ -1097,7 +1097,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 		}
 	}
 
-	mt, _ := c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
+	var mt, _ = c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
 	return mustRecreateTypeChange(p, mt, existing), nil
 }
 
@@ -1105,7 +1105,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 // drop & re-create of the target based on the existing materialized field.
 // Generally this is true if there is a type change that can't be migrated.
 func mustRecreateTypeChange[MT MappedTyper](p *pf.Projection, mt MT, existing ExistingField) bool {
-	canMigrate := mt.CanMigrate(existing)
+	var canMigrate = mt.CanMigrate(existing)
 	if p.IsPrimaryKey {
 		// It would theoretically be possible for a few systems to migrate
 		// collection key columns, but for the most part this is not practical, so
@@ -1126,7 +1126,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 		}
 	}
 
-	mt, _ := c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
+	var mt, _ = c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
 	return mt.String(), nil
 }
 
@@ -1141,7 +1141,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 // Apply and Open. Anywhere further from the RPC boundary, thread down the flags
 // resolved there instead of re-resolving them.
 func ResolveFlags[EC EndpointConfiger](cfg EC, spec *pf.MaterializationSpec) (map[string]bool, error) {
-	createdAt, err := specCreatedAt(spec)
+	var createdAt, err = specCreatedAt(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -1153,8 +1153,8 @@ func ResolveFlags[EC EndpointConfiger](cfg EC, spec *pf.MaterializationSpec) (ma
 // the creation date is carried by every task spec, all of Validate, Apply and
 // Open resolve the same flags for a given task without persisting anything.
 func resolveFlags(cfg EndpointConfiger, createdAt common.CreatedAt) map[string]bool {
-	rawFlags, defaultFlags := cfg.FeatureFlags()
-	parsedFlags := common.ResolveFlags(rawFlags, defaultFlags, createdAt)
+	var rawFlags, defaultFlags = cfg.FeatureFlags()
+	var parsedFlags = common.ResolveFlags(rawFlags, defaultFlags, createdAt)
 	if rawFlags != "" {
 		log.WithField("flags", parsedFlags).Info("parsed feature flags")
 	}
@@ -1171,7 +1171,7 @@ func specCreatedAt(spec *pf.MaterializationSpec) (common.CreatedAt, error) {
 	if spec == nil {
 		return common.CreatedAt{}, nil
 	}
-	createdAt, err := common.ParseCreatedAt(spec.CreatedAt)
+	var createdAt, err = common.ParseCreatedAt(spec.CreatedAt)
 	if err != nil {
 		return common.CreatedAt{}, fmt.Errorf("resolving feature flags: %w", err)
 	}

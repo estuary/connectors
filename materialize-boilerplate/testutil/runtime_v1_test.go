@@ -7,7 +7,7 @@ import (
 )
 
 func TestStripRuntimeNextOutput(t *testing.T) {
-	singleShard := `Task: acmeCo/tests/materialize-x
+	var singleShard = `Task: acmeCo/tests/materialize-x
 
 Resource: public.simple_standard
 ["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS ..."]
@@ -19,7 +19,7 @@ Resource: public.simple_standard
 Table Data:
 {"id":1}
 `
-	sharded := `Task: acmeCo/tests/materialize-x
+	var sharded = `Task: acmeCo/tests/materialize-x
 
 Resource: public.simple_standard
 
