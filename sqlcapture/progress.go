@@ -78,7 +78,7 @@ func (c *Capture) backfillProgress() string {
 	for _, binding := range backfilling {
 		tableIDs = append(tableIDs, TableID{binding.Resource.Namespace, binding.Resource.Stream})
 	}
-	estimatedCounts, err := c.Database.EstimatedRowCounts(context.Background(), tableIDs)
+	var estimatedCounts, err = c.Database.EstimatedRowCounts(context.Background(), tableIDs)
 	if err != nil {
 		log.WithError(err).Warn("error querying estimated row counts for backfill progress")
 		return tables

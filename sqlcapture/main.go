@@ -169,7 +169,7 @@ func (e *prerequisitesError) Unwrap() []error {
 // documentation URL. It uses that instead of the default documentation URL from the connector if
 // found.
 func docsURLFromEnv(providedURL string) string {
-	fromEnv := os.Getenv("DOCS_URL")
+	var fromEnv = os.Getenv("DOCS_URL")
 	if fromEnv != "" {
 		return fromEnv
 	}
@@ -180,7 +180,7 @@ func docsURLFromEnv(providedURL string) string {
 // Spec returns the specification definition of this driver.
 // Notably this includes its endpoint and resource configuration JSON schema.
 func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema := d.ResourceSchema
+	var resourceSchema = d.ResourceSchema
 	if resourceSchema == nil {
 		var err error
 		resourceSchema, err = schemagen.GenerateSchema("SQL Database Resource Spec", &Resource{}).MarshalJSON()
@@ -289,7 +289,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	}
 	if len(errs) > 0 {
 		log.WithField("count", len(errs)).Debug("prerequisite validation encountered errors")
-		e := &prerequisitesError{errs}
+		var e = &prerequisitesError{errs}
 		return nil, cerrors.NewUserError(nil, e.Error())
 	}
 	return &pc.Response_Validated{Bindings: out}, nil
@@ -399,7 +399,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
-	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
+	var db, err = d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -451,7 +451,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if len(errs) > 0 {
 		log.WithField("count", len(errs)).Debug("prerequisite validation encountered errors")
-		e := &prerequisitesError{errs}
+		var e = &prerequisitesError{errs}
 		return cerrors.NewUserError(nil, e.Error())
 	}
 

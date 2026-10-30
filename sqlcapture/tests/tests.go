@@ -45,7 +45,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 // testConfigSchema serializes the response to a SpecRequest RPC and verifies it
 // against a snapshot.
 func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
-	response, err := tb.CaptureSpec(ctx, t).Spec(ctx)
+	var response, err = tb.CaptureSpec(ctx, t).Spec(ctx)
 	require.NoError(t, err)
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	} else {
 		res.PrimaryKey = []string{"fullname", "year"}
 	}
-	resourceJSON, err := json.Marshal(res)
+	var resourceJSON, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceJSON
 	cs.Bindings[0].Collection.Key = res.PrimaryKey
@@ -222,7 +222,7 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	} else {
 		res.PrimaryKey = []string{"fullname", "year"}
 	}
-	resourceJSON, err := json.Marshal(res)
+	var resourceJSON, err = json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceJSON
 	cs.Bindings[0].Collection.Key = res.PrimaryKey

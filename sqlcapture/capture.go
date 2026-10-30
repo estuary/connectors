@@ -499,7 +499,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	}
 
 	// Add a state entry for any new bindings, initially "Pending"
-	allStreamsAreNew := true
+	var allStreamsAreNew = true
 	for _, binding := range c.Bindings {
 		var stateKey = binding.StateKey
 
@@ -1009,7 +1009,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	var eventCount int
 	var backfillDocumentBytes = 0
 	var backfillChunkStarted = time.Now()
-	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, binding.Resource.BackfillFilter(), func(event ChangeEvent) error {
+	var backfillComplete, resumeCursor, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, binding.Resource.BackfillFilter(), func(event ChangeEvent) error {
 		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized

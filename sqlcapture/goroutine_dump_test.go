@@ -24,7 +24,7 @@ func TestDumpGoroutineStacks(t *testing.T) {
 	// Park a goroutine on a channel receive so the dump has a known blocked
 	// stack to find.
 	var release = make(chan struct{})
-	started := make(chan struct{})
+	var started = make(chan struct{})
 	go func() {
 		close(started)
 		blockedForStackDumpTest(release)

@@ -8,7 +8,7 @@ import (
 )
 
 func TestRecommendedCatalogName(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		schema string
 		table  string
 		want   string
@@ -67,7 +67,7 @@ func TestRecommendedCatalogName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.schema+"."+tt.table, func(t *testing.T) {
-			got := recommendedCatalogName(tt.schema, tt.table)
+			var got = recommendedCatalogName(tt.schema, tt.table)
 			require.Equal(t, path.Clean(got), got)
 			require.Equal(t, tt.want, got)
 		})
@@ -103,7 +103,7 @@ func TestKeyRoundTrip(t *testing.T) {
 }
 
 func TestParseVersion(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		version   string
 		major     int
 		minor     int
@@ -155,7 +155,7 @@ func TestParseVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.version, func(t *testing.T) {
-			major, minor, err := ParseVersion(tt.version)
+			var major, minor, err = ParseVersion(tt.version)
 			if tt.shouldErr {
 				require.Error(t, err)
 				return
@@ -168,7 +168,7 @@ func TestParseVersion(t *testing.T) {
 }
 
 func TestValidVersion(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name               string
 		major, minor       int
 		reqMajor, reqMinor int

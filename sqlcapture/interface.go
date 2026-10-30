@@ -42,11 +42,11 @@ func (s StreamID) EncodeKey() string {
 
 // ParseStreamIDKey parses a string key (produced by EncodeKey) back into a StreamID.
 func ParseStreamIDKey(key string) (StreamID, error) {
-	parts := strings.SplitN(key, ".", 2)
+	var parts = strings.SplitN(key, ".", 2)
 	if len(parts) != 2 {
 		return StreamID{}, fmt.Errorf("invalid stream ID key %q: expected schema.table format", key)
 	}
-	schema, err := url.PathUnescape(parts[0])
+	var schema, err = url.PathUnescape(parts[0])
 	if err != nil {
 		return StreamID{}, fmt.Errorf("invalid stream ID key %q: %w", key, err)
 	}

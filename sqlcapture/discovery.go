@@ -17,7 +17,7 @@ import (
 // DiscoverCatalog queries the database and generates discovered bindings
 // describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovered_Binding, error) {
-	tableIDs, err := db.ListTables(ctx)
+	var tableIDs, err = db.ListTables(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error listing database tables: %w", err)
 	}

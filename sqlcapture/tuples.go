@@ -142,11 +142,11 @@ func AppendIntFDB(buf []byte, i int64) (bs []byte, err error) {
 		return AppendUintFDB(buf, uint64(i))
 	}
 
-	n := bisectLeft(uint64(-i))
+	var n = bisectLeft(uint64(-i))
 	var scratch [8]byte
 
 	buf = append(buf, byte(intZeroCode-n))
-	offsetEncoded := int64(sizeLimits[n]) + i
+	var offsetEncoded = int64(sizeLimits[n]) + i
 	binary.BigEndian.PutUint64(scratch[:], uint64(offsetEncoded))
 	return append(buf, scratch[8-n:]...), nil
 }
@@ -156,7 +156,7 @@ func AppendUintFDB(buf []byte, i uint64) (bs []byte, err error) {
 		return append(buf, byte(intZeroCode)), nil
 	}
 
-	n := bisectLeft(i)
+	var n = bisectLeft(i)
 	var scratch [8]byte
 
 	buf = append(buf, byte(intZeroCode+n))
@@ -193,7 +193,7 @@ func UnpackTuple(bs []byte, translate func(t tuple.TupleElement) (interface{}, e
 	}
 	var xs []interface{}
 	for _, elem := range t {
-		decoded, err := translate(elem)
+		var decoded, err = translate(elem)
 		if err != nil {
 			return nil, fmt.Errorf("unpack tuple: %w", err)
 		}
