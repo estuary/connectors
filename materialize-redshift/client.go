@@ -151,9 +151,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 
 // connectError maps a connection failure to a readable error.
 func connectError(err error, cfg config) error {
-	var pgErr *pgconn.ConnectError
-
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.ConnectError](err); ok {
 		err = pgErr.Unwrap()
 		if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
 			err = fmt.Errorf("incorrect username or password")
@@ -201,13 +199,12 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
 	testKey := path.Join(cfg.effectiveBucketPath(), uuid.NewString())
 
-	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
-		if errors.As(err, &awsErr) {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
 			// exist but the configured credentials aren't authorized to write to it.
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
@@ -221,7 +218,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)
@@ -229,7 +226,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)

@@ -1125,8 +1125,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				// updated this column. Practically this means we will try to set a column that is
 				// already VARCHAR(MAX) to VARCHAR(MAX), and Redshift returns a specific error in
 				// this case that can be safely discarded.
-				var pgErr *pgconn.PgError
-				if errors.As(err, &pgErr) {
+				if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 					if pgErr.Code == "0A000" && strings.Contains(pgErr.Message, "target column size should be different") {
 						log.WithFields(log.Fields{
 							"table":  b.target.Identifier,

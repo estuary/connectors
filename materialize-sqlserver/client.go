@@ -66,14 +66,11 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 
 // connectError maps a connection failure to a readable error.
 func connectError(err error, cfg config) error {
-	var netConnErr *net.DNSError
-	var netOpErr *net.OpError
-
-	if errors.As(err, &netConnErr) {
+	if netConnErr, ok := errors.AsType[*net.DNSError](err); ok {
 		if netConnErr.IsNotFound {
 			err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 		}
-	} else if errors.As(err, &netOpErr) {
+	} else if netOpErr, ok := errors.AsType[*net.OpError](err); ok {
 		if netOpErr.Timeout() {
 			err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 		}

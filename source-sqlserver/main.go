@@ -480,8 +480,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 
 	var conn = sql.OpenDB(connector)
 	if err := conn.PingContext(ctx); err != nil {
-		var mssqlErr mssqldb.Error
-		if errors.As(err, &mssqlErr) {
+		if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok {
 			switch mssqlErr.Number {
 			case 18456:
 				return cerrors.NewUserError(err, "incorrect username or password")

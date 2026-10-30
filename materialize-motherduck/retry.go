@@ -24,8 +24,8 @@ var retryBaseDelay = 250 * time.Millisecond
 // include DuckLake rejecting a commit because a concurrent transaction changed
 // the same catalog state first.
 func isRetryable(err error) bool {
-	var duckdbErr *duckdb.Error
-	return errors.As(err, &duckdbErr) &&
+	var duckdbErr, ok = errors.AsType[*duckdb.Error](err)
+	return ok &&
 		(duckdbErr.Type == duckdb.ErrorTypeConnection || duckdbErr.Type == duckdb.ErrorTypeTransaction)
 }
 

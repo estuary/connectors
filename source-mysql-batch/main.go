@@ -195,7 +195,6 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	defer connectionTimer.Stop()
 
 	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
-	var mysqlErr *mysql.MyError
 	var withTimeouts = func(c *client.Conn) error {
 		// Some polling queries can take a long time to start yielding results,
 		// especially for large tables with unindexed cursor columns. While we
@@ -229,7 +228,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	if tlsConfig == nil {
 		if conn, err = dial(nil); err == nil {
 			log.WithField("addr", cfg.Address).Info("connected without TLS")
-		} else if errors.As(err, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		} else if mysqlErr, ok := errors.AsType[*mysql.MyError](err); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 			return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 		} else {
 			return nil, fmt.Errorf("unable to connect to database without TLS: %w", err)
@@ -237,7 +236,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	} else if connWithTLS, errWithTLS := dial(tlsConfig); errWithTLS == nil {
 		log.WithFields(log.Fields{"addr": cfg.Address, "sslmode": settings.EffectiveMode()}).Info("connected with TLS")
 		conn = connWithTLS
-	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithTLS); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
 		if msg := settings.FailureMessage(errWithTLS, cfg.serverHost(), true); msg != "" {
@@ -252,10 +251,10 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		// - Otherwise we report both errors.
 		log.WithFields(log.Fields{"addr": cfg.Address, "errWithTLS": errWithTLS}).Warn("connected without TLS")
 		conn = connWithoutTLS
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithoutTLS); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		log.WithFields(log.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithoutTLS); ok && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
 		return nil, fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)

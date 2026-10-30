@@ -430,13 +430,12 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 	// requiring s3:DeleteObject.
 	testKey := path.Join(d.cfg.Prefix, ".estuary-prerequisites-check")
 
-	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
-		if errors.As(err, &awsErr) {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
 				err = fmt.Errorf("bucket %q does not exist", d.cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
@@ -448,7 +447,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 		}
 		errs.Err(err)

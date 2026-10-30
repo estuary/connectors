@@ -71,11 +71,9 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 
 	// Ping the primary
 	if err := client.Ping(ctx, readpref.Primary()); err != nil {
-		var mongoErr mongoDriver.Error
-
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", redactedAddress(cfg.Address)))
-		} else if errors.As(err, &mongoErr) {
+		} else if mongoErr, ok := errors.AsType[mongoDriver.Error](err); ok {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
 				// An auth error can occur for any of these reasons, and the mongo driver gives us no way to tell them apart:
@@ -220,11 +218,10 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		err := d.client.Database(dbName).CreateCollection(ctx, collectionName)
 
 		if err != nil {
-			mongoErr := mongo.CommandError{}
 			// Error code 48 is "Collection already exists", which we ignore
 			// this error is no longer emitted since Mongo 8, and we keep this code
 			// for backward compatibility with older Mongo versions
-			if errors.As(err, &mongoErr) {
+			if mongoErr, ok := errors.AsType[mongo.CommandError](err); ok {
 				if mongoErr.Code != 48 {
 					return err
 				}

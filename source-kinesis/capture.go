@@ -291,8 +291,7 @@ func (c *capture) getShardIterator(ctx context.Context, stream kinesisStream, sh
 	for {
 		iterInit, err := c.client.GetShardIterator(ctx, iteratorInput)
 		if err != nil {
-			var invalidArugmentErr *types.InvalidArgumentException
-			if errors.As(err, &invalidArugmentErr) && iteratorInput.ShardIteratorType == types.ShardIteratorTypeAfterSequenceNumber {
+			if invalidArugmentErr, ok := errors.AsType[*types.InvalidArgumentException](err); ok && iteratorInput.ShardIteratorType == types.ShardIteratorTypeAfterSequenceNumber {
 				// This error occurs if a stream is deleted and re-created, or
 				// if the retention limit of a sequence number is exceeded. In
 				// either case the only thing to do is start reading the shard
@@ -375,8 +374,7 @@ func (c *capture) readShard(
 			StreamARN:     &stream.arn,
 		})
 		if err != nil {
-			var expiredIteratorErr *types.ExpiredIteratorException
-			if errors.As(err, &expiredIteratorErr) {
+			if _, ok := errors.AsType[*types.ExpiredIteratorException](err); ok {
 				ll.Info("shard iterator expired, getting new iterator")
 				if iterator, err = c.getShardIterator(ctx, stream, shard.shardId, lastSequence); err != nil {
 					return err

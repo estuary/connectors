@@ -475,8 +475,7 @@ func (r *reader) processObject(ctx context.Context, obj ObjectInfo) error {
 		// An *exec.ExitError means the parser command failed and returned a non-zero exit code. In
 		// this case the parser command will log the error message and the connector should exit
 		// without any additional logging.
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if _, ok := errors.AsType[*exec.ExitError](err); ok {
 			return cerrors.NewTransparentError(err)
 		}
 

@@ -218,8 +218,7 @@ func (db *sqlserverDatabase) prerequisiteViewCDCScanHistory(ctx context.Context)
 	var _, err = latestCDCLogScanSession(ctx, db.conn)
 	if err != nil {
 		log.WithField("err", err).Error("failed to list CDC log scan sessions")
-		var msErr mssqldb.Error
-		if errors.As(err, &msErr) && msErr.SQLErrorNumber() == 297 { // Error 297 = "The user does not have permission to perform this action"
+		if msErr, ok := errors.AsType[mssqldb.Error](err); ok && msErr.SQLErrorNumber() == 297 { // Error 297 = "The user does not have permission to perform this action"
 			return fmt.Errorf("user %q needs the VIEW DATABASE STATE permission", db.config.User)
 		}
 		return fmt.Errorf("failed to query sys.dm_cdc_log_scan_sessions: %w", err)

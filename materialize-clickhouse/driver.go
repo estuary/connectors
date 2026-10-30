@@ -1106,8 +1106,8 @@ func (t *transactor) prepareBinding(ctx context.Context, b *binding, shouldProce
 // "unknown table" exception (code 60), raised when a query references a table
 // that does not exist.
 func isUnknownTableErr(err error) bool {
-	var exc *clickhouseproto.Exception
-	return errors.As(err, &exc) && exc.Code == int32(chproto.ErrUnknownTable)
+	var exc, ok = errors.AsType[*clickhouseproto.Exception](err)
+	return ok && exc.Code == int32(chproto.ErrUnknownTable)
 }
 
 // queryStoreParts reads the binding's store table partitions and their row

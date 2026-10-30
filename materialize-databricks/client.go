@@ -285,20 +285,16 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	// https://github.com/databricks/databricks-sql-go/issues/198
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var execErr dbsqlerr.DBExecutionError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &execErr) {
+		if execErr, ok := errors.AsType[dbsqlerr.DBExecutionError](err); ok {
 			// See https://pkg.go.dev/github.com/databricks/databricks-sql-go/errors#pkg-constants
 			// and https://docs.databricks.com/en/error-messages/index.html
 			switch execErr.SqlState() {
 			}
-		} else if errors.As(err, &netConnErr) {
+		} else if netConnErr, ok := errors.AsType[*net.DNSError](err); ok {
 			if netConnErr.IsNotFound {
 				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
-		} else if errors.As(err, &netOpErr) {
+		} else if netOpErr, ok := errors.AsType[*net.OpError](err); ok {
 			if netOpErr.Timeout() {
 				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}

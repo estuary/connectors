@@ -136,8 +136,7 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {
-		var errNotFound *ssmTypes.ParameterNotFound
-		if !errors.As(err, &errNotFound) {
+		if _, ok := errors.AsType[*ssmTypes.ParameterNotFound](err); !ok {
 			return fmt.Errorf("error getting catalog credential parameter: %w", err)
 		}
 	}
@@ -380,8 +379,7 @@ func ssmPutParameterWithRetry(ctx context.Context, client *ssm.Client, name, val
 		if err == nil {
 			return nil
 		}
-		var tooMany *ssmTypes.TooManyUpdates
-		if !errors.As(err, &tooMany) {
+		if _, ok := errors.AsType[*ssmTypes.TooManyUpdates](err); !ok {
 			return err
 		}
 		log.WithField("attempt", attempt+1).Warn("SSM PutParameter TooManyUpdates, retrying")
@@ -390,8 +388,8 @@ func ssmPutParameterWithRetry(ctx context.Context, client *ssm.Client, name, val
 }
 
 func isAccessDeniedErr(err error) bool {
-	var apiErr smithy.APIError
-	if !errors.As(err, &apiErr) {
+	var apiErr, ok = errors.AsType[smithy.APIError](err)
+	if !ok {
 		return false
 	}
 	switch apiErr.ErrorCode() {
@@ -402,8 +400,8 @@ func isAccessDeniedErr(err error) bool {
 }
 
 func isConflictErr(err error) bool {
-	var conflictErr *emrTypes.ConflictException
-	return errors.As(err, &conflictErr)
+	var _, ok = errors.AsType[*emrTypes.ConflictException](err)
+	return ok
 }
 
 func encodeInput(in any) ([]byte, error) {

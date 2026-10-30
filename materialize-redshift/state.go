@@ -166,8 +166,7 @@ func (s *checkpointsTable) decodeTokensColumn(raw *string) (checkpointTokensMap,
 func (s *checkpointsTable) ensureTokensColumn(ctx context.Context, conn *pgx.Conn) error {
 	if _, err := conn.Exec(ctx, fmt.Sprintf(
 		"ALTER TABLE %s ADD COLUMN %s VARBYTE(1024000);", s.table, checkpointTokensColumn)); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42701" {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "42701" {
 			return nil
 		}
 		return fmt.Errorf("adding %s column: %w", checkpointTokensColumn, err)

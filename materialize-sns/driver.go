@@ -304,8 +304,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		if _, err := client.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{
 			TopicArn: aws.String(topicARN),
 		}); err != nil {
-			var notFound *snstypes.NotFoundException
-			if !errors.As(err, &notFound) {
+			if _, ok := errors.AsType[*snstypes.NotFoundException](err); !ok {
 				return nil, fmt.Errorf("checking SNS topic %q: %w", topicARN, err)
 			}
 		}
@@ -360,8 +359,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		if err == nil {
 			continue
 		}
-		var notFound *snstypes.NotFoundException
-		if !errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*snstypes.NotFoundException](err); !ok {
 			return nil, fmt.Errorf("checking SNS topic %q: %w", topicARN, err)
 		}
 

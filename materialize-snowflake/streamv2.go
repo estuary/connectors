@@ -221,8 +221,7 @@ func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, ta
 		if err != nil {
 			// Snowflake reports an absent pipe with the same error as one the role
 			// may not see, so the miss is logged.
-			var sfErr *sf.SnowflakeError
-			if errors.As(err, &sfErr) && sfErr.Number == streamV2ErrObjectNotExistOrAuthorized {
+			if sfErr, ok := errors.AsType[*sf.SnowflakeError](err); ok && sfErr.Number == streamV2ErrObjectNotExistOrAuthorized {
 				log.WithFields(log.Fields{"in": in, "error": err.Error()}).Info("no channels are visible to this role")
 				continue
 			}
@@ -711,8 +710,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 		// one, and re-opening it is an error, so the drop is tried first and the
 		// channel is opened only when the drop reports no handle.
 		var err = client.CloseChannel(ctx, channelName, true)
-		var se *sidecarError
-		if errors.As(err, &se) && se.Code == "unknown_channel" {
+		if se, ok := errors.AsType[*sidecarError](err); ok && se.Code == "unknown_channel" {
 			if _, err = client.OpenChannel(ctx, database, m.dialect.Identifier(schema), table, channelName); err != nil {
 				return fmt.Errorf("opening channel %q to drop it: %w", channelName, err)
 			}
