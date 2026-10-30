@@ -54,7 +54,7 @@ func (r resource) Validate() error {
 }
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := schemagen.GenerateSchema("Slack Connection", &config{}).MarshalJSON()
+	var endpointSchema, err = schemagen.GenerateSchema("Slack Connection", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -149,7 +149,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		return nil, err
 	}
 
-	api, apiErr := cfg.buildAPI()
+	var api, apiErr = cfg.buildAPI()
 	if apiErr != nil {
 		return nil, apiErr
 	}
@@ -181,7 +181,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	api, err := cfg.buildAPI()
+	var api, err = cfg.buildAPI()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -264,7 +264,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		// Parse the timestamp as a time.Time
-		ts, err := time.Parse(time.RFC3339Nano, tsStr)
+		var ts, err = time.Parse(time.RFC3339Nano, tsStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid timestamp %q", tsStr)
 		}
