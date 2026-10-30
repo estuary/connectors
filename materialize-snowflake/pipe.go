@@ -41,9 +41,9 @@ func (parts *pipeParts) toQualifiedName() string {
 
 // Deconstruct a pipeName into its constituent parts
 func pipeNameToParts(pipeName string) pipeParts {
-	pipeNameSplit := strings.Split(pipeName, ".")
-	nameParts := strings.Split(strings.TrimPrefix(pipeNameSplit[2], "FLOW_PIPE_"), "_")
-	tableName := strings.Join(nameParts[3:], "_")
+	var pipeNameSplit = strings.Split(pipeName, ".")
+	var nameParts = strings.Split(strings.TrimPrefix(pipeNameSplit[2], "FLOW_PIPE_"), "_")
+	var tableName = strings.Join(nameParts[3:], "_")
 	return pipeParts{
 		Catalog:   pipeNameSplit[0],
 		Schema:    pipeNameSplit[1],
@@ -61,9 +61,9 @@ var pipeSanitizeRegex = regexp.MustCompile("(?i)[^a-z0-9_]")
 // "original" value to guarantee a unique (with respect to the input) and
 // deterministic output.
 func sanitizeAndAppendHash(tableName string) string {
-	sanitizedTable := pipeSanitizeRegex.ReplaceAllString(tableName, "_")
+	var sanitizedTable = pipeSanitizeRegex.ReplaceAllString(tableName, "_")
 
-	limited := sanitizedTable
+	var limited = sanitizedTable
 
 	if len(sanitizedTable) > 32 {
 		// Limit the length of the "human readable" part of the table name to
@@ -86,7 +86,7 @@ type PipeClient struct {
 }
 
 func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
-	der, err := x509.MarshalPKIXPublicKey(publicKey)
+	var der, err = x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return "", fmt.Errorf("marshalling public key: %w", err)
 	}
@@ -97,7 +97,7 @@ func publicKeyFingerprint(publicKey *rsa.PublicKey) (string, error) {
 // See https://docs.snowflake.com/en/developer-guide/sql-api/authenticating#using-key-pair-authentication
 // for details on how the JWT token is constructed
 func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (string, time.Time, error) {
-	fingerprint, err := publicKeyFingerprint(key.Public().(*rsa.PublicKey))
+	var fingerprint, err = publicKeyFingerprint(key.Public().(*rsa.PublicKey))
 	if err != nil {
 		return "", time.UnixMilli(0), err
 	}
@@ -124,7 +124,7 @@ func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (str
 }
 
 func NewPipeClient(cfg *config, accountName, materializationName string) (*PipeClient, error) {
-	httpClient := http.Client{}
+	var httpClient = http.Client{}
 
 	var dsn, err = cfg.toURI(true, materializationName)
 	if err != nil {
@@ -237,7 +237,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}
 	var url = w.String()
 
-	reqBodyJson, err := json.Marshal(reqBody)
+	var reqBodyJson, err = json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal insertFiles body: %w", err)
 	}
@@ -343,7 +343,7 @@ func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error
 	}
 	var url = w.String()
 
-	req, err := http.NewRequest("GET", url, nil)
+	var req, err = http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating insertReport request: %w", err)
 	}

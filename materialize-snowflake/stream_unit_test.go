@@ -18,12 +18,12 @@ func TestChannelName(t *testing.T) {
 }
 
 func TestGetNextFileName(t *testing.T) {
-	calendar, err := time.Parse(time.RFC3339Nano, "2025-04-03T13:40:36.434227277Z")
+	var calendar, err = time.Parse(time.RFC3339Nano, "2025-04-03T13:40:36.434227277Z")
 	require.NoError(t, err)
 
-	clientPrefix := "asdfasdf_1234"
+	var clientPrefix = "asdfasdf_1234"
 
-	sm := &streamManager{keyBegin: 5678, counter: -1}
+	var sm = &streamManager{keyBegin: 5678, counter: -1}
 
 	for idx := range 5 {
 		require.Equal(t,
@@ -34,7 +34,7 @@ func TestGetNextFileName(t *testing.T) {
 }
 
 func TestShouldWriteNextToken(t *testing.T) {
-	strPtr := func(s string) *string { return &s }
+	var strPtr = func(s string) *string { return &s }
 
 	for _, tt := range []struct {
 		name         string
@@ -101,7 +101,7 @@ func TestShouldWriteNextToken(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := shouldWriteNextToken(t.Context(), tt.blobToken, tt.currentToken)
+			var got, err = shouldWriteNextToken(t.Context(), tt.blobToken, tt.currentToken)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -113,7 +113,7 @@ func TestShouldWriteNextToken(t *testing.T) {
 }
 
 func TestValidWriteBlobs(t *testing.T) {
-	makeChunkMeta := func(db, sch, tbl, ch, tok string) uploadChunkMetadata {
+	var makeChunkMeta = func(db, sch, tbl, ch, tok string) uploadChunkMetadata {
 		return uploadChunkMetadata{
 			Database: db,
 			Schema:   sch,
@@ -122,10 +122,10 @@ func TestValidWriteBlobs(t *testing.T) {
 		}
 	}
 
-	db := "db"
-	sch := "sch"
-	tbl := "tbl"
-	ch := "ch"
+	var db = "db"
+	var sch = "sch"
+	var tbl = "tbl"
+	var ch = "ch"
 
 	for _, tt := range []struct {
 		name  string
@@ -238,7 +238,7 @@ func TestValidWriteBlobs(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validWriteBlobs(tt.blobs)
+			var err = validWriteBlobs(tt.blobs)
 			if tt.valid {
 				require.NoError(t, err)
 			} else {

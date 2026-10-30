@@ -113,7 +113,7 @@ func (c config) toURI(includeSchema bool, materializationName string) (string, e
 		Host: c.Host + ":443",
 	}
 
-	queryParams := make(url.Values)
+	var queryParams = make(url.Values)
 
 	if includeSchema {
 		queryParams.Add("schema", c.Schema)
@@ -178,7 +178,7 @@ func (c config) toURI(includeSchema bool, materializationName string) (string, e
 		} else if privateKey, err := x509.MarshalPKCS8PrivateKey(key); err != nil {
 			return "", fmt.Errorf("parsing private key: %w", err)
 		} else {
-			privateKeyString := base64.URLEncoding.EncodeToString(privateKey)
+			var privateKeyString = base64.URLEncoding.EncodeToString(privateKey)
 			queryParams.Add("privateKey", privateKeyString)
 			queryParams.Add("authenticator", strings.ToLower(sf.AuthTypeJwt.String()))
 		}
@@ -187,15 +187,15 @@ func (c config) toURI(includeSchema bool, materializationName string) (string, e
 		return "", fmt.Errorf("unknown auth type: %s", c.Credentials.AuthType)
 	}
 
-	dsn := user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
+	var dsn = user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
 	return dsn, nil
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
 
 func validHost(h string) error {
-	hasProtocol := strings.Contains(h, "://")
-	missingDomain := !hostRe.MatchString(h)
+	var hasProtocol = strings.Contains(h, "://")
+	var missingDomain = !hostRe.MatchString(h)
 
 	if hasProtocol && missingDomain {
 		return fmt.Errorf("invalid host %q (must end in snowflakecomputing.com and not include a protocol)", h)

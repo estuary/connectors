@@ -21,7 +21,7 @@ import (
 // system python3, not the snowpipe-streaming SDK.
 func fakeSidecarArgv(t *testing.T) []string {
 	t.Helper()
-	python, err := exec.LookPath("python3")
+	var python, err = exec.LookPath("python3")
 	if err != nil {
 		t.Skip("python3 not available")
 	}
@@ -33,7 +33,7 @@ func startFakeSidecar(t *testing.T, mode string) (*sidecarSupervisor, *sidecarCl
 	if mode != "" {
 		t.Setenv("FAKE_SIDECAR_MODE", mode)
 	}
-	sup, client, err := startSidecar(context.Background(), fakeSidecarArgv(t))
+	var sup, client, err = startSidecar(context.Background(), fakeSidecarArgv(t))
 	if err == nil {
 		t.Cleanup(func() { sup.stop(client) })
 	}
@@ -41,7 +41,7 @@ func startFakeSidecar(t *testing.T, mode string) (*sidecarSupervisor, *sidecarCl
 }
 
 func TestSidecarHappyPath(t *testing.T) {
-	sup, client, err := startFakeSidecar(t, "")
+	var sup, client, err = startFakeSidecar(t, "")
 	require.NoError(t, err)
 
 	var ctx = context.Background()
@@ -84,7 +84,7 @@ func TestSidecarHappyPath(t *testing.T) {
 // rows appear nowhere in the header, which is what keeps them off the sidecar's
 // JSON parsing path.
 func TestSidecarAppendFraming(t *testing.T) {
-	conn, sidecar := net.Pipe()
+	var conn, sidecar = net.Pipe()
 	var client = newSidecarClient(conn, make(chan struct{}), func() error { return nil })
 
 	var rows = []json.RawMessage{
@@ -110,7 +110,7 @@ func TestSidecarAppendFraming(t *testing.T) {
 	require.NotContains(t, header.raw, "KEY")
 
 	var payload = make([]byte, header.Params.PayloadLen)
-	_, err := io.ReadFull(reader, payload)
+	var _, err = io.ReadFull(reader, payload)
 	require.NoError(t, err)
 	require.JSONEq(t, `[{"KEY":1,"DOC":{"nested":["a",1,null]}},{"KEY":2,"S":"你好 🌟"}]`, string(payload))
 	require.Equal(t, `[`+string(rows[0])+`,`+string(rows[1])+`]`, string(payload))
@@ -129,7 +129,7 @@ func TestSidecarAppendFraming(t *testing.T) {
 // does not send but which must still frame as a payload the reader can consume
 // rather than as no payload at all.
 func TestSidecarAppendFramingOfNoRows(t *testing.T) {
-	conn, sidecar := net.Pipe()
+	var conn, sidecar = net.Pipe()
 	var client = newSidecarClient(conn, make(chan struct{}), func() error { return nil })
 
 	var appended = make(chan error, 1)
@@ -141,7 +141,7 @@ func TestSidecarAppendFramingOfNoRows(t *testing.T) {
 	require.Equal(t, 2, header.Params.PayloadLen)
 
 	var payload = make([]byte, header.Params.PayloadLen)
-	_, err := io.ReadFull(reader, payload)
+	var _, err = io.ReadFull(reader, payload)
 	require.NoError(t, err)
 	require.Equal(t, "[]", string(payload))
 
@@ -165,7 +165,7 @@ type sidecarRequestHeader struct {
 
 func readSidecarRequest(t *testing.T, reader *bufio.Reader) sidecarRequestHeader {
 	t.Helper()
-	line, err := reader.ReadBytes('\n')
+	var line, err = reader.ReadBytes('\n')
 	require.NoError(t, err)
 
 	var header sidecarRequestHeader
@@ -176,12 +176,12 @@ func readSidecarRequest(t *testing.T, reader *bufio.Reader) sidecarRequestHeader
 
 func writeSidecarReply(t *testing.T, conn net.Conn, id uint64) {
 	t.Helper()
-	_, err := fmt.Fprintf(conn, "{\"id\":%d,\"ok\":true}\n", id)
+	var _, err = fmt.Fprintf(conn, "{\"id\":%d,\"ok\":true}\n", id)
 	require.NoError(t, err)
 }
 
 func TestSidecarBadAuthRejected(t *testing.T) {
-	_, client, err := startFakeSidecar(t, "")
+	var _, client, err = startFakeSidecar(t, "")
 	require.NoError(t, err)
 
 	err = client.Configure(context.Background(), sidecarProfile{}, "wrong-token")
@@ -194,7 +194,7 @@ func TestSidecarBadAuthRejected(t *testing.T) {
 // by the sidecar round-trips into sidecarError.Code so callers can log and
 // classify it.
 func TestSidecarStructuredErrorCode(t *testing.T) {
-	sup, client, err := startFakeSidecar(t, "")
+	var sup, client, err = startFakeSidecar(t, "")
 	require.NoError(t, err)
 
 	var ctx = context.Background()
@@ -210,13 +210,13 @@ func TestSidecarNeverReady(t *testing.T) {
 	defer func(d time.Duration) { sidecarReadyTimeout = d }(sidecarReadyTimeout)
 	sidecarReadyTimeout = 2 * time.Second
 
-	_, _, err := startFakeSidecar(t, "never_ready")
+	var _, _, err = startFakeSidecar(t, "never_ready")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not ready after")
 }
 
 func TestSidecarExitsBeforeReady(t *testing.T) {
-	_, _, err := startFakeSidecar(t, "exit_before_ready")
+	var _, _, err = startFakeSidecar(t, "exit_before_ready")
 	require.Error(t, err)
 	// The error must carry both the exit status and the stderr tail.
 	require.Contains(t, err.Error(), "exit status 7")
@@ -224,7 +224,7 @@ func TestSidecarExitsBeforeReady(t *testing.T) {
 }
 
 func TestSidecarCrashMidRPC(t *testing.T) {
-	sup, client, err := startFakeSidecar(t, "crash_after_configure")
+	var sup, client, err = startFakeSidecar(t, "crash_after_configure")
 	require.NoError(t, err)
 
 	var ctx = context.Background()
@@ -243,13 +243,13 @@ func TestSidecarCrashMidRPC(t *testing.T) {
 }
 
 func TestSidecarHangSurfacesTimeout(t *testing.T) {
-	sup, client, err := startFakeSidecar(t, "hang_on_append")
+	var sup, client, err = startFakeSidecar(t, "hang_on_append")
 	require.NoError(t, err)
 
 	var ctx = context.Background()
 	require.NoError(t, client.Configure(ctx, sidecarProfile{}, sup.authToken))
 
-	shortCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	var shortCtx, cancel = context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	err = client.Append(shortCtx, "chan_0", "1", "1", []byte("[]"), 0)
 	require.Error(t, err)
@@ -264,14 +264,14 @@ func TestSidecarHangSurfacesTimeout(t *testing.T) {
 // its socket: the calls blocked writing to it, and those queued behind that
 // write, must still fail at their deadlines.
 func TestSidecarStalledReaderSurfacesTimeout(t *testing.T) {
-	conn, sidecar := net.Pipe()
+	var conn, sidecar = net.Pipe()
 	defer sidecar.Close()
 	var client = newSidecarClient(conn, make(chan struct{}), func() error { return nil })
 
 	var errs = make(chan error, 2)
 	for _, timeout := range []time.Duration{200 * time.Millisecond, 400 * time.Millisecond} {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			var ctx, cancel = context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 			errs <- client.Append(ctx, "ch_0", "1", "1", make([]byte, 1<<20), 1)
 		}()
@@ -291,7 +291,7 @@ func TestSidecarStopEscalatesToKill(t *testing.T) {
 	defer func(d time.Duration) { sidecarStopTimeout = d }(sidecarStopTimeout)
 	sidecarStopTimeout = 2 * time.Second
 
-	sup, client, err := startFakeSidecar(t, "ignore_sigterm")
+	var sup, client, err = startFakeSidecar(t, "ignore_sigterm")
 	require.NoError(t, err)
 
 	// Poison the RPC path so stop's shutdown RPC can't succeed. The fake
@@ -366,7 +366,7 @@ func TestSidecarKillTimesOutAwaitingExit(t *testing.T) {
 }
 
 func TestSidecarProcessGroupSignal(t *testing.T) {
-	sup, client, err := startFakeSidecar(t, "")
+	var sup, client, err = startFakeSidecar(t, "")
 	require.NoError(t, err)
 
 	// The child must be in its own process group, distinct from ours.

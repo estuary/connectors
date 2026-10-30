@@ -71,7 +71,7 @@ type rowSize struct {
 }
 
 func newRowSizing(sch ParquetSchema) rowSize {
-	rs := rowSize{
+	var rs = rowSize{
 		fixed: 24, // slice header for the row itself; it will use this much memory even for an empty row
 	}
 
@@ -99,7 +99,7 @@ func newRowSizing(sch ParquetSchema) rowSize {
 }
 
 func (rs rowSize) estSize(row []any) int {
-	out := rs.fixed
+	var out = rs.fixed
 
 	for _, pos := range rs.calcLen {
 		switch v := row[pos].(type) {
@@ -205,7 +205,7 @@ func WithParquetMetadata(meta map[string]string) ParquetOption {
 }
 
 func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) (*ParquetWriter, error) {
-	cfg := parquetConfig{
+	var cfg = parquetConfig{
 		compression:       Uncompressed,
 		bufferSize:        defaultBufferSize,
 		rowGroupRowLimit:  defaultRowGroupRowLimit,
@@ -215,20 +215,20 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 		o(&cfg)
 	}
 
-	fields := make(schema.FieldList, 0, len(sch))
+	var fields = make(schema.FieldList, 0, len(sch))
 	for _, e := range sch {
 		fields = append(fields, makeNode(e))
 	}
 
-	schemaRoot := schema.MustGroup(schema.NewGroupNode("schema", parquet.Repetitions.Required, fields, -1))
+	var schemaRoot = schema.MustGroup(schema.NewGroupNode("schema", parquet.Repetitions.Required, fields, -1))
 
-	cwc := &countingWriteCloser{w: w}
+	var cwc = &countingWriteCloser{w: w}
 
 	// Use the non-panicking constructor: the sink here is typically one end of an io.Pipe
 	// streaming to a cloud-storage upload, and its very first write (the parquet magic header)
 	// can fail transiently (e.g. a broken pipe). The legacy file.NewParquetWriter panics in that
 	// case; returning the error instead lets the caller surface it as a normal, retryable failure.
-	sinkWriter, err := file.NewParquetWriterWithError(cwc, schemaRoot, writerOpts(cfg, sch)...)
+	var sinkWriter, err = file.NewParquetWriterWithError(cwc, schemaRoot, writerOpts(cfg, sch)...)
 	if err != nil {
 		return nil, fmt.Errorf("initializing parquet sink writer: %w", err)
 	}
@@ -245,7 +245,7 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 }
 
 func writerOpts(cfg parquetConfig, sch ParquetSchema) []file.WriteOption {
-	propOpts := []parquet.WriterProperty{}
+	var propOpts = []parquet.WriterProperty{}
 
 	switch cfg.compression {
 	case Uncompressed:
@@ -274,9 +274,9 @@ func writerOpts(cfg parquetConfig, sch ParquetSchema) []file.WriteOption {
 		}
 	}
 
-	out := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
+	var out = []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
 	if len(cfg.metadata) > 0 {
-		meta := metadata.NewKeyValueMetadata()
+		var meta = metadata.NewKeyValueMetadata()
 		for k, v := range cfg.metadata {
 			if err := meta.Append(k, v); err != nil {
 				panic(fmt.Sprintf("invalid metadata: %s", err)) // only possible if the metadata keys/values contain invalid UTF-8
@@ -372,7 +372,7 @@ func (w *ParquetWriter) flushScratchFile() error {
 		return fmt.Errorf("closing scratch writer: %w", err)
 	}
 
-	sr, err := os.Open(w.scratch.file.Name())
+	var sr, err = os.Open(w.scratch.file.Name())
 	if err != nil {
 		return fmt.Errorf("opening scratch file to transfer values: %w", err)
 	}
@@ -417,12 +417,12 @@ func (w *ParquetWriter) flushBuffer() error {
 	if w.scratch.writer == nil {
 		// Either the very first buffered row group, or the first one after flushing the scratch
 		// file.
-		scratchFile, err := os.CreateTemp("", "parquet-scratch-*")
+		var scratchFile, err = os.CreateTemp("", "parquet-scratch-*")
 		if err != nil {
 			return fmt.Errorf("flushing buffer creating scratch file: %w", err)
 		}
 
-		scratchOpts := []parquet.WriterProperty{
+		var scratchOpts = []parquet.WriterProperty{
 			// Don't use dictionary encoding for the scratch file, since it is
 			// much slower to write than plain encoding with the small row
 			// groups of the scratch file.
@@ -438,7 +438,7 @@ func (w *ParquetWriter) flushBuffer() error {
 		w.scratch.writer = scratchWriter
 	}
 
-	rgWriter := w.scratch.writer.AppendRowGroup()
+	var rgWriter = w.scratch.writer.AppendRowGroup()
 
 	// Transpose the buffered rows into the scratch file row group by writing them column-by-column.
 	for colIdx, f := range w.schema {
@@ -451,7 +451,7 @@ func (w *ParquetWriter) flushBuffer() error {
 			continue
 		}
 
-		cw, err := rgWriter.NextColumn()
+		var cw, err = rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
 		}
@@ -578,12 +578,12 @@ func writeColumn[T parquetValue](
 	var defLevels []int16
 
 	for _, row := range buf {
-		v := row[colIdx]
+		var v = row[colIdx]
 		switch tv := v.(type) {
 		case nil:
 			defLevels = append(defLevels, 0)
 		default:
-			got, err := getVal(tv)
+			var got, err = getVal(tv)
 			if err != nil {
 				return fmt.Errorf("getting typed value for value: %w (type %T)", err, tv)
 			}
@@ -699,7 +699,7 @@ func writeVariantColumn(e ParquetSchemaElement, colIdx int, buf [][]any, rgWrite
 			continue
 		}
 
-		encoded, err := encodeVariant(row[colIdx], e.VariantStringType)
+		var encoded, err = encodeVariant(row[colIdx], e.VariantStringType)
 		if err != nil {
 			return fmt.Errorf("encoding value as variant: %w (type %T)", err, row[colIdx])
 		}
@@ -710,7 +710,7 @@ func writeVariantColumn(e ParquetSchemaElement, colIdx int, buf [][]any, rgWrite
 	}
 
 	for _, vals := range [][]parquet.ByteArray{metaVals, valueVals} {
-		cw, err := rgWriter.NextColumn()
+		var cw, err = rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
 		}
@@ -734,20 +734,20 @@ func writeVariantColumn(e ParquetSchemaElement, colIdx int, buf [][]any, rgWrite
 // read and written in order to combine all of the row groups from the scratch file into a single
 // row group written to w.
 func transferColumnValues(r *file.Reader, w *file.Writer, scratchFile *os.File) error {
-	sch := r.MetaData().Schema
-	rgWriter := w.AppendRowGroup()
+	var sch = r.MetaData().Schema
+	var rgWriter = w.AppendRowGroup()
 
 	for c := 0; c < sch.NumColumns(); c++ {
-		cw, err := rgWriter.NextColumn()
+		var cw, err = rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column writer: %w", err)
 		}
 
 		for rgIdx := 0; rgIdx < r.NumRowGroups(); rgIdx++ {
-			rgReader := r.RowGroup(rgIdx)
-			n := int(rgReader.NumRows())
+			var rgReader = r.RowGroup(rgIdx)
+			var n = int(rgReader.NumRows())
 
-			cr, err := rgReader.Column(c)
+			var cr, err = rgReader.Column(c)
 			if err != nil {
 				return fmt.Errorf("getting next column reader: %w", err)
 			}
@@ -787,7 +787,7 @@ func transferColumnValues(r *file.Reader, w *file.Writer, scratchFile *os.File) 
 			// cgroup-charged memory.
 			if scratchFile != nil {
 				if ccMeta, err := r.MetaData().RowGroup(rgIdx).ColumnChunk(c); err == nil {
-					off := ccMeta.DataPageOffset()
+					var off = ccMeta.DataPageOffset()
 					if dictOff := ccMeta.DictionaryPageOffset(); dictOff > 0 && dictOff < off {
 						off = dictOff
 					}
@@ -805,9 +805,9 @@ func transferColumnValues(r *file.Reader, w *file.Writer, scratchFile *os.File) 
 }
 
 func doTransfer[T parquetValue](numRows int, r columnBatchReader[T], w columnBatchWriter[T]) error {
-	vals := make([]T, numRows)
-	defLvls := make([]int16, numRows)
-	rowsRead, valuesRead, err := r.ReadBatch(int64(numRows), vals, defLvls, nil)
+	var vals = make([]T, numRows)
+	var defLvls = make([]int16, numRows)
+	var rowsRead, valuesRead, err = r.ReadBatch(int64(numRows), vals, defLvls, nil)
 	if err != nil {
 		return fmt.Errorf("reading batch: %w", err)
 	}
@@ -983,8 +983,8 @@ func getDateVal(val any) (got int32, err error) {
 		if d, parseErr := time.Parse(time.DateOnly, v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as time.DateOnly: %w", v, parseErr)
 		} else {
-			unixSeconds := d.Unix()
-			unixDays := unixSeconds / 60 / 60 / 24
+			var unixSeconds = d.Unix()
+			var unixDays = unixSeconds / 60 / 60 / 24
 			got = int32(unixDays)
 		}
 	default:
@@ -1001,8 +1001,8 @@ func getTimeVal(val any) (got int64, err error) {
 		if parsed, parseErr := time.Parse("15:04:05.999999999Z07:00", v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as time: %w", v, parseErr)
 		} else {
-			year, month, day := parsed.UTC().Date()
-			midnight := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+			var year, month, day = parsed.UTC().Date()
+			var midnight = time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 			got = parsed.UnixMicro() - midnight.UnixMicro()
 		}
 	default:
@@ -1034,11 +1034,11 @@ func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
 		if d, parseErr := iso8601.ParseISO8601(v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as ISO8601 duration string: %w", v, parseErr)
 		} else {
-			months := uint32(d.Y*12 + d.M)
-			days := uint32(d.W*7 + d.D)
-			millis := uint32(d.TH*60*60*1000 + d.TM*60*1000 + d.TS*1000)
+			var months = uint32(d.Y*12 + d.M)
+			var days = uint32(d.W*7 + d.D)
+			var millis = uint32(d.TH*60*60*1000 + d.TM*60*1000 + d.TS*1000)
 
-			val := make([]byte, 0, 12)
+			var val = make([]byte, 0, 12)
 			val = binary.LittleEndian.AppendUint32(val, months)
 			val = binary.LittleEndian.AppendUint32(val, days)
 			val = binary.LittleEndian.AppendUint32(val, millis)

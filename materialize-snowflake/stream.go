@@ -74,7 +74,7 @@ type streamManager struct {
 }
 
 func newStreamManager(cfg *config, materialization string, account string, keyBegin uint32) (*streamManager, error) {
-	c, err := newStreamClient(cfg, account)
+	var c, err = newStreamClient(cfg, account)
 	if err != nil {
 		return nil, fmt.Errorf("newStreamClient: %w", err)
 	}
@@ -91,7 +91,7 @@ func newStreamManager(cfg *config, materialization string, account string, keyBe
 }
 
 func (sm *streamManager) addBinding(ctx context.Context, schema string, table string, target sql.Table) error {
-	channel, err := sm.c.openChannel(ctx, schema, table, sm.channelName)
+	var channel, err = sm.c.openChannel(ctx, schema, table, sm.channelName)
 	if err != nil {
 		return fmt.Errorf("openChannel: %w", err)
 	}
@@ -182,11 +182,11 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 		return fmt.Errorf("initializing bucket: %w", err)
 	}
 
-	fName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
-	w := sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(fName)), sm.objMetadata())
+	var fName = sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
+	var w = sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(fName)), sm.objMetadata())
 
-	ts := sm.tableStreams[binding]
-	bdecWriter, err := newBdecWriter(w, ts.mappedColumns, ts.channel.TableColumns, ts.channel.EncryptionKey, fName)
+	var ts = sm.tableStreams[binding]
+	var bdecWriter, err = newBdecWriter(w, ts.mappedColumns, ts.channel.TableColumns, ts.channel.EncryptionKey, fName)
 	if err != nil {
 		return fmt.Errorf("newBdecWriter: %w", err)
 	}
@@ -209,8 +209,8 @@ func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, map[i
 		}
 	}
 
-	out := make(map[int][]*blobMetadata)
-	keys := make(map[int]string)
+	var out = make(map[int][]*blobMetadata)
+	var keys = make(map[int]string)
 	for binding, trackedBlobs := range sm.blobStats {
 		for idx, trackedBlob := range trackedBlobs {
 			out[binding] = append(out[binding], generateBlobMetadata(
@@ -252,7 +252,7 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, decry
 	var channelName = blobs[0].Chunks[0].Channels[0].ChannelName
 	var thisChannel *channel
 	for _, v := range sm.tableStreams {
-		matches := v.channel.Schema == schema && v.channel.Table == table && v.channel.ChannelName == channelName
+		var matches = v.channel.Schema == schema && v.channel.Table == table && v.channel.ChannelName == channelName
 		if matches && thisChannel != nil {
 			return fmt.Errorf("internal error: found duplicate channel %s in tableStreams", channelName)
 		} else if matches {
@@ -263,15 +263,15 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, decry
 		return fmt.Errorf("unknown channel %s", channelName)
 	}
 
-	logger := log.WithFields(log.Fields{
+	var logger = log.WithFields(log.Fields{
 		"schema": schema,
 		"table":  table,
 	})
 	ctx = WithLogger(ctx, logger)
 
 	for _, blob := range blobs {
-		blobToken := blob.Chunks[0].Channels[0].OffsetToken
-		currentChannelToken := thisChannel.OffsetToken
+		var blobToken = blob.Chunks[0].Channels[0].OffsetToken
+		var currentChannelToken = thisChannel.OffsetToken
 		logger.WithFields(log.Fields{
 			"currentChannelToken": thisChannel.OffsetToken,
 			"blobToken":           blobToken,
@@ -346,10 +346,10 @@ func (sm *streamManager) writeRenamed(ctx context.Context, decryptKey string, ch
 	if err := sm.maybeInitializeBucket(ctx); err != nil {
 		return fmt.Errorf("initializing bucket to rename: %w", err)
 	}
-	nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
+	var nextName = sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
 
-	logger := Logger(ctx)
-	ll := logger.WithFields(log.Fields{
+	var logger = Logger(ctx)
+	var ll = logger.WithFields(log.Fields{
 		"oldName": blob.Path,
 		"newName": nextName,
 		"token":   blob.Chunks[0].Channels[0].OffsetToken,
@@ -378,11 +378,11 @@ func (sm *streamManager) renameBlob(
 	channel *channel,
 	newName blobFileName,
 ) error {
-	r, err := sm.bucket.NewReader(ctx, path.Join(sm.bucketPath, blob.Path))
+	var r, err = sm.bucket.NewReader(ctx, path.Join(sm.bucketPath, blob.Path))
 	if err != nil {
 		return fmt.Errorf("NewReader: %w", err)
 	}
-	w := sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(newName)), sm.objMetadata())
+	var w = sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(newName)), sm.objMetadata())
 
 	if err := reencrypt(r, w, blob, decryptKey, channel, newName); err != nil {
 		return fmt.Errorf("reencrypt: %w", err)
@@ -403,20 +403,20 @@ func (sm *streamManager) maybeInitializeBucket(ctx context.Context) error {
 		return nil
 	}
 
-	cfg, err := sm.c.configure(ctx)
+	var cfg, err = sm.c.configure(ctx)
 	if err != nil {
 		return fmt.Errorf("configuring channel: %w", err)
 	}
 
-	parts := strings.Split(cfg.StageLocation.Location, "/")
-	bucket := parts[0]
+	var parts = strings.Split(cfg.StageLocation.Location, "/")
+	var bucket = parts[0]
 	sm.bucketPath = path.Join(parts[1:]...)
 	sm.prefix = cfg.Prefix
 	sm.deploymentId = cfg.DeploymentID
 
 	switch cfg.StageLocation.LocationType {
 	case "S3":
-		provider := credentials.NewStaticCredentialsProvider(
+		var provider = credentials.NewStaticCredentialsProvider(
 			cfg.StageLocation.Creds.AwsKeyId,
 			cfg.StageLocation.Creds.AwsSecretKey,
 			cfg.StageLocation.Creds.AwsToken,
@@ -425,15 +425,15 @@ func (sm *streamManager) maybeInitializeBucket(ctx context.Context) error {
 			return fmt.Errorf("new s3 blob bucket: %w", err)
 		}
 	case "GCS":
-		auth := option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
+		var auth = option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: cfg.StageLocation.Creds.GcsAccessToken,
 		}))
 		if sm.bucket, err = blob.NewGCSBucket(ctx, bucket, auth); err != nil {
 			return fmt.Errorf("new gcs blob bucket: %w", err)
 		}
 	case "AZURE":
-		auth := blob.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken)
-		ep := blob.WithAzureEndpoint(cfg.StageLocation.Endpoint)
+		var auth = blob.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken)
+		var ep = blob.WithAzureEndpoint(cfg.StageLocation.Endpoint)
 		if sm.bucket, err = blob.NewAzureBlobBucket(ctx, bucket, cfg.StageLocation.StorageAccount, auth, ep); err != nil {
 			return fmt.Errorf("new azure blob bucket: %w", err)
 		}
@@ -474,13 +474,13 @@ type blobFileName string
 // https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/InternalStageManager.java#L161-L206
 func (sm *streamManager) getNextFileName(calendar time.Time, clientPrefix string) blobFileName {
 	calendar = calendar.UTC()
-	year := strconv.Itoa(calendar.Year())
-	month := strconv.Itoa(int(calendar.Month()))
-	day := strconv.Itoa(calendar.Day())
-	hour := strconv.Itoa(calendar.Hour())
-	minute := strconv.Itoa(calendar.Minute())
-	timestamp := calendar.Unix()
-	blobShortName := strconv.FormatInt(timestamp, 36) +
+	var year = strconv.Itoa(calendar.Year())
+	var month = strconv.Itoa(int(calendar.Month()))
+	var day = strconv.Itoa(calendar.Day())
+	var hour = strconv.Itoa(calendar.Hour())
+	var minute = strconv.Itoa(calendar.Minute())
+	var timestamp = calendar.Unix()
+	var blobShortName = strconv.FormatInt(timestamp, 36) +
 		"_" +
 		clientPrefix +
 		"_" +
@@ -511,7 +511,7 @@ func blobToken(baseToken string, n int) string {
 // if the `n` value for `next` is exactly one larger than `current` (or there is
 // no `current`), the blob should be written.
 func shouldWriteNextToken(ctx context.Context, next string, current *string) (bool, error) {
-	logger := Logger(ctx)
+	var logger = Logger(ctx)
 	if current == nil {
 		// Maybe this should be more strict and error out unless `next` is the
 		// first one in the sequence, but that would block cases where a user
@@ -520,8 +520,8 @@ func shouldWriteNextToken(ctx context.Context, next string, current *string) (bo
 		return true, nil
 	}
 
-	currentToken := *current
-	nextBase, nextN, err := splitToken(next)
+	var currentToken = *current
+	var nextBase, nextN, err = splitToken(next)
 	if err != nil {
 		return false, err
 	}
@@ -530,7 +530,7 @@ func shouldWriteNextToken(ctx context.Context, next string, current *string) (bo
 		return false, err
 	}
 
-	ll := logger.WithFields(log.Fields{
+	var ll = logger.WithFields(log.Fields{
 		"nextToken":    next,
 		"currentToken": currentToken,
 		"currentBase":  currentBase,
@@ -553,7 +553,7 @@ func shouldWriteNextToken(ctx context.Context, next string, current *string) (bo
 }
 
 func splitToken(token string) (string, int, error) {
-	idx := strings.Index(token, ":")
+	var idx = strings.Index(token, ":")
 	if idx == -1 {
 		return "", 0, fmt.Errorf("invalid token %q: no ':' found", token)
 	} else if idx == 0 {
@@ -562,9 +562,9 @@ func splitToken(token string) (string, int, error) {
 		return "", 0, fmt.Errorf("invalid token %q: no number found", token)
 	}
 
-	baseToken := token[:idx]
-	nStr := token[idx+1:]
-	n, err := strconv.Atoi(nStr)
+	var baseToken = token[:idx]
+	var nStr = token[idx+1:]
+	var n, err = strconv.Atoi(nStr)
 	if err != nil {
 		return "", 0, err
 	}
@@ -586,8 +586,8 @@ func validWriteBlobs(blobs []*blobMetadata) error {
 			return fmt.Errorf("internal error: expected chunk channel to have length 1 but was %d", l)
 		}
 
-		persistToken := blob.Chunks[0].Channels[0].OffsetToken
-		token, thisN, err := splitToken(persistToken)
+		var persistToken = blob.Chunks[0].Channels[0].OffsetToken
+		var token, thisN, err = splitToken(persistToken)
 		if err != nil {
 			return fmt.Errorf("invalid token %q: %w", persistToken, err)
 		}

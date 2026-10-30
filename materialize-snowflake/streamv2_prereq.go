@@ -63,7 +63,7 @@ func requireStreamingV2Runtime(spec *pf.MaterializationSpec, stateJson json.RawM
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	flags, err := boilerplate.ResolveFlags(cfg, spec)
+	var flags, err = boilerplate.ResolveFlags(cfg, spec)
 	if err != nil {
 		return err
 	}

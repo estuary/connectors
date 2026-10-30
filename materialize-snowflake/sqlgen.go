@@ -69,11 +69,11 @@ func rfc3339ToUTCString() sql.ElementConverter {
 
 var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestampType, featureFlags map[string]bool) sql.Dialect {
 	// Convert the configured timestamp type to the actual Snowflake type mapping
-	timestampMapping := timestampType.toTimestampTypeMapping()
+	var timestampMapping = timestampType.toTimestampTypeMapping()
 
 	// Define base date/time mappings without primary key wrapper
-	primaryKeyTextType := sql.MapStatic("TEXT")
-	dateMapping := sql.MapStatic("DATE")
+	var primaryKeyTextType = sql.MapStatic("TEXT")
+	var dateMapping = sql.MapStatic("DATE")
 
 	// For TIMESTAMP_NTZ with normalize, use a converter to transform to UTC strings
 	var datetimeMapping sql.MapProjectionFn
@@ -97,12 +97,12 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
-	binaryMapping := sql.MapStatic("TEXT")
+	var binaryMapping = sql.MapStatic("TEXT")
 	if featureFlags["native_binary_column_type"] {
 		binaryMapping = sql.MapStatic("BINARY", sql.AlsoCompatibleWith("varbinary"))
 	}
 
-	mapper := sql.NewDDLMapper(
+	var mapper = sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:    sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.BINARY:   binaryMapping,
@@ -128,7 +128,7 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
-	translateIdentifier := func(in string) string {
+	var translateIdentifier = func(in string) string {
 		if isSimpleIdentifier(in) {
 			// Snowflake uppercases all identifiers unless they are quoted. We don't quote identifiers if
 			// isSimpleIdentifier is true.

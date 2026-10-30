@@ -17,7 +17,7 @@ var testTemplates = renderTemplates(testDialect)
 // native_binary_column_type forced off, for snapshot tests that exercise the
 // flag-disabled code path.
 func flagsWithoutNativeBinary() map[string]bool {
-	out := common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
+	var out = common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})
 	out["native_binary_column_type"] = false
 	return out
 }
@@ -27,13 +27,13 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestSQLGeneration_NoNativeBinaryColumnType(t *testing.T) {
-	dialect := snowflakeDialect("PUBLIC", timestampTypeLTZ, flagsWithoutNativeBinary())
-	tpls := renderTemplates(dialect)
+	var dialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, flagsWithoutNativeBinary())
+	var tpls = renderTemplates(dialect)
 	runSQLGen(t, dialect, tpls)
 }
 
 func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
-	snap, tables := sql.RunSqlGenTests(
+	var snap, tables = sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string {
@@ -54,11 +54,11 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		testTemplates.loadQueryNoFlowDocument,
 		testTemplates.mergeInto,
 	} {
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
-		bounds := []sql.MergeBound{
+		var bounds = []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
 				LiteralLower: testDialect.Literal(int64(10)),
@@ -76,7 +76,7 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 			},
 		}
 
-		tf := boundedQueryInput{
+		var tf = boundedQueryInput{
 			Table:  tbl,
 			File:   "test-file",
 			Bounds: bounds,
@@ -90,7 +90,7 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	for _, tpl := range []*template.Template{
 		testTemplates.copyInto,
 	} {
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -107,7 +107,7 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	for _, tpl := range []*template.Template{
 		testTemplates.copyInto,
 	} {
-		tbl := tables[1]
+		var tbl = tables[1]
 		require.True(t, tbl.DeltaUpdates)
 		require.Nil(t, tbl.Document)
 		var testcase = tbl.Identifier + " " + tpl.Name()
@@ -125,7 +125,7 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	for _, tpl := range []*template.Template{
 		testTemplates.createPipe,
 	} {
-		tbl := tables[0]
+		var tbl = tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
 

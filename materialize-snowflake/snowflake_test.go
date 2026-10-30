@@ -28,7 +28,7 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.yaml").Output()
+	var jsonBytes, err = exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.yaml").Output()
 	require.NoError(t, err)
 
 	var out config
@@ -43,7 +43,7 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	makeResourceFn := func(table string, delta bool) tableConfig {
+	var makeResourceFn = func(table string, delta bool) tableConfig {
 		return tableConfig{
 			Table:  table,
 			Schema: "ESTUARY_SCHEMA",
@@ -52,19 +52,19 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("apply-drain", func(t *testing.T) {
-		cfg := mustGetCfg(t)
-		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
-		res := makeResourceFn(tableName, false).WithDefaults(cfg)
+		var cfg = mustGetCfg(t)
+		var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 
-		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+		var seedPending = func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 			// A staged transaction is a query persisted in the connector
 			// state, keyed by the binding's state key, along with the staged
 			// directory holding its files. The directory is cleaned up after
 			// the query executes; a directory with no files under the
 			// connector's flow_v1 stage (created by Setup during the base
 			// Apply) stands in for one whose files were already consumed.
-			query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
-			state, err := json.Marshal(map[string]any{
+			var query = sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
+			var state, err = json.Marshal(map[string]any{
 				appliedSpec.Bindings[0].StateKey: map[string]any{
 					"Table":     tableName,
 					"Query":     query,
@@ -75,14 +75,14 @@ func TestIntegration(t *testing.T) {
 			return state
 		}
 
-		verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+		var verifyDrained = func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
 			require.Len(t, rows, 1, "the staged transaction's row must have been committed")
 		}
 
 		sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
 	})
 
-	actionDescSanitizers := []func(string) string{
+	var actionDescSanitizers = []func(string) string{
 		func(s string) string {
 			return regexp.MustCompile(`@flow_v1/[a-fA-F0-9\-]{36}`).ReplaceAllString(s, `<uuid>`)
 		},
@@ -163,9 +163,9 @@ func TestPrereqs(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	cfg := mustGetCfg(t)
+	var cfg = mustGetCfg(t)
 
-	tests := []struct {
+	var tests = []struct {
 		name string
 		cfg  func(config) *config
 		want []error
@@ -211,10 +211,10 @@ func TestPrereqs(t *testing.T) {
 // NewEndpoint runs before the prerequisite checks, so a login failure must be
 // reported as a connection failure rather than as the first query it runs.
 func TestNewEndpointConnectError(t *testing.T) {
-	cfg := mustGetCfg(t)
+	var cfg = mustGetCfg(t)
 	cfg.Credentials.User = "wrong" + cfg.Credentials.User
 
-	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	var _, err = NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
 	require.ErrorContains(t, err, "unable to connect to database: JWT token is invalid")
 
 	var userErr *cerrors.UserError
@@ -226,10 +226,10 @@ func TestQueryCurrentClusterBy(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	ctx := context.Background()
-	cfg := mustGetCfg(t)
+	var ctx = context.Background()
+	var cfg = mustGetCfg(t)
 
-	dsn, err := cfg.toURI(true, "")
+	var dsn, err = cfg.toURI(true, "")
 	require.NoError(t, err)
 	db, err := stdsql.Open("snowflake", dsn)
 	require.NoError(t, err)
@@ -238,12 +238,12 @@ func TestQueryCurrentClusterBy(t *testing.T) {
 	const schema = "ESTUARY_SCHEMA"
 	// The decoy differs from the target only at the underscore position, and
 	// its "A" sorts before "_" so an unescaped LIKE pattern returns it first.
-	base := fmt.Sprintf("CLUSTERBY_%s", strings.ToUpper(uuid.NewString()[:8]))
-	target := base + "_T"
-	decoy := base + "AT"
+	var base = fmt.Sprintf("CLUSTERBY_%s", strings.ToUpper(uuid.NewString()[:8]))
+	var target = base + "_T"
+	var decoy = base + "AT"
 
 	for _, name := range []string{target, decoy} {
-		_, err := db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s.%s (ID INTEGER);`, schema, name))
+		var _, err = db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s.%s (ID INTEGER);`, schema, name))
 		require.NoError(t, err)
 		t.Cleanup(func() { db.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s.%s;`, schema, name)) })
 	}

@@ -19,11 +19,11 @@ func TestStreamManager(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	cfg := mustGetCfg(t)
+	var cfg = mustGetCfg(t)
 
-	dsn, err := cfg.toURI(true, "")
+	var dsn, err = cfg.toURI(true, "")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)
@@ -33,10 +33,10 @@ func TestStreamManager(t *testing.T) {
 	var accountName string
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
 
-	verify := func(t *testing.T, query string, want [][]any) {
+	var verify = func(t *testing.T, query string, want [][]any) {
 		t.Helper()
 
-		rows, err := db.Query(query)
+		var rows, err = db.Query(query)
 		require.NoError(t, err)
 		defer rows.Close()
 
@@ -58,7 +58,7 @@ func TestStreamManager(t *testing.T) {
 	}
 
 	t.Run("lifecycle", func(t *testing.T) {
-		table := sql.Table{
+		var table = sql.Table{
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
@@ -68,7 +68,7 @@ func TestStreamManager(t *testing.T) {
 			Document:   nil,
 		}
 
-		cleanup := func(t *testing.T) {
+		var cleanup = func(t *testing.T) {
 			t.Helper()
 			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
 		}
@@ -78,7 +78,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
+		var sm, err = newStreamManager(&cfg, "testing", accountName, 0)
 		require.NoError(t, err)
 
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
@@ -151,7 +151,7 @@ func TestStreamManager(t *testing.T) {
 	})
 
 	t.Run("upload with rename", func(t *testing.T) {
-		table := sql.Table{
+		var table = sql.Table{
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
@@ -161,7 +161,7 @@ func TestStreamManager(t *testing.T) {
 			Document:   nil,
 		}
 
-		cleanup := func(t *testing.T) {
+		var cleanup = func(t *testing.T) {
 			t.Helper()
 			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
 		}
@@ -171,7 +171,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
+		var sm, err = newStreamManager(&cfg, "testing", accountName, 0)
 		require.NoError(t, err)
 
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
@@ -213,7 +213,7 @@ func TestStreamManager(t *testing.T) {
 	})
 
 	t.Run("multiple blobs", func(t *testing.T) {
-		table := sql.Table{
+		var table = sql.Table{
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
@@ -223,7 +223,7 @@ func TestStreamManager(t *testing.T) {
 			Document:   nil,
 		}
 
-		cleanup := func(t *testing.T) {
+		var cleanup = func(t *testing.T) {
 			t.Helper()
 			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
 		}
@@ -233,7 +233,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
+		var sm, err = newStreamManager(&cfg, "testing", accountName, 0)
 		require.NoError(t, err)
 
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
@@ -263,9 +263,9 @@ func TestStreamManager(t *testing.T) {
 	})
 
 	t.Run("multiple bindings and transactions", func(t *testing.T) {
-		keys := []sql.Column{{Identifier: `key`}}
-		values := []sql.Column{{Identifier: `firstcol`}, {Identifier: `secondcol`}}
-		tables := []sql.Table{
+		var keys = []sql.Column{{Identifier: `key`}}
+		var values = []sql.Column{{Identifier: `firstcol`}, {Identifier: `secondcol`}}
+		var tables = []sql.Table{
 			{
 				TableShape: sql.TableShape{Binding: 0},
 				Identifier: `STREAM_TEST_1`,
@@ -289,7 +289,7 @@ func TestStreamManager(t *testing.T) {
 			},
 		}
 
-		cleanup := func(t *testing.T) {
+		var cleanup = func(t *testing.T) {
 			t.Helper()
 			for _, tbl := range tables {
 				_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+tbl.Identifier+";")
@@ -304,7 +304,7 @@ func TestStreamManager(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
+		var sm, err = newStreamManager(&cfg, "testing", accountName, 0)
 		require.NoError(t, err)
 
 		for _, tbl := range tables {
@@ -385,13 +385,13 @@ func TestStreamManager(t *testing.T) {
 	})
 
 	t.Run("non-selected columns and quoted columns", func(t *testing.T) {
-		keys := []sql.Column{{Identifier: `key`}}
-		values := []sql.Column{
+		var keys = []sql.Column{{Identifier: `key`}}
+		var values = []sql.Column{
 			{Identifier: `" Column WiTh ""quotes"" and ""\""spaces"""" ,;{}().-� 𐀀 嶲 "`},
 			{Identifier: `"1234startsWithNumbers"`},
 			{Identifier: `"$dollar$signs.here#andotherstuff"`},
 		}
-		tbl := sql.Table{
+		var tbl = sql.Table{
 			TableShape: sql.TableShape{Binding: 0},
 			Identifier: `STREAM_TEST_QUOTED_COLUMNS`,
 			Keys:       keys,
@@ -399,7 +399,7 @@ func TestStreamManager(t *testing.T) {
 			Document:   nil,
 		}
 
-		cleanup := func(t *testing.T) {
+		var cleanup = func(t *testing.T) {
 			t.Helper()
 			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+tbl.Identifier+";")
 			require.NoError(t, err)
@@ -408,7 +408,7 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup(t)
 
-		createQuery := `
+		var createQuery = `
 		CREATE TABLE STREAM_TEST_QUOTED_COLUMNS(
 			someothercolumn TEXT,
 			key TEXT NOT NULL,
@@ -423,7 +423,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, createQuery)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
+		var sm, err = newStreamManager(&cfg, "testing", accountName, 0)
 		require.NoError(t, err)
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))
 
@@ -447,13 +447,13 @@ func TestStreamManager(t *testing.T) {
 		type hugeThing struct {
 			Val string
 		}
-		fixture := hugeThing{
+		var fixture = hugeThing{
 			Val: strings.Repeat("a", 32*1024*1024),
 		}
-		data, err := json.Marshal(fixture)
+		var data, err = json.Marshal(fixture)
 		require.NoError(t, err)
 
-		table := sql.Table{
+		var table = sql.Table{
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
@@ -463,7 +463,7 @@ func TestStreamManager(t *testing.T) {
 			Document:   nil,
 		}
 
-		cleanup := func(t *testing.T) {
+		var cleanup = func(t *testing.T) {
 			t.Helper()
 			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
 		}
@@ -498,11 +498,11 @@ func TestStreamDatatypes(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
-	ctx := context.Background()
+	var ctx = context.Background()
 
-	cfg := mustGetCfg(t)
+	var cfg = mustGetCfg(t)
 
-	dsn, err := cfg.toURI(true, "")
+	var dsn, err = cfg.toURI(true, "")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)
@@ -514,9 +514,9 @@ func TestStreamDatatypes(t *testing.T) {
 
 	var templates = renderTemplates(testDialect)
 
-	testTableBaseName := "STREAM_TEST_DATATYPES"
+	var testTableBaseName = "STREAM_TEST_DATATYPES"
 
-	timestamps := []any{
+	var timestamps = []any{
 		"2022-08-17T04:32:19.987654321Z",
 		"2022-08-17T04:32:19.987654321+02:00",
 		"2022-08-17T04:32:19.987654321+03:30",
@@ -572,14 +572,14 @@ func TestStreamDatatypes(t *testing.T) {
 		},
 	} {
 		t.Run(tt.ddl, func(t *testing.T) {
-			tbl := sql.Table{
+			var tbl = sql.Table{
 				TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 				Identifier: testTableBaseName + "_" + tt.ddl,
 				Keys:       []sql.Column{{Identifier: `key`, MappedType: sql.MappedType{DDL: "INTEGER"}}},
 				Values:     []sql.Column{{Identifier: `val`, MappedType: sql.MappedType{DDL: tt.ddl}}},
 				Document:   nil,
 			}
-			cleanup := func(t *testing.T) {
+			var cleanup = func(t *testing.T) {
 				t.Helper()
 				_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
 			}
@@ -593,7 +593,7 @@ func TestStreamDatatypes(t *testing.T) {
 			_, err = db.ExecContext(ctx, createQuery.String())
 			require.NoError(t, err)
 
-			sm, err := newStreamManager(&cfg, "testing", accountName, 0)
+			var sm, err = newStreamManager(&cfg, "testing", accountName, 0)
 			require.NoError(t, err)
 
 			require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))

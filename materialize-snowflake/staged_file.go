@@ -138,7 +138,7 @@ const (
 )
 
 func newUploadLimiter() *semaphore.Weighted {
-	slots := common.MemoryLimit() * uploadBudgetPercent / 100 / uploadMemoryPerFile
+	var slots = common.MemoryLimit() * uploadBudgetPercent / 100 / uploadMemoryPerFile
 	return semaphore.NewWeighted(max(1, slots))
 }
 
@@ -254,7 +254,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		if err := f.uploads.Acquire(ctx, 1); err != nil {
 			return err
 		}
-		err := f.put(db, file)
+		var err = f.put(db, file)
 		f.uploads.Release(1)
 		if err != nil {
 			return err
@@ -263,7 +263,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 }
 
 func (f *stagedFile) put(db *stdsql.DB, file string) error {
-	query := fmt.Sprintf(
+	var query = fmt.Sprintf(
 		// OVERWRITE=TRUE is set here not because we intend to overwrite anything, but rather to
 		// avoid an extra LIST query that setting OVERWRITE=FALSE incurs.
 		`PUT file://%s @flow_v1/%s AUTO_COMPRESS=FALSE SOURCE_COMPRESSION=GZIP OVERWRITE=TRUE PARALLEL=%d;`,
@@ -272,7 +272,7 @@ func (f *stagedFile) put(db *stdsql.DB, file string) error {
 	// NB: Not derived from the worker's context since the Go Snowflake
 	// driver retains contexts internally, and the worker's context is
 	// cancelled after group.Wait() returns.
-	putCtx := gosnowflake.WithFileTransferOptions(context.Background(), &gosnowflake.SnowflakeFileTransferOptions{
+	var putCtx = gosnowflake.WithFileTransferOptions(context.Background(), &gosnowflake.SnowflakeFileTransferOptions{
 		MultiPartThreshold: uploadPartSize,
 	})
 	var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
@@ -280,12 +280,12 @@ func (f *stagedFile) put(db *stdsql.DB, file string) error {
 	// Retry a few times on errors since there are occasionally transient
 	// network errors when running PUT queries.
 	for attempt = 1; ; attempt++ {
-		ts := time.Now()
-		err := db.QueryRowContext(putCtx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
+		var ts = time.Now()
+		var err = db.QueryRowContext(putCtx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
 		if err != nil && attempt > 3 {
 			return fmt.Errorf("putWorker PUT to stage: %w", err)
 		} else if err != nil {
-			delay := time.Duration(attempt) * time.Second
+			var delay = time.Duration(attempt) * time.Second
 			log.WithFields(log.Fields{
 				"attempt":         attempt,
 				"delay":           delay,
@@ -329,9 +329,9 @@ func (f *stagedFile) put(db *stdsql.DB, file string) error {
 
 func (f *stagedFile) newFile() error {
 	var fName = uuid.NewString()
-	filePath := filepath.Join(f.dir, fName)
+	var filePath = filepath.Join(f.dir, fName)
 
-	file, err := os.Create(filePath)
+	var file, err = os.Create(filePath)
 	if err != nil {
 		return err
 	}

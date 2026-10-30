@@ -92,7 +92,7 @@ func (c *sidecarClient) readLoop() {
 		}
 
 		c.mu.Lock()
-		ch, ok := c.pending[res.ID]
+		var ch, ok = c.pending[res.ID]
 		delete(c.pending, res.ID)
 		c.mu.Unlock()
 

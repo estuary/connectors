@@ -21,7 +21,7 @@ import (
 )
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
-	d := &transactor{
+	var d = &transactor{
 		cp: checkpoint{
 			"a_table.v1": {Table: "a_table", Query: "MERGE INTO a", StagedDir: "dir"},
 		},
@@ -31,7 +31,7 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	// The staged entry's state key is not requested: nothing may execute (the
 	// nil database would panic if a query ran) and no state update is
 	// returned, so the entry remains pending in the persisted state.
-	state, err := d.Acknowledge(context.Background(), nil, []string{"other_table.v1"})
+	var state, err = d.Acknowledge(context.Background(), nil, []string{"other_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
 	require.NotNil(t, d.cp["a_table.v1"])
@@ -44,7 +44,7 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 // and must report no state update on its account, since an update which changes
 // nothing would burn an iteration of the runtime's bounded Apply loop.
 func TestAcknowledgeKeepsStreamV2Item(t *testing.T) {
-	d := &transactor{
+	var d = &transactor{
 		cp: checkpoint{
 			"a_table.v1": {Table: "a_table", StreamV2: streamV2Checkpoint{
 				fullKeyRange: {ChannelName: "chan", Routed: 42},
@@ -58,7 +58,7 @@ func TestAcknowledgeKeepsStreamV2Item(t *testing.T) {
 		snowpipeStreamingV2: &streamV2Manager{},
 	}
 
-	state, err := d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
+	var state, err = d.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
 	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2[fullKeyRange].Routed)
@@ -184,7 +184,7 @@ func TestStreamingChannelQuotesSchema(t *testing.T) {
 			})
 			var ts = httptest.NewServer(mux)
 			t.Cleanup(ts.Close)
-			pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+			var pkey, err = rsa.GenerateKey(rand.Reader, 1024)
 			require.NoError(t, err)
 
 			var d = &transactor{

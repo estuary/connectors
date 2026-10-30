@@ -172,7 +172,7 @@ type streamClient struct {
 func newStreamClient(cfg *config, account string) (*streamClient, error) {
 	var role *string
 
-	key, err := cfg.Credentials.ParsePrivateKey()
+	var key, err = cfg.Credentials.ParsePrivateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (s *streamClient) configure(ctx context.Context) (*streamConfig, error) {
 		Role *string `json:"role,omitempty"`
 	}
 
-	res, err := post[streamConfig](ctx, s, "/client/configure", req{
+	var res, err = post[streamConfig](ctx, s, "/client/configure", req{
 		Role: s.role,
 	})
 	if err != nil {
@@ -219,7 +219,7 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, channelNa
 		WriteMode   string  `json:"write_mode"`
 	}
 
-	res, err := post[channel](ctx, s, "/channels/open", req{
+	var res, err = post[channel](ctx, s, "/channels/open", req{
 		Role:        s.role,
 		Database:    s.database,
 		Schema:      schema,
@@ -255,7 +255,7 @@ func (s *streamClient) dropChannel(ctx context.Context, schema, table, channelNa
 		Message    string `json:"message"`
 	}
 
-	res, err := post[dropResponse](ctx, s, "/channels/drop", req{
+	var res, err = post[dropResponse](ctx, s, "/channels/drop", req{
 		Role:        s.role,
 		Database:    s.database,
 		Schema:      schema,
@@ -277,13 +277,13 @@ func (s *streamClient) dropChannel(ctx context.Context, schema, table, channelNa
 }
 
 func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
-	logger := Logger(ctx)
+	var logger = Logger(ctx)
 	type req struct {
 		Role  *string         `json:"role,omitempty"`
 		Blobs []*blobMetadata `json:"blobs"`
 	}
 
-	res, err := post[writeResponse](ctx, s, "/channels/write/blobs", req{
+	var res, err = post[writeResponse](ctx, s, "/channels/write/blobs", req{
 		Role: s.role,
 		Blobs: []*blobMetadata{
 			blob,
@@ -333,7 +333,7 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 		Channels []channelReq `json:"channels"`
 	}
 
-	res, err := post[channelStatusResponse](ctx, s, "/channels/status", req{
+	var res, err = post[channelStatusResponse](ctx, s, "/channels/status", req{
 		Role: s.role,
 		Channels: []channelReq{
 			{
@@ -363,10 +363,10 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 }
 
 func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, clientSeq int, schema, table, channelName string) error {
-	logger := Logger(ctx)
-	maxBackoff := 2 * time.Second
-	backoff := 100 * time.Millisecond
-	ts := time.Now()
+	var logger = Logger(ctx)
+	var maxBackoff = 2 * time.Second
+	var backoff = 100 * time.Millisecond
+	var ts = time.Now()
 	for n := 1; ; n++ {
 		if status, err := s.channelStatus(ctx, clientSeq, schema, table, channelName); err != nil {
 			if !errors.Is(err, ErrTemporary) {
@@ -422,7 +422,7 @@ func post[T any](ctx context.Context, c *streamClient, path string, body any) (*
 		return nil, err
 	}
 
-	req := c.r.
+	var req = c.r.
 		NewRequest().
 		WithContext(ctx).
 		SetHeader("Accept", "application/json").
@@ -431,7 +431,7 @@ func post[T any](ctx context.Context, c *streamClient, path string, body any) (*
 		SetError(&streamingApiError{})
 
 	var res T
-	got, err := req.SetResult(&res).SetBody(body).Post(path)
+	var got, err = req.SetResult(&res).SetBody(body).Post(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to POST %s: %w", path, err)
 	}
@@ -539,9 +539,9 @@ func generateBlobMetadata(
 	channel *channel,
 	token string,
 ) *blobMetadata {
-	md5 := hex.EncodeToString(tracked.md5.Sum(nil))
+	var md5 = hex.EncodeToString(tracked.md5.Sum(nil))
 
-	out := blobMetadata{
+	var out = blobMetadata{
 		Path:        string(tracked.fileName),
 		MD5:         md5,
 		BDECVersion: 3,
@@ -552,7 +552,7 @@ func generateBlobMetadata(
 		},
 	}
 
-	chunkMeta := uploadChunkMetadata{
+	var chunkMeta = uploadChunkMetadata{
 		Database:                channel.Database,
 		Schema:                  channel.Schema,
 		Table:                   channel.Table,
@@ -578,7 +578,7 @@ func generateBlobMetadata(
 	}
 
 	for _, col := range tracked.columns {
-		props := fileColumnProperties{
+		var props = fileColumnProperties{
 			ColumnOrdinal:  col.ordinal,
 			NullCount:      col.nullCount,
 			DistinctValues: -1,
@@ -591,8 +591,8 @@ func generateBlobMetadata(
 			props.MaxRealValue = marshalFloat(col.numStats.maxVal)
 			props.MinRealValue = marshalFloat(col.numStats.minVal)
 		} else if col.isStr {
-			maxHex := truncateBytesAsHex([]byte(col.strStats.maxVal), true)
-			minHex := truncateBytesAsHex([]byte(col.strStats.minVal), false)
+			var maxHex = truncateBytesAsHex([]byte(col.strStats.maxVal), true)
+			var minHex = truncateBytesAsHex([]byte(col.strStats.minVal), false)
 			props.MaxLength = col.strStats.maxLen
 			props.MaxStrValue = &maxHex
 			props.MinStrValue = &minHex
@@ -634,7 +634,7 @@ func marshalFloat(f float64) json.RawMessage {
 	} else if math.IsInf(f, 1) {
 		return json.RawMessage(`"Infinity"`)
 	}
-	b, _ := json.Marshal(f)
+	var b, _ = json.Marshal(f)
 
 	return b
 }

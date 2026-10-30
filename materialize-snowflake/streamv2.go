@@ -85,11 +85,11 @@ func (r streamV2Range) MarshalText() ([]byte, error) {
 }
 
 func (r *streamV2Range) UnmarshalText(text []byte) error {
-	begin, end, ok := bytes.Cut(text, []byte("-"))
+	var begin, end, ok = bytes.Cut(text, []byte("-"))
 	if !ok {
 		return fmt.Errorf("key range %q lacks a hyphen", text)
 	}
-	keyBegin, err := strconv.ParseUint(string(begin), 16, 32)
+	var keyBegin, err = strconv.ParseUint(string(begin), 16, 32)
 	if err != nil {
 		return fmt.Errorf("key range %q: %w", text, err)
 	}
@@ -127,7 +127,7 @@ func streamV2SplitChannelName(channelName string) (streamV2ChannelNameParts, boo
 	if groups == nil {
 		return streamV2ChannelNameParts{}, false
 	}
-	epoch, err := strconv.Atoi(groups[2])
+	var epoch, err = strconv.Atoi(groups[2])
 	if err != nil {
 		return streamV2ChannelNameParts{}, false
 	}
@@ -169,7 +169,7 @@ func streamV2ParseOffsetToken(token string) (int64, streamV2Range, bool) {
 		return 0, streamV2Range{}, false
 	}
 
-	offset, err := strconv.ParseInt(offsetText, 10, 64)
+	var offset, err = strconv.ParseInt(offsetText, 10, 64)
 	if err != nil {
 		return 0, streamV2Range{}, false
 	}
@@ -417,7 +417,7 @@ func newStreamV2Manager(
 	accountName string,
 	keyRange *pf.RangeSpec,
 ) *streamV2Manager {
-	procCtx, procCancel := context.WithCancel(ctx)
+	var procCtx, procCancel = context.WithCancel(ctx)
 	return &streamV2Manager{
 		cfg:             cfg,
 		materialization: materialization,
@@ -455,7 +455,7 @@ func (m *streamV2Manager) streamingChannelKeyBegin(channelName string) (uint32, 
 	if len(channelName) != len(prefix)+8 || !strings.EqualFold(channelName[:len(prefix)], prefix) {
 		return 0, false
 	}
-	keyBegin, err := strconv.ParseUint(channelName[len(prefix):], 16, 32)
+	var keyBegin, err = strconv.ParseUint(channelName[len(prefix):], 16, 32)
 	if err != nil {
 		return 0, false
 	}
@@ -472,7 +472,7 @@ func (m *streamV2Manager) ensureStarted(ctx context.Context) (*sidecarClient, er
 
 	// The process uses the session-scoped context of the manager, not the context of
 	// the caller. It therefore survives the return of whichever call started it first.
-	sup, client, err := startSidecar(m.procCtx, m.argv)
+	var sup, client, err = startSidecar(m.procCtx, m.argv)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +514,7 @@ func (m *streamV2Manager) addBinding(database, schema, table string, target sql.
 // through channels of this write path's shape. Two tasks may not stream into one
 // table. A channel of no v2 shape is left alone.
 func (m *streamV2Manager) rejectForeignChannels(ctx context.Context, b *streamV2Binding) error {
-	channelNames, err := m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
+	var channelNames, err = m.listChannels(ctx, b.database, b.schema, unquotedIdentifier(b.table))
 	if err != nil {
 		return err
 	}
@@ -550,7 +550,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
-	client, err := m.ensureStarted(ctx)
+	var client, err = m.ensureStarted(ctx)
 	if err != nil {
 		return err
 	}
@@ -580,7 +580,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 				item.ChannelName, keyRange, shardKeyRange,
 			)
 		}
-		epoch, _, ok := m.parseChannelName(item.ChannelName, b.stateKey)
+		var epoch, _, ok = m.parseChannelName(item.ChannelName, b.stateKey)
 		if !ok {
 			return fmt.Errorf("channel %q recorded for key range %s is not a channel this task derived for this binding", item.ChannelName, keyRange)
 		}
@@ -617,7 +617,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	var activeChannels = make([]*streamV2Channel, 0, len(liveKeyRanges))
 	var keep = make(map[string]bool, len(liveKeyRanges))
 	for _, keyRange := range liveKeyRanges {
-		c, err := m.openChannel(ctx, client, b, keyRange, owned[keyRange], priorItems)
+		var c, err = m.openChannel(ctx, client, b, keyRange, owned[keyRange], priorItems)
 		if err != nil {
 			return err
 		}
@@ -658,7 +658,7 @@ func (m *streamV2Manager) openChannel(
 		channelName, routed = item.ChannelName, item.Routed
 	}
 
-	status, err := client.OpenChannel(ctx, b.database, m.dialect.Identifier(b.schema), b.table, channelName)
+	var status, err = client.OpenChannel(ctx, b.database, m.dialect.Identifier(b.schema), b.table, channelName)
 	if err != nil {
 		return nil, fmt.Errorf("opening channel %q: %w", channelName, err)
 	}
@@ -679,7 +679,7 @@ func (m *streamV2Manager) openChannel(
 // never restores one, so a channel under any other state key belongs to a binding
 // that no longer exists.
 func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table string, keep map[string]bool) error {
-	channelNames, err := m.listChannels(ctx, database, schema, unquotedIdentifier(table))
+	var channelNames, err = m.listChannels(ctx, database, schema, unquotedIdentifier(table))
 	if err != nil {
 		return err
 	}
@@ -702,7 +702,7 @@ func (m *streamV2Manager) sweep(ctx context.Context, database, schema, table str
 			}
 			continue
 		}
-		parts, ok := streamV2SplitChannelName(channelName)
+		var parts, ok = streamV2SplitChannelName(channelName)
 		if !ok || parts.materialization != own || !shard.contains(parts.keyRange.keyBegin) {
 			continue
 		}
@@ -792,10 +792,10 @@ func (m *streamV2Manager) appendAllBatches(ctx context.Context) error {
 // buffer of its own.
 func (m *streamV2Manager) appendBatch(ctx context.Context, c *streamV2Channel) error {
 	var firstOffset, lastOffset = c.batch.firstOffset, c.progress.routed
-	payload, rows, released := c.batch.finish()
+	var payload, rows, released = c.batch.finish()
 	m.bufBytes -= released
 
-	client, err := m.ensureStarted(ctx)
+	var client, err = m.ensureStarted(ctx)
 	if err != nil {
 		return err
 	}
@@ -828,7 +828,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 		if !b.opened {
 			continue // the binding stored nothing since it was last opened
 		}
-		advanced, err := m.settle(ctx, b)
+		var advanced, err = m.settle(ctx, b)
 		if err != nil {
 			return nil, err
 		}
@@ -871,7 +871,7 @@ func (m *streamV2Manager) flush(ctx context.Context) (map[int]streamV2Checkpoint
 	// channel and not globally. A wide materialization therefore does not pay the
 	// commit latency of each channel in series. The limit scales with the channels
 	// per shard so that a binding's channels do not queue behind each other.
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries * streamV2ChannelsPerShard)
 	for _, w := range waits {
 		group.Go(func() error { return m.waitCommit(groupCtx, w.b, w.c, w.c.progress.routed) })
@@ -938,7 +938,7 @@ func (m *streamV2Manager) settle(ctx context.Context, b *streamV2Binding) (bool,
 // waitCommit blocks until the channel durably holds every document through offset. If
 // Snowflake rejected any of its rows, waitCommit fails the transaction.
 func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, c *streamV2Channel, offset int64) error {
-	client, err := m.ensureStarted(ctx)
+	var client, err = m.ensureStarted(ctx)
 	if err != nil {
 		return err
 	}
@@ -998,7 +998,7 @@ func streamV2ValidateCommittedToken(channelName, table string, committedToken *s
 		return 0, nil
 	}
 
-	committedOffset, appendedBy, ok := streamV2ParseOffsetToken(*committedToken)
+	var committedOffset, appendedBy, ok = streamV2ParseOffsetToken(*committedToken)
 	if !ok {
 		return 0, fmt.Errorf(
 			"channel %q reports the committed offset token %q, which carries no offset: this channel was written by something other than this connector's snowpipe_streaming_v2 write path, and continuing could duplicate or drop rows",

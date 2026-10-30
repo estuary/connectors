@@ -31,7 +31,7 @@ func init() {
 // the fake sidecar holds committed offset tokens for.
 func fakeSnowflakeDB(t *testing.T) *stdsql.DB {
 	t.Helper()
-	db, err := stdsql.Open("fakesnowflake", "")
+	var db, err = stdsql.Open("fakesnowflake", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	return db
@@ -44,7 +44,7 @@ func fakeSidecarChannels() ([]string, error) {
 	if path == "" {
 		return nil, nil
 	}
-	raw, err := os.ReadFile(path)
+	var raw, err = os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
 	} else if err != nil {
@@ -83,7 +83,7 @@ func (fakeSnowflakeConn) Begin() (driver.Tx, error) {
 func (fakeSnowflakeConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
 	switch {
 	case strings.HasPrefix(query, "SHOW CHANNELS IN PIPE "):
-		names, err := fakeSidecarChannels()
+		var names, err = fakeSidecarChannels()
 		return &fakeChannelRows{names: names}, err
 	case strings.HasPrefix(query, "SHOW CHANNELS IN TABLE "):
 		return &fakeChannelRows{}, nil
@@ -126,7 +126,7 @@ func fakeStreamManager(t *testing.T, task string) (*streamManager, func() []stri
 	})
 	var ts = httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
-	pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+	var pkey, err = rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err)
 	var sm = &streamManager{
 		c: &streamClient{
@@ -147,7 +147,7 @@ func fakeStreamManager(t *testing.T, task string) (*streamManager, func() []stri
 // the manager through FAKE_SIDECAR_STATE.
 func newFakeStreamV2Manager(t *testing.T, ctx context.Context, cfg *config, task string, keyRange *pf.RangeSpec) *streamV2Manager {
 	t.Helper()
-	sm, _ := fakeStreamManager(t, task)
+	var sm, _ = fakeStreamManager(t, task)
 	var m = newStreamV2Manager(ctx, cfg, fakeSnowflakeDB(t), testDialect, sm, task, "acct", keyRange)
 	m.argv = fakeSidecarArgv(t)
 	t.Cleanup(m.stop)

@@ -45,19 +45,19 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 		t.Skip("set RUN_MEM_REPRO=1 to run this memory reproduction")
 	}
 
-	memLimit := envInt("MEM_LIMIT_BYTES", 1<<30)
-	docKB := envInt("DOC_KB", 1024)
-	maxBlobs := envInt("MAX_BLOBS", 48)
+	var memLimit = envInt("MEM_LIMIT_BYTES", 1<<30)
+	var docKB = envInt("DOC_KB", 1024)
+	var maxBlobs = envInt("MAX_BLOBS", 48)
 
-	zeroScale := 0
-	mapped := []*sql.Column{{Identifier: "ID"}, {Identifier: "DOC"}}
-	existing := []tableColumn{
+	var zeroScale = 0
+	var mapped = []*sql.Column{{Identifier: "ID"}, {Identifier: "DOC"}}
+	var existing = []tableColumn{
 		{Name: "ID", Type: "number", LogicalType: "fixed", PhysicalType: "SB16", Scale: &zeroScale, Nullable: false, Ordinal: 1},
 		{Name: "DOC", Type: "variant", LogicalType: "variant", PhysicalType: "LOB", Nullable: true, Ordinal: 2},
 	}
 
-	encryptionKey := "aGVsbG8K"
-	rng := rand.New(rand.NewSource(1))
+	var encryptionKey = "aGVsbG8K"
+	var rng = rand.New(rand.NewSource(1))
 
 	// Mimics streamManager.blobStats: one tracker per finished blob, all
 	// retained until the transaction's StartCommit calls flush.
@@ -65,7 +65,7 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 	var totalBytes int64
 	var rowID int64
 
-	logMem := func(blobs int) uint64 {
+	var logMem = func(blobs int) uint64 {
 		runtime.GC()
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
@@ -79,7 +79,7 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 	}
 
 	for n := range maxBlobs {
-		bw, err := newBdecWriter(
+		var bw, err = newBdecWriter(
 			discardWriteCloser{},
 			mapped,
 			existing,
@@ -91,7 +91,7 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 		// Write rows until the blob's single row group is full, exactly as
 		// streamManager.writeRow does.
 		for !bw.done {
-			doc := makeDoc(rng, docKB<<10)
+			var doc = makeDoc(rng, docKB<<10)
 			totalBytes += int64(len(doc))
 			require.NoError(t, bw.writeRow([]any{rowID, json.RawMessage(doc)}))
 			rowID++
@@ -111,7 +111,7 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 	// to attribute any remaining per-blob memory growth.
 	if profilePath := os.Getenv("HEAP_PROFILE"); profilePath != "" {
 		runtime.GC()
-		f, err := os.Create(profilePath)
+		var f, err = os.Create(profilePath)
 		require.NoError(t, err)
 		require.NoError(t, pprof.WriteHeapProfile(f))
 		require.NoError(t, f.Close())
@@ -120,7 +120,7 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 
 	// Transaction commit: blob metadata is generated and the trackers are
 	// released, as streamManager.flush does.
-	ch := &channel{Database: "DB", Schema: "S", Table: "T", ChannelName: "C"}
+	var ch = &channel{Database: "DB", Schema: "S", Table: "T", ChannelName: "C"}
 	for i, tr := range trackers {
 		_ = generateBlobMetadata(tr, ch, blobToken("basetoken", i))
 	}
@@ -131,14 +131,14 @@ func TestStreamingMemoryClimbRepro(t *testing.T) {
 // makeDoc produces a JSON document of roughly n bytes with incompressible
 // content, approximating a real flow_document of that size.
 func makeDoc(rng *rand.Rand, n int) []byte {
-	raw := make([]byte, n*3/4)
+	var raw = make([]byte, n*3/4)
 	rng.Read(raw)
 	return []byte(`{"data":"` + base64.StdEncoding.EncodeToString(raw) + `"}`)
 }
 
 func envInt(name string, fallback int) int {
 	if v := os.Getenv(name); v != "" {
-		n, err := strconv.Atoi(v)
+		var n, err = strconv.Atoi(v)
 		if err != nil {
 			panic(fmt.Sprintf("invalid %s: %v", name, err))
 		}

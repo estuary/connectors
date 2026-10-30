@@ -64,8 +64,8 @@ func (c tableConfig) ClusteringColumns() []string {
 	if c.Clustering == "" {
 		return nil
 	}
-	parts := strings.Split(c.Clustering, ",")
-	out := make([]string, 0, len(parts))
+	var parts = strings.Split(c.Clustering, ",")
+	var out = make([]string, 0, len(parts))
 	for _, p := range parts {
 		if p = strings.TrimSpace(p); p != "" {
 			out = append(out, p)
@@ -121,7 +121,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				"schema":   cfg.Schema,
 			}).Info("opening Snowflake")
 
-			dsn, err := cfg.toURI(false, "")
+			var dsn, err = cfg.toURI(false, "")
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
@@ -181,7 +181,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			// truncate objects or arrays. The default maximum size of a VARCHAR
 			// column is 16 MiB, so those technically do need to be truncated to
 			// guarantee they always fit.
-			serPolicy := &pf.SerPolicy{
+			var serPolicy = &pf.SerPolicy{
 				StrTruncateAfter:       16 * 1024 * 1024, // 16 MiB
 				NestedObjTruncateAfter: 0,
 				ArrayTruncateAfter:     0,
@@ -223,19 +223,19 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 		Level string `db:"level"`
 	}
 
-	got := paramRow{}
+	var got = paramRow{}
 	if err := xdb.GetContext(ctx, &got, "SHOW PARAMETERS LIKE 'TIMESTAMP_TYPE_MAPPING';"); err != nil {
 		return "", false, err
 	}
 
-	m := timestampTypeMapping(got.Value)
+	var m = timestampTypeMapping(got.Value)
 	if !m.valid() {
 		return "", false, fmt.Errorf("invalid timestamp type mapping: %s", got.Value)
 	}
 
 	log.WithFields(log.Fields{"value": got.Value, "level": got.Level}).Debug("queried TIMESTAMP_TYPE_MAPPING")
 
-	isExplicit := got.Level != ""
+	var isExplicit = got.Level != ""
 
 	if m == timestampNTZ && !isExplicit {
 		// Default to LTZ if the TIMESTAMP_TYPE_MAPPING parameter is using the
@@ -306,7 +306,7 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	dsn, err := cfg.toURI(true, materializationName)
+	var dsn, err = cfg.toURI(true, materializationName)
 	if err != nil {
 		return nil, fmt.Errorf("building snowflake dsn: %w", err)
 	}
@@ -489,7 +489,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
 		var tableName = b.target.Path[len(b.target.Path)-1]
-		parts := pipeParts{
+		var parts = pipeParts{
 			Catalog:   d.cfg.Database,
 			Schema:    d.cfg.Schema,
 			Binding:   fmt.Sprintf("%d", b.target.Binding),
@@ -570,18 +570,18 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return nil // Nothing to load.
 	}
 
-	loadCtx, cancel := context.WithCancel(ctx)
+	var loadCtx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
 	var loadCh = make(chan *loadDoc)
 
-	loadGroup, loadGroupCtx := errgroup.WithContext(loadCtx)
+	var loadGroup, loadGroupCtx = errgroup.WithContext(loadCtx)
 	loadGroup.Go(func() error {
 		defer cancel()
 		return d.loadDocuments(loadGroupCtx, loadCh, loaded)
 	})
 
-	group, groupCtx := errgroup.WithContext(loadCtx)
+	var group, groupCtx = errgroup.WithContext(loadCtx)
 	group.SetLimit(MaxConcurrentQueries)
 
 	// In order for the concurrent requests below to be actually run concurrently we need
@@ -592,7 +592,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			log.WithFields(log.Fields{
 				"query": query,
 			}).Debug("querying Load documents")
-			start := time.Now()
+			var start = time.Now()
 
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the load channel.
@@ -600,7 +600,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// NB: Not using groupCtx here since the Go Snowflake driver
 			// retains contexts internally, and the group context is cancelled
 			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(ctx, query)
+			var rows, err = d.db.QueryContext(ctx, query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -614,15 +614,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				"requestDuration": time.Since(start).String(),
 			}).Debug("sending Loaded documents from query")
 
-			rowsProcessed := 0
+			var rowsProcessed = 0
 			for rows.Next() {
 				if err = rows.Scan(&binding, &document); err != nil {
 					return fmt.Errorf("scanning Load document(%d): %w", rowsProcessed, err)
 				}
 				rowsProcessed += 1
 
-				message := slices.Clone(document)
-				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
+				var message = slices.Clone(document)
+				var doc = &loadDoc{binding: binding, document: json.RawMessage(message)}
 				select {
 				case <-groupCtx.Done():
 					return groupCtx.Err()
@@ -659,7 +659,7 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 			if !ok {
 				return nil
 			}
-			loadDoc := doc.document
+			var loadDoc = doc.document
 			if b := d.bindings[doc.binding]; len(b.nullFieldsToStrip) > 0 {
 				var err error
 				if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
@@ -677,7 +677,7 @@ func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, err
 	// We use SHOW PIPES to avoid waking up the warehouse. SELECT from INFORMATION_SCHEMA.PIPES wakes up the warehouse.
 	var parts = pipeNameToParts(pipeName)
 	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", strings.ReplaceAll(parts.toPipeName(), "_", "\\\\_"))
-	rows, err := d.db.QueryContext(ctx, query)
+	var rows, err = d.db.QueryContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("finding pipe %q: %w", pipeName, err)
 	}
@@ -770,8 +770,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, round int) (json.RawMessage, error) {
-	streamBlobs := make(map[int][]*blobMetadata)
-	keys := make(map[int]string)
+	var streamBlobs = make(map[int][]*blobMetadata)
+	var keys = make(map[int]string)
 	if d.snowpipeStreaming != nil {
 		// The "base token" only really needs to be sufficiently random that it
 		// doesn't collide with the prior or next transaction's value. Deriving
@@ -784,7 +784,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 	}
 
-	streamV2Entries := make(map[int]streamV2Checkpoint)
+	var streamV2Entries = make(map[int]streamV2Checkpoint)
 	if d.snowpipeStreamingV2 != nil {
 		var err error
 		if streamV2Entries, err = d.snowpipeStreamingV2.flush(ctx); err != nil {
@@ -803,7 +803,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		rows := b.store.rows
+		var rows = b.store.rows
 		b.store.rows = 0
 
 		if b.streaming {
@@ -822,13 +822,13 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		dir, err := b.store.stage.wait()
+		var dir, err = b.store.stage.wait()
 		if err != nil {
 			return nil, err
 		}
 
 		if b.store.mustMerge {
-			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+			var mergeIntoQuery, err = renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}
@@ -844,7 +844,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			b.store.mustMerge = false
 		} else if b.pipeName != "" {
 			// Check to see if a pipe for this version already exists
-			exists, err := d.pipeExists(ctx, b.pipeName)
+			var exists, err = d.pipeExists(ctx, b.pipeName)
 			if err != nil {
 				return nil, err
 			}
@@ -917,7 +917,7 @@ type pipeRecord struct {
 
 // finished reports the pipe's row stats once all of its files have loaded.
 func (pipe *pipeRecord) finished(be *m.BindingEvents) {
-	stats := m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
+	var stats = m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
 	if pipe.rows > 0 {
 		stats = stats.WithStaged(pipe.rows)
 	}
@@ -944,7 +944,7 @@ type copyHistoryRow struct {
 }
 
 func (d *transactor) copyHistory(ctx context.Context, tableName string, fileNames []string) ([]copyHistoryRow, error) {
-	query, err := renderCopyHistoryTemplate(tableName, fileNames, d.templates.copyHistory)
+	var query, err = renderCopyHistoryTemplate(tableName, fileNames, d.templates.copyHistory)
 	if err != nil {
 		return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
 	}
@@ -1006,10 +1006,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	}()
 
 	// Run store queries concurrently, as each independently operates on a separate table.
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
 
-	shouldProcess := m.StateKeyFilter(stateKeys)
+	var shouldProcess = m.StateKeyFilter(stateKeys)
 
 	var drained []string
 	var pipes = make(map[string]*pipeRecord)
@@ -1025,7 +1025,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		path := d.pathForStateKey(stateKey)
+		var path = d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
 		if len(path) == 0 {
@@ -1035,7 +1035,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		drained = append(drained, stateKey)
 
 		if len(item.Query) > 0 {
-			item := item
+			var item = item
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				// NB: Not using groupTx here since the Go Snowflake driver
@@ -1061,7 +1061,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				d.be.FinishedResourceCommit(path)
 
 				// Snowpipe Streaming gives no row counts back.
-				stats := m.RowStats{}
+				var stats = m.RowStats{}
 				if item.Rows > 0 {
 					stats = stats.WithStaged(item.Rows)
 				}
@@ -1140,7 +1140,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			// We first try to check the status of pipes using the REST API's insertReport
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is limited to 10,000 results and the last 10 minutes only
-			report, err := d.pipeClient.InsertReport(pipeName)
+			var report, err = d.pipeClient.InsertReport(pipeName)
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
 			}
@@ -1166,7 +1166,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 					fileNames[i] = f.Path
 				}
 
-				rows, err := d.copyHistory(ctx, pipe.tableName, fileNames)
+				var rows, err = d.copyHistory(ctx, pipe.tableName, fileNames)
 				if err != nil {
 					return nil, err
 				}
@@ -1295,7 +1295,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		delete(d.cp, sk)
 	}
 
-	checkpointJSON, err := json.Marshal(checkpointClear)
+	var checkpointJSON, err = json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
@@ -1307,14 +1307,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // the row counts from its result set. A result that can't be read is logged
 // and skipped; only the query itself can fail the commit.
 func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, path []string) error {
-	isMerge := strings.HasPrefix(item.Query, "\nMERGE INTO")
+	var isMerge = strings.HasPrefix(item.Query, "\nMERGE INTO")
 
-	queryCtx := ctx
-	queryIDs := make(chan string, 1)
+	var queryCtx = ctx
+	var queryIDs = make(chan string, 1)
 	if isMerge {
 		queryCtx = sf.WithQueryIDChan(ctx, queryIDs)
 	}
-	rows, err := d.db.QueryContext(queryCtx, item.Query)
+	var rows, err = d.db.QueryContext(queryCtx, item.Query)
 	if err != nil {
 		return fmt.Errorf("running ack query: %w", err)
 	}
@@ -1344,26 +1344,26 @@ func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, pa
 func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
 	defer rows.Close()
 
-	cols, err := rows.Columns()
+	var cols, err = rows.Columns()
 	if err != nil {
 		return m.RowStats{}, err
 	}
-	colIdx := make(map[string]int, len(cols))
+	var colIdx = make(map[string]int, len(cols))
 	for i, c := range cols {
 		colIdx[strings.ToLower(c)] = i
 	}
 
-	vals := make([]stdsql.NullString, len(cols))
-	ptrs := make([]any, len(cols))
+	var vals = make([]stdsql.NullString, len(cols))
+	var ptrs = make([]any, len(cols))
 	for i := range vals {
 		ptrs[i] = &vals[i]
 	}
-	col := func(name string) (int64, bool) {
-		i, ok := colIdx[name]
+	var col = func(name string) (int64, bool) {
+		var i, ok = colIdx[name]
 		if !ok || !vals[i].Valid {
 			return 0, false
 		}
-		n, err := strconv.ParseInt(vals[i].String, 10, 64)
+		var n, err = strconv.ParseInt(vals[i].String, 10, 64)
 		return n, err == nil
 	}
 
@@ -1374,9 +1374,9 @@ func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
 			return m.RowStats{}, err
 		}
 		if isMerge {
-			i, okI := col("number of rows inserted")
-			u, okU := col("number of rows updated")
-			d, okD := col("number of rows deleted")
+			var i, okI = col("number of rows inserted")
+			var u, okU = col("number of rows updated")
+			var d, okD = col("number of rows deleted")
 			if !okI && !okU && !okD {
 				return m.RowStats{}, fmt.Errorf("unexpected MERGE result columns %v", cols)
 			}
@@ -1448,15 +1448,15 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 	// Use sqlx to scan SHOW results by column name via `pipeRow`, since
 	// Snowflake may change the number of columns returned across releases.
 	var pipeRows []pipeRow
-	xdb := sqlx.NewDb(d.db, "snowflake").Unsafe()
+	var xdb = sqlx.NewDb(d.db, "snowflake").Unsafe()
 	if err := xdb.SelectContext(ctx, &pipeRows, query); err != nil {
 		return fmt.Errorf("listing pipes: %w", err)
 	}
 
 	var toDelete []string
 	for _, row := range pipeRows {
-		fullName := fmt.Sprintf("%s.%s.%s", row.DB, row.Schema, row.Name)
-		parts := pipeNameToParts(fullName)
+		var fullName = fmt.Sprintf("%s.%s.%s", row.DB, row.Schema, row.Name)
+		var parts = pipeNameToParts(fullName)
 
 		for _, pipe := range currentPipes {
 			if pipe.Catalog == row.DB && pipe.Schema == row.Schema && pipe.TableName == parts.TableName && pipe.Version != parts.Version {
@@ -1495,7 +1495,7 @@ func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table str
 	}
 
 	var scanned, total stdsql.NullInt64
-	row := db.QueryRowContext(ctx,
+	var row = db.QueryRowContext(ctx,
 		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
          FROM TABLE(GET_QUERY_OPERATOR_STATS(?)),
          LATERAL FLATTEN(INPUT => operator_statistics)
@@ -1531,7 +1531,7 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 	}
 
 	var result stdsql.NullString
-	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
+	var query = fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
 	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
 		log.WithFields(log.Fields{
 			"table":          table,
@@ -1570,7 +1570,7 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 // collection field names by resolving each one to its quoted column identifier
 // in the table.
 func clusteringKeyExpr(table sql.Table, fieldNames []string) (string, error) {
-	parts := make([]string, len(fieldNames))
+	var parts = make([]string, len(fieldNames))
 	for i, name := range fieldNames {
 		var ident string
 		for _, col := range table.Columns() {
@@ -1634,13 +1634,13 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 			return fmt.Errorf("parsing resource config for %s: %w", table.Identifier, err)
 		}
 
-		fields := rc.ClusteringColumns()
+		var fields = rc.ClusteringColumns()
 		if len(fields) > 0 {
-			keyExpr, err := clusteringKeyExpr(table, fields)
+			var keyExpr, err = clusteringKeyExpr(table, fields)
 			if err != nil {
 				return err
 			}
-			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", table.Identifier, keyExpr)
+			var stmt = fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", table.Identifier, keyExpr)
 			if _, err := d.db.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("enabling clustering on %s: %w", table.Identifier, err)
 			}
@@ -1650,8 +1650,8 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 			}).Info("enabled automatic clustering")
 			d.bindings[i].clusteringExpr = keyExpr
 		} else {
-			loc := d.ep.Dialect.TableLocator(table.Path)
-			currentClusterBy, err := queryCurrentClusterBy(ctx, d.db, loc.TableSchema, loc.TableName)
+			var loc = d.ep.Dialect.TableLocator(table.Path)
+			var currentClusterBy, err = queryCurrentClusterBy(ctx, d.db, loc.TableSchema, loc.TableName)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"table": table.Identifier,
@@ -1659,7 +1659,7 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 				continue
 			}
 			if currentClusterBy != "" {
-				stmt := fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY;", table.Identifier)
+				var stmt = fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY;", table.Identifier)
 				if _, err := d.db.ExecContext(ctx, stmt); err != nil {
 					return fmt.Errorf("dropping clustering key on %s: %w", table.Identifier, err)
 				}

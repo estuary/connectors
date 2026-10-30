@@ -72,15 +72,15 @@ func newBdecWriter(
 	encryptionKey string,
 	fileName blobFileName,
 ) (*bdecWriter, error) {
-	orderedCols, err := orderExistingColumns(mappedColumns, existingColumns)
+	var orderedCols, err = orderExistingColumns(mappedColumns, existingColumns)
 	if err != nil {
 		return nil, fmt.Errorf("making stream columns: %w", err)
 	}
 
-	metadata := map[string]string{"primaryFileId": path.Base(string(fileName))}
-	sch := make(bdecparquet.ParquetSchema, 0, len(orderedCols))
+	var metadata = map[string]string{"primaryFileId": path.Base(string(fileName))}
+	var sch = make(bdecparquet.ParquetSchema, 0, len(orderedCols))
 	for _, col := range orderedCols {
-		e, err := makeSchemaElement(col)
+		var e, err = makeSchemaElement(col)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func newBdecWriter(
 		return nil, fmt.Errorf("getting cipher stream: %w", err)
 	}
 
-	blobStats := &blobStatsTracker{
+	var blobStats = &blobStatsTracker{
 		fileName: fileName,
 		md5:      md5.New(),
 		start:    time.Now(),
@@ -144,7 +144,7 @@ func newBdecWriter(
 
 func (bw *bdecWriter) writeRow(row []any) error {
 	for i, col := range bw.cols {
-		stats := bw.blobStats.columns[i]
+		var stats = bw.blobStats.columns[i]
 
 		// Write null values for table columns that aren't in our field
 		// selection, in addition to null values for fields in the field
@@ -159,32 +159,32 @@ func (bw *bdecWriter) writeRow(row []any) error {
 
 		switch col.LogicalType {
 		case "fixed":
-			v, err := getInt(row[i])
+			var v, err = getInt(row[i])
 			if err != nil {
 				return fmt.Errorf("getInt for column %q: %w", col.Name, err)
 			}
 			row[i] = v
 			stats.nextInt(v)
 		case "text":
-			maxLength := BYTES_16_MB
+			var maxLength = BYTES_16_MB
 			if col.ByteLength != nil {
 				maxLength = *col.ByteLength
 			}
-			v, err := getStr(row[i], maxLength)
+			var v, err = getStr(row[i], maxLength)
 			if err != nil {
 				return fmt.Errorf("getStr for column %q: %w", col.Name, err)
 			}
 			row[i] = v
 			stats.nextStr(v)
 		case "variant":
-			v, err := getStr(row[i], math.MaxInt)
+			var v, err = getStr(row[i], math.MaxInt)
 			if err != nil {
 				return fmt.Errorf("getStr for column %q: %w", col.Name, err)
 			}
 			row[i] = v
 			stats.nextStr(v)
 		case "real":
-			v, err := getNum(row[i])
+			var v, err = getNum(row[i])
 			if err != nil {
 				return fmt.Errorf("getNum for column %q: %w", col.Name, err)
 			}
@@ -198,13 +198,13 @@ func (bw *bdecWriter) writeRow(row []any) error {
 			// The original value (a date string) is left as-is in the row, so
 			// we'll end up parsing it twice: Once here for stats, and once in
 			// the parquet writer.
-			v, err := getDateInt(row[i])
+			var v, err = getDateInt(row[i])
 			if err != nil {
 				return fmt.Errorf("getDateInt for column %q: %w", col.Name, err)
 			}
 			stats.nextInt(v)
 		case "timestamp_ltz", "timestamp_ntz", "timestamp_tz":
-			v, err := getTimestamp(row[i], col.LogicalType, *col.Scale)
+			var v, err = getTimestamp(row[i], col.LogicalType, *col.Scale)
 			if err != nil {
 				return fmt.Errorf("getTimestamp for column %q: %w", col.Name, err)
 			}
@@ -240,7 +240,7 @@ func (bw *bdecWriter) close() error {
 	if err := bw.pq.Close(); err != nil {
 		return fmt.Errorf("closing parquet writer: %w", err)
 	}
-	fm, err := bw.pq.FileMetadata()
+	var fm, err = bw.pq.FileMetadata()
 	if err != nil {
 		return fmt.Errorf("getting parquet file metadata: %w", err)
 	}
@@ -319,7 +319,7 @@ func (bs *blobStatsTracker) Write(p []byte) (int, error) {
 
 	var total int
 	for len(p) > 0 {
-		n := min(len(p), encryptChunkSize)
+		var n = min(len(p), encryptChunkSize)
 		bs.stream.XORKeyStream(bs.buf[:n], p[:n])
 		if written, err := bs.w.Write(bs.buf[:n]); err != nil {
 			return total + written, fmt.Errorf("blobStatsTracker error writing to output: %w", err)
@@ -451,7 +451,7 @@ func (cs *columnStatsTracker) nextNum(v float64) {
 }
 
 func getCipherStream(encryptionKey string, fileName blobFileName) (cipher.Stream, error) {
-	derivedKey, err := deriveKey(encryptionKey, fileName)
+	var derivedKey, err = deriveKey(encryptionKey, fileName)
 	if err != nil {
 		return nil, fmt.Errorf("deriving key: %w", err)
 	}
@@ -478,7 +478,7 @@ func reencrypt(
 	channel *channel,
 	newFileName blobFileName,
 ) error {
-	decryptStream, err := getCipherStream(decryptKey, blobFileName(blob.Path))
+	var decryptStream, err = getCipherStream(decryptKey, blobFileName(blob.Path))
 	if err != nil {
 		return fmt.Errorf("getting decryptStream: %w", err)
 	}
@@ -488,12 +488,12 @@ func reencrypt(
 		return fmt.Errorf("getting encryptStream: %w", err)
 	}
 
-	downMd5 := md5.New()
-	upMd5 := md5.New()
+	var downMd5 = md5.New()
+	var upMd5 = md5.New()
 
-	buf := make([]byte, 64*1024)
+	var buf = make([]byte, 64*1024)
 
-	firstRead := true
+	var firstRead = true
 	n, err := io.ReadAtLeast(r, buf, 4)
 	if err != nil {
 		return fmt.Errorf("reading from r: %w", err)
@@ -533,8 +533,8 @@ func reencrypt(
 		}
 	}
 
-	downHash := hex.EncodeToString(downMd5.Sum(nil))
-	upHash := hex.EncodeToString(upMd5.Sum(nil))
+	var downHash = hex.EncodeToString(downMd5.Sum(nil))
+	var upHash = hex.EncodeToString(upMd5.Sum(nil))
 	if downHash != blob.MD5 || downHash != blob.Chunks[0].ChunkMD5 {
 		return fmt.Errorf("md5 mismatch: %s != %s", downHash, blob.MD5)
 	}
@@ -549,12 +549,12 @@ func reencrypt(
 
 // Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/utils/Cryptor.java#L61-L74
 func deriveKey(secretKey string, diversifier blobFileName) ([]byte, error) {
-	decodedString, err := base64.StdEncoding.DecodeString(secretKey)
+	var decodedString, err = base64.StdEncoding.DecodeString(secretKey)
 	if err != nil {
 		return nil, err
 	}
-	concat := append(decodedString, []byte(diversifier)...)
-	derivedBytes := sha256.Sum256(concat)
+	var concat = append(decodedString, []byte(diversifier)...)
+	var derivedBytes = sha256.Sum256(concat)
 	return derivedBytes[:], nil
 }
 
@@ -564,7 +564,7 @@ func truncateBytesAsHex(bytes []byte, truncateUp bool) string {
 		return hex.EncodeToString(bytes)
 	}
 
-	result := make([]byte, MAX_LOB_LENGTH)
+	var result = make([]byte, MAX_LOB_LENGTH)
 	copy(result, bytes[:MAX_LOB_LENGTH])
 	if truncateUp {
 		var idx int
@@ -599,14 +599,14 @@ func newUnhandledColError(format string, a ...any) error {
 // Loosely adapted from
 // https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/ParquetTypeGenerator.java#L77-L148
 func makeSchemaElement(col tableColumn) (bdecparquet.ParquetSchemaElement, error) {
-	fieldId := int32(col.Ordinal)
-	e := bdecparquet.ParquetSchemaElement{
+	var fieldId = int32(col.Ordinal)
+	var e = bdecparquet.ParquetSchemaElement{
 		Name:     col.Name,
 		Required: !col.Nullable,
 		FieldId:  &fieldId,
 	}
 
-	nilOrScale := func(s *int) string {
+	var nilOrScale = func(s *int) string {
 		if s == nil {
 			return "<nil>"
 		}
@@ -682,9 +682,9 @@ var physicalTypeOrdinals = map[string]string{
 // way allows for rows of data to easily be correlated with the target column
 // for selected fields, and adding null values at the end for the rest.
 func orderExistingColumns(mappedColumns []*sql.Column, existingColumns []tableColumn) ([]tableColumn, error) {
-	findExisting := func(col *sql.Column) (tableColumn, error) {
+	var findExisting = func(col *sql.Column) (tableColumn, error) {
 		var out tableColumn
-		idx := slices.IndexFunc(existingColumns, func(c tableColumn) bool {
+		var idx = slices.IndexFunc(existingColumns, func(c tableColumn) bool {
 			// If the column was created with quotes, it will be reported as
 			// quoted. Otherwise column matching is case-insensitive.
 			if strings.HasPrefix(c.Name, `"`) && strings.HasSuffix(c.Name, `"`) {
@@ -702,9 +702,9 @@ func orderExistingColumns(mappedColumns []*sql.Column, existingColumns []tableCo
 		return existingColumns[idx], nil
 	}
 
-	out := make([]tableColumn, 0, len(existingColumns))
+	var out = make([]tableColumn, 0, len(existingColumns))
 	for _, mapped := range mappedColumns {
-		existing, err := findExisting(mapped)
+		var existing, err = findExisting(mapped)
 		if err != nil {
 			return nil, err
 		}
@@ -722,12 +722,12 @@ func orderExistingColumns(mappedColumns []*sql.Column, existingColumns []tableCo
 
 var (
 	maxSnowflakeInteger = func() decimal128.Num {
-		n, _ := decimal128.FromString(strings.Repeat("9", 38), 38, 0)
+		var n, _ = decimal128.FromString(strings.Repeat("9", 38), 38, 0)
 		return n
 	}()
 
 	minSnowflakeInteger = func() decimal128.Num {
-		n, _ := decimal128.FromString("-"+strings.Repeat("9", 38), 38, 0)
+		var n, _ = decimal128.FromString("-"+strings.Repeat("9", 38), 38, 0)
 		return n
 	}()
 )
@@ -835,8 +835,8 @@ func getDateInt(val any) (got decimal128.Num, err error) {
 		if d, parseErr := time.Parse(time.DateOnly, v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as time.DateOnly: %w", v, parseErr)
 		} else {
-			unixSeconds := d.Unix()
-			unixDays := unixSeconds / 60 / 60 / 24
+			var unixSeconds = d.Unix()
+			var unixDays = unixSeconds / 60 / 60 / 24
 			got = decimal128.FromI64(int64(unixDays))
 		}
 	default:
@@ -849,7 +849,7 @@ func getDateInt(val any) (got decimal128.Num, err error) {
 
 // Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/TimestampWrapper.java
 func getTimestamp(val any, logicalType string, scale int) (got decimal128.Num, err error) {
-	ts, ok := val.(string)
+	var ts, ok = val.(string)
 	if !ok {
 		return got, fmt.Errorf("getTimestamp unhandled type: %T", val)
 	}
@@ -873,7 +873,7 @@ func getTimestamp(val any, logicalType string, scale int) (got decimal128.Num, e
 		)
 	}
 
-	fraction := (int64(parsed.Nanosecond()) / int64(math.Pow10(9-scale))) * int64(math.Pow10(9-scale))
+	var fraction = (int64(parsed.Nanosecond()) / int64(math.Pow10(9-scale))) * int64(math.Pow10(9-scale))
 	got = decimal128.FromI64(parsed.Unix()).
 		Mul(decimal128.FromI64(int64(math.Pow10(9)))). // seconds to nanoseconds
 		Add(decimal128.FromI64(int64(fraction)))       // add in the truncated nanoseconds fraction
@@ -891,8 +891,8 @@ func getTimestamp(val any, logicalType string, scale int) (got decimal128.Num, e
 
 	if logicalType == "timestamp_tz" {
 		// Must embed the timezone offset in the value.
-		_, timezoneOffsetSeconds := parsed.Zone()
-		offsetMin := timezoneOffsetSeconds / 60
+		var _, timezoneOffsetSeconds = parsed.Zone()
+		var offsetMin = timezoneOffsetSeconds / 60
 		if offsetMin < -1440 || offsetMin > 1440 {
 			// I don't know if this is possible to happen, but it is a check the
 			// Java SDK does so we'll do it too.
@@ -902,10 +902,10 @@ func getTimestamp(val any, logicalType string, scale int) (got decimal128.Num, e
 
 		// Shift left by 14 bits to make room for the offset, and then add the
 		// offset.
-		shift := 14
-		hi := got.HighBits()
-		lo := got.LowBits()
-		shifted := decimal128.New(
+		var shift = 14
+		var hi = got.HighBits()
+		var lo = got.LowBits()
+		var shifted = decimal128.New(
 			hi<<shift|int64(lo>>(64-shift)),
 			lo<<shift,
 		)

@@ -134,7 +134,7 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 	t.Run("the v2 write path with key-pair credentials is allowed", func(t *testing.T) {
 		var cfg = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.JWT)
 		require.NoError(t, cfg.Validate())
-		flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		var flags, err = boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
 		require.NoError(t, err)
 		require.True(t, cfg.isStreamsV2(true, flags))
 	})
@@ -142,7 +142,7 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 	t.Run("the v2 flag without key-pair credentials is allowed and does not select the path", func(t *testing.T) {
 		var cfg = testStreamingConfigAuth(t, "snowpipe_streaming_v2", snowflake_auth.UserPass)
 		require.NoError(t, cfg.Validate())
-		flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		var flags, err = boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
 		require.NoError(t, err)
 		require.False(t, cfg.isStreamsV2(true, flags))
 	})
@@ -163,7 +163,7 @@ func TestValidateStreamingV2Auth(t *testing.T) {
 func testStreamingSpec(t *testing.T, featureFlags string, runtimeV2 bool) *pf.MaterializationSpec {
 	t.Helper()
 
-	configJson, err := json.Marshal(testStreamingConfig(t, featureFlags))
+	var configJson, err = json.Marshal(testStreamingConfig(t, featureFlags))
 	require.NoError(t, err)
 
 	var shardTemplate = new(pc.ShardSpec)
@@ -221,12 +221,12 @@ func TestRuntimePrereqDriverRejections(t *testing.T) {
 	var spec = testStreamingSpec(t, "snowpipe_streaming_v2", false)
 
 	t.Run("publishing is rejected", func(t *testing.T) {
-		_, err := driver.Apply(ctx, &pm.Request_Apply{Materialization: spec})
+		var _, err = driver.Apply(ctx, &pm.Request_Apply{Materialization: spec})
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 	})
 
 	t.Run("starting is rejected", func(t *testing.T) {
-		_, _, _, err := driver.NewTransactor(ctx, pm.Request_Open{Materialization: spec}, nil)
+		var _, _, _, err = driver.NewTransactor(ctx, pm.Request_Open{Materialization: spec}, nil)
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 	})
 }
@@ -276,14 +276,14 @@ func TestRequireStreamingV2RuntimeWithState(t *testing.T) {
 	// so the rejection reaches the operator without Snowflake being touched at all.
 	t.Run("publishing an item off the v2 runtime is rejected", func(t *testing.T) {
 		var state = stateWith(t, streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}})
-		_, err := NewRuntimePrereqDriver().Apply(context.Background(), &pm.Request_Apply{Materialization: specOf(t, false), StateJson: state})
+		var _, err = NewRuntimePrereqDriver().Apply(context.Background(), &pm.Request_Apply{Materialization: specOf(t, false), StateJson: state})
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 		require.ErrorContains(t, err, channel)
 	})
 
 	t.Run("opening an item off the v2 runtime is rejected", func(t *testing.T) {
 		var state = stateWith(t, streamV2Checkpoint{fullKeyRange: {ChannelName: channel, Routed: 3}})
-		_, _, _, err := NewRuntimePrereqDriver().NewTransactor(context.Background(), pm.Request_Open{Materialization: specOf(t, false), StateJson: state}, nil)
+		var _, _, _, err = NewRuntimePrereqDriver().NewTransactor(context.Background(), pm.Request_Open{Materialization: specOf(t, false), StateJson: state}, nil)
 		require.ErrorContains(t, err, boilerplate.RuntimeV2FlagName)
 		require.ErrorContains(t, err, channel)
 	})

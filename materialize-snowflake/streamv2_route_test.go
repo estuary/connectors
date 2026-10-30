@@ -14,7 +14,7 @@ func TestStreamV2TargetLayout(t *testing.T) {
 	var full = streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32}
 
 	t.Run("full range quarters", func(t *testing.T) {
-		layout, err := streamV2TargetLayout(0, math.MaxUint32)
+		var layout, err = streamV2TargetLayout(0, math.MaxUint32)
 		require.NoError(t, err)
 		require.Equal(t, []streamV2Range{
 			{keyBegin: 0x00000000, keyEnd: 0x3fffffff},
@@ -26,7 +26,7 @@ func TestStreamV2TargetLayout(t *testing.T) {
 	})
 
 	t.Run("half range", func(t *testing.T) {
-		layout, err := streamV2TargetLayout(0x80000000, math.MaxUint32)
+		var layout, err = streamV2TargetLayout(0x80000000, math.MaxUint32)
 		require.NoError(t, err)
 		require.Equal(t, []streamV2Range{
 			{keyBegin: 0x80000000, keyEnd: 0x9fffffff},
@@ -38,7 +38,7 @@ func TestStreamV2TargetLayout(t *testing.T) {
 	})
 
 	t.Run("eighth of the range", func(t *testing.T) {
-		layout, err := streamV2TargetLayout(0x20000000, 0x3fffffff)
+		var layout, err = streamV2TargetLayout(0x20000000, 0x3fffffff)
 		require.NoError(t, err)
 		require.Equal(t, []streamV2Range{
 			{keyBegin: 0x20000000, keyEnd: 0x27ffffff},

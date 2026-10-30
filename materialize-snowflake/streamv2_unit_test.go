@@ -34,7 +34,7 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 	// Under one key per state key the two shards collide: a merge patch replaces
 	// the scalars of the object they share, so only the shard which reduced last
 	// is left. This is the loss the per-channel key exists to prevent.
-	collided, err := jsonpatch.MergePatch(
+	var collided, err = jsonpatch.MergePatch(
 		fmt.Appendf(nil, `{%q:{"StreamV2":%s}}`, stateKey, lo),
 		fmt.Appendf(nil, `{%q:{"StreamV2":%s}}`, stateKey, hi),
 	)
@@ -83,7 +83,7 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 
 	require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", "v"}))
 
-	entries, err := m.flush(ctx)
+	var entries, err = m.flush(ctx)
 	require.ErrorContains(t, err, "not committed")
 	require.Empty(t, entries)
 }
@@ -131,7 +131,7 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		// The rejection is the transaction's own, so it must fail the transaction
 		// rather than the one after it: the count is read as the commit is awaited,
 		// which is before the routed offset reaches the checkpoint.
-		entries, err := m.flush(ctx)
+		var entries, err = m.flush(ctx)
 		require.ErrorContains(t, err, "1 row(s) rejected")
 		require.ErrorContains(t, err, channel)
 		require.ErrorContains(t, err, "fake rejection")
@@ -187,7 +187,7 @@ func TestStreamV2DropChannel(t *testing.T) {
 		require.NoError(t, testWriteRow(ctx, first, 0, []any{"k", i}))
 	}
 	var channel = first.bindings[0].activeChannels[0].channelName
-	entries, err := first.flush(ctx)
+	var entries, err = first.flush(ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(3), soleCheckpointItem(t, entries, 0).Routed)
 	first.stop()
@@ -264,7 +264,7 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 		fmt.Appendf(nil, `{"committed":{%q:"1"},"errors":{}}`, unattributable), 0o644))
 	var alone = newSession(t, "test/task")
 	require.NoError(t, testWriteRow(ctx, alone, 0, []any{"k", "v"}))
-	_, err := alone.flush(ctx)
+	var _, err = alone.flush(ctx)
 	require.NoError(t, err)
 	alone.stop()
 
@@ -314,7 +314,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	// leaves the one whose first key lies in the lower shard's range.
 	var hi = newTopologyManager(t, "test/task", upper.keyBegin, upper.keyEnd, nil)
 	storeKeys(t, hi, keysHashingTo(upper, 1, "hi"))
-	_, err := hi.flush(ctx)
+	var _, err = hi.flush(ctx)
 	require.NoError(t, err)
 	hi.stop()
 
@@ -455,7 +455,7 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			committed, err := streamV2ValidateCommittedToken("chan", "WIDGETS", tt.committed, tt.sv2ChannelCheckpointItem, r, tt.priorItems)
+			var committed, err = streamV2ValidateCommittedToken("chan", "WIDGETS", tt.committed, tt.sv2ChannelCheckpointItem, r, tt.priorItems)
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 				return

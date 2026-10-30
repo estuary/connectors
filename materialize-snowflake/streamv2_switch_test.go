@@ -114,7 +114,7 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	for i := range 3 {
 		require.NoError(t, testWriteRow(ctx, before, 0, []any{"k", i}))
 	}
-	entries, err := before.flush(ctx)
+	var entries, err = before.flush(ctx)
 	require.NoError(t, err)
 	var channel = before.bindings[0].activeChannels[0].channelName
 	require.Equal(t, int64(3), entries[0][fullKeyRange].Routed)
@@ -143,7 +143,7 @@ func openChannelServer(t *testing.T, status int) *streamManager {
 	var ts = httptest.NewServer(mux)
 	t.Cleanup(ts.Close)
 
-	pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+	var pkey, err = rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err)
 	var role = "TEST_ROLE"
 
@@ -193,7 +193,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		for i := range 3 {
 			require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", i}))
 		}
-		entries, err := m.flush(ctx)
+		var entries, err = m.flush(ctx)
 		require.NoError(t, err)
 		var channel = m.bindings[0].activeChannels[0].channelName
 		m.stop()
@@ -328,7 +328,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	var cfg = mustGetCfg(t)
 	t.Setenv("SNOWPIPE_SIDECAR_PYTHON", testSidecarPython(t))
 
-	dsn, err := cfg.toURI(true, "")
+	var dsn, err = cfg.toURI(true, "")
 	require.NoError(t, err)
 	db, err := stdsql.Open("snowflake", dsn)
 	require.NoError(t, err)
@@ -374,7 +374,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	}
 
 	var truncate = func(t *testing.T) {
-		_, err := db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", tableName))
+		var _, err = db.ExecContext(ctx, fmt.Sprintf("TRUNCATE TABLE %s;", tableName))
 		require.NoError(t, err)
 	}
 
@@ -382,7 +382,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	// streaming path, as one transaction of it: rows are staged into blobs by
 	// Store and registered by Acknowledge.
 	var storeV1 = func(t *testing.T, token string, lo, hi int) {
-		sm, err := newStreamManager(&cfg, testMaterialization, accountName, 0)
+		var sm, err = newStreamManager(&cfg, testMaterialization, accountName, 0)
 		require.NoError(t, err)
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, tableName, target("v1.v1")))
 
@@ -423,7 +423,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var c = m.bindings[0].activeChannels[0]
 		require.Zero(t, c.progress.committed)
 
-		entries, err := m.flush(ctx)
+		var entries, err = m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(2), entries[0][c.keyRange].Routed)
 		require.Equal(t, 5, countRows())
@@ -437,7 +437,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		// The snowpipe_streaming path holds one deterministic channel per shard,
 		// with the token of everything it committed. Dropping it leaves Snowflake
 		// with nothing under that name, so a later open starts from no token.
-		sm, err := newStreamManager(&cfg, testMaterialization, accountName, 0)
+		var sm, err = newStreamManager(&cfg, testMaterialization, accountName, 0)
 		require.NoError(t, err)
 		require.NoError(t, sm.dropChannel(ctx, cfg.Schema, tableName, sm.channelName))
 
@@ -457,7 +457,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		var m = newV2(t, tgt, nil)
 		storeV2(t, m, 0, 3)
 		var c = m.bindings[0].activeChannels[0]
-		entries, err := m.flush(ctx)
+		var entries, err = m.flush(ctx)
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
 		m.stop()
@@ -515,7 +515,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		storeV2(t, m, 0, 3)
 		var c = m.bindings[0].activeChannels[0]
 		require.NoError(t, c.wait())
-		_, err := m.client.WaitCommit(ctx, c.channelName, c.offsetToken(3))
+		var _, err = m.client.WaitCommit(ctx, c.channelName, c.offsetToken(3))
 		require.NoError(t, err)
 		require.Equal(t, 3, countRows())
 		m.sup.kill()
@@ -651,7 +651,7 @@ func TestStreamV2SweepDropsTheStreamingChannel(t *testing.T) {
 
 	// The lower shard of two. Snowflake lists the names upper-cased. Only the first
 	// channel is this shard's to drop.
-	sm, drops := fakeStreamManager(t, "test/onto")
+	var sm, drops = fakeStreamManager(t, "test/onto")
 	var m = newStreamV2Manager(ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, fakeSnowflakeDB(t), testDialect, sm, "test/onto", "acct",
 		&pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32})
 	m.argv = fakeSidecarArgv(t)

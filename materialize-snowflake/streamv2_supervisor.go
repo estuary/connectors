@@ -62,7 +62,7 @@ type sidecarReadyMsg struct {
 // startSidecar launches argv (the sidecar command), performs the readiness
 // handshake, and connects to the unix domain socket the sidecar listens on.
 func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *sidecarClient, error) {
-	tmpDir, err := os.MkdirTemp("", "sfss")
+	var tmpDir, err = os.MkdirTemp("", "sfss")
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating sidecar temp dir: %w", err)
 	}
@@ -129,7 +129,7 @@ func startSidecar(ctx context.Context, argv []string) (*sidecarSupervisor, *side
 	go func() {
 		defer pipesDone.Done()
 		var reader = bufio.NewReader(stdout)
-		line, err := reader.ReadString('\n')
+		var line, err = reader.ReadString('\n')
 		if err != nil {
 			readyErrCh <- fmt.Errorf("sidecar exited before becoming ready: %w", err)
 			return

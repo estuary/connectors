@@ -23,22 +23,22 @@ import (
 )
 
 func TestBdecWriter(t *testing.T) {
-	mappedColumns := []*sql.Column{
+	var mappedColumns = []*sql.Column{
 		{Identifier: "col1"},
 		{Identifier: "col2"},
 	}
-	bl := 1 << 18
-	existingColumns := []tableColumn{
+	var bl = 1 << 18
+	var existingColumns = []tableColumn{
 		{Name: "col1", Type: "text", LogicalType: "text", PhysicalType: "LOB", ByteLength: &bl, Ordinal: 1},
 		{Name: "col2", Type: "text", LogicalType: "text", PhysicalType: "LOB", ByteLength: &bl, Ordinal: 2},
 	}
 
-	tmpFile, err := os.CreateTemp(t.TempDir(), "test-file.parquet")
+	var tmpFile, err = os.CreateTemp(t.TempDir(), "test-file.parquet")
 	require.NoError(t, err)
 	defer tmpFile.Close()
 
-	encryptionKey := "aGVsbG8K"
-	fileName := blobFileName(tmpFile.Name())
+	var encryptionKey = "aGVsbG8K"
+	var fileName = blobFileName(tmpFile.Name())
 	key, err := deriveKey(encryptionKey, fileName)
 	require.NoError(t, err)
 
@@ -53,8 +53,8 @@ func TestBdecWriter(t *testing.T) {
 	got, err := os.ReadFile(tmpFile.Name())
 	require.NoError(t, err)
 
-	outputFile := path.Join(t.TempDir(), "out.parquet")
-	dec := decrypt(t, got, key, 0)
+	var outputFile = path.Join(t.TempDir(), "out.parquet")
+	var dec = decrypt(t, got, key, 0)
 	require.NoError(t, os.WriteFile(outputFile, dec, 0644))
 
 	db, err := stdsql.Open("duckdb", "")
@@ -65,7 +65,7 @@ func TestBdecWriter(t *testing.T) {
 	require.NoError(t, err)
 	defer rows.Close()
 
-	gotRows := [][]string{}
+	var gotRows = [][]string{}
 	for rows.Next() {
 		var col1, col2 string
 		require.NoError(t, rows.Scan(&col1, &col2))
@@ -82,22 +82,22 @@ func TestBdecWriter(t *testing.T) {
 }
 
 func BenchmarkBlobStatsWrite(b *testing.B) {
-	encryptionKey := "aGVsbG8K"
-	diversifier := blobFileName("test-file.parquet")
-	derivedKey, err := deriveKey(encryptionKey, diversifier)
+	var encryptionKey = "aGVsbG8K"
+	var diversifier = blobFileName("test-file.parquet")
+	var derivedKey, err = deriveKey(encryptionKey, diversifier)
 	require.NoError(b, err)
 
 	block, err := aes.NewCipher(derivedKey)
 	require.NoError(b, err)
 
-	w := &blobStatsTracker{
+	var w = &blobStatsTracker{
 		md5:    md5.New(),
 		w:      discardWriteCloser{},
 		stream: cipher.NewCTR(block, make([]byte, aes.BlockSize)),
 	}
 
-	chunkSize := 4 * 1024
-	data := make([]byte, chunkSize)
+	var chunkSize = 4 * 1024
+	var data = make([]byte, chunkSize)
 	if _, err := rand.Read(data); err != nil {
 		b.Fatal(err)
 	}
@@ -112,14 +112,14 @@ func BenchmarkBlobStatsWrite(b *testing.B) {
 }
 
 func TestReencrypt(t *testing.T) {
-	input := make([]byte, 1024*1024+3)
-	_, err := rand.Read(input)
+	var input = make([]byte, 1024*1024+3)
+	var _, err = rand.Read(input)
 	require.NoError(t, err)
 	copy(input, "PAR1")
 
-	encryptionKey := "aGVsbG8K"
-	oldFileName := blobFileName("old")
-	newFileName := blobFileName("new")
+	var encryptionKey = "aGVsbG8K"
+	var oldFileName = blobFileName("old")
+	var newFileName = blobFileName("new")
 
 	// Simulate the originally encrypted data.
 	encryptStream, err := getCipherStream(encryptionKey, oldFileName)
@@ -127,18 +127,18 @@ func TestReencrypt(t *testing.T) {
 		t.Fatalf("getCipherStream (encrypt): %v", err)
 	}
 
-	encrypted := make([]byte, len(input))
+	var encrypted = make([]byte, len(input))
 	encryptStream.XORKeyStream(encrypted, input)
 
-	sum := md5.Sum(encrypted)
-	hsh := hex.EncodeToString(sum[:])
+	var sum = md5.Sum(encrypted)
+	var hsh = hex.EncodeToString(sum[:])
 
-	channel := &channel{
+	var channel = &channel{
 		EncryptionKey:   encryptionKey,
 		EncryptionKeyId: 12345,
 	}
 
-	blob := &blobMetadata{
+	var blob = &blobMetadata{
 		Path:   string(oldFileName),
 		MD5:    hsh,
 		Chunks: []uploadChunkMetadata{{ChunkMD5: hsh}},
@@ -153,7 +153,7 @@ func TestReencrypt(t *testing.T) {
 	// The re-encrypted file matches the original input.
 	newKey, err := deriveKey(encryptionKey, newFileName)
 	require.NoError(t, err)
-	got := decrypt(t, out.Bytes(), newKey, 0)
+	var got = decrypt(t, out.Bytes(), newKey, 0)
 	require.Equal(t, input, got)
 
 	// The blob metadata has been updated.
@@ -188,9 +188,9 @@ func TestTruncateBytesAsHex(t *testing.T) {
 }
 
 func TestGetInt(t *testing.T) {
-	tooBig, _ := new(big.Int).SetString("99999999999999999999999999999999999999", 10)
+	var tooBig, _ = new(big.Int).SetString("99999999999999999999999999999999999999", 10)
 	tooBig = tooBig.Add(tooBig, big.NewInt(1))
-	tooSmall, _ := new(big.Int).SetString("99999999999999999999999999999999999999", 10)
+	var tooSmall, _ = new(big.Int).SetString("99999999999999999999999999999999999999", 10)
 	tooSmall = tooSmall.Sub(tooSmall, big.NewInt(-1))
 
 	var err error
@@ -240,7 +240,7 @@ func TestGetTimestamp(t *testing.T) {
 		{input: "9999-12-31T23:59:59.999999999-23:59", want: "4151744710901759999983617", logicalType: "timestamp_tz"},
 	} {
 		t.Run(tt.input+"_"+tt.logicalType, func(t *testing.T) {
-			got, err := getTimestamp(tt.input, tt.logicalType, 9)
+			var got, err = getTimestamp(tt.input, tt.logicalType, 9)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got.BigInt().String())
 		})
@@ -248,7 +248,7 @@ func TestGetTimestamp(t *testing.T) {
 }
 
 func BenchmarkGetTimestamp(b *testing.B) {
-	input := "2025-04-15T19:23:47.583294617Z"
+	var input = "2025-04-15T19:23:47.583294617Z"
 	b.Run("fast path", func(b *testing.B) {
 		b.ResetTimer()
 		for b.Loop() {
@@ -276,21 +276,21 @@ func (discardWriteCloser) Close() error                 { return nil }
 func decrypt(t *testing.T, enc []byte, key []byte, iv uint64) []byte {
 	t.Helper()
 
-	block, err := aes.NewCipher(key)
+	var block, err = aes.NewCipher(key)
 	require.NoError(t, err)
-	ivBytes := make([]byte, aes.BlockSize)
+	var ivBytes = make([]byte, aes.BlockSize)
 	binary.BigEndian.PutUint64(ivBytes[8:], iv)
-	decStream := cipher.NewCTR(block, ivBytes)
+	var decStream = cipher.NewCTR(block, ivBytes)
 
-	dec := make([]byte, len(enc))
+	var dec = make([]byte, len(enc))
 	decStream.XORKeyStream(dec, enc)
 
 	return dec
 }
 
 func TestGetNum(t *testing.T) {
-	bigVal, _ := new(big.Int).SetString("184467440737095516160", 10)
-	tooBig, _ := new(big.Int).SetString("1"+strings.Repeat("0", 400), 10)
+	var bigVal, _ = new(big.Int).SetString("184467440737095516160", 10)
+	var tooBig, _ = new(big.Int).SetString("1"+strings.Repeat("0", 400), 10)
 
 	for _, tt := range []struct {
 		name  string
@@ -304,12 +304,12 @@ func TestGetNum(t *testing.T) {
 		{name: "big.Int", input: bigVal, want: 184467440737095516160},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getNum(tt.input)
+			var got, err = getNum(tt.input)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
 	}
 
-	_, err := getNum(tooBig)
+	var _, err = getNum(tooBig)
 	require.Error(t, err)
 }

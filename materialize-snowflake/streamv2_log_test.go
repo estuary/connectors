@@ -28,7 +28,7 @@ func TestStreamV2LogFieldsAvoidRuntimeKeys(t *testing.T) {
 			seen = true
 		}
 		for _, key := range reserved {
-			_, clash := e.Data[key]
+			var _, clash = e.Data[key]
 			require.False(t, clash, "log %q carries field %q, which the runtime reserves", e.Message, key)
 		}
 	}

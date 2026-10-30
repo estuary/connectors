@@ -43,7 +43,7 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	dsnWithSchema, err := ep.Config.toURI(true, materializationName)
+	var dsnWithSchema, err = ep.Config.toURI(true, materializationName)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 // SHOW COLUMNS IN SCHEMA, but there is a documented limit of 10,000 results
 // from SHOW COLUMNS and it can't be paginated.
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	existingSchemas, err := c.ListSchemas(ctx)
+	var existingSchemas, err = c.ListSchemas(ctx)
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)
 	}
@@ -88,9 +88,9 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	// Filter down to just schemas that are relevant for the included resource
 	// paths, and for each of those fetch & filter down to just the tables that
 	// are relevant.
-	relevantExistingSchemasAndTables := make(map[string][]string)
+	var relevantExistingSchemasAndTables = make(map[string][]string)
 	for _, rp := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(rp)
+		var loc = c.ep.Dialect.TableLocator(rp)
 		if _, ok := relevantExistingSchemasAndTables[loc.TableSchema]; ok {
 			continue // already populated the list of existing, relevant tables
 		} else if !slices.Contains(existingSchemas, loc.TableSchema) {
@@ -100,7 +100,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		// SHOW TABLES is only run a single time per schema, as it occurs in the
 		// list of resource paths.
 		relevantExistingSchemasAndTables[loc.TableSchema] = []string{}
-		tables, err := runShowPaginated(ctx, c.xdb, func(cursor *string) string {
+		var tables, err = runShowPaginated(ctx, c.xdb, func(cursor *string) string {
 			if cursor != nil {
 				return fmt.Sprintf("SHOW TERSE TABLES IN %q LIMIT %d FROM '%s';", loc.TableSchema, showQueryLimit, *cursor)
 			} else {
@@ -113,7 +113,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 		for _, table := range tables {
 			if slices.ContainsFunc(resourcePaths, func(rrp []string) bool {
-				thisLoc := c.ep.Dialect.TableLocator(rrp)
+				var thisLoc = c.ep.Dialect.TableLocator(rrp)
 				return thisLoc.TableSchema == loc.TableSchema && thisLoc.TableName == table
 			}) {
 				// This is a relevant table for the materialization, and its
@@ -124,7 +124,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	var mu sync.Mutex
-	group, groupCtx := errgroup.WithContext(ctx)
+	var group, groupCtx = errgroup.WithContext(ctx)
 	// Some amount of concurrency bounding is helpful when there are a large
 	// number of tables. Sending excessive numbers of concurrent requests seems
 	// to trigger something in Snowflake that starts to throttle them. Running
@@ -157,7 +157,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 				mu.Lock()
 				defer mu.Unlock()
-				res := is.PushResource(schema, table)
+				var res = is.PushResource(schema, table)
 				for _, col := range columns {
 					var columnDef dataTypeDef
 					if err := json.Unmarshal([]byte(col.DataType), &columnDef); err != nil {
@@ -199,11 +199,11 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 
 	if rc, ok := tc.Resource.(tableConfig); ok {
 		if fields := rc.ClusteringColumns(); len(fields) > 0 {
-			keyExpr, err := clusteringKeyExpr(tc.Table, fields)
+			var keyExpr, err = clusteringKeyExpr(tc.Table, fields)
 			if err != nil {
 				return err
 			}
-			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", tc.Identifier, keyExpr)
+			var stmt = fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", tc.Identifier, keyExpr)
 			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("enabling clustering on new table %s: %w", tc.Identifier, err)
 			}
@@ -214,19 +214,19 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
+		var _, err = c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -238,7 +238,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		alterColumnStmt := alterColumnStmtBuilder.String()
+		var alterColumnStmt = alterColumnStmtBuilder.String()
 		stmts = append(stmts, alterColumnStmt)
 	}
 
@@ -299,9 +299,9 @@ func connectError(err error, cfg config) error {
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
-	errs := &cerrors.PrereqErr{}
+	var errs = &cerrors.PrereqErr{}
 
-	dsn, err := cfg.toURI(false, "")
+	var dsn, err = cfg.toURI(false, "")
 	if err != nil {
 		errs.Err(err)
 		return errs
@@ -333,12 +333,12 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 		// created. Estuary uses quoted identifiers for column names containing special characters
 		// (such as "_meta/op"), and requires that Snowflake preserve their case exactly as created.
 		var key, value, default_, level, desc, type_ string
-		query := "SHOW PARAMETERS LIKE 'QUOTED_IDENTIFIERS_IGNORE_CASE' IN SESSION;"
-		err := db.QueryRowContext(ctx, query).Scan(&key, &value, &default_, &level, &desc, &type_)
+		var query = "SHOW PARAMETERS LIKE 'QUOTED_IDENTIFIERS_IGNORE_CASE' IN SESSION;"
+		var err = db.QueryRowContext(ctx, query).Scan(&key, &value, &default_, &level, &desc, &type_)
 		if err != nil {
 			errs.Err(fmt.Errorf("checking for QUOTED_IDENTIFIERS_IGNORE_CASE: %w", err))
 		} else {
-			ignoreCase, err := strconv.ParseBool(value)
+			var ignoreCase, err = strconv.ParseBool(value)
 			if err != nil {
 				errs.Err(fmt.Errorf("unable to parse QUOTED_IDENTIFIERS_IGNORE_CASE value: %w", err))
 			} else if ignoreCase {

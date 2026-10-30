@@ -15,7 +15,7 @@ import (
 )
 
 func TestWaitForTokenPersisted(t *testing.T) {
-	tests := []struct {
+	var tests = []struct {
 		name    string
 		handler http.HandlerFunc
 		check   func(err error)
@@ -24,7 +24,7 @@ func TestWaitForTokenPersisted(t *testing.T) {
 			name: "success",
 			handler: func() http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
-					_, err := io.ReadAll(r.Body)
+					var _, err = io.ReadAll(r.Body)
 					require.NoError(t, err)
 
 					w.Header().Set("Content-Type", "application/json")
@@ -53,7 +53,7 @@ func TestWaitForTokenPersisted(t *testing.T) {
 			name: "top status code",
 			handler: func() http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
-					_, err := io.ReadAll(r.Body)
+					var _, err = io.ReadAll(r.Body)
 					require.NoError(t, err)
 
 					w.Header().Set("Content-Type", "application/json")
@@ -73,16 +73,16 @@ func TestWaitForTokenPersisted(t *testing.T) {
 		{
 			name: "retry top status code",
 			handler: func() http.HandlerFunc {
-				count := 0
+				var count = 0
 				return func(w http.ResponseWriter, r *http.Request) {
-					_, err := io.ReadAll(r.Body)
+					var _, err = io.ReadAll(r.Body)
 					require.NoError(t, err)
 
 					if count == 0 {
 						count++
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
-						respBody, err := json.Marshal(map[string]any{
+						var respBody, err = json.Marshal(map[string]any{
 							"status_code": 10,
 							"message":     "Snowflake experienced a transient exception, please retry the request",
 						})
@@ -91,7 +91,7 @@ func TestWaitForTokenPersisted(t *testing.T) {
 					} else {
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
-						respBody, err := json.Marshal(map[string]any{
+						var respBody, err = json.Marshal(map[string]any{
 							"status_code": 0,
 							"message":     "Success",
 							"channels": []any{
@@ -116,7 +116,7 @@ func TestWaitForTokenPersisted(t *testing.T) {
 			name: "channel error status code",
 			handler: func() http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) {
-					_, err := io.ReadAll(r.Body)
+					var _, err = io.ReadAll(r.Body)
 					require.NoError(t, err)
 
 					w.Header().Set("Content-Type", "application/json")
@@ -144,16 +144,16 @@ func TestWaitForTokenPersisted(t *testing.T) {
 		{
 			name: "retry temporary channel status code",
 			handler: func() http.HandlerFunc {
-				count := 0
+				var count = 0
 				return func(w http.ResponseWriter, r *http.Request) {
-					_, err := io.ReadAll(r.Body)
+					var _, err = io.ReadAll(r.Body)
 					require.NoError(t, err)
 
 					if count == 0 {
 						count++
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
-						respBody, err := json.Marshal(map[string]any{
+						var respBody, err = json.Marshal(map[string]any{
 							"status_code": 0,
 							"message":     "Success",
 							"channels": []any{
@@ -170,7 +170,7 @@ func TestWaitForTokenPersisted(t *testing.T) {
 					} else {
 						w.Header().Set("Content-Type", "application/json")
 						w.WriteHeader(http.StatusOK)
-						respBody, err := json.Marshal(map[string]any{
+						var respBody, err = json.Marshal(map[string]any{
 							"status_code": 0,
 							"message":     "Success",
 							"channels": []any{
@@ -193,21 +193,21 @@ func TestWaitForTokenPersisted(t *testing.T) {
 		},
 	}
 
-	pkey, err := rsa.GenerateKey(rand.Reader, 1024)
+	var pkey, err = rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mux := http.NewServeMux()
+			var mux = http.NewServeMux()
 			mux.HandleFunc("POST /v1/streaming/channels/status", tt.handler)
 
-			ts := httptest.NewServer(mux)
+			var ts = httptest.NewServer(mux)
 			defer ts.Close()
 
-			ctx := context.Background()
+			var ctx = context.Background()
 
-			role := "TEST_ROLE"
-			streamClient := &streamClient{
+			var role = "TEST_ROLE"
+			var streamClient = &streamClient{
 				r:        resty.New().SetBaseURL(ts.URL + "/v1/streaming").SetDisableWarn(true),
 				key:      pkey,
 				user:     "TEST_USER",
@@ -215,7 +215,7 @@ func TestWaitForTokenPersisted(t *testing.T) {
 				account:  "TEST_ACCOUNT",
 				role:     &role,
 			}
-			err := streamClient.waitForTokenPersisted(ctx, "", 0, "TEST_SCHEMA", "TEST_TABLE", "TEST_CHANNEL")
+			var err = streamClient.waitForTokenPersisted(ctx, "", 0, "TEST_SCHEMA", "TEST_TABLE", "TEST_CHANNEL")
 			tt.check(err)
 		})
 	}
