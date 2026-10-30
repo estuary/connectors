@@ -1002,20 +1002,28 @@ func TestAcknowledgeMergesStagingTables(t *testing.T) {
 }
 
 func TestCopyIntoStagingTable(t *testing.T) {
-	for _, needsMerge := range []bool{false, true} {
+	for _, tc := range []struct {
+		needsMerge bool
+		storeRows  int
+		copies     bool
+	}{
+		{needsMerge: false, storeRows: minStagingTableRows, copies: false},
+		{needsMerge: true, storeRows: minStagingTableRows - 1, copies: false},
+		{needsMerge: true, storeRows: minStagingTableRows, copies: true},
+	} {
 		var db = recordingDB(t, nil)
 		var d = renderingTransactor(lowerRangeKey)
 		var b = d.bindings[0]
 		b.storeFile = newStagedFile(config{}, b.rootStagingPath, "abc", []string{"id", "ts", "_flow_delete"}, d.files)
 		b.storeFile.dir = filepath.Join(t.TempDir(), "local")
-		b.needsMerge = needsMerge
+		b.needsMerge, b.storeRows = tc.needsMerge, tc.storeRows
 
 		var ctx = context.Background()
 		require.NoError(t, b.storeFile.start(ctx, db))
 		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
 		require.NoError(t, d.copyIntoStagingTable(ctx, db, b))
 
-		if !needsMerge {
+		if !tc.copies {
 			require.Len(t, recording.executed, 1)
 			require.Empty(t, b.stagingTable)
 			continue

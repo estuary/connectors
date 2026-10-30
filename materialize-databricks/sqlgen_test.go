@@ -31,8 +31,8 @@ func TestSQLGeneration(t *testing.T) {
 	)
 
 	for _, tpl := range []*template.Template{
-		testTemplates.loadQuery,
-		testTemplates.loadQueryNoFlowDocument,
+		testTemplates.loadScript,
+		testTemplates.loadScriptNoFlowDocument,
 		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]
@@ -155,27 +155,20 @@ func TestSQLGeneration(t *testing.T) {
 
 	{
 		tbl := tables[0]
-		var load = func(files ...string) *tableWithFiles {
-			return &tableWithFiles{
-				Table:        &tbl,
-				Directories:  []string{"test-staging-path/txn-1"},
-				Schema:       stagedSchemaDDL(tbl.KeyPtrs(), false),
-				Bounds:       []sql.MergeBound{{Column: tbl.Keys[0], LiteralLower: "10", LiteralUpper: "100"}, {Column: tbl.Keys[1]}, {Column: tbl.Keys[2]}},
-				Version:      "42",
-				MatchedFiles: files,
-			}
+		var load = &tableWithFiles{
+			Table:       &tbl,
+			Directories: []string{"test-staging-path/txn-1"},
+			Schema:      stagedSchemaDDL(tbl.KeyPtrs(), false),
+			Bounds:      []sql.MergeBound{{Column: tbl.Keys[0], LiteralLower: "10", LiteralUpper: "100"}, {Column: tbl.Keys[1]}, {Column: tbl.Keys[2]}},
 		}
-		var files = []string{"s3://bucket/table/part-0.parquet", "s3://bucket/table/part-1's.parquet"}
 		for _, tc := range []struct {
 			name string
 			tpl  *template.Template
-			data *tableWithFiles
 		}{
-			{"loadMatchFiles", testTemplates.loadMatchFiles, load()},
-			{"loadQuery matched files", testTemplates.loadQuery, load(files...)},
-			{"loadQueryNoFlowDocument matched files", testTemplates.loadQueryNoFlowDocument, load(files...)},
+			{"loadScript", testTemplates.loadScript},
+			{"loadScriptNoFlowDocument", testTemplates.loadScriptNoFlowDocument},
 		} {
-			var rendered, err = renderTemplate(tc.tpl, tc.data)
+			var rendered, err = renderTemplate(tc.tpl, load)
 			require.NoError(t, err)
 			snap.WriteString("--- Begin " + tbl.Identifier + " " + tc.name + " ---")
 			snap.WriteString(rendered)
@@ -203,8 +196,8 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		}
 		for _, tpl := range []*template.Template{
-			testTemplates.loadQuery,
-			testTemplates.loadQueryNoFlowDocument,
+			testTemplates.loadScript,
+			testTemplates.loadScriptNoFlowDocument,
 			testTemplates.mergeInto,
 		} {
 			var schema = stagedSchemaDDL(tbl.KeyPtrs(), false)
@@ -252,11 +245,11 @@ func TestDatetimeKeyRanges(t *testing.T) {
 		wantBounds string
 	}{
 		{"TIMESTAMP key splits at the gap", map[string]bool{"datetime_keys_as_string": false},
-			"schema.events.created_at = r.created_at AND (" +
-				"(schema.events.created_at >= '2026-03-01T00:00:00Z' AND schema.events.created_at <= '2026-03-01T00:00:00Z') OR " +
-				"(schema.events.created_at >= '2026-10-26T12:00:00Z' AND schema.events.created_at <= '2026-10-26T12:15:00Z'))"},
+			"l.created_at = r.created_at AND (" +
+				"(l.created_at >= '2026-03-01T00:00:00Z' AND l.created_at <= '2026-03-01T00:00:00Z') OR " +
+				"(l.created_at >= '2026-10-26T12:00:00Z' AND l.created_at <= '2026-10-26T12:15:00Z'))"},
 		{"STRING key keeps one date range", map[string]bool{"datetime_keys_as_string": true},
-			"schema.events.created_at = r.created_at AND schema.events.created_at >= '2026-02-28' AND schema.events.created_at <= '2026-10-28'"},
+			"l.created_at = r.created_at AND l.created_at >= '2026-02-28' AND l.created_at <= '2026-10-28'"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var dialect = createDatabricksDialect(tc.flags)
@@ -270,10 +263,10 @@ func TestDatetimeKeyRanges(t *testing.T) {
 				builder.NextKey(converted)
 			}
 
-			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadQuery, builder.Build())
+			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadScript, builder.Build())
 			require.NoError(t, err)
 			require.Contains(t, query, tc.wantBounds)
-			require.Contains(t, query, "schema.events.id = r.id AND schema.events.id >= 'a' AND schema.events.id <= 'd'")
+			require.Contains(t, query, "l.id = r.id AND l.id >= 'a' AND l.id <= 'd'")
 		})
 	}
 }
@@ -312,9 +305,9 @@ func TestDatetimeKeyBounds(t *testing.T) {
 		wantBounds string
 	}{
 		{"TIMESTAMP key is bounded by the values", map[string]bool{"datetime_keys_as_string": false}, "TIMESTAMP",
-			"schema.events.created_at >= '2025-05-04T22:59:59-01:00' AND schema.events.created_at <= '2025-05-05T00:00:01.123456789Z'"},
+			"l.created_at >= '2025-05-04T22:59:59-01:00' AND l.created_at <= '2025-05-05T00:00:01.123456789Z'"},
 		{"STRING key is bounded by dates", map[string]bool{"datetime_keys_as_string": true}, "STRING",
-			"schema.events.created_at >= '2025-05-03' AND schema.events.created_at <= '2025-05-07'"},
+			"l.created_at >= '2025-05-03' AND l.created_at <= '2025-05-07'"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var dialect = createDatabricksDialect(tc.flags)
@@ -330,10 +323,10 @@ func TestDatetimeKeyBounds(t *testing.T) {
 			}
 			var bounds = builder.Build()
 
-			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadQuery, bounds)
+			query, err := RenderTableWithStaged(table, []string{"dir"}, nil, stagedSchemaDDL(table.KeyPtrs(), false), renderTemplates(dialect).loadScript, bounds)
 			require.NoError(t, err)
-			require.Contains(t, query, "schema.events.created_at = r.created_at")
-			require.Contains(t, query, "schema.events.id = r.id AND schema.events.id >= 'a' AND schema.events.id <= 'd'")
+			require.Contains(t, query, "l.created_at = r.created_at")
+			require.Contains(t, query, "l.id = r.id AND l.id >= 'a' AND l.id <= 'd'")
 			require.Contains(t, query, tc.wantBounds)
 		})
 	}

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-30
+### Changed
+- Every load runs as one SQL script, replacing the `two_phase_loads` feature
+  flag. The script first finds the files holding rows that match its keys,
+  reading only the key columns, then reads documents from those files alone.
+  Loads of large tables whose rows are updated get much faster: Databricks
+  otherwise reads every document of each file an update left a deletion
+  vector on. A load fails, and its transaction is retried, if the table's
+  files were rewritten between finding and reading them.
+- A MERGE of fewer than 100,000 rows reads them straight from the staged
+  files, instead of first copying them into a staging table. This saves a
+  query of a few seconds from each commit of small batches.
+
 ## 2026-10-29
 ### Fixed
 - Load, staging and commit queries now carry the `materialization_name` query

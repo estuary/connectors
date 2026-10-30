@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,7 +31,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
@@ -178,10 +176,6 @@ type transactor struct {
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
 	profiler              *queryProfiler
-	// twoPhaseLoads uses two queries to prune files: one that finds files
-	// where the rows matching the keys exist on, and another to read
-	// flow_document from those specific files.
-	twoPhaseLoads bool
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -336,7 +330,6 @@ func newTransactor(
 		templates:             renderTemplates(ep.Dialect),
 		materializationName:   materializationName,
 		stagingPrefix:         stagingPrefix(materializationName),
-		twoPhaseLoads:         featureFlags["two_phase_loads"],
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -405,6 +398,7 @@ type binding struct {
 	// stagingTable is the Delta table of this transaction's store rows,
 	// relative to rootStagingPath. It's set only when the rows are merged.
 	stagingTable string
+	storeRows    int
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -479,9 +473,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var loadTemplate = d.templates.loadQuery
+	var script = d.templates.loadScript
 	if d.cfg.Advanced.NoFlowDocument {
-		loadTemplate = d.templates.loadQueryNoFlowDocument
+		script = d.templates.loadScriptNoFlowDocument
 	}
 
 	var loads []bindingLoad
@@ -497,7 +491,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		var bounds = b.loadMergeBounds.Build()
 		loads = append(loads, bindingLoad{
-			data: &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
+			binding: b,
+			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
 			fields: log.Fields{
 				"resourcePath": b.target.Path,
 				"keys":         keyCounts[idx],
@@ -546,38 +541,27 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			if d.twoPhaseLoads {
-				if matched, err := d.matchLoadFiles(groupCtx, db, load); err != nil {
-					return err
-				} else if !matched {
-					return nil
-				}
-			}
-			query, err := renderTemplate(loadTemplate, load.data)
+			rows, trace, err := d.queryLoad(groupCtx, db, script, load)
 			if err != nil {
-				return fmt.Errorf("loadQuery template: %w", err)
+				return err
 			}
-
-			var queryCtx, trace = d.profiler.trace(groupCtx, "load", load.fields)
-			var executeTook time.Duration
-			var docCount, docBytes int
-			defer func() {
-				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
-			}()
-
-			rows, err := db.QueryContext(queryCtx, query)
-			executeTook = time.Since(trace.started)
+			var executeTook = time.Since(trace.started)
 			finishEvaluating()
-			if err != nil {
-				return fmt.Errorf("querying Load documents: %w", err)
-			}
 			defer rows.Close()
 
+			var docCount, docBytes int
+			var matched, matchedFiles = -1, -1
+			defer func() {
+				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes, "matchedFiles": matchedFiles})
+			}()
 			for rows.Next() {
 				var doc loadedDoc
 				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
 				} else if doc.binding < 0 {
+					if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
+						return fmt.Errorf("parsing load match counts %q: %w", doc.document, err)
+					}
 					continue
 				}
 				docCount, docBytes = docCount+1, docBytes+len(doc.document)
@@ -589,6 +573,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 			if err := rows.Err(); err != nil {
 				return fmt.Errorf("querying Loads: %w", err)
+			} else if docCount != matched {
+				// Files rewritten between the script's match and its read of
+				// documents, such as by OPTIMIZE, hide their rows from the read.
+				return fmt.Errorf("load of %s read %d of the %d rows matching its keys, as the table's files changed during the load", load.binding.target.Identifier, docCount, matched)
 			}
 			return nil
 		})
@@ -606,75 +594,31 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // bindingLoad is the load query parameters of a binding, with the fields of
 // its query profile.
 type bindingLoad struct {
-	data   *tableWithFiles
-	fields log.Fields
+	binding *binding
+	data    *tableWithFiles
+	fields  log.Fields
 }
 
-// maxMatchedFiles is the maximum number of files a two-phase load filters on.
-// A load that matches more, will omit the filter altogether, reading all the
-// files. With usually 256 MB to 1 GB per table file in Databricks, 10,000
-// files is about 2.5 to 10 TB of table. Each file path is about 280 bytes so
-// the longest list is about 2.9 MB that takes about 3s to compile.
+// maxMatchedFiles is the most files a load script restricts its read of
+// documents to. A load matching more reads every file within its key bounds.
+// With usually 256 MB to 1 GB per table file in Databricks, 10,000 files is
+// about 2.5 to 10 TB of table.
 const maxMatchedFiles = 10000
 
-// matchLoadFiles is the first phase of a two-phase load. It pins the load to
-// the table's current version, so that both phases read the same files, and
-// restricts it to the files holding rows that match its keys, found by reading
-// only the key columns. It reports whether any rows matched.
-func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, load bindingLoad) (bool, error) {
-	version, err := tableVersion(ctx, db, load.data.Table.Identifier)
+// queryLoad runs a binding's load script, and returns its rows with the trace
+// to finish once they're read.
+func (d *transactor) queryLoad(ctx context.Context, db *stdsql.DB, tpl *template.Template, load bindingLoad) (*stdsql.Rows, *queryTrace, error) {
+	query, err := renderTemplate(tpl, load.data)
 	if err != nil {
-		return false, err
+		return nil, nil, fmt.Errorf("%s template: %w", tpl.Name(), err)
 	}
-	load.data.Version = strconv.FormatInt(version, 10)
-	load.fields["version"] = version
-
-	query, err := renderTemplate(d.templates.loadMatchFiles, load.data)
+	var queryCtx, trace = d.profiler.trace(ctx, tpl.Name(), load.fields)
+	rows, err := db.QueryContext(queryCtx, query)
 	if err != nil {
-		return false, fmt.Errorf("loadMatchFiles template: %w", err)
+		trace.finish(err, nil)
+		return nil, nil, fmt.Errorf("querying Load documents: %w", err)
 	}
-	var queryCtx, trace = d.profiler.trace(ctx, "loadMatch", load.fields)
-	files, err := queryStrings(queryCtx, db, query)
-	trace.finish(err, log.Fields{"matchedFiles": len(files)})
-	if err != nil {
-		return false, fmt.Errorf("matching Load files: %w", err)
-	}
-
-	load.fields["matchedFiles"] = len(files)
-	if len(files) <= maxMatchedFiles {
-		load.data.MatchedFiles = files
-	}
-	return len(files) > 0, nil
-}
-
-// tableVersion is the latest version of a Delta table.
-func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64, error) {
-	var latest struct {
-		Version int64 `db:"version"`
-	}
-	if err := sqlx.NewDb(db, "databricks").Unsafe().GetContext(ctx, &latest, "DESCRIBE HISTORY "+identifier+" LIMIT 1"); err != nil {
-		return 0, fmt.Errorf("describing history of %s: %w", identifier, err)
-	}
-	return latest.Version, nil
-}
-
-// queryStrings runs a query and returns the values of its first column.
-func queryStrings(ctx context.Context, db *stdsql.DB, query string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []string
-	for rows.Next() {
-		var value string
-		if err := rows.Scan(&value); err != nil {
-			return nil, err
-		}
-		out = append(out, value)
-	}
-	return out, rows.Err()
+	return rows, trace, nil
 }
 
 // loadedDoc is a document read by a binding's load query.
@@ -996,6 +940,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
+			b.storeRows++
 		}
 
 		if it.Exists {
@@ -1032,7 +977,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			NeedsMerge:   !b.target.DeltaUpdates && b.needsMerge,
 			round:        it.Round,
 		})
-		b.needsMerge, b.stagingTable = false, "" // reset for next round
+		b.needsMerge, b.stagingTable, b.storeRows = false, "", 0 // reset for next round
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -1044,14 +989,19 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}, nil
 }
 
+// minStagingTableRows is the fewest store rows that are copied into a staging
+// table before their MERGE. Below it, the copies take longer than they save
+// the MERGEs, even with many bindings: their copies queue on the warehouse.
+const minStagingTableRows = 100_000
+
 // copyIntoStagingTable waits for the binding's store files to upload and, if
-// they need a MERGE, copies them into a Delta table. The MERGE reads that table rather than
+// they need a MERGE of many rows, copies them into a Delta table. The MERGE reads that table rather than
 // the JSON files, so Databricks doesn't materialize the files during MERGE time. The table lives
 // in the staging volume by path and isn't registered in the catalog.
 func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
 	if err := b.storeFile.wait(); err != nil {
 		return err
-	} else if b.target.DeltaUpdates || !b.needsMerge {
+	} else if b.target.DeltaUpdates || !b.needsMerge || b.storeRows < minStagingTableRows {
 		return nil
 	}
 
