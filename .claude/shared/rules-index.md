@@ -41,16 +41,19 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 
 | Rule | Check | Statement |
 | ---- | ----- | --------- |
-| `FETCH-MODEL-OWNS-CONTRACT` | diff | Paths, items keys, cursor params are ClassVars; cursor via `get_cursor()` |
+| `FETCH-MODEL-OWNS-CONTRACT` | diff | Paths, items keys, cursor params are ClassVars; generic fetch code reads a document's cursor via `get_cursor()` |
 | `FETCH-PARAM-DICT-NAMING` | diff | `params` at the call site; `request_params` when it crosses a boundary |
+| `FETCH-NAMED-ERROR-CODES` | diff | A provider error code the connector branches on is a named constant citing its source |
 | `FETCH-COMPLETE-TICKS` | diff | Cap the window at the last fully-elapsed tick; early-return if `horizon <= cursor` |
+| `FETCH-LAG-BEYOND-INTERVAL` | diff | A cursor that can trail `now` by more than `interval` returns without a checkpoint while the window is shorter than `interval` |
 | `FETCH-SERVER-SIDE-BOUNDARIES` | runtime | Boundaries in the request, not client-side filters; probe inclusivity first |
 | `FETCH-SEAM-PRECISION` | diff | Gapless at cutoff and cursor; backfill start is not load-bearing |
 | `FETCH-BACKFILL-ALONGSIDE` | diff | Implement `fetch_page` alongside `fetch_changes` |
 | `FETCH-CURSOR-MUST-BE-UPDATED` | diff | `created_at` is not a usable incremental cursor |
 | `FETCH-LOGCURSOR-AFTER-DOCS` | diff | A LogCursor must be yielded after documents are emitted |
-| `FETCH-VALUE-WATERMARK-RESUME` | diff | Resume by value watermark, not positional offset — **data-loss-class** |
+| `FETCH-VALUE-WATERMARK-RESUME` | diff | Resume by value watermark, not positional offset; an unsortable timestamp filter backfills by id — **data-loss-class** |
 | `FETCH-CHECKPOINT-STABLE-STATE` | diff | A `PageCursor` must mean the same thing after a resume gap — **data-loss-class** |
+| `FETCH-FANOUT-RESUME` | diff | A fan-out backfill resumes from `(parent_id, child_page_token)` over sorted parents; a dict work list only when parents can't be re-listed or ordered |
 | `FETCH-PAGE-SIZE-RESEARCH` | runtime | Max page size and enforcement mode, per endpoint |
 | `DOC-FLAG-ONLY-UNVERIFIED` | diff | No "(verified live)" stamps; annotate only what could *not* be verified |
 | `DOC-CONTRACT-NOT-MECHANISM` | diff | Docstrings state guarantees, not the current implementation's steps |
@@ -61,7 +64,7 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | Rule | Check | Statement |
 | ---- | ----- | --------- |
 | `API-CONFIG-GATE` | conduct | Read-only calls only while `config.yaml` is clean and tracked |
-| `API-NEVER-MUTATE` | conduct | The user runs mutations, not you — consent doesn't lift this |
+| `API-MUTATE-ONLY-WITH-CONSENT` | conduct | Mutations only with `seeding: assistant`, only under `bruno/Seeding/` |
 | `API-ROUTE-THROUGH-BRUNO` | diff | No ad-hoc `curl` against the provider in committed files |
 | `API-TOKEN-EPHEMERAL` | diff | Token on `req` only; never `setVar` / `setEnvVar` / committed |
 | `API-DONT-READ-CREDS` | conduct | Don't read the encrypted credentials file directly |
@@ -73,7 +76,6 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 
 | Rule | Check | Statement |
 | ---- | ----- | --------- |
-| `CONDUCT-TODO-LIST` | conduct | Open with a TODO list, one task per phase |
 | `CONDUCT-CONSENT-DESTRUCTIVE` | conduct | Consent before destructive ops |
 | `CONDUCT-CONFIRM-BEFORE-WRITE-HISTORY` | conduct | Push/PR always need confirmation; a purely formatting- or snapshot-only commit doesn't |
 | `CONDUCT-STATE-CONVENTIONS` | conduct | Say when you follow a convention, and when you deviate |
@@ -81,6 +83,30 @@ Invoke before writing or changing any `fetch_*` / `backfill_*` function.
 | `CONDUCT-GREP-BEFORE-CITE` | conduct | Grep for remembered symbols before recommending them |
 | `CONDUCT-ESTABLISH-BASELINE` | conduct | Baseline suite in background at session start; gate the first edit on it |
 | `CONDUCT-VERIFY-FIRST` | conduct | Live behavior over docs over recall |
+| `CONDUCT-END-TURN-WITH-ASK` | conduct | A background session ends every turn saying what it needs from the user, with absolute paths |
+
+### Work mode — [`work-mode.md`](work-mode.md)
+
+Gates are the points where a skill would ask the user; each resolves as _interactive / autonomous_ below. All are `conduct` — invisible in a diff except through the decision ledger.
+
+| Rule | Check | Statement |
+| ---- | ----- | --------- |
+| `CONDUCT-FORWARD-MODE` | conduct | Every dispatch carries `work mode: …` and the seeding answer |
+| `CONDUCT-PERMISSIONS-FILE` | conduct | Permissions file managed only via `permissions.py`, only by the orchestrator |
+| `CONDUCT-CONSENT-PER-CONNECTOR` | conduct | Questionnaire answers are per connector, per run |
+| `GATE-STREAM-LIST` | conduct | Ask / build every documented resource |
+| `GATE-AUTH-SCHEME` | conduct | Confirm / simplest static scheme |
+| `GATE-CREDENTIALS` | conduct | Hard stop in both modes; batched in autonomous |
+| `GATE-TIGHT-BUDGET` | conduct | Ask per run / declare a budget at the checkpoint |
+| `GATE-STREAM-DESIGN` | conduct | Confirm endpoint, grain, classification / proceed and ledger |
+| `GATE-INCREMENTAL-ONLY` | conduct | Confirm / never |
+| `GATE-STRATEGY-UNCLEAR` | conduct | Ask / decide on size and cursor |
+| `GATE-OPAQUE-CURSOR` | conduct | Blocker / reject the opaque cursor |
+| `GATE-PARTITION-COVERAGE` | conduct | Decide together / sentinel else sequential sweeps |
+| `GATE-PLAN-REVIEW` | conduct | Human gate / self-review + reviewer subagent |
+| `GATE-SEEDING` | conduct | Hand over / PENDING, unless `seeding: assistant` |
+| `GATE-CONFIG-DIRTY` | conduct | Ask / stop live calls |
+| `GATE-COMMIT-SPLIT` | conduct | Recommend / perform |
 
 ### Situational skills
 
@@ -92,6 +118,7 @@ Not rule lists — invoke when the situation applies, and audit against them whe
 | Choosing a replication strategy | [`classify-stream-types`](../skills/classify-stream-types/SKILL.md) |
 | Wiring credentials / OAuth | [`configure-auth`](../skills/configure-auth/SKILL.md) |
 | Verifying an endpoint against live behavior | [`bruno-probe-endpoint`](../skills/bruno-probe-endpoint/SKILL.md) |
+| Tagging a claim about API behavior (VERIFIED / DOCUMENTED / PENDING / UNOBSERVABLE) | [`evidence-markers.md`](evidence-markers.md) |
 
 ### Cross-cutting review sweeps
 
