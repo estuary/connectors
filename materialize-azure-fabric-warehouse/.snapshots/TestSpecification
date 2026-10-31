@@ -25,7 +25,7 @@
       "schema": {
         "type": "string",
         "title": "Schema",
-        "description": "Schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
+        "description": "Schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table.",
         "order": 3
       },
       "connectionString": {
