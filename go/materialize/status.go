@@ -220,6 +220,13 @@ func (t *statusTracker) syncWait(at time.Time, every time.Duration) {
 	t.updateCurrent()
 }
 
+// nextSync is the scheduled sync last reported by syncWait.
+func (t *statusTracker) nextSync() (at time.Time, every time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.syncAt, t.syncEvery
+}
+
 // setBacklog sets whether recent transactions were large enough to skip the
 // sync delay.
 func (t *statusTracker) setBacklog(backlog bool) {
@@ -319,11 +326,7 @@ func (t *statusTracker) render(now time.Time) string {
 	case stageWaitingForData:
 		return "Waiting, no new collection data since " + formatTime(t.waitingSince)
 	case stageSyncWait:
-		msg = "Waiting, next scheduled sync at " + formatTime(t.syncAt)
-		if t.syncEvery > 0 {
-			msg += " (every " + formatDuration(t.syncEvery) + ")"
-		}
-		return msg
+		return "Waiting, " + describeSync(t.syncAt, t.syncEvery)
 	case stageReading:
 		msg = fmt.Sprintf("Reading new data (round %d)", r)
 	case stageLoading:
@@ -345,6 +348,16 @@ func (t *statusTracker) render(now time.Time) string {
 	}
 	if d := now.Sub(t.currentSince); d >= statusRefresh {
 		msg += ", running for " + formatDuration(d.Truncate(time.Minute))
+	}
+	return msg
+}
+
+// describeSync is like "next scheduled sync at 2026-10-22 11:30:00 UTC (every
+// 30m)". `every` is zero when the schedule has no fixed interval.
+func describeSync(at time.Time, every time.Duration) string {
+	msg := "next scheduled sync at " + formatTime(at)
+	if every > 0 {
+		msg += " (every " + formatDuration(every) + ")"
 	}
 	return msg
 }
