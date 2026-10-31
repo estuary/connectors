@@ -1,5 +1,13 @@
 # materialize-redshift
 
+## 2026-10-31
+
+### Fixed
+- A row with a NULL `flow_document`, such as one left from before the binding
+  materialized its document, now fails the task with an error naming the
+  table and how to resolve it, instead of an error about parsing the loaded
+  document.
+
 ## 2026-10-22
 
 ### Added
