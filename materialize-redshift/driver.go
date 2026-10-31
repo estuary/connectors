@@ -740,16 +740,36 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	defer rows.Close()
 	d.be.FinishedEvaluatingLoads()
 
+	if err := d.sendLoaded(rows, loaded); err != nil {
+		return err
+	}
+
+	if err := txn.Commit(ctx); err != nil {
+		return fmt.Errorf("committing load transaction: %w", err)
+	}
+
+	return nil
+}
+
+// sendLoaded passes each document of the load query's result to |loaded|.
+func (d *transactor) sendLoaded(rows pgx.Rows, loaded func(int, json.RawMessage) error) error {
 	for rows.Next() {
 		var binding int
 		var document json.RawMessage
 
-		if err = rows.Scan(&binding, &document); err != nil {
+		if err := rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning load document: %w", err)
 		}
 
+		b := d.bindings[binding]
+		// The no_flow_document load query builds documents from columns instead.
+		if document == nil && !d.cfg.Advanced.NoFlowDocument {
+			return nullFlowDocumentError(b.target.Identifier)
+		}
+
+		var err error
 		doc := json.RawMessage(document)
-		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+		if len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
 			}
@@ -758,15 +778,21 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return err
 		}
 	}
-	if err = rows.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
 
-	if err := txn.Commit(ctx); err != nil {
-		return fmt.Errorf("committing load transaction: %w", err)
-	}
-
 	return nil
+}
+
+// nullFlowDocumentError reports a loaded row without a flow_document. The
+// column is added as nullable, so rows that predate it never get one.
+func nullFlowDocumentError(table string) error {
+	return fmt.Errorf("table %s has a row whose flow_document is NULL, so its document cannot be loaded. "+
+		"This happens when the binding adopted a table that already held rows, "+
+		"or kept rows written while 'Exclude Flow Document' was enabled (see https://go.estuary.dev/matff). "+
+		"Enable the 'Exclude Flow Document' advanced option to have loads rebuild documents from the table's columns instead, "+
+		"or backfill the binding, which empties the table unless the 'retain_existing_data_on_backfill' feature flag is set", table)
 }
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {

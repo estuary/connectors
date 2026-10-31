@@ -192,6 +192,35 @@ func TestIntegration(t *testing.T) {
 	t.Run("idempotency", func(t *testing.T) {
 		runIdempotencyTest(t, makeResourceFn)
 	})
+
+	t.Run("null-flow-document", func(t *testing.T) {
+		ctx := context.Background()
+		conn, err := pgx.Connect(ctx, mustGetCfg(t).toURI())
+		require.NoError(t, err)
+		defer conn.Close(ctx)
+
+		d := &transactor{bindings: []*binding{{target: sql.Table{Identifier: `"public"."loaded"`}}}}
+		send := func(query string) ([]string, error) {
+			rows, err := conn.Query(ctx, query)
+			require.NoError(t, err)
+			defer rows.Close()
+
+			var docs []string
+			err = d.sendLoaded(rows, func(_ int, doc json.RawMessage) error {
+				docs = append(docs, string(doc))
+				return nil
+			})
+			return docs, err
+		}
+
+		docs, err := send(`SELECT 0, JSON_PARSE('{"id":1}');`)
+		require.NoError(t, err)
+		require.Equal(t, []string{`{"id":1}`}, docs)
+
+		_, err = send(`SELECT 0, CAST(NULL AS SUPER);`)
+		require.ErrorContains(t, err, `table "public"."loaded" has a row whose flow_document is NULL`)
+		require.ErrorContains(t, err, "Exclude Flow Document")
+	})
 }
 
 // stageRows stages rows to S3 as a transaction of a binding having the given
