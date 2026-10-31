@@ -45,8 +45,14 @@ sql> CREATE UNIQUE INDEX UX_693037_k23 ON dbo.SecondaryIndexDiscovery_index_only
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

@@ -38,8 +38,14 @@ sql> CREATE TABLE dbo.Datatypes_RowversionTypes_rowversion_318641 (id INTEGER PR
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

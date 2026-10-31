@@ -50,8 +50,14 @@ sql> CREATE TABLE test.keylessdiscovery_729953 (a INTEGER, b VARCHAR(2000), c RE
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

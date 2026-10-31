@@ -32,8 +32,14 @@ sql> CREATE TABLE test.multidimensionalarrays_911995 (id INTEGER PRIMARY KEY, ar
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

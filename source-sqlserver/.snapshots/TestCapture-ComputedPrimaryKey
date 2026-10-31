@@ -31,8 +31,14 @@ sql> CREATE TABLE dbo.Capture_ComputedPrimaryKey_812546 (actual_id INTEGER NOT N
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

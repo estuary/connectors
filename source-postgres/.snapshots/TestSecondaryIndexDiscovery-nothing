@@ -41,8 +41,14 @@ sql> CREATE TABLE test.tbl237250 (k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NO
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
