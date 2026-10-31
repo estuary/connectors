@@ -14,21 +14,17 @@ To use this connector, you'll need:
 
   If you haven't yet captured your data from its external source, start at the beginning of the [guide to create a dataflow](../../../guides/create-dataflow.md). You'll be referred back to this connector-specific documentation at the appropriate steps.
 
-:::caution
-For performance reasons, this connector is limited to 1 million cells per materialized sheet.
-If a bound collection has more than 1 million unique keys, the materialization will fail.
-
-If you plan to materialize a collection with an unbounded number of keys,
-you should first use a [derivation](../../../guides/flowctl/create-derivation.md) to summarize it
-into a collection with a bounded set of keys.
-:::
+* This connector is limited to 1 million cells per materialized sheet, for performance reasons.
+  If a bound collection has more than 1 million unique keys, the materialization fails.
+  To materialize a collection with an unbounded number of keys, first use a [derivation](../../../guides/flowctl/create-derivation.md)
+  to summarize it into a collection with a bounded set of keys.
 
 * The URL of a Google spreadsheet that *does not* contain the output of a prior Estuary materialization.
 
-:::caution
-Materializing data to a spreadsheet that already contains the output of another Estuary materialization can result in an error.
-Use a new spreadsheet for each materialization, or completely clear the output of prior materializations from the spreadsheet before you continue.
-:::
+* Only one materialization can write to each sheet. This includes disabled materializations.
+  If a sheet contains the output of another materialization, the connector fails with the error `PrevRound must have been committed`.
+  Use a new spreadsheet or sheet for each materialization.
+  To give a sheet to a different materialization, see [Move a sheet to a new materialization](#move-a-sheet-to-a-new-materialization).
 
 There are two ways to authenticate with Google when using this connector:
 signing in with Google through OAuth in the web app, and configuring manually with a Google service account key.
@@ -115,3 +111,20 @@ materializations:
           sheet: my_sheet
       source: ${PREFIX}/${source_collection}
 ```
+
+## Move a sheet to a new materialization
+
+The connector keeps its state in the hidden first column of each sheet.
+A new materialization cannot use a sheet that another materialization wrote, even if you clear the visible cells.
+To move a sheet to a new materialization:
+
+1. Delete or disable the old materialization, or remove the sheet's binding from it.
+2. In Google Sheets, delete the sheet's tab.
+3. Publish the new materialization. If it is already published, it picks up the change on its next restart.
+   The connector creates the missing tab when the task starts, and fills it from the source collection.
+
+:::caution
+Do not delete a tab while its own materialization still writes to it.
+The connector creates the tab again, but writes only the rows whose documents change after that.
+To fill the tab again, [backfill](/reference/backfilling-data/#materialization-backfill) the binding.
+:::
