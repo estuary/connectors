@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-31
+
+### Fixed
+- Bindings keyed on a date-time field could miss existing rows when keys in
+  the same transaction had different fractional-second precisions or time
+  zone offsets, inserting duplicates instead of updating them.
+
 ## 2026-09-30
 
 ### Fixed
