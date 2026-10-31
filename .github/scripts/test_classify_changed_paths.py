@@ -77,10 +77,11 @@ class TestLanes(unittest.TestCase):
             (True, False, ["source-sentry"]),
         )
 
-    def test_python_cdk_also_reaches_the_go_lane(self):
-        # materialize-snowflake's image holds estuary-cdk for its sidecar.
+    def test_cdk_is_python_only(self):
+        # materialize-snowflake's sidecar takes estuary-cdk from PyPI, not
+        # from this directory.
         self.assertEqual(
-            classify("estuary-cdk/estuary_cdk/http.py"), (True, True, ALL)
+            classify("estuary-cdk/estuary_cdk/http.py"), (True, False, ALL)
         )
 
     def test_go_connector_is_go_only(self):

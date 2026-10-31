@@ -90,7 +90,6 @@ class TestRules(unittest.TestCase):
 
     def test_non_go_inputs(self):
         self.assertEqual(pick("bson-transcoder/src/main.rs"), ["source-mongodb"])
-        self.assertEqual(pick("estuary-cdk/estuary_cdk/http.py"), ["materialize-snowflake"])
 
     def test_rust_connector_builds_no_go_connector(self):
         self.assertEqual(pick("source-kafka/src/main.rs"), [])
@@ -199,10 +198,6 @@ class TestRealGraph(unittest.TestCase):
         # go/mysql/tls embeds them from its cloudcas/ subdirectory.
         got = go_connectors(classify("go/mysql/tls/cloudcas/aws.pem", graph=self.graph))
         self.assertEqual(got, ["source-mysql", "source-mysql-batch"])
-
-    def test_estuary_cdk_builds_materialize_snowflake(self):
-        verdict = classify("estuary-cdk/estuary_cdk/http.py", graph=self.graph)
-        self.assertEqual(go_connectors(verdict), ["materialize-snowflake"])
 
     def test_connector_docs_build_only_that_connector(self):
         got = go_connectors(classify("source-postgres/CHANGELOG.md", graph=self.graph))

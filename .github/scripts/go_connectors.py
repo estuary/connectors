@@ -4,7 +4,7 @@ Work out which Go connectors a set of changed paths affects.
 
 Reads changed paths on stdin, one per line, and prints `all` or a compact JSON
 list of Go connector directories. classify-changed-paths.sh calls it with the
-paths it routed to the Go & Rust lane, plus estuary-cdk's.
+paths it routed to the Go & Rust lane.
 
 A shared Go package affects exactly the connectors that import it, directly or
 not, so the in-repo import graph decides. It comes from
@@ -25,12 +25,10 @@ from pathlib import Path
 MODULE = "github.com/estuary/connectors/"
 
 # Directories outside the Go import graph that a Go connector's Dockerfile
-# copies into its image. test_go_connectors.py checks every Dockerfile against
+# copies into its image. test_connector_lists.py checks every Dockerfile against
 # this, so a new one can't go unnoticed.
 NON_GO_INPUTS = {
     "bson-transcoder": ["source-mongodb"],
-    # The Snowpipe Streaming sidecar runs on estuary-cdk.
-    "estuary-cdk": ["materialize-snowflake"],
 }
 
 # Paths whose change affects every Go connector: what go.yaml is and reads,
