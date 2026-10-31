@@ -78,6 +78,7 @@ async def _list_memberships_worker(
     http: HTTPSession,
     log: Logger,
     list_id: int,
+    processing_type: str,
     context: ContactListMembershipControl,
     start: datetime,
     end: datetime | None = None,
@@ -120,6 +121,7 @@ async def _list_memberships_worker(
             f"Contact list {list_id} worker encountered an error.",
             {
                 "exception": msg,
+                "processing_type": processing_type,
             },
         )
         raise
@@ -137,7 +139,9 @@ async def _request_all_contact_list_memberships(
     )
 
     control = ContactListMembershipControl()
-    all_list_ids: list[int] = []
+    # Processing types are kept so a failing worker can report what the
+    # lists search said about its list.
+    all_lists: list[tuple[int, str]] = []
     adhoc_list_ids: list[int] = []
     async for item in request_contact_lists_in_time_range(
         http,
@@ -152,23 +156,25 @@ async def _request_all_contact_list_memberships(
         if item.processingType == AD_HOC_LIST_TYPE:
             adhoc_list_ids.append(item.listId)
         else:
-            all_list_ids.append(item.listId)
+            all_lists.append((item.listId, item.processingType))
 
     if adhoc_list_ids:
         log.warning(
             "skipping ADHOC contact lists",
             extra={"list_ids": adhoc_list_ids},
         )
-    if not all_list_ids:
+    if not all_lists:
         return
 
     async with asyncio.TaskGroup() as tg:
 
         async def dispatcher() -> None:
-            for list_id in all_list_ids:
+            for list_id, processing_type in all_lists:
                 _ = await control.task_slots.acquire()
                 _ = tg.create_task(
-                    _list_memberships_worker(http, log, list_id, control, start, end)
+                    _list_memberships_worker(
+                        http, log, list_id, processing_type, control, start, end
+                    )
                 )
 
         _ = tg.create_task(dispatcher())
@@ -180,7 +186,7 @@ async def _request_all_contact_list_memberships(
                 control.finished_tasks += 1
                 control.task_slots.release()
 
-                if control.finished_tasks == len(all_list_ids):
+                if control.finished_tasks == len(all_lists):
                     break
             else:
                 yield item
