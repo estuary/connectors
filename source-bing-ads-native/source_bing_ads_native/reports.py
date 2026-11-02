@@ -44,11 +44,15 @@ INCREMENTAL_WINDOW_DAYS = MAX_LOOKBACK_WINDOW_DAYS + 2
 
 TICK = timedelta(days=1)
 
-# Report days are London days, as in Airbyte's connector, which customers are
-# migrating from. "Greenwich Mean Time" observes British Summer Time, so a UTC
-# date is never later than the report's current day and is always a valid
-# range end. Microsoft offers no UTC time zone.
+# Reports are requested in London time, as in Airbyte's connector, which
+# customers are migrating from. Microsoft says the time zone only sets which
+# day is "today" and that report data is always in UTC; Fivetran's docs
+# suggest it also sets which day a row's numbers fall on. Neither is verified.
+# "Greenwich Mean Time" observes British Summer Time, so a UTC date is never
+# later than London's today and is always a valid range end. Microsoft offers
+# no UTC time zone.
 # https://learn.microsoft.com/en-us/advertising/reporting-service/reporttimezone?view=bingads-13
+# https://learn.microsoft.com/en-us/advertising/guides/reports?view=bingads-13#time-zones-in-reporting
 REPORT_TIME_ZONE = "GreenwichMeanTimeDublinEdinburghLisbonLondon"
 
 # Attribute columns that split a report into rows: entity IDs and segments.

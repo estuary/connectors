@@ -175,7 +175,7 @@ async def test_report_job_submits_polls_and_parses_the_download():
     assert request["Aggregation"] == "Daily"
     assert request["ReturnOnlyCompleteData"] is False
     assert request["Scope"] == {"AccountIds": ["1"]}
-    # London days, as in Airbyte's connector.
+    # London time, as in Airbyte's connector.
     assert request["Time"]["ReportTimeZone"] == "GreenwichMeanTimeDublinEdinburghLisbonLondon"
     assert stub.downloads == [("https://blob/job-1.zip", False)]
 
