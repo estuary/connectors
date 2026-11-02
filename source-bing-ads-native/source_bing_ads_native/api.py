@@ -235,7 +235,8 @@ def _customer_id_candidates(
     Microsoft's docs disagree on which CustomerId reaches an account managed
     through a client link: the linking manager's (the role that lists it) or
     the account's owner (ParentCustomerId). For accounts the user's own
-    customer owns, both are the same.
+    customer owns, both are the same, and Microsoft ignores the header anyway
+    (bruno/Campaigns/wrong customer id).
     """
     candidates: list[str] = []
     for role in roles:
