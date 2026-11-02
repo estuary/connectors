@@ -483,7 +483,7 @@ type binding struct {
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
-	var b = &binding{target: target, nullFieldsToStrip: target.NullableFieldsToStrip()}
+	var b = &binding{target: target, nullFieldsToStrip: target.NullablePropertiesToStrip()}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template

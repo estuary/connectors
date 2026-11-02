@@ -428,7 +428,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains quotes or backslashes, or has a custom projection
+  name.
+
 ## 2026-10-31
 
 ### Changed

@@ -7,6 +7,9 @@
   downloads two files of its results at a time, instead of ten, so the
   queries that run at once hold no more results in memory than a single
   query did before loads ran concurrently.
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains special or non-ASCII characters, or has a custom
+  projection name.
 
 ### Changed
 - Every load runs as one SQL script, replacing the `two_phase_loads` feature

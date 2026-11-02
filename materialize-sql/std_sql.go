@@ -412,7 +412,9 @@ func StdPopulateInfoSchema(
 			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 			Type:               c.DataType,
 			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
-			HasDefault:         c.ColumnDefault.Valid,
+			// DuckLake and MariaDB report a column with no default as the string
+			// "NULL" rather than SQL NULL.
+			HasDefault: c.ColumnDefault.Valid && !strings.EqualFold(c.ColumnDefault.String, "NULL"),
 		})
 	}
 	if err := columns.Err(); err != nil {

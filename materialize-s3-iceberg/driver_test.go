@@ -394,6 +394,7 @@ func TestRestGlueSnapshotParity(t *testing.T) {
 // year 10000; clampTimestamp rewrites it to the year-9999 boundary before the
 // writer sees it, so the append round-trips without error.
 func runTimestampOverflowRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	ctx := context.Background()
 
 	rt := newRegressionTable(t, ctx, cfg, "ts_overflow_regression", nil,
@@ -527,6 +528,7 @@ func (rt *regressionTable) uploadParquetRows(t *testing.T, ctx context.Context, 
 // clampDate rewrites a year > 9999 (which time.Parse rejects outright) to the
 // year-9999 boundary before the writer sees it, so the append round-trips.
 func runDateOverflowRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	ctx := context.Background()
 
 	rt := newRegressionTable(t, ctx, cfg, "date_overflow_regression", nil,
@@ -552,6 +554,7 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 // appendFiles does not scan existing manifests for duplicate paths, matching
 // the pyiceberg 0.7.0 behavior this connector originally shipped with.
 func runCheckpointFenceRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	ctx := context.Background()
 
 	const materialization = "acmeCo/tests/regression"
@@ -783,6 +786,7 @@ func withAdvanced(cfg config, set func(*advancedConfig)) config {
 //   - encode exact int64 nanosecond values in the produced Parquet file
 //     (asserted against the raw column bytes)
 func runNanosecondTimestampTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -845,6 +849,7 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 // backfill), and UpdateResource must upgrade it to v3 for the AddColumn to be
 // valid.
 func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -895,6 +900,7 @@ func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
 // explicit error, and a clean create yields a format v3 table with a
 // timestamptz_ns column.
 func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -959,6 +965,7 @@ func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 // nanosecond precision. A second migration back to microseconds proves the
 // reverse direction.
 func runNanosecondMigrateTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1265,6 +1272,7 @@ func TestCreateResourceFormatVersionConflictNamesOptions(t *testing.T) {
 // while the (multi-type) collection key and an ignoreStringFormat-overridden
 // field keep their string mapping.
 func runVariantCreateResourceTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1400,6 +1408,7 @@ func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
 // the REST catalog: DuckDB cannot attach the Glue catalog with this mechanism,
 // and the variant encoding under test is identical for both.
 func runVariantDuckDBRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1597,6 +1606,7 @@ func nameMappingNames(t *testing.T, tbl *icebergtable.Table) map[string]bool {
 // does, and recomputing it after the flip yields nothing, pinning that
 // repeated applies cause no schema churn.
 func runVariantMigrateTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1745,6 +1755,7 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 // set after the flip yields nothing, pinning that repeated applies cause no
 // schema churn.
 func runVariantDisableFlipTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 

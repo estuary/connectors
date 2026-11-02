@@ -25,6 +25,7 @@ func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	boilerplate.SkipRuntimeV1(t)
 
 	out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
 	require.NoError(t, err, "docker compose up failed: %s", string(out))

@@ -118,6 +118,9 @@ type RuntimeConfig struct {
 	// feature flags — e.g. the connector's scale-out flag, which multi-shard
 	// runs require.
 	ExtraFeatureFlags []string
+	// ConfigOverrides sets endpoint config values by sjson path, e.g.
+	// "advanced.no_flow_document", to re-run a suite in another mode.
+	ConfigOverrides map[string]any
 	// Timeout is a backstop against a hung run; a healthy run ends by
 	// transaction count. Zero defaults to ten minutes.
 	Timeout time.Duration
@@ -161,14 +164,21 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// sets (later entries win in ParseFeatureFlags). flowctl passes a
 	// plaintext (non-sops) config to the connector unchanged, so writing the
 	// decrypted config back inline is sufficient.
-	if len(runtime.ExtraFeatureFlags) > 0 {
+	if len(runtime.ExtraFeatureFlags) > 0 || len(runtime.ConfigOverrides) > 0 {
 		rawCfg := decryptConfigRaw(t, bundled, taskName)
-		flags := strings.Join(runtime.ExtraFeatureFlags, ",")
-		if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
-			flags = baseFlags + "," + flags
+		var err error
+		if len(runtime.ExtraFeatureFlags) > 0 {
+			flags := strings.Join(runtime.ExtraFeatureFlags, ",")
+			if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
+				flags = baseFlags + "," + flags
+			}
+			rawCfg, err = sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
+			require.NoError(t, err)
 		}
-		rawCfg, err := sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
-		require.NoError(t, err)
+		for path, value := range runtime.ConfigOverrides {
+			rawCfg, err = sjson.SetBytes(rawCfg, path, value)
+			require.NoError(t, err)
+		}
 		bundled, err = sjson.SetRawBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), rawCfg)
 		require.NoError(t, err)
 	}
@@ -302,6 +312,25 @@ func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
 
 // RuntimeV1 reports whether FLOW_TEST_RUNTIME selects the runtime v1 pass.
 func RuntimeV1() bool { return os.Getenv("FLOW_TEST_RUNTIME") == "v1" }
+
+// SkipRuntimeV1 skips the runtime v1 pass of a test that never drives legacy
+// `flowctl preview`: it drives the connector directly or through preview-next,
+// so its outcome is the runtime-next pass's.
+func SkipRuntimeV1(t *testing.T) {
+	t.Helper()
+	if RuntimeV1() {
+		t.Skip("does not drive runtime v1; covered by the runtime-next pass")
+	}
+}
+
+// requireRuntimeV1Selected fails a materialization test that CI's runtime v1
+// pass, which runs only `-run '^TestIntegration'`, would never select.
+func requireRuntimeV1Selected(t *testing.T) {
+	t.Helper()
+	if !strings.HasPrefix(t.Name(), "TestIntegration") {
+		t.Fatalf("%s drives runtime v1 but CI's runtime v1 pass only runs TestIntegration* tests; rename it", t.Name())
+	}
+}
 
 // runtimeV1Liveness drives the task through legacy `flowctl preview` -- the
 // runtime v1 protocol, under which Acknowledge never carries statePatches -- as

@@ -541,7 +541,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 
 	var queryLoadTemplate = t.templates.queryLoadTable
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		queryLoadTemplate = t.templates.queryLoadTableNoFlowDocument
 	}
 

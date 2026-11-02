@@ -56,6 +56,12 @@ func TestIntegration(t *testing.T) {
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
 	t.Run("truncate", func(t *testing.T) {
 		if boilerplate.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
@@ -142,6 +148,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("additional table create sql", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		ctx := context.Background()
 		cfg := testConfig()
 
@@ -193,6 +200,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply changes", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				ctx := context.Background()

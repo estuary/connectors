@@ -543,7 +543,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	b := &spannerBinding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Render createLoadTable template

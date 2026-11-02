@@ -7,6 +7,11 @@
   to sync sooner, and explain in plain language when a sync does not wait for
   the schedule.
 
+### Fixed
+- Bindings keyed on a date-time field could miss existing rows when keys in
+  the same transaction had different fractional-second precisions or time
+  zone offsets, inserting duplicates instead of updating them.
+
 ## 2026-09-30
 
 ### Fixed

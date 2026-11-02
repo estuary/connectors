@@ -81,6 +81,14 @@ func buildProjection(p *pf.Projection) Projection {
 	return out
 }
 
+var pointerTokenUnescaper = strings.NewReplacer("~1", "/", "~0", "~")
+
+// RootProperty returns the document property located by a root-level
+// projection, which differs from its Field when the projection is renamed.
+func (p *Projection) RootProperty() string {
+	return pointerTokenUnescaper.Replace(strings.TrimPrefix(p.Ptr, "/"))
+}
+
 // AsFlatType returns the Projection's FlatType.
 func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	mustExist = p.Inference.Exists == pf.Inference_MUST

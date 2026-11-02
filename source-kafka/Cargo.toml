@@ -18,6 +18,7 @@ hex = "0.4"
 highway = "1.2"
 http = "0.2" # 0.2x version is needed for MSK token signing via aws-sigv4
 lazy_static = "1.5"
+libc = "0.2"
 rdkafka = { version = "0.36", features = [
     "cmake-build",
     "sasl",
@@ -63,3 +64,11 @@ async-trait = "0.1"
 # Using git commit to get fix for bigdecimal feature regression where apache-avro
 # incorrectly depended on "serde-json" instead of "serde" feature
 apache-avro = { git = "https://github.com/apache/avro-rs.git", rev = "0c38f3f" }
+
+[profile.release]
+# Thin LTO lets the optimizer inline non-generic code from dependencies, such
+# as prost-reflect and serde_json, into the per-message path. A single codegen
+# unit lets it optimize each crate as a whole instead of in 16 pieces. Together
+# they make each message about 10% cheaper, at the cost of slower release builds.
+lto = "thin"
+codegen-units = 1

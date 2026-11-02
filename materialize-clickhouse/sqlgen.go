@@ -585,9 +585,9 @@ SETTINGS select_sequential_consistency = 1;
 {{ if not $.DeltaUpdates -}}
 SELECT
 concat('{',
-{{- range $i, $col := $.RootLevelColumns -}}
+{{- range $i, $col := $.RootPropertyColumns -}}
 	{{- if $i }}, ',',{{ end }}
-	'"{{ $col.Field }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
+	toJSONString({{ Literal $col.RootProperty }}), ':', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
 , '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
