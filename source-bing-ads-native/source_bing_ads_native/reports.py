@@ -240,11 +240,17 @@ async def fetch_report_rows(
                     raise RuntimeError(f"{job} was still pending after {MAX_POLL_WAIT}.")
                 await asyncio.sleep(POLL_INTERVAL.total_seconds())
         except HTTPError as err:
+            # Every report shares one submit URL, so the error alone doesn't
+            # say which job failed.
             fault = fault_of(err)
-            detail = fault.describe() if fault else err.message
-            raise HTTPError(
-                f"{job} failed: {detail}\n\n{err.message}", err.code, err.body
-            ) from err
+            log.error("report failed", {
+                "report": definition.name,
+                "account_id": context.id,
+                "first_day": str(first_day),
+                "last_day": str(last_day),
+                "detail": fault.describe() if fault else err.message,
+            })
+            raise
 
         if status.Status != "Success":
             raise RuntimeError(f"{job} failed with status {status.Status}.")

@@ -227,7 +227,7 @@ async def test_report_still_pending_past_the_deadline_raises(monkeypatch: pytest
 
 
 @pytest.mark.asyncio
-async def test_report_faults_name_the_account_and_tracking_id():
+async def test_report_faults_log_the_account_and_tracking_id(caplog: pytest.LogCaptureFixture):
     class Rejecting(ReportStub):
         async def request(
             self,
@@ -241,12 +241,17 @@ async def test_report_faults_name_the_account_and_tracking_id():
             body = {"TrackingId": "t-9", "Errors": [{"Code": 106, "ErrorCode": "UserIsNotAuthorized", "Message": "no"}]}
             raise HTTPError("Encountered HTTP error status 400.", 400, dumps(body).encode())
 
-    with pytest.raises(HTTPError, match=r"account 1 .*106 UserIsNotAuthorized.*TrackingId t-9"):
+    with pytest.raises(HTTPError, match="status 400"):
         async for _ in fetch_report_rows(
             _session(Rejecting()), LOG, CONTEXT, CAMPAIGN_REPORT, CAMPAIGN_REPORT.row_model(),
             date(2026, 10, 1), date(2026, 10, 1),
         ):
             pass
+
+    [record] = [r for r in caplog.records if r.levelname == "ERROR"]
+    fields: Any = record.args
+    assert fields["account_id"] == CONTEXT.id
+    assert "106 UserIsNotAuthorized" in fields["detail"] and "TrackingId t-9" in fields["detail"]
 
 
 @pytest.mark.asyncio
