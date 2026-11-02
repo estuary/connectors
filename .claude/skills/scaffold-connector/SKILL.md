@@ -33,8 +33,8 @@ source-$1/
 └── $PKG/
     ├── __init__.py             # Connector class (extends BaseCaptureConnector)
     ├── __main__.py             # Entry: asyncio.run(Connector().serve())
-    ├── models.py               # Pydantic models for config, resources, documents
     ├── api.py                  # Pure functions for API interactions
+    ├── models.py               # Every Pydantic model: config, state, documents, response shapes
     └── resources.py            # Binds models + API into Resource objects
 ```
 
