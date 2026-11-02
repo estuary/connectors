@@ -83,6 +83,12 @@ enum Parsed {
     Value(serde_json::Value),
 }
 
+// With no timeout, `poll` returns only for a message or an error. So the
+// loop can't run between messages while every assigned partition is idle.
+// rdkafka already wakes up once a second while it waits, so a one-second
+// timeout adds no wake-ups.
+const POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+
 pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
@@ -108,10 +114,10 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
 
     loop {
-        let msg = consumer
-            .poll(None)
-            .expect("polling without a timeout should always produce a message")
-            .context("receiving next message")?;
+        let Some(result) = consumer.poll(POLL_TIMEOUT) else {
+            continue;
+        };
+        let msg = result.context("receiving next message")?;
 
         let mut op = "u";
         let payload = match msg.payload() {
