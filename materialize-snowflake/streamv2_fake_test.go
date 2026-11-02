@@ -43,6 +43,7 @@ import (
 // Fault injection via FAKE_SNOWPIPE_MODE:
 //
 //	commit_never_lands  accepts appends but never advances the committed token
+//	hex_binary_input    reports pipes that read binary values as HEX
 //
 // A row carrying the REJECT column stands in for a row Snowflake's ingestion
 // discards: the append and the commit both succeed and the committed token still
@@ -280,7 +281,7 @@ func (f *fakeSnowpipe) pipeInfo(w http.ResponseWriter, r *http.Request) {
 		f.fail(w, 400, "ERR_UNSUPPORTED_ENCRYPTION_VERSION", "")
 		return
 	}
-	f.reply(w, 200, map[string]any{
+	var res = map[string]any{
 		"rowset_stage_location": map[string]any{
 			"location_type":  "FAKE",
 			"bucket_name":    "fake-stage",
@@ -294,7 +295,11 @@ func (f *fakeSnowpipe) pipeInfo(w http.ResponseWriter, r *http.Request) {
 			"diversifier":        fakePipeDiversifier,
 			"encryption_version": req.EncryptionVersion,
 		},
-	})
+	}
+	if f.mode == "hex_binary_input" {
+		res["parameter_overrides"] = map[string]string{"binary_input_format": "HEX"}
+	}
+	f.reply(w, 200, res)
 }
 
 // The key material every fake pipe lends.

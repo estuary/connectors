@@ -91,6 +91,29 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	require.Empty(t, entries)
 }
 
+// TestStreamV2PipeBinaryFormatCheckedBeforeFirstAppend covers a pipe that reads
+// binary values in a format other than BASE64. A small append goes through /rows,
+// which never fetches pipe info, so the pipe must be checked when the binding is
+// opened rather than at the first file append.
+func TestStreamV2PipeBinaryFormatCheckedBeforeFirstAppend(t *testing.T) {
+	var ctx = context.Background()
+	singleChannelLayout(t)
+	t.Setenv("FAKE_SNOWPIPE_MODE", "hex_binary_input")
+
+	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/hexBinary",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+
+	m.addBinding("DB", "SCH", "TBL", sql.Table{
+		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
+		Identifier: "TBL",
+		Keys:       []sql.Column{{Identifier: `KEY`}},
+		Values:     []sql.Column{{Identifier: `VAL`}},
+		StateKey:   "hexBinary.v1",
+	}, nil)
+
+	require.ErrorContains(t, testWriteRow(ctx, m, 0, []any{"k", "v"}), `binary input format "HEX"`)
+}
+
 // TestStreamV2RejectedRows covers, without credentials, what the live test
 // covers against Snowflake: a rejected row fails the transaction that produced
 // it, and goes on rejecting the channel it was appended to.
