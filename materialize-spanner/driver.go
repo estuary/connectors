@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -112,6 +111,20 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, false, nil
 }
 
+// loadTablePrefix names the Load tables of one shard of a task. A shard drops
+// and recreates its Load tables when it starts and clears them at every Load,
+// so they must not be shared with other tasks or shards in the database.
+func loadTablePrefix(materialization string, keyBegin, keyEnd uint32) string {
+	readable := identifierSanitizerRegexp.ReplaceAllString(materialization, "_")
+	if len(readable) > 32 {
+		readable = readable[:32]
+	}
+	h := fnv.New64a()
+	h.Write([]byte(materialization))
+
+	return fmt.Sprintf("flow_internal.flow_temp_%s_%016x_%08x_%08x_", readable, h.Sum64(), keyBegin, keyEnd)
+}
+
 // initializeFlowInternalSchema builds DDL statements for flow_internal schema setup
 // It returns DDL statements to drop existing temporary tables, create the schema, and create all Load tables
 func initializeFlowInternalSchema(bindings []*spannerBinding) []string {
@@ -122,9 +135,8 @@ func initializeFlowInternalSchema(bindings []*spannerBinding) []string {
 
 	// Step 1: Drop all temporary tables if they exist
 	// Note: Spanner doesn't support dropping a schema with tables in it, so we drop tables individually
-	for idx := range bindings {
-		tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", idx)
-		ddlStatements = append(ddlStatements, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTableName))
+	for _, binding := range bindings {
+		ddlStatements = append(ddlStatements, fmt.Sprintf("DROP TABLE IF EXISTS %s", binding.loadTable))
 	}
 
 	// Step 2: Create the schema if it doesn't exist
@@ -154,7 +166,7 @@ var sqlDriver = &sql.Driver[config, tableConfig]{
 		}).Info("opening Spanner database")
 
 		dialect := createSpannerDialect(featureFlags)
-		templates := renderTemplates(dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
+		templates := renderTemplates(dialect, !cfg.Advanced.DisableKeyDistributionOptimization, "")
 
 		return &sql.Endpoint[config]{
 			Config:              cfg,
@@ -278,12 +290,15 @@ type transactor struct {
 	fence         sql.Fence
 	be            *m.BindingEvents
 	numPartitions int // Number of partitions for key distribution (nodes × 10)
+
+	checkpointsTable string
 }
 
 // spannerBinding represents a materialized binding with its configuration
 type spannerBinding struct {
 	target             sql.Table
 	nullFieldsToStrip  []string
+	loadTable          string
 	createLoadTableSQL string
 	loadQuerySQL       string
 	dropLoadTableSQL   string
@@ -454,7 +469,8 @@ func newTransactor(
 		}
 	}()
 
-	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
+	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization,
+		loadTablePrefix(fence.Materialization.String(), fence.KeyBegin, fence.KeyEnd))
 
 	// Always query node count for partition calculation
 	// Partitions = nodes × 10 for parallel flushing
@@ -483,6 +499,8 @@ func newTransactor(
 		fence:         fence,
 		be:            be,
 		numPartitions: numPartitions,
+
+		checkpointsTable: ep.Dialect.Identifier(fence.TablePath...),
 	}
 
 	// Setup bindings first to get the createLoadTableSQL for each
@@ -545,6 +563,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	if t.cfg.Advanced.NoFlowDocument {
 		b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	}
+
+	loadTable, err := sql.RenderTableTemplate(target, t.templates.loadTableName)
+	if err != nil {
+		return fmt.Errorf("rendering loadTableName template: %w", err)
+	}
+	b.loadTable = loadTable
 
 	// Render createLoadTable template
 	createLoadTableSQL, err := sql.RenderTableTemplate(target, t.templates.createLoadTable)
@@ -664,7 +688,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		// Initialize state for this binding on first key
 		if bindingStates[bindingIdx] == nil {
-			tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
+			tempTableName := b.loadTable
 
 			log.WithField("table", tempTableName).Info("load: clearing temporary table")
 			// Clear any existing data from the table using a mutation
@@ -835,7 +859,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
-// Store implements the Store phase using Spanner mutations with optimal batching
+// Store implements the Store phase using Spanner mutations with optimal batching.
+// Partitions are applied as independent commits as they fill, so a transaction's
+// data is visible before its checkpoint is written, and a failed transaction can
+// be left partially applied. Data is therefore at-least-once, as with any
+// non-transactional destination; only the checkpoint write is fenced.
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	storeStart := time.Now()
 	var storeCount int
@@ -1034,21 +1062,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// Update the fence checkpoint
 		t.fence.Checkpoint = checkpointBytes
 
-		// Add fence update mutation to the current batch
-		// Use the standard checkpoint table name
-		fenceValues := []interface{}{
-			t.fence.Materialization.String(),
-			int64(t.fence.KeyBegin), // Convert uint32 to int64
-			int64(t.fence.KeyEnd),   // Convert uint32 to int64
-			int64(t.fence.Fence),    // Convert uint64 to int64
-			base64.StdEncoding.EncodeToString(checkpointBytes),
-		}
-		fenceMutation := spanner.InsertOrUpdate(
-			sql.DefaultFlowCheckpoints,
-			[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
-			fenceValues,
-		)
-
 		// Flush all data partitions first (before fence)
 		nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
 		if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
@@ -1060,10 +1073,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("flushing data mutations: %w", err))
 		}
 
-		// Apply fence mutation separately after all data succeeds
-		// This ensures data is never committed without the checkpoint update
-		if _, _, err := t.timedSpannerApply(ctx, []*spanner.Mutation{fenceMutation}, "store-fence"); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("applying fence checkpoint: %w", err))
+		// The checkpoint is written only after all of the data, so a stored
+		// checkpoint never covers data that isn't committed.
+		if err := updateFence(ctx, t.client, t.checkpointsTable, t.fence); err != nil {
+			return nil, m.FinishedOperation(err)
 		}
 
 		for i, b := range t.bindings {
