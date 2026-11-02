@@ -98,10 +98,10 @@ func createDuckDialect(featureFlags map[string]bool, isDuckLake bool) sql.Dialec
 			"json": {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
 			"*":    {sql.NewMigrationSpec([]string{"json"}, directCast, sql.WithCastSQL(toJsonCast))},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
 				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
-		},
+		}),
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),

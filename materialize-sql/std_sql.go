@@ -551,6 +551,22 @@ var StdMigrationSteps = []ColumnMigrationStep{
 	},
 }
 
+// BatchedColumnMigrationStep builds a ColumnMigrationStep which alters all of a
+// table's columns in one multi-clause ALTER TABLE, with clause rendering each
+// column's part of it.
+func BatchedColumnMigrationStep(clause func(MigrationInstruction) string) ColumnMigrationStep {
+	return func(_ Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
+		if len(instructions) == 0 {
+			return nil, nil
+		}
+		clauses := make([]string, len(instructions))
+		for i, ins := range instructions {
+			clauses[i] = clause(ins)
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s\n\t%s;", table.Identifier, strings.Join(clauses, ",\n\t"))}, nil
+	}
+}
+
 func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, migrations []ColumnTypeMigration, steps ...ColumnMigrationStep) ([]string, error) {
 	// Connectors can provide custom steps, if they don't, we default to std steps
 	if len(steps) == 0 {
@@ -565,8 +581,7 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 	// ALTER ... TYPE statement instead of the multi-step rename. An interrupted
 	// rename (the temporary column already exists) must still finish via the rename
 	// path, otherwise the existing temporary column would be orphaned.
-	var directStmts []string
-	var renameMigrations []ColumnTypeMigration
+	var directMigrations, renameMigrations []ColumnTypeMigration
 	for _, migration := range migrations {
 		if migration.DirectCast && !migration.ProgressColumnExists {
 			if dialect.DirectCastSQL == nil {
@@ -577,10 +592,15 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 				"ddl":   migration.DDL,
 				"field": migration.Field,
 			}).Info("rendering query for column migration using direct cast")
-			directStmts = append(directStmts, dialect.DirectCastSQL(table, migration))
+			directMigrations = append(directMigrations, migration)
 		} else {
 			renameMigrations = append(renameMigrations, migration)
 		}
+	}
+
+	var directStmts []string
+	if len(directMigrations) > 0 {
+		directStmts = dialect.DirectCastSQL(table, directMigrations)
 	}
 
 	var stepInstructions = make(map[int][]MigrationInstruction)

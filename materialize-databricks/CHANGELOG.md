@@ -17,6 +17,11 @@
   feature flag, enabled by default; a binding without a `flow_published_at`
   column, or in delta-updates mode, is unaffected.
 
+### Changed
+- Changing the type of several columns of a table is faster: the temporary
+  columns are added, and the original columns dropped, in one statement each
+  instead of one statement per column.
+
 ## 2026-10-31
 ### Changed
 - Log messages about the sync schedule now say when the next sync is and how

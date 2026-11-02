@@ -167,11 +167,19 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	}, nil
 }
 
+// BigQuery allows a table only about 5 metadata updates every 10 seconds, so
+// each step alters all of its columns in a single multi-clause statement.
 var columnMigrationSteps = []sql.ColumnMigrationStep{
-	sql.StdMigrationSteps[0],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("ADD COLUMN %s %s", ins.TempColumnIdentifier, ins.TypeMigration.NullableDDL)
+	}),
 	sql.StdMigrationSteps[1],
-	sql.StdMigrationSteps[2],
-	sql.StdMigrationSteps[3],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("DROP COLUMN %s", ins.TypeMigration.Identifier)
+	}),
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("RENAME COLUMN %s TO %s", ins.TempColumnIdentifier, ins.TypeMigration.Identifier)
+	}),
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		// BigQuery does not support making a column REQUIRED when it is NULLABLE
 		// TODO: do we prefer to backfill in these instances for BigQuery, or just continue
