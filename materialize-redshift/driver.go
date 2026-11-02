@@ -930,10 +930,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // Flush records completed backfills on the primary only, since every shard
 // receives the same completions and only the primary applies staged work.
 func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
-	d.truncations = make(map[int]time.Time, len(completes))
 	if !d.primary {
 		return nil
 	}
+	d.truncations = make(map[int]time.Time, len(completes))
 	for binding, boundary := range completes {
 		var b = d.bindings[binding]
 		if b.target.DeltaUpdates {
@@ -1272,11 +1272,8 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			// Pass.
 		} else if b.truncateSQL == "" {
 			var _, reason = b.target.PublishedAtColumn()
-			log.WithFields(log.Fields{
-				"table":    b.target.Identifier,
-				"boundary": *g.merged.TruncateBefore,
-				"reason":   reason.Error(),
-			}).Warn("skipping staged truncation because the binding no longer supports it")
+			return nil, fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
+				g.merged.TruncateBefore.Format(time.RFC3339), b.target.Identifier, reason)
 		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
 			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 		} else {
