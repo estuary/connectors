@@ -68,10 +68,15 @@ class Fault(BaseModel, extra="allow"):
 
 
 def parse_fault(body: bytes) -> Fault | None:
+    """The Microsoft fault in a response body, or None if it isn't one.
+
+    Every field of `Fault` is optional, so any JSON object parses. A body
+    counts as a fault only if it lists at least one error."""
     try:
-        return Fault.model_validate_json(body)
+        fault = Fault.model_validate_json(body)
     except PydanticValidationError:
         return None
+    return fault if fault.errors else None
 
 
 def fault_of(err: HTTPError) -> Fault | None:
@@ -105,7 +110,7 @@ def should_retry(
         # Not a Microsoft fault, such as a gateway error.
         return True
 
-    return bool(fault.errors) and all(_is_retryable(e) for e in fault.errors)
+    return all(_is_retryable(e) for e in fault.errors)
 
 
 def _is_retryable(error: FaultError) -> bool:

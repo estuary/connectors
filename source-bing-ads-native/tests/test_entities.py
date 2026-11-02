@@ -353,6 +353,8 @@ async def test_asset_groups_come_only_from_performance_max_campaigns():
         (_fault(105, "InvalidCredentials"), 1, False),
         (b"<html>Bad Gateway</html>", 1, True),
         (b"<html>Bad Gateway</html>", 8, False),
+        # JSON that isn't a fault, such as a gateway's own error body.
+        (b'{"message": "Service Unavailable"}', 1, True),
     ],
 )
 def test_should_retry_throttling_and_internal_errors(body: bytes, attempt: int, expected: bool):
