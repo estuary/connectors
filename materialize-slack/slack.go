@@ -37,14 +37,18 @@ func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block, con
 		return fmt.Errorf("error getting channel id: %w", err)
 	}
 
-	_, _, err = api.Client.PostMessage(
-		channelID,
+	var options = []slack.MsgOption{
 		slack.MsgOptionText(text, false),
-		slack.MsgOptionBlocks(blocks...),
 		slack.MsgOptionUsername(config.DisplayName),
 		slack.MsgOptionIconEmoji(config.LogoEmoji),
 		slack.MsgOptionIconURL(config.LogoPicture),
-	)
+	}
+	// MsgOptionBlocks with no blocks sends `blocks=[]` rather than omitting them.
+	if len(blocks) > 0 {
+		options = append(options, slack.MsgOptionBlocks(blocks...))
+	}
+
+	_, _, err = api.Client.PostMessage(channelID, options...)
 	return err
 }
 
