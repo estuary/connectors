@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.http import HTTPError, HTTPSession
 
-from .errors import ACCESS_DENIED_CODES, fault_of
+from .errors import ACCESS_DENIED_CODES, FaultError, fault_of
 from .models import (
     SANDBOX_SCOPE,
     SCOPE,
@@ -100,33 +100,35 @@ class User(BaseModel, extra="allow"):
 class CustomerRole(BaseModel, extra="allow"):
     CustomerId: str
     # Null for a role that covers every account of the customer.
-    AccountIds: list[str] | None = None
-    LinkedAccountIds: list[str] | None = None
+    AccountIds: list[str] | None
+    LinkedAccountIds: list[str] | None
 
 
 class UserQueryResponse(BaseModel, extra="allow"):
     User: User
-    CustomerRoles: list[CustomerRole] | None = None
+    CustomerRoles: list[CustomerRole]
 
 
 class AccountsSearchResponse(BaseModel, extra="allow"):
-    Accounts: list[Account] | None = None
+    Accounts: list[Account]
 
 
 class CampaignsResponse(BaseModel, extra="allow"):
-    Campaigns: list[Campaign] | None = None
+    Campaigns: list[Campaign]
 
 
 class AdGroupsResponse(BaseModel, extra="allow"):
-    AdGroups: list[AdGroup] | None = None
+    AdGroups: list[AdGroup]
 
 
 class AdsResponse(BaseModel, extra="allow"):
-    Ads: list[Ad] | None = None
+    Ads: list[Ad]
 
 
 class AssetGroupsResponse(BaseModel, extra="allow"):
-    AssetGroups: list[AssetGroup] | None = None
+    AssetGroups: list[AssetGroup]
+    # Errors for campaigns that couldn't be read, while the rest succeed.
+    PartialErrors: list[FaultError]
 
 
 async def query_user(http: HTTPSession, log: Logger, is_sandbox: bool) -> UserQueryResponse:
@@ -162,7 +164,7 @@ async def search_accounts(
         response = AccountsSearchResponse.model_validate_json(
             await http.request(log, url, method="POST", json=body)
         )
-        page = response.Accounts or []
+        page = response.Accounts
         for account in page:
             accounts.setdefault(account.Id, account)
 
@@ -199,7 +201,7 @@ async def _query_campaigns(
         ),
         context=ParentIds({"AccountId": account_id}),
     )
-    return by_id(response.Campaigns or [])
+    return by_id(response.Campaigns)
 
 
 @dataclass(frozen=True)
@@ -320,7 +322,7 @@ class AccountDirectory:
         else:
             selected = reachable
 
-        roles = user.CustomerRoles or []
+        roles = user.CustomerRoles
         semaphore = asyncio.Semaphore(MAX_CONCURRENT_ENTITY_REQUESTS)
 
         async def resolve(account: Account) -> AccountContext | str:
@@ -387,7 +389,7 @@ async def _ad_groups(
         ),
         context=ParentIds({"AccountId": context.id, "CampaignId": campaign.Id}),
     )
-    return by_id(response.AdGroups or [])
+    return by_id(response.AdGroups)
 
 
 async def _ads(
@@ -411,7 +413,7 @@ async def _ads(
             }
         ),
     )
-    return by_id(response.Ads or [])
+    return by_id(response.Ads)
 
 
 async def _asset_groups(
@@ -429,7 +431,12 @@ async def _asset_groups(
         ),
         context=ParentIds({"AccountId": context.id, "CampaignId": campaign.Id}),
     )
-    return by_id(response.AssetGroups or [])
+    if response.PartialErrors:
+        raise RuntimeError(
+            f"Asset groups for campaign {campaign.Id} couldn't be read: "
+            + "; ".join(f"{e.Code} {e.ErrorCode or ''}: {e.Message or ''}" for e in response.PartialErrors)
+        )
+    return by_id(response.AssetGroups)
 
 
 async def _in_order[P, T](

@@ -95,7 +95,7 @@ def _account(id: str, parent: str = "900") -> dict[str, Any]:
 def _user(roles: list[dict[str, Any]] | None = None) -> Handler:
     return lambda body, headers: {
         "User": {"Id": "42"},
-        "CustomerRoles": roles if roles is not None else [{"CustomerId": "900", "AccountIds": None}],
+        "CustomerRoles": roles if roles is not None else [{"CustomerId": "900", "AccountIds": None, "LinkedAccountIds": None}],
     }
 
 
@@ -183,7 +183,7 @@ async def test_linked_account_falls_back_to_its_owner_customer_id():
         {
             "/User/Query": _user(
                 [
-                    {"CustomerId": "900", "AccountIds": ["1"]},
+                    {"CustomerId": "900", "AccountIds": ["1"], "LinkedAccountIds": None},
                     {"CustomerId": "500", "AccountIds": [], "LinkedAccountIds": ["2"]},
                 ]
             ),
@@ -294,6 +294,25 @@ async def test_ad_groups_and_ads_carry_parent_ids_in_order():
     assert all(a.AccountId == "1" for a in ads)
     headline = ads[0].model_dump()["Headlines"][0]
     assert headline == {"Asset": {"Id": "5", "Text": "hi"}, "AssetPerformanceLabel": "Good"}
+
+
+@pytest.mark.asyncio
+async def test_asset_group_partial_errors_fail_the_snapshot():
+    http = _session(
+        {
+            "/User/Query": _user(),
+            "/Accounts/Search": _accounts(_account("1")),
+            "/Campaigns/QueryByAccountId": _campaigns({"1": ["10"]}, types={"10": "PerformanceMax"}),
+            "/AssetGroups/QueryByCampaignId": lambda body, headers: {
+                "AssetGroups": [],
+                "PartialErrors": [{"Code": 1100, "ErrorCode": "CampaignServiceInvalidCampaignId", "Message": "nope"}],
+            },
+        },
+    )
+    directory = AccountDirectory(http, False, [])
+
+    with pytest.raises(RuntimeError, match="campaign 10 couldn't be read"):
+        [g async for g in snapshot_asset_groups(http, directory, LOG)]
     ads_calls = [(b, h) for s, b, h in http.calls if s == "/Ads/QueryByAdGroupId"]
     assert all(h == {"CustomerId": "900", "CustomerAccountId": "1"} for _, h in ads_calls)
     assert all("ResponsiveSearch" in b["AdTypes"] for b, _ in ads_calls)
