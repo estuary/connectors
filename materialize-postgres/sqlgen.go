@@ -160,6 +160,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		}),
 		TypeMapper:             mapper,
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
+		MaxColumns:             1600,
 		CaseInsensitiveColumns: false,
 	}
 }
