@@ -41,7 +41,11 @@ SANDBOX_DEVELOPER_TOKEN = "BBD37VB98"
 
 def _configure_http(log: Logger, http: BingAdsHTTPMixin, config: EndpointConfig) -> None:
     oauth_spec = OAUTH2_SPEC.model_copy(
-        update={"additionalTokenExchangeBody": {"scope": token_exchange_scope()}}
+        update={
+            "additionalTokenExchangeBody": {
+                "scope": token_exchange_scope(config.advanced.is_sandbox)
+            }
+        }
     )
     http.token_source = TokenSource(oauth_spec=oauth_spec, credentials=config.credentials)
     developer_token = config.credentials.developer_token
@@ -75,7 +79,7 @@ async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: Endp
         credentials.access_token_expires_at = utc_now() + timedelta(seconds=token.expires_in)
 
     try:
-        await query_user(http, log)
+        await query_user(http, log, config.advanced.is_sandbox)
     except HTTPError as err:
         if err.code == 401:
             raise ValidationError(
@@ -92,7 +96,7 @@ async def validate_credentials(log: Logger, http: BingAdsHTTPMixin, config: Endp
         raise
 
     try:
-        await AccountDirectory(http, config.account_ids).accounts(log)
+        await AccountDirectory(http, config.advanced.is_sandbox, config.account_ids).accounts(log)
     except AccountAccessError as err:
         raise ValidationError(err.errors)
 
@@ -232,7 +236,7 @@ async def all_resources(
     """Enumerate every stream the connector exposes. Makes no API calls:
     accounts are discovered once, lazily, when a stream first needs them."""
     _configure_http(log, http, config)
-    directory = AccountDirectory(http, config.account_ids)
+    directory = AccountDirectory(http, config.advanced.is_sandbox, config.account_ids)
 
     return [
         *entity_resources(directory, http),

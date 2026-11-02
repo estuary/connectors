@@ -14,7 +14,6 @@ from typing import Any, Callable, cast
 import pytest
 from estuary_cdk.http import HTTPError, HTTPSession
 from source_bing_ads_native.api import (
-    ENVIRONMENT_VAR,
     AccountAccessError,
     AccountDirectory,
     customer_management_url,
@@ -127,7 +126,7 @@ async def test_accounts_are_deduplicated_and_ordered_by_id():
             "/Campaigns/QueryByAccountId": _campaigns({"4": [], "30": []}),
         }
     )
-    directory = AccountDirectory(http, [])
+    directory = AccountDirectory(http, False, [])
 
     ids = [a.Id async for a in snapshot_accounts(directory, LOG)]
 
@@ -143,7 +142,7 @@ async def test_accounts_are_discovered_once_per_run():
             "/Campaigns/QueryByAccountId": _campaigns({"1": []}),
         }
     )
-    directory = AccountDirectory(http, [])
+    directory = AccountDirectory(http, False, [])
 
     await asyncio.gather(directory.accounts(LOG), directory.accounts(LOG))
 
@@ -160,7 +159,7 @@ async def test_unknown_account_ids_are_reported_with_the_accessible_ones():
     )
 
     with pytest.raises(AccountAccessError) as err:
-        await AccountDirectory(http, ["2", "777"]).accounts(LOG)
+        await AccountDirectory(http, False, ["2", "777"]).accounts(LOG)
 
     assert "777" in err.value.errors[0]
     assert "Accessible account IDs: 1, 2" in err.value.errors[0]
@@ -171,7 +170,7 @@ async def test_no_reachable_accounts_fails():
     http = _session({"/User/Query": _user(), "/Accounts/Search": _accounts()})
 
     with pytest.raises(AccountAccessError, match="can't access any"):
-        await AccountDirectory(http, []).accounts(LOG)
+        await AccountDirectory(http, False, []).accounts(LOG)
 
 
 @pytest.mark.asyncio
@@ -196,7 +195,7 @@ async def test_linked_account_falls_back_to_its_owner_customer_id():
         }
     )
 
-    contexts = await AccountDirectory(http, []).accounts(LOG)
+    contexts = await AccountDirectory(http, False, []).accounts(LOG)
 
     assert [(c.id, c.customer_id) for c in contexts] == [("1", "900"), ("2", "900")]
 
@@ -214,7 +213,7 @@ async def test_every_unreadable_account_is_reported_together():
     )
 
     with pytest.raises(AccountAccessError) as err:
-        await AccountDirectory(http, []).accounts(LOG)
+        await AccountDirectory(http, False, []).accounts(LOG)
 
     assert len(err.value.errors) == 2
     assert "Account 1" in err.value.errors[0] and "TrackingId tracking-1" in err.value.errors[0]
@@ -232,7 +231,7 @@ async def test_other_errors_fail_discovery():
     )
 
     with pytest.raises(AccountAccessError, match="117"):
-        await AccountDirectory(http, []).accounts(LOG)
+        await AccountDirectory(http, False, []).accounts(LOG)
 
 
 @pytest.mark.asyncio
@@ -246,7 +245,7 @@ async def test_campaigns_emit_in_account_then_campaign_order_despite_concurrency
         # Account 1's full campaign query finishes last.
         delays={"/Campaigns/QueryByAccountId:1": 0.05},
     )
-    directory = AccountDirectory(http, [])
+    directory = AccountDirectory(http, False, [])
 
     campaigns = [(c.AccountId, c.Id) async for c in snapshot_campaigns(http, directory, LOG)]
 
@@ -279,7 +278,7 @@ async def test_ad_groups_and_ads_carry_parent_ids_in_order():
         },
         delays={"/AdGroups/QueryByCampaignId:9": 0.05},
     )
-    directory = AccountDirectory(http, [])
+    directory = AccountDirectory(http, False, [])
 
     ad_groups = [
         (g.CampaignId, g.Id) async for g in snapshot_ad_groups(http, directory, LOG)
@@ -325,7 +324,7 @@ async def test_asset_groups_come_only_from_performance_max_campaigns():
         },
         delays={"/AssetGroups/QueryByCampaignId:8": 0.05},
     )
-    directory = AccountDirectory(http, [])
+    directory = AccountDirectory(http, False, [])
 
     groups = [g async for g in snapshot_asset_groups(http, directory, LOG)]
 
@@ -369,29 +368,17 @@ def test_authenticated_request_needs_developer_token():
 
 
 @pytest.mark.parametrize(
-    "environment, host, scope",
+    "is_sandbox, host, scope",
     [
-        (None, "clientcenter.api.bingads.microsoft.com", "https://ads.microsoft.com/"),
-        ("sandbox", "clientcenter.api.sandbox.bingads.microsoft.com", "https://si.ads.microsoft.com/"),
+        (False, "clientcenter.api.bingads.microsoft.com", "https://ads.microsoft.com/"),
+        (True, "clientcenter.api.sandbox.bingads.microsoft.com", "https://si.ads.microsoft.com/"),
     ],
 )
-def test_environment_picks_hosts_and_token_scope(
-    monkeypatch: pytest.MonkeyPatch, environment: str | None, host: str, scope: str
-):
+def test_sandbox_picks_hosts_and_token_scope(is_sandbox: bool, host: str, scope: str):
     # The sandbox rejects production-scoped tokens, so the refresh scope has to
     # follow the hosts.
-    if environment is None:
-        monkeypatch.delenv(ENVIRONMENT_VAR, raising=False)
-    else:
-        monkeypatch.setenv(ENVIRONMENT_VAR, environment)
-    assert customer_management_url().startswith(f"https://{host}/")
-    assert token_exchange_scope().startswith(scope)
-
-
-def test_unknown_environment_fails(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv(ENVIRONMENT_VAR, "staging")
-    with pytest.raises(RuntimeError, match=ENVIRONMENT_VAR):
-        token_exchange_scope()
+    assert customer_management_url(is_sandbox).startswith(f"https://{host}/")
+    assert token_exchange_scope(is_sandbox).startswith(scope)
 
 
 @pytest.mark.asyncio

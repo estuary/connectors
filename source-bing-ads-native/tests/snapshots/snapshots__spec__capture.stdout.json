@@ -12,6 +12,12 @@
               "minimum": 0,
               "title": "Lookback Window Days",
               "type": "integer"
+            },
+            "is_sandbox": {
+              "default": false,
+              "description": "Capture from the Microsoft Advertising sandbox instead of production. Requires sandbox credentials.",
+              "title": "Use Sandbox Environment",
+              "type": "boolean"
             }
           },
           "title": "Advanced",

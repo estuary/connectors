@@ -1,6 +1,5 @@
 import asyncio
 import functools
-import os
 from dataclasses import dataclass
 from logging import Logger
 from typing import AsyncGenerator, Awaitable, Callable, Iterable
@@ -25,12 +24,6 @@ from .models import (
 # Microsoft sunsets Bing Ads API versions; bump this when migrating.
 # See https://learn.microsoft.com/en-us/advertising/guides/migration-guide?view=bingads-13
 API_VERSION = "v13"
-
-# Setting BING_ADS_ENVIRONMENT=sandbox points the connector at Microsoft's sandbox,
-# whose hosts insert `.sandbox` into the production hostname. It's for local
-# development and tests only, so it isn't part of the endpoint config.
-# https://learn.microsoft.com/en-us/advertising/guides/sandbox?view=bingads-13
-ENVIRONMENT_VAR = "BING_ADS_ENVIRONMENT"
 
 # Accounts/Search's maximum page size.
 # https://learn.microsoft.com/en-us/advertising/customer-management-service/searchaccounts?view=bingads-13
@@ -69,41 +62,30 @@ ALL_AD_TYPES = [
 MAX_CONCURRENT_ENTITY_REQUESTS = 10
 
 
-def _environment() -> str:
-    environment = os.environ.get(ENVIRONMENT_VAR, "production").lower()
-    if environment not in ("production", "sandbox"):
-        raise RuntimeError(
-            f"{ENVIRONMENT_VAR} must be 'production' or 'sandbox', got {environment!r}"
-        )
-    return environment
+# The sandbox's hosts insert `.sandbox` into the production hostname.
+# https://learn.microsoft.com/en-us/advertising/guides/sandbox?view=bingads-13
+def _host(is_sandbox: bool, service: str) -> str:
+    return f"https://{service}.api.{'sandbox.' if is_sandbox else ''}bingads.microsoft.com"
 
 
-def _host(service: str) -> str:
-    match _environment():
-        case "sandbox":
-            return f"https://{service}.api.sandbox.bingads.microsoft.com"
-        case _:
-            return f"https://{service}.api.bingads.microsoft.com"
-
-
-def token_exchange_scope() -> str:
+def token_exchange_scope(is_sandbox: bool) -> str:
     """The scope the connector's own refresh-token exchanges request. The
     dashboard's sign-in always uses the production scope."""
-    return SANDBOX_SCOPE if _environment() == "sandbox" else SCOPE
+    return SANDBOX_SCOPE if is_sandbox else SCOPE
 
 
 # The API is split across per-service hosts.
 # https://learn.microsoft.com/en-us/advertising/guides/web-service-addresses?view=bingads-13
-def customer_management_url() -> str:
-    return f"{_host('clientcenter')}/CustomerManagement/{API_VERSION}"
+def customer_management_url(is_sandbox: bool) -> str:
+    return f"{_host(is_sandbox, 'clientcenter')}/CustomerManagement/{API_VERSION}"
 
 
-def campaign_management_url() -> str:
-    return f"{_host('campaign')}/CampaignManagement/{API_VERSION}"
+def campaign_management_url(is_sandbox: bool) -> str:
+    return f"{_host(is_sandbox, 'campaign')}/CampaignManagement/{API_VERSION}"
 
 
-def reporting_url() -> str:
-    return f"{_host('reporting')}/Reporting/{API_VERSION}"
+def reporting_url(is_sandbox: bool) -> str:
+    return f"{_host(is_sandbox, 'reporting')}/Reporting/{API_VERSION}"
 
 
 def by_id[T: (Account, Campaign, AdGroup, Ad, AssetGroup)](items: list[T]) -> list[T]:
@@ -147,13 +129,13 @@ class AssetGroupsResponse(BaseModel, extra="allow"):
     AssetGroups: list[AssetGroup] | None = None
 
 
-async def query_user(http: HTTPSession, log: Logger) -> UserQueryResponse:
+async def query_user(http: HTTPSession, log: Logger, is_sandbox: bool) -> UserQueryResponse:
     """Return the authenticated user and their customer roles. Needs no
     CustomerId or CustomerAccountId headers.
 
     https://learn.microsoft.com/en-us/advertising/customer-management-service/getuser?view=bingads-13
     """
-    url = f"{customer_management_url()}/User/Query"
+    url = f"{customer_management_url(is_sandbox)}/User/Query"
     # A null UserId means the authenticated user.
     body = {"UserId": None}
     return UserQueryResponse.model_validate_json(
@@ -161,12 +143,14 @@ async def query_user(http: HTTPSession, log: Logger) -> UserQueryResponse:
     )
 
 
-async def search_accounts(http: HTTPSession, log: Logger, user_id: str) -> list[Account]:
+async def search_accounts(
+    http: HTTPSession, log: Logger, is_sandbox: bool, user_id: str
+) -> list[Account]:
     """Every account the user can reach, deduplicated, in Id order.
 
     https://learn.microsoft.com/en-us/advertising/customer-management-service/searchaccounts?view=bingads-13
     """
-    url = f"{customer_management_url()}/Accounts/Search"
+    url = f"{customer_management_url(is_sandbox)}/Accounts/Search"
     accounts: dict[str, Account] = {}
     index = 0
     while True:
@@ -197,12 +181,13 @@ def account_headers(customer_id: str, account_id: str) -> dict[str, str]:
 async def _query_campaigns(
     http: HTTPSession,
     log: Logger,
+    is_sandbox: bool,
     customer_id: str,
     account_id: str,
     campaign_type: str,
 ) -> list[Campaign]:
     """https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13"""
-    url = f"{campaign_management_url()}/Campaigns/QueryByAccountId"
+    url = f"{campaign_management_url(is_sandbox)}/Campaigns/QueryByAccountId"
     body = {"AccountId": account_id, "CampaignType": campaign_type}
     response = CampaignsResponse.model_validate_json(
         await http.request(
@@ -223,6 +208,7 @@ class AccountContext:
 
     account: Account
     customer_id: str
+    is_sandbox: bool
 
     @property
     def id(self) -> str:
@@ -264,7 +250,7 @@ def _customer_id_candidates(
 
 
 async def _resolve_customer_id(
-    http: HTTPSession, log: Logger, account: Account, candidates: list[str]
+    http: HTTPSession, log: Logger, is_sandbox: bool, account: Account, candidates: list[str]
 ) -> str:
     """Return the first candidate CustomerId that can read the account.
 
@@ -274,7 +260,7 @@ async def _resolve_customer_id(
     last_error: HTTPError | None = None
     for customer_id in candidates:
         try:
-            await _query_campaigns(http, log, customer_id, account.Id, "Search")
+            await _query_campaigns(http, log, is_sandbox, customer_id, account.Id, "Search")
             return customer_id
         except HTTPError as err:
             fault = fault_of(err)
@@ -294,8 +280,9 @@ class AccountDirectory:
     downstream.
     """
 
-    def __init__(self, http: HTTPSession, account_ids: list[str]):
+    def __init__(self, http: HTTPSession, is_sandbox: bool, account_ids: list[str]):
         self._http = http
+        self._is_sandbox = is_sandbox
         self._account_ids = account_ids
         self._lock = asyncio.Lock()
         self._accounts: list[AccountContext] | None = None
@@ -309,8 +296,8 @@ class AccountDirectory:
             return self._accounts
 
     async def _discover(self, log: Logger) -> list[AccountContext]:
-        user = await query_user(self._http, log)
-        reachable = await search_accounts(self._http, log, user.User.Id)
+        user = await query_user(self._http, log, self._is_sandbox)
+        reachable = await search_accounts(self._http, log, self._is_sandbox, user.User.Id)
 
         if not reachable:
             raise AccountAccessError(
@@ -339,13 +326,19 @@ class AccountDirectory:
             async with semaphore:
                 try:
                     customer_id = await _resolve_customer_id(
-                        self._http, log, account, _customer_id_candidates(account, roles)
+                        self._http,
+                        log,
+                        self._is_sandbox,
+                        account,
+                        _customer_id_candidates(account, roles),
                     )
                 except HTTPError as err:
                     fault = fault_of(err)
                     detail = fault.describe() if fault else err.message
                     return f"Account {account.Id} ({account.Name}) can't be read: {detail}"
-                return AccountContext(account=account, customer_id=customer_id)
+                return AccountContext(
+                    account=account, customer_id=customer_id, is_sandbox=self._is_sandbox
+                )
 
         results = await asyncio.gather(*(resolve(a) for a in selected))
         errors = [r for r in results if isinstance(r, str)]
@@ -366,7 +359,7 @@ async def _campaigns(
     http: HTTPSession, log: Logger, context: AccountContext
 ) -> list[Campaign]:
     return await _query_campaigns(
-        http, log, context.customer_id, context.id, ALL_CAMPAIGN_TYPES
+        http, log, context.is_sandbox, context.customer_id, context.id, ALL_CAMPAIGN_TYPES
     )
 
 
@@ -374,7 +367,7 @@ async def _ad_groups(
     http: HTTPSession, log: Logger, context: AccountContext, campaign: Campaign
 ) -> list[AdGroup]:
     """https://learn.microsoft.com/en-us/advertising/campaign-management-service/getadgroupsbycampaignid?view=bingads-13"""
-    url = f"{campaign_management_url()}/AdGroups/QueryByCampaignId"
+    url = f"{campaign_management_url(context.is_sandbox)}/AdGroups/QueryByCampaignId"
     response = AdGroupsResponse.model_validate_json(
         await http.request(
             log,
@@ -392,7 +385,7 @@ async def _ads(
     http: HTTPSession, log: Logger, context: AccountContext, ad_group: AdGroup
 ) -> list[Ad]:
     """https://learn.microsoft.com/en-us/advertising/campaign-management-service/getadsbyadgroupid?view=bingads-13"""
-    url = f"{campaign_management_url()}/Ads/QueryByAdGroupId"
+    url = f"{campaign_management_url(context.is_sandbox)}/Ads/QueryByAdGroupId"
     response = AdsResponse.model_validate_json(
         await http.request(
             log,
@@ -416,7 +409,7 @@ async def _asset_groups(
     http: HTTPSession, log: Logger, context: AccountContext, campaign: Campaign
 ) -> list[AssetGroup]:
     """https://learn.microsoft.com/en-us/advertising/campaign-management-service/getassetgroupsbycampaignid?view=bingads-13"""
-    url = f"{campaign_management_url()}/AssetGroups/QueryByCampaignId"
+    url = f"{campaign_management_url(context.is_sandbox)}/AssetGroups/QueryByCampaignId"
     response = AssetGroupsResponse.model_validate_json(
         await http.request(
             log,

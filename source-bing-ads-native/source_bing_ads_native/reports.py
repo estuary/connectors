@@ -182,7 +182,7 @@ async def _submit(
     response = SubmitResponse.model_validate_json(
         await http.request(
             log,
-            f"{reporting_url()}/GenerateReport/Submit",
+            f"{reporting_url(context.is_sandbox)}/GenerateReport/Submit",
             method="POST",
             json=request,
             headers=context.headers(),
@@ -201,7 +201,7 @@ async def _poll(
     response = PollResponse.model_validate_json(
         await http.request(
             log,
-            f"{reporting_url()}/GenerateReport/Poll",
+            f"{reporting_url(context.is_sandbox)}/GenerateReport/Poll",
             method="POST",
             json={"ReportRequestId": request_id},
             headers=context.headers(),

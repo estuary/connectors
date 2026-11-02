@@ -5,8 +5,8 @@ import pytest
 from pytest_insta import SnapshotFixture
 
 
-# Copied from source-front. config.yaml holds sandbox credentials, and
-# test.flow.yaml points the connector at the sandbox (BING_ADS_ENVIRONMENT).
+# Copied from source-front. config.yaml holds sandbox credentials and sets
+# advanced.is_sandbox.
 def test_capture(request: pytest.FixtureRequest, snapshot: SnapshotFixture):
     result = subprocess.run(
         [

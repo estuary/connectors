@@ -139,6 +139,11 @@ class EndpointConfig(BaseModel):
             ge=0,
             le=MAX_LOOKBACK_WINDOW_DAYS,
         )
+        is_sandbox: bool = Field(
+            default=False,
+            title="Use Sandbox Environment",
+            description="Capture from the Microsoft Advertising sandbox instead of production. Requires sandbox credentials.",
+        )
 
     advanced: Advanced = Field(
         default_factory=Advanced,  # type: ignore

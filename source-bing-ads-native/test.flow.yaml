@@ -9,10 +9,6 @@ captures:
         - -m
         - source_bing_ads_native
         config: config.yaml
-        # config.yaml holds sandbox credentials, so point the connector at the
-        # sandbox's hosts and token scope (BING_ADS_ENVIRONMENT in api.py).
-        env:
-          BING_ADS_ENVIRONMENT: sandbox
     bindings:
     - resource:
         name: accounts
