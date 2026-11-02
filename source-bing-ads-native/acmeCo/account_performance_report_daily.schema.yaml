@@ -32,47 +32,47 @@ properties:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Addistribution
   BidMatchType:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Bidmatchtype
   DeliveredMatchType:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Deliveredmatchtype
   DeviceOS:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Deviceos
   DeviceType:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Devicetype
   Network:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Network
   TopVsOther:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Topvsother
 required:
 - AccountId
 - TimePeriod
+- AdDistribution
+- BidMatchType
+- DeliveredMatchType
+- DeviceOS
+- DeviceType
+- Network
+- TopVsOther
 title: AccountPerformanceReportRequestRow
 type: object
 x-infer-schema: true

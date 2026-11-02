@@ -32,11 +32,11 @@ properties:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Campaignid
 required:
 - AccountId
 - Date
+- CampaignId
 title: BudgetSummaryReportRequestRow
 type: object
 x-infer-schema: true

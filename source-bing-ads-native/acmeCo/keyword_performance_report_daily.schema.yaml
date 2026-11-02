@@ -32,77 +32,77 @@ properties:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Addistribution
   AdGroupId:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Adgroupid
   AdId:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Adid
   BidMatchType:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Bidmatchtype
   CampaignId:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Campaignid
   DeliveredMatchType:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Deliveredmatchtype
   DeviceOS:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Deviceos
   DeviceType:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Devicetype
   KeywordId:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Keywordid
   Language:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Language
   Network:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Network
   TopVsOther:
     anyOf:
     - type: string
     - type: 'null'
-    default: null
     title: Topvsother
 required:
 - AccountId
 - TimePeriod
+- AdDistribution
+- AdGroupId
+- AdId
+- BidMatchType
+- CampaignId
+- DeliveredMatchType
+- DeviceOS
+- DeviceType
+- KeywordId
+- Language
+- Network
+- TopVsOther
 title: KeywordPerformanceReportRequestRow
 type: object
 x-infer-schema: true

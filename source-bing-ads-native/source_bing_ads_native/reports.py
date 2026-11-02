@@ -119,9 +119,15 @@ class ReportDefinition:
         ]
 
     def row_model(self) -> type[ReportRow]:
-        """Declares only the key columns. Schema inference types the rest."""
+        """Declares only the key columns. Schema inference types the rest.
+
+        Grain columns must be in every row, so a requested column missing
+        from the download fails loudly. Their values may still be null:
+        Microsoft documents `Unknown` for segments it can't tell, but doesn't
+        promise that no cell is ever blank.
+        """
         fields: dict[str, Any] = {self.time_column: (str, ...)}
-        fields.update({c: (str | None, None) for c in self.grain_columns()})
+        fields.update({c: (str | None, ...) for c in self.grain_columns()})
         return create_model(f"{self.request_type}Row", __base__=ReportRow, **fields)
 
 

@@ -13,6 +13,7 @@ from logging import getLogger
 from typing import Any, AsyncGenerator, cast
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 from estuary_cdk.capture.common import ResourceState
 from estuary_cdk.http import HTTPError, HTTPSession
 from source_bing_ads_native import reports
@@ -526,3 +527,15 @@ async def test_new_account_backfill_and_incremental_cover_every_day_once(monkeyp
         days.extend(first + n * timedelta(days=1) for n in range((last - first).days + 1))
     # Backfill owns Jul 1-14, incremental starts with Jul 15: no gap, no overlap.
     assert days == [date(2026, 7, 1) + n * timedelta(days=1) for n in range(15)]
+
+
+def test_grain_columns_may_be_blank_but_not_missing():
+    model = CAMPAIGN_REPORT.row_model()
+
+    row = model.model_validate(_campaign_row("2026-10-01", DeviceOS=""))
+    assert row.DeviceOS is None  # type: ignore[attr-defined]
+
+    missing = _campaign_row("2026-10-01")
+    del missing["DeviceOS"]
+    with pytest.raises(PydanticValidationError, match="DeviceOS"):
+        model.model_validate(missing)

@@ -419,7 +419,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Addistribution"
         },
         "BidMatchType": {
@@ -431,7 +430,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Bidmatchtype"
         },
         "DeliveredMatchType": {
@@ -443,7 +441,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deliveredmatchtype"
         },
         "DeviceOS": {
@@ -455,7 +452,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deviceos"
         },
         "DeviceType": {
@@ -467,7 +463,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Devicetype"
         },
         "Network": {
@@ -479,7 +474,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Network"
         },
         "TopVsOther": {
@@ -491,13 +485,19 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Topvsother"
         }
       },
       "required": [
         "AccountId",
-        "TimePeriod"
+        "TimePeriod",
+        "AdDistribution",
+        "BidMatchType",
+        "DeliveredMatchType",
+        "DeviceOS",
+        "DeviceType",
+        "Network",
+        "TopVsOther"
       ],
       "title": "AccountPerformanceReportRequestRow",
       "type": "object",
@@ -596,7 +596,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Addistribution"
         },
         "BidMatchType": {
@@ -608,7 +607,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Bidmatchtype"
         },
         "CampaignId": {
@@ -620,7 +618,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Campaignid"
         },
         "DeliveredMatchType": {
@@ -632,7 +629,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deliveredmatchtype"
         },
         "DeviceOS": {
@@ -644,7 +640,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deviceos"
         },
         "DeviceType": {
@@ -656,7 +651,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Devicetype"
         },
         "Network": {
@@ -668,7 +662,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Network"
         },
         "TopVsOther": {
@@ -680,13 +673,20 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Topvsother"
         }
       },
       "required": [
         "AccountId",
-        "TimePeriod"
+        "TimePeriod",
+        "AdDistribution",
+        "BidMatchType",
+        "CampaignId",
+        "DeliveredMatchType",
+        "DeviceOS",
+        "DeviceType",
+        "Network",
+        "TopVsOther"
       ],
       "title": "CampaignPerformanceReportRequestRow",
       "type": "object",
@@ -786,7 +786,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Addistribution"
         },
         "AdGroupId": {
@@ -798,7 +797,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Adgroupid"
         },
         "BidMatchType": {
@@ -810,7 +808,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Bidmatchtype"
         },
         "CampaignId": {
@@ -822,7 +819,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Campaignid"
         },
         "DeliveredMatchType": {
@@ -834,7 +830,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deliveredmatchtype"
         },
         "DeviceOS": {
@@ -846,7 +841,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deviceos"
         },
         "DeviceType": {
@@ -858,7 +852,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Devicetype"
         },
         "Language": {
@@ -870,7 +863,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Language"
         },
         "Network": {
@@ -882,7 +874,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Network"
         },
         "TopVsOther": {
@@ -894,13 +885,22 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Topvsother"
         }
       },
       "required": [
         "AccountId",
-        "TimePeriod"
+        "TimePeriod",
+        "AdDistribution",
+        "AdGroupId",
+        "BidMatchType",
+        "CampaignId",
+        "DeliveredMatchType",
+        "DeviceOS",
+        "DeviceType",
+        "Language",
+        "Network",
+        "TopVsOther"
       ],
       "title": "AdGroupPerformanceReportRequestRow",
       "type": "object",
@@ -1002,7 +1002,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Addistribution"
         },
         "AdGroupId": {
@@ -1014,7 +1013,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Adgroupid"
         },
         "AdId": {
@@ -1026,7 +1024,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Adid"
         },
         "BidMatchType": {
@@ -1038,7 +1035,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Bidmatchtype"
         },
         "CampaignId": {
@@ -1050,7 +1046,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Campaignid"
         },
         "DeliveredMatchType": {
@@ -1062,7 +1057,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deliveredmatchtype"
         },
         "DeviceOS": {
@@ -1074,7 +1068,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deviceos"
         },
         "DeviceType": {
@@ -1086,7 +1079,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Devicetype"
         },
         "Language": {
@@ -1098,7 +1090,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Language"
         },
         "Network": {
@@ -1110,7 +1101,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Network"
         },
         "TopVsOther": {
@@ -1122,13 +1112,23 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Topvsother"
         }
       },
       "required": [
         "AccountId",
-        "TimePeriod"
+        "TimePeriod",
+        "AdDistribution",
+        "AdGroupId",
+        "AdId",
+        "BidMatchType",
+        "CampaignId",
+        "DeliveredMatchType",
+        "DeviceOS",
+        "DeviceType",
+        "Language",
+        "Network",
+        "TopVsOther"
       ],
       "title": "AdPerformanceReportRequestRow",
       "type": "object",
@@ -1231,7 +1231,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Addistribution"
         },
         "AdGroupId": {
@@ -1243,7 +1242,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Adgroupid"
         },
         "AdId": {
@@ -1255,7 +1253,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Adid"
         },
         "BidMatchType": {
@@ -1267,7 +1264,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Bidmatchtype"
         },
         "CampaignId": {
@@ -1279,7 +1275,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Campaignid"
         },
         "DeliveredMatchType": {
@@ -1291,7 +1286,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deliveredmatchtype"
         },
         "DeviceOS": {
@@ -1303,7 +1297,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Deviceos"
         },
         "DeviceType": {
@@ -1315,7 +1308,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Devicetype"
         },
         "KeywordId": {
@@ -1327,7 +1319,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Keywordid"
         },
         "Language": {
@@ -1339,7 +1330,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Language"
         },
         "Network": {
@@ -1351,7 +1341,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Network"
         },
         "TopVsOther": {
@@ -1363,13 +1352,24 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Topvsother"
         }
       },
       "required": [
         "AccountId",
-        "TimePeriod"
+        "TimePeriod",
+        "AdDistribution",
+        "AdGroupId",
+        "AdId",
+        "BidMatchType",
+        "CampaignId",
+        "DeliveredMatchType",
+        "DeviceOS",
+        "DeviceType",
+        "KeywordId",
+        "Language",
+        "Network",
+        "TopVsOther"
       ],
       "title": "KeywordPerformanceReportRequestRow",
       "type": "object",
@@ -1473,13 +1473,13 @@
               "type": "null"
             }
           ],
-          "default": null,
           "title": "Campaignid"
         }
       },
       "required": [
         "AccountId",
-        "Date"
+        "Date",
+        "CampaignId"
       ],
       "title": "BudgetSummaryReportRequestRow",
       "type": "object",
