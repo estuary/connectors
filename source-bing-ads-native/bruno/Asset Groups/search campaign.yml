@@ -36,6 +36,6 @@ docs: |-
   campaign". This checks what happens for any other campaign, which decides
   whether the connector must skip non-Performance Max campaigns.
 
-  **PENDING:** needs a Search campaign in the sandbox (checklist 3.2); then
+  **PENDING:** needs a Search campaign, created in the sandbox UI; then
   pin its ID as `search_campaign_id`. Until then the connector only asks for
   asset groups of Performance Max campaigns, which is what the docs allow.

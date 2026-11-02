@@ -37,4 +37,4 @@ docs: |-
   accepted and the ad shape. Run `Ad Groups / bare` first.
 
   **PENDING:** every `ALL_AD_TYPES` value accepted, and an ad's shape. Needs
-  an ad group with a responsive search ad in the sandbox (checklist 3.2).
+  an ad group with a responsive search ad, created in the sandbox UI.

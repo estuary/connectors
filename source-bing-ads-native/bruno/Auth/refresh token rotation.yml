@@ -70,10 +70,11 @@ settings:
 docs: |-
   **REFERENCE:** https://learn.microsoft.com/en-us/advertising/guides/authentication-oauth-get-tokens?view=bingads-13
 
-  **WHY:** P6. The connector reuses the configured refresh token on every
-  refresh (`BaseOAuth2Credentials`), which is only safe if Microsoft keeps an
-  old refresh token valid after issuing a new one. This shows whether a refresh
-  returns a new refresh token and how long access tokens last. The response is
+  **WHY:** the connector saves each new refresh token back to the config
+  (`RotatingOAuth2Credentials`), and `validate` refreshes without saving, which
+  is only safe if Microsoft keeps an old refresh token valid after issuing a
+  new one. This shows whether a refresh returns a new refresh token and how
+  long access tokens last. The response is
   replaced with booleans and hashes compared in the script; no token is shown.
 
   **DOCUMENTED (2026-10-29):** "Although refresh tokens are not revoked when
@@ -85,12 +86,10 @@ docs: |-
   configured refresh token kept working after dozens of refreshes that day,
   each of which issued a new one, so using a token doesn't revoke it.
 
-  **UNOBSERVABLE:** whether the configured token outlives 90 days of reuse
-  without rotation (P6, explainer 5.7). It can't be observed in a session. The
-  connector relies on Microsoft's "refresh tokens are not revoked when used";
-  if a long-running task starts failing with `invalid_grant`, the fallback is
-  `RotatingOAuth2Credentials` plus a CDK change for mid-run rotation (design
-  doc D8).
+  **UNOBSERVABLE:** how long an unused refresh token stays valid (Airbyte
+  users have had to sign in again about every 90 days). It can't be observed
+  in a session. Saving the rotated token on each refresh keeps it fresh, so
+  only a task stopped for that long should need to sign in again.
 
 examples:
   - name: 200 - new refresh token every refresh (redacted to facts)

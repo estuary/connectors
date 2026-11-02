@@ -45,7 +45,7 @@ docs: |-
   `ReportDownloadUrl: null`, the empty-report case the connector skips.
 
   **PENDING:** a `Pending` status and a non-null download URL. Needs same-day
-  activity on a sandbox entity (checklist 3.9) and a re-run.
+  activity (impressions or clicks) on a sandbox entity and a re-run.
 
 examples:
   - name: 200 - success, no rows

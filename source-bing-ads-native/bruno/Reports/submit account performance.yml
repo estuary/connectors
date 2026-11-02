@@ -106,7 +106,7 @@ settings:
 docs: |-
   **REFERENCE:** https://learn.microsoft.com/en-us/advertising/reporting-service/submitgeneratereport?view=bingads-13
 
-  **WHY:** P1. The body is `_report_request` in `reports.py` for
+  **WHY:** the body is `_report_request` in `reports.py` for
   `account_performance_report_daily`, generated from the connector rather than
   copied, with the dates set to today. It checks Microsoft accepts the
   connector's request shape and every column in its list (a rejected column
@@ -119,7 +119,7 @@ docs: |-
   one day.
 
   **VERIFIED (2026-10-29):** accepted: `200` with a `ReportRequestId`, so the
-  connector's request shape and its Account report columns are valid (P1).
+  connector's request shape and its Account report columns are valid.
 
 examples:
   - name: 200 - job accepted

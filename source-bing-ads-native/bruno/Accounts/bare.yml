@@ -52,8 +52,8 @@ docs: |-
   the docs' `key`/`value`; the connector's `Account` model doesn't read them.
 
   **PENDING:** whether `Inactive`, `Pause` or `Suspended` accounts also come
-  back. The sandbox customer has none; a second account, paused in the UI
-  (checklist 3.2), would show it.
+  back. The sandbox customer has none; a second account, created and paused
+  in the sandbox UI, would show it.
 
 examples:
   - name: 200 - one pending sandbox account
