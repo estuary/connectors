@@ -45,10 +45,7 @@ def _fault(code: int, error_code: str = "") -> bytes:
 
 
 def _http_error(code: int) -> HTTPError:
-    return HTTPError(
-        f"Encountered HTTP error status 400.\nURL: x\nResponse:\n{_fault(code).decode()}",
-        400,
-    )
+    return HTTPError("Encountered HTTP error status 400.", 400, _fault(code))
 
 
 class StubSession:

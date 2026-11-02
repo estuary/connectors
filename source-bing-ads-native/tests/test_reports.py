@@ -239,7 +239,7 @@ async def test_report_faults_name_the_account_and_tracking_id():
             **kwargs: Any,
         ) -> bytes:
             body = {"TrackingId": "t-9", "Errors": [{"Code": 106, "ErrorCode": "UserIsNotAuthorized", "Message": "no"}]}
-            raise HTTPError(f"Encountered HTTP error status 400.\nResponse:\n{dumps(body)}", 400)
+            raise HTTPError("Encountered HTTP error status 400.", 400, dumps(body).encode())
 
     with pytest.raises(HTTPError, match=r"account 1 .*106 UserIsNotAuthorized.*TrackingId t-9"):
         async for _ in fetch_report_rows(

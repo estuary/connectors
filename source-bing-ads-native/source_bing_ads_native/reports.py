@@ -242,7 +242,9 @@ async def fetch_report_rows(
         except HTTPError as err:
             fault = fault_of(err)
             detail = fault.describe() if fault else err.message
-            raise HTTPError(f"{job} failed: {detail}\n\n{err.message}", err.code) from err
+            raise HTTPError(
+                f"{job} failed: {detail}\n\n{err.message}", err.code, err.body
+            ) from err
 
         if status.Status != "Success":
             raise RuntimeError(f"{job} failed with status {status.Status}.")

@@ -67,7 +67,7 @@ class Fault(BaseModel, extra="allow"):
         return f"{messages} (TrackingId {self.TrackingId})"
 
 
-def parse_fault(body: bytes | str) -> Fault | None:
+def parse_fault(body: bytes) -> Fault | None:
     try:
         return Fault.model_validate_json(body)
     except PydanticValidationError:
@@ -76,9 +76,9 @@ def parse_fault(body: bytes | str) -> Fault | None:
 
 def fault_of(err: HTTPError) -> Fault | None:
     """The fault in an `HTTPError`'s response body, if it has one."""
-    if "Response:" not in err.message:
+    if err.body is None:
         return None
-    return parse_fault(err.message.split("Response:", 1)[1].strip())
+    return parse_fault(err.body)
 
 
 def should_retry(
