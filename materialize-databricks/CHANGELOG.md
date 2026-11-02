@@ -11,6 +11,11 @@
   top-level field contains special or non-ASCII characters, or has a custom
   projection name.
 
+### Changed
+- Changing the type of several columns of a table is faster: the temporary
+  columns are added, and the original columns dropped, in one statement each
+  instead of one statement per column.
+
 ## 2026-10-31
 ### Changed
 - Log messages about the sync schedule now say when the next sync is and how

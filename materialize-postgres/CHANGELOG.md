@@ -6,6 +6,11 @@
 - With Exclude Flow Document enabled, documents now load correctly when a
   top-level field has a custom projection name.
 
+### Changed
+- Changing the type of several columns of a table now rewrites the table once
+  instead of once per column, which makes the migration faster and uses less
+  disk I/O and WAL.
+
 ## 2026-10-31
 
 ### Changed

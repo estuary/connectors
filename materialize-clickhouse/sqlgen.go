@@ -279,9 +279,9 @@ var clickHouseDialect = func(database string) sql.Dialect {
 			"datetime64(6, 'utc')": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"*":                    {sql.NewMigrationSpec([]string{"string"})},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s SETTINGS mutations_sync = 1", table.Identifier, m.Identifier, m.NullableDDL)
-		},
+		}),
 	}
 }
 

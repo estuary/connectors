@@ -131,9 +131,15 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"jsonb": {sql.NewMigrationSpec([]string{"json", "text"}, sql.WithDirectCast())},
 			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
-			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
-				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
+		// Postgres rewrites the table for each statement that changes a column's
+		// type, so every column changes in one statement and the table is
+		// rewritten once.
+		DirectCastSQL: func(table sql.Table, migrations []sql.ColumnTypeMigration) []string {
+			clauses := make([]string, len(migrations))
+			for i, m := range migrations {
+				clauses[i] = fmt.Sprintf("ALTER COLUMN %s TYPE %s USING %s", m.Identifier, m.BareDDL, m.CastSQL(m))
+			}
+			return []string{fmt.Sprintf("ALTER TABLE %s\n\t%s", table.Identifier, strings.Join(clauses, ",\n\t"))}
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
