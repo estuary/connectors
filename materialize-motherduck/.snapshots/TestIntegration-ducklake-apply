@@ -157,41 +157,41 @@ Big Schema Materialized Resource Schema With All Fields Required:
 
 Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
-{"Name":"arrayField","Nullable":false,"Type":"JSON"}
-{"Name":"boolField","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"arrayField","Nullable":true,"Type":"JSON"}
+{"Name":"boolField","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
-{"Name":"intField","Nullable":false,"Type":"BIGINT"}
+{"Name":"intField","Nullable":true,"Type":"BIGINT"}
 {"Name":"key","Nullable":false,"Type":"VARCHAR"}
-{"Name":"multipleField","Nullable":false,"Type":"JSON"}
-{"Name":"numField","Nullable":false,"Type":"DOUBLE"}
-{"Name":"objField","Nullable":false,"Type":"JSON"}
-{"Name":"stringDateField","Nullable":false,"Type":"DATE"}
-{"Name":"stringDateTimeField","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
-{"Name":"stringDurationField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringEmailField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringHostnameField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringIdnEmailField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringIdnHostnameField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringIntegerField","Nullable":false,"Type":"HUGEINT"}
-{"Name":"stringIpv4Field","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringIpv6Field","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringIriField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringIriReferenceField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringJsonPointerField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringMacAddr8Field","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringMacAddrField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringNumberField","Nullable":false,"Type":"DOUBLE"}
-{"Name":"stringRegexField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringTimeField","Nullable":false,"Type":"TIME"}
-{"Name":"stringUint32Field","Nullable":false,"Type":"HUGEINT"}
-{"Name":"stringUint64Field","Nullable":false,"Type":"HUGEINT"}
-{"Name":"stringUriField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringUriReferenceField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringUriTemplateField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"stringUuidField","Nullable":false,"Type":"UUID"}
+{"Name":"multipleField","Nullable":true,"Type":"JSON"}
+{"Name":"numField","Nullable":true,"Type":"DOUBLE"}
+{"Name":"objField","Nullable":true,"Type":"JSON"}
+{"Name":"stringDateField","Nullable":true,"Type":"DATE"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"stringDurationField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringEmailField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIdnEmailField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIdnHostnameField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"HUGEINT"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIriField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringNumberField","Nullable":true,"Type":"DOUBLE"}
+{"Name":"stringRegexField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringTimeField","Nullable":true,"Type":"TIME"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"HUGEINT"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"HUGEINT"}
+{"Name":"stringUriField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringUuidField","Nullable":true,"Type":"UUID"}
 
 Big Schema Changed Types With Backfill Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
