@@ -7,6 +7,7 @@ import (
 	stdsql "database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"math"
@@ -533,7 +534,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var group, groupCtx = errgroup.WithContext(loadCtx)
 	group.SetLimit(maxConcurrentLoads)
 	for _, load := range loads {
-		group.Go(func() (err error) {
+		group.Go(func() error {
 			var finishEvaluating = sync.OnceFunc(func() {
 				if evaluating.Add(-1) == 0 {
 					d.be.FinishedEvaluatingLoads()
@@ -541,44 +542,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			rows, trace, err := d.queryLoad(groupCtx, db, script, load)
-			if err != nil {
-				return err
-			}
-			var executeTook = time.Since(trace.started)
-			finishEvaluating()
-			defer rows.Close()
-
-			var docCount, docBytes int
-			var matched, matchedFiles = -1, -1
-			defer func() {
-				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes, "matchedFiles": matchedFiles})
-			}()
-			for rows.Next() {
-				var doc loadedDoc
-				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
-					return fmt.Errorf("scanning Load document: %w", err)
-				} else if doc.binding < 0 {
-					if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
-						return fmt.Errorf("parsing load match counts %q: %w", doc.document, err)
-					}
-					continue
-				}
-				docCount, docBytes = docCount+1, docBytes+len(doc.document)
-				select {
-				case docs <- doc:
-				case <-groupCtx.Done():
-					return groupCtx.Err()
-				}
-			}
-			if err := rows.Err(); err != nil {
-				return fmt.Errorf("querying Loads: %w", err)
-			} else if docCount != matched {
-				// Files rewritten between the script's match and its read of
-				// documents, such as by OPTIMIZE, hide their rows from the read.
-				return fmt.Errorf("load of %s read %d of the %d rows matching its keys, as the table's files changed during the load", load.binding.target.Identifier, docCount, matched)
-			}
-			return nil
+			return d.loadBinding(groupCtx, db, script, load, docs, finishEvaluating)
 		})
 	}
 
@@ -604,6 +568,70 @@ type bindingLoad struct {
 // With usually 256 MB to 1 GB per table file in Databricks, 10,000 files is
 // about 2.5 to 10 TB of table.
 const maxMatchedFiles = 10000
+
+// maxLoadAttempts is how many times a binding's load script runs while its
+// matched files are rewritten during it.
+const maxLoadAttempts = 3
+
+// errLoadFilesRewritten is a load script's read of no documents, as the files
+// it matched were rewritten before the read.
+var errLoadFilesRewritten = errors.New("the files matching its keys were rewritten before they were read")
+
+// loadBinding evaluates a binding's load, rerunning its script while the
+// files it matched are rewritten before it reads them.
+func (d *transactor) loadBinding(ctx context.Context, db *stdsql.DB, script *template.Template, load bindingLoad, docs chan<- loadedDoc, executed func()) error {
+	for attempt := 1; ; attempt++ {
+		var err = d.evaluateLoad(ctx, db, script, load, docs, executed)
+		if !errors.Is(err, errLoadFilesRewritten) {
+			return err
+		} else if attempt == maxLoadAttempts {
+			return fmt.Errorf("load of %s: %w in each of %d attempts", load.binding.target.Identifier, err, attempt)
+		}
+		log.WithFields(load.fields).WithField("attempt", attempt).Info("retrying load, as the files matching its keys were rewritten during it")
+	}
+}
+
+// evaluateLoad runs a binding's load script and sends its documents.
+func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, script *template.Template, load bindingLoad, docs chan<- loadedDoc, executed func()) (err error) {
+	rows, trace, err := d.queryLoad(ctx, db, script, load)
+	if err != nil {
+		return err
+	}
+	var executeTook = time.Since(trace.started)
+	executed()
+	defer rows.Close()
+
+	var docCount, docBytes int
+	var matched, matchedFiles = -1, -1
+	defer func() {
+		trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes, "matchedFiles": matchedFiles})
+	}()
+	for rows.Next() {
+		var doc loadedDoc
+		if err := rows.Scan(&doc.binding, &doc.document); err != nil {
+			return fmt.Errorf("scanning Load document: %w", err)
+		} else if doc.binding < 0 {
+			if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
+				return fmt.Errorf("parsing load match counts %q: %w", doc.document, err)
+			}
+			continue
+		}
+		docCount, docBytes = docCount+1, docBytes+len(doc.document)
+		select {
+		case docs <- doc:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("querying Loads: %w", err)
+	} else if docCount == 0 && matched > 0 {
+		return errLoadFilesRewritten
+	} else if docCount != matched {
+		return fmt.Errorf("load of %s read %d of the %d rows matching its keys, as the table changed during the load", load.binding.target.Identifier, docCount, matched)
+	}
+	return nil
+}
 
 // queryLoad runs a binding's load script, and returns its rows with the trace
 // to finish once they're read.

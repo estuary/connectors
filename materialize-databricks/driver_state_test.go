@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -19,6 +20,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,6 +95,9 @@ var recording struct {
 	// failMatching limits failWith to statements containing it when set.
 	failMatching string
 	attempts     int
+	// results are the rows of successive queries, after which queries return
+	// no rows.
+	results [][][]driver.Value
 }
 
 func (recordingDriver) Open(string) (driver.Conn, error) { return recordingConn{}, nil }
@@ -119,7 +124,26 @@ func (recordingConn) QueryContext(_ context.Context, query string, _ []driver.Na
 		return nil, recording.failWith
 	}
 	recording.executed = append(recording.executed, query)
+	if len(recording.results) > 0 {
+		var rows = &valueRows{rows: recording.results[0]}
+		recording.results = recording.results[1:]
+		return rows, nil
+	}
 	return noRows{}, nil
+}
+
+// valueRows is a recorded query's result of binding and document rows.
+type valueRows struct{ rows [][]driver.Value }
+
+func (*valueRows) Columns() []string { return []string{"binding", "document"} }
+func (*valueRows) Close() error      { return nil }
+func (r *valueRows) Next(dest []driver.Value) error {
+	if len(r.rows) == 0 {
+		return io.EOF
+	}
+	copy(dest, r.rows[0])
+	r.rows = r.rows[1:]
+	return nil
 }
 
 // noRows is the empty result of a recorded statement.
@@ -139,7 +163,7 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	t.Helper()
 	registerRecordingDriver()
 
-	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts = nil, failWith, 0, "", 0
+	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts, recording.results = nil, failWith, 0, "", 0, nil
 	db, err := stdsql.Open("recording", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
@@ -1152,5 +1176,65 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 		// both.
 		require.NotNil(t, d.cp["a_table.v1"])
 		require.NotNil(t, d.cp["b_table.v1"])
+	})
+}
+
+func TestLoadBindingRetriesRewrittenFiles(t *testing.T) {
+	var ctx = context.Background()
+	var d = renderingTransactor(lowerRangeKey)
+	var b = d.bindings[0]
+	var script = template.Must(template.New("loadScript").Parse("BEGIN SELECT doc FROM t; END"))
+	var load = bindingLoad{binding: b, data: &tableWithFiles{Table: &b.target}, fields: log.Fields{}}
+	var doc = func(document string) []driver.Value { return []driver.Value{int64(0), document} }
+	var counts = func(matched string) []driver.Value { return []driver.Value{int64(-1), matched} }
+
+	var run = func(results ...[][]driver.Value) ([]string, int, error) {
+		var db = recordingDB(t, nil)
+		recording.results = results
+		var docs = make(chan loadedDoc, 10)
+		var err = d.loadBinding(ctx, db, script, load, docs, func() {})
+		close(docs)
+		var sent []string
+		for doc := range docs {
+			sent = append(sent, doc.document)
+		}
+		return sent, len(recording.executed), err
+	}
+
+	t.Run("rewritten files read no documents, and the script reruns", func(t *testing.T) {
+		sent, queries, err := run(
+			[][]driver.Value{counts("2 1")},
+			[][]driver.Value{doc(`{"a":1}`), doc(`{"b":2}`), counts("2 1")},
+		)
+		require.NoError(t, err)
+		require.Equal(t, []string{`{"a":1}`, `{"b":2}`}, sent)
+		require.Equal(t, 2, queries)
+	})
+
+	t.Run("files rewritten on every attempt fail the load", func(t *testing.T) {
+		_, queries, err := run(
+			[][]driver.Value{counts("2 1")},
+			[][]driver.Value{counts("2 1")},
+			[][]driver.Value{counts("2 1")},
+		)
+		require.ErrorIs(t, err, errLoadFilesRewritten)
+		require.ErrorContains(t, err, "in each of 3 attempts")
+		require.Equal(t, maxLoadAttempts, queries)
+	})
+
+	t.Run("a read missing rows after sending some fails without a rerun", func(t *testing.T) {
+		sent, queries, err := run(
+			[][]driver.Value{doc(`{"a":1}`), counts("2 1")},
+		)
+		require.ErrorContains(t, err, "read 1 of the 2 rows")
+		require.Equal(t, []string{`{"a":1}`}, sent)
+		require.Equal(t, 1, queries)
+	})
+
+	t.Run("no matching rows read no documents", func(t *testing.T) {
+		sent, queries, err := run([][]driver.Value{counts("0 0")})
+		require.NoError(t, err)
+		require.Empty(t, sent)
+		require.Equal(t, 1, queries)
 	})
 }

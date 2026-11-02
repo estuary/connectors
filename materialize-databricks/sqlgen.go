@@ -213,7 +213,7 @@ to_json(struct(
 {{ define "loadScript" }}
 BEGIN
 {{ template "loadMatch" $ }}
-{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" }}
+{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" $ }}
 {{ template "loadMatchCounts" }}
 END
 {{ end }}
@@ -221,7 +221,7 @@ END
 {{ define "loadScriptNoFlowDocument" }}
 BEGIN
 {{ template "loadMatch" $ }}
-{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" }}
+{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" $ }}
 {{ template "loadMatchCounts" }}
 END
 {{ end }}
@@ -236,10 +236,16 @@ SET (files, matched) = (
 {{- end }}
 
 -- The variable list prunes files as a literal list does. A load matching more
--- than MaxMatchedFiles reads every file within its key bounds.
+-- than MaxMatchedFiles reads every file within its key bounds. The read returns
+-- no documents if a matched file was rewritten since the match, such as by
+-- OPTIMIZE, as its rows would be missing from the read.
 
 {{ define "loadMatchedFiles" -}}
 AND (size(files) > {{ MaxMatchedFiles }} OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > {{ MaxMatchedFiles }} OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM {{ $.Table.Identifier }}
+		WHERE size(files) <= {{ MaxMatchedFiles }} AND array_contains(files, _metadata.file_path)
+	)
 {{- end }}
 
 {{ define "loadMatchCounts" -}}

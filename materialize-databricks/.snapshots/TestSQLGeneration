@@ -84,6 +84,10 @@ SELECT 0, l.flow_document
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScript ---
@@ -130,6 +134,10 @@ SELECT 0, l.flow_document
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScript ---
@@ -176,6 +184,10 @@ SELECT 0, l.flow_document
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScript ---
@@ -222,6 +234,10 @@ SELECT 0, l.flow_document
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScript ---
@@ -285,6 +301,10 @@ FROM `a-schema`.key_value AS l
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
@@ -358,6 +378,10 @@ FROM `a-schema`.key_value AS l
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
@@ -431,6 +455,10 @@ FROM `a-schema`.key_value AS l
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
@@ -504,6 +532,10 @@ FROM `a-schema`.key_value AS l
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
@@ -766,6 +798,10 @@ SELECT 0, l.flow_document
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value ---
@@ -829,6 +865,10 @@ FROM `a-schema`.key_value AS l
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value ---
@@ -865,6 +905,10 @@ SELECT 0, l.flow_document
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value ---
@@ -928,6 +972,10 @@ FROM `a-schema`.key_value AS l
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	AND (size(files) > 10000 OR array_contains(files, l._metadata.file_path))
+	WHERE size(files) > 10000 OR size(files) = (
+		SELECT count(DISTINCT _metadata.file_path) FROM `a-schema`.key_value
+		WHERE size(files) <= 10000 AND array_contains(files, _metadata.file_path)
+	)
 UNION ALL SELECT -1, concat(matched, ' ', size(files));
 END
 --- End `a-schema`.key_value ---
