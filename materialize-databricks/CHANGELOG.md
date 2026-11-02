@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-02
+### Fixed
+- A load of many bindings no longer runs out of memory, restarting the task,
+  while it reads the documents its queries return. Each load query now
+  downloads two files of its results at a time, instead of ten, so the
+  queries that run at once hold no more results in memory than a single
+  query did before loads ran concurrently.
+
 ## 2026-10-29
 ### Fixed
 - Load, staging and commit queries now carry the `materialization_name` query

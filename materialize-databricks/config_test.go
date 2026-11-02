@@ -24,13 +24,13 @@ func TestDatabricksConfig(t *testing.T) {
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI("my-materialization")
-	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&query_tags=materialization_name%3Amy-materialization&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&maxDownloadThreads=2&query_tags=materialization_name%3Amy-materialization&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noPort = validConfig
 	noPort.Address = "db-something.cloud.databricks.com"
 	require.NoError(t, noPort.Validate())
 	uri = noPort.ToURI("")
-	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&maxDownloadThreads=2&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""
@@ -66,7 +66,7 @@ func TestDatabricksConfig(t *testing.T) {
 	}
 	require.NoError(t, validOAuthConfig.Validate())
 	var oauthUri = validOAuthConfig.ToURI("")
-	require.Equal(t, "db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?authType=OauthM2M&catalog=mycatalog&clientID=my-client-id&clientSecret=my-client-secret&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", oauthUri)
+	require.Equal(t, "db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?authType=OauthM2M&catalog=mycatalog&clientID=my-client-id&clientSecret=my-client-secret&maxDownloadThreads=2&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", oauthUri)
 
 	var noClientID = validOAuthConfig
 	noClientID.Credentials.ClientID = ""

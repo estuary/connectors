@@ -52,6 +52,11 @@ const maxConcurrentCommits = 5
 // maxConcurrentLoads is how many bindings' load queries run at once.
 const maxConcurrentLoads = 5
 
+// maxDownloadThreads is how many result files a query downloads ahead and
+// holds in memory, so concurrent loads together hold no more than the driver's
+// default of 10 for a single query.
+const maxDownloadThreads = 2
+
 // maxBoundRanges is the most ranges a date-time key's merge bound splits into.
 const maxBoundRanges = 8
 
