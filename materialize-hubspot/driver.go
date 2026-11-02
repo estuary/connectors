@@ -160,7 +160,7 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 	actions := []string{}
 	for _, b := range mapped {
 		for _, field := range b.fields {
-			if _, ok := schema.GetProperty(b.object, field.Property.Name); !ok {
+			if _, ok := schema.GetProperty(b.objectName, field.Property.Name); !ok {
 				return nil, fmt.Errorf("unable to locate required property: %q", field.Property.Name)
 			}
 		}
@@ -174,9 +174,9 @@ func (*Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_A
 // mappedBinding is a binding free from the actual schema with which it may or
 // may not be compatible.
 type mappedBinding struct {
-	object   CRMObject
-	fields   []*MappedField
-	docField *MappedField
+	objectName ObjectName
+	fields     []*MappedField
+	docField   *MappedField
 }
 
 func (m *mappedBinding) Key() *MappedField {
@@ -213,22 +213,23 @@ func (m *materialization) NewTransactor(
 ) (m.Transactor, error) {
 	var bindings []*binding
 	for _, mapped := range mappedBindings {
-		idProperty, ok := schema.GetProperty(mapped.object, mapped.Key().Property.Name)
+		idProperty, ok := schema.GetProperty(mapped.objectName, mapped.Key().Property.Name)
 		if !ok {
 			return nil, fmt.Errorf("property not found: %q", mapped.Key().Property.Name)
 		}
 
-		properties := schema.CRM.Objects[mapped.object].Properties
+		objectSchema := schema.CRM.Objects[mapped.objectName]
+		properties := objectSchema.Properties
 
 		log.WithFields(log.Fields{
-			"object":          mapped.object,
+			"object":          mapped.objectName,
 			"id_property":     idProperty.Name,
 			"unique_property": idProperty.HasUniqueValue,
 		}).Info("add binding")
 
 		bindings = append(bindings, &binding{
-			object:     mapped.object,
-			path:       []string{"crm", mapped.object.String()},
+			object:     objectSchema.ObjectTypeID,
+			path:       []string{"crm", mapped.objectName.String()},
 			properties: properties,
 			idProperty: idProperty,
 			fields:     mapped.fields,
@@ -345,7 +346,7 @@ func (*Driver) NewTransactor(
 // A Request_Validate_Binding is similar but doesn't have the field selection
 // and some other pieces of information.
 func buildMappedBinding(resource Resource, b *pf.MaterializationSpec_Binding) (*mappedBinding, error) {
-	object, err := resource.CRMObject()
+	objectName, err := resource.ObjectName()
 	if err != nil {
 		return nil, err
 	}
@@ -358,8 +359,8 @@ func buildMappedBinding(resource Resource, b *pf.MaterializationSpec_Binding) (*
 	fields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
 
 	mappedBinding := &mappedBinding{
-		object: object,
-		fields: make([]*MappedField, 0, len(fields)),
+		objectName: objectName,
+		fields:     make([]*MappedField, 0, len(fields)),
 	}
 
 	mapField := func(field string) (*MappedField, error) {

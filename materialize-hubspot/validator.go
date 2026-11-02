@@ -63,7 +63,7 @@ func (v *Validator) ValidateBinding(
 		}
 	}
 
-	object, err := resource.CRMObject()
+	objectName, err := resource.ObjectName()
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (v *Validator) ValidateBinding(
 	constraints := make(map[string][]*pm.Response_Validated_Constraint)
 	keys := []string{}
 	for _, projection := range binding.Collection.Projections {
-		constraint, err := v.NewConstraint(projection, object, binding, lastBinding, keys)
+		constraint, err := v.NewConstraint(projection, objectName, binding, lastBinding, keys)
 		if err != nil {
 			return nil, err
 		}
@@ -87,14 +87,14 @@ func (v *Validator) ValidateBinding(
 
 func (v *Validator) NewConstraint(
 	projection pf.Projection,
-	object CRMObject,
+	objectName ObjectName,
 	binding *pm.Request_Validate_Binding,
 	lastBinding *pf.MaterializationSpec_Binding,
 	keys []string,
 ) (*pm.Response_Validated_Constraint, error) {
-	objectSchema, ok := v.schema.CRM.Objects[object]
+	objectSchema, ok := v.schema.CRM.Objects[objectName]
 	if !ok {
-		return nil, fmt.Errorf("no properties loaded for object: %q", object)
+		return nil, fmt.Errorf("no properties loaded for object: %q", objectName)
 	}
 
 	name, err := PropertyName(projection.Field)

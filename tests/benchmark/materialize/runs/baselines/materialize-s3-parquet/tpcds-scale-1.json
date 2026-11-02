@@ -1,0 +1,251 @@
+{
+  "connector": "materialize-s3-parquet",
+  "scenario": "tpcds-scale-1.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 0.117598208,
+  "wall_seconds": 141.150060032,
+  "rounds_observed": 6,
+  "scenario_transactions": 6,
+  "total_docs": 19557335,
+  "total_bytes": 6371608799,
+  "observed_docs": 19557335,
+  "observed_bytes": 6371608799,
+  "docs_per_sec": 138557.04344416273,
+  "mb_per_sec": 43.0495011083721,
+  "tpcds": {
+    "scale": 1.0,
+    "transaction_size": 1073741824,
+    "complete": true,
+    "tables": {
+      "call_center": {
+        "docs": 6,
+        "bytes": 5158
+      },
+      "catalog_page": {
+        "docs": 11718,
+        "bytes": 4311878
+      },
+      "catalog_returns": {
+        "docs": 144067,
+        "bytes": 108673180
+      },
+      "catalog_sales": {
+        "docs": 1441548,
+        "bytes": 1332481190
+      },
+      "customer": {
+        "docs": 100000,
+        "bytes": 50706453
+      },
+      "customer_address": {
+        "docs": 50000,
+        "bytes": 18859013
+      },
+      "customer_demographics": {
+        "docs": 1920800,
+        "bytes": 532048096
+      },
+      "date_dim": {
+        "docs": 73049,
+        "bytes": 44431321
+      },
+      "household_demographics": {
+        "docs": 7200,
+        "bytes": 1188453
+      },
+      "income_band": {
+        "docs": 20,
+        "bytes": 2528
+      },
+      "inventory": {
+        "docs": 11745000,
+        "bytes": 1702204227
+      },
+      "item": {
+        "docs": 18000,
+        "bytes": 11950650
+      },
+      "promotion": {
+        "docs": 300,
+        "bytes": 153687
+      },
+      "reason": {
+        "docs": 35,
+        "bytes": 4979
+      },
+      "ship_mode": {
+        "docs": 20,
+        "bytes": 4093
+      },
+      "store": {
+        "docs": 12,
+        "bytes": 9347
+      },
+      "store_returns": {
+        "docs": 287514,
+        "bytes": 148570716
+      },
+      "store_sales": {
+        "docs": 2880404,
+        "bytes": 1687122709
+      },
+      "time_dim": {
+        "docs": 86400,
+        "bytes": 19630180
+      },
+      "warehouse": {
+        "docs": 5,
+        "bytes": 1870
+      },
+      "web_page": {
+        "docs": 60,
+        "bytes": 22517
+      },
+      "web_returns": {
+        "docs": 71763,
+        "bytes": 48070455
+      },
+      "web_sales": {
+        "docs": 719384,
+        "bytes": 661132283
+      },
+      "web_site": {
+        "docs": 30,
+        "bytes": 23816
+      }
+    }
+  },
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "24 tables",
+      "doc_count": 2200559,
+      "doc_size": 487,
+      "bytes": 1073741825,
+      "tables": {
+        "income_band": 20,
+        "promotion": 300,
+        "ship_mode": 20,
+        "call_center": 6,
+        "inventory": 480000,
+        "reason": 35,
+        "warehouse": 5,
+        "web_page": 60,
+        "customer_demographics": 460000,
+        "store": 12,
+        "web_site": 30,
+        "household_demographics": 7200,
+        "customer": 100000,
+        "customer_address": 50000,
+        "date_dim": 73049,
+        "store_returns": 28957,
+        "store_sales": 274747,
+        "time_dim": 86400,
+        "catalog_page": 11718,
+        "catalog_returns": 28259,
+        "catalog_sales": 281741,
+        "item": 18000,
+        "web_returns": 26928,
+        "web_sales": 273072
+      },
+      "wall_seconds": 28.981189888,
+      "mb_per_sec": 35.333262882269494,
+      "docs_per_sec": 75930.59527590919
+    },
+    {
+      "index": 1,
+      "collection": "8 tables",
+      "doc_count": 2125626,
+      "doc_size": 505,
+      "bytes": 1073742347,
+      "tables": {
+        "store_sales": 334639,
+        "web_returns": 32918,
+        "web_sales": 327082,
+        "catalog_returns": 31959,
+        "catalog_sales": 318221,
+        "inventory": 528750,
+        "customer_demographics": 520400,
+        "store_returns": 31657
+      },
+      "wall_seconds": 21.841986304,
+      "mb_per_sec": 46.882205881803834,
+      "docs_per_sec": 97318.34689461035
+    },
+    {
+      "index": 2,
+      "collection": "8 tables",
+      "doc_count": 2440162,
+      "doc_size": 440,
+      "bytes": 1073742394,
+      "tables": {
+        "catalog_returns": 40713,
+        "catalog_sales": 409107,
+        "customer_demographics": 690000,
+        "inventory": 740000,
+        "store_returns": 39940,
+        "store_sales": 389255,
+        "web_returns": 11917,
+        "web_sales": 119230
+      },
+      "wall_seconds": 21.74121984,
+      "mb_per_sec": 47.09949814823088,
+      "docs_per_sec": 112236.66463785687
+    },
+    {
+      "index": 3,
+      "collection": "6 tables",
+      "doc_count": 2837108,
+      "doc_size": 378,
+      "bytes": 1073741919,
+      "tables": {
+        "store_sales": 556286,
+        "catalog_returns": 43136,
+        "catalog_sales": 432479,
+        "customer_demographics": 250400,
+        "inventory": 1500288,
+        "store_returns": 54519
+      },
+      "wall_seconds": 22.265854976,
+      "mb_per_sec": 45.98970449159994,
+      "docs_per_sec": 127419.6747916517
+    },
+    {
+      "index": 4,
+      "collection": "3 tables",
+      "doc_count": 4568749,
+      "doc_size": 235,
+      "bytes": 1073742245,
+      "tables": {
+        "inventory": 3622212,
+        "store_returns": 86406,
+        "store_sales": 860131
+      },
+      "wall_seconds": 24.095617024,
+      "mb_per_sec": 42.49737205222636,
+      "docs_per_sec": 189609.1307995716
+    },
+    {
+      "index": 5,
+      "collection": "3 tables",
+      "doc_count": 5385131,
+      "doc_size": 186,
+      "bytes": 1002898069,
+      "tables": {
+        "store_sales": 465346,
+        "inventory": 4873750,
+        "store_returns": 46035
+      },
+      "wall_seconds": 22.224192,
+      "mb_per_sec": 43.0359011647633,
+      "docs_per_sec": 242309.41669330432
+    }
+  ],
+  "environment": {
+    "machine": "c3-standard-22-lssd",
+    "flowctl": "flowctl dev",
+    "flow_commit": "a15bc3fcb0f",
+    "connectors_commit": "b223d678e"
+  }
+}

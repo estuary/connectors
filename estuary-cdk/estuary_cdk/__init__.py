@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
-from typing import Any, ClassVar, TypeVar, Callable, AsyncGenerator, Generic
+from typing import Any, Awaitable, ClassVar, TypeVar, Callable, AsyncGenerator, Generic
 import abc
 from types import FrameType
 import asyncio
@@ -39,6 +39,23 @@ class Mixin:
     # return self.
     async def _mixin_enter(self, log: Logger, /) -> Any: ...
     async def _mixin_exit(self, log: Logger, /) -> Any: ...
+
+
+# Walks the MRO rather than the direct bases: BaseCaptureConnector already
+# mixes in HTTPMixin, so a connector that lists its own HTTPMixin subclass
+# would otherwise open a second session and never close it.
+def _mixin_hooks(
+    cls: type, hook: str
+) -> list[Callable[[Any, Logger], Awaitable[Any]]]:
+    definers = [c for c in cls.__mro__ if c is not Mixin and hook in c.__dict__]
+    # Skip a hook that a subclass overrides, so an override that calls super()
+    # doesn't run its parent twice, and one that doesn't really replaces it.
+    return [
+        f
+        for c in definers
+        if not any(d is not c and issubclass(d, c) for d in definers)
+        if (f := getattr(c, hook)) is not None
+    ]
 
 
 @dataclass
@@ -139,10 +156,8 @@ class BaseConnector(Generic[Request], abc.ABC):
 
         signal.signal(signal.SIGQUIT, dump_all_tasks)
 
-        # Call _mixin_enter() on all mixed-in base classes.
-        for base in self.__class__.__bases__:
-            if enter := getattr(base, "_mixin_enter", None):
-                await enter(self, log)
+        for enter in _mixin_hooks(type(self), "_mixin_enter"):
+            await enter(self, log)
 
         failed = False
         try:
@@ -170,10 +185,8 @@ class BaseConnector(Generic[Request], abc.ABC):
                     failed = True
 
         finally:
-            # Call _mixin_exit() on all mixed-in base classes, in reverse order.
-            for base in reversed(self.__class__.__bases__):
-                if exit := getattr(base, "_mixin_exit", None):
-                    await exit(self, log)
+            for exit in reversed(_mixin_hooks(type(self), "_mixin_exit")):
+                await exit(self, log)
 
             await self.exit(log)
 

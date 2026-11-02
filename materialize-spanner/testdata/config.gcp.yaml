@@ -1,0 +1,7 @@
+# A real Cloud Spanner database for benchmarks, which the emulator can't stand
+# in for. No credentials: the connector uses application default credentials,
+# such as a benchmark VM's service account.
+project_id: estuary-theatre
+instance_id: connectors-test
+database: flow_bench
+hardDelete: true

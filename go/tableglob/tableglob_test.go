@@ -28,8 +28,8 @@ func TestCompileErrors(t *testing.T) {
 			if err == nil {
 				t.Fatalf("Compile(%q) returned no error, want one wrapping %q", tc.pattern, tc.causeWant)
 			}
-			var ipe *InvalidPatternError
-			if !errors.As(err, &ipe) {
+			var ipe, ok = errors.AsType[*InvalidPatternError](err)
+			if !ok {
 				t.Fatalf("Compile(%q) error = %v, want *InvalidPatternError", tc.pattern, err)
 			}
 			if ipe.Pattern != tc.pattern {

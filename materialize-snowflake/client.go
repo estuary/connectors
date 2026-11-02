@@ -276,8 +276,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 
 // connectError maps a connection failure to a readable error.
 func connectError(err error, cfg config) error {
-	var sfError *sf.SnowflakeError
-	if errors.As(err, &sfError) {
+	if sfError, ok := errors.AsType[*sf.SnowflakeError](err); ok {
 		switch sfError.Number {
 		case 390100:
 			err = fmt.Errorf("incorrect username or password")

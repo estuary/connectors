@@ -49,6 +49,29 @@ func parseConfig(filename string) (*hubspot.Config, error) {
 	return &config, nil
 }
 
+func ResolveObjectTypeID(ctx context.Context, client *hubspot.Client, object hubspot.CRMObject, customObjectName string) (hubspot.ObjectTypeID, error) {
+	objectTypeID := hubspot.ObjectTypeID(object.String())
+	if object == hubspot.CustomObjectObject {
+		objectTypeIDs, err := client.GetCustomObjectTypeIDs(ctx)
+		if err != nil {
+			return hubspot.ObjectTypeID(""), err
+		}
+
+		objectName, err := hubspot.CustomObjectName(customObjectName)
+		if err != nil {
+			return hubspot.ObjectTypeID(""), err
+		}
+
+		if id, ok := objectTypeIDs[objectName]; ok {
+			objectTypeID = id
+		} else {
+			return hubspot.ObjectTypeID(""), fmt.Errorf("definition not found for Custom Object: %q", customObjectName)
+		}
+	}
+
+	return objectTypeID, nil
+}
+
 type AuthCmd struct {
 	// RedirectHost must match the app's setting.
 	RedirectHost string `arg:"--redirect-host" default:"localhost:3000"`
@@ -151,8 +174,9 @@ func (*InspectTokensCmd) Run(ctx context.Context, client *hubspot.Client) error 
 }
 
 type GetPropertyCmd struct {
-	Object string `arg:"positional,required"`
-	Name   string `arg:"--name,required"`
+	Object           string `arg:"positional,required"`
+	Name             string `arg:"--name,required"`
+	CustomObjectName string `arg:"--custom-object-name"`
 }
 
 func (c *GetPropertyCmd) Run(ctx context.Context, client *hubspot.Client) error {
@@ -161,7 +185,12 @@ func (c *GetPropertyCmd) Run(ctx context.Context, client *hubspot.Client) error 
 		return err
 	}
 
-	property, err := client.GetProperty(ctx, object, c.Name)
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	property, err := client.GetProperty(ctx, objectTypeID, c.Name)
 	if err != nil {
 		return err
 	}
@@ -176,7 +205,8 @@ func (c *GetPropertyCmd) Run(ctx context.Context, client *hubspot.Client) error 
 }
 
 type ListPropertiesCmd struct {
-	Object string `arg:"positional,required"`
+	Object           string `arg:"positional,required"`
+	CustomObjectName string `arg:"--custom-object-name"`
 }
 
 func (c *ListPropertiesCmd) Run(ctx context.Context, client *hubspot.Client) error {
@@ -185,7 +215,12 @@ func (c *ListPropertiesCmd) Run(ctx context.Context, client *hubspot.Client) err
 		return err
 	}
 
-	properties, err := client.ListProperties(ctx, object)
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	properties, err := client.ListProperties(ctx, objectTypeID)
 	if err != nil {
 		return err
 	}
@@ -200,7 +235,8 @@ func (c *ListPropertiesCmd) Run(ctx context.Context, client *hubspot.Client) err
 }
 
 type ListPropertyGroupsCmd struct {
-	Object string `arg:"positional,required"`
+	Object           string `arg:"positional,required"`
+	CustomObjectName string `arg:"--custom-object-name"`
 }
 
 func (c *ListPropertyGroupsCmd) Run(ctx context.Context, client *hubspot.Client) error {
@@ -209,7 +245,12 @@ func (c *ListPropertyGroupsCmd) Run(ctx context.Context, client *hubspot.Client)
 		return err
 	}
 
-	groups, err := client.ListPropertyGroups(ctx, object)
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	groups, err := client.ListPropertyGroups(ctx, objectTypeID)
 	if err != nil {
 		return err
 	}
@@ -224,14 +265,20 @@ func (c *ListPropertyGroupsCmd) Run(ctx context.Context, client *hubspot.Client)
 }
 
 type BatchReadCmd struct {
-	Object     string   `arg:"positional,required"`
-	IDProperty string   `arg:"--idproperty,required"`
-	Inputs     []string `arg:"--inputs,separate,required"`
-	Properties []string `arg:"--properties,separate"`
+	Object           string   `arg:"positional,required"`
+	IDProperty       string   `arg:"--idproperty,required"`
+	Inputs           []string `arg:"--inputs,separate,required"`
+	Properties       []string `arg:"--properties,separate"`
+	CustomObjectName string   `arg:"--custom-object-name"`
 }
 
 func (c *BatchReadCmd) Run(ctx context.Context, client *hubspot.Client) error {
 	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
 	if err != nil {
 		return err
 	}
@@ -242,7 +289,7 @@ func (c *BatchReadCmd) Run(ctx context.Context, client *hubspot.Client) error {
 		Properties: c.Properties,
 	}
 
-	batch, err := client.BatchRead(ctx, object, read)
+	batch, err := client.BatchRead(ctx, objectTypeID, read)
 	if err != nil {
 		return err
 	}
@@ -257,14 +304,20 @@ func (c *BatchReadCmd) Run(ctx context.Context, client *hubspot.Client) error {
 }
 
 type SearchEqualCmd struct {
-	Object     string   `arg:"positional,required"`
-	IDProperty string   `arg:"--idproperty,required"`
-	Values     []string `arg:"--values,separate,required"`
-	Properties []string `arg:"--properties,separate"`
+	Object           string   `arg:"positional,required"`
+	IDProperty       string   `arg:"--idproperty,required"`
+	Values           []string `arg:"--values,separate,required"`
+	Properties       []string `arg:"--properties,separate"`
+	CustomObjectName string   `arg:"--custom-object-name"`
 }
 
 func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error {
 	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
 	if err != nil {
 		return err
 	}
@@ -276,7 +329,7 @@ func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error 
 		request.Properties = c.Properties
 	}
 
-	results, err := client.Search(ctx, object, request)
+	results, err := client.Search(ctx, objectTypeID, request)
 	if err != nil {
 		return err
 	}

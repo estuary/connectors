@@ -35,6 +35,9 @@ from .utils import format_error_message
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
 
+SERVER_ERROR_INITIAL_BACKOFF = 1.0
+SERVER_ERROR_MAX_BACKOFF = 30.0
+
 T = TypeVar("T")
 
 Headers = CIMultiDictProxy[str]
@@ -618,6 +621,7 @@ class HTTPMixin(Mixin, HTTPSession):
         if headers is None:
             headers = {}
         attempt = 0
+        server_error_backoff = SERVER_ERROR_INITIAL_BACKOFF
 
         while True:
             cur_delay = self.rate_limiter.delay
@@ -642,6 +646,7 @@ class HTTPMixin(Mixin, HTTPSession):
             )
 
             should_release_response = True
+            sleep_for = 0.0
             try:
                 self.rate_limiter.update(log, cur_delay, resp.status == 429)
 
@@ -662,12 +667,17 @@ class HTTPMixin(Mixin, HTTPSession):
                     if should_retry is None or should_retry(
                         resp.status, resp.headers, body, attempt
                     ):
+                        sleep_for = server_error_backoff
+                        server_error_backoff = min(
+                            server_error_backoff * 2, SERVER_ERROR_MAX_BACKOFF
+                        )
                         log.warning(
                             "server internal error (will retry)",
                             {
                                 "status_code": resp.status,
                                 "content_type": resp.content_type,
                                 "body": format_error_body(body),
+                                "sleep_for": sleep_for,
                             },
                         )
                     else:
@@ -700,3 +710,6 @@ class HTTPMixin(Mixin, HTTPSession):
             finally:
                 if should_release_response:
                     await resp.release()
+
+            if sleep_for:
+                await asyncio.sleep(sleep_for)

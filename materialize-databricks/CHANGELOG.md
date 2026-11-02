@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-10-30
+## 2026-11-02
 ### Changed
 - Every load runs as one SQL script, replacing the `two_phase_loads` feature
   flag. The script first finds the files holding rows that match its keys,
@@ -12,6 +12,12 @@
 - A MERGE of fewer than 100,000 rows reads them straight from the staged
   files, instead of first copying them into a staging table. This saves a
   query of a few seconds from each commit of small batches.
+
+## 2026-10-31
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
 
 ## 2026-10-29
 ### Fixed

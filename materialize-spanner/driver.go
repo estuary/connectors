@@ -990,7 +990,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Route to partition based on hash
 			partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
-			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values), mutationSize); err != nil {
+			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerValues), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding store mutation: %w", err)
 			}
 

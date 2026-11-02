@@ -63,8 +63,7 @@ func dryRunPartitionBy(ctx context.Context, bq *client, dialect sql.Dialect, tpl
 	if err == nil && job != nil && job.LastStatus() != nil {
 		err = job.LastStatus().Err()
 	}
-	var gErr *googleapi.Error
-	if errors.As(err, &gErr) && gErr.Code == 404 {
+	if gErr, ok := errors.AsType[*googleapi.Error](err); ok && gErr.Code == 404 {
 		log.WithFields(log.Fields{
 			"dataset": rc.Dataset,
 			"table":   rc.Table,

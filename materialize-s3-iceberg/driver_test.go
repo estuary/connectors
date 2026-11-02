@@ -7,11 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"iter"
 	"math"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -42,13 +39,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
-)
-
-const (
-	polarisCatalogURL    = "http://localhost:9700/api/catalog"
-	polarisManagementURL = "http://localhost:9700/api/management/v1"
-	polarisClientID      = "root"
-	polarisClientSecret  = "s3cr3t"
 )
 
 func TestSpec(t *testing.T) {
@@ -132,10 +122,6 @@ func TestIntegration(t *testing.T) {
 	})
 
 	cfg := loadTestConfig(t)
-
-	// Create the rustfs bucket and the Polaris catalog backed by it.
-	createTestBucket(t, cfg)
-	createTestWarehouse(t, cfg)
 	ensureNamespace(t, cfg)
 
 	d := true
@@ -1161,162 +1147,6 @@ func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
 	require.NoError(t, sopsCmd.Wait())
 
 	return out
-}
-
-func createTestBucket(t *testing.T, cfg config) {
-	t.Helper()
-
-	ctx := context.Background()
-	client := s3.New(s3.Options{
-		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
-		BaseEndpoint: aws.String(cfg.S3Endpoint),
-		UsePathStyle: true,
-	})
-
-	if _, err := client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(cfg.Bucket)}); err != nil {
-		// Tolerate already-exists; rustfs bucket persists across container restarts
-		// only when /data is a volume. Even so, surface unexpected errors.
-		if !strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") &&
-			!strings.Contains(err.Error(), "BucketAlreadyExists") {
-			t.Fatalf("creating rustfs bucket %q: %v", cfg.Bucket, err)
-		}
-	}
-
-	t.Cleanup(func() {
-		// Best-effort wipe so reruns start clean.
-		paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(cfg.Bucket)})
-		for paginator.HasMorePages() {
-			page, err := paginator.NextPage(ctx)
-			if err != nil {
-				return
-			}
-			for _, obj := range page.Contents {
-				_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(cfg.Bucket), Key: obj.Key})
-			}
-		}
-	})
-}
-
-func polarisToken(t *testing.T) string {
-	t.Helper()
-
-	form := url.Values{}
-	form.Set("grant_type", "client_credentials")
-	form.Set("client_id", polarisClientID)
-	form.Set("client_secret", polarisClientSecret)
-	form.Set("scope", "PRINCIPAL_ROLE:ALL")
-
-	var resp *http.Response
-	var err error
-	for i := 0; i < 30; i++ {
-		resp, err = http.Post(
-			polarisCatalogURL+"/v1/oauth/tokens",
-			"application/x-www-form-urlencoded",
-			strings.NewReader(form.Encode()),
-		)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			break
-		}
-		if resp != nil {
-			resp.Body.Close()
-		}
-		time.Sleep(time.Second)
-	}
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equalf(t, http.StatusOK, resp.StatusCode, "token response: %s", body)
-
-	tok := gjson.GetBytes(body, "access_token").String()
-	require.NotEmpty(t, tok, "missing access_token in response: %s", body)
-	return tok
-}
-
-func createTestWarehouse(t *testing.T, cfg config) {
-	t.Helper()
-
-	token := polarisToken(t)
-
-	baseLocation := "s3://" + cfg.Bucket + "/" + cfg.Prefix
-
-	body, err := json.Marshal(map[string]any{
-		"catalog": map[string]any{
-			"name":     cfg.Catalog.Warehouse,
-			"type":     "INTERNAL",
-			"readOnly": false,
-			"properties": map[string]any{
-				"default-base-location": baseLocation,
-				"s3.endpoint":           cfg.S3Endpoint,
-				"s3.access-key-id":      cfg.Credentials.AWSAccessKeyID,
-				"s3.secret-access-key":  cfg.Credentials.AWSSecretAccessKey,
-				"s3.region":             cfg.Region,
-				"s3.path-style-access":  "true",
-			},
-			"storageConfigInfo": map[string]any{
-				"storageType":      "S3",
-				"allowedLocations": []string{baseLocation + "/"},
-				"roleArn":          "arn:aws:iam::000000000000:role/dummy",
-				"region":           cfg.Region,
-				// Client-visible endpoint (host port mapped from rustfs).
-				"endpoint": cfg.S3Endpoint,
-				// Polaris-side endpoint uses the docker-network name.
-				"endpointInternal": "http://rustfs:9000",
-				"pathStyleAccess":  true,
-				// Disable STS-based credential vending: rustfs has no STS.
-				// Clients will use the s3.* properties on the catalog instead.
-				"stsUnavailable": true,
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	// Drop a previous catalog if one exists from an earlier failed run.
-	delReq, _ := http.NewRequest(http.MethodDelete, polarisManagementURL+"/catalogs/"+cfg.Catalog.Warehouse, nil)
-	delReq.Header.Set("Authorization", "Bearer "+token)
-	if delResp, err := http.DefaultClient.Do(delReq); err == nil {
-		delResp.Body.Close()
-	}
-
-	req, err := http.NewRequest(http.MethodPost, polarisManagementURL+"/catalogs", bytes.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		t.Fatalf("creating polaris catalog failed with status %d: %s", resp.StatusCode, respBody)
-	}
-
-	// Grant the bootstrap principal full access on the catalog so the
-	// connector (using the same OAuth client) can read/write everything.
-	grantPrincipalRole(t, token, "service_admin", cfg.Catalog.Warehouse, "catalog_admin")
-}
-
-func grantPrincipalRole(t *testing.T, token, principalRole, catalog, catalogRole string) {
-	t.Helper()
-
-	url := polarisManagementURL + "/principal-roles/" + principalRole + "/catalog-roles/" + catalog
-	body, err := json.Marshal(map[string]any{
-		"catalogRole": map[string]any{"name": catalogRole},
-	})
-	require.NoError(t, err)
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
-	require.Truef(t, resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusNoContent,
-		"granting principal role failed: status %d body %s", resp.StatusCode, respBody)
 }
 
 // TestMapTypeIgnoreStringFormatOnNonStringField guards against a regression

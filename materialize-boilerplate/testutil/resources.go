@@ -111,6 +111,14 @@ func DropResource(ctx context.Context, m ResourceDeleter, path []string) (string
 		}
 	}
 
+	// A connector which batches DDL, such as materialize-spanner, runs it only
+	// when flushed, as Apply does.
+	if flusher, ok := m.(boilerplate.DDLFlusher); ok {
+		if err := flusher.FlushDDL(ctx); err != nil {
+			return "", fmt.Errorf("deleting %s: flushing DDL: %w", strings.Join(path, "."), err)
+		}
+	}
+
 	return desc, nil
 }
 
@@ -290,8 +298,7 @@ func ReadConfigFile(path string) (json.RawMessage, error) {
 		}
 
 		if err := sopsCmd.Wait(); err != nil {
-			var exitErr *exec.ExitError
-			if errors.As(err, &exitErr) {
+			if _, ok := errors.AsType[*exec.ExitError](err); ok {
 				return nil, fmt.Errorf("decrypting %s with sops: %s", path, strings.TrimSpace(sopsStderr.String()))
 			}
 			return nil, fmt.Errorf("decrypting %s with sops (is it installed?): %w", path, err)

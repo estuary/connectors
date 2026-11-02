@@ -435,12 +435,11 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 
 	// Ping the primary
 	if err := client.Ping(pingCtx, readpref.Primary()); err != nil {
-		var mongoErr mongoDriver.Error
 		client.Disconnect(ctx) // ignore error result
 
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", redactedAddress(cfg.Address)))
-		} else if errors.As(err, &mongoErr) {
+		} else if mongoErr, ok := errors.AsType[mongoDriver.Error](err); ok {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
 				// An auth error can occur for any of these reasons, and the mongo driver gives us no way to tell them apart:

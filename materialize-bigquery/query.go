@@ -52,8 +52,7 @@ func (c client) queryIdempotent(
 
 		job, err := q.Run(ctx)
 		if err != nil {
-			var e *googleapi.Error
-			if errors.As(err, &e) && e.Code == 409 {
+			if e, ok := errors.AsType[*googleapi.Error](err); ok && e.Code == 409 {
 				// A 409 error code means that a job with the given ID already
 				// exists. If a prior job with the same ID failed, we must try
 				// again with a new job ID that is 1 higher than the last one.

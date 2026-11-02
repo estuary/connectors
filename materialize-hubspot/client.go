@@ -70,6 +70,8 @@ const (
 	// Maximum length of a property name.
 	MaxPropertyNameLength = 100
 
+	MaxCustomObjectNameLength = 72
+
 	// Actual rate limits depend on the associated app, and if the user has
 	// purchased the API limit increase.  The search API has a separate rate
 	// limit from the reset of the CRM API.
@@ -86,11 +88,12 @@ const (
 )
 
 var (
-	baseURL         *url.URL      = MustParseURL("https://api.hubapi.com")
-	tokenPath       string        = "/oauth/2026-03/token"
-	objectPath      string        = "/crm/objects/2026-03"
-	propertyPath    string        = "/crm/properties/2026-03"
-	refreshLeadTime time.Duration = 5 * time.Minute
+	baseURL                 *url.URL      = MustParseURL("https://api.hubapi.com")
+	tokenPath               string        = "/oauth/2026-03/token"
+	objectPath              string        = "/crm/objects/2026-03"
+	propertyPath            string        = "/crm/properties/2026-03"
+	customObjectSchemasPath string        = "/crm-object-schemas/2026-03/schemas"
+	refreshLeadTime         time.Duration = 5 * time.Minute
 )
 
 // DetailedError is included in the response for some, but not all, APIs.
@@ -137,6 +140,11 @@ type PropertyGroup struct {
 	Label        string `json:"label"`
 	Name         string `json:"name"`
 	DisplayOrder int    `json:"displayOrder"`
+}
+
+type CustomObjectSchema struct {
+	Name         string `json:"name"`
+	ObjectTypeID string `json:"objectTypeId"`
 }
 
 type PropertyModificationMetadata struct {
@@ -410,7 +418,7 @@ func (c *Client) Close() {
 // property.
 func (c *Client) BatchRead(
 	ctx context.Context,
-	object CRMObject,
+	object ObjectTypeID,
 	read *BatchReadRequest,
 ) ([]json.RawMessage, error) {
 	if len(read.Inputs) > MaxBatchRecords {
@@ -468,7 +476,7 @@ func (c *Client) BatchRead(
 
 func (c *Client) BatchUpsert(
 	ctx context.Context,
-	object CRMObject,
+	object ObjectTypeID,
 	inputs []*BatchUpsertInput,
 ) error {
 	if len(inputs) > MaxBatchRecords {
@@ -522,7 +530,7 @@ func (c *Client) BatchUpsert(
 
 func (c *Client) BatchUpdate(
 	ctx context.Context,
-	object CRMObject,
+	object ObjectTypeID,
 	inputs []*BatchUpdateInput,
 ) error {
 	if len(inputs) > MaxBatchRecords {
@@ -576,7 +584,7 @@ func (c *Client) BatchUpdate(
 
 func (c *Client) BatchCreate(
 	ctx context.Context,
-	object CRMObject,
+	object ObjectTypeID,
 	inputs []*BatchCreateInput,
 ) error {
 	if len(inputs) > MaxBatchRecords {
@@ -630,7 +638,7 @@ func (c *Client) BatchCreate(
 
 func (c *Client) Search(
 	ctx context.Context,
-	object CRMObject,
+	object ObjectTypeID,
 	search *SearchRequest,
 ) (*SearchResponse, error) {
 	if len(search.FilterGroups) > MaxSearchFilterGroups {
@@ -700,7 +708,7 @@ type GetResponse struct {
 
 func (c *Client) Get(
 	ctx context.Context,
-	object CRMObject,
+	object ObjectTypeID,
 	get *GetRequest,
 ) (*GetResponse, error) {
 	params := url.Values{}
@@ -752,7 +760,57 @@ func (c *Client) Get(
 	return &getResponse, nil
 }
 
-func (c *Client) ListPropertyGroups(ctx context.Context, object CRMObject) ([]*PropertyGroup, error) {
+func (c *Client) GetCustomObjectTypeIDs(ctx context.Context) (map[ObjectName]ObjectTypeID, error) {
+	uri := baseURL.JoinPath(customObjectSchemasPath)
+
+	type Response struct {
+		Results []CustomObjectSchema `json:"results"`
+	}
+
+	var value Response
+	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+		req, err := c.newRequest(ctx, "GET", uri, nil)
+		if err != nil {
+			return err
+		}
+
+		start := time.Now()
+		if err := c.limiter.Wait(ctx); err != nil {
+			return err
+		}
+		delay := time.Since(start)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		defer logExchange(resp, start, delay)
+
+		if resp.StatusCode != 200 {
+			apiError := parseAPIError(resp)
+			return fmt.Errorf("unexpected response: %w", apiError)
+		}
+
+		err = parseBody(resp, &value, MaxResponseBytes)
+		if err != nil {
+			return fmt.Errorf("unable to parse custom object schemas: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(map[ObjectName]ObjectTypeID, len(value.Results))
+	for _, result := range value.Results {
+		res[ObjectName(result.Name)] = ObjectTypeID(result.ObjectTypeID)
+	}
+	return res, nil
+}
+
+func (c *Client) ListPropertyGroups(ctx context.Context, object ObjectTypeID) ([]*PropertyGroup, error) {
 	uri := baseURL.JoinPath(propertyPath, object.String(), "groups")
 
 	type Response struct {
@@ -798,7 +856,7 @@ func (c *Client) ListPropertyGroups(ctx context.Context, object CRMObject) ([]*P
 	return value.Results, nil
 }
 
-func (c *Client) ListProperties(ctx context.Context, object CRMObject) ([]*Property, error) {
+func (c *Client) ListProperties(ctx context.Context, object ObjectTypeID) ([]*Property, error) {
 	uri := baseURL.JoinPath(propertyPath, object.String())
 
 	type Response struct {
@@ -844,7 +902,7 @@ func (c *Client) ListProperties(ctx context.Context, object CRMObject) ([]*Prope
 }
 
 // GetProperty returns property by name.
-func (c *Client) GetProperty(ctx context.Context, object CRMObject, name string) (*Property, error) {
+func (c *Client) GetProperty(ctx context.Context, object ObjectTypeID, name string) (*Property, error) {
 	uri := baseURL.JoinPath(propertyPath, object.String(), name)
 
 	var property Property

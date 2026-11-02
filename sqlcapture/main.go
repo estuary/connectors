@@ -375,6 +375,13 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	var ctx = stream.Context()
 
+	// Notify Flow that we're ready and would like to receive acknowledgements. This comes before
+	// the startup delay and connecting because Flow can't move the task to a newly published spec
+	// until the connector is ready.
+	if err := stream.Ready(true); err != nil {
+		return err
+	}
+
 	// Wait a random time before connecting, so that captures which start together spread out.
 	if d.MaxStartupDelay != nil {
 		var maxDelay, err = d.MaxStartupDelay(open.Capture.ConfigJson)
@@ -454,11 +461,6 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		State:    &state,
 		Output:   stream,
 		Database: db,
-	}
-
-	// Notify Flow that we're ready and would like to receive acknowledgements.
-	if err := c.Output.Ready(true); err != nil {
-		return err
 	}
 
 	err = c.Run(ctx)

@@ -75,7 +75,7 @@ func TestStoreBatches(t *testing.T) {
 			name: "simple",
 			bindings: []*binding{
 				{
-					object:     CompaniesObject,
+					object:     ObjectTypeID(CompaniesObject.String()),
 					properties: companiesProperties,
 					idProperty: companiesProperties["domain"],
 					fields: []*MappedField{
@@ -138,7 +138,7 @@ func TestStoreBatches(t *testing.T) {
 			name: "multiple items",
 			bindings: []*binding{
 				{
-					object:     CompaniesObject,
+					object:     ObjectTypeID(CompaniesObject.String()),
 					properties: companiesProperties,
 					idProperty: companiesProperties["domain"],
 					fields: []*MappedField{
@@ -200,7 +200,7 @@ func TestStoreBatches(t *testing.T) {
 			name: "multiple batches per binding",
 			bindings: []*binding{
 				{
-					object:     CompaniesObject,
+					object:     ObjectTypeID(CompaniesObject.String()),
 					properties: companiesProperties,
 					idProperty: companiesProperties["domain"],
 					fields: []*MappedField{
@@ -282,7 +282,7 @@ func TestStoreBatches(t *testing.T) {
 			name: "multiple bindings",
 			bindings: []*binding{
 				{
-					object:     CompaniesObject,
+					object:     ObjectTypeID(CompaniesObject.String()),
 					properties: companiesProperties,
 					idProperty: companiesProperties["domain"],
 					fields: []*MappedField{
@@ -296,7 +296,7 @@ func TestStoreBatches(t *testing.T) {
 					docField: nil,
 				},
 				{
-					object:     ContactsObject,
+					object:     ObjectTypeID(ContactsObject.String()),
 					properties: contactsProperties,
 					idProperty: contactsProperties["email"],
 					fields: []*MappedField{
@@ -369,7 +369,7 @@ func TestStoreBatches(t *testing.T) {
 			name: "empty string key",
 			bindings: []*binding{
 				{
-					object:     CompaniesObject,
+					object:     ObjectTypeID(CompaniesObject.String()),
 					properties: companiesProperties,
 					idProperty: companiesProperties["domain"],
 					fields: []*MappedField{
@@ -434,7 +434,7 @@ func TestStoreBatches(t *testing.T) {
 			name: "simple deletion",
 			bindings: []*binding{
 				{
-					object:     ContactsObject,
+					object:     ObjectTypeID(ContactsObject.String()),
 					properties: contactsProperties,
 					idProperty: contactsProperties["email"],
 					fields: []*MappedField{

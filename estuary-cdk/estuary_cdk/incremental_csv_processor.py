@@ -103,24 +103,30 @@ class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
         self._exhausted = False
 
     async def read(self, size: int = -1) -> str:
-        """Read and incrementally decode data from the byte stream."""
-        if self._exhausted:
-            return ""
+        """Read and incrementally decode data from the byte stream.
 
-        try:
-            chunk = await self.byte_gen.__anext__()
+        aiocsv takes an empty string as the end of the file, so a chunk that
+        decodes to no text (an empty chunk, a lone byte-order mark, or part of
+        a multi-byte character) is never returned; the next chunk is read
+        instead.
+        """
+        while not self._exhausted:
+            try:
+                chunk = await self.byte_gen.__anext__()
+            except StopAsyncIteration:
+                self._exhausted = True
+
+                # Finalize the decoder to get any remaining characters.
+                # This will raise UnicodeDecodeError if there are incomplete characters.
+                return self.decoder.decode(b'', final=True)
+
             # Use incremental decoder to handle multi-byte characters
             # that may be split across chunk boundaries.
-            return self.decoder.decode(chunk, final=False)
+            text = self.decoder.decode(chunk, final=False)
+            if text:
+                return text
 
-        except StopAsyncIteration:
-            self._exhausted = True
-
-            # Finalize the decoder to get any remaining characters.
-            # This will raise UnicodeDecodeError if there are incomplete characters.
-            final_chunk = self.decoder.decode(b'', final=True)
-
-            return final_chunk if final_chunk else ""
+        return ""
 
 
 class IncrementalCSVProcessor(Generic[T]):

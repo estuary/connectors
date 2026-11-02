@@ -450,6 +450,8 @@ type sqlserverDatabase struct {
 
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
 	loggedBackfill  map[sqlcapture.StreamID]struct{}                  // Tracks tables whose backfill query has been logged during this connector invocation
+
+	isReplica *bool // Cached result of replicaStatus, nil until its first successful query
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {
@@ -478,8 +480,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 
 	var conn = sql.OpenDB(connector)
 	if err := conn.PingContext(ctx); err != nil {
-		var mssqlErr mssqldb.Error
-		if errors.As(err, &mssqlErr) {
+		if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok {
 			switch mssqlErr.Number {
 			case 18456:
 				return cerrors.NewUserError(err, "incorrect username or password")

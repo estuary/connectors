@@ -341,8 +341,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 			TableName: aws.String(tableName),
 		})
 		if err != nil {
-			var errNotFound *types.ResourceNotFoundException
-			if errors.As(err, &errNotFound) {
+			if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 				// Table hasn't been created yet.
 				continue
 			}

@@ -103,8 +103,7 @@ func (b *GCSBucket) Delete(ctx context.Context, uris []string) error {
 		}
 		group.Go(func() error {
 			if err := b.client.Bucket(bucket).Object(key).Delete(groupCtx); err != nil {
-				var gErr *googleapi.Error
-				if errors.As(err, &gErr) && gErr.Code == http.StatusNotFound {
+				if gErr, ok := errors.AsType[*googleapi.Error](err); ok && gErr.Code == http.StatusNotFound {
 					return nil
 				}
 
@@ -149,9 +148,8 @@ func (b *GCSBucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsCo
 	bucketHandle := b.client.Bucket(b.bucket)
 
 	checkReadOnlyFn := func(key string) error {
-		var apiErr *googleapi.Error
 		_, err := bucketHandle.Object(key).Attrs(ctx)
-		if !errors.As(err, &apiErr) || apiErr.Code != 404 {
+		if apiErr, ok := errors.AsType[*googleapi.Error](err); !ok || apiErr.Code != 404 {
 			return err
 		}
 

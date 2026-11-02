@@ -292,20 +292,21 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 			"storedHistory":    l.storedHistory,
 		})
 
-		// If there have been at least `storedHistorySize` transactions
-		// completed and none of the transactions were large enough to suggest
-		// we are still in the midst of a backfill, the acknowledgement delay
-		// may be applicable.
-		delayBasedOnStoredHistory := len(l.storedHistory) >= storedHistorySize && !slices.ContainsFunc(l.storedHistory, isBackfillSize)
-
-		if !delayBasedOnStoredHistory {
-			ll.Info("not delaying commit acknowledgement based on stored history")
+		// The acknowledgement delay applies only once `storedHistorySize`
+		// transactions have completed and none of them were large enough to
+		// suggest we are still in the midst of a backfill.
+		if slices.ContainsFunc(l.storedHistory, isBackfillSize) {
+			ll.Infof("Not waiting for the sync schedule while catching up on a backlog. The schedule applies again once the last %d transactions have each stored fewer than %s documents.", storedHistorySize, formatCount(storeBackfillThreshold))
+		} else if len(l.storedHistory) < storedHistorySize {
+			ll.Infof("Not waiting for the sync schedule because the task started recently. The schedule applies once %d transactions have stored data since it started (%d so far).", storedHistorySize, len(l.storedHistory))
 		} else if d <= 0 {
-			ll.Info("not delaying commit acknowledgement since current time is after next scheduled acknowledgement")
+			ll.Infof("Not waiting for the sync schedule because the scheduled sync time %s has already passed.", formatTime(nextAckAt))
 		} else {
+			every := schedule.IntervalAt(l.ackSchedule, l.lastAckTime)
+			// Before startedAckDelay, whose extended logger reads the next sync.
+			l.be.status.syncWait(nextAckAt, every)
 			l.handler(startedAckDelay)
-			l.be.status.syncWait(nextAckAt, schedule.IntervalAt(l.ackSchedule, l.lastAckTime))
-			ll.WithField("delay", d.String()).Info("delaying before acknowledging commit")
+			ll.WithField("delay", d.String()).Info(syncWaitMessage(nextAckAt, every))
 
 			select {
 			case <-l.ctx.Done():
@@ -317,4 +318,10 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 
 	l.lastAckTime = time.Now()
 	return nil
+}
+
+// syncWaitMessage is logged while a commit's acknowledgement waits for the next
+// scheduled sync.
+func syncWaitMessage(at time.Time, every time.Duration) string {
+	return "Waiting for the " + describeSync(at, every) + ". Disable and re-enable the task to sync and apply config changes now."
 }
