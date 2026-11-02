@@ -61,7 +61,7 @@ func TestMergeOnRead(t *testing.T) {
 
 func runMergeOnRead(t *testing.T, cfg config, wantFormatVersion int) {
 	h := newMORHarness(t, cfg)
-	mb, tablePath := h.createTable(fmt.Sprintf("mor_flow_test_%d", time.Now().UnixNano()))
+	mb, tablePath := h.createTable(fmt.Sprintf("mor_flow_test_%d", time.Now().UnixNano()), "")
 	table := morFQN(tablePath)
 
 	h.exec(fmt.Sprintf("ALTER TABLE %s SET TBLPROPERTIES ('write.merge.mode'='merge-on-read', 'write.update.mode'='merge-on-read', 'write.delete.mode'='merge-on-read')", table))
@@ -181,29 +181,33 @@ func newMORHarness(t *testing.T, cfg config) *morHarness {
 	return &morHarness{t: t, ctx: ctx, cfg: cfg, mat: mat}
 }
 
-func (h *morHarness) project(field, ptr string, types []string, isKey bool) realBoilerplate.MappedProjection[mapped] {
+func (h *morHarness) project(field, ptr string, types []string, format string, isKey bool) realBoilerplate.MappedProjection[mapped] {
+	inference := pf.Inference{Types: types, Exists: pf.Inference_MUST}
+	if format != "" {
+		inference.String_ = &pf.Inference_String{Format: format}
+	}
 	p := realBoilerplate.MapProjection(pf.Projection{
 		Field:        field,
 		Ptr:          ptr,
 		IsPrimaryKey: isKey,
-		Inference:    pf.Inference{Types: types, Exists: pf.Inference_MUST},
+		Inference:    inference,
 	}, fieldConfig{})
 	mt, _ := h.mat.MapType(p, fieldConfig{})
 	return realBoilerplate.MappedProjection[mapped]{Projection: p, Mapped: mt}
 }
 
-// createTable creates a table keyed on a string id with an integer n, and
-// drops it when the test ends.
-func (h *morHarness) createTable(table string) (morBinding, []string) {
+// createTable creates a table keyed on a string id of the given format, if
+// any, with an integer n, and drops it when the test ends.
+func (h *morHarness) createTable(table, keyFormat string) (morBinding, []string) {
 	res := resource{Table: table}.WithDefaults(h.cfg)
 	path, _, err := res.Parameters()
 	require.NoError(h.t, err)
-	doc := h.project("flow_document", "", []string{"object"}, false)
+	doc := h.project("flow_document", "", []string{"object"}, "", false)
 	mb := morBinding{
 		MaterializationSpec_Binding: pf.MaterializationSpec_Binding{ResourcePath: path},
 		Config:                      res,
-		Keys:                        []realBoilerplate.MappedProjection[mapped]{h.project("id", "/id", []string{"string"}, true)},
-		Values:                      []realBoilerplate.MappedProjection[mapped]{h.project("n", "/n", []string{"integer"}, false)},
+		Keys:                        []realBoilerplate.MappedProjection[mapped]{h.project("id", "/id", []string{"string"}, keyFormat, true)},
+		Values:                      []realBoilerplate.MappedProjection[mapped]{h.project("n", "/n", []string{"integer"}, "", false)},
 		Document:                    &doc,
 	}
 
