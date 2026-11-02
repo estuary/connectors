@@ -233,8 +233,7 @@ func (c *capture) doScan(
 			TotalSegments:          aws.Int32(int32(t.totalBackfillSegments)),
 		})
 		if err != nil {
-			var throughputError *types.ProvisionedThroughputExceededException
-			if errors.As(err, &throughputError) {
+			if _, ok := errors.AsType[*types.ProvisionedThroughputExceededException](err); ok {
 				log.WithFields(log.Fields{
 					"table":   t.tableName,
 					"segment": segment,

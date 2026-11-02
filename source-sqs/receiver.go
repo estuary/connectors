@@ -162,8 +162,7 @@ func runReceiver(ctx context.Context, client *sqs.Client, binding *bindingInfo, 
 			// of the quota. The SDK treats it as a client fault and won't
 			// retry it, but it's transient, so back off and retry here
 			// instead of failing.
-			var overLimit *types.OverLimit
-			if errors.As(err, &overLimit) {
+			if _, ok := errors.AsType[*types.OverLimit](err); ok {
 				log.WithField("queue", binding.queueURL).
 					Warn("queue in-flight message quota exceeded (OverLimit); backing off")
 				select {

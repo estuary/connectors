@@ -292,8 +292,7 @@ func queryAffected(ctx context.Context, images []string, sql string) ([]affected
 // predicate produces (the predicate is the only free-form part of the query)
 // into an actionable message, rather than leaking a bare SQLSTATE.
 func annotatePredicateError(err error) error {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		switch pgErr.Code {
 		case "42804": // datatype_mismatch, e.g. "argument of AND must be type boolean"
 			return fmt.Errorf("the predicate must be a boolean expression over the collection row (alias `c`), "+

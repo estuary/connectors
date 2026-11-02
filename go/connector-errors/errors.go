@@ -59,8 +59,7 @@ func (e *TransparentError) Error() string { return e.source.Error() }
 // HandleFinalError performs special handling for final errors when the error type is one that is
 // defined in this package. For other errors, the error is logged on a newline.
 func HandleFinalError(err error) {
-	var userError *UserError
-	if errors.As(err, &userError) {
+	if userError, ok := errors.AsType[*UserError](err); ok {
 		// Log the structured information from the error if this was specifically a user-facing
 		// error.
 		log.WithFields(log.Fields{
@@ -70,8 +69,7 @@ func HandleFinalError(err error) {
 		}).Fatal(userError)
 	}
 
-	var transparentError *TransparentError
-	if errors.As(err, &transparentError) {
+	if _, ok := errors.AsType[*TransparentError](err); ok {
 		// Exit without any additional logging.
 		os.Exit(1)
 	}

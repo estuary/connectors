@@ -28,11 +28,10 @@ func createTable(
 
 	_, err := client.db.CreateTable(ctx, input)
 	if err != nil {
-		var errInUse *types.ResourceInUseException
 		// Any error other than an "already exists" error is a more serious problem. Usually we
 		// should not be trying to create tables that already exist, so emit a warning log if that
 		// ever occurs.
-		if !errors.As(err, &errInUse) {
+		if _, ok := errors.AsType[*types.ResourceInUseException](err); !ok {
 			return fmt.Errorf("create table %s: %w", name, err)
 		}
 		log.WithField("table", name).Warn("table already exists")
@@ -63,8 +62,6 @@ func createTable(
 }
 
 func deleteTable(ctx context.Context, client *client, name string) error {
-	var errNotFound *types.ResourceNotFoundException
-
 	if _, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 		TableName: aws.String(name),
 	}); err != nil {
@@ -82,7 +79,7 @@ func deleteTable(ctx context.Context, client *client, name string) error {
 			TableName: aws.String(name),
 		})
 		if err != nil {
-			if errors.As(err, &errNotFound) {
+			if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 				return nil
 			}
 			return fmt.Errorf("waiting for table deletion to finish: %w", err)
