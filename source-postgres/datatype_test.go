@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
@@ -357,6 +358,26 @@ func TestTemporalTypes(t *testing.T) {
 		(106, NULL, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+// TestFormatInterval pins interval formatting to the output of PGX v5.6.0, since captured
+// intervals (including key values) must not change.
+func TestFormatInterval(t *testing.T) {
+	for _, tc := range []struct {
+		interval pgtype.Interval
+		expected any
+	}{
+		{pgtype.Interval{}, nil},
+		{pgtype.Interval{Valid: true}, ""},
+		{pgtype.Interval{Months: 14, Days: 3, Valid: true}, "14 mon 3 day"},
+		{pgtype.Interval{Microseconds: 19800000000, Valid: true}, " 05:30:00"},
+		{pgtype.Interval{Months: 1, Valid: true}, "1 mon "},
+		{pgtype.Interval{Months: 1, Microseconds: 1, Valid: true}, "1 mon  00:00:00.000001"},
+		{pgtype.Interval{Days: -2, Microseconds: -3723000004, Valid: true}, "-2 day -01:02:03.000004"},
+		{pgtype.Interval{Months: -1, Days: 1, Microseconds: 86399999999, Valid: true}, "-1 mon 1 day 23:59:59.999999"},
+	} {
+		require.Equal(t, tc.expected, formatInterval(tc.interval), "interval %+v", tc.interval)
+	}
 }
 
 // TestGeometryTypes exercises PostgreSQL geometric types.

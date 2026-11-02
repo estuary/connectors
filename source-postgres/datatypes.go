@@ -101,6 +101,20 @@ func registerDatatypeTweaks(ctx context.Context, conn *pgx.Conn, m *pgtype.Map) 
 		Codec: &customDecodingCodec{decodeRawJSONB, &pgtype.JSONBCodec{Marshal: json.Marshal, Unmarshal: json.Unmarshal}},
 	})
 
+	// Newer PGX versions have dedicated codecs for these types, which decode them differently
+	// (XML as bytes, tsvector as a struct, xid8 as an integer). Keep capturing them as the text
+	// strings we've always produced, using the same codec as unknown OIDs get in the transcoders.
+	for _, t := range []struct {
+		name string
+		oid  uint32
+	}{
+		{"xml", pgtype.XMLOID}, {"_xml", pgtype.XMLArrayOID},
+		{"tsvector", pgtype.TSVectorOID}, {"_tsvector", pgtype.TSVectorArrayOID},
+		{"xid8", pgtype.XID8OID}, {"_xid8", pgtype.XID8ArrayOID},
+	} {
+		m.RegisterType(&pgtype.Type{Name: t.name, OID: t.oid, Codec: &pgtype.TextCodec{}})
+	}
+
 	// Query pg_catalog.pg_type for specific extension types we support, and install the
 	// appropriate scalar and array codecs for them.
 	var queryExtensionTypes = `
@@ -492,7 +506,7 @@ func (db *postgresDatabase) translateRecordField(discoveredColumnType postgresTy
 	case pgtype.Bits:
 		return x.Value() // The Value() method encodes to the desired "0101" text string
 	case pgtype.Interval:
-		return x.Value()
+		return formatInterval(x), nil
 	case pgtype.Line:
 		return x.Value()
 	case pgtype.Lseg:
@@ -521,6 +535,37 @@ func stringifySpecialFloats(x float64) (string, bool) {
 		return "-Infinity", true
 	}
 	return "", false
+}
+
+// formatInterval reproduces the interval text encoding of PGX v5.6.0, quirks included,
+// because intervals may be collection keys and so captured values must never change.
+func formatInterval(x pgtype.Interval) any {
+	if !x.Valid {
+		return nil
+	}
+	var buf []byte
+	if x.Months != 0 {
+		buf = strconv.AppendInt(buf, int64(x.Months), 10)
+		buf = append(buf, " mon "...)
+	}
+	if x.Days != 0 {
+		buf = strconv.AppendInt(buf, int64(x.Days), 10)
+		buf = append(buf, " day"...)
+	}
+	if x.Microseconds != 0 {
+		buf = append(buf, ' ')
+		var abs = x.Microseconds
+		if abs < 0 {
+			abs = -abs
+			buf = append(buf, '-')
+		}
+		const usPerSecond, usPerMinute, usPerHour = 1_000_000, 60 * 1_000_000, 60 * 60 * 1_000_000
+		buf = fmt.Appendf(buf, "%02d:%02d:%02d", abs/usPerHour, (abs%usPerHour)/usPerMinute, (abs%usPerMinute)/usPerSecond)
+		if us := abs % usPerSecond; us != 0 {
+			buf = fmt.Appendf(buf, ".%06d", us)
+		}
+	}
+	return string(buf)
 }
 
 var unknownElementType = postgresBasicType{Name: "unknown-range-element-type"}
