@@ -343,10 +343,18 @@ class AccountDirectory:
 
         results = await asyncio.gather(*(resolve(a) for a in selected))
         errors = [r for r in results if isinstance(r, str)]
+        readable = [r for r in results if isinstance(r, AccountContext)]
         if errors:
+            # Skipping an account would renumber every snapshot row after it,
+            # so the user chooses what to leave out.
+            if readable:
+                errors.append(
+                    "To capture only the accounts that can be read, set Account IDs to: "
+                    f"{', '.join(c.id for c in readable)}."
+                )
             raise AccountAccessError(errors)
 
-        return [r for r in results if isinstance(r, AccountContext)]
+        return readable
 
 
 async def snapshot_accounts(

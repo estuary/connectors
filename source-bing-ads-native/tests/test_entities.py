@@ -212,9 +212,11 @@ async def test_every_unreadable_account_is_reported_together():
     with pytest.raises(AccountAccessError) as err:
         await AccountDirectory(http, False, []).accounts(LOG)
 
-    assert len(err.value.errors) == 2
+    assert len(err.value.errors) == 3
     assert "Account 1" in err.value.errors[0] and "TrackingId tracking-1" in err.value.errors[0]
     assert "Account 3" in err.value.errors[1]
+    # The fix: list only the readable accounts.
+    assert err.value.errors[2].endswith("set Account IDs to: 2.")
 
 
 @pytest.mark.asyncio
