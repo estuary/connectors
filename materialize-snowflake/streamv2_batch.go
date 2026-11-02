@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/estuary/connectors/go/writer"
-	"github.com/google/uuid"
 )
 
 // streamV2Batch accumulates the rows of one Snowpipe Streaming append in a local
@@ -85,14 +83,12 @@ func (b *streamV2Batch) finish() (streamV2BatchFile, error) {
 }
 
 func (b *streamV2Batch) newFile() error {
-	var path = filepath.Join(os.TempDir(), uuid.NewString())
-
-	file, err := os.Create(path)
+	file, err := os.CreateTemp("", "streamv2-batch-*")
 	if err != nil {
 		return err
 	}
 
-	b.path = path
+	b.path = file.Name()
 	b.writer = writer.NewJsonWriter(
 		&fileBuffer{buf: bufio.NewWriter(file), file: file},
 		b.columns,
