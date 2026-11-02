@@ -179,9 +179,12 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
+	// Bound now: the runtime v1 pass reassigns rt and materializer below, and
+	// its liveness tables must still be dropped.
+	firstRT, firstMaterializer := rt, materializer
 	t.Cleanup(func() {
-		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
-		cleanupTestTasks(t, ctx, materializer, tsSuffix)
+		CleanupTestResources(t, ctx, firstMaterializer, firstRT.resourcePaths, tsSuffix)
+		cleanupTestTasks(t, ctx, firstMaterializer, tsSuffix)
 	})
 
 	// One session runs every fixture transaction. A session halts after its
