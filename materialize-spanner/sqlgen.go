@@ -301,7 +301,7 @@ SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ QuoteAlias $col.Field }}
 {{- end}}
 )) as flow_document
 FROM {{ template "temp_name" . }} AS l
@@ -329,7 +329,9 @@ UPDATE {{ Identifier $.TablePath }}
 -- Verify the update succeeded (Spanner doesn't have @@ROWCOUNT)
 -- We'll handle verification in the Go code instead
 {{ end }}
-`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
+`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix), template.FuncMap{
+		"QuoteAlias": sql.QuoteTransformEscapedBackslash("`", "\\`"),
+	})
 
 	return templates{
 		createLoadTable:         tplAll.Lookup("createLoadTable"),
