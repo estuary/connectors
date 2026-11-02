@@ -137,12 +137,22 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
                         };
                         let partitions = topic.partitions().len();
                         if partitions > binding.partition_count {
-                            tracing::warn!(
+                            // A clean exit makes the runtime start a new
+                            // session, and `setup_consumer` then assigns the
+                            // added partitions. Every shard restarts, which
+                            // leaves `setup_consumer` as the only place that
+                            // decides ownership. Checking here before the next
+                            // poll means the previous message's checkpoint has
+                            // already been written.
+                            tracing::info!(
+                                eventType = "connectorStatus",
                                 topic = topic.name(),
                                 partitions_at_startup = binding.partition_count,
                                 partitions,
-                                "topic has new partitions that won't be captured until the connector restarts",
+                                "Restarting to capture new partitions of topic {}",
+                                topic.name(),
                             );
+                            return Ok(());
                         }
                     }
                 }
