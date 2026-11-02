@@ -190,6 +190,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("idempotency", func(t *testing.T) {
+		testutil.SkipRuntimeV1(t)
 		runIdempotencyTest(t, makeResourceFn)
 	})
 }

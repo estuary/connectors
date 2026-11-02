@@ -362,6 +362,10 @@ jobs:
       # both runtimes must leave the same destination -- and is snapshotted as
       # `<test>-runtime-v1` where the connector has one (see testutil's
       # runtimeV1Liveness, requireMatchesRuntimeNextSnapshot, runtimeV1SnapshotName).
+      # Only the materialize tests drive runtime v1, so this runs just the
+      # TestIntegration* tests that hold them, and everything in there that
+      # drives the connector directly or through preview-next skips itself
+      # (testutil.SkipRuntimeV1).
       - name: Materialization connector ${{ matrix.connector.name }} integration tests (runtime v1)
         if: startsWith(matrix.connector.name, 'materialize-')
         env:
@@ -369,11 +373,7 @@ jobs:
           FLOW_TEST_FLOWCTL: flowctl-v1
         run: |
           cd ${{ matrix.connector.name }}
-          TIMEOUT=20m
-          if [ "${{ matrix.connector.name }}" = "materialize-snowflake" ]; then
-            TIMEOUT=30m
-          fi
-          go test -v ./... -timeout $TIMEOUT
+          go test -v ./... -run '^TestIntegration' -timeout 20m
 
       # On a snapshot mismatch the harness writes this run's value beside the
       # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed

@@ -347,16 +347,19 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("variant-create-v3", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		boilerplate.RunTestAllTasks(t, "testdata/materialize-variant-rest-local.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			runVariantCreateV3(t, taskName, cfg)
 		})
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		runTimestampOverflowRegression(t)
 	})
 
 	t.Run("date-overflow-regression", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		runDateOverflowRegression(t)
 	})
 }
