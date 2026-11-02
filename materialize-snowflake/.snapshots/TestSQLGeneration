@@ -129,7 +129,7 @@ OBJECT_CONSTRUCT_KEEP_NULL(
 	'array', "a-schema".key_value.array,
 	'binary', BASE64_ENCODE("a-schema".key_value.binary),
 	'boolean', "a-schema".key_value.boolean,
-	'field_with_projection', "a-schema".key_value.field_with_projection,
+	'fieldWithProjection', "a-schema".key_value.field_with_projection,
 	'integer', "a-schema".key_value.integer,
 	'integerGt128Bit', "a-schema".key_value.integerGt128Bit,
 	'integerGt256Bit', "a-schema".key_value.integerGt256Bit,
