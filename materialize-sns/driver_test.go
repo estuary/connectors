@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/bradleyjkemp/cupaloy"
+	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -258,6 +259,7 @@ func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in -short mode")
 	}
+	testutil.SkipRuntimeV1(t)
 
 	// Ensure shared docker network exists; ignore failure if it already does.
 	_ = exec.Command("docker", "network", "create", "flow-test").Run()

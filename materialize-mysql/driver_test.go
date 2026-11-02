@@ -142,6 +142,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("additional table create sql", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		ctx := context.Background()
 		cfg := testConfig()
 
@@ -193,6 +194,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply changes", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				ctx := context.Background()

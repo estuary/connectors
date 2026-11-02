@@ -257,6 +257,8 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	actionDescSanitizers []func(string) string,
 	runtime RuntimeConfig,
 ) {
+	requireRuntimeV1Selected(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
@@ -287,6 +289,8 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	actionDescSanitizers []func(string) string,
 	runtime RuntimeConfig,
 ) {
+	requireRuntimeV1Selected(t)
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -329,6 +333,8 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -390,6 +396,8 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -466,6 +474,8 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -511,6 +521,8 @@ func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate
 	phases []FeatureFlagMigrationPhase,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -635,6 +647,8 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 

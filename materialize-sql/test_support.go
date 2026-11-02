@@ -188,6 +188,8 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 	createTableTpl *template.Template,
 	updateFence func(context.Context, Client, Fence) error,
 ) {
+	testutil.SkipRuntimeV1(t)
+
 	// runTest takes zero or more key range fixtures, followed by a final pair
 	// which is the key range under test.
 	var runTest = func(t *testing.T, taskName string, cfg EC, ranges ...uint32) {
