@@ -299,7 +299,7 @@ SELECT {{ $.Binding }} AS binding,
 json_object(                                                                                                                                                       
 {{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
        {{- if $i}}, {{end}}                                                                                                                                        
-       '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
+       {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       

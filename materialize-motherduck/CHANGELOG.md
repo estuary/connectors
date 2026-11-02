@@ -1,5 +1,11 @@
 # materialize-motherduck
 
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains a single quote.
+
 ## 2026-10-31
 
 ### Changed

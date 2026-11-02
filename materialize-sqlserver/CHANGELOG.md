@@ -1,5 +1,11 @@
 # materialize-sqlserver
 
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains a dot.
+
 ## 2026-10-22
 
 ### Added

@@ -7,6 +7,11 @@
   to sync sooner, and explain in plain language when a sync does not wait for
   the schedule.
 
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field is a reserved word or contains special or non-ASCII
+  characters.
+
 ## 2026-10-22
 
 ### Added

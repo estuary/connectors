@@ -320,7 +320,7 @@ SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ QuoteAlias $col.Field }}
 {{- end}}
 )) as flow_document
 FROM {{ $.Identifier }} AS l
@@ -452,7 +452,10 @@ UPDATE {{ Identifier $.TablePath }}
 	AND key_end={{ $.KeyEnd }}
 	AND fence={{ $.Fence }};
 {{ end }}
-`, template.FuncMap{"PartitionExpr": partitionExpr})
+`, template.FuncMap{
+		"PartitionExpr": partitionExpr,
+		"QuoteAlias":    sql.QuoteTransformEscapedBackslash("`", "\\`"),
+	})
 
 	return templates{
 		tempTableName:           tplAll.Lookup("tempTableName"),

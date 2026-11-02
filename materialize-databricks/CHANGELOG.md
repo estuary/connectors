@@ -7,6 +7,8 @@
   downloads two files of its results at a time, instead of ten, so the
   queries that run at once hold no more results in memory than a single
   query did before loads ran concurrently.
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains special or non-ASCII characters.
 
 ## 2026-10-31
 ### Changed
