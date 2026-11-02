@@ -483,3 +483,46 @@ async def test_new_accounts_get_state_and_existing_state_is_kept(monkeypatch: py
 
     await resources._reconcile_account_state(["1", "2"], Binding(), state, Task())  # type: ignore[arg-type]
     assert len(checkpoints) == 1
+
+
+@pytest.mark.asyncio
+async def test_new_account_backfill_and_incremental_cover_every_day_once(monkeypatch: pytest.MonkeyPatch):
+    from source_bing_ads_native import resources
+
+    # A new account shows up late in the UTC day, while London is already
+    # on the next day.
+    now = datetime(2026, 7, 15, 23, 30, tzinfo=UTC)
+    monkeypatch.setattr(resources, "utc_now", _at(now))
+    monkeypatch.setattr(reports, "utc_now", _at(now))
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    state = ResourceState(inc={}, backfill={})
+
+    class Task:
+        log = LOG
+
+        async def checkpoint(self, value: Any) -> None:
+            pass
+
+    class Binding:
+        stateKey = "campaign_performance_report_daily"
+
+    await resources._reconcile_account_state(["2"], Binding(), state, Task())  # type: ignore[arg-type]
+    assert isinstance(state.inc, dict) and isinstance(state.backfill, dict)
+    inc, backfill = state.inc["2"], state.backfill["2"]
+    assert isinstance(inc, ResourceState.Incremental) and isinstance(backfill, ResourceState.Backfill)
+
+    backfilled = ReportStub()
+    await _drain(
+        backfill_report(
+            _session(backfilled), CONTEXT, CAMPAIGN_REPORT, CAMPAIGN_REPORT.row_model(),
+            start, LOG, backfill.next_page, backfill.cutoff,
+        )
+    )
+    incremental = ReportStub()
+    await _incremental(incremental, cast(datetime, inc.cursor), lookback_window_days=0, start=start)
+
+    days: list[date] = []
+    for first, last in [_range(r) for r in backfilled.submitted + incremental.submitted]:
+        days.extend(first + n * timedelta(days=1) for n in range((last - first).days + 1))
+    # Backfill owns Jul 1-14, incremental starts with Jul 15: no gap, no overlap.
+    assert days == [date(2026, 7, 1) + n * timedelta(days=1) for n in range(15)]
