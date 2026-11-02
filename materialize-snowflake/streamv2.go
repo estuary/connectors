@@ -413,6 +413,12 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 		return err
 	}
 
+	// The pipe info refuses a pipe that reads values in a format other than the one
+	// this connector writes, and fetching it here refuses that pipe before any append.
+	if _, err := m.client.pipeInfo(ctx, streamV2PipePath(b.database, b.schema, unquotedIdentifier(b.table))); err != nil {
+		return fmt.Errorf("fetching pipe info for %s: %w", b.table, err)
+	}
+
 	var shardKeyRange = m.shardRange()
 	targetChannelKeyRanges, err := streamV2TargetLayout(m.keyBegin, m.keyEnd)
 	if err != nil {
