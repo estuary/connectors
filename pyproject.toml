@@ -9,11 +9,10 @@
 # outside this repo; source-google-ads' `<3.15` supplies the only ceiling. The
 # lock therefore resolves for `==3.14.*`.
 #
-# The two Python packages that belong to Go connectors are deliberately not
-# members. materialize-snowflake/sidecar must run on the base image's 3.13 and
-# is its own uv project with its own lock; materialize-iceberg/python is
-# `go:embed`-ed and submitted to Spark images carrying 3.10 and 3.8, and keeps
-# the poetry.lock it has always had.
+# The Python package that belongs to the Go connector materialize-iceberg is
+# deliberately not a member. materialize-iceberg/python is `go:embed`-ed and
+# submitted to Spark images carrying 3.10 and 3.8, and keeps the poetry.lock it
+# has always had.
 [tool.uv.workspace]
 members = [
     "estuary-cdk",
