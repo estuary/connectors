@@ -31,6 +31,12 @@ func TestIntegration(t *testing.T) {
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
 	})

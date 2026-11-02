@@ -318,9 +318,9 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 {{ define "loadQueryNoFlowDocument" -}}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
-{{- range $i, $col := $.RootLevelColumns}}
+{{- range $i, $col := $.RootPropertyColumns}}
 	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ QuoteAlias $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
 FROM {{ $.Identifier }} AS l

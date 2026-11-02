@@ -597,7 +597,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose the appropriate load query template based on configuration

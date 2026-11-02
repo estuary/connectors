@@ -201,9 +201,9 @@ SELECT -1, ""
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Table.Binding }},
 to_json(struct(
-{{- range $i, $col := $.Table.RootLevelColumns}}
+{{- range $i, $col := $.Table.RootPropertyColumns}}
 	{{- if $i}},{{end}}
-	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ QuoteAlias $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
 {{ template "loadJoin" $ }}

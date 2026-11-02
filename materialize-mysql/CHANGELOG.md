@@ -1,5 +1,11 @@
 # materialize-mysql
 
+## 2026-10-31
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
 ## 2026-10-22
 
 ### Added

@@ -166,6 +166,12 @@ func runIntegrationSuite(t *testing.T, variant integrationVariant) {
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
 	})
 
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), variant.materializeSpec, makeTestResource, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver(), variant.applySpec, makeTestResource)
 	})

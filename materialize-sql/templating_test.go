@@ -194,6 +194,39 @@ func TestRootLevelColumns(t *testing.T) {
 	}
 }
 
+func TestRootPropertyColumns(t *testing.T) {
+	var col = func(field, ptr string, mustExist bool, types ...string) Column {
+		return Column{
+			Projection: Projection{Projection: pf.Projection{Field: field, Ptr: ptr, Inference: pf.Inference{Types: types}}},
+			MustExist:  mustExist,
+		}
+	}
+
+	table := Table{
+		Keys: []Column{col("key", "/key", true, "string")},
+		Values: []Column{
+			col("field_with_projection", "/fieldWithProjection", false, "string"),
+			col("fieldWithProjection", "/fieldWithProjection", false, "string"),
+			col("a/b~c", "/a~1b~0c", false, "string", "null"),
+			col("escapes", "/~01", false, "integer"),
+			col("nested/field", "/nested/field", false, "string"),
+		},
+	}
+
+	var props []string
+	for _, c := range table.RootPropertyColumns() {
+		props = append(props, c.Field+" => "+c.RootProperty())
+	}
+	require.Equal(t, []string{
+		"key => key",
+		"field_with_projection => fieldWithProjection",
+		"a/b~c => a/b~c",
+		"escapes => ~1",
+	}, props)
+
+	require.Equal(t, []string{"fieldWithProjection", "~1"}, table.NullablePropertiesToStrip())
+}
+
 func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 	literaler := ToLiteralFn(QuoteTransform("'", "''"))
 	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
