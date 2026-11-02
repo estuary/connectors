@@ -11,6 +11,13 @@
   top-level field contains special or non-ASCII characters, or has a custom
   projection name.
 
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. Controlled by the `truncate_after_backfill`
+  feature flag, enabled by default; a binding without a `flow_published_at`
+  column, or in delta-updates mode, is unaffected.
+
 ### Changed
 - Every load runs as one SQL script, replacing the `two_phase_loads` feature
   flag. The script first finds the files holding rows that match its keys,

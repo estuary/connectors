@@ -179,6 +179,10 @@ maintenance is planned).
 If you're using the AWS Glue catalog, you can enable automatic data file compaction by following
 [this guide](https://docs.aws.amazon.com/lake-formation/latest/dg/data-compaction.html).
 
+Every backfill drops and recreates the table. The connector removes only the catalog entry, so the
+dropped table's files stay in your bucket. To delete them, run Iceberg's
+[`remove_orphan_files`](https://iceberg.apache.org/docs/latest/spark-procedures/#remove_orphan_files) on the new table with `older_than` set to the time of the backfill.
+
 ## At-Least-Once Semantics
 
 In rare cases, it may be possible for documents from a source collection to be appended to a target
