@@ -285,8 +285,12 @@ type streamV2Manager struct {
 
 	client *streamV2Client
 
-	// batchFiles holds one slot per batch file on local disk, across every channel.
-	batchFiles *semaphore.Weighted
+	// batchBytes holds the on-disk bytes of every finished batch file, across every
+	// channel. The batch files still being written are outside it, and they all
+	// belong to one binding because writeRow sends a binding's batches when a
+	// document of another binding arrives. So local disk holds at most
+	// streamV2BatchFileBudget plus one batch per channel of a binding.
+	batchBytes *semaphore.Weighted
 
 	bindings map[int]*streamV2Binding
 	// lastBinding is the binding of the most recently written document, or -1
@@ -316,7 +320,7 @@ func newStreamV2Manager(
 		dialect:         dialect,
 		streaming:       streaming,
 		client:          client,
-		batchFiles:      semaphore.NewWeighted(streamV2BatchFileSlots),
+		batchBytes:      semaphore.NewWeighted(streamV2BatchFileBudget),
 		bindings:        make(map[int]*streamV2Binding),
 		lastBinding:     -1,
 	}, nil
@@ -522,7 +526,7 @@ func (m *streamV2Manager) openChannel(
 	if err != nil {
 		return nil, err
 	}
-	return newStreamV2Channel(b, m.client, m.batchFiles, channelName, keyRange, routed, committedOffset), nil
+	return newStreamV2Channel(b, m.client, m.batchBytes, channelName, keyRange, routed, committedOffset), nil
 }
 
 // sweep drops the channels this task derived for the binding's table that it no

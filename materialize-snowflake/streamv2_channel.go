@@ -20,12 +20,9 @@ import (
 // reports as committed, whatever batch boundaries the interrupted attempt cut.
 var streamV2BatchSizeLimit = 256 * 1024 * 1024
 
-// streamV2BatchFileSlots is the number of batch files that may exist on local disk
-// at once. A batch file stays under 512 MiB, so the slots bound disk use to 16 GiB.
-//
-// It must be at least streamV2ChannelsPerShard, because every channel of the binding
-// being written can hold an open batch file while a row waits for a slot.
-const streamV2BatchFileSlots = 32
+// streamV2BatchFileBudget is the number of bytes that finished batch files may
+// occupy on local disk at once, from the end of a batch until its append returns.
+const streamV2BatchFileBudget = 4 * 1024 * 1024 * 1024
 
 // streamV2PaceBytesPerSecond is the uncompressed byte rate this write path allows
 // itself on one channel.
@@ -74,13 +71,13 @@ type streamV2Channel struct {
 	// per channel, because Snowflake meters each channel independently.
 	limiter *rate.Limiter
 
-	// batchFiles holds a slot for each batch file of this channel, from the file's
-	// creation until its removal.
-	batchFiles *semaphore.Weighted
+	// batchBytes holds the on-disk size of each finished batch file of this channel,
+	// from the end of the batch until the file's removal.
+	batchBytes *semaphore.Weighted
 }
 
 // newStreamV2Channel builds the in-memory state of one opened, reconciled channel.
-func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, batchFiles *semaphore.Weighted, channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
+func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, batchBytes *semaphore.Weighted, channelName string, keyRange streamV2Range, routed, committed int64) *streamV2Channel {
 	var c = &streamV2Channel{
 		binding:     b,
 		client:      client,
@@ -88,7 +85,7 @@ func newStreamV2Channel(b *streamV2Binding, client *streamV2Client, batchFiles *
 		keyRange:    keyRange,
 		batch:       streamV2Batch{columns: b.columns},
 		limiter:     rate.NewLimiter(streamV2PaceBytesPerSecond, 2*streamV2PaceBytesPerSecond),
-		batchFiles:  batchFiles,
+		batchBytes:  batchBytes,
 		progress: struct {
 			routed       int64
 			checkpointed int64
@@ -139,13 +136,20 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 		c.appends.SetLimit(1)
 	} else if c.appendsCtx.Err() != nil {
 		os.Remove(file.path)
-		c.batchFiles.Release(1)
 		return fmt.Errorf("appending to channel %q of %s: %w", c.channelName, c.binding.table, c.appends.Wait())
+	}
+
+	// A file larger than the whole budget waits for every other file to go, rather
+	// than forever.
+	var weight = min(int64(file.compressedBytes), streamV2BatchFileBudget)
+	if err := c.batchBytes.Acquire(ctx, weight); err != nil {
+		os.Remove(file.path)
+		return err
 	}
 
 	var appendsCtx = c.appendsCtx
 	c.appends.Go(func() error {
-		defer c.batchFiles.Release(1)
+		defer c.batchBytes.Release(weight)
 		defer os.Remove(file.path)
 		if err := streamV2Pace(appendsCtx, c.limiter, file.uncompressedBytes); err != nil {
 			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
@@ -184,9 +188,6 @@ func (c *streamV2Channel) writeRow(ctx context.Context, converted []any) error {
 	}
 
 	if c.batch.empty() {
-		if err := c.batchFiles.Acquire(ctx, 1); err != nil {
-			return err
-		}
 		c.batch.firstOffset = offset
 	}
 	if err := c.batch.writeRow(converted); err != nil {
