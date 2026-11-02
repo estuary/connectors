@@ -28,6 +28,7 @@ Auto-loads on `source-*/**/*.py`. Short rules where silence produces a bug.
 | required-not-getattr | diff | Fields the logic depends on are required, not `getattr(o, "f", None)` |
 | incremental-processors | diff | Prefer `IncrementalJsonProcessor` / `IncrementalCsvProcessor` |
 | basedocument-extra-allow | diff | Documents subclass `BaseDocument`, `extra="allow"`, minimal fields |
+| models-in-models-py | diff | Every Pydantic model, document or parse-only, lives in `models.py` |
 | snake-case-log-keys | diff | Structured-log keys are snake_case |
 | pep695-generics | diff | `class Foo[T]`, never `TypeVar` + `Generic[...]` |
 | fetch-naming | diff | `fetch_<s>` / `backfill_<s>` / `snapshot_<s>` |
