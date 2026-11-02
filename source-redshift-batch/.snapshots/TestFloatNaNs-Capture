@@ -148,5 +148,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"floatnans_198258":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":3}}}
+{"bindingStateV1":{"floatnans_198258":{"DocumentCount":3,"LastPolled":"<TIMESTAMP>"}}}
 
