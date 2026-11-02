@@ -7,13 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"iter"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -697,60 +698,64 @@ func TestS3PropsForIAMCredentials(t *testing.T) {
 
 // fakeCatalog implements only the icebergcatalog.Catalog methods that
 // populateInfoSchema exercises; the embedded interface panics if any other
-// method is called.
+// method is called, ListTables included.
 type fakeCatalog struct {
 	icebergcatalog.Catalog
-	namespaces       []icebergtable.Identifier
-	tablesByNS       map[string][]string
-	listTablesCalled bool
+	namespaces []icebergtable.Identifier
+	tablesByNS map[string][]string
+	loadErr    error
+
+	mu     sync.Mutex
+	loaded []string
 }
 
 func (f *fakeCatalog) ListNamespaces(ctx context.Context, parent icebergtable.Identifier) ([]icebergtable.Identifier, error) {
 	return f.namespaces, nil
 }
 
-func (f *fakeCatalog) ListTables(ctx context.Context, namespace icebergtable.Identifier) iter.Seq2[icebergtable.Identifier, error] {
-	f.listTablesCalled = true
-	return func(yield func(icebergtable.Identifier, error) bool) {
-		name := namespace[0]
-		tbls, ok := f.tablesByNS[name]
-		if !ok {
-			// Reproduce Glue's ListTables, which yields a raw AWS
-			// EntityNotFoundException for an absent database rather than
-			// catalog.ErrNoSuchNamespace.
-			yield(icebergtable.Identifier{}, errors.New("failed to list tables in namespace "+name+": EntityNotFoundException"))
-			return
-		}
-		for _, t := range tbls {
-			if !yield(icebergtable.Identifier{name, t}, nil) {
-				return
-			}
-		}
+func (f *fakeCatalog) LoadTable(ctx context.Context, ident icebergtable.Identifier) (*icebergtable.Table, error) {
+	f.mu.Lock()
+	f.loaded = append(f.loaded, pathToFQN(ident))
+	f.mu.Unlock()
+
+	if f.loadErr != nil {
+		return nil, f.loadErr
 	}
+	ns, name := ident[0], ident[1]
+	if !slices.Contains(f.tablesByNS[ns], name) {
+		// Glue's GetTable error for a missing table, which iceberg-go wraps
+		// around ErrNoSuchTable (the REST catalog maps its 404 the same way).
+		return nil, fmt.Errorf("failed to get table %s.%s: %w", ns, name, icebergcatalog.ErrNoSuchTable)
+	}
+	schema := iceberg.NewSchema(0, iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.Int64, Required: true})
+	meta, err := icebergtable.NewMetadata(schema, iceberg.UnpartitionedSpec, icebergtable.UnsortedSortOrder, "s3://bucket/"+ns+"/"+name, nil)
+	if err != nil {
+		return nil, err
+	}
+	return icebergtable.New(ident, meta, "", nil, nil), nil
+}
+
+func newTestInfoSchema() *mboilerplate.InfoSchema {
+	return mboilerplate.NewInfoSchema(
+		func(p []string) []string { return p },
+		func(ns string) string { return ns },
+		func(f string) string { return f },
+		false, false,
+	)
 }
 
 // TestPopulateInfoSchemaSkipsAbsentNamespace guards parity with the removed
-// Python info_schema, which listed tables only in namespaces returned by
-// list_namespaces(). A wanted namespace that does not yet exist must be skipped
-// silently — on Glue, ListTables surfaces a raw EntityNotFoundException that is
-// never catalog.ErrNoSuchNamespace, so error-matching alone fails to bootstrap.
+// Python info_schema, which looked up tables only in namespaces returned by
+// list_namespaces(). A wanted namespace that does not yet exist must be
+// skipped silently, without a lookup.
 func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
-	newIS := func() *mboilerplate.InfoSchema {
-		return mboilerplate.NewInfoSchema(
-			func(p []string) []string { return p },
-			func(ns string) string { return ns },
-			func(f string) string { return f },
-			false, false,
-		)
-	}
-
 	t.Run("absent namespace is skipped without error", func(t *testing.T) {
 		fake := &fakeCatalog{namespaces: nil}
 		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
 
-		err := c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
+		err := c.populateInfoSchema(context.Background(), newTestInfoSchema(), [][]string{{"tests", "mytable"}})
 		require.NoError(t, err)
-		require.False(t, fake.listTablesCalled, "must not scan a namespace that does not exist")
+		require.Empty(t, fake.loaded, "must not look up a table in a namespace that does not exist")
 	})
 
 	t.Run("existing namespace is scanned", func(t *testing.T) {
@@ -760,9 +765,54 @@ func TestPopulateInfoSchemaSkipsAbsentNamespace(t *testing.T) {
 		}
 		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
 
-		err := c.populateInfoSchema(context.Background(), newIS(), [][]string{{"tests", "mytable"}})
+		is := newTestInfoSchema()
+		err := c.populateInfoSchema(context.Background(), is, [][]string{{"tests", "mytable"}})
 		require.NoError(t, err)
-		require.True(t, fake.listTablesCalled)
+		require.Equal(t, []string{"tests.mytable"}, fake.loaded)
+		require.True(t, is.HasNamespace("tests"))
+		require.Empty(t, is.Resources())
+	})
+}
+
+// TestPopulateInfoSchemaLoadsTablesByName guards that the scan costs one
+// lookup per bound table rather than a listing of the whole namespace, which
+// on a large Glue database dominates every Validate and Apply.
+func TestPopulateInfoSchemaLoadsTablesByName(t *testing.T) {
+	t.Run("existing tables are pushed with their fields", func(t *testing.T) {
+		fake := &fakeCatalog{
+			namespaces: []icebergtable.Identifier{{"tests"}, {"unbound"}},
+			tablesByNS: map[string][]string{"tests": {"mytable", "other"}, "unbound": {"mytable"}},
+		}
+		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
+
+		is := newTestInfoSchema()
+		err := c.populateInfoSchema(context.Background(), is, [][]string{
+			{"tests", "mytable"},
+			{"tests", "missing"},
+			{"tests", "mytable"},
+		})
+		require.NoError(t, err)
+		require.ElementsMatch(t, []string{"tests.mytable", "tests.missing"}, fake.loaded)
+		require.True(t, is.HasNamespace("unbound"))
+
+		require.Len(t, is.Resources(), 1)
+		res := is.GetResource([]string{"tests", "mytable"})
+		require.NotNil(t, res)
+		f := res.GetField("id")
+		require.NotNil(t, f)
+		require.False(t, f.Nullable)
+		require.Len(t, res.AllFields(), 1)
+	})
+
+	t.Run("errors other than a missing table are surfaced", func(t *testing.T) {
+		fake := &fakeCatalog{
+			namespaces: []icebergtable.Identifier{{"tests"}},
+			loadErr:    errors.New("AccessDeniedException"),
+		}
+		c := &catalog{cfg: &config{}, locationStyle: NestedLocationStyle, cat: fake}
+
+		err := c.populateInfoSchema(context.Background(), newTestInfoSchema(), [][]string{{"tests", "mytable"}})
+		require.ErrorContains(t, err, "AccessDeniedException")
 	})
 }
 
