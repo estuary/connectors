@@ -1,14 +1,5 @@
 # Changelog
 
-## 2026-11-02
-
-### Fixed
-- Validating and applying a materialization now looks up only the tables it
-  binds, instead of listing every table in each of its namespaces. With a Glue
-  database that holds thousands of tables, each check took tens of seconds and
-  publishing a change could take several minutes; it now takes about as long
-  as loading the bound tables.
-
 ## 2026-10-31
 
 ### Changed

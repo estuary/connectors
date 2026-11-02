@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -240,18 +239,14 @@ func (t *stripDelegationTransport) RoundTrip(req *http.Request) (*http.Response,
 // released after fn returns instead of being accumulated: a loaded table
 // retains its full parsed metadata, including the entire snapshot history, so
 // holding one per binding exhausts the container's memory on materializations
-// with many long-lived tables. fn must be safe to call concurrently. With
-// missingOK, a table the catalog reports as absent is skipped instead of
-// failing the call.
-func (c *catalog) forEachTable(ctx context.Context, idents []icebergtable.Identifier, missingOK bool, fn func(idx int, tbl *icebergtable.Table) error) error {
+// with many long-lived tables. fn must be safe to call concurrently.
+func (c *catalog) forEachTable(ctx context.Context, idents []icebergtable.Identifier, fn func(idx int, tbl *icebergtable.Table) error) error {
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
 	for i, ident := range idents {
 		g.Go(func() error {
 			tbl, err := c.cat.LoadTable(gctx, ident)
-			if missingOK && errors.Is(err, icebergcatalog.ErrNoSuchTable) {
-				return nil
-			} else if err != nil {
+			if err != nil {
 				return fmt.Errorf("loading table %s: %w", pathToFQN(ident), err)
 			}
 			return fn(i, tbl)
@@ -262,10 +257,10 @@ func (c *catalog) forEachTable(ctx context.Context, idents []icebergtable.Identi
 
 func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	// info-schema is consulted before namespaces are necessarily created. List
-	// the existing namespaces first, both to register them and to look up
-	// tables only in namespaces that exist, mirroring the removed Python
-	// info_schema. Both Glue and REST report a table in an absent namespace as
-	// ErrNoSuchTable, so this only saves lookups that cannot succeed.
+	// the existing namespaces first, both to register them and to scan tables
+	// only in namespaces that exist, mirroring the removed Python info_schema.
+	// Relying on ListTables to report an absent namespace is not portable: Glue
+	// surfaces a raw EntityNotFoundException never mapped to ErrNoSuchNamespace.
 	existing, err := c.listNamespaces(ctx)
 	if err != nil {
 		return fmt.Errorf("listing namespaces: %w", err)
@@ -279,6 +274,14 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 		return nil
 	}
 
+	wantTables := make(map[string]map[string]struct{})
+	for _, p := range resourcePaths {
+		if wantTables[p[0]] == nil {
+			wantTables[p[0]] = map[string]struct{}{}
+		}
+		wantTables[p[0]][p[1]] = struct{}{}
+	}
+
 	log.WithField("count", len(resourcePaths)).Info("info-schema: scanning tables")
 
 	existingNamespaces := make(map[string]struct{}, len(existing))
@@ -286,25 +289,25 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 		existingNamespaces[ns] = struct{}{}
 	}
 
-	// Load the wanted tables by name rather than listing their namespaces: a
-	// listing costs time in proportion to every table in the namespace, which
-	// in a large Glue database dwarfs loading just the bound tables.
-	var candidates []icebergtable.Identifier
-	seen := make(map[[2]string]struct{}, len(resourcePaths))
-	for _, p := range resourcePaths {
-		key := [2]string{p[0], p[1]}
-		if _, ok := existingNamespaces[p[0]]; !ok {
-			continue
-		} else if _, ok := seen[key]; ok {
+	var matched []icebergtable.Identifier
+	for ns, want := range wantTables {
+		if _, ok := existingNamespaces[ns]; !ok {
 			continue
 		}
-		seen[key] = struct{}{}
-		candidates = append(candidates, icebergtable.Identifier{p[0], p[1]})
+		nsIdent := icebergtable.Identifier{ns}
+		for tblIdent, err := range c.cat.ListTables(ctx, nsIdent) {
+			if err != nil {
+				return fmt.Errorf("listing tables in %s: %w", ns, err)
+			}
+			tbl := tblIdent[len(tblIdent)-1]
+			if _, ok := want[tbl]; ok {
+				matched = append(matched, tblIdent)
+			}
+		}
 	}
 
-	found := make([]bool, len(candidates))
-	fields := make([][]boilerplate.ExistingField, len(candidates))
-	if err := c.forEachTable(ctx, candidates, true, func(idx int, tbl *icebergtable.Table) error {
+	fields := make([][]boilerplate.ExistingField, len(matched))
+	if err := c.forEachTable(ctx, matched, func(idx int, tbl *icebergtable.Table) error {
 		schemaFields := tbl.Schema().Fields()
 		out := make([]boilerplate.ExistingField, len(schemaFields))
 		for i, f := range schemaFields {
@@ -315,24 +318,19 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 			}
 		}
 		fields[idx] = out
-		found[idx] = true
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	var foundCount int
-	for i, ident := range candidates {
-		if !found[i] {
-			continue
-		}
-		foundCount++
-		res := is.PushResource(ident[0], ident[1])
+	for i, ident := range matched {
+		ns, name := ident[0], ident[len(ident)-1]
+		res := is.PushResource(ns, name)
 		for _, f := range fields[i] {
 			res.PushField(f)
 		}
 	}
-	log.WithField("count", foundCount).Info("info-schema: found tables")
+	log.WithField("count", len(matched)).Info("info-schema: found tables")
 	return nil
 }
 
@@ -364,7 +362,7 @@ func (c *catalog) tableInfos(ctx context.Context, resourcePaths [][]string) ([]t
 		idents[i] = p
 	}
 	out := make([]tableInfo, len(idents))
-	if err := c.forEachTable(ctx, idents, false, func(idx int, tbl *icebergtable.Table) error {
+	if err := c.forEachTable(ctx, idents, func(idx int, tbl *icebergtable.Table) error {
 		fieldIDs := make(map[string]int)
 		for _, f := range tbl.Schema().Fields() {
 			fieldIDs[f.Name] = f.ID
