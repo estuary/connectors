@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -39,6 +40,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSpec(t *testing.T) {
@@ -109,6 +111,50 @@ func ensureNamespace(t *testing.T, cfg config) {
 		!strings.Contains(err.Error(), "AlreadyExists") {
 		t.Fatalf("pre-creating namespace %q: %v", cfg.Namespace, err)
 	}
+}
+
+// staleTestTable matches the names testutil gives per-run test tables.
+var staleTestTable = regexp.MustCompile(`_flow_test_(\d+)$`)
+
+// sweepStaleTestTables drops test tables in cfg.Namespace left by runs that
+// never reached their cleanup, such as cancelled CI jobs. The boilerplate
+// sweep cannot see them: it enumerates through PopulateInfoSchema, which
+// reports only the bound tables. Glue is shared and persistent, so leftovers
+// would otherwise accumulate and slow every info-schema scan, which lists the
+// namespace. The age threshold matches testutil's, so a concurrent run's
+// in-use tables are left alone.
+func sweepStaleTestTables(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	var stale []icebergtable.Identifier
+	for ident, err := range cat.cat.ListTables(ctx, icebergtable.Identifier{cfg.Namespace}) {
+		require.NoError(t, err)
+		m := staleTestTable.FindStringSubmatch(ident[len(ident)-1])
+		if m == nil {
+			continue
+		}
+		secs, err := strconv.ParseInt(m[1], 10, 64)
+		if err == nil && time.Since(time.Unix(secs, 0)) > 60*time.Minute {
+			stale = append(stale, ident)
+		}
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10)
+	for _, ident := range stale {
+		g.Go(func() error {
+			if err := cat.cat.DropTable(gctx, ident); err != nil {
+				t.Logf("failed to drop stale test table %s: %v", pathToFQN(ident), err)
+			}
+			return nil
+		})
+	}
+	require.NoError(t, g.Wait())
+	t.Logf("dropped %d stale test tables from %s", len(stale), cfg.Namespace)
 }
 
 func TestIntegration(t *testing.T) {
@@ -307,6 +353,7 @@ func TestIntegrationGlue(t *testing.T) {
 
 	cfg := loadGlueTestConfig(t)
 	ensureNamespace(t, cfg)
+	sweepStaleTestTables(t, cfg)
 
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
