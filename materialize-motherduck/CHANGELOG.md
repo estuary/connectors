@@ -1,5 +1,17 @@
 # materialize-motherduck
 
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+### Fixed
+- On DuckLake databases, a column whose field becomes optional now has its
+  `NOT NULL` constraint dropped, so commits no longer fail when that field is
+  missing.
+
 ## 2026-10-22
 
 ### Added

@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"github.com/estuary/connectors/go/common"
+	"slices"
 	"testing"
 	"text/template"
 
@@ -107,4 +108,78 @@ func TestCreateResourceCarriesStateKey(t *testing.T) {
 	require.NoError(t, apply(context.Background()))
 
 	require.Equal(t, "a_table.v3", client.created.StateKey)
+}
+
+func TestColumnLimit(t *testing.T) {
+	var dialect = newTestDialect()
+	dialect.MaxColumns = 3
+
+	var s = &sqlMaterialization[boilerplate.EndpointConfiger, Resource]{
+		materializationName: "a/materialization",
+		endpoint: &Endpoint[boilerplate.EndpointConfiger]{
+			Config:              stateKeyTestConfig{},
+			Dialect:             dialect,
+			CreateTableTemplate: template.Must(template.New("createTargetTable").Parse(`CREATE TABLE {{$.Identifier}};`)),
+		},
+		client: new(recordingClient),
+	}
+
+	var binding = func(values ...string) boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType] {
+		var projections []pf.Projection
+		for _, f := range slices.Sorted(slices.Values(append([]string{"id"}, values...))) {
+			projections = append(projections, pf.Projection{
+				Field:     f,
+				Ptr:       "/" + f,
+				Inference: pf.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST},
+			})
+		}
+		return boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
+				Collection:     pf.CollectionSpec{Name: "a/collection", Projections: projections},
+				FieldSelection: pf.FieldSelection{Keys: []string{"id"}, Values: values},
+			},
+			Config: stateKeyTestResource{},
+		}
+	}
+
+	var existing = func(fields ...string) boilerplate.ExistingResource {
+		var r = boilerplate.NewInfoSchema(nil, nil, func(f string) string { return f }, false, false).PushResource("public", "a_table")
+		for _, f := range fields {
+			r.PushField(boilerplate.ExistingField{Name: f})
+		}
+		return *r
+	}
+
+	var update = func(b boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType], newFields ...string) boilerplate.BindingUpdate[boilerplate.EndpointConfiger, Resource, MappedType] {
+		var u = boilerplate.BindingUpdate[boilerplate.EndpointConfiger, Resource, MappedType]{Binding: b}
+		for _, f := range newFields {
+			u.NewProjections = append(u.NewProjections, boilerplate.MappedProjection[MappedType]{
+				Projection: boilerplate.Projection{Projection: pf.Projection{Field: f}},
+			})
+		}
+		return u
+	}
+
+	var ctx = context.Background()
+	var path = []string{"public", "a_table"}
+
+	_, _, err := s.CreateResource(ctx, binding("a", "b"))
+	require.NoError(t, err)
+
+	_, _, err = s.CreateResource(ctx, binding("a", "b", "c"))
+	require.EqualError(t, err, `table a_database.public.a_table for collection "a/collection" would have 4 columns, which exceeds the destination's limit of 3 columns per table: exclude fields from this binding to reduce the number of columns`)
+
+	_, _, err = s.UpdateResource(ctx, path, existing("id", "a"), update(binding("a", "b"), "b"))
+	require.NoError(t, err)
+
+	// A column that is no longer selected still counts toward the limit.
+	_, _, err = s.UpdateResource(ctx, path, existing("id", "a", "old"), update(binding("a", "b"), "b"))
+	require.EqualError(t, err, `table a_database.public.a_table for collection "a/collection" would have 4 columns (3 existing and 1 new), which exceeds the destination's limit of 3 columns per table: exclude fields from this binding to reduce the number of columns`)
+
+	// A table already at the limit can still be altered if no columns are added.
+	_, _, err = s.UpdateResource(ctx, path, existing("id", "a", "old"), boilerplate.BindingUpdate[boilerplate.EndpointConfiger, Resource, MappedType]{
+		Binding:             binding("a"),
+		NewlyNullableFields: []boilerplate.ExistingField{{Name: "old"}},
+	})
+	require.NoError(t, err)
 }

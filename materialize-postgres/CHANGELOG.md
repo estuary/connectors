@@ -1,5 +1,12 @@
 # materialize-postgres
 
+## 2026-10-31
+
+### Changed
+- A table that would exceed Postgres's limit of 1600 columns now fails before
+  any binding's table is created or altered, with an error naming the table
+  and its column count and asking you to exclude fields from the binding.
+
 ## 2026-10-23
 
 ### Fixed

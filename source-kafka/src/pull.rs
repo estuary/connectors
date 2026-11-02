@@ -56,6 +56,10 @@ struct ResourceState {
 struct BindingInfo {
     binding_index: u32,
     state_key: String,
+    // The topic's partition count when `setup_consumer` assigned partitions.
+    // Partitions added to the topic later aren't assigned until the connector
+    // restarts.
+    partition_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -83,6 +87,19 @@ enum Parsed {
     Value(serde_json::Value),
 }
 
+// With no timeout, `poll` returns only for a message or an error. So the
+// loop can't run between messages while every assigned partition is idle.
+// rdkafka already wakes up once a second while it waits, so a one-second
+// timeout adds no wake-ups.
+const POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+
+// How often the poll loop checks the bound topics for partitions added since
+// startup. Each check is one metadata request for every topic in the cluster,
+// and it blocks the polling thread, so it's kept infrequent.
+const PARTITION_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+// Bounds how long an unresponsive broker can hold up a partition check.
+const PARTITION_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
@@ -106,12 +123,49 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
 
     let topics_to_bindings =
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
+    let mut next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
 
     loop {
-        let msg = consumer
-            .poll(None)
-            .expect("polling without a timeout should always produce a message")
-            .context("receiving next message")?;
+        if std::time::Instant::now() >= next_partition_check {
+            next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
+
+            match consumer.fetch_metadata(None, PARTITION_CHECK_TIMEOUT) {
+                Ok(metadata) => {
+                    for topic in metadata.topics() {
+                        let Some(binding) = topics_to_bindings.get(topic.name()) else {
+                            continue;
+                        };
+                        let partitions = topic.partitions().len();
+                        if partitions > binding.partition_count {
+                            // A clean exit makes the runtime start a new
+                            // session, and `setup_consumer` then assigns the
+                            // added partitions. Every shard restarts, which
+                            // leaves `setup_consumer` as the only place that
+                            // decides ownership. Checking here before the next
+                            // poll means the previous message's checkpoint has
+                            // already been written.
+                            tracing::info!(
+                                eventType = "connectorStatus",
+                                topic = topic.name(),
+                                partitions_at_startup = binding.partition_count,
+                                partitions,
+                                "Restarting to capture new partitions of topic {}",
+                                topic.name(),
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "couldn't fetch metadata to check for added partitions");
+                }
+            }
+        }
+
+        let Some(result) = consumer.poll(POLL_TIMEOUT) else {
+            continue;
+        };
+        let msg = result.context("receiving next message")?;
 
         let mut op = "u";
         let payload = match msg.payload() {
@@ -321,6 +375,7 @@ async fn setup_consumer(
             BindingInfo {
                 binding_index: idx as u32,
                 state_key: state_key.to_string(),
+                partition_count: partition_info.len(),
             },
         );
     }

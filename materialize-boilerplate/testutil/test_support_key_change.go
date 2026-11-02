@@ -39,6 +39,8 @@ func RunKeyChangeMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.F
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 

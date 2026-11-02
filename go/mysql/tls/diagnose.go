@@ -52,13 +52,8 @@ func tlsUnsupported(err error) bool {
 // serverHost that failed because the server certificate was rejected, or
 // returns "" when err is not a certificate verification failure.
 func (s Settings) verificationRemediation(err error, serverHost string) string {
-	var verifyErr *tls.CertificateVerificationError
-	var hostErr x509.HostnameError
-	var authErr x509.UnknownAuthorityError
-	var invalidErr x509.CertificateInvalidError
-
 	var chain []*x509.Certificate // The certificates the server presented, leaf first.
-	if errors.As(err, &verifyErr) {
+	if verifyErr, ok := errors.AsType[*tls.CertificateVerificationError](err); ok {
 		chain = verifyErr.UnverifiedCertificates
 	}
 	var pin = findPinnableCert(chain)
@@ -75,11 +70,11 @@ func (s Settings) verificationRemediation(err error, serverHost string) string {
 
 	// Go checks the certificate's validity and names before its chain, so a
 	// hostname error says nothing about whether the chain would be trusted.
-	switch {
-	case errors.As(err, &invalidErr):
+	if invalidErr, ok := errors.AsType[x509.CertificateInvalidError](err); ok {
 		return fmt.Sprintf("The server certificate is invalid (%s). "+
 			"Renew or reissue the server certificate.", invalidErr.Error())
-	case errors.As(err, &hostErr):
+	}
+	if hostErr, ok := errors.AsType[x509.HostnameError](err); ok {
 		var problem = "does not name any host, as is standard in MySQL's auto-generated certificates"
 		if listed := certificateNames(hostErr.Certificate); len(listed) > 0 {
 			problem = fmt.Sprintf("is issued for %q, not %q", listed, serverHost)
@@ -89,7 +84,8 @@ func (s Settings) verificationRemediation(err error, serverHost string) string {
 			"- set 'sslmode' to %q and 'ssl_server_ca' to %s, or\n"+
 			"- set 'sslmode' to %q.%s",
 			problem, ModeVerifyCA, pin.toSet(), ModeRequired, pin.hint())
-	case errors.As(err, &authErr):
+	}
+	if _, ok := errors.AsType[x509.UnknownAuthorityError](err); ok {
 		if s.ServerCA != "" {
 			return "The server certificate is not signed by the configured 'ssl_server_ca'. " +
 				"Set 'ssl_server_ca' to " + pin.toSet() + "." + pin.hint()

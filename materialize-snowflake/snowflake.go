@@ -462,13 +462,11 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 
 	if d.cfg.isStreamsV1(b.target.DeltaUpdates, d.featureFlags) {
 		if err := d.snowpipeStreaming.addBinding(ctx, d.ep.Identifier(loc.TableSchema), d.ep.Identifier(loc.TableName), b.target); err != nil {
-			var apiError *streamingApiError
-			var colError *unhandledColError
-			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {
+			if apiError, ok := errors.AsType[*streamingApiError](err); ok && (apiError.Code == 6 || apiError.Code == 55) {
 				// Streaming API errors with code 6 or 55  come from tables that
 				// don't support streaming at all, so we will fall back to a
 				// non-streaming strategy for them if they are encountered.
-			} else if errors.As(err, &colError) {
+			} else if _, ok := errors.AsType[*unhandledColError](err); ok {
 				// This column type is something that we haven't yet implemented
 				// Snowpipe Streaming support for, although we could at some
 				// point.
@@ -1078,8 +1076,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			}
 
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
-				var insertErr InsertFilesError
-				if errors.As(err, &insertErr) && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
+				if insertErr, ok := errors.AsType[InsertFilesError](err); ok && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
 					// This error can happen if either the pipe was not found, or we are not authorized to use it
 					// It is possible to not be authorized to use the pipe even though we have created it. When creating the pipe
 					// we specify the role by which to create the pipe, but when using Snowpipe, we can't specify a role. Rather, the

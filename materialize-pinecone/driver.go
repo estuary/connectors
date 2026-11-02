@@ -272,6 +272,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.B
 
 		bindings = append(bindings, binding{
 			conn:        conn,
+			collection:  b.Collection.Name.String(),
 			path:        b.ResourcePath,
 			dataHeaders: b.FieldSelection.AllFields(),
 		})

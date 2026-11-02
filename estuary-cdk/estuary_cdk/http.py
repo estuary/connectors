@@ -77,12 +77,17 @@ class HTTPError(RuntimeError):
     """
     HTTPError is an custom error class that provides the HTTP status code
     as a distinct attribute.
+
+    `body` is the raw response body, when the error came from a response.
+    Read error details from it rather than parsing them out of `message`,
+    whose wording may change.
     """
 
-    def __init__(self, message: str, code: int):
+    def __init__(self, message: str, code: int, body: bytes | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
+        self.body = body
 
 
 def format_error_body(body: bytes) -> str:
@@ -684,12 +689,14 @@ class HTTPMixin(Mixin, HTTPSession):
                         raise HTTPError(
                             f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nResponse:\n{format_error_body(body)}",
                             resp.status,
+                            body,
                         )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
                         f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nResponse:\n{format_error_body(body)}",
                         resp.status,
+                        body,
                     )
                 else:
                     resp.raise_for_status()

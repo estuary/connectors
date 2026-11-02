@@ -34,6 +34,8 @@ func RunApplyDrainTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	seedPending func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage,
 	verifyDrained func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any),
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
 

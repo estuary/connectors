@@ -303,6 +303,25 @@ func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
 // RuntimeV1 reports whether FLOW_TEST_RUNTIME selects the runtime v1 pass.
 func RuntimeV1() bool { return os.Getenv("FLOW_TEST_RUNTIME") == "v1" }
 
+// SkipRuntimeV1 skips the runtime v1 pass of a test that never drives legacy
+// `flowctl preview`: it drives the connector directly or through preview-next,
+// so its outcome is the runtime-next pass's.
+func SkipRuntimeV1(t *testing.T) {
+	t.Helper()
+	if RuntimeV1() {
+		t.Skip("does not drive runtime v1; covered by the runtime-next pass")
+	}
+}
+
+// requireRuntimeV1Selected fails a materialization test that CI's runtime v1
+// pass, which runs only `-run '^TestIntegration'`, would never select.
+func requireRuntimeV1Selected(t *testing.T) {
+	t.Helper()
+	if !strings.HasPrefix(t.Name(), "TestIntegration") {
+		t.Fatalf("%s drives runtime v1 but CI's runtime v1 pass only runs TestIntegration* tests; rename it", t.Name())
+	}
+}
+
 // runtimeV1Liveness drives the task through legacy `flowctl preview` -- the
 // runtime v1 protocol, under which Acknowledge never carries statePatches -- as
 // a single session with no trailing drain session, and requires that every

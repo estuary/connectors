@@ -456,8 +456,8 @@ func classifyBulkErr(err error) (terminal error, retryable []int) {
 		return nil, nil
 	}
 
-	var bwe mongo.BulkWriteException
-	if !errors.As(err, &bwe) {
+	var bwe, ok = errors.AsType[mongo.BulkWriteException](err)
+	if !ok {
 		return err, nil
 	}
 	if bwe.WriteConcernError != nil {

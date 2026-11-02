@@ -202,8 +202,7 @@ func (m *streamV2Manager) listChannels(ctx context.Context, database, schema, ta
 		if err != nil {
 			// Snowflake reports an absent pipe with the same error as one the role
 			// may not see, so the miss is logged.
-			var sfErr *sf.SnowflakeError
-			if errors.As(err, &sfErr) && sfErr.Number == streamV2ErrObjectNotExistOrAuthorized {
+			if sfErr, ok := errors.AsType[*sf.SnowflakeError](err); ok && sfErr.Number == streamV2ErrObjectNotExistOrAuthorized {
 				log.WithFields(log.Fields{"in": in, "error": err.Error()}).Info("no channels are visible to this role")
 				continue
 			}
