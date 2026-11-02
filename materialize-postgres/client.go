@@ -73,8 +73,7 @@ func preReqs(ctx context.Context, conf config, _ map[string]bool) *cerrors.Prere
 
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var pgErr *pgconn.ConnectError
-		if errors.As(err, &pgErr) {
+		if pgErr, ok := errors.AsType[*pgconn.ConnectError](err); ok {
 			err = pgErr.Unwrap()
 			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28P01)") {
 				err = fmt.Errorf("incorrect username or password")

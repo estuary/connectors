@@ -1,5 +1,12 @@
 # materialize-snowflake
 
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
 ## 2026-10-22
 
 ### Added

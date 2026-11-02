@@ -321,8 +321,9 @@ func (l *extendedLogger) finishedCommitLogFn(round int) func() {
 
 func (l *extendedLogger) waitingForAckDelayLogFn(round int) func() {
 	l.ackDelayStart = time.Now()
+	msg := syncWaitMessage(l.be.status.nextSync())
 	return func() {
-		l.log(log.Fields{"round": round}, "waiting to acknowledge materialization commit")
+		l.log(log.Fields{"round": round}, msg)
 	}
 }
 
@@ -425,7 +426,7 @@ func (l *BindingEvents) StartedEvaluatingLoads() {
 			for {
 				select {
 				case <-ticker.C:
-					l.log(log.Fields{"round": l.round}, "evaluting loads")
+					l.log(log.Fields{"round": l.round}, "evaluating loads")
 				case <-l.stopLogger:
 					l.log(log.Fields{"round": l.round, "took": time.Since(l.evaluatingLoadsStart).String()}, "finished evaluating loads")
 					return

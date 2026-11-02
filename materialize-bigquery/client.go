@@ -85,8 +85,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 // pushTableMetadata records a listed table and its fields in is.
 func pushTableMetadata(ctx context.Context, is *boilerplate.InfoSchema, mu *sync.Mutex, table *bigquery.Table) error {
 	md, err := tableMetadataWithRetry(ctx, table)
-	var gErr *googleapi.Error
-	if errors.As(err, &gErr) && gErr.Code == 404 {
+	if gErr, ok := errors.AsType[*googleapi.Error](err); ok && gErr.Code == 404 {
 		// The table was dropped after the listing returned it, so it is
 		// simply not part of the information schema.
 		log.WithField("table", fmt.Sprintf("%s.%s", table.DatasetID, table.TableID)).Debug("listed table no longer exists; skipping")
@@ -129,8 +128,7 @@ func tableMetadataWithRetry(ctx context.Context, table *bigquery.Table) (*bigque
 		if err == nil {
 			return md, nil
 		}
-		var gErr *googleapi.Error
-		if !errors.As(err, &gErr) || gErr.Code != 404 || attempt == maxAttempts {
+		if gErr, ok := errors.AsType[*googleapi.Error](err); !ok || gErr.Code != 404 || attempt == maxAttempts {
 			return nil, err
 		}
 		log.WithFields(log.Fields{
@@ -290,8 +288,7 @@ func checkDatasetLocation(ctx context.Context, cfg config) error {
 	defer bq.Close()
 
 	md, err := bq.bigqueryClient.DatasetInProject(cfg.ProjectID, cfg.Dataset).Metadata(ctx)
-	var apiErr *googleapi.Error
-	if errors.As(err, &apiErr) && apiErr.Code == 404 {
+	if apiErr, ok := errors.AsType[*googleapi.Error](err); ok && apiErr.Code == 404 {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("getting metadata for dataset %q: %w", cfg.Dataset, err)
