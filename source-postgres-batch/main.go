@@ -314,6 +314,12 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 			return json.RawMessage(bs), nil
 		}
 		return val, nil
+	case "XML":
+		// The pgx database/sql adapter returns XML as bytes, but we've always captured it as a string.
+		if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
 	case "DATE", "TIMESTAMP", "TIMESTAMPTZ":
 		// The pgx database/sql adapter returns infinite dates and timestamps as the strings
 		// "infinity" and "-infinity" instead of a time.Time. We map them to the same
