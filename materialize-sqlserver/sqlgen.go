@@ -420,9 +420,9 @@ SELECT {{ $.Binding }},
 (
 	{{- /* FOR JSON PATH would nest on a dot in a property; AUTO keeps it. */}}
 	SELECT * FROM (SELECT
-		{{- range $i, $col := $.RootLevelColumns}}
+		{{- range $i, $col := $.RootPropertyColumns}}
 			{{- if $i}},{{end}}
-		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
 	) AS d
 	FOR JSON AUTO, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER

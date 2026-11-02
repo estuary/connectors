@@ -297,9 +297,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ else -}}                                                                                                                                                        
 SELECT {{ $.Binding }} AS binding,                                                                                                                                 
 json_object(                                                                                                                                                       
-{{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
+{{- range $i, $col := $.RootPropertyColumns}}                                                                                                                         
        {{- if $i}}, {{end}}                                                                                                                                        
-       {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
+       {{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       

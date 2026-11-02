@@ -8,7 +8,8 @@
   queries that run at once hold no more results in memory than a single
   query did before loads ran concurrently.
 - With Exclude Flow Document enabled, documents now load correctly when a
-  top-level field contains special or non-ASCII characters.
+  top-level field contains special or non-ASCII characters, or has a custom
+  projection name.
 
 ## 2026-10-31
 ### Changed

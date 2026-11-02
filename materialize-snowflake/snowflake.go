@@ -419,7 +419,7 @@ type binding struct {
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
 	var b = new(binding)
 	b.target = target
-	b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	var loc = d.ep.Dialect.TableLocator(b.target.Path)

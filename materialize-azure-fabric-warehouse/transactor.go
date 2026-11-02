@@ -97,7 +97,7 @@ func newTransactor(
 			hasBinaryColumns: hasBinaryColumns,
 		}
 		if ep.Config.Advanced.NoFlowDocument {
-			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+			b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		}
 		b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
 		b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)

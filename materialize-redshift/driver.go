@@ -500,7 +500,7 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose appropriate templates based on configuration

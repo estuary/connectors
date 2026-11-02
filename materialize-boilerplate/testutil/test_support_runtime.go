@@ -118,6 +118,9 @@ type RuntimeConfig struct {
 	// feature flags — e.g. the connector's scale-out flag, which multi-shard
 	// runs require.
 	ExtraFeatureFlags []string
+	// ConfigOverrides sets endpoint config values by sjson path, e.g.
+	// "advanced.no_flow_document", to re-run a suite in another mode.
+	ConfigOverrides map[string]any
 	// Timeout is a backstop against a hung run; a healthy run ends by
 	// transaction count. Zero defaults to ten minutes.
 	Timeout time.Duration
@@ -161,14 +164,21 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// sets (later entries win in ParseFeatureFlags). flowctl passes a
 	// plaintext (non-sops) config to the connector unchanged, so writing the
 	// decrypted config back inline is sufficient.
-	if len(runtime.ExtraFeatureFlags) > 0 {
+	if len(runtime.ExtraFeatureFlags) > 0 || len(runtime.ConfigOverrides) > 0 {
 		rawCfg := decryptConfigRaw(t, bundled, taskName)
-		flags := strings.Join(runtime.ExtraFeatureFlags, ",")
-		if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
-			flags = baseFlags + "," + flags
+		var err error
+		if len(runtime.ExtraFeatureFlags) > 0 {
+			flags := strings.Join(runtime.ExtraFeatureFlags, ",")
+			if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
+				flags = baseFlags + "," + flags
+			}
+			rawCfg, err = sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
+			require.NoError(t, err)
 		}
-		rawCfg, err := sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
-		require.NoError(t, err)
+		for path, value := range runtime.ConfigOverrides {
+			rawCfg, err = sjson.SetBytes(rawCfg, path, value)
+			require.NoError(t, err)
+		}
 		bundled, err = sjson.SetRawBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), rawCfg)
 		require.NoError(t, err)
 	}

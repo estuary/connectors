@@ -4,7 +4,7 @@
 
 ### Fixed
 - With Exclude Flow Document enabled, documents now load correctly when a
-  top-level field contains a single quote.
+  top-level field contains a single quote or has a custom projection name.
 
 ## 2026-10-31
 

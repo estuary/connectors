@@ -332,13 +332,13 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 (
-{{- $chunks := ChunkColumns $.RootLevelColumns 49 -}}
+{{- $chunks := ChunkColumns $.RootPropertyColumns 49 -}}
 {{- range $chunkIdx, $chunk := $chunks }}
 	{{- if $chunkIdx }} || {{ end -}}
 	JSONB_BUILD_OBJECT(
 	{{- range $i, $col := $chunk}}
 		{{- if $i}},{{end}}
-		{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 	{{- end}}
 	)
 {{- end}}

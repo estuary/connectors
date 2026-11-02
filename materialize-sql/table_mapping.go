@@ -71,22 +71,6 @@ type Column struct {
 	MustExist bool
 }
 
-// NullableFieldsToStrip returns the list of field names that are optional (may be absent)
-// and non-nullable (schema doesn't allow null). When these fields are SQL NULL (because
-// the document didn't include them), they should be stripped from the reconstructed JSON
-// to avoid schema validation errors.
-func (t *Table) NullableFieldsToStrip() []string {
-	var fields []string
-	for _, cols := range [][]Column{t.Keys, t.Values} {
-		for _, col := range cols {
-			if !col.MustExist && !slices.Contains(col.Inference.Types, "null") {
-				fields = append(fields, col.Field)
-			}
-		}
-	}
-	return fields
-}
-
 // ConvertKey converts a key Tuple to database parameters.
 func (t *Table) ConvertKey(key tuple.Tuple) (out []interface{}, err error) {
 	return t.convertTuple(key, t.Keys, out)
@@ -191,6 +175,34 @@ func (t *Table) RootLevelColumns() []*Column {
 		}
 	}
 	return rootLevelCols
+}
+
+// RootPropertyColumns returns a column for each materialized root-level
+// property, to rebuild a document from. A property projected by several
+// fields is rebuilt from the first of them.
+func (t *Table) RootPropertyColumns() []*Column {
+	var out []*Column
+	var seen = make(map[string]bool)
+	for _, col := range t.RootLevelColumns() {
+		if prop := col.RootProperty(); !seen[prop] {
+			seen[prop] = true
+			out = append(out, col)
+		}
+	}
+	return out
+}
+
+// NullablePropertiesToStrip returns the properties of a document rebuilt from
+// RootPropertyColumns that are optional and non-nullable. Their SQL NULLs mean
+// the document didn't include them, so they're stripped to keep it valid.
+func (t *Table) NullablePropertiesToStrip() []string {
+	var props []string
+	for _, col := range t.RootPropertyColumns() {
+		if !col.MustExist && !slices.Contains(col.Inference.Types, "null") {
+			props = append(props, col.RootProperty())
+		}
+	}
+	return props
 }
 
 // KeyPtrs returns all keys of the Table as a single slice.

@@ -9,8 +9,8 @@
 
 ### Fixed
 - With Exclude Flow Document enabled, documents now load correctly when a
-  top-level field is a reserved word or contains special or non-ASCII
-  characters.
+  top-level field is a reserved word, contains special or non-ASCII characters,
+  or has a custom projection name.
 
 ## 2026-10-22
 
