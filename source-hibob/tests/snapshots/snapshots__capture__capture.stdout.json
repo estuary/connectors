@@ -1,0 +1,525 @@
+[
+  [
+    "acmeCo/employees",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "about": {
+        "about": null,
+        "foodPreferences": [],
+        "hobbies": [],
+        "socialData": {
+          "facebook": null,
+          "linkedin": null,
+          "twitter": null
+        },
+        "superpowers": []
+      },
+      "address": {
+        "activeEffectiveDate": null,
+        "city": null,
+        "country": null,
+        "fullAddress": null,
+        "line1": null,
+        "line2": null,
+        "postCode": null,
+        "siteAddress1": null,
+        "siteAddress2": null,
+        "siteCity": null,
+        "siteCountry": "United States",
+        "sitePostalCode": null,
+        "siteState": null,
+        "usaState": null,
+        "zipCode": null
+      },
+      "companyId": 644219,
+      "creationDate": "2026-11-02",
+      "creationDateTime": "2026-11-02T16:08:36.856642",
+      "displayName": "Jonathan Wihl",
+      "eeo": {
+        "ethnicity": null,
+        "jobCategory": null
+      },
+      "email": "jonathan@estuary.dev",
+      "emergency": {
+        "address": null,
+        "city": null,
+        "country": null,
+        "email": null,
+        "firstName": null,
+        "mobilePhone": null,
+        "phone": null,
+        "postCode": null,
+        "relation": null,
+        "secondName": null,
+        "surname": null
+      },
+      "employee": {
+        "applicationId": null,
+        "attendancePolicyId": null,
+        "band_baseSalary_id": null,
+        "band_compaRatio_baseSalary": null,
+        "band_compaRatio_ote": null,
+        "band_currency_baseSalary": null,
+        "band_currency_ote": null,
+        "band_effectiveDate_baseSalary": null,
+        "band_effectiveDate_ote": null,
+        "band_max_baseSalary": null,
+        "band_max_ote": null,
+        "band_mid_baseSalary": null,
+        "band_mid_ote": null,
+        "band_min_baseSalary": null,
+        "band_min_ote": null,
+        "band_ote_id": null,
+        "band_payPeriod_baseSalary": null,
+        "band_payPeriod_ote": null,
+        "band_rangePositioning_baseSalary": null,
+        "band_rangePositioning_ote": null,
+        "band_site_baseSalary": null,
+        "band_site_ote": null,
+        "buddy": null,
+        "candidateId": null,
+        "dateLeftPreviousEmployment": null,
+        "directorAppointedOn": null,
+        "directorsNIBasis": null,
+        "disabilityStatus": null,
+        "eligibleForRehire": null,
+        "employerId": null,
+        "employerWorkLocationId": null,
+        "enrolledInPayrollModuleStatus": null,
+        "ethnicities": [],
+        "firstDayOfWork": null,
+        "hrbp": null,
+        "isIR35Contractor": null,
+        "itAdmin": null,
+        "jobFamilyGroupId": null,
+        "jobFamilyId": null,
+        "jobLevelName": null,
+        "jobLevelTypeId": null,
+        "jobProfileCode": null,
+        "jobProfileDescription": null,
+        "jobProfileId": null,
+        "jobProfileTitle": null,
+        "jobRoleId": null,
+        "lastDayOfWork": null,
+        "legalSex": null,
+        "loanTypes": [],
+        "nationalInsuranceCategory": null,
+        "orgLevel": "individualContributor",
+        "payrollManager": null,
+        "positionOpeningId": null,
+        "previousTaxPaid": null,
+        "previousTaxablePay": null,
+        "recentLeaveEndDate": null,
+        "recentLeaveStartDate": null,
+        "regrettableTermination": null,
+        "sin": null,
+        "sinExpirationDate": null,
+        "starterDeclaration": null,
+        "starterType": null,
+        "taxCode": null,
+        "taxResidency": null,
+        "veteranStatus": [],
+        "w1m1": null,
+        "workLocationId": null
+      },
+      "financial": {
+        "identificationNumber": null,
+        "passportNumber": null,
+        "rightToWorkExpiryDate": null
+      },
+      "firstName": "Jonathan",
+      "fullName": "Jonathan Wihl",
+      "home": {
+        "familyStatus": null,
+        "legalGender": null,
+        "mobilePhone": null,
+        "numberOfKids": 0,
+        "privateEmail": null,
+        "privatePhone": null,
+        "spouse": {
+          "birthDate": null,
+          "firstName": null,
+          "gender": null,
+          "shortBirthDate": null,
+          "surname": null
+        }
+      },
+      "id": "4021630335610520270",
+      "identification": {
+        "ssn": null,
+        "ssnSerialNumber": null
+      },
+      "internal": {
+        "currentActiveStatusStartDate": "2026-11-02",
+        "lifecycleStatus": "employed",
+        "notice": null,
+        "probationEndDate": null,
+        "status": "Active",
+        "terminationDate": null,
+        "terminationReason": null,
+        "terminationType": null
+      },
+      "payroll": {
+        "additionalPensionContribution": null,
+        "deduction": {
+          "Childcare vouchers": {
+            "amount": null
+          },
+          "Company Car": {
+            "amount": null
+          },
+          "Cycle to work": {
+            "amount": null
+          },
+          "Lunch vouchers": {
+            "amount": null
+          },
+          "Season ticket loans": {
+            "amount": null
+          }
+        },
+        "employment": {
+          "activeEffectiveDate": "2026-11-02",
+          "actualWorkingPattern": {
+            "days": {
+              "friday": 8,
+              "monday": 8,
+              "saturday": 0,
+              "sunday": 0,
+              "thursday": 8,
+              "tuesday": 8,
+              "wednesday": 8
+            },
+            "hoursPerDay": 8,
+            "workingPatternId": 66985751,
+            "workingPatternType": "hourly"
+          },
+          "calendarId": null,
+          "contract": "Full time",
+          "flsaCode": null,
+          "fte": 100,
+          "hoursInDayNotWorked": 8,
+          "personalWorkingPatternType": null,
+          "salaryPayType": null,
+          "siteWorkingPattern": {
+            "days": {
+              "friday": 8,
+              "monday": 8,
+              "saturday": 0,
+              "sunday": 0,
+              "thursday": 8,
+              "tuesday": 8,
+              "wednesday": 8
+            },
+            "hoursPerDay": 8,
+            "workingPatternId": 66985751,
+            "workingPatternType": "hourly"
+          },
+          "standardWorkingPattern": null,
+          "type": null,
+          "weeklyHours": 40,
+          "workingPattern": null
+        },
+        "entitlement": {
+          "Childcare vouchers": {
+            "amount": null
+          },
+          "Company Car": {
+            "amount": null
+          },
+          "Cycle to work": {
+            "amount": null
+          },
+          "Lunch vouchers": {
+            "amount": null
+          },
+          "Season ticket loans": {
+            "amount": null
+          }
+        },
+        "nin": null,
+        "salary": {
+          "activeEffectiveDate": null,
+          "monthlyPayment": null,
+          "payFrequency": null,
+          "payPeriod": null,
+          "payment": {
+            "currency": null
+          },
+          "yearlyPayment": null
+        },
+        "taxCode": null,
+        "variable": {
+          "Bonus": {
+            "amount": null,
+            "companyPercent": null,
+            "departmentPercent": null,
+            "individualPercent": null,
+            "paymentPeriod": null,
+            "payoutType": null,
+            "percentageOfAnnualSalary": null
+          },
+          "Commission": {
+            "amount": null,
+            "companyPercent": null,
+            "departmentPercent": null,
+            "individualPercent": null,
+            "paymentPeriod": null,
+            "payoutType": null,
+            "percentageOfAnnualSalary": null
+          },
+          "Executive bonus": {
+            "amount": null,
+            "companyPercent": null,
+            "departmentPercent": null,
+            "individualPercent": null,
+            "paymentPeriod": null,
+            "payoutType": null,
+            "percentageOfAnnualSalary": null
+          }
+        }
+      },
+      "peopleAnalytics": {
+        "ageRiskIndicator": null,
+        "atRiskCounter": null,
+        "isManagerRiskIndicator": null,
+        "kidsRiskIndicator": null,
+        "lowRiskCounter": null,
+        "managerTenureRiskIndicator": null,
+        "numOfDirectReportsRiskIndicator": null,
+        "numWithSameTitleRiskIndicator": null,
+        "recentManagerChangeRiskIndicator": null,
+        "someRiskCounter": null,
+        "teamRecentTurnoverRiskIndicator": null,
+        "teamSizeRiskIndicator": null,
+        "tenureRankRiskIndicator": null,
+        "timeoffFrequencyRiskIndicator": null,
+        "yearsWithCurrentTitleRiskIndicator": null,
+        "yearsWithRecentSalaryRiskIndicator": null
+      },
+      "personal": {
+        "birthDate": null,
+        "communication": {
+          "skypeUsername": null,
+          "slackUsername": null
+        },
+        "honorific": null,
+        "nationality": [],
+        "pronouns": null,
+        "shortBirthDate": null
+      },
+      "secondName": null,
+      "state": "active",
+      "surname": "Wihl",
+      "temporaryAddress": {
+        "city": null,
+        "country": null,
+        "line1": null,
+        "line2": null,
+        "postCode": null,
+        "usaState": null
+      },
+      "work": {
+        "activeEffectiveDate": "2026-11-02",
+        "daysOfPreviousService": 0,
+        "department": null,
+        "directReports": null,
+        "employeeIdInCompany": null,
+        "indirectReports": null,
+        "isManager": false,
+        "manager": null,
+        "originalStartDate": "2026-11-02",
+        "reportsTo": null,
+        "reportsToIdInCompany": null,
+        "secondLevelManager": null,
+        "shortStartDate": "11-02",
+        "site": "New York (Demo)",
+        "siteId": 2614101,
+        "startDate": "2026-11-02",
+        "title": null,
+        "workChangeType": "New Employee",
+        "workMobile": null,
+        "workPhone": "6176105413"
+      }
+    }
+  ],
+  [
+    "acmeCo/employee_fields",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "category": "about",
+      "categoryDisplayName": "About",
+      "categoryId": "about",
+      "description": null,
+      "historical": false,
+      "id": "about.about",
+      "jsonPath": "about.about",
+      "name": "About",
+      "type": "text-area",
+      "typeData": {}
+    }
+  ],
+  [
+    "acmeCo/named_lists",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "items": [
+        {
+          "archived": false,
+          "children": [],
+          "id": "Checking",
+          "name": "Checking",
+          "value": "Checking"
+        },
+        {
+          "archived": false,
+          "children": [],
+          "id": "Savings",
+          "name": "Savings",
+          "value": "Savings"
+        }
+      ],
+      "name": "accountType"
+    }
+  ],
+  [
+    "acmeCo/employment_history",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activeEffectiveDate": "2026-11-02",
+      "actualWorkingPattern": {
+        "days": {
+          "friday": 8,
+          "monday": 8,
+          "saturday": 0,
+          "sunday": 0,
+          "thursday": 8,
+          "tuesday": 8,
+          "wednesday": 8
+        },
+        "hoursPerDay": 8,
+        "workingPatternId": 66985751,
+        "workingPatternType": "hourly"
+      },
+      "calendarId": null,
+      "calendarName": null,
+      "canBeDeleted": true,
+      "canEditOotbColumns": true,
+      "change": {
+        "changedBy": "redacted",
+        "changedById": "system",
+        "reason": null
+      },
+      "contract": "Full time",
+      "creationDate": null,
+      "customColumns": {},
+      "effectiveDate": "2026-11-02",
+      "employeeId": "4021630335610520270",
+      "endEffectiveDate": null,
+      "flsaCode": null,
+      "fte": 100,
+      "hoursInDayNotWorked": 8,
+      "id": 1000020261102,
+      "isCurrent": true,
+      "modificationDate": "2026-11-02",
+      "personalWorkingPatternType": null,
+      "salaryPayType": null,
+      "siteWorkingPattern": {
+        "days": {
+          "friday": 8,
+          "monday": 8,
+          "saturday": 0,
+          "sunday": 0,
+          "thursday": 8,
+          "tuesday": 8,
+          "wednesday": 8
+        },
+        "hoursPerDay": 8,
+        "workingPatternId": 66985751,
+        "workingPatternType": "hourly"
+      },
+      "standardWorkingPattern": null,
+      "standardWorkingPatternId": null,
+      "type": null,
+      "weeklyHours": 40,
+      "workingPattern": null
+    }
+  ],
+  [
+    "acmeCo/lifecycle_history",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "canBeDeleted": false,
+      "canEditOotbColumns": true,
+      "change": {
+        "changedBy": "redacted",
+        "changedById": "system",
+        "reason": null
+      },
+      "creationDate": "2026-11-02",
+      "customColumns": {},
+      "effectiveDate": "2026-11-02",
+      "employeeId": "4021630335610520270",
+      "employeeStatus": "Active",
+      "endEffectiveDate": null,
+      "id": 1000020261102,
+      "isCurrent": true,
+      "leaveReason": null,
+      "modificationDate": "2026-11-02",
+      "reasonType": null,
+      "status": "employed"
+    }
+  ],
+  [
+    "acmeCo/work_history",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activeEffectiveDate": "2026-11-02",
+      "canBeDeleted": false,
+      "canEditOotbColumns": true,
+      "change": {
+        "changedBy": "redacted",
+        "changedById": "system",
+        "reason": null
+      },
+      "creationDate": null,
+      "customColumns": {},
+      "department": null,
+      "effectiveDate": "2026-11-02",
+      "employeeId": "4021630335610520270",
+      "endEffectiveDate": null,
+      "id": 1000020261102,
+      "isCurrent": true,
+      "modificationDate": "2026-11-02",
+      "reportsTo": null,
+      "site": "New York (Demo)",
+      "siteId": 2614101,
+      "title": null,
+      "workChangeType": "New Employee"
+    }
+  ]
+]

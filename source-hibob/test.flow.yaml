@@ -1,0 +1,36 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-hibob:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_hibob
+        config: config.yaml
+    bindings:
+    - resource:
+        name: employees
+        interval: PT1H
+      target: acmeCo/employees
+    - resource:
+        name: employee_fields
+        interval: PT1H
+      target: acmeCo/employee_fields
+    - resource:
+        name: named_lists
+        interval: PT1H
+      target: acmeCo/named_lists
+    - resource:
+        name: employment_history
+        interval: PT1H
+      target: acmeCo/employment_history
+    - resource:
+        name: lifecycle_history
+        interval: PT1H
+      target: acmeCo/lifecycle_history
+    - resource:
+        name: work_history
+        interval: PT1H
+      target: acmeCo/work_history

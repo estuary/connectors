@@ -1,0 +1,259 @@
+info:
+  name: employeeIds terminated
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/bulk/people/{{table}}?limit=200&employeeIds=4021630453151695573,4021630442204562130"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `table` selects the bulk table (employment | lifecycle | work). Override per
+        // run with `--env-var table=<name>`; otherwise default to employment.
+        if (!bru.getEnvVar('table') && !bru.getVar('table')) bru.setVar('table', 'employment');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/get_bulk-people-lifecycle
+
+    **WHY:** Silent-data-loss audit for terminated employees. After employee
+    4021630453151695573 was terminated (2026-10-31, by
+    `Seeding / H3 - Terminate Employee`), the default (no `employeeIds`) call
+    dropped them from all three tables. This asks for them explicitly, next to an
+    active control employee (4021630442204562130), to tell a scope problem from
+    an endpoint default.
+
+    **VERIFIED (2026-11-02):** it is a **permission scope**, not an endpoint
+    default. The control employee came back normally; the terminated one
+    appeared only in `errors`:
+    `{"4021630453151695573": {"error": "MISSING_PERMISSION", "message": "You don't have permission to access data for employee with id ..."}}`.
+    After removing "Lifecycle status equals Employed" from the permission
+    group's "Access data for", the default (no-ids) listing included them again
+    (`Lifecycle History / bare`, "full access" examples). Docs:
+    https://apidocs.hibob.com/docs/api-service-users ("By default, the service
+    user's permission group grants access to all **active** employees. To access
+    inactive employees you need to use **select by condition** and remove the
+    condition: **Lifecycle status equals Employed**").
+  type: text/markdown
+
+examples:
+  - name: "200 - lifecycle: terminated id -> errors{id: MISSING_PERMISSION} while Access data for = Employed (full body)"
+    request:
+      url: "{{base_url}}/bulk/people/lifecycle?limit=200&employeeIds=4021630453151695573%2C4021630442204562130"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "96"
+        - name: x-ratelimit-reset
+          value: "1793642940"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "id": 1000020140202,
+                    "effectiveDate": "2014-02-02",
+                    "endEffectiveDate": null,
+                    "isCurrent": true,
+                    "canBeDeleted": false,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": "REDACTED",
+                      "changedById": "4021630335610520270"
+                    },
+                    "creationDate": "2026-11-02",
+                    "modificationDate": "2026-11-02",
+                    "status": "employed",
+                    "employeeStatus": "Active",
+                    "reasonType": null,
+                    "leaveReason": null,
+                    "customColumns": {}
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {
+              "4021630453151695573": {
+                "error": "MISSING_PERMISSION",
+                "message": "You don't have permission to access data for employee with id 4021630453151695573"
+              }
+            }
+          }
+  - name: "200 - employment: same, active control id returned with 2-entry history (full body)"
+    request:
+      url: "{{base_url}}/bulk/people/employment?limit=200&employeeIds=4021630453151695573%2C4021630442204562130"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "95"
+        - name: x-ratelimit-reset
+          value: "1793642940"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "id": 1000020140202,
+                    "effectiveDate": "2014-02-02",
+                    "endEffectiveDate": "2026-10-14",
+                    "isCurrent": false,
+                    "canBeDeleted": true,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "4021630335610520270"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "contract": "Full time",
+                    "type": null,
+                    "workingPattern": null,
+                    "standardWorkingPattern": null,
+                    "standardWorkingPatternId": null,
+                    "personalWorkingPatternType": null,
+                    "siteWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "calendarName": null,
+                    "calendarId": null,
+                    "flsaCode": null,
+                    "salaryPayType": null,
+                    "fte": 100,
+                    "weeklyHours": 40,
+                    "activeEffectiveDate": "2014-02-02",
+                    "actualWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "hoursInDayNotWorked": 8,
+                    "customColumns": {}
+                  },
+                  {
+                    "id": 1000020261015,
+                    "effectiveDate": "2026-10-15",
+                    "endEffectiveDate": null,
+                    "isCurrent": true,
+                    "canBeDeleted": true,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "SERVICE-46749"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "contract": "Part time",
+                    "type": null,
+                    "workingPattern": null,
+                    "standardWorkingPattern": null,
+                    "standardWorkingPatternId": null,
+                    "personalWorkingPatternType": null,
+                    "siteWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "calendarName": null,
+                    "calendarId": null,
+                    "flsaCode": null,
+                    "salaryPayType": null,
+                    "fte": 100,
+                    "weeklyHours": 40,
+                    "activeEffectiveDate": "2026-10-15",
+                    "actualWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "hoursInDayNotWorked": 8,
+                    "customColumns": {}
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {
+              "4021630453151695573": {
+                "error": "MISSING_PERMISSION",
+                "message": "You don't have permission to access data for employee with id 4021630453151695573"
+              }
+            }
+          }

@@ -1,0 +1,50 @@
+info:
+  name: H3 - Terminate Employee
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/employees/4021630453151695573/terminate"
+  body:
+    type: json
+    data: |-
+      {
+        "terminationDate": "2026-10-31"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/post_employees-identifier-terminate
+    
+    SEEDING REQUEST — only the user runs this; never the assistant. Irreversible
+    in practice: it terminates a test-account employee (4021630453151695573,
+    Developer, effective 2015-02-10).
+    
+    **WHY:** all 45 employees are `employed/Active`, so we can't see whether the
+    bulk endpoints return terminated employees without `showInactive`. They take
+    no such parameter: the docs only say "all the employees for which the service
+    user has the permission for". After this runs, re-run `Lifecycle History / bare`
+    and check that the employee is still there with a `terminated` (and inactive)
+    entry dated 2026-10-31, and that `Work History / bare` /
+    `Employment History / bare` still return them. This is the user's
+    termination-date requirement.
+    **Outcome:** run by the user 2026-11-02. The first call succeeded: the
+    resulting lifecycle entry has `change.changedById = SERVICE-46749`, the
+    service user. Later re-runs returned **404**, because once terminated the
+    employee was invisible to the service user (Access data for = Employed). The
+    employee then **disappeared** from all three default bulk listings, and
+    `_bulk-table / employeeIds terminated` returned
+    `errors{id: MISSING_PERMISSION}`. After the user removed "Lifecycle status
+    equals Employed" from the permission group's Access data for, the employee
+    reappeared, VERIFIED in `Lifecycle History / bare`
+    (`status: terminated, employeeStatus: Inactive, effectiveDate: 2026-10-31`).
+    Don't re-run it: the employee is already terminated.
+  type: text/markdown

@@ -1,0 +1,477 @@
+info:
+  name: all fields
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/people/search"
+  body:
+    type: json
+    data: |-
+      { "fields": ["root.id"], "showInactive": true }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Shapes this ONE request's body (no request loop): the first 400 field ids from
+        // `Metadata / fields` (runtime var all_field_ids), filtered to the pinned
+        // employees from `People / ids only show inactive`. Run both first.
+        const all = JSON.parse(bru.getVar('all_field_ids') || 'null');
+        const ids = JSON.parse(bru.getVar('pin_employee_ids') || 'null');
+        if (!all || !ids) throw new Error('run Metadata/fields and People/ids only show inactive first');
+        req.setBody({
+          fields: all.slice(0, 400),
+          filters: [{ fieldPath: 'root.id', operator: 'equals', values: ids }],
+          showInactive: true,
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - projection: 1 of 45 employees, nested keys only (slash keys elided; signed media tokens REDACTED)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": [
+              {
+                "about": {
+                  "socialData": {
+                    "twitter": null,
+                    "facebook": null,
+                    "linkedin": null
+                  },
+                  "superpowers": [
+                    "pitching",
+                    "copywriting"
+                  ],
+                  "foodPreferences": [],
+                  "hobbies": [
+                    "rugby",
+                    "cycling",
+                    "running"
+                  ],
+                  "about": "Do not dwell in the past, do not dream of the future, concentrate the mind on the present moment, ",
+                  "avatar": "https://media-process.hibob.com/image/upload/v1/hibob/demo-avatar/demo_employee/images/ldhPvw3OwkTGFULN5AOg_19.jpg?REDACTED_SIGNED_TOKEN"
+                },
+                "identification": {
+                  "ssnSerialNumber": "***-**-4255"
+                },
+                "id": "4021630481756848861",
+                "state": "uninvited",
+                "creationDateTime": "2026-11-02T16:08:54.286571",
+                "avatarUrl": "https://media-process.hibob.com/image/upload/v1/hibob/demo-avatar/demo_employee/images/ldhPvw3OwkTGFULN5AOg_19.jpg?REDACTED_SIGNED_TOKEN",
+                "work": {
+                  "tenureDuration": {
+                    "periodISO": "P11Y6M2D",
+                    "sortFactor": 4142,
+                    "humanize": "11 years, 6 months and 2 days"
+                  },
+                  "directReports": null,
+                  "tenureYears": 12,
+                  "indirectReports": null,
+                  "title": "Account Manager",
+                  "originalStartDate": "2015-05-01",
+                  "employeeIdInCompany": 40,
+                  "reportsToIdInCompany": 30,
+                  "durationOfEmployment": {
+                    "periodISO": "P11Y6M2D",
+                    "sortFactor": 4142,
+                    "humanize": "11 years, 6 months and 2 days"
+                  },
+                  "yearsOfService": 11.507,
+                  "shortStartDate": "05-01",
+                  "isManager": false,
+                  "activeEffectiveDate": "2015-05-01",
+                  "department": "Client Services",
+                  "manager": "4021630477688373980",
+                  "reportsTo": {
+                    "firstName": "Frederick",
+                    "surname": "Bateson",
+                    "displayName": "Frederick Bateson",
+                    "id": "4021630477688373980",
+                    "email": "frederick.bateson_644219_13@samplebob.com"
+                  },
+                  "workMobile": null,
+                  "tenureDurationYears": 11.507,
+                  "site": "New York (Demo)",
+                  "daysOfPreviousService": 0,
+                  "siteId": 2614101,
+                  "workPhone": null,
+                  "secondLevelManager": "4021630467101950681",
+                  "startDate": "2015-05-01"
+                },
+                "personal": {
+                  "nationality": [
+                    "American"
+                  ],
+                  "shortBirthDate": "08-10",
+                  "pronouns": null,
+                  "communication": {
+                    "skypeUsername": null,
+                    "slackUsername": null
+                  },
+                  "age": 40,
+                  "honorific": "Mr"
+                },
+                "payroll": {
+                  "nin": null,
+                  "deduction": {
+                    "Company Car": {
+                      "amount": {
+                        "value": 37,
+                        "currency": "GBP"
+                      }
+                    },
+                    "Childcare vouchers": {
+                      "amount": null
+                    },
+                    "Season ticket loans": {
+                      "amount": {
+                        "value": 70,
+                        "currency": "GBP"
+                      }
+                    },
+                    "Lunch vouchers": {
+                      "amount": null
+                    },
+                    "Cycle to work": {
+                      "amount": null
+                    }
+                  },
+                  "variable": {
+                    "Executive bonus": {
+                      "individualPercent": null,
+                      "amount": null,
+                      "departmentPercent": null,
+                      "payoutType": null,
+                      "companyPercent": null,
+                      "paymentPeriod": null,
+                      "percentageOfAnnualSalary": null
+                    },
+                    "Commission": {
+                      "individualPercent": null,
+                      "amount": null,
+                      "departmentPercent": null,
+                      "payoutType": null,
+                      "companyPercent": null,
+                      "paymentPeriod": null,
+                      "percentageOfAnnualSalary": null
+                    },
+                    "Bonus": {
+                      "individualPercent": null,
+                      "amount": null,
+                      "departmentPercent": null,
+                      "payoutType": null,
+                      "companyPercent": null,
+                      "paymentPeriod": null,
+                      "percentageOfAnnualSalary": null
+                    }
+                  },
+                  "timeSinceLastSalaryChange": {
+                    "periodISO": "P11Y6M1D",
+                    "sortFactor": 4141,
+                    "humanize": "11 years, 6 months and 1 day"
+                  },
+                  "entitlement": {
+                    "Company Car": {
+                      "amount": null
+                    },
+                    "Childcare vouchers": {
+                      "amount": null
+                    },
+                    "Season ticket loans": {
+                      "amount": null
+                    },
+                    "Lunch vouchers": {
+                      "amount": {
+                        "value": 150,
+                        "currency": "GBP"
+                      }
+                    },
+                    "Cycle to work": {
+                      "amount": null
+                    }
+                  },
+                  "employment": {
+                    "weeklyHours": 40,
+                    "contract": "Full time",
+                    "personalWorkingPatternType": null,
+                    "hoursInDayNotWorked": 8,
+                    "type": null,
+                    "flsaCode": null,
+                    "actualWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "workingPattern": null,
+                    "salaryPayType": null,
+                    "calendarId": null,
+                    "fte": 100,
+                    "siteWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "activeEffectiveDate": "2015-05-01",
+                    "standardWorkingPattern": null
+                  },
+                  "taxCode": null,
+                  "salary": {
+                    "payPeriod": "Annual",
+                    "monthlyPayment": {
+                      "value": 3083.3333333333335,
+                      "currency": "USD"
+                    },
+                    "payFrequency": "Every two weeks",
+                    "payment": {
+                      "currency": "USD",
+                      "value": 37000
+                    },
+                    "activeEffectiveDate": "2015-05-01",
+                    "yearlyPayment": {
+                      "value": 37000,
+                      "currency": "USD"
+                    }
+                  },
+                  "additionalPensionContribution": null
+                },
+                "internal": {
+                  "terminationDate": null,
+                  "yearsSinceTermination": null,
+                  "probationEndDate": null,
+                  "currentActiveStatusStartDate": "2015-05-01",
+                  "lifecycleStatus": "employed",
+                  "terminationType": null,
+                  "periodSinceTermination": null,
+                  "terminationReason": null,
+                  "notice": null,
+                  "status": "Active"
+                },
+                "displayName": "Alan Tullin",
+                "surname": "Tullin",
+                "email": "alan.tullin_644219_14@samplebob.com",
+                "secondName": "George",
+                "address": {
+                  "zipCode": "13420",
+                  "country": "United States",
+                  "siteCity": null,
+                  "city": "Old Forge",
+                  "siteState": null,
+                  "usaState": null,
+                  "siteCountry": "United States",
+                  "siteAddress2": null,
+                  "siteAddress1": null,
+                  "sitePostalCode": null,
+                  "fullAddress": "2292 Oak Street, Old Forge, 13420, NY, United States",
+                  "postCode": "13420",
+                  "activeEffectiveDate": "2015-05-01",
+                  "line2": null,
+                  "line1": "2292 Oak Street"
+                },
+                "emergency": {
+                  "firstName": null,
+                  "country": null,
+                  "address": null,
+                  "mobilePhone": null,
+                  "city": null,
+                  "phone": null,
+                  "surname": null,
+                  "postCode": null,
+                  "email": null,
+                  "relation": null,
+                  "secondName": null
+                },
+                "employee": {
+                  "band_payPeriod_ote": null,
+                  "band_effectiveDate_baseSalary": null,
+                  "taxResidency": null,
+                  "veteranStatus": [],
+                  "regrettableTermination": null,
+                  "isIR35Contractor": null,
+                  "jobRoleId": 66985892,
+                  "previousTaxPaid": null,
+                  "band_mid_baseSalary": null,
+                  "band_compaRatio_baseSalary": null,
+                  "jobLevelTypeId": 66985909,
+                  "band_compaRatio_ote": null,
+                  "starterDeclaration": null,
+                  "loanTypes": [],
+                  "attendancePolicyId": null,
+                  "jobProfileDescription": "This role is responsible for all tasks and duties related to Client Services Account Manager",
+                  "directorAppointedOn": null,
+                  "sinExpirationDate": null,
+                  "jobProfileCode": "J-Demo-100009",
+                  "band_min_baseSalary": null,
+                  "taxCode": null,
+                  "band_rangePositioning_baseSalary": null,
+                  "jobFamilyGroupId": 66985880,
+                  "eligibleForRehire": null,
+                  "ethnicities": [],
+                  "band_effectiveDate_ote": null,
+                  "previousTaxablePay": null,
+                  "employerId": null,
+                  "nationalInsuranceCategory": null,
+                  "starterType": null,
+                  "band_currency_baseSalary": null,
+                  "applicationId": null,
+                  "candidateId": null,
+                  "jobProfileId": 66985929,
+                  "directorsNIBasis": null,
+                  "employerWorkLocationId": null,
+                  "jobProfileTitle": "Principal Account Manager Client Services Customer Success & Support (J-Demo-100009)",
+                  "disabilityStatus": null,
+                  "itAdmin": null,
+                  "w1m1": null,
+                  "orgLevel": "individualContributor",
+                  "band_ote_id": null,
+                  "legalSex": null,
+                  "lastDayOfWork": null,
+                  "band_max_baseSalary": null,
+                  "dateLeftPreviousEmployment": null,
+                  "band_site_baseSalary": null,
+                  "firstDayOfWork": null,
+                  "band_min_ote": null,
+                  "sin": null,
+                  "buddy": null,
+                  "positionOpeningId": 66985967,
+                  "recentLeaveEndDate": null,
+                  "band_site_ote": null,
+                  "enrolledInPayrollModuleStatus": null,
+                  "hrbp": null,
+                  "band_baseSalary_id": null,
+                  "band_max_ote": null,
+                  "band_rangePositioning_ote": null,
+                  "band_payPeriod_baseSalary": null,
+                  "workLocationId": null,
+                  "jobFamilyId": 66985884,
+                  "band_currency_ote": null,
+                  "recentLeaveStartDate": null,
+                  "payrollManager": null,
+                  "band_mid_ote": null,
+                  "jobLevelName": 66985915
+                },
+                "creationDate": "2026-11-02",
+                "firstName": "Alan",
+                "companyId": 644219,
+                "peopleAnalytics": {
+                  "numOfDirectReportsRiskIndicator": null,
+                  "tenureRankRiskIndicator": null,
+                  "kidsRiskIndicator": null,
+                  "recentManagerChangeRiskIndicator": null,
+                  "atRiskCounter": null,
+                  "numWithSameTitleRiskIndicator": null,
+                  "teamRecentTurnoverRiskIndicator": null,
+                  "teamSizeRiskIndicator": null,
+                  "ageRiskIndicator": null,
+                  "managerTenureRiskIndicator": null,
+                  "timeoffFrequencyRiskIndicator": null,
+                  "lowRiskCounter": null,
+                  "yearsWithCurrentTitleRiskIndicator": null,
+                  "yearsWithRecentSalaryRiskIndicator": null,
+                  "someRiskCounter": null,
+                  "isManagerRiskIndicator": null
+                },
+                "temporaryAddress": {
+                  "country": null,
+                  "city": null,
+                  "usaState": null,
+                  "postCode": null,
+                  "line2": null,
+                  "line1": null
+                },
+                "financial": {
+                  "passportNumber": null,
+                  "rightToWorkExpiryDate": null,
+                  "identificationNumber": null
+                },
+                "coverImageUrl": "https://media-process.hibob.com/image/upload/v1/hibob/public-image/cover/white_default_cover_image.png?REDACTED_SIGNED_TOKEN",
+                "eeo": {
+                  "jobCategory": null,
+                  "ethnicity": null
+                },
+                "fullName": "Alan George Tullin",
+                "home": {
+                  "legalGender": "Male",
+                  "privateEmail": null,
+                  "numberOfKids": 0,
+                  "mobilePhone": "202 555 0157",
+                  "privatePhone": null,
+                  "spouse": {
+                    "firstName": null,
+                    "gender": null,
+                    "shortBirthDate": null,
+                    "surname": null
+                  },
+                  "familyStatus": "Single"
+                }
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for employees](https://apidocs.hibob.com/reference/post_people-search.md)
+
+  Read-only search. Requires `Metadata / fields` and `People / ids only show inactive`
+  in the same session.
+
+  **WHY:** evaluates the "derive fields[] from metadata" strategy at the 400 cap.
+
+  **VERIFIED (2026-11-02):** all 276 metadata ids requested for 45 employees: 200,
+  ~692 KB raw, ~9 KB per employee once slash keys are dropped.
+
+  **VERIFIED (2026-11-02):** the nested form is a **superset** of the slash form —
+  for every field, if the slash key is present the value at metadata `jsonPath` in the
+  nested form is present and equal (0 mismatches, 0 slash-only fields across 45 x 276).
+
+  **LIMITATION (VERIFIED 2026-11-02):** 28 requested ids are absent from **both**
+  forms — silently dropped, as documented (restricted, e.g. `identification.ssn`,
+  `personal.birthDate`, `actualPayment.*`; or history-table markers such as
+  `work.isCurrent`, `payroll.employment.endEffectiveDate`). The document can't tell
+  "restricted" from "not applicable".
+
+  **LIMITATION (VERIFIED 2026-11-02):** volatile values that change without any HR
+  change: `avatarUrl` / `coverImageUrl` / `about.avatar` carry signed Cloudinary tokens
+  (`__cld_token__=exp=...`, `token=...`); tenure/age values tick daily
+  (`work.tenureDuration`, `work.durationOfEmployment`, `work.yearsOfService`,
+  `work.tenureDurationYears`, `work.tenureYears`, `personal.age`,
+  `payroll.timeSinceLastSalaryChange`, `internal.periodSinceTermination`,
+  `internal.yearsSinceTermination`). Top-level `creationDateTime` has no timezone
+  (`2026-11-02T16:08:54.286571`) — not RFC3339.
