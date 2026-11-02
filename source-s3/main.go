@@ -234,12 +234,10 @@ func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error 
 	if err != nil {
 		// Note that a listing with zero objects does not return an error here, so we don't have to
 		// account for that case.
-		var noSuchBucket *s3Types.NoSuchBucket
-		var apiErr smithy.APIError
-		switch {
-		case errors.As(err, &noSuchBucket):
+		if _, ok := errors.AsType[*s3Types.NoSuchBucket](err); ok {
 			return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
-		case errors.As(err, &apiErr):
+		}
+		if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 			switch apiErr.ErrorCode() {
 			case "AccessDenied":
 				return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
@@ -259,8 +257,7 @@ func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error 
 	// successful outcome.
 	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
 	if _, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &cfg.Bucket, Key: aws.String(objectKey)}); err != nil {
-		var notFoundErr *s3Types.NotFound
-		if !errors.As(err, &notFoundErr) {
+		if _, ok := errors.AsType[*s3Types.NotFound](err); !ok {
 			return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
 		}
 	}

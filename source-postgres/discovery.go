@@ -244,8 +244,7 @@ func (db *postgresDatabase) extendTableDetails(ctx context.Context, dst map[sqlc
 
 	generatedColumns, err := getGeneratedColumns(ctx, db.conn, requested)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if !errors.As(err, &pgErr) || pgErr.Code != "42703" {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); !ok || pgErr.Code != "42703" {
 			// Failure is expected on pre-12 versions of PostgreSQL which don't have
 			// the 'attgenerated' column. Other errors should still be logged but
 			// also probably don't warrant a fatal error.

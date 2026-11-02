@@ -198,9 +198,8 @@ func (b *S3Bucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, 
 
 func (b *S3Bucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsConfig) error {
 	checkReadOnlyFn := func(key string) error {
-		var awsErr *smithyhttp.ResponseError
 		if _, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &b.bucket, Key: aws.String(key)}); err != nil {
-			if !errors.As(err, &awsErr) || awsErr.Response.Response.StatusCode != http.StatusNotFound {
+			if awsErr, ok := errors.AsType[*smithyhttp.ResponseError](err); !ok || awsErr.Response.Response.StatusCode != http.StatusNotFound {
 				return err
 			}
 		}

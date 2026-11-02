@@ -57,11 +57,7 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var mysqlErr *mysql.MySQLError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &mysqlErr) {
+		if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok {
 			// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
 			switch mysqlErr.Number {
 			case 1045:
@@ -71,11 +67,11 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 			case 1044:
 				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", cfg.Database, mysqlErr.Number, mysqlErr.Message)
 			}
-		} else if errors.As(err, &netConnErr) {
+		} else if netConnErr, ok := errors.AsType[*net.DNSError](err); ok {
 			if netConnErr.IsNotFound {
 				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
-		} else if errors.As(err, &netOpErr) {
+		} else if netOpErr, ok := errors.AsType[*net.OpError](err); ok {
 			if netOpErr.Timeout() {
 				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
