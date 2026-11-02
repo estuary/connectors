@@ -15,9 +15,11 @@ CONCURRENT_REQUEST_OVER_LIMIT = (207, "ConcurrentRequestOverLimit")
 
 ACCESS_DENIED_CODES = {INVALID_CREDENTIALS, USER_IS_NOT_AUTHORIZED}
 
-# Bounds retries of internal errors. Without a callback the CDK retries 5xx
-# responses indefinitely.
-MAX_INTERNAL_ERROR_ATTEMPTS = 5
+# Bounds retries. Without a callback the CDK retries 5xx responses
+# indefinitely. The CDK waits before each retry, from 1 s doubling to 30 s,
+# so 8 attempts wait about 90 s in all: longer than the 60 s Microsoft says to
+# wait after a call-rate fault (117).
+MAX_ATTEMPTS = 8
 
 
 class FaultError(BaseModel, extra="allow"):
@@ -82,16 +84,18 @@ def fault_of(err: HTTPError) -> Fault | None:
 def should_retry(
     log: Logger, status: int, headers: Headers, body: bytes, attempt: int
 ) -> bool:
-    """Retry only internal errors, a bounded number of times.
+    """Retry internal errors (0), call-rate faults (117) and concurrent-report
+    faults (207), up to MAX_ATTEMPTS. Microsoft says to wait 60 s after a 117,
+    and for running reports to finish after a 207; the CDK's growing wait
+    between retries covers both. Any other fault fails at once.
 
-    Call-rate (117) and concurrent-report (207) faults are not retried: the
-    CDK would retry them about once a second with no limit, which could keep a
-    sliding-window throttle from ever clearing. They fail the task instead, and
-    it restarts from its last checkpoint.
+    The CDK only calls this for 5xx responses. A fault sent as a 4xx fails at
+    once whatever this returns. Which status the REST API uses for 117 and 207
+    isn't documented.
     """
-    if attempt >= MAX_INTERNAL_ERROR_ATTEMPTS:
+    if attempt >= MAX_ATTEMPTS:
         log.debug(
-            "not retrying: reached the maximum attempts for internal errors",
+            "not retrying: reached the maximum attempts",
             {"attempt": attempt, "status": status},
         )
         return False
@@ -101,4 +105,11 @@ def should_retry(
         # Not a Microsoft fault, such as a gateway error.
         return True
 
-    return fault.codes() == {INTERNAL_ERROR}
+    return bool(fault.errors) and all(_is_retryable(e) for e in fault.errors)
+
+
+def _is_retryable(error: FaultError) -> bool:
+    if error.Code in (INTERNAL_ERROR, CALL_RATE_EXCEEDED):
+        return True
+    # Code 207 is also used for an unrelated address error, so match the name.
+    return (error.Code, error.ErrorCode) == CONCURRENT_REQUEST_OVER_LIMIT

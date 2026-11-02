@@ -345,14 +345,18 @@ async def test_asset_groups_come_only_from_performance_max_campaigns():
     "body, attempt, expected",
     [
         (_fault(0, "InternalError"), 1, True),
-        (_fault(0, "InternalError"), 5, False),
-        (_fault(117, "CallRateExceeded"), 1, False),
-        (_fault(207, "ConcurrentRequestOverLimit"), 1, False),
+        (_fault(0, "InternalError"), 8, False),
+        (_fault(117, "CallRateExceeded"), 7, True),
+        (_fault(117, "CallRateExceeded"), 8, False),
+        (_fault(207, "ConcurrentRequestOverLimit"), 1, True),
+        # 207 is reused for an unrelated address error.
+        (_fault(207, "InvalidAddress"), 1, False),
+        (_fault(105, "InvalidCredentials"), 1, False),
         (b"<html>Bad Gateway</html>", 1, True),
-        (b"<html>Bad Gateway</html>", 5, False),
+        (b"<html>Bad Gateway</html>", 8, False),
     ],
 )
-def test_should_retry_only_internal_errors(body: bytes, attempt: int, expected: bool):
+def test_should_retry_throttling_and_internal_errors(body: bytes, attempt: int, expected: bool):
     assert should_retry(LOG, 500, None, body, attempt) is expected  # type: ignore[arg-type]
 
 
