@@ -56,6 +56,10 @@ struct ResourceState {
 struct BindingInfo {
     binding_index: u32,
     state_key: String,
+    // The topic's partition count when `setup_consumer` assigned partitions.
+    // Partitions added to the topic later aren't assigned until the connector
+    // restarts.
+    partition_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -89,6 +93,13 @@ enum Parsed {
 // timeout adds no wake-ups.
 const POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
+// How often the poll loop checks the bound topics for partitions added since
+// startup. Each check is one metadata request for every topic in the cluster,
+// and it blocks the polling thread, so it's kept infrequent.
+const PARTITION_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+// Bounds how long an unresponsive broker can hold up a partition check.
+const PARTITION_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
@@ -112,8 +123,35 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
 
     let topics_to_bindings =
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
+    let mut next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
 
     loop {
+        if std::time::Instant::now() >= next_partition_check {
+            next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
+
+            match consumer.fetch_metadata(None, PARTITION_CHECK_TIMEOUT) {
+                Ok(metadata) => {
+                    for topic in metadata.topics() {
+                        let Some(binding) = topics_to_bindings.get(topic.name()) else {
+                            continue;
+                        };
+                        let partitions = topic.partitions().len();
+                        if partitions > binding.partition_count {
+                            tracing::warn!(
+                                topic = topic.name(),
+                                partitions_at_startup = binding.partition_count,
+                                partitions,
+                                "topic has new partitions that won't be captured until the connector restarts",
+                            );
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "couldn't fetch metadata to check for added partitions");
+                }
+            }
+        }
+
         let Some(result) = consumer.poll(POLL_TIMEOUT) else {
             continue;
         };
@@ -327,6 +365,7 @@ async fn setup_consumer(
             BindingInfo {
                 binding_index: idx as u32,
                 state_key: state_key.to_string(),
+                partition_count: partition_info.len(),
             },
         );
     }
