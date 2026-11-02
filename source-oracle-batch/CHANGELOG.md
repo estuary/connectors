@@ -1,4 +1,6 @@
-# source-oracle-batch
+# Changelog
 
-## v1, 2025-02-13
-- Beginning of changelog.
+## 2026-11-02
+
+### Changed
+- Transactions containing sourced schemas are checkpointed immediately instead of after the connector's first poll. This may make task publications more responsive in certain setups.
