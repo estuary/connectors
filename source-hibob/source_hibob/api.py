@@ -15,7 +15,6 @@ from .models import (
     EmployeeField,
     EmployeeIdsResponse,
     EmployeesResponse,
-    EndpointConfig,
     NamedList,
 )
 
@@ -47,10 +46,6 @@ VOLATILE_FIELDS = {
 
 _employee_fields_adapter = TypeAdapter(list[EmployeeField])
 _named_lists_adapter = TypeAdapter(dict[str, NamedList])
-
-
-def base_url(config: EndpointConfig) -> str:
-    return SANDBOX_API if config.advanced.sandbox else API
 
 
 async def list_employee_ids(http: HTTPSession, base_url: str, log: Logger) -> list[str]:
@@ -149,6 +144,11 @@ async def snapshot_employees(
                 _deep_merge(merged.setdefault(nested["id"], {}), nested)
 
         # Employees deleted between listing ids and reading them are simply absent.
+        if missing := [i for i in batch if i not in merged]:
+            log.info(
+                "employees listed but not returned by search, skipping",
+                {"missing_employee_ids": missing},
+            )
         for employee_id in batch:
             if employee_id in merged:
                 yield Employee.model_validate(merged[employee_id])
@@ -166,6 +166,9 @@ async def snapshot_bulk_table(
         "includeArchived": "true",
     }
     restricted: set[str] = set()
+    # Buffered so the snapshot is emitted in a stable order: row_ids are positional and the
+    # API's result order isn't guaranteed across polls.
+    entries: list[BulkTableEntry] = []
 
     while True:
         _, body = await http.request_stream(log, url, params=params)
@@ -178,7 +181,9 @@ async def snapshot_bulk_table(
 
         async for result in processor:
             for entry in result.values:
-                yield table.model_validate({"employeeId": result.employeeId, **entry})
+                entries.append(
+                    table.model_validate({"employeeId": result.employeeId, **entry})
+                )
 
         remainder = processor.get_remainder()
         if remainder.errors:
@@ -198,3 +203,7 @@ async def snapshot_bulk_table(
             f"{table.name}: the service user lacks View or View history permission on some columns, so they are omitted or null",
             {"restricted_columns": sorted(restricted)},
         )
+
+    entries.sort(key=lambda e: (e.employeeId, e.id))
+    for entry in entries:
+        yield entry

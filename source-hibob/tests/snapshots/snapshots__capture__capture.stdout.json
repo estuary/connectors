@@ -38,24 +38,24 @@
       "companyId": 644219,
       "creationDate": "2026-11-02",
       "creationDateTime": "2026-11-02T16:08:36.856642",
-      "displayName": "Jonathan Wihl",
+      "displayName": "redacted",
       "eeo": {
         "ethnicity": null,
         "jobCategory": null
       },
-      "email": "jonathan@estuary.dev",
+      "email": "redacted",
       "emergency": {
         "address": null,
         "city": null,
         "country": null,
-        "email": null,
-        "firstName": null,
+        "email": "redacted",
+        "firstName": "redacted",
         "mobilePhone": null,
         "phone": null,
         "postCode": null,
         "relation": null,
         "secondName": null,
-        "surname": null
+        "surname": "redacted"
       },
       "employee": {
         "applicationId": null,
@@ -131,8 +131,8 @@
         "passportNumber": null,
         "rightToWorkExpiryDate": null
       },
-      "firstName": "Jonathan",
-      "fullName": "Jonathan Wihl",
+      "firstName": "redacted",
+      "fullName": "redacted",
       "home": {
         "familyStatus": null,
         "legalGender": null,
@@ -142,10 +142,10 @@
         "privatePhone": null,
         "spouse": {
           "birthDate": null,
-          "firstName": null,
+          "firstName": "redacted",
           "gender": null,
           "shortBirthDate": null,
-          "surname": null
+          "surname": "redacted"
         }
       },
       "id": "4021630335610520270",
@@ -314,7 +314,7 @@
       },
       "secondName": null,
       "state": "active",
-      "surname": "Wihl",
+      "surname": "redacted",
       "temporaryAddress": {
         "city": null,
         "country": null,

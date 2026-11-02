@@ -6,6 +6,12 @@ from pydantic import JsonValue
 FIELDS_TO_REDACT = [
     # Display name of whoever last edited a history entry.
     "changedBy",
+    # Personal details of the test tenant's real user.
+    "displayName",
+    "email",
+    "firstName",
+    "fullName",
+    "surname",
 ]
 
 

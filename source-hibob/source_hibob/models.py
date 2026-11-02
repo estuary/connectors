@@ -102,8 +102,6 @@ class BulkTableEntry(BaseDocument, extra="allow"):
     employeeId: str
     # Entry ids are only unique per employee, so the natural key is (employeeId, id).
     id: int
-    effectiveDate: str
-    isCurrent: bool
 
 
 class EmploymentHistory(BulkTableEntry):
@@ -143,7 +141,7 @@ class RestrictedColumns(BaseModel, extra="allow"):
 
 class BulkTableRemainder(BaseModel, extra="allow"):
     class ResponseMetadata(BaseModel, extra="allow"):
-        next_cursor: str | None
+        next_cursor: str | None = None
 
     response_metadata: ResponseMetadata
     # Keyed by employee id, despite the docs describing an array.

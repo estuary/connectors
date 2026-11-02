@@ -8,7 +8,8 @@ from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
-    base_url,
+    API,
+    SANDBOX_API,
     list_employee_ids,
     snapshot_bulk_table,
     snapshot_employee_fields,
@@ -25,6 +26,10 @@ from .models import (
 SNAPSHOT_INTERVAL = timedelta(hours=1)
 
 type SnapshotFn = Callable[[HTTPSession, str, Logger], AsyncGenerator]
+
+
+def base_url(config: EndpointConfig) -> str:
+    return SANDBOX_API if config.advanced.sandbox else API
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
