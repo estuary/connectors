@@ -15,6 +15,8 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 
+from .errors import FaultError
+
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -209,3 +211,57 @@ class AssetGroup(StampedDocument):
     Id: str
     AccountId: str
     CampaignId: str
+
+
+# API response shapes.
+
+
+class User(BaseModel, extra="allow"):
+    Id: str
+
+
+class CustomerRole(BaseModel, extra="allow"):
+    CustomerId: str
+    # Null for a role that covers every account of the customer.
+    AccountIds: list[str] | None
+    LinkedAccountIds: list[str] | None
+
+
+class UserQueryResponse(BaseModel, extra="allow"):
+    User: User
+    CustomerRoles: list[CustomerRole]
+
+
+class AccountsSearchResponse(BaseModel, extra="allow"):
+    Accounts: list[Account]
+
+
+class CampaignsResponse(BaseModel, extra="allow"):
+    Campaigns: list[Campaign]
+
+
+class AdGroupsResponse(BaseModel, extra="allow"):
+    AdGroups: list[AdGroup]
+
+
+class AdsResponse(BaseModel, extra="allow"):
+    Ads: list[Ad]
+
+
+class AssetGroupsResponse(BaseModel, extra="allow"):
+    AssetGroups: list[AssetGroup]
+    # Errors for campaigns that couldn't be read, while the rest succeed.
+    PartialErrors: list[FaultError]
+
+
+class SubmitResponse(BaseModel, extra="allow"):
+    ReportRequestId: str
+
+
+class ReportRequestStatus(BaseModel, extra="allow"):
+    Status: str
+    ReportDownloadUrl: str | None = None
+
+
+class PollResponse(BaseModel, extra="allow"):
+    ReportRequestStatus: ReportRequestStatus

@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 from logging import DEBUG, Logger
 from typing import Any, AsyncGenerator, Literal
 
-from pydantic import BaseModel, create_model
+from pydantic import create_model
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -17,7 +17,13 @@ from estuary_cdk.unzip_stream import UnzipStream
 
 from .api import AccountContext, reporting_url
 from .errors import fault_of
-from .models import MAX_LOOKBACK_WINDOW_DAYS, utc_now
+from .models import (
+    MAX_LOOKBACK_WINDOW_DAYS,
+    PollResponse,
+    ReportRequestStatus,
+    SubmitResponse,
+    utc_now,
+)
 
 # One cap on in-flight report jobs (submit through download) for the whole
 # connector process. Microsoft doesn't publish the concurrent-report limit
@@ -133,19 +139,6 @@ class ReportDefinition:
         fields: dict[str, Any] = {self.time_column: (str, ...)}
         fields.update({c: (str | None, ...) for c in self.grain_columns()})
         return create_model(f"{self.request_type}Row", __base__=ReportRow, **fields)
-
-
-class SubmitResponse(BaseModel, extra="allow"):
-    ReportRequestId: str
-
-
-class ReportRequestStatus(BaseModel, extra="allow"):
-    Status: str
-    ReportDownloadUrl: str | None = None
-
-
-class PollResponse(BaseModel, extra="allow"):
-    ReportRequestStatus: ReportRequestStatus
 
 
 def _date(day: date) -> dict[str, int]:

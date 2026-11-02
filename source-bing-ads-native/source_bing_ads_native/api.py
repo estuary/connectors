@@ -4,21 +4,26 @@ from dataclasses import dataclass
 from logging import Logger
 from typing import AsyncGenerator, Awaitable, Callable, Iterable
 
-from pydantic import BaseModel
-
 from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.http import HTTPError, HTTPSession
 
-from .errors import ACCESS_DENIED_CODES, FaultError, fault_of
+from .errors import ACCESS_DENIED_CODES, fault_of
 from .models import (
     SANDBOX_SCOPE,
     SCOPE,
     Account,
+    AccountsSearchResponse,
     Ad,
     AdGroup,
+    AdGroupsResponse,
+    AdsResponse,
     AssetGroup,
+    AssetGroupsResponse,
     Campaign,
+    CampaignsResponse,
+    CustomerRole,
     ParentIds,
+    UserQueryResponse,
 )
 
 # Microsoft sunsets Bing Ads API versions; bump this when migrating.
@@ -91,44 +96,6 @@ def reporting_url(is_sandbox: bool) -> str:
 def by_id[T: (Account, Campaign, AdGroup, Ad, AssetGroup)](items: list[T]) -> list[T]:
     """Sort entities by numeric Id, so snapshots are emitted in a stable order."""
     return sorted(items, key=lambda item: int(item.Id))
-
-
-class User(BaseModel, extra="allow"):
-    Id: str
-
-
-class CustomerRole(BaseModel, extra="allow"):
-    CustomerId: str
-    # Null for a role that covers every account of the customer.
-    AccountIds: list[str] | None
-    LinkedAccountIds: list[str] | None
-
-
-class UserQueryResponse(BaseModel, extra="allow"):
-    User: User
-    CustomerRoles: list[CustomerRole]
-
-
-class AccountsSearchResponse(BaseModel, extra="allow"):
-    Accounts: list[Account]
-
-
-class CampaignsResponse(BaseModel, extra="allow"):
-    Campaigns: list[Campaign]
-
-
-class AdGroupsResponse(BaseModel, extra="allow"):
-    AdGroups: list[AdGroup]
-
-
-class AdsResponse(BaseModel, extra="allow"):
-    Ads: list[Ad]
-
-
-class AssetGroupsResponse(BaseModel, extra="allow"):
-    AssetGroups: list[AssetGroup]
-    # Errors for campaigns that couldn't be read, while the rest succeed.
-    PartialErrors: list[FaultError]
 
 
 async def query_user(http: HTTPSession, log: Logger, is_sandbox: bool) -> UserQueryResponse:
