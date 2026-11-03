@@ -30,7 +30,9 @@ import (
 )
 
 var featureFlagDefaults = map[string]common.FlagDefault{
-	"datetimes_as_string": common.FlagEnabled,
+	"datetimes_as_string":              common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 }
 
 // credentialConfig represents authentication options for Cloud Spanner
@@ -278,6 +280,13 @@ type transactor struct {
 	fence         sql.Fence
 	be            *m.BindingEvents
 	numPartitions int // Number of partitions for key distribution (nodes × 10)
+
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 // spannerBinding represents a materialized binding with its configuration
@@ -290,6 +299,7 @@ type spannerBinding struct {
 	columnNames        []string // Column names in order for mutations
 	columnTypes        []string // DDL types for each column (e.g., "TIMESTAMP", "DATE", "INT64")
 	keyColumnIdxs      []int    // Indexes of key columns within columnNames
+	truncateSQL        string   // Deletes rows published before a backfill's boundary. Empty if the binding excludes flow_published_at.
 }
 
 // hashSingleValue computes FNV-1a 64-bit hash of a single value.
@@ -475,14 +485,15 @@ func newTransactor(
 	}).Info("calculated partitions for parallel flushing")
 
 	t := &transactor{
-		client:        clients.dataClient,
-		adminClient:   clients.adminClient,
-		dbPath:        clients.dbPath,
-		cfg:           cfg,
-		templates:     templates,
-		fence:         fence,
-		be:            be,
-		numPartitions: numPartitions,
+		client:                clients.dataClient,
+		adminClient:           clients.adminClient,
+		dbPath:                clients.dbPath,
+		cfg:                   cfg,
+		templates:             templates,
+		fence:                 fence,
+		be:                    be,
+		numPartitions:         numPartitions,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	// Setup bindings first to get the createLoadTableSQL for each
@@ -574,6 +585,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 	b.dropLoadTableSQL = dropLoadTableSQL
 
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < @boundary", target.Identifier, col.Identifier)
+	}
+
 	// Build column names and types list for mutations
 	// Order: [flow_key_hash (optional)], keys, values, flow_document
 	if !t.cfg.Advanced.DisableKeyDistributionOptimization {
@@ -600,7 +615,27 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -1060,6 +1095,27 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, m.FinishedOperation(fmt.Errorf("flushing data mutations: %w", err))
 		}
 
+		// Truncations run after the stores, because a store of an existing
+		// row is an InsertOrUpdate that would re-insert a fresh row if its
+		// old row were already deleted.
+		truncated := make(map[int]int64, len(t.truncations))
+		for binding, boundary := range t.truncations {
+			b := t.bindings[binding]
+			rowCount, err := t.client.PartitionedUpdate(ctx, spanner.Statement{
+				SQL:    b.truncateSQL,
+				Params: map[string]interface{}{"boundary": boundary},
+			})
+			if err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+			}
+			truncated[binding] = rowCount
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+				"deleted":  rowCount,
+			}).Info("truncated rows published before the backfill")
+		}
+
 		// Apply fence mutation separately after all data succeeds
 		// This ensures data is never committed without the checkpoint update
 		if _, _, err := t.timedSpannerApply(ctx, []*spanner.Mutation{fenceMutation}, "store-fence"); err != nil {
@@ -1067,9 +1123,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		for i, b := range t.bindings {
-			if stored[i] > 0 {
-				t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(stored[i]))
+			stats := m.TotalRowStats(stored[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if stored[i] == 0 {
+				continue
 			}
+			t.be.ReportRowStats(round, b.target.Path, stats)
 		}
 
 		log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
