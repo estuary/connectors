@@ -60,6 +60,7 @@ members = [
     "source-outreach",
     "source-pendo",
     "source-posthog",
+    "source-pylon",
     "source-qualtrics",
     "source-quickbooks",
     "source-recharge",
@@ -2536,6 +2537,21 @@ requires-dist = [
 name = "source-posthog"
 version = "1.0.0"
 source = { editable = "source-posthog" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-pylon"
+version = "0.1.0"
+source = { editable = "source-pylon" }
 dependencies = [
     { name = "estuary-cdk" },
     { name = "pydantic" },

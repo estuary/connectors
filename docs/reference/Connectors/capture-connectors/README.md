@@ -113,6 +113,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Hubspot](./HubSpot-real-time.md)
 - [Intercom](./intercom-native.md)
 - [Outreach](./outreach.md)
+- [Pylon](./pylon.md)
 - [RingCentral](./ringcentral.md)
 - [Salesforce](./Salesforce/salesforce-native.md)
 - [Zendesk Chat](./zendesk-chat.md)
