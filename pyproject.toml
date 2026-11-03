@@ -73,6 +73,7 @@ members = [
     "source-outreach",
     "source-pendo",
     "source-posthog",
+    "source-pylon",
     "source-qualtrics",
     "source-quickbooks",
     "source-recharge",
