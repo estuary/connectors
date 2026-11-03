@@ -290,7 +290,7 @@ func maxKey(k1 any, k2 any) any {
 
 // Build outputs the computed merge conditions for this transaction and resets
 // the tracked values in preparation for the next transaction.
-func (b *MergeBoundsBuilder) Build() []MergeBound {
+func (b *MergeBoundsBuilder) Build() MergeBounds {
 	conditions := make([]MergeBound, len(b.lower))
 
 	for idx, col := range b.keyColumns {
