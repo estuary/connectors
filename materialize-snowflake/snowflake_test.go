@@ -39,6 +39,8 @@ func mustGetCfg(t *testing.T) config {
 }
 
 func TestIntegration(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip()
 	}

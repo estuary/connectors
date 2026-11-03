@@ -22,12 +22,11 @@ import (
 // limit.
 func TestStreamV2BatchCutAtTheSizeLimit(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 	defer func(n int) { streamV2BatchSizeLimit = n }(streamV2BatchSizeLimit)
 	streamV2BatchSizeLimit = 1000
 
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/cap",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/cap",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 		Identifier: "TBL",
@@ -58,10 +57,8 @@ func TestStreamV2BatchCutAtTheSizeLimit(t *testing.T) {
 // commit an offset beyond rows it never stored.
 func TestStreamV2NoAppendAfterAFailedAppend(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
-
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/failed",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/failed",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 		Identifier: "TBL",
@@ -96,10 +93,8 @@ func TestStreamV2NoAppendAfterAFailedAppend(t *testing.T) {
 // registered with the channel instead, and commits like any other append.
 func TestStreamV2OversizedAppendUsesFileMode(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
-
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/oversized",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/oversized",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 		Identifier: "TBL",
@@ -133,10 +128,8 @@ func TestStreamV2OversizedAppendUsesFileMode(t *testing.T) {
 // limiter's burst: it is paced through the limiter and committed.
 func TestStreamV2AppendLargerThanTheBurst(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
-
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/burst",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/burst",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 		Identifier: "TBL",
@@ -162,10 +155,8 @@ func TestStreamV2AppendLargerThanTheBurst(t *testing.T) {
 // same transaction has failed: it returns that append's error at once.
 func TestStreamV2SendFailsOnceAnAppendHasFailed(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
-
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/sendfails",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/sendfails",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 		Identifier: "TBL",
