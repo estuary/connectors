@@ -52,11 +52,13 @@ class EndpointConfig(BaseModel):
 
 ConnectorState = GenericConnectorState[ResourceState]
 
+type HTTPMethod = Literal["GET", "POST"]
+
 
 class PylonDocument(BaseDocument, extra="allow"):
     name: ClassVar[str]
     path: ClassVar[str]
-    method: ClassVar[Literal["GET", "POST"]] = "GET"
+    method: ClassVar[HTTPMethod] = "GET"
     paginated: ClassVar[bool] = False
     page_size: ClassVar[int] = 100
     request_params: ClassVar[dict[str, JsonValue]] = {}
@@ -112,7 +114,7 @@ class CustomFields(PylonDocument):
 class Issue(PylonDocument):
     name: ClassVar[str] = "issues"
     path: ClassVar[str] = "/issues/search"
-    method: ClassVar[Literal["GET", "POST"]] = "POST"  # Read-only search.
+    method: ClassVar[HTTPMethod] = "POST"  # Read-only search.
     paginated: ClassVar[bool] = True
     cursor_field: ClassVar[str] = "updated_at"
     id: str = Field(min_length=1)
