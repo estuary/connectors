@@ -30,7 +30,7 @@ func TestCheckpointSplitsExistingAndNewRows(t *testing.T) {
 		var b = &binding{target: sql.Table{StateKey: "a_table", Identifier: "a_table"}}
 		b.store.mergeStage, b.store.copyStage = merge, copy
 		b.store.mergeBounds = sql.NewMergeBoundsBuilder(nil, nil)
-		return &transactor{bindings: []*binding{b}, cp: make(checkpoint), templates: testTemplates}
+		return &transactor{bindings: []*binding{b}, cp: make(checkpoint), staged: make(stagedCheckpoint), rangeKey: fullRangeKey, templates: testTemplates}
 	}
 
 	t.Run("existing and new rows", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestCheckpointSplitsExistingAndNewRows(t *testing.T) {
 		_, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
 		require.NoError(t, err)
 
-		var item = d.cp["a_table"]
+		var item = d.staged["a_table"][fullRangeKey]
 		require.True(t, strings.HasPrefix(item.Query, "\nMERGE INTO"))
 		require.Contains(t, item.Query, "@flow_v1/merged")
 		require.Equal(t, "@flow_v1/merged", item.StagedDir)
@@ -52,7 +52,7 @@ func TestCheckpointSplitsExistingAndNewRows(t *testing.T) {
 		cpJSON, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
 		require.NoError(t, err)
 
-		var item = d.cp["a_table"]
+		var item = d.staged["a_table"][fullRangeKey]
 		require.True(t, strings.HasPrefix(item.Query, "\nCOPY INTO"))
 		require.Equal(t, "@flow_v1/copied", item.StagedDir)
 		require.NotContains(t, string(cpJSON), "CopyQuery")
@@ -64,7 +64,7 @@ func TestCheckpointSplitsExistingAndNewRows(t *testing.T) {
 		_, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
 		require.NoError(t, err)
 
-		var item = d.cp["a_table"]
+		var item = d.staged["a_table"][fullRangeKey]
 		require.True(t, strings.HasPrefix(item.Query, "\nMERGE INTO"))
 		require.Empty(t, item.CopyQuery)
 	})

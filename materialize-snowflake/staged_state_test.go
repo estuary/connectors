@@ -150,16 +150,20 @@ func stagedTransactor(t *testing.T, rangeKey string, stateKeys ...string) *trans
 	require.NoError(t, err)
 
 	var d = &transactor{
-		primary:   strings.HasPrefix(rangeKey, "00000000-"),
-		rangeKey:  rangeKey,
-		cp:        make(checkpoint),
-		staged:    make(stagedCheckpoint),
-		be:        m.NewBindingEvents(),
-		db:        db,
-		templates: testTemplates,
-		version:   "v1",
+		primary:      strings.HasPrefix(rangeKey, "00000000-"),
+		rangeKey:     rangeKey,
+		cp:           make(checkpoint),
+		staged:       make(stagedCheckpoint),
+		legacyStaged: make(checkpoint),
+		be:           m.NewBindingEvents(),
+		db:           db,
+		templates:    testTemplates,
+		version:      "v1",
 	}
 	d.store.conn = conn
+	d.profiler = boilerplate.NewQueryProfiler(nil, time.Hour, nil, nil, nil)
+	t.Cleanup(d.profiler.Stop)
+	d.commitProfile = d.profiler.NewProfile()
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: stagedTable(t, sk)})
 	}
@@ -230,11 +234,12 @@ func TestUnmarshalStagedState(t *testing.T) {
 		var d = stagedTransactor(t, lowerRangeKey, "a_table.v1", "b_table.v1")
 		require.NoError(t, d.UnmarshalState(json.RawMessage(state)))
 
+		require.Len(t, d.staged, 1)
 		require.Len(t, d.staged["a_table.v1"], 2)
-		require.Len(t, d.staged["b_table.v1"], 1)
+		require.Len(t, d.legacyStaged, 1)
 		require.Equal(t, "@flow_v1/al", d.staged["a_table.v1"][lowerRangeKey].StagedDir)
 		require.Equal(t, "@flow_v1/au", d.staged["a_table.v1"][upperRangeKey].StagedDir)
-		require.Equal(t, "@flow_v1/b0", d.staged["b_table.v1"][legacyRangeKey].StagedDir)
+		require.Equal(t, "@flow_v1/b0", d.legacyStaged["b_table.v1"].StagedDir)
 
 		require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2[fullKeyRange].Routed)
 		require.Empty(t, d.cp["a_table.v1"].Query)
@@ -246,6 +251,7 @@ func TestUnmarshalStagedState(t *testing.T) {
 		require.NoError(t, d.UnmarshalState(json.RawMessage(state)))
 
 		require.Empty(t, d.staged)
+		require.Empty(t, d.legacyStaged)
 		require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2[fullKeyRange].Routed)
 		require.NotContains(t, d.cp, "b_table.v1")
 	})
@@ -261,6 +267,54 @@ func TestUnmarshalStagedState(t *testing.T) {
 		require.Nil(t, state)
 		require.Empty(t, recordedStatements())
 	})
+}
+
+func TestUnmarshalStateRejectsUnknownFields(t *testing.T) {
+	for _, state := range []string{
+		`{"a_table.v1": {"Unknown": 1}}`,
+		`{"a_table.v1": {"Table": "a_table", "Unknown": 1}}`,
+		`{"a_table.v1": {"00000000-ffffffff": {"Unknown": 1}}}`,
+		`{"a_table.v1": {"80000000-ffffffff": {"Query": "\nMERGE INTO a_table", "Unknown": 1}}}`,
+		`{"00000000-ffffffff": {"a_table.v1": {"Query": "\nMERGE INTO a_table"}}}`,
+	} {
+		for _, rangeKey := range []string{fullRangeKey, upperRangeKey} {
+			var d = stagedTransactor(t, rangeKey, "a_table.v1")
+			require.Error(t, d.UnmarshalState(json.RawMessage(state)), "state %s on range %s", state, rangeKey)
+		}
+	}
+
+	var d = stagedTransactor(t, fullRangeKey, "a_table.v1")
+	var _, err = d.Acknowledge(context.Background(),
+		[]json.RawMessage{json.RawMessage(`{"a_table.v1": {"80000000-ffffffff": {"Unknown": 1}}}`)}, nil)
+	require.Error(t, err)
+}
+
+// TestUnmarshalLegacyFlatState recovers a state document of flat items, as a
+// connector without range-keyed entries persisted it.
+func TestUnmarshalLegacyFlatState(t *testing.T) {
+	var truncateBefore = time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	var state = mustJSON(t, checkpoint{
+		"a_table.v1": {Table: "a_table", Query: "\nMERGE INTO a_table", StagedDir: "@flow_v1/a0", Version: "v0", Round: 3, Rows: 2},
+		"b_table.v1": {Table: "b_table", TruncateBefore: &truncateBefore, Round: 4},
+		"c_table.v1": {Table: "c_table", PipeName: "pipe_c", PipeFiles: []fileRecord{{Path: "c0", Size: 10}}, Version: "v0"},
+		"d_table.v1": {Table: "d_table", StreamBlobs: []*blobMetadata{{Path: "d0", MD5: "abc", BDECVersion: 3}}, EncryptionKey: "key"},
+		"e_table.v1": {Table: "e_table", StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: "chan", Routed: 7}}},
+	})
+
+	var d = stagedTransactor(t, fullRangeKey, "a_table.v1", "b_table.v1", "c_table.v1", "d_table.v1", "e_table.v1")
+	require.NoError(t, d.UnmarshalState(state))
+
+	require.Equal(t, "@flow_v1/a0", d.legacyStaged["a_table.v1"].StagedDir)
+	require.Equal(t, 3, d.legacyStaged["a_table.v1"].Round)
+	require.Equal(t, truncateBefore, *d.legacyStaged["b_table.v1"].TruncateBefore)
+	require.Len(t, d.legacyStaged, 2)
+	require.Empty(t, d.staged)
+
+	require.Equal(t, []fileRecord{{Path: "c0", Size: 10}}, d.cp["c_table.v1"].PipeFiles)
+	require.Equal(t, "d0", d.cp["d_table.v1"].StreamBlobs[0].Path)
+	require.Equal(t, "key", d.cp["d_table.v1"].EncryptionKey)
+	require.Equal(t, int64(7), d.cp["e_table.v1"].StreamV2[fullKeyRange].Routed)
+	require.Len(t, d.cp, 3)
 }
 
 func TestStartCommitStateEmitsOwnEntries(t *testing.T) {
@@ -397,6 +451,24 @@ func TestAcknowledgeClearsLegacyEntryByField(t *testing.T) {
 	})
 	var after = reduce(t, reduce(t, persisted, peer), update.UpdatedJson)
 	require.JSONEq(t, reduce(t, `{}`, peer), after)
+}
+
+// Clearing a flat entry's staged work keeps the streaming v2 channel state
+// that shares its state key.
+func TestAcknowledgeClearsLegacyEntryKeepingStreamV2(t *testing.T) {
+	var d = stagedTransactor(t, fullRangeKey, "a_table.v1")
+	var persisted = string(mustJSON(t, checkpoint{
+		"a_table.v1": {Table: "a_table", Query: "\nMERGE INTO a_table", StagedDir: "@flow_v1/a0", Version: "v0",
+			StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: "chan", Routed: 42}}},
+	}))
+	require.NoError(t, d.UnmarshalState(json.RawMessage(persisted)))
+
+	update, err := d.Acknowledge(context.Background(), nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"\nMERGE INTO a_table", "REMOVE @flow_v1/a0"}, recordedStatements())
+
+	var streamV2 = mustJSON(t, streamV2Checkpoint{fullKeyRange: {ChannelName: "chan", Routed: 42}})
+	require.JSONEq(t, `{"a_table.v1":{"StreamV2":`+string(streamV2)+`}}`, reduce(t, persisted, update.UpdatedJson))
 }
 
 func TestAcknowledgeLeavesEntriesOfRemovedBindings(t *testing.T) {
@@ -571,6 +643,13 @@ func TestAcknowledgeRejectsResetPatch(t *testing.T) {
 	_, err := d.Acknowledge(context.Background(), []json.RawMessage{json.RawMessage("null")}, nil)
 	require.ErrorContains(t, err, "unexpected state reset patch")
 	require.Empty(t, recordedStatements())
+}
+
+func TestAcknowledgeNonPrimaryIgnoresPeerPatches(t *testing.T) {
+	var d = stagedTransactor(t, upperRangeKey, "a_table.v1")
+	update, err := d.Acknowledge(context.Background(), []json.RawMessage{json.RawMessage("null")}, nil)
+	require.NoError(t, err)
+	require.Nil(t, update)
 }
 
 func TestCombineBoundsOfStagedKeys(t *testing.T) {

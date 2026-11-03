@@ -90,6 +90,8 @@ func TestMergeBoundsCoverOnlyTheirRound(t *testing.T) {
 	var d = &transactor{
 		bindings:  []*binding{b},
 		cp:        make(checkpoint),
+		staged:    make(stagedCheckpoint),
+		rangeKey:  "00000000-ffffffff",
 		templates: testTemplates,
 		profiler:  newQueryProfiler(nil, []*binding{b}),
 	}
@@ -104,7 +106,7 @@ func TestMergeBoundsCoverOnlyTheirRound(t *testing.T) {
 		}
 		_, err := d.buildDriverCheckpoint(t.Context(), nil, 0)
 		require.NoError(t, err)
-		return d.cp["t"]
+		return d.staged["t"][d.rangeKey]
 	}
 
 	require.Contains(t, round(true, "a", "z").CopyQuery, "COPY INTO")
