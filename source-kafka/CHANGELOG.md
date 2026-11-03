@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-03
+
+### Fixed
+- The connector keeps reading while the Kafka client reconnects to a disconnected broker instead of exiting. This may reduce task failures on clusters whose brokers sometimes close connections.
+
 ## 2026-11-02
 
 ### Changed
