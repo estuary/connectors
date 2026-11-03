@@ -56,15 +56,8 @@ ALTER TABLE `a-schema`.key_value ADD COLUMN
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -79,9 +72,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -102,15 +92,8 @@ END
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -130,9 +113,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -158,15 +138,8 @@ END
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -186,9 +159,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -214,15 +184,8 @@ END
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -242,9 +205,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -496,15 +456,8 @@ CREATE TABLE IF NOT EXISTS delta.`test-staging-path/txn-1_delta` (
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -519,9 +472,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -542,15 +492,8 @@ END
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -565,9 +508,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, to_json(struct(
 	l.key1 AS `key1`,
 	l.key2 AS `key2`,
@@ -614,15 +554,8 @@ END
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
 SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
@@ -637,9 +570,6 @@ SET matched_files = (
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (

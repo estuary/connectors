@@ -190,22 +190,22 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 BEGIN
 DECLARE pinned_version STRING;
 DECLARE matched_files ARRAY<STRING>;
-
--- Pin both reads below to the table's latest version, so a commit during the
--- load can't change what they read. VERSION AS OF takes no variables, so the
--- version is bound into a view as a parameter.
+{{- /*
+	Pin both reads below to the table's latest version, so a commit during the
+	load can't change what they read. VERSION AS OF takes no variables, so the
+	version is bound into a view as a parameter.
+*/}}
 SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY {{ $.Table.Identifier }} LIMIT 1));
 EXECUTE IMMEDIATE {{ Literal (printf "CREATE OR REPLACE TEMPORARY VIEW %s AS SELECT *, _metadata.file_path AS %s FROM %s VERSION AS OF :version" (LoadView $.Table.Binding) LoadFileColumn $.Table.Identifier) }} USING pinned_version AS version;
-
--- Find the files holding rows that match the load keys, reading only the key
--- columns.
+{{- /* Find the files holding rows that match the load keys, reading only the key columns. */}}
 SET matched_files = (
 	SELECT collect_set(l.{{ LoadFileColumn }})
 	{{ template "loadJoin" $ }}
 );
-
--- Read the matching documents from those files alone. A load matching more
--- than {{ MaxMatchedFiles }} files reads every file within its key bounds.
+{{- /*
+	Read the matching documents from those files alone. A load matching more
+	than MaxMatchedFiles files reads every file within its key bounds.
+*/}}
 SELECT {{ $.Table.Binding }}, {{ template "loadDocument" $ }}
 	{{ template "loadJoin" $ }}
 	AND (size(matched_files) > {{ MaxMatchedFiles }} OR array_contains(matched_files, l.{{ LoadFileColumn }}));
