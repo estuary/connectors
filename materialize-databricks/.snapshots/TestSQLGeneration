@@ -54,11 +54,18 @@ ALTER TABLE `a-schema`.key_value ADD COLUMN
 
 --- Begin `a-schema`.key_value loadScript directory ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -73,6 +80,8 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
 
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -85,17 +94,24 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
 --- Begin `a-schema`.key_value loadScript directories ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -115,6 +131,8 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
 
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -132,17 +150,24 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
 --- Begin `a-schema`.key_value loadScript root files ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -162,6 +187,8 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
 
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -179,17 +206,24 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
 --- Begin `a-schema`.key_value loadScript directory and root files ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -209,6 +243,8 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
 
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -226,295 +262,9 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
-
---- Begin `a-schema`.key_value loadScriptNoFlowDocument directory ---
-BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
-	SELECT collect_set(l._flow_load_file)
-	FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-);
-
-SELECT 0,
-to_json(struct(
-	l.key1 AS `key1`,
-	l.key2 AS `key2`,
-	l.`key!binary` AS `key!binary`,
-	l.array AS `array`,
-	l.binary AS `binary`,
-	l.boolean AS `boolean`,
-	l.field_with_projection AS `fieldWithProjection`,
-	l.integer AS `integer`,
-	l.`integerGt128Bit` AS `integerGt128Bit`,
-	l.`integerGt256Bit` AS `integerGt256Bit`,
-	l.`integerGt64Bit` AS `integerGt64Bit`,
-	l.`integerWithUserDDL` AS `integerWithUserDDL`,
-	l.multiple AS `multiple`,
-	l.`nonAsciiκόσμε` AS `nonAsciiκόσμε`,
-	l.number AS `number`,
-	CAST(l.`numberCastToString` AS STRING) AS `numberCastToString`,
-	l.object AS `object`,
-	l.string AS `string`,
-	CAST(l.`stringInteger` AS STRING) AS `stringInteger`,
-	CAST(l.`stringInteger18Chars` AS STRING) AS `stringInteger18Chars`,
-	CAST(l.`stringInteger38Chars` AS STRING) AS `stringInteger38Chars`,
-	CAST(l.`stringInteger39Chars` AS STRING) AS `stringInteger39Chars`,
-	CAST(l.`stringInteger66Chars` AS STRING) AS `stringInteger66Chars`,
-	CAST(l.`stringInteger77Chars` AS STRING) AS `stringInteger77Chars`,
-	CAST(l.`stringNumber` AS STRING) AS `stringNumber`
-)) as flow_document
-FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
-END
---- End `a-schema`.key_value loadScriptNoFlowDocument ---
-
---- Begin `a-schema`.key_value loadScriptNoFlowDocument directories ---
-BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
-	SELECT collect_set(l._flow_load_file)
-	FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-		 UNION ALL (
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-2', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-);
-
-SELECT 0,
-to_json(struct(
-	l.key1 AS `key1`,
-	l.key2 AS `key2`,
-	l.`key!binary` AS `key!binary`,
-	l.array AS `array`,
-	l.binary AS `binary`,
-	l.boolean AS `boolean`,
-	l.field_with_projection AS `fieldWithProjection`,
-	l.integer AS `integer`,
-	l.`integerGt128Bit` AS `integerGt128Bit`,
-	l.`integerGt256Bit` AS `integerGt256Bit`,
-	l.`integerGt64Bit` AS `integerGt64Bit`,
-	l.`integerWithUserDDL` AS `integerWithUserDDL`,
-	l.multiple AS `multiple`,
-	l.`nonAsciiκόσμε` AS `nonAsciiκόσμε`,
-	l.number AS `number`,
-	CAST(l.`numberCastToString` AS STRING) AS `numberCastToString`,
-	l.object AS `object`,
-	l.string AS `string`,
-	CAST(l.`stringInteger` AS STRING) AS `stringInteger`,
-	CAST(l.`stringInteger18Chars` AS STRING) AS `stringInteger18Chars`,
-	CAST(l.`stringInteger38Chars` AS STRING) AS `stringInteger38Chars`,
-	CAST(l.`stringInteger39Chars` AS STRING) AS `stringInteger39Chars`,
-	CAST(l.`stringInteger66Chars` AS STRING) AS `stringInteger66Chars`,
-	CAST(l.`stringInteger77Chars` AS STRING) AS `stringInteger77Chars`,
-	CAST(l.`stringNumber` AS STRING) AS `stringNumber`
-)) as flow_document
-FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-		 UNION ALL (
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-2', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
-END
---- End `a-schema`.key_value loadScriptNoFlowDocument ---
-
---- Begin `a-schema`.key_value loadScriptNoFlowDocument root files ---
-BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
-	SELECT collect_set(l._flow_load_file)
-	FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM json.`test-staging-path/file1.json.gz`
-		)
-		 UNION ALL (
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM json.`test-staging-path/file2.json.gz`
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-);
-
-SELECT 0,
-to_json(struct(
-	l.key1 AS `key1`,
-	l.key2 AS `key2`,
-	l.`key!binary` AS `key!binary`,
-	l.array AS `array`,
-	l.binary AS `binary`,
-	l.boolean AS `boolean`,
-	l.field_with_projection AS `fieldWithProjection`,
-	l.integer AS `integer`,
-	l.`integerGt128Bit` AS `integerGt128Bit`,
-	l.`integerGt256Bit` AS `integerGt256Bit`,
-	l.`integerGt64Bit` AS `integerGt64Bit`,
-	l.`integerWithUserDDL` AS `integerWithUserDDL`,
-	l.multiple AS `multiple`,
-	l.`nonAsciiκόσμε` AS `nonAsciiκόσμε`,
-	l.number AS `number`,
-	CAST(l.`numberCastToString` AS STRING) AS `numberCastToString`,
-	l.object AS `object`,
-	l.string AS `string`,
-	CAST(l.`stringInteger` AS STRING) AS `stringInteger`,
-	CAST(l.`stringInteger18Chars` AS STRING) AS `stringInteger18Chars`,
-	CAST(l.`stringInteger38Chars` AS STRING) AS `stringInteger38Chars`,
-	CAST(l.`stringInteger39Chars` AS STRING) AS `stringInteger39Chars`,
-	CAST(l.`stringInteger66Chars` AS STRING) AS `stringInteger66Chars`,
-	CAST(l.`stringInteger77Chars` AS STRING) AS `stringInteger77Chars`,
-	CAST(l.`stringNumber` AS STRING) AS `stringNumber`
-)) as flow_document
-FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM json.`test-staging-path/file1.json.gz`
-		)
-		 UNION ALL (
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM json.`test-staging-path/file2.json.gz`
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
-END
---- End `a-schema`.key_value loadScriptNoFlowDocument ---
-
---- Begin `a-schema`.key_value loadScriptNoFlowDocument directory and root files ---
-BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
-	SELECT collect_set(l._flow_load_file)
-	FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-		 UNION ALL (
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM json.`test-staging-path/file1.json.gz`
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-);
-
-SELECT 0,
-to_json(struct(
-	l.key1 AS `key1`,
-	l.key2 AS `key2`,
-	l.`key!binary` AS `key!binary`,
-	l.array AS `array`,
-	l.binary AS `binary`,
-	l.boolean AS `boolean`,
-	l.field_with_projection AS `fieldWithProjection`,
-	l.integer AS `integer`,
-	l.`integerGt128Bit` AS `integerGt128Bit`,
-	l.`integerGt256Bit` AS `integerGt256Bit`,
-	l.`integerGt64Bit` AS `integerGt64Bit`,
-	l.`integerWithUserDDL` AS `integerWithUserDDL`,
-	l.multiple AS `multiple`,
-	l.`nonAsciiκόσμε` AS `nonAsciiκόσμε`,
-	l.number AS `number`,
-	CAST(l.`numberCastToString` AS STRING) AS `numberCastToString`,
-	l.object AS `object`,
-	l.string AS `string`,
-	CAST(l.`stringInteger` AS STRING) AS `stringInteger`,
-	CAST(l.`stringInteger18Chars` AS STRING) AS `stringInteger18Chars`,
-	CAST(l.`stringInteger38Chars` AS STRING) AS `stringInteger38Chars`,
-	CAST(l.`stringInteger39Chars` AS STRING) AS `stringInteger39Chars`,
-	CAST(l.`stringInteger66Chars` AS STRING) AS `stringInteger66Chars`,
-	CAST(l.`stringInteger77Chars` AS STRING) AS `stringInteger77Chars`,
-	CAST(l.`stringNumber` AS STRING) AS `stringNumber`
-)) as flow_document
-FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-		 UNION ALL (
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM json.`test-staging-path/file1.json.gz`
-		)
-) AS r
-	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
-END
---- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
 --- Begin `a-schema`.key_value mergeInto directory ---
 	MERGE INTO `a-schema`.key_value AS l
@@ -744,11 +494,18 @@ CREATE TABLE IF NOT EXISTS delta.`test-staging-path/txn-1_delta` (
 
 --- Begin `a-schema`.key_value loadScript ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -763,6 +520,8 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary`
 );
 
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -775,17 +534,24 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 
---- Begin `a-schema`.key_value loadScriptNoFlowDocument ---
+--- Begin `a-schema`.key_value loadScript no_flow_document ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -800,8 +566,9 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary`
 );
 
-SELECT 0,
-to_json(struct(
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
+SELECT 0, to_json(struct(
 	l.key1 AS `key1`,
 	l.key2 AS `key2`,
 	l.`key!binary` AS `key!binary`,
@@ -827,8 +594,8 @@ to_json(struct(
 	CAST(l.`stringInteger66Chars` AS STRING) AS `stringInteger66Chars`,
 	CAST(l.`stringInteger77Chars` AS STRING) AS `stringInteger77Chars`,
 	CAST(l.`stringNumber` AS STRING) AS `stringNumber`
-)) as flow_document
-FROM flow_load_0 AS l
+)) AS flow_document
+	FROM flow_load_0 AS l
 	JOIN (
 		(
 			SELECT
@@ -839,17 +606,24 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 
 --- Begin `a-schema`.key_value loadScript ranges ---
 BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
+EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
 	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
@@ -864,6 +638,8 @@ SET files = (
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 );
 
+-- Read the matching documents from those files alone. A load matching more
+-- than 10000 files reads every file within its key bounds.
 SELECT 0, l.flow_document
 	FROM flow_load_0 AS l
 	JOIN (
@@ -876,71 +652,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
-END
---- End `a-schema`.key_value ---
-
---- Begin `a-schema`.key_value loadScriptNoFlowDocument ranges ---
-BEGIN
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
-EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET files = (
-	SELECT collect_set(l._flow_load_file)
-	FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-) AS r
-	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-);
-
-SELECT 0,
-to_json(struct(
-	l.key1 AS `key1`,
-	l.key2 AS `key2`,
-	l.`key!binary` AS `key!binary`,
-	l.array AS `array`,
-	l.binary AS `binary`,
-	l.boolean AS `boolean`,
-	l.field_with_projection AS `fieldWithProjection`,
-	l.integer AS `integer`,
-	l.`integerGt128Bit` AS `integerGt128Bit`,
-	l.`integerGt256Bit` AS `integerGt256Bit`,
-	l.`integerGt64Bit` AS `integerGt64Bit`,
-	l.`integerWithUserDDL` AS `integerWithUserDDL`,
-	l.multiple AS `multiple`,
-	l.`nonAsciiκόσμε` AS `nonAsciiκόσμε`,
-	l.number AS `number`,
-	CAST(l.`numberCastToString` AS STRING) AS `numberCastToString`,
-	l.object AS `object`,
-	l.string AS `string`,
-	CAST(l.`stringInteger` AS STRING) AS `stringInteger`,
-	CAST(l.`stringInteger18Chars` AS STRING) AS `stringInteger18Chars`,
-	CAST(l.`stringInteger38Chars` AS STRING) AS `stringInteger38Chars`,
-	CAST(l.`stringInteger39Chars` AS STRING) AS `stringInteger39Chars`,
-	CAST(l.`stringInteger66Chars` AS STRING) AS `stringInteger66Chars`,
-	CAST(l.`stringInteger77Chars` AS STRING) AS `stringInteger77Chars`,
-	CAST(l.`stringNumber` AS STRING) AS `stringNumber`
-)) as flow_document
-FROM flow_load_0 AS l
-	JOIN (
-		(
-			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
-			FROM read_files('test-staging-path/txn-1', format => 'json', schema => '`key1` BIGINT, `key2` BOOLEAN, `key!binary` STRING', mode => 'FAILFAST', schemaEvolutionMode => 'none')
-		)
-) AS r
-	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
-	AND l.key2 = r.key2
-	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
+	AND (size(matched_files) > 10000 OR array_contains(matched_files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 

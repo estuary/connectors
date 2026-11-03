@@ -32,7 +32,6 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tpl := range []*template.Template{
 		testTemplates.loadScript,
-		testTemplates.loadScriptNoFlowDocument,
 		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]
@@ -162,13 +161,14 @@ func TestSQLGeneration(t *testing.T) {
 			Bounds:      []sql.MergeBound{{Column: tbl.Keys[0], LiteralLower: "10", LiteralUpper: "100"}, {Column: tbl.Keys[1]}, {Column: tbl.Keys[2]}},
 		}
 		for _, tc := range []struct {
-			name string
-			tpl  *template.Template
+			name           string
+			noFlowDocument bool
 		}{
-			{"loadScript", testTemplates.loadScript},
-			{"loadScriptNoFlowDocument", testTemplates.loadScriptNoFlowDocument},
+			{"loadScript", false},
+			{"loadScript no_flow_document", true},
 		} {
-			var rendered, err = renderTemplate(tc.tpl, load)
+			load.NoFlowDocument = tc.noFlowDocument
+			var rendered, err = renderTemplate(testTemplates.loadScript, load)
 			require.NoError(t, err)
 			snap.WriteString("--- Begin " + tbl.Identifier + " " + tc.name + " ---")
 			snap.WriteString(rendered)
@@ -197,7 +197,6 @@ func TestSQLGeneration(t *testing.T) {
 		}
 		for _, tpl := range []*template.Template{
 			testTemplates.loadScript,
-			testTemplates.loadScriptNoFlowDocument,
 			testTemplates.mergeInto,
 		} {
 			var schema = stagedSchemaDDL(tbl.KeyPtrs(), false)

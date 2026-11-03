@@ -494,11 +494,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var script = d.templates.loadScript
-	if d.cfg.Advanced.NoFlowDocument {
-		script = d.templates.loadScriptNoFlowDocument
-	}
-
 	var loads []bindingLoad
 	var toDelete []string
 	for idx, b := range d.bindings {
@@ -513,7 +508,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var bounds = b.loadMergeBounds.Build()
 		loads = append(loads, bindingLoad{
 			binding: b,
-			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
+			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds, NoFlowDocument: d.cfg.Advanced.NoFlowDocument},
 			fields: log.Fields{
 				"resourcePath": b.target.Path,
 				"keys":         keyCounts[idx],
@@ -562,7 +557,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			rows, trace, err := d.queryLoad(groupCtx, db, script, load)
+			rows, trace, err := d.queryLoad(groupCtx, db, d.templates.loadScript, load)
 			if err != nil {
 				return err
 			}

@@ -146,14 +146,13 @@ func binaryToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	createTargetTable        *template.Template
-	alterTableColumns        *template.Template
-	loadScript               *template.Template
-	loadScriptNoFlowDocument *template.Template
-	copyIntoDirect           *template.Template
-	createStagingTable       *template.Template
-	copyIntoStaging          *template.Template
-	mergeInto                *template.Template
+	createTargetTable  *template.Template
+	alterTableColumns  *template.Template
+	loadScript         *template.Template
+	copyIntoDirect     *template.Template
+	createStagingTable *template.Template
+	copyIntoStaging    *template.Template
+	mergeInto          *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -183,67 +182,50 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{- end }};
 {{ end }}
 
--- Templated query which joins keys from the load table with the target table, and returns values. It
--- deliberately skips the trailing semi-colon as the load script appends its file filter.
+-- A load as one script. Databricks reads every document of a file that an
+-- update left a deletion vector on, matched or not, so the script first finds
+-- the files holding matching rows and then reads documents from them alone.
 
-{{ define "loadQuery" }}
-SELECT {{ $.Table.Binding }}, l.{{ $.Table.Document.Identifier }}
+{{ define "loadScript" }}
+BEGIN
+DECLARE pinned_version STRING;
+DECLARE matched_files ARRAY<STRING>;
+
+-- Pin both reads below to the table's latest version, so a commit during the
+-- load can't change what they read. VERSION AS OF takes no variables, so the
+-- version is bound into a view as a parameter.
+SET pinned_version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY {{ $.Table.Identifier }} LIMIT 1));
+EXECUTE IMMEDIATE {{ Literal (printf "CREATE OR REPLACE TEMPORARY VIEW %s AS SELECT *, _metadata.file_path AS %s FROM %s VERSION AS OF :version" (LoadView $.Table.Binding) LoadFileColumn $.Table.Identifier) }} USING pinned_version AS version;
+
+-- Find the files holding rows that match the load keys, reading only the key
+-- columns.
+SET matched_files = (
+	SELECT collect_set(l.{{ LoadFileColumn }})
 	{{ template "loadJoin" $ }}
+);
+
+-- Read the matching documents from those files alone. A load matching more
+-- than {{ MaxMatchedFiles }} files reads every file within its key bounds.
+SELECT {{ $.Table.Binding }}, {{ template "loadDocument" $ }}
+	{{ template "loadJoin" $ }}
+	AND (size(matched_files) > {{ MaxMatchedFiles }} OR array_contains(matched_files, l.{{ LoadFileColumn }}));
+END
 {{ end }}
 
--- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+-- The document of a loaded row: its flow_document column, or with
+-- no_flow_document a JSON object of its root-level columns.
 
-{{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }},
+{{ define "loadDocument" -}}
+{{- if $.NoFlowDocument -}}
 to_json(struct(
 {{- range $i, $col := $.Table.RootPropertyColumns}}
 	{{- if $i}},{{end}}
 	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
-)) as flow_document
-{{ template "loadJoin" $ }}
-{{ end }}
-
--- A load as one script, which first finds the files holding rows that match
--- the load keys by reading only the key columns, and then reads documents from
--- those files alone. Databricks reads every document of a file that an update
--- left a deletion vector on, matched or not. Both reads are of the table's
--- version when the script starts, so a commit during the script can't change
--- what they read.
-
-{{ define "loadScript" }}
-BEGIN
-{{ template "loadMatch" $ }}
-{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" }};
-END
-{{ end }}
-
-{{ define "loadScriptNoFlowDocument" }}
-BEGIN
-{{ template "loadMatch" $ }}
-{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" }};
-END
-{{ end }}
-
--- VERSION AS OF takes neither a variable nor an expression, so the version is
--- bound to a view of the table at it.
-
-{{ define "loadMatch" -}}
-DECLARE version STRING;
-DECLARE files ARRAY<STRING>;
-SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY {{ $.Table.Identifier }} LIMIT 1));
-EXECUTE IMMEDIATE {{ Literal (printf "CREATE OR REPLACE TEMPORARY VIEW %s AS SELECT *, _metadata.file_path AS %s FROM %s VERSION AS OF :version" (LoadView $.Table.Binding) LoadFileColumn $.Table.Identifier) }} USING version AS version;
-SET files = (
-	SELECT collect_set(l.{{ LoadFileColumn }})
-	{{ template "loadJoin" $ }}
-);
+)) AS flow_document
+{{- else -}}
+l.{{ $.Table.Document.Identifier }}
 {{- end }}
-
--- The variable list prunes files as a literal list does. A load matching more
--- than MaxMatchedFiles reads every file within its key bounds.
-
-{{ define "loadMatchedFiles" -}}
-AND (size(files) > {{ MaxMatchedFiles }} OR array_contains(files, l.{{ LoadFileColumn }}))
 {{- end }}
 
 -- The join of the table and the load keys.
@@ -456,14 +438,13 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 	})
 
 	return templates{
-		createTargetTable:        tplAll.Lookup("createTargetTable"),
-		alterTableColumns:        tplAll.Lookup("alterTableColumns"),
-		loadScript:               tplAll.Lookup("loadScript"),
-		loadScriptNoFlowDocument: tplAll.Lookup("loadScriptNoFlowDocument"),
-		copyIntoDirect:           tplAll.Lookup("copyIntoDirect"),
-		createStagingTable:       tplAll.Lookup("createStagingTable"),
-		copyIntoStaging:          tplAll.Lookup("copyIntoStaging"),
-		mergeInto:                tplAll.Lookup("mergeInto"),
+		createTargetTable:  tplAll.Lookup("createTargetTable"),
+		alterTableColumns:  tplAll.Lookup("alterTableColumns"),
+		loadScript:         tplAll.Lookup("loadScript"),
+		copyIntoDirect:     tplAll.Lookup("copyIntoDirect"),
+		createStagingTable: tplAll.Lookup("createStagingTable"),
+		copyIntoStaging:    tplAll.Lookup("copyIntoStaging"),
+		mergeInto:          tplAll.Lookup("mergeInto"),
 	}
 }
 
@@ -479,6 +460,8 @@ type tableWithFiles struct {
 	Schema      string
 	// Tables are the staging tables a MERGE reads.
 	Tables []string
+	// NoFlowDocument loads documents from root-level columns.
+	NoFlowDocument bool
 }
 
 // boundOn is a merge bound on the key column of the table aliased Alias.
