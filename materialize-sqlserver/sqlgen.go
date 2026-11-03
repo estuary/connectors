@@ -132,9 +132,9 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			},
 			"*": {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s", table.Identifier, m.Identifier, m.BareDDL)
-		},
+		}),
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any

@@ -1,5 +1,12 @@
 # materialize-bigquery
 
+## 2026-11-02
+
+### Changed
+- Changing the type of many columns at once is much faster: each step of the
+  migration now alters all of a table's columns in one statement, instead of
+  one statement per column that BigQuery's table update rate limit throttled.
+
 ## 2026-10-31
 
 ### Changed

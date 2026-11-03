@@ -1,5 +1,12 @@
 # materialize-mysql
 
+## 2026-11-02
+
+### Changed
+- Changing the type of several columns of a table now alters all of them in
+  one statement per migration step, so MySQL and MariaDB rebuild the table far
+  fewer times.
+
 ## 2026-10-31
 
 ### Fixed

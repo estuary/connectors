@@ -138,44 +138,30 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	return rows.Err()
 }
 
+// Each step alters all of its columns in one statement, since MySQL and
+// MariaDB can rebuild the whole table for every ALTER TABLE that adds, drops or
+// redefines a column.
 var migrationSteps = []sql.ColumnMigrationStep{
-	sql.StdMigrationSteps[0],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("ADD COLUMN %s %s", ins.TempColumnIdentifier, ins.TypeMigration.NullableDDL)
+	}),
 	sql.StdMigrationSteps[1],
-	sql.StdMigrationSteps[2],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("DROP COLUMN %s", ins.TypeMigration.Identifier)
+	}),
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("CHANGE COLUMN %s %s %s", ins.TempColumnIdentifier, ins.TypeMigration.Identifier, ins.TypeMigration.DDL)
+	}),
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		var queries []string
-		for _, ins := range instructions {
-			queries = append(
-				queries,
-				fmt.Sprintf(
-					"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
-					table.Identifier,
-					ins.TempColumnIdentifier,
-					ins.TypeMigration.Identifier,
-					ins.TypeMigration.DDL,
-				),
-			)
-		}
-
-		return queries, nil
-	},
-	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		var queries []string
-
+		var notNull []sql.MigrationInstruction
 		for _, ins := range instructions {
 			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
-				queries = append(
-					queries,
-					fmt.Sprintf("ALTER TABLE %s MODIFY %s %s;",
-						table.Identifier,
-						ins.TypeMigration.Identifier,
-						ins.TypeMigration.DDL,
-					),
-				)
+				notNull = append(notNull, ins)
 			}
 		}
-
-		return queries, nil
+		return sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+			return fmt.Sprintf("MODIFY %s %s", ins.TypeMigration.Identifier, ins.TypeMigration.DDL)
+		})(dialect, table, notNull)
 	},
 }
 

@@ -29,6 +29,9 @@
 - A MERGE of fewer than 100,000 rows reads them straight from the staged
   files, instead of first copying them into a staging table. This saves a
   query of a few seconds from each commit of small batches.
+- Changing the type of several columns of a table is faster: the temporary
+  columns are added, and the original columns dropped, in one statement each
+  instead of one statement per column.
 
 ## 2026-10-31
 ### Changed
