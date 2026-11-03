@@ -387,6 +387,10 @@ func newTransactor(
 		}
 	}
 
+	if err := requireMultiShardCapable(open.Range, d.bindings); err != nil {
+		return nil, err
+	}
+
 	if err := d.syncClustering(ctx, bindings, open); err != nil {
 		return nil, fmt.Errorf("syncing clustering keys: %w", err)
 	}
