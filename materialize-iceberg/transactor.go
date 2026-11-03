@@ -44,7 +44,11 @@ func mergeIdempotencyTokens(bindings []python.MergeBinding) string {
 type binding struct {
 	Idx    int
 	Mapped *boilerplate.MappedBinding[config, resource, mapped]
-	load   struct {
+	// publishedAtColumn is the column that holds each document's publication
+	// time, used to delete rows published before a completed backfill. Nil
+	// if the binding excludes flow_published_at.
+	publishedAtColumn *boilerplate.MappedProjection[mapped]
+	load              struct {
 		keys        []python.NestedField
 		mergeBounds *mergeBoundsBuilder
 	}
@@ -78,6 +82,13 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 
 	pyFiles pyFileURIs
+
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for staging into this transaction's pendingMerge.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -216,33 +227,51 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		pyBindings := make(map[string]*pendingMerge)
 		for idx, b := range t.bindings {
-			if !t.storeFiles.Started(idx) {
+			boundary, truncating := t.truncations[idx]
+			if !t.storeFiles.Started(idx) && !truncating {
 				continue
 			}
 
-			files, err := t.storeFiles.Flush(idx)
-			if err != nil {
-				return nil, m.FinishedOperation(fmt.Errorf("flushing store files: %w", err))
+			mb := python.MergeBinding{
+				Binding:          idx,
+				IdempotencyToken: uuid.NewString(),
 			}
 
-			var mergeQuery strings.Builder
-			if err := t.templates.mergeQuery.Execute(&mergeQuery, templateInput{
-				binding: b,
-				Bounds:  b.store.mergeBounds.build(),
-			}); err != nil {
-				return nil, m.FinishedOperation(fmt.Errorf("rendering mergeQuery template: %w", err))
+			if t.storeFiles.Started(idx) {
+				files, err := t.storeFiles.Flush(idx)
+				if err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("flushing store files: %w", err))
+				}
+
+				var mergeQuery strings.Builder
+				if err := t.templates.mergeQuery.Execute(&mergeQuery, templateInput{
+					binding: b,
+					Bounds:  b.store.mergeBounds.build(),
+				}); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("rendering mergeQuery template: %w", err))
+				}
+
+				mb.Query = mergeQuery.String()
+				mb.Columns = b.store.columns
+				mb.Files = files
+			}
+
+			if truncating {
+				var truncateQuery strings.Builder
+				if err := t.templates.truncateQuery.Execute(&truncateQuery, truncateInput{
+					binding:           b,
+					PublishedAtColumn: b.publishedAtColumn.Mapped.Name,
+					Boundary:          quoteLiteral(timestamptzLiteral(boundary)),
+				}); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("rendering truncateQuery template: %w", err))
+				}
+				mb.TruncateQuery = truncateQuery.String()
 			}
 
 			pyBindings[b.Mapped.StateKey] = &pendingMerge{
-				MergeBinding: python.MergeBinding{
-					Binding:          idx,
-					Query:            mergeQuery.String(),
-					Columns:          b.store.columns,
-					Files:            files,
-					IdempotencyToken: uuid.NewString(),
-				},
-				Round: round,
-				Rows:  rows[idx],
+				MergeBinding: mb,
+				Round:        round,
+				Rows:         rows[idx],
 			}
 		}
 
@@ -259,7 +288,24 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for idx, boundary := range completes {
+		var b = t.bindings[idx]
+		if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.Mapped.ResourcePath,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.publishedAtColumn == nil {
+			var _, reason = publishedAtColumn(b.Mapped)
+			t.be.Warn(strings.Join(b.Mapped.ResourcePath, "."), fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", strings.Join(b.Mapped.ResourcePath, "."), reason))
+			continue
+		}
+		t.truncations[idx] = boundary
+	}
 	return nil
 }
 
@@ -285,7 +331,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			delete(t.cp, sk)
 			checkpointClear[sk] = nil
 
-			if t.recovery {
+			if t.recovery && len(pyMergeBinding.Files) > 0 {
 				extantFiles, err := t.extantFiles(ctx, pyMergeBinding.Files)
 				if err != nil {
 					return nil, fmt.Errorf("listing previously staged files for recovery transaction: %w", err)
