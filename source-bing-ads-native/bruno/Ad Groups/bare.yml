@@ -14,14 +14,14 @@ http:
   body:
     type: json
     data: |-
-      {"CampaignId": "{{campaign_id}}"}
+      {"CampaignId": "{{search_campaign_id}}"}
   auth: inherit
 
 runtime:
   scripts:
     - type: before-request
       code: |-
-        if (!bru.getVar("campaign_id")) throw new Error("run `Campaigns / all types comma` first to set campaign_id");
+        if (!bru.getVar("search_campaign_id")) throw new Error("run `Campaigns / all types comma` first to set search_campaign_id");
     - type: after-response
       code: |-
         // Chain the first ad group into `Ads / bare`.
@@ -46,10 +46,61 @@ docs: |-
   not ad groups, so the `asset_groups` stream covers them instead (see
   `Asset Groups / bare`).
 
-  **PENDING:** an ad group's shape. Needs a Search campaign with an ad group
-  in the sandbox, created in the UI; then re-run with its `campaign_id`.
+  **VERIFIED (2026-11-03):** a Search campaign (`1150435732`) returns its
+  one ad group, `1194069955690481`. There's no account or campaign ID in it,
+  so the connector's stamped parent IDs are needed. This request now reads
+  the first Search campaign (`search_campaign_id`).
+
+  **VERIFIED (2026-11-03, P3):** a paused ad group (`1200667025834839`) comes
+  back with `Status: Paused`. An ad group created and then deleted doesn't
+  come back. Ad groups in a paused campaign keep their own `Active` status.
 
 examples:
+  - name: 200 - Search campaign, one ad group
+    request:
+      url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "AdGroups": [
+              {
+                "Id": "1194069955690481",
+                "Name": "Ad Group 1",
+                "StartDate": {
+                  "Year": 2026,
+                  "Month": 11,
+                  "Day": 3
+                },
+                "EndDate": null,
+                "Language": null,
+                "Status": "Active",
+                "PrivacyStatus": null,
+                "CpcBid": {
+                  "Amount": 0.05
+                },
+                "Network": "OwnedAndOperatedAndSyndicatedSearch",
+                "AdRotation": null,
+                "AudienceAdsBidAdjustment": null,
+                "TrackingUrlTemplate": null,
+                "FinalUrlSuffix": null,
+                "UrlCustomParameters": null,
+                "BiddingScheme": {
+                  "Type": "InheritFromParent",
+                  "InheritedBidStrategyType": "EnhancedCpc"
+                },
+                "Settings": null,
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }
   - name: 200 - PerformanceMax campaign has no ad groups
     request:
       url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"

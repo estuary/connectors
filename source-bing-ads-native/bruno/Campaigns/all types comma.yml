@@ -21,9 +21,14 @@ runtime:
   scripts:
     - type: after-response
       code: |-
-        // Chain the first campaign into `Ad Groups / bare`.
-        const id = res.getBody()?.Campaigns?.[0]?.Id;
+        // Chain the first campaign into `Asset Groups / bare` (in the sandbox
+        // it's the Performance Max one), and the first Search campaign into
+        // `Ad Groups / bare` and `Asset Groups / search campaign`.
+        const campaigns = res.getBody()?.Campaigns ?? [];
+        const id = campaigns[0]?.Id;
         if (id) bru.setVar("campaign_id", String(id));
+        const searchId = campaigns.find((c) => c.CampaignType === "Search")?.Id;
+        if (searchId) bru.setVar("search_campaign_id", String(searchId));
 
 settings:
   encodeUrl: true
@@ -45,6 +50,16 @@ docs: |-
   `PerformanceMax`, Active), which `Campaigns / default type` (Search only)
   doesn't. The space-delimited SOAP form is rejected over REST
   (`Campaigns / all types space`), so comma-joined is the REST format.
+
+  **VERIFIED (2026-11-03):** with two Search campaigns added
+  (`1150435732`, `1150435746`), it returns all three campaigns, in
+  ascending Id order. The example below is from before they were added.
+
+  **VERIFIED (2026-11-03, P3):** a paused campaign (`1150435746`) comes back
+  with `Status: Paused`. A campaign created and then deleted in the UI
+  doesn't come back at all, and the UI no longer shows it either. So the
+  connector's snapshot drops a deleted campaign, and its row is deleted
+  downstream.
 
 examples:
   - name: 200 - every type, one PerformanceMax campaign

@@ -51,9 +51,16 @@ docs: |-
   page ended paging. `ForwardCompatibilityMap` entries are `Key`/`Value`, not
   the docs' `key`/`value`; the connector's `Account` model doesn't read them.
 
-  **PENDING:** whether `Inactive`, `Pause` or `Suspended` accounts also come
-  back. The sandbox customer has none; a second account, created and paused
-  in the sandbox UI, would show it.
+  **VERIFIED (2026-11-03):** `Pause` accounts come back too. A second
+  account created in the sandbox UI, `555628715` ("estuary-second-account",
+  `EasternTimeUSCanada`), came back as `AccountLifeCycleStatus: Pause` with
+  `PauseReason: 2`, though nobody paused it. It can still be read: its
+  campaigns return `[]` with 200. Its Id is lower than the first account's,
+  so sandbox account Ids don't grow over time, and a new account can sort
+  first.
+
+  **PENDING:** whether `Inactive` or `Suspended` accounts also come back. The
+  sandbox customer has none.
 
 examples:
   - name: 200 - one pending sandbox account

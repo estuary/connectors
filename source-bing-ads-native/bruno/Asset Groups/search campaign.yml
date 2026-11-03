@@ -21,7 +21,7 @@ runtime:
   scripts:
     - type: before-request
       code: |-
-        if (!bru.getVar("search_campaign_id")) bru.setVar("search_campaign_id", "PIN_SEARCH_CAMPAIGN_ID");
+        if (!bru.getVar("search_campaign_id")) throw new Error("run `Campaigns / all types comma` first to set search_campaign_id");
 
 settings:
   encodeUrl: true
@@ -36,6 +36,36 @@ docs: |-
   campaign". This checks what happens for any other campaign, which decides
   whether the connector must skip non-Performance Max campaigns.
 
-  **PENDING:** needs a Search campaign, created in the sandbox UI; then
-  pin its ID as `search_campaign_id`. Until then the connector only asks for
-  asset groups of Performance Max campaigns, which is what the docs allow.
+  **VERIFIED (2026-11-03):** a Search campaign (`1150435732`) is rejected
+  with 400, code 6746 `UnsupportedCampaignTypeForAssetGroup`. So the
+  connector must skip non-Performance Max campaigns, which
+  `snapshot_asset_groups` in `api.py` does. Run `Campaigns / all types
+  comma` first to set `search_campaign_id`.
+
+examples:
+  - name: 400 - Search campaign rejected
+    request:
+      url: "{{campaign_management_url}}/AssetGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "BatchErrors": [],
+            "OperationErrors": [
+              {
+                "Code": 6746,
+                "ErrorCode": "UnsupportedCampaignTypeForAssetGroup",
+                "Details": null,
+                "Message": "The campaign type is not supported for asset groups."
+              }
+            ],
+            "TrackingId": "4cd45408-5646-489f-b8cd-0cb78b2fb138",
+            "Type": "ApiFaultDetail"
+          }
