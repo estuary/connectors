@@ -279,6 +279,13 @@ type transactor struct {
 	// If this is still the recovery (first after startup) commit, where special
 	// handling may be needed for registering streaming files.
 	didRecovery bool
+
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging into the checkpoint.
+	truncations map[int]time.Time
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -347,6 +354,8 @@ func newTransactor(
 		be:                  be,
 		cp:                  make(checkpoint),
 		uploads:             newUploadLimiter(),
+
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	if len(open.StateJson) > 0 {
@@ -398,6 +407,10 @@ type binding struct {
 	// clusteringExpr is the parenthesized CLUSTER BY expression for this
 	// binding, or empty if clustering is not configured.
 	clusteringExpr string
+	// truncateSQL deletes rows published before a backfill's boundary, which
+	// it binds as an RFC3339 string. Empty if the binding has no usable
+	// flow_published_at column.
+	truncateSQL string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery   string
@@ -419,6 +432,9 @@ type binding struct {
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
 	var b = new(binding)
 	b.target = target
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
+	}
 	b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
@@ -697,6 +713,11 @@ type checkpointItem struct {
 	// for reporting the commit's row stats when it runs in Acknowledge.
 	Round int
 	Rows  int64
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. Applying the item deletes the table's rows published
+	// before it, after the item's stores. It is omitted when unset, so that
+	// the item stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -895,6 +916,17 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 	}
 
+	for idx, boundary := range d.truncations {
+		var b = d.bindings[idx]
+		var item = d.cp[b.target.StateKey]
+		if item == nil {
+			item = &checkpointItem{Table: b.target.Identifier, Round: round}
+			d.cp[b.target.StateKey] = item
+		}
+		item.TruncateBefore = &boundary
+	}
+	d.truncations = nil
+
 	var checkpointJSON, err = json.Marshal(d.cp)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint json: %w", err)
@@ -993,7 +1025,26 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 	return items, nil
 }
 
-func (d *transactor) Flush(context.Context, map[int]time.Time) error {
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	d.truncations = make(map[int]time.Time, len(completes))
+
+	for idx, boundary := range completes {
+		var b = d.bindings[idx]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		} else if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			d.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		d.truncations[idx] = boundary
+	}
 	return nil
 }
 
@@ -1032,20 +1083,32 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 		drained = append(drained, stateKey)
 
-		if len(item.Query) > 0 {
+		if len(item.Query) > 0 || item.TruncateBefore != nil {
 			item := item
+			stateKey := stateKey
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
-				if err := d.runStoreQuery(ctx, item, path); err != nil {
-					return err
+				if len(item.Query) > 0 {
+					if err := d.runStoreQuery(ctx, item, path); err != nil {
+						return err
+					}
+				}
+				// The truncation runs after the stores, so that it keeps the
+				// rows they just wrote, which were published after the boundary.
+				if item.TruncateBefore != nil {
+					if err := d.runTruncation(ctx, item, stateKey, path); err != nil {
+						return err
+					}
 				}
 				d.be.FinishedResourceCommit(path)
 
-				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
-					return fmt.Errorf("cleaning up files: %w", err)
+				if item.StagedDir != "" {
+					if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
+						return fmt.Errorf("cleaning up files: %w", err)
+					}
 				}
 
 				return nil
@@ -1332,6 +1395,42 @@ func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, pa
 		stats = stats.WithStaged(item.Rows)
 	}
 	d.be.ReportRowStats(item.Round, path, stats)
+	return nil
+}
+
+// runTruncation deletes the rows of the item's table published before its
+// TruncateBefore boundary, and reports how many it deleted.
+func (d *transactor) runTruncation(ctx context.Context, item *checkpointItem, stateKey string, path []string) error {
+	var b *binding
+	for _, candidate := range d.bindings {
+		if candidate.target.StateKey == stateKey {
+			b = candidate
+			break
+		}
+	}
+	if b == nil {
+		return fmt.Errorf("no binding for state key %q", stateKey)
+	} else if b.truncateSQL == "" {
+		var _, reason = b.target.PublishedAtColumn()
+		return fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
+			item.TruncateBefore.Format(time.RFC3339Nano), b.target.Identifier, reason)
+	}
+
+	result, err := d.db.ExecContext(ctx, b.truncateSQL, item.TruncateBefore.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("reading rows deleted from %s after backfill: %w", b.target.Identifier, err)
+	}
+
+	d.be.ReportRowStats(item.Round, path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
+	log.WithFields(log.Fields{
+		"table":    b.target.Identifier,
+		"boundary": *item.TruncateBefore,
+		"deleted":  deleted,
+	}).Info("truncated rows published before the backfill")
 	return nil
 }
 
