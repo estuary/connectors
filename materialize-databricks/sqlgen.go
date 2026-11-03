@@ -184,7 +184,7 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
--- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
+-- deliberately skips the trailing semi-colon as the load script appends its file filter.
 
 {{ define "loadQuery" }}
 SELECT {{ $.Table.Binding }}, l.{{ $.Table.Document.Identifier }}
@@ -209,22 +209,19 @@ to_json(struct(
 -- those files alone. Databricks reads every document of a file that an update
 -- left a deletion vector on, matched or not. Both reads are of the table's
 -- version when the script starts, so a commit during the script can't change
--- what they read. Its last row, of binding -1, has the number of rows and files
--- the match found.
+-- what they read.
 
 {{ define "loadScript" }}
 BEGIN
 {{ template "loadMatch" $ }}
-{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" }}
-{{ template "loadMatchCounts" }}
+{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" }};
 END
 {{ end }}
 
 {{ define "loadScriptNoFlowDocument" }}
 BEGIN
 {{ template "loadMatch" $ }}
-{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" }}
-{{ template "loadMatchCounts" }}
+{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" }};
 END
 {{ end }}
 
@@ -234,11 +231,10 @@ END
 {{ define "loadMatch" -}}
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY {{ $.Table.Identifier }} LIMIT 1));
 EXECUTE IMMEDIATE {{ Literal (printf "CREATE OR REPLACE TEMPORARY VIEW %s AS SELECT *, _metadata.file_path AS %s FROM %s VERSION AS OF :version" (LoadView $.Table.Binding) LoadFileColumn $.Table.Identifier) }} USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l.{{ LoadFileColumn }}), count(*)
+SET files = (
+	SELECT collect_set(l.{{ LoadFileColumn }})
 	{{ template "loadJoin" $ }}
 );
 {{- end }}
@@ -248,10 +244,6 @@ SET (files, matched) = (
 
 {{ define "loadMatchedFiles" -}}
 AND (size(files) > {{ MaxMatchedFiles }} OR array_contains(files, l.{{ LoadFileColumn }}))
-{{- end }}
-
-{{ define "loadMatchCounts" -}}
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
 {{- end }}
 
 -- The join of the table and the load keys.

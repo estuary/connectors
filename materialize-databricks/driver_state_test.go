@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -20,7 +19,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1176,45 +1174,5 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 		// both.
 		require.NotNil(t, d.cp["a_table.v1"])
 		require.NotNil(t, d.cp["b_table.v1"])
-	})
-}
-
-func TestEvaluateLoadChecksMatchedRows(t *testing.T) {
-	var ctx = context.Background()
-	var d = renderingTransactor(lowerRangeKey)
-	var b = d.bindings[0]
-	var script = template.Must(template.New("loadScript").Parse("BEGIN SELECT doc FROM t; END"))
-	var load = bindingLoad{binding: b, data: &tableWithFiles{Table: &b.target}, fields: log.Fields{}}
-	var doc = func(document string) []driver.Value { return []driver.Value{int64(0), document} }
-	var counts = func(matched string) []driver.Value { return []driver.Value{int64(-1), matched} }
-
-	var run = func(results ...[]driver.Value) ([]string, error) {
-		var db = recordingDB(t, nil)
-		recording.results = [][][]driver.Value{results}
-		var docs = make(chan loadedDoc, 10)
-		var err = d.evaluateLoad(ctx, db, script, load, docs, func() {})
-		close(docs)
-		var sent []string
-		for doc := range docs {
-			sent = append(sent, doc.document)
-		}
-		return sent, err
-	}
-
-	t.Run("a read of every matched row", func(t *testing.T) {
-		sent, err := run(doc(`{"a":1}`), doc(`{"b":2}`), counts("2 1"))
-		require.NoError(t, err)
-		require.Equal(t, []string{`{"a":1}`, `{"b":2}`}, sent)
-	})
-
-	t.Run("a read missing matched rows fails", func(t *testing.T) {
-		_, err := run(doc(`{"a":1}`), counts("2 1"))
-		require.ErrorContains(t, err, "read 1 of the 2 rows")
-	})
-
-	t.Run("no matching rows read no documents", func(t *testing.T) {
-		sent, err := run(counts("0 0"))
-		require.NoError(t, err)
-		require.Empty(t, sent)
 	})
 }

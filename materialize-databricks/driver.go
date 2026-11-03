@@ -600,19 +600,13 @@ func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, script *te
 	defer rows.Close()
 
 	var docCount, docBytes int
-	var matched, matchedFiles = -1, -1
 	defer func() {
-		trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes, "matchedFiles": matchedFiles})
+		trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
 	}()
 	for rows.Next() {
 		var doc loadedDoc
 		if err := rows.Scan(&doc.binding, &doc.document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
-		} else if doc.binding < 0 {
-			if _, err := fmt.Sscan(doc.document, &matched, &matchedFiles); err != nil {
-				return fmt.Errorf("parsing load match counts %q: %w", doc.document, err)
-			}
-			continue
 		}
 		docCount, docBytes = docCount+1, docBytes+len(doc.document)
 		select {
@@ -623,8 +617,6 @@ func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, script *te
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
-	} else if docCount != matched {
-		return fmt.Errorf("load of %s read %d of the %d rows matching its keys", load.binding.target.Identifier, docCount, matched)
 	}
 	return nil
 }

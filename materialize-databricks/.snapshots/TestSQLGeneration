@@ -56,11 +56,10 @@ ALTER TABLE `a-schema`.key_value ADD COLUMN
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -86,8 +85,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
@@ -95,11 +93,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -135,8 +132,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
@@ -144,11 +140,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -184,8 +179,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
@@ -193,11 +187,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -233,8 +226,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScript ---
 
@@ -242,11 +234,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -299,8 +290,7 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
@@ -308,11 +298,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -375,8 +364,7 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
@@ -384,11 +372,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -451,8 +438,7 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
@@ -460,11 +446,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -527,8 +512,7 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value loadScriptNoFlowDocument ---
 
@@ -762,11 +746,10 @@ CREATE TABLE IF NOT EXISTS delta.`test-staging-path/txn-1_delta` (
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -792,8 +775,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 
@@ -801,11 +783,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -858,8 +839,7 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary`
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 
@@ -867,11 +847,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -897,8 +876,7 @@ SELECT 0, l.flow_document
 	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 
@@ -906,11 +884,10 @@ END
 BEGIN
 DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
-DECLARE matched BIGINT;
 SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY `a-schema`.key_value LIMIT 1));
 EXECUTE IMMEDIATE 'CREATE OR REPLACE TEMPORARY VIEW flow_load_0 AS SELECT *, _metadata.file_path AS _flow_load_file FROM `a-schema`.key_value VERSION AS OF :version' USING version AS version;
-SET (files, matched) = (
-	SELECT collect_set(l._flow_load_file), count(*)
+SET files = (
+	SELECT collect_set(l._flow_load_file)
 	FROM flow_load_0 AS l
 	JOIN (
 		(
@@ -963,8 +940,7 @@ FROM flow_load_0 AS l
 	ON l.key1 = r.key1 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
 	AND l.key2 = r.key2
 	AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file))
-UNION ALL SELECT -1, concat(matched, ' ', size(files));
+	AND (size(files) > 10000 OR array_contains(files, l._flow_load_file));
 END
 --- End `a-schema`.key_value ---
 
