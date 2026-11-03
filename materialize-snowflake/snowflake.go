@@ -275,6 +275,11 @@ type transactor struct {
 	// commitProfile is the profile of the commit queries of the checkpoint
 	// last built, which Acknowledge runs.
 	commitProfile *boilerplate.QueryProfile
+	staged        stagedCheckpoint
+	primary       bool
+	rangeKey      string
+
+	sweptStreamV2 []string
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
@@ -737,9 +742,39 @@ type checkpointItem struct {
 	// before it, after the item's stores. It is omitted when unset, so that
 	// the item stays readable by a connector build without it.
 	TruncateBefore *time.Time `json:",omitempty"`
+	// Bounds are the rendered merge-bound literals of the keys staged for a
+	// MERGE INTO, positional with the target table's key columns.
+	Bounds []mergeBoundLiterals `json:",omitempty"`
 }
 
 type checkpoint = map[string]*checkpointItem
+
+// mergeBoundLiterals is the serialized form of a key column's sql.MergeBound.
+// Empty literals mean the column carries no bound.
+type mergeBoundLiterals struct {
+	Lower string `json:",omitempty"`
+	Upper string `json:",omitempty"`
+}
+
+// stagedCheckpoint holds staged entries by binding state key, then by the
+// range key of the shard that staged them.
+type stagedCheckpoint map[string]map[string]*checkpointItem
+
+func (s stagedCheckpoint) add(stateKey, rangeKey string, item *checkpointItem) {
+	if s[stateKey] == nil {
+		s[stateKey] = make(map[string]*checkpointItem)
+	}
+	s[stateKey][rangeKey] = item
+}
+
+// legacyRangeKey holds an entry persisted without a range key.
+const legacyRangeKey = ""
+
+func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound { return nil }
+
+func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals { return nil }
+
+func (d *transactor) forgetStreamV2(stateKey string) {}
 
 // streamV2Only reports whether the item holds streaming v2 channel state and no
 // staged work.
@@ -949,6 +984,10 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	}
 	d.truncations = nil
 
+	return d.startCommitState()
+}
+
+func (d *transactor) startCommitState() (json.RawMessage, error) {
 	var checkpointJSON, err = json.Marshal(d.cp)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint json: %w", err)

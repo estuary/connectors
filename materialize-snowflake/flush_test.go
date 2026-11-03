@@ -54,6 +54,8 @@ func TestCheckpointCarriesTruncation(t *testing.T) {
 	var d = &transactor{
 		bindings:    []*binding{newBinding("truncated"), newBinding("untouched")},
 		cp:          make(checkpoint),
+		staged:      make(stagedCheckpoint),
+		rangeKey:    fullRangeKey,
 		truncations: map[int]time.Time{0: boundary},
 	}
 
@@ -61,17 +63,16 @@ func TestCheckpointCarriesTruncation(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, d.truncations)
 
-	// A binding that stored nothing still gets an item carrying the boundary,
-	// and an item without one stays readable by builds that predate it.
-	var got map[string]map[string]any
+	// A binding that stored nothing still gets an item carrying the boundary.
+	var got map[string]map[string]map[string]any
 	require.NoError(t, json.Unmarshal(cpJSON, &got))
-	require.Equal(t, map[string]map[string]any{
-		"truncated": {
+	require.Equal(t, map[string]map[string]map[string]any{
+		"truncated": {fullRangeKey: {
 			"Table": "truncated", "Query": "", "StagedDir": "", "StreamBlobs": nil,
 			"PipeName": "", "PipeFiles": nil, "Version": "", "EncryptionKey": "",
 			"Round": float64(7), "Rows": float64(0),
 			"TruncateBefore": "2026-09-29T00:00:00.0000001Z",
-		},
+		}},
 	}, got)
 }
 
