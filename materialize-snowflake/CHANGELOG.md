@@ -9,6 +9,10 @@
   feature flag, enabled by default; a binding without a `flow_published_at`
   column, or in delta-updates mode, is unaffected.
 
+### Changed
+- Tasks that run on more than one shard now fail at startup unless every
+  binding writes through `snowpipe_streaming_v2`.
+
 ## 2026-11-02
 
 ### Fixed
