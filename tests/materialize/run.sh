@@ -8,34 +8,6 @@ command -v flowctl >/dev/null 2>&1 || { echo >&2 "flowctl must be available via 
 test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
 test -n "${VERSION}" || bail "must specify VERSION env variable"
 
-# Runs `go test ./...` once per filter, concurrently, prints each run's output
-# once all have exited, and fails if any of them failed.
-function go_test_concurrently() {
-  local timeout=$1
-  shift
-  local logs pids=() failed=0 i
-  logs="$(mktemp -d)"
-  # Compile once up front rather than in every run at the same time.
-  go test -run '^$' ./... >/dev/null
-  for i in $(seq $#); do
-    # The filter is unquoted so that it splits into its flag and pattern.
-    go test -v ./... -timeout "$timeout" ${!i} >"$logs/$i.log" 2>&1 &
-    pids+=($!)
-  done
-  for i in $(seq $#); do
-    if wait "${pids[$((i-1))]}"; then
-      echo "::group::go test ${!i} (ok)"
-      cat "$logs/$i.log"
-      echo "::endgroup::"
-    else
-      failed=1
-      echo "go test ${!i} FAILED:"
-      cat "$logs/$i.log"
-    fi
-  done
-  return $failed
-}
-
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
@@ -61,17 +33,7 @@ else
   elif [ "$CONNECTOR" = "materialize-snowflake" ]; then
     TIMEOUT=30m
   fi
-  cd $ROOT_DIR/$CONNECTOR
-  if [ "$CONNECTOR" = "materialize-snowflake" ]; then
-    # Each group spends most of its time waiting on Snowflake. They run as
-    # separate processes because the streaming tests repin package state.
-    go_test_concurrently $TIMEOUT \
-      '-run ^TestIntegration$' \
-      '-run ^TestStreamV2Manager$' \
-      '-skip ^(TestIntegration|TestStreamV2Manager)$'
-  else
-    go test -v ./... -timeout $TIMEOUT
-  fi
+  cd $ROOT_DIR/$CONNECTOR && go test -v ./... -timeout $TIMEOUT
 fi
 
 # Verify that the built image at least works enough to run the spec command.

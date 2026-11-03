@@ -161,21 +161,24 @@ func packKey(key tuple.TupleElement) []byte {
 	return tuple.Tuple{key}.Pack()
 }
 
-// testBatchRows, when not zero, makes testWriteRow send a channel's batch once it
-// holds that many documents, so that a handful of documents spans several appends.
-var testBatchRows int
-
 // testWriteRow stores one converted row under the key in its first value, which is
 // the KEY column of every table these tests store into.
 func testWriteRow(ctx context.Context, m *streamV2Manager, binding int, converted []any) error {
+	return testWriteRowBatched(ctx, m, binding, converted, 0)
+}
+
+// testWriteRowBatched is testWriteRow that, when batchRows is not zero, sends a
+// channel's batch once it holds that many documents, so that a handful of
+// documents spans several appends.
+func testWriteRowBatched(ctx context.Context, m *streamV2Manager, binding int, converted []any, batchRows int) error {
 	if err := m.writeRow(ctx, binding, packKey(converted[0]), converted); err != nil {
 		return err
 	}
-	if testBatchRows == 0 {
+	if batchRows == 0 {
 		return nil
 	}
 	for _, c := range m.bindings[binding].activeChannels {
-		if c.batch.rows >= testBatchRows {
+		if c.batch.rows >= batchRows {
 			if err := c.sendBatch(ctx); err != nil {
 				return err
 			}
@@ -200,14 +203,13 @@ func soleCheckpointItem(t *testing.T, entries map[int]streamV2Checkpoint, bindin
 	return sv2Checkpoint[0]
 }
 
-// singleChannelLayout pins streamV2ChannelsPerShard to one for a test whose
+// singleChannelLayout pins m to one channel per shard, for a test whose
 // assertions follow a single channel's counter, committed offset, or token. The write
 // path's behavior per channel is identical at any depth; these tests are about that
 // behavior, not about routing, which has coverage of its own.
-func singleChannelLayout(t *testing.T) {
-	var restore = streamV2ChannelsPerShard
-	t.Cleanup(func() { streamV2ChannelsPerShard = restore })
-	streamV2ChannelsPerShard = 1
+func singleChannelLayout(m *streamV2Manager) *streamV2Manager {
+	m.channelsPerShard = 1
+	return m
 }
 
 // fullKeyRange is the key range of a single-channel layout on an unsplit task.

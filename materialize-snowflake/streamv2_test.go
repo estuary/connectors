@@ -34,6 +34,8 @@ func noncedStateKey(stateKey string) string {
 // Snowflake, which is the seam this design rests on: everything it guarantees
 // is a statement about what Snowflake ends up holding.
 func TestStreamV2Manager(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -87,20 +89,21 @@ func TestStreamV2Manager(t *testing.T) {
 	sm, err := newStreamManager(&cfg, testMaterialization, accountName, 0)
 	require.NoError(t, err)
 
-	// These subtests follow a single channel's counter, committed offset, and token
-	// against live Snowflake; the multi-channel routing and the split/join
-	// inheritance have fake-Snowpipe suites of their own.
-	singleChannelLayout(t)
-
 	// priorOf wraps a single-channel item as the checkpoint of a binding on an
 	// unsplit task, keyed the way the driver checkpoint keys it.
 	var priorOf = func(sv2ChannelCheckpointItem *streamV2ChannelCheckpointItem) streamV2Checkpoint {
 		return streamV2Checkpoint{fullKeyRange: sv2ChannelCheckpointItem}
 	}
 
+	// These subtests follow a single channel's counter, committed offset, and token
+	// against live Snowflake; the multi-channel routing and the split/join
+	// inheritance have fake-Snowpipe suites of their own.
+	var channels = 1
+	var batchRows = 0
 	var newManager = func(keyRange *pf.RangeSpec) *streamV2Manager {
 		var m, err = newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization, accountName, keyRange)
 		require.NoError(t, err)
+		m.channelsPerShard = channels
 		return m
 	}
 
@@ -121,20 +124,20 @@ func TestStreamV2Manager(t *testing.T) {
 	// what a replay of the same transaction produces again.
 	var writeRows = func(m *streamV2Manager, lo, hi int) {
 		for i := lo; i < hi; i++ {
-			require.NoError(t, testWriteRow(ctx, m, 0, []any{
+			require.NoError(t, testWriteRowBatched(ctx, m, 0, []any{
 				fmt.Sprintf("key-%d", i),
 				i,
 				json.RawMessage(fmt.Sprintf(`{"nested":{"i":%d},"arr":[1,2]}`, i)),
-			}))
+			}, batchRows))
 		}
 	}
 
 	// The topology subtests below drive real multi-channel layouts, under the
 	// single-channel pin the rest of the suite runs with.
 	var channelsPerShard = func(t *testing.T, n int) {
-		var restore = streamV2ChannelsPerShard
-		t.Cleanup(func() { streamV2ChannelsPerShard = restore })
-		streamV2ChannelsPerShard = n
+		var restore = channels
+		t.Cleanup(func() { channels = restore })
+		channels = n
 	}
 
 	// The midpoint split's two halves, as shard ranges and as key ranges.
@@ -191,7 +194,7 @@ func TestStreamV2Manager(t *testing.T) {
 	// storeKeys stores one document per key, in order.
 	var storeKeys = func(t *testing.T, m *streamV2Manager, keys []string) {
 		for i, k := range keys {
-			require.NoError(t, testWriteRow(ctx, m, 0, []any{k, i, json.RawMessage(`{"k":1}`)}))
+			require.NoError(t, testWriteRowBatched(ctx, m, 0, []any{k, i, json.RawMessage(`{"k":1}`)}, batchRows))
 		}
 	}
 
@@ -241,8 +244,8 @@ func TestStreamV2Manager(t *testing.T) {
 	// smallBatches cuts batches every two documents, so that a handful of rows
 	// exercises the boundaries a production batch needs ten thousand for.
 	var smallBatches = func(t *testing.T) {
-		t.Cleanup(func() { testBatchRows = 0 })
-		testBatchRows = 2
+		t.Cleanup(func() { batchRows = 0 })
+		batchRows = 2
 	}
 
 	t.Run("happy path", func(t *testing.T) {
@@ -336,9 +339,9 @@ func TestStreamV2Manager(t *testing.T) {
 		channelsPerShard(t, 4)
 		var tgt = target("split.v1")
 
-		parentTargets, err := streamV2TargetLayout(0, math.MaxUint32)
+		parentTargets, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 		require.NoError(t, err)
-		lowTargets, err := streamV2TargetLayout(0, math.MaxUint32/2)
+		lowTargets, err := streamV2TargetLayout(0, math.MaxUint32/2, streamV2ChannelsPerShard)
 		require.NoError(t, err)
 
 		// Five keys per parent quarter, interleaved so every channel's rows
@@ -427,7 +430,7 @@ func TestStreamV2Manager(t *testing.T) {
 		smallBatches(t)
 		var tgt = target("splitcut.v1")
 
-		parentTargets, err := streamV2TargetLayout(0, math.MaxUint32)
+		parentTargets, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 		require.NoError(t, err)
 		var first = make([][]string, len(parentTargets))
 		var second = make([][]string, len(parentTargets))
@@ -490,9 +493,9 @@ func TestStreamV2Manager(t *testing.T) {
 		smallBatches(t)
 		var tgt = target("join.v1")
 
-		lowTargets, err := streamV2TargetLayout(0, math.MaxUint32/2)
+		lowTargets, err := streamV2TargetLayout(0, math.MaxUint32/2, streamV2ChannelsPerShard)
 		require.NoError(t, err)
-		highTargets, err := streamV2TargetLayout(math.MaxUint32/2+1, math.MaxUint32)
+		highTargets, err := streamV2TargetLayout(math.MaxUint32/2+1, math.MaxUint32, streamV2ChannelsPerShard)
 		require.NoError(t, err)
 
 		var prior = make(streamV2Checkpoint)
@@ -770,6 +773,7 @@ func TestStreamV2Manager(t *testing.T) {
 
 		second, err := newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization+"-second", accountName, fullRange)
 		require.NoError(t, err)
+		singleChannelLayout(second)
 		second.addBinding(cfg.Database, cfg.Schema, sharedTable, tgt, nil)
 		var rejection = testWriteRow(ctx, second, 0, []any{"k", 1, json.RawMessage(`{}`)})
 		require.ErrorContains(t, rejection, sanitizeAndAppendHash(testMaterialization))
@@ -945,6 +949,8 @@ func TestStreamV2Manager(t *testing.T) {
 // TestStreamDatatypes, narrowed to the shapes this connector's converters emit,
 // so that the two write paths can be compared column by column.
 func TestStreamV2Datatypes(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -963,8 +969,6 @@ func TestStreamV2Datatypes(t *testing.T) {
 
 	var templates = renderTemplates(testDialect)
 
-	singleChannelLayout(t)
-
 	// One manager serves every type: each type is a binding
 	// of its own, with a state key of its own and therefore a channel of its own.
 	sm, err := newStreamManager(&cfg, "test/streamV2Datatypes", accountName, 0)
@@ -972,6 +976,7 @@ func TestStreamV2Datatypes(t *testing.T) {
 	m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2Datatypes", accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 	require.NoError(t, err)
+	singleChannelLayout(m)
 
 	// The three timestamp types take the same values: offsets Snowflake must
 	// resolve rather than truncate, and both ends of the range it accepts.
@@ -1146,13 +1151,14 @@ func TestStreamV2Datatypes(t *testing.T) {
 // table that has never streamed reports no channels, and one that has reports the
 // channel the write path opened on it, by the name the write path derived.
 func TestStreamV2ListChannels(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
 
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
-	singleChannelLayout(t)
 
 	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
@@ -1182,6 +1188,7 @@ func TestStreamV2ListChannels(t *testing.T) {
 	m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2List", accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 	require.NoError(t, err)
+	singleChannelLayout(m)
 
 	// A table nothing has streamed into has no default pipe, so no channels.
 	names, err := m.listChannels(ctx, cfg.Database, cfg.Schema, tableName)
@@ -1236,6 +1243,8 @@ func TestStreamV2ListChannels(t *testing.T) {
 // simple identifier, on both the snowpipe_streaming and snowpipe_streaming_v2
 // paths.
 func TestStreamingQuotedSchema(t *testing.T) {
+	t.Parallel()
+
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
 
@@ -1296,12 +1305,12 @@ func TestStreamingQuotedSchema(t *testing.T) {
 	})
 
 	t.Run("snowpipe_streaming_v2", func(t *testing.T) {
-		singleChannelLayout(t)
 		sm, err := newStreamManager(&cfg, "test/streamV2QuotedSchema-"+testRunNonce, accountName, 0)
 		require.NoError(t, err)
 		m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2QuotedSchema-"+testRunNonce, accountName,
 			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 		require.NoError(t, err)
+		singleChannelLayout(m)
 
 		for _, tgt := range []sql.Table{target, hyphenTarget} {
 			var loc = testDialect.TableLocator(tgt.Path)

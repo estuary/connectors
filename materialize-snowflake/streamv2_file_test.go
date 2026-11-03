@@ -106,6 +106,8 @@ func (f streamV2DoerFunc) Do(r *http.Request) (*http.Response, error) { return f
 // whose compressed size exceeds a rows request is stored through the pipe's stage,
 // encrypted under the pipe's key, and reads back whole.
 func TestStreamV2FileModeLive(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -122,12 +124,12 @@ func TestStreamV2FileModeLive(t *testing.T) {
 	var accountName string
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName))
 
-	singleChannelLayout(t)
 	sm, err := newStreamManager(&cfg, "test/streamV2FileMode", accountName, 0)
 	require.NoError(t, err)
 	m, err := newStreamV2Manager(&cfg, db, testDialect, sm, "test/streamV2FileMode", accountName,
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
 	require.NoError(t, err)
+	singleChannelLayout(m)
 
 	var tbl = sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
