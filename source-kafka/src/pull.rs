@@ -19,6 +19,7 @@ use proto_flow::{
 use prost_reflect::DynamicMessage;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
+    error::{KafkaError, RDKafkaErrorCode},
     message::Headers,
     metadata::MetadataPartition,
     Message, Offset, Timestamp, TopicPartitionList,
@@ -165,7 +166,17 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
         let Some(result) = consumer.poll(POLL_TIMEOUT) else {
             continue;
         };
-        let msg = result.context("receiving next message")?;
+        let msg = match result {
+            Ok(msg) => msg,
+            // The Kafka client reconnects on its own after a broker connection
+            // drops, so the connector keeps polling. We can't assume other
+            // non-fatal errors are safe to skip because some of them stop the
+            // client from fetching a partition.
+            Err(KafkaError::MessageConsumption(RDKafkaErrorCode::BrokerTransportFailure)) => {
+                continue;
+            }
+            Err(err) => return Err(err).context("receiving next message"),
+        };
 
         let mut op = "u";
         let payload = match msg.payload() {
