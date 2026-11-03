@@ -405,6 +405,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 
 	// Create templates using the dialect from the endpoint (which already has feature flags)

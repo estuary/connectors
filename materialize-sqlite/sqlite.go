@@ -189,6 +189,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var d = &transactor{
 		dialect:               &sqliteDialect,
 		be:                    be,

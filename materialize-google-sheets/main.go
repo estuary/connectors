@@ -240,6 +240,10 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 }
 
 func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
