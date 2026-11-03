@@ -1,0 +1,4 @@
+credentials:
+  credentials_title: Bot Token
+  access_token_sops: PLACEHOLDER_REPLACE_WITH_XOXB_BOT_TOKEN
+start_date: "2024-01-01T00:00:00Z"

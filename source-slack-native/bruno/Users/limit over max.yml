@@ -1,0 +1,28 @@
+info:
+  name: limit over max
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/users.list?limit=1000"
+  params:
+    - name: limit
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [users.list](https://docs.slack.dev/reference/methods/users.list)
+
+  **WHY:** the docs say "specify a `limit` value under `1000`" and recommend at
+  most 200. Learns the enforcement mode at 1000 (reject / clamp). The connector
+  uses 200 either way.
+
+  **PENDING:** run once credentials are in place.

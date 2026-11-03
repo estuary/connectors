@@ -1,0 +1,102 @@
+opencollection: 1.0.0
+
+info:
+  name: Slack
+
+request:
+  auth:
+    mode: none
+  scripts:
+    - type: before-request
+      code: |-
+        // Slack bot-token auth via the connector's sops-encrypted config.yaml. The
+        // token is re-derived from sops on every request and lives only on `req` —
+        // it is never persisted to a var or env file. Requires the developer JS
+        // sandbox:
+        //   CLI: `bru run <request>.yml --env Slack --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the platform
+        // strips it at runtime, sops itself does not) — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const token = creds?.access_token ?? creds?.access_token_sops;
+        if (!token) {
+          throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        }
+        req.setHeader('Authorization', `Bearer ${token}`);
+    - type: after-response
+      code: |-
+        // Redact personal fields so saved Response Examples never commit a real
+        // person's name, email, or avatar. Keep in sync with FIELDS_TO_REDACT in
+        // tests/test_snapshots.py, which redacts the same fields with the same
+        // marker.
+        const REDACTED_FIELDS = [
+          'profile', 'user_profile', 'real_name', 'email', 'image_original',
+        ];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        // Only touch JSON object/array bodies; leave throttle errors alone.
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Base URL:** `https://slack.com/api/<method>`. Tokens go in the
+      `Authorization: Bearer` header (not a query param) —
+      https://docs.slack.dev/apis/web-api (DOCUMENTED 2026-11-03).
+    - **Rate limits are per method, per workspace, per app**, by tier —
+      https://docs.slack.dev/apis/web-api/rate-limits (DOCUMENTED 2026-11-03):
+      - Tier 2 (20+/min): `users.list`, `conversations.list`
+      - Tier 3 (50+/min): `conversations.history`, `conversations.replies`,
+        `conversations.join`
+      - Tier 4 (100+/min): `conversations.members`
+      - Special (hundreds/min): `auth.test`
+    - **Distributed-app throttle:** commercially distributed, non-Marketplace
+      apps installed after 2025-05-29 drop to 1 req/min and 15 objects per page
+      on `conversations.history` / `conversations.replies`. Internal,
+      customer-built apps keep Tier 3 —
+      https://docs.slack.dev/changelog/2025/05/29/rate-limit-changes-for-non-marketplace-apps
+      (DOCUMENTED 2026-11-03). This is why the connector requires a customer-created app.
+    - **Throttling:** HTTP 429 with a `Retry-After` header (seconds)
+      (DOCUMENTED 2026-11-03). The CDK retries 429s with its own adaptive
+      backoff and does not read `Retry-After`; the connector paces each method
+      to its tier to stay under the limit.
+    - **Errors:** every response is a JSON envelope with `ok`; failures carry
+      `error` (DOCUMENTED 2026-11-03). See `_auth / auth test` for the HTTP
+      status Slack actually uses.
+    - **Pagination cursors expire** ("do not persist cursors for hours or
+      days") — https://docs.slack.dev/apis/web-api/pagination (DOCUMENTED
+      2026-11-03). The connector never checkpoints a `next_cursor`.
+
+    Budget: every required method allows > 20 req/hr, so preview, discover and
+    pytest runs are unrestricted (discover makes no Slack calls at all).
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions. Enumerate
+    markers with `grep -rl '\*\*PENDING' . | grep -v opencollection.yml`.
+
+    ### Per-endpoint limitations
+
+    (index — filled in as probes run)

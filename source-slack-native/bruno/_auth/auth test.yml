@@ -1,0 +1,24 @@
+info:
+  name: auth test
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/auth.test"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [auth.test](https://docs.slack.dev/reference/methods/auth.test)
+
+  **WHY:** the connector's `validate_credentials` probe. Confirms the bot token
+  authenticates and shows the success envelope (`ok`, `user_id`, `team_id`,
+  `bot_id`) that `AuthTestResponse` models.
+
+  **PENDING:** run once credentials are in place.

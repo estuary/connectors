@@ -1,0 +1,5 @@
+variables:
+  - name: base_url
+    value: https://slack.com/api
+  - name: config_path
+    value: ../config.yaml
