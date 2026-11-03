@@ -5,24 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/databricks/databricks-sdk-go/apierr"
 	dbsql "github.com/databricks/databricks-sdk-go/service/sql"
-	"github.com/databricks/databricks-sql-go/driverctx"
-	sql "github.com/estuary/connectors/materialize-sql"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
-type fakeHistory struct {
-	queries  map[string]dbsql.QueryInfo
-	err      error
-	requests [][]string
+type fakeHistoryAPI struct {
+	queries map[string]dbsql.QueryInfo
+	err     error
 }
 
-func (h *fakeHistory) List(_ context.Context, req dbsql.ListQueryHistoryRequest) (*dbsql.ListQueriesResponse, error) {
-	h.requests = append(h.requests, req.FilterBy.StatementIds)
+func (h *fakeHistoryAPI) List(_ context.Context, req dbsql.ListQueryHistoryRequest) (*dbsql.ListQueriesResponse, error) {
 	if h.err != nil {
 		return nil, h.err
 	}
@@ -35,94 +31,21 @@ func (h *fakeHistory) List(_ context.Context, req dbsql.ListQueryHistoryRequest)
 	return resp, nil
 }
 
-// testProfiler is a profiler without its background loop, collecting what it
-// logs.
-func testProfiler(history queryHistory, minDuration time.Duration) (*queryProfiler, *[]log.Fields) {
-	var emitted []log.Fields
-	return &queryProfiler{
-		history:     history,
-		minDuration: minDuration,
-		queue:       make(chan *profiledQuery, profileQueueSize),
-		emit:        func(fields log.Fields) { emitted = append(emitted, fields) },
-	}, &emitted
-}
-
-func TestQueryTrace(t *testing.T) {
-	var fields = log.Fields{"resourcePath": []string{"a", "b"}}
-
-	t.Run("queues a slow query with its id and fields", func(t *testing.T) {
-		var p, _ = testProfiler(nil, 0)
-		var ctx, trace = p.trace(context.Background(), "merge", fields)
-		driverctx.NewContextWithQueryId(ctx, "q1")
-		trace.finish(errors.New("boom"), log.Fields{"docs": 3})
-
-		var q = <-p.queue
-		require.Equal(t, "q1", q.id)
-		require.Equal(t, "q1", q.fields["queryId"])
-		require.Equal(t, "merge", q.fields["query"])
-		require.Equal(t, 3, q.fields["docs"])
-		require.Equal(t, true, q.fields["failed"])
-		require.Contains(t, q.fields, "took")
-	})
-
-	t.Run("skips quick queries and queries without an id", func(t *testing.T) {
-		var p, _ = testProfiler(nil, time.Hour)
-		var ctx, trace = p.trace(context.Background(), "merge", fields)
-		driverctx.NewContextWithQueryId(ctx, "q1")
-		trace.finish(nil, nil)
-
-		p.minDuration = 0
-		_, trace = p.trace(context.Background(), "merge", fields)
-		trace.finish(nil, nil)
-
-		require.Empty(t, p.queue)
-	})
-
-	t.Run("drops queries when the queue is full", func(t *testing.T) {
-		var p, _ = testProfiler(nil, 0)
-		p.queue = make(chan *profiledQuery, 1)
-		for range 2 {
-			var ctx, trace = p.trace(context.Background(), "merge", fields)
-			driverctx.NewContextWithQueryId(ctx, "q1")
-			trace.finish(nil, nil)
-		}
-		require.Len(t, p.queue, 1)
-	})
-}
-
-func TestQueryProfilerFetch(t *testing.T) {
-	var now = time.Now()
-	var awaiting = func(finished time.Time, ids ...string) []*profiledQuery {
-		var out []*profiledQuery
-		for _, id := range ids {
-			out = append(out, &profiledQuery{id: id, fields: log.Fields{"queryId": id}, finished: finished})
-		}
-		return out
-	}
-	var ids = func(qs []*profiledQuery) []string {
-		var out []string
-		for _, q := range qs {
-			out = append(out, q.id)
-		}
-		return out
-	}
-
-	t.Run("logs complete history, waits for the rest", func(t *testing.T) {
-		var history = &fakeHistory{queries: map[string]dbsql.QueryInfo{
+func TestQueryHistoryFetch(t *testing.T) {
+	t.Run("returns complete history only", func(t *testing.T) {
+		var h = &queryHistory{api: &fakeHistoryAPI{queries: map[string]dbsql.QueryInfo{
 			"done": {QueryId: "done", Status: dbsql.QueryStatusFinished, IsFinal: true, Metrics: &dbsql.QueryMetrics{
 				TotalTimeMs: 9000, ExecutionTimeMs: 7000, ReadFilesCount: 2, PrunedFilesCount: 158,
 				ProvisioningQueueStartTimestamp: 1000, OverloadingQueueStartTimestamp: 1500, QueryCompilationStartTimestamp: 4000,
 			}},
 			"filling": {QueryId: "filling", Status: dbsql.QueryStatusFinished, Metrics: &dbsql.QueryMetrics{TotalTimeMs: 9000}},
 			"running": {QueryId: "running", Status: dbsql.QueryStatusRunning, IsFinal: true, Metrics: &dbsql.QueryMetrics{}},
-		}}
-		var p, emitted = testProfiler(history, 0)
+		}}}
 
-		var rest = p.fetch(context.Background(), awaiting(now, "done", "filling", "running", "missing"), now)
-		require.Equal(t, []string{"filling", "running", "missing"}, ids(rest))
-		require.Len(t, *emitted, 1)
-		require.Equal(t, log.Fields{
-			"queryId": "done", "status": dbsql.QueryStatusFinished,
+		history, err := h.Fetch(context.Background(), []string{"done", "filling", "running", "missing"})
+		require.NoError(t, err)
+		require.Equal(t, map[string]log.Fields{"done": {
+			"status":  dbsql.QueryStatusFinished,
 			"totalMs": int64(9000), "compilationMs": int64(0), "executionMs": int64(7000), "resultFetchMs": int64(0),
 			"taskTotalMs": int64(0), "photonTotalMs": int64(0),
 			"readFiles": int64(2), "prunedFiles": int64(158), "readFilesBytes": int64(0), "prunedBytes": int64(0),
@@ -130,79 +53,20 @@ func TestQueryProfilerFetch(t *testing.T) {
 			"rowsRead": int64(0), "rowsProduced": int64(0),
 			"spillToDiskBytes": int64(0), "networkSentBytes": int64(0), "writeRemoteBytes": int64(0),
 			"queuedMs": int64(3000),
-		}, (*emitted)[0])
+		}}, history)
 	})
 
-	t.Run("logs queries without history after the max wait", func(t *testing.T) {
-		var p, emitted = testProfiler(&fakeHistory{}, 0)
-		var rest = p.fetch(context.Background(), append(awaiting(now.Add(-profileMaxWait), "old"), awaiting(now, "new")...), now)
-		require.Equal(t, []string{"new"}, ids(rest))
-		require.Equal(t, []log.Fields{{"queryId": "old"}}, *emitted)
+	t.Run("reports a denied request", func(t *testing.T) {
+		var h = &queryHistory{api: &fakeHistoryAPI{err: fmt.Errorf("listing: %w", apierr.ErrPermissionDenied)}}
+		var _, err = h.Fetch(context.Background(), []string{"q1"})
+		require.ErrorIs(t, err, boilerplate.ErrQueryHistoryDenied)
 	})
 
-	t.Run("requests history in batches", func(t *testing.T) {
-		var history = &fakeHistory{}
-		var p, _ = testProfiler(history, 0)
-		var many []*profiledQuery
-		for i := range 2*profileBatchSize + 1 {
-			many = append(many, awaiting(now, fmt.Sprintf("q%d", i))...)
-		}
-		p.fetch(context.Background(), many, now)
-		require.Len(t, history.requests, 3)
-		require.Len(t, history.requests[0], profileBatchSize)
-		require.Len(t, history.requests[2], 1)
+	t.Run("passes other errors through", func(t *testing.T) {
+		var unavailable = errors.New("unavailable")
+		var h = &queryHistory{api: &fakeHistoryAPI{err: unavailable}}
+		var _, err = h.Fetch(context.Background(), []string{"q1"})
+		require.ErrorIs(t, err, unavailable)
+		require.NotErrorIs(t, err, boilerplate.ErrQueryHistoryDenied)
 	})
-
-	t.Run("keeps waiting on a failed request", func(t *testing.T) {
-		var p, emitted = testProfiler(&fakeHistory{err: errors.New("unavailable")}, 0)
-		require.Len(t, p.fetch(context.Background(), awaiting(now, "q1"), now), 1)
-		require.True(t, p.warned)
-		require.Empty(t, *emitted)
-	})
-
-	t.Run("logs without history once it's not permitted", func(t *testing.T) {
-		var history = &fakeHistory{err: fmt.Errorf("listing: %w", apierr.ErrPermissionDenied)}
-		var p, emitted = testProfiler(history, 0)
-		require.Empty(t, p.fetch(context.Background(), awaiting(now, "q1"), now))
-		require.Nil(t, p.history)
-		require.Equal(t, []log.Fields{{"queryId": "q1"}}, *emitted)
-	})
-}
-
-func TestProfileBounds(t *testing.T) {
-	var bound = func(field, lower, upper string, ranges ...sql.MergeRange) sql.MergeBound {
-		var b = sql.MergeBound{LiteralLower: lower, LiteralUpper: upper, Ranges: ranges}
-		b.Field = field
-		return b
-	}
-
-	require.Equal(t, map[string]any{
-		"created_at": map[string]any{
-			"lower":      "'2025-12-16T12:00:00Z'",
-			"upper":      "'2026-10-27T13:30:00.5Z'",
-			"span":       "7561h30m0.5s",
-			"rangesSpan": "15m0.5s",
-			"ranges": [][2]string{
-				{"'2025-12-16T12:00:00Z'", "'2025-12-16T12:00:00Z'"},
-				{"'2026-10-27T13:15:00Z'", "'2026-10-27T13:30:00.5Z'"},
-			},
-		},
-		"day": map[string]any{"lower": "'2026-02-28'", "upper": "'2026-03-02'", "span": "48h0m0s"},
-		"id":  map[string]any{"lower": "'018f'", "upper": "'01a1'"},
-		"ok":  nil,
-	}, profileBounds([]sql.MergeBound{
-		bound("created_at", "'2025-12-16T12:00:00Z'", "'2026-10-27T13:30:00.5Z'",
-			sql.MergeRange{LiteralLower: "'2025-12-16T12:00:00Z'", LiteralUpper: "'2025-12-16T12:00:00Z'"},
-			sql.MergeRange{LiteralLower: "'2026-10-27T13:15:00Z'", LiteralUpper: "'2026-10-27T13:30:00.5Z'"},
-		),
-		bound("day", "'2026-02-28'", "'2026-03-02'"),
-		bound("id", "'018f'", "'01a1'"),
-		bound("ok", "", ""),
-	}))
-}
-
-func TestStatementKind(t *testing.T) {
-	require.Equal(t, "merge", statementKind("\n\tMERGE INTO t AS l USING ..."))
-	require.Equal(t, "copy", statementKind("COPY INTO t FROM ..."))
-	require.Equal(t, "", statementKind("  "))
 }
