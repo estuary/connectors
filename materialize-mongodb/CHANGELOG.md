@@ -1,5 +1,10 @@
 # materialize-mongodb
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
 ## 2026-10-07
 
 ### Added

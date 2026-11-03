@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
 ## 2026-11-02
 ### Added
 - A completed backfill now deletes a table's rows published before the
