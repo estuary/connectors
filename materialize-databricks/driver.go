@@ -554,7 +554,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var group, groupCtx = errgroup.WithContext(loadCtx)
 	group.SetLimit(maxConcurrentLoads)
 	for _, load := range loads {
-		group.Go(func() error {
+		group.Go(func() (err error) {
 			var finishEvaluating = sync.OnceFunc(func() {
 				if evaluating.Add(-1) == 0 {
 					d.be.FinishedEvaluatingLoads()
@@ -562,7 +562,34 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			return d.evaluateLoad(groupCtx, db, script, load, docs, finishEvaluating)
+			rows, trace, err := d.queryLoad(groupCtx, db, script, load)
+			if err != nil {
+				return err
+			}
+			var executeTook = time.Since(trace.started)
+			finishEvaluating()
+			defer rows.Close()
+
+			var docCount, docBytes int
+			defer func() {
+				trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
+			}()
+			for rows.Next() {
+				var doc loadedDoc
+				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
+					return fmt.Errorf("scanning Load document: %w", err)
+				}
+				docCount, docBytes = docCount+1, docBytes+len(doc.document)
+				select {
+				case docs <- doc:
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				}
+			}
+			if err := rows.Err(); err != nil {
+				return fmt.Errorf("querying Loads: %w", err)
+			}
+			return nil
 		})
 	}
 
@@ -588,38 +615,6 @@ type bindingLoad struct {
 // With usually 256 MB to 1 GB per table file in Databricks, 10,000 files is
 // about 2.5 to 10 TB of table.
 const maxMatchedFiles = 10000
-
-// evaluateLoad runs a binding's load script and sends its documents.
-func (d *transactor) evaluateLoad(ctx context.Context, db *stdsql.DB, script *template.Template, load bindingLoad, docs chan<- loadedDoc, executed func()) (err error) {
-	rows, trace, err := d.queryLoad(ctx, db, script, load)
-	if err != nil {
-		return err
-	}
-	var executeTook = time.Since(trace.started)
-	executed()
-	defer rows.Close()
-
-	var docCount, docBytes int
-	defer func() {
-		trace.finish(err, log.Fields{"executeTook": executeTook.String(), "docs": docCount, "docBytes": docBytes})
-	}()
-	for rows.Next() {
-		var doc loadedDoc
-		if err := rows.Scan(&doc.binding, &doc.document); err != nil {
-			return fmt.Errorf("scanning Load document: %w", err)
-		}
-		docCount, docBytes = docCount+1, docBytes+len(doc.document)
-		select {
-		case docs <- doc:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("querying Loads: %w", err)
-	}
-	return nil
-}
 
 // queryLoad runs a binding's load script, and returns its rows with the trace
 // to finish once they're read.
