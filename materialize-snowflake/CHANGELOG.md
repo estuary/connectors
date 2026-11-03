@@ -8,6 +8,12 @@
   overwrites or removes them. Controlled by the `truncate_after_backfill`
   feature flag, enabled by default; a binding without a `flow_published_at`
   column, or in delta-updates mode, is unaffected.
+- Load, commit and truncation queries that run for at least five seconds are logged with
+  the metrics Snowflake records of them in its query history: time spent
+  queued, blocked, compiling and executing, the bytes and partitions they
+  scanned, and the bytes they spilled. Load and merge queries also log the key
+  bounds they were restricted to. The metrics are read in the background,
+  without holding up the transaction.
 
 ### Changed
 - Tasks that run on more than one shard now fail at startup unless every
