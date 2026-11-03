@@ -154,6 +154,12 @@ type queryParams struct {
 	Bounds            []sql.MergeBound
 }
 
+type truncateParams struct {
+	sql.Table
+	PublishedAtColumn string
+	Boundary          string
+}
+
 type migrateParams struct {
 	SourceTable string
 	TmpName     string
@@ -178,6 +184,7 @@ type templates struct {
 	storeInsertQuery         *template.Template
 	dropStoreTable           *template.Template
 	storeCopyIntoDirectQuery *template.Template
+	truncateQuery            *template.Template
 	updateFence              *template.Template
 }
 
@@ -196,6 +203,7 @@ func renderTemplates(dialect sql.Dialect) *templates {
 		storeInsertQuery:         tplAll.Lookup("storeInsertQuery"),
 		dropStoreTable:           tplAll.Lookup("dropStoreTable"),
 		storeCopyIntoDirectQuery: tplAll.Lookup("storeCopyIntoDirectQuery"),
+		truncateQuery:            tplAll.Lookup("truncateQuery"),
 		updateFence:              tplAll.Lookup("updateFence"),
 	}
 }
@@ -376,6 +384,10 @@ WITH (
 	FIELDQUOTE = '{{ Backtick }}',
 	CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='{{ $.StorageAccountKey }}')
 );
+{{ end }}
+
+{{ define "truncateQuery" }}
+DELETE FROM {{ $.Identifier }} WHERE {{ $.PublishedAtColumn }} < {{ Literal $.Boundary }};
 {{ end }}
 
 {{ define "updateFence" }}
