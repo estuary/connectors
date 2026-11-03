@@ -18,7 +18,9 @@ def test_capture(request: pytest.FixtureRequest, snapshot: SnapshotFixture):
             "--sessions",
             "1",
             "--delay",
-            "10s",
+            # ads is read last, after every campaign and ad group; with 10s
+            # against the sandbox it emitted nothing.
+            "60s",
         ],
         stdout=subprocess.PIPE,
         text=True,
