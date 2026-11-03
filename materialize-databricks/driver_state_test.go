@@ -1179,7 +1179,7 @@ func TestAcknowledgeCommitsBindingsConcurrently(t *testing.T) {
 	})
 }
 
-func TestLoadBindingRetriesRewrittenFiles(t *testing.T) {
+func TestEvaluateLoadChecksMatchedRows(t *testing.T) {
 	var ctx = context.Background()
 	var d = renderingTransactor(lowerRangeKey)
 	var b = d.bindings[0]
@@ -1188,53 +1188,33 @@ func TestLoadBindingRetriesRewrittenFiles(t *testing.T) {
 	var doc = func(document string) []driver.Value { return []driver.Value{int64(0), document} }
 	var counts = func(matched string) []driver.Value { return []driver.Value{int64(-1), matched} }
 
-	var run = func(results ...[][]driver.Value) ([]string, int, error) {
+	var run = func(results ...[]driver.Value) ([]string, error) {
 		var db = recordingDB(t, nil)
-		recording.results = results
+		recording.results = [][][]driver.Value{results}
 		var docs = make(chan loadedDoc, 10)
-		var err = d.loadBinding(ctx, db, script, load, docs, func() {})
+		var err = d.evaluateLoad(ctx, db, script, load, docs, func() {})
 		close(docs)
 		var sent []string
 		for doc := range docs {
 			sent = append(sent, doc.document)
 		}
-		return sent, len(recording.executed), err
+		return sent, err
 	}
 
-	t.Run("rewritten files read no documents, and the script reruns", func(t *testing.T) {
-		sent, queries, err := run(
-			[][]driver.Value{counts("2 1")},
-			[][]driver.Value{doc(`{"a":1}`), doc(`{"b":2}`), counts("2 1")},
-		)
+	t.Run("a read of every matched row", func(t *testing.T) {
+		sent, err := run(doc(`{"a":1}`), doc(`{"b":2}`), counts("2 1"))
 		require.NoError(t, err)
 		require.Equal(t, []string{`{"a":1}`, `{"b":2}`}, sent)
-		require.Equal(t, 2, queries)
 	})
 
-	t.Run("files rewritten on every attempt fail the load", func(t *testing.T) {
-		_, queries, err := run(
-			[][]driver.Value{counts("2 1")},
-			[][]driver.Value{counts("2 1")},
-			[][]driver.Value{counts("2 1")},
-		)
-		require.ErrorIs(t, err, errLoadFilesRewritten)
-		require.ErrorContains(t, err, "in each of 3 attempts")
-		require.Equal(t, maxLoadAttempts, queries)
-	})
-
-	t.Run("a read missing rows after sending some fails without a rerun", func(t *testing.T) {
-		sent, queries, err := run(
-			[][]driver.Value{doc(`{"a":1}`), counts("2 1")},
-		)
+	t.Run("a read missing matched rows fails", func(t *testing.T) {
+		_, err := run(doc(`{"a":1}`), counts("2 1"))
 		require.ErrorContains(t, err, "read 1 of the 2 rows")
-		require.Equal(t, []string{`{"a":1}`}, sent)
-		require.Equal(t, 1, queries)
 	})
 
 	t.Run("no matching rows read no documents", func(t *testing.T) {
-		sent, queries, err := run([][]driver.Value{counts("0 0")})
+		sent, err := run(counts("0 0"))
 		require.NoError(t, err)
 		require.Empty(t, sent)
-		require.Equal(t, 1, queries)
 	})
 }

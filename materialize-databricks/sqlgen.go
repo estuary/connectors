@@ -207,13 +207,15 @@ to_json(struct(
 -- A load as one script, which first finds the files holding rows that match
 -- the load keys by reading only the key columns, and then reads documents from
 -- those files alone. Databricks reads every document of a file that an update
--- left a deletion vector on, matched or not. Its last row, of binding -1, has
--- the number of rows and files the match found.
+-- left a deletion vector on, matched or not. Both reads are of the table's
+-- version when the script starts, so a commit during the script can't change
+-- what they read. Its last row, of binding -1, has the number of rows and files
+-- the match found.
 
 {{ define "loadScript" }}
 BEGIN
 {{ template "loadMatch" $ }}
-{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" $ }}
+{{ template "loadQuery" $ }}	{{ template "loadMatchedFiles" }}
 {{ template "loadMatchCounts" }}
 END
 {{ end }}
@@ -221,31 +223,31 @@ END
 {{ define "loadScriptNoFlowDocument" }}
 BEGIN
 {{ template "loadMatch" $ }}
-{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" $ }}
+{{ template "loadQueryNoFlowDocument" $ }}	{{ template "loadMatchedFiles" }}
 {{ template "loadMatchCounts" }}
 END
 {{ end }}
 
+-- VERSION AS OF takes neither a variable nor an expression, so the version is
+-- bound to a view of the table at it.
+
 {{ define "loadMatch" -}}
+DECLARE version STRING;
 DECLARE files ARRAY<STRING>;
 DECLARE matched BIGINT;
+SET version = (SELECT CAST(version AS STRING) FROM (DESCRIBE HISTORY {{ $.Table.Identifier }} LIMIT 1));
+EXECUTE IMMEDIATE {{ Literal (printf "CREATE OR REPLACE TEMPORARY VIEW %s AS SELECT *, _metadata.file_path AS %s FROM %s VERSION AS OF :version" (LoadView $.Table.Binding) LoadFileColumn $.Table.Identifier) }} USING version AS version;
 SET (files, matched) = (
-	SELECT collect_set(l._metadata.file_path), count(*)
+	SELECT collect_set(l.{{ LoadFileColumn }}), count(*)
 	{{ template "loadJoin" $ }}
 );
 {{- end }}
 
 -- The variable list prunes files as a literal list does. A load matching more
--- than MaxMatchedFiles reads every file within its key bounds. The read returns
--- no documents if a matched file was rewritten since the match, such as by
--- OPTIMIZE, as its rows would be missing from the read.
+-- than MaxMatchedFiles reads every file within its key bounds.
 
 {{ define "loadMatchedFiles" -}}
-AND (size(files) > {{ MaxMatchedFiles }} OR array_contains(files, l._metadata.file_path))
-	WHERE size(files) > {{ MaxMatchedFiles }} OR size(files) = (
-		SELECT count(DISTINCT _metadata.file_path) FROM {{ $.Table.Identifier }}
-		WHERE size(files) <= {{ MaxMatchedFiles }} AND array_contains(files, _metadata.file_path)
-	)
+AND (size(files) > {{ MaxMatchedFiles }} OR array_contains(files, l.{{ LoadFileColumn }}))
 {{- end }}
 
 {{ define "loadMatchCounts" -}}
@@ -255,7 +257,7 @@ UNION ALL SELECT -1, concat(matched, ' ', size(files));
 -- The join of the table and the load keys.
 
 {{ define "loadJoin" -}}
-FROM {{ $.Table.Identifier }} AS l
+FROM {{ LoadView $.Table.Binding }} AS l
 	JOIN ({{ template "loadSource" $ }}) AS r
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
@@ -456,6 +458,8 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
   `, template.FuncMap{
 		"BoundOn":         func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
 		"MaxMatchedFiles": func() int { return maxMatchedFiles },
+		"LoadView":        func(binding int) string { return fmt.Sprintf("flow_load_%d", binding) },
+		"LoadFileColumn":  func() string { return "_flow_load_file" },
 		"QuoteAlias":      sql.QuoteTransform("`", "``"),
 	})
 
