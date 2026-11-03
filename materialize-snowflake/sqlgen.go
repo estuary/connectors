@@ -515,6 +515,7 @@ func renderCopyHistoryTemplate(tableName string, files []string, tpl *template.T
 type boundedQueryInput struct {
 	Table  sql.Table
 	File   string
+	Files  []string
 	Bounds []sql.MergeBound
 }
 
