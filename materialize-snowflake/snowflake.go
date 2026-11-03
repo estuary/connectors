@@ -271,6 +271,10 @@ type transactor struct {
 	uploads   *semaphore.Weighted
 	be        *m.BindingEvents
 	cp        checkpoint
+	profiler  *boilerplate.QueryProfiler
+	// commitProfile is the profile of the commit queries of the checkpoint
+	// last built, which Acknowledge runs.
+	commitProfile *boilerplate.QueryProfile
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
@@ -398,6 +402,8 @@ func newTransactor(
 	go func() {
 		d.logAllClusteringInfo(ctx)
 	}()
+	d.profiler = newQueryProfiler(db, d.bindings)
+	d.commitProfile = d.profiler.NewProfile()
 
 	return d, nil
 }
@@ -532,8 +538,10 @@ type loadDoc struct {
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 
+	var profile = d.profiler.NewProfile()
 	for it.Next() {
 		var b = d.bindings[it.Binding]
+		profile.AddKeys(it.Binding, 1)
 
 		if err := b.load.stage.start(ctx, d.db); err != nil {
 			return err
@@ -567,7 +575,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = d.templates.loadQueryNoFlowDocument
 			}
 
-			if subqueries[i], err = renderBoundedQueryTemplate(loadTemplate, b.target, dir, b.load.mergeBounds.Build()); err != nil {
+			var bounds = b.load.mergeBounds.Build()
+			profile.SetBounds(i, bounds)
+			if subqueries[i], err = renderBoundedQueryTemplate(loadTemplate, b.target, dir, bounds); err != nil {
 				return fmt.Errorf("loadQuery template: %w", err)
 			} else {
 				filesToCleanup = append(filesToCleanup, dir)
@@ -604,13 +614,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// In order for the concurrent requests below to be actually run concurrently we need
 	// a separate connection for each
-	for _, queryLoop := range subqueries {
+	for i, queryLoop := range subqueries {
 		var query = queryLoop
-		group.Go(func() error {
+		group.Go(func() (err error) {
 			log.WithFields(log.Fields{
 				"query": query,
 			}).Debug("querying Load documents")
 			start := time.Now()
+
+			var queryCtx, trace = profile.Trace(ctx, i, "load")
+			defer func() { trace.Finish(err) }()
 
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the load channel.
@@ -618,7 +631,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// NB: Not using groupCtx here since the Go Snowflake driver
 			// retains contexts internally, and the group context is cancelled
 			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(ctx, query)
+			rows, err := d.db.QueryContext(queryCtx, query)
+			trace.Executed()
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -640,6 +654,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				rowsProcessed += 1
 
 				message := slices.Clone(document)
+				trace.AddDocument(len(message))
 				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
 				select {
 				case <-groupCtx.Done():
@@ -793,6 +808,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, round int) (json.RawMessage, error) {
+	d.commitProfile = d.profiler.NewProfile()
 	streamBlobs := make(map[int][]*blobMetadata)
 	keys := make(map[int]string)
 	if d.snowpipeStreaming != nil {
@@ -851,7 +867,8 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 
 		if b.store.mustMerge {
-			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+			var bounds = b.store.mergeBounds.Build()
+			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, bounds)
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}
@@ -863,6 +880,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Round:     round,
 				Rows:      rows,
 			}
+			d.commitProfile.SetBounds(idx, bounds)
 			// Reset for next round.
 			b.store.mustMerge = false
 		} else if b.pipeName != "" {
@@ -1078,32 +1096,32 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			continue
 		}
 
-		path := d.pathForStateKey(stateKey)
+		idx := d.bindingForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if len(path) == 0 {
+		if idx < 0 {
 			continue
 		}
+		path := d.bindings[idx].target.Path
 
 		drained = append(drained, stateKey)
 
 		if len(item.Query) > 0 || item.TruncateBefore != nil {
 			item := item
-			stateKey := stateKey
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
 				if len(item.Query) > 0 {
-					if err := d.runStoreQuery(ctx, item, path); err != nil {
+					if err := d.runStoreQuery(ctx, item, idx, path); err != nil {
 						return err
 					}
 				}
 				// The truncation runs after the stores, so that it keeps the
 				// rows they just wrote, which were published after the boundary.
 				if item.TruncateBefore != nil {
-					if err := d.runTruncation(ctx, item, stateKey, path); err != nil {
+					if err := d.runTruncation(ctx, item, idx, path); err != nil {
 						return err
 					}
 				}
@@ -1370,24 +1388,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // runStoreQuery runs a checkpoint item's MERGE INTO or COPY INTO and reports
 // the row counts from its result set. A result that can't be read is logged
 // and skipped; only the query itself can fail the commit.
-func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, path []string) error {
+func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, binding int, path []string) error {
 	isMerge := strings.HasPrefix(item.Query, "\nMERGE INTO")
 
-	queryCtx := ctx
-	queryIDs := make(chan string, 1)
-	if isMerge {
-		queryCtx = sf.WithQueryIDChan(ctx, queryIDs)
-	}
+	var queryCtx, trace = d.commitProfile.Trace(ctx, binding, boilerplate.StatementKind(item.Query))
 	rows, err := d.db.QueryContext(queryCtx, item.Query)
+	trace.Finish(err)
 	if err != nil {
 		return fmt.Errorf("running ack query: %w", err)
-	}
-	if isMerge {
-		select {
-		case queryID := <-queryIDs:
-			logQueryStats(ctx, d.db, queryID, item.Table)
-		default:
-		}
 	}
 
 	stats, err := scanStoreResult(rows, isMerge)
@@ -1404,23 +1412,17 @@ func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, pa
 
 // runTruncation deletes the rows of the item's table published before its
 // TruncateBefore boundary, and reports how many it deleted.
-func (d *transactor) runTruncation(ctx context.Context, item *checkpointItem, stateKey string, path []string) error {
-	var b *binding
-	for _, candidate := range d.bindings {
-		if candidate.target.StateKey == stateKey {
-			b = candidate
-			break
-		}
-	}
-	if b == nil {
-		return fmt.Errorf("no binding for state key %q", stateKey)
-	} else if b.truncateSQL == "" {
+func (d *transactor) runTruncation(ctx context.Context, item *checkpointItem, binding int, path []string) error {
+	var b = d.bindings[binding]
+	if b.truncateSQL == "" {
 		var _, reason = b.target.PublishedAtColumn()
 		return fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
 			item.TruncateBefore.Format(time.RFC3339Nano), b.target.Identifier, reason)
 	}
 
-	result, err := d.db.ExecContext(ctx, b.truncateSQL, item.TruncateBefore.UTC().Format(time.RFC3339Nano))
+	var queryCtx, trace = d.profiler.Trace(ctx, binding, boilerplate.StatementKind(b.truncateSQL))
+	result, err := d.db.ExecContext(queryCtx, b.truncateSQL, item.TruncateBefore.UTC().Format(time.RFC3339Nano))
+	trace.Finish(err)
 	if err != nil {
 		return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 	}
@@ -1498,13 +1500,10 @@ func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
 	return m.ExactRowStats(loaded, 0, 0).WithLoaded(loaded), nil
 }
 
-func (d *transactor) pathForStateKey(stateKey string) []string {
-	for _, b := range d.bindings {
-		if b.target.StateKey == stateKey {
-			return b.target.Path
-		}
-	}
-	return nil
+// bindingForStateKey is the index of the binding with the state key, or -1 if
+// there's none.
+func (d *transactor) bindingForStateKey(stateKey string) int {
+	return slices.IndexFunc(d.bindings, func(b *binding) bool { return b.target.StateKey == stateKey })
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
@@ -1581,45 +1580,10 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 }
 
 func (d *transactor) Destroy() {
+	d.profiler.Stop()
 	d.load.conn.Close()
 	d.store.conn.Close()
 	d.db.Close()
-}
-
-func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
-	if !log.IsLevelEnabled(log.DebugLevel) {
-		return
-	}
-
-	var scanned, total stdsql.NullInt64
-	row := db.QueryRowContext(ctx,
-		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
-         FROM TABLE(GET_QUERY_OPERATOR_STATS(?)),
-         LATERAL FLATTEN(INPUT => operator_statistics)
-         WHERE VALUE:"partitions_scanned" IS NOT NULL`,
-		queryID,
-	)
-	if err := row.Scan(&scanned, &total); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch query partition stats")
-		return
-	}
-
-	var queuedOverloadTime stdsql.NullInt64
-	row = db.QueryRowContext(ctx,
-		`SELECT QUEUED_OVERLOAD_TIME FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) WHERE QUERY_ID = ?`,
-		queryID,
-	)
-	if err := row.Scan(&queuedOverloadTime); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch queued overload time")
-	}
-
-	log.WithFields(log.Fields{
-		"table":                   table,
-		"query_id":                queryID,
-		"partitions_scanned":      scanned.Int64,
-		"partitions_total":        total.Int64,
-		"queued_overload_time_ms": queuedOverloadTime.Int64,
-	}).Debug("query stats")
 }
 
 func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
