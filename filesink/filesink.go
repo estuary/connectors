@@ -163,6 +163,10 @@ func (d FileDriver[T, R]) Validate(ctx context.Context, req *pm.Request_Validate
 }
 
 func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err

@@ -78,6 +78,10 @@ func (driver) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, e
 }
 
 func (driver) NewTransactor(_ context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	return transactor{}, &pm.Response_Opened{}, &m.MaterializeOptions{ExtendedLogging: true}, nil
 }
 

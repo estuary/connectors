@@ -449,6 +449,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (_ m.Transactor, err error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	cfg := ep.Config
 
 	// Create shared Spanner clients

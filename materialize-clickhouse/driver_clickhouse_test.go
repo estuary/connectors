@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -564,7 +565,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	}
 	// BindingEvents zero value is safe: all methods check the enabled flag first.
 	var be = &m.BindingEvents{}
-	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
+	var open = pm.Request_Open{Range: &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}}
 
 	// No bindings — returns a valid transactor.
 	txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, nil, open, nil, be)
@@ -612,7 +613,7 @@ func TestNewTransactorRejectsMissingIsDeletedColumn(t *testing.T) {
 	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var be = &m.BindingEvents{}
-	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
+	var open = pm.Request_Open{Range: &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}}
 
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()

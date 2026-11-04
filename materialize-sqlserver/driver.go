@@ -410,6 +410,10 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
+		if err := boilerplate.RequireSingleShard(open); err != nil {
+			return nil, err
+		}
+
 		var cfg = ep.Config
 		var d = &transactor{
 			templates:             templates,

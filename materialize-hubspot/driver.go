@@ -211,6 +211,10 @@ func (m *materialization) NewTransactor(
 	mappedBindings []*mappedBinding,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	var bindings []*binding
 	for _, mapped := range mappedBindings {
 		idProperty, ok := schema.GetProperty(mapped.objectName, mapped.Key().Property.Name)

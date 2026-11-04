@@ -375,6 +375,10 @@ func newTransactor(
 	_ *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 	t := &transactor{
 		dialect:           ep.Dialect,
