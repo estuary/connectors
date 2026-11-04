@@ -62,7 +62,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	// Query tables from system.tables.
 	var tableRows *stdsql.Rows
-	if err := transientRetryPolicy.retry(ctx, "querying system.tables", isTransientErr, func() (err error) {
+	if err := idempotentRetry.Do(ctx, "querying system.tables", func(ctx context.Context) (err error) {
 		tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
 			"SELECT database, name FROM system.tables WHERE database = %s",
 			c.ep.Dialect.Literal(database),
