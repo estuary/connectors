@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestFlushFeatureFlags(t *testing.T) {
 			var flags = common.ResolveFlags(tc.flags, featureFlagDefaults, common.CreatedAt{})
 			var d = &transactor{
 				bindings:              []*binding{{target: sql.Table{}, truncateSQL: "DELETE"}},
-				primary:               true,
+				state:                 newState(0, math.MaxUint32, nil),
 				truncateAfterBackfill: sql.TruncateAfterBackfill(flags),
 			}
 			require.NoError(t, d.Flush(t.Context(), map[int]time.Time{0: boundary}))

@@ -30,10 +30,8 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 		panic(err)
 	}
 	var d = &transactor{
-		rangeKey:        rangeKey,
-		primary:         keyBegin == 0,
 		committedTokens: make(map[string]bool),
-		state:           make(connectorState),
+		state:           newState(keyBegin, keyEnd, stateKeys),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -45,16 +43,22 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 }
 
 func TestParseState(t *testing.T) {
+	var parse = func(raw string) (boilerplate.ShardedEntries[*stateItem], error) {
+		var d = testTransactor(fullRange, "a_table.v1")
+		err := d.UnmarshalState(json.RawMessage(raw))
+		return d.state.Pending(), err
+	}
+
 	t.Run("a task crossing over opens with no state", func(t *testing.T) {
-		for _, raw := range []json.RawMessage{nil, json.RawMessage(``), json.RawMessage(`{}`)} {
-			pending, err := parseState(raw)
+		for _, raw := range []string{``, `{}`} {
+			pending, err := parse(raw)
 			require.NoError(t, err)
 			require.Empty(t, pending)
 		}
 	})
 
 	t.Run("entries are keyed by state key then range", func(t *testing.T) {
-		pending, err := parseState(json.RawMessage(`{
+		pending, err := parse(`{
 			"a_table.v1": {
 				"00000000-ffffffff": {
 					"id": "p/x/files.manifest",
@@ -64,9 +68,9 @@ func TestParseState(t *testing.T) {
 					"widen": ["\"col\""]
 				}
 			}
-		}`))
+		}`)
 		require.NoError(t, err)
-		require.Equal(t, connectorState{"a_table.v1": {fullRange: &stateItem{
+		require.Equal(t, boilerplate.ShardedEntries[*stateItem]{"a_table.v1": {fullRange: &stateItem{
 			ID:          "p/x/files.manifest",
 			StoreFiles:  []string{"p/x/f1"},
 			DeleteFiles: []string{},
@@ -76,14 +80,29 @@ func TestParseState(t *testing.T) {
 	})
 
 	t.Run("an entry with unknown fields is rejected", func(t *testing.T) {
-		_, err := parseState(json.RawMessage(`{"a_table.v1": {"00000000-ffffffff": {"Queries": ["Q1"]}}}`))
+		_, err := parse(`{"a_table.v1": {"00000000-ffffffff": {"Queries": ["Q1"]}}}`)
 		require.Error(t, err)
 	})
 
 	t.Run("an entry not nested under a range key is rejected", func(t *testing.T) {
-		_, err := parseState(json.RawMessage(`{"a_table.v1": {"id": "m", "storeFiles": [], "deleteFiles": [], "mustMerge": false, "widen": []}}`))
+		_, err := parse(`{"a_table.v1": {"id": "m", "storeFiles": [], "deleteFiles": [], "mustMerge": false, "widen": []}}`)
 		require.Error(t, err)
 	})
+}
+
+// The StartCommit patch is byte-for-byte what earlier versions wrote, so
+// they can still read the state after a downgrade.
+func TestStartCommitPatch(t *testing.T) {
+	var d = testTransactor(upperRange, "a_table.v1", "b_table.v1")
+	update, err := d.state.StartCommit(map[string]*stateItem{
+		"a_table.v1": {ID: "t1", StoreFiles: []string{"p/a/f1"}, MustMerge: true, Round: 2, Rows: 3},
+		"b_table.v1": {ID: "t2", DeleteFiles: []string{"p/b/f1"}, Widen: []string{`"c"`}},
+	})
+	require.NoError(t, err)
+	require.True(t, update.MergePatch)
+	require.Equal(t, `{"a_table.v1":{"80000000-ffffffff":{"id":"t1","storeFiles":["p/a/f1"],"deleteFiles":null,"mustMerge":true,"widen":null,"round":2,"rows":3}},`+
+		`"b_table.v1":{"80000000-ffffffff":{"id":"t2","storeFiles":null,"deleteFiles":["p/b/f1"],"mustMerge":false,"widen":["\"c\""],"round":0,"rows":0}}}`,
+		string(update.UpdatedJson))
 }
 
 func TestStateItemObjects(t *testing.T) {
@@ -139,15 +158,15 @@ func TestEntryPatchReplacesPrevious(t *testing.T) {
 	next := entry("p/2/files.manifest", "p/2/f1")
 
 	var before, patch any
-	require.NoError(t, json.Unmarshal(mustMarshal(t, connectorState{"a_table.v1": {fullRange: previous}}), &before))
-	require.NoError(t, json.Unmarshal(mustMarshal(t, connectorState{"a_table.v1": {fullRange: next}}), &patch))
+	require.NoError(t, json.Unmarshal(mustMarshal(t, map[string]map[string]*stateItem{"a_table.v1": {fullRange: previous}}), &before))
+	require.NoError(t, json.Unmarshal(mustMarshal(t, map[string]map[string]*stateItem{"a_table.v1": {fullRange: next}}), &patch))
 
 	reduced, err := json.Marshal(boilerplate.ApplyMergePatch(before, patch))
 	require.NoError(t, err)
 
-	pending, err := parseState(reduced)
-	require.NoError(t, err)
-	require.Equal(t, next, pending["a_table.v1"][fullRange])
+	var d = testTransactor(fullRange, "a_table.v1")
+	require.NoError(t, d.UnmarshalState(reduced))
+	require.Equal(t, next, d.state.Pending()["a_table.v1"][fullRange])
 }
 
 func TestEntryWithoutTruncationOmitsIt(t *testing.T) {
@@ -167,39 +186,20 @@ func TestStateRouting(t *testing.T) {
 	t.Run("the primary recovers every range", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		require.Len(t, d.state, 1)
-		require.Len(t, d.state["a_table.v1"], 2)
-		require.Equal(t, "l/files.manifest", d.state["a_table.v1"][lowerRange].ID)
-		require.Equal(t, "u/files.manifest", d.state["a_table.v1"][upperRange].ID)
+		require.True(t, d.state.Primary())
+		require.Equal(t, 2, d.state.Len())
+		require.Equal(t, "l/files.manifest", d.state.Pending()["a_table.v1"][lowerRange].ID)
+		require.Equal(t, "u/files.manifest", d.state.Pending()["a_table.v1"][upperRange].ID)
 	})
 
 	t.Run("a non-primary shard recovers nothing and acknowledges nothing", func(t *testing.T) {
 		d := testTransactor(upperRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		require.Empty(t, d.state)
+		require.False(t, d.state.Primary())
+		require.Zero(t, d.state.Len())
 		patch, err := d.Acknowledge(t.Context(), []json.RawMessage{state}, nil)
 		require.NoError(t, err)
 		require.Nil(t, patch)
-	})
-
-	t.Run("the primary folds peers' patches and skips its own echo", func(t *testing.T) {
-		d := testTransactor(lowerRange, "a_table.v1")
-		d.state["a_table.v1"] = map[string]*stateItem{lowerRange: entry("own/files.manifest", "own/f")}
-		require.NoError(t, d.mergePeerStatePatches([]json.RawMessage{state}))
-		require.Equal(t, "own/files.manifest", d.state["a_table.v1"][lowerRange].ID)
-		require.Equal(t, "u/files.manifest", d.state["a_table.v1"][upperRange].ID)
-
-		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{json.RawMessage(`null`)}))
-
-		// The peer's previous transaction is still pending: its work would be lost.
-		require.Error(t, d.mergePeerStatePatches([]json.RawMessage{state}))
-	})
-
-	t.Run("the primary acknowledges with no patches at all, as on runtime v1", func(t *testing.T) {
-		d := testTransactor(lowerRange, "a_table.v1")
-		d.state["a_table.v1"] = map[string]*stateItem{lowerRange: entry("own/files.manifest", "own/f")}
-		require.NoError(t, d.mergePeerStatePatches(nil))
-		require.Equal(t, "own/files.manifest", d.state["a_table.v1"][lowerRange].ID)
 	})
 
 	t.Run("an entry with no live binding stays pending and gives Acknowledge nothing to do", func(t *testing.T) {
@@ -210,19 +210,17 @@ func TestStateRouting(t *testing.T) {
 		patch, err := d.Acknowledge(t.Context(), nil, nil)
 		require.NoError(t, err)
 		require.Nil(t, patch)
-		require.NotNil(t, d.state["gone_table.v1"][fullRange])
+		require.NotNil(t, d.state.Pending()["gone_table.v1"][fullRange])
 	})
 
-	t.Run("acknowledge leaves unrequested and unbound state keys pending", func(t *testing.T) {
+	t.Run("acknowledge leaves unrequested state keys pending", func(t *testing.T) {
 		d := testTransactor(lowerRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
-		d.state["gone_table.v1"] = map[string]*stateItem{upperRange: entry("g/files.manifest", "g/f")}
 
 		patch, err := d.Acknowledge(t.Context(), nil, []string{"other.v1"})
 		require.NoError(t, err)
 		require.Nil(t, patch)
-		require.Len(t, d.state["a_table.v1"], 2)
-		require.NotNil(t, d.state["gone_table.v1"][upperRange])
+		require.Equal(t, 2, d.state.Len())
 	})
 }
 
