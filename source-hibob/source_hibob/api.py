@@ -1,4 +1,5 @@
 import itertools
+from collections import Counter
 from collections.abc import AsyncGenerator
 from logging import Logger
 from typing import Any
@@ -43,6 +44,8 @@ VOLATILE_FIELDS = {
     "internal.periodSinceTermination",
     "internal.yearsSinceTermination",
 }
+# Categories HiBob recomputes on its own schedule (People Analytics attrition-risk scores).
+VOLATILE_CATEGORIES = {"peopleAnalytics"}
 
 _employee_fields_adapter = TypeAdapter(list[EmployeeField])
 _named_lists_adapter = TypeAdapter(dict[str, NamedList])
@@ -103,7 +106,11 @@ async def snapshot_employees(
     # Request every field the service user can see, so custom fields are picked up as
     # they're added. Fields it isn't permitted to view are silently omitted by HiBob.
     field_ids = sorted(
-        {f.id for f in await _fetch_employee_fields(http, base_url, log)}
+        {
+            f.id
+            for f in await _fetch_employee_fields(http, base_url, log)
+            if f.id.split(".", 1)[0] not in VOLATILE_CATEGORIES
+        }
         - VOLATILE_FIELDS
         - {"root.id"}
     )
@@ -112,12 +119,14 @@ async def snapshot_employees(
         for chunk in itertools.batched(
             field_ids, MAX_FIELDS_PER_SEARCH - 1, strict=False
         )
-    ]
+    ] or [["root.id"]]
 
     employee_ids = await list_employee_ids(http, base_url, log)
 
     for batch in itertools.batched(employee_ids, EMPLOYEE_ID_BATCH_SIZE, strict=False):
         merged: dict[str, dict[str, Any]] = {}
+        # Number of field slices each employee was returned in.
+        seen: Counter[str] = Counter()
 
         for fields in field_slices:
             response = await http.request(
@@ -142,15 +151,17 @@ async def snapshot_employees(
                 # top-level "/category/field" key that omits nulls. Keep the nested form.
                 nested = {k: v for k, v in employee.items() if not k.startswith("/")}
                 _deep_merge(merged.setdefault(nested["id"], {}), nested)
+                seen[nested["id"]] += 1
 
-        # Employees deleted between listing ids and reading them are simply absent.
-        if missing := [i for i in batch if i not in merged]:
-            log.info(
-                "employees listed but not returned by search, skipping",
+        # An employee missing from any slice would be emitted with only some of its
+        # fields, so it's skipped like one deleted between listing ids and reading them.
+        if missing := [i for i in batch if seen[i] < len(field_slices)]:
+            log.warning(
+                "employees listed but not returned by every search, skipping",
                 {"missing_employee_ids": missing},
             )
         for employee_id in batch:
-            if employee_id in merged:
+            if seen[employee_id] == len(field_slices):
                 yield Employee.model_validate(merged[employee_id])
 
 
@@ -186,10 +197,11 @@ async def snapshot_bulk_table(
                 )
 
         remainder = processor.get_remainder()
+        # Emitting the snapshot without these employees would delete their history
+        # downstream, so fail the poll instead.
         if remainder.errors:
-            log.warning(
-                f"{table.name}: HiBob reported per-employee errors",
-                {"errors": remainder.errors},
+            raise RuntimeError(
+                f"{table.name}: HiBob reported per-employee errors: {remainder.errors}"
             )
         if remainder.restricted_columns:
             restricted |= remainder.restricted_columns.all()

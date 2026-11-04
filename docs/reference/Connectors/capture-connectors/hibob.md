@@ -21,11 +21,11 @@ The following data resources are supported:
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 
-- `employees` includes every field in the `employee_fields` metadata that the service user can view, including custom fields. Terminated employees are included. Department, site, and other list-type fields hold named list item IDs, which can be joined to `named_lists`.
+- `employees` includes every field in the `employee_fields` metadata that the service user can view, including custom fields. Fields whose values change without any HR change are excluded: avatar and cover image URLs, tenure and age counters, and People Analytics risk scores. Terminated employees are included. Department, site, and other list-type fields hold named list item IDs, which can be joined to `named_lists`.
 - `employment_history` holds FTE, weekly hours, and contract history; `lifecycle_history` holds start, leave, and termination events; `work_history` holds department, title, site, and manager history.
 
 :::tip
-HiBob's API has no way to request only changed records, so every resource is re-captured in full on each interval (one hour by default). Documents deleted in HiBob are removed from the collections.
+HiBob's API has no way to request only changed records, so every resource is re-captured in full on each interval (one hour by default). Documents deleted in HiBob are removed from the collections. A poll with no changes captures nothing, but any change to a resource re-captures every document in it. Expect one full re-capture of each resource on the first poll after the initial backfill.
 
 History entry `id`s are only unique per employee. Use `employeeId` and `id` together to identify a history entry.
 :::

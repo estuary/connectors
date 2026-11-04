@@ -283,24 +283,6 @@
           }
         }
       },
-      "peopleAnalytics": {
-        "ageRiskIndicator": null,
-        "atRiskCounter": null,
-        "isManagerRiskIndicator": null,
-        "kidsRiskIndicator": null,
-        "lowRiskCounter": null,
-        "managerTenureRiskIndicator": null,
-        "numOfDirectReportsRiskIndicator": null,
-        "numWithSameTitleRiskIndicator": null,
-        "recentManagerChangeRiskIndicator": null,
-        "someRiskCounter": null,
-        "teamRecentTurnoverRiskIndicator": null,
-        "teamSizeRiskIndicator": null,
-        "tenureRankRiskIndicator": null,
-        "timeoffFrequencyRiskIndicator": null,
-        "yearsWithCurrentTitleRiskIndicator": null,
-        "yearsWithRecentSalaryRiskIndicator": null
-      },
       "personal": {
         "birthDate": null,
         "communication": {
