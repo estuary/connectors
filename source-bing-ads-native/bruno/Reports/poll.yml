@@ -38,7 +38,7 @@ docs: |-
   values, and whether a successful job with no rows has a null
   `ReportDownloadUrl` (the connector treats that as an empty report). The
   download itself is a signed zip URL fetched without the access token, which
-  Bruno can't unzip; the capture test exercises it.
+  Bruno can't unzip; `tests/test_reports.py` covers it with zipped CSVs.
 
   **VERIFIED (2026-10-29):** for an account with no activity today, the first
   poll (about 6 s after submit) returned `Status: Success` with
