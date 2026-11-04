@@ -1,66 +1,83 @@
 import json
+import re
 import subprocess
 
-from pydantic import JsonValue
+import pytest
 
-FIELDS_TO_REDACT = [
-    # Display name of whoever last edited a history entry.
-    "changedBy",
-    # Personal details of the test tenant's real user.
-    "displayName",
-    "email",
-    "firstName",
-    "fullName",
-    "surname",
-]
+# The capture test runs against a live HiBob partner account, which can expire, be
+# rate-limited or go down. Every PR touching estuary-cdk or the lockfile runs this
+# suite, so an outage on HiBob's side must skip the test rather than block those PRs.
+HIBOB_UNAVAILABLE = re.compile(
+    # 400s and 404s are left to fail: they're more likely a connector bug.
+    r"Encountered HTTP error status (401|403|429|5\d\d)"
+    r"|can't see any employees"
+    r"|Cannot connect to host"
+    r"|ServerDisconnectedError"
+    r"|TimeoutError"
+)
 
-
-def redact_nested_fields(
-    input: list[JsonValue] | dict[str, JsonValue], fields: list[str]
-):
-    if isinstance(input, list):
-        for element in input:
-            if isinstance(element, (list, dict)):
-                redact_nested_fields(element, fields)
-    elif isinstance(input, dict):
-        for key in list(input.keys()):
-            if key in fields:
-                input[key] = "redacted"
-            elif isinstance(input[key], (list, dict)):
-                redact_nested_fields(input[key], fields)
+# Fields every document of each stream must carry. Values aren't compared: the tenant's
+# data changes (HiBob recomputes fields, people get edited), so an exact snapshot would
+# break without any connector change.
+REQUIRED_FIELDS = {
+    "acmeCo/employees": ["id"],
+    "acmeCo/employee_fields": ["id", "jsonPath"],
+    "acmeCo/named_lists": ["name", "items"],
+    "acmeCo/employment_history": ["employeeId", "id"],
+    "acmeCo/lifecycle_history": ["employeeId", "id"],
+    "acmeCo/work_history": ["employeeId", "id"],
+}
 
 
-def test_capture(request, snapshot):
-    result = subprocess.run(
-        [
-            "flowctl",
-            "raw",
-            "preview-next",
-            "--source",
-            request.fspath.dirname + "/../test.flow.yaml",
-            "--sessions",
-            "1",
-            "--delay",
-            "10s",
-        ],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    assert result.returncode == 0
-    lines = [json.loads(l) for l in result.stdout.splitlines()]
+def test_capture(request):
+    try:
+        result = subprocess.run(
+            [
+                "flowctl",
+                "raw",
+                "preview-next",
+                "--source",
+                request.fspath.dirname + "/../test.flow.yaml",
+                "--sessions",
+                "1",
+                "--delay",
+                "10s",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=600,
+        )
+    except subprocess.TimeoutExpired:
+        pytest.skip("HiBob capture timed out")
 
-    unique_stream_lines = []
-    seen = set()
+    if result.returncode != 0 and HIBOB_UNAVAILABLE.search(result.stderr):
+        pytest.skip(f"HiBob is unavailable:\n{result.stderr[-2000:]}")
+    assert result.returncode == 0, result.stderr[-2000:]
 
-    for line in lines:
-        stream = line[0]
-        if stream not in seen:
-            unique_stream_lines.append(line)
-            seen.add(stream)
+    docs: dict[str, list[dict]] = {stream: [] for stream in REQUIRED_FIELDS}
+    for line in result.stdout.splitlines():
+        stream, doc = json.loads(line)
+        docs[stream].append(doc)
 
-    redact_nested_fields(unique_stream_lines, FIELDS_TO_REDACT)
+    for stream, fields in REQUIRED_FIELDS.items():
+        assert docs[stream], f"{stream} captured no documents"
+        for doc in docs[stream]:
+            missing = [f for f in fields if f not in doc]
+            assert not missing, f"{stream} document missing {missing}"
 
-    assert snapshot("capture.stdout.json") == unique_stream_lines
+    # HiBob returns every field twice; only the nested copy should be kept.
+    for doc in docs["acmeCo/employees"]:
+        assert not [k for k in doc if k.startswith("/")]
+
+    # History entry ids are only unique per employee.
+    for stream in [
+        "acmeCo/employment_history",
+        "acmeCo/lifecycle_history",
+        "acmeCo/work_history",
+    ]:
+        keys = [(d["employeeId"], d["id"]) for d in docs[stream]]
+        assert len(keys) == len(set(keys)), f"{stream} has duplicate (employeeId, id)"
 
 
 def test_discover(request, snapshot):
