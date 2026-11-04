@@ -1,5 +1,11 @@
 # materialize-motherduck
 
+## 2026-11-04
+
+### Fixed
+- A connection lost while committing a transaction can no longer insert the
+  same rows twice.
+
 ## 2026-11-03
 
 ### Changed
