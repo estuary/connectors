@@ -140,7 +140,7 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 	var backoff = p.InitialBackoff
 
 	for attempt := 1; ; attempt++ {
-		var err, timedOut = p.attempt(ctx, fn)
+		var timedOut, err = p.attempt(ctx, fn)
 		if err == nil {
 			return nil
 		} else if ctx.Err() != nil {
@@ -197,15 +197,15 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 }
 
 // attempt runs fn once and reports whether its own AttemptTimeout ended it.
-func (p Policy) attempt(ctx context.Context, fn func(context.Context) error) (error, bool) {
+func (p Policy) attempt(ctx context.Context, fn func(context.Context) error) (bool, error) {
 	if p.AttemptTimeout <= 0 {
-		return fn(ctx), false
+		return false, fn(ctx)
 	}
 	var attemptCtx, cancel = context.WithTimeout(ctx, p.AttemptTimeout)
 	defer cancel()
 
 	var err = fn(attemptCtx)
-	return err, err != nil && attemptCtx.Err() != nil && ctx.Err() == nil
+	return err != nil && attemptCtx.Err() != nil && ctx.Err() == nil, err
 }
 
 func (p Policy) delay(backoff time.Duration, err error) time.Duration {
