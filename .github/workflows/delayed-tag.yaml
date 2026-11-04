@@ -18,11 +18,11 @@ name: Delayed tag
 # tagging: ':delayed' is supposed to be more stable, so we must not knowingly
 # ship a bug that was already fixed in a subsequent PR.
 #
-# Finally, a guard step drops any connector whose boundary is OLDER than the
-# image ':delayed' already points at, so a nightly run never moves ':delayed'
-# backward — in particular it never silently undoes a deliberate
-# forward-delayed-tag.yaml fast-forward. (A boundary that is older only because
-# the current image was reverted on main is still allowed through.)
+# Finally, a guard step drops any connector whose boundary is not provably
+# newer than (or the same as) the commit ':delayed' already points at, so a
+# nightly run never moves ':delayed' backward — in particular it never silently
+# undoes a deliberate forward-delayed-tag.yaml fast-forward. A ':delayed' whose
+# commit can't be determined is held too.
 #
 # Core logic lives in .github/scripts/delayed_tag.py (unit-tested via
 # test_delayed_tag.py). This workflow handles auth, docker setup, and the
@@ -120,11 +120,12 @@ jobs:
           key: delayed-verdict-${{ github.run_id }}
 
       - name: Guard against moving ':delayed' backward
-        # Drop any connector whose 2-week boundary is OLDER than the image
+        # Drop any connector whose 2-week boundary isn't newer than the image
         # ':delayed' already points at — otherwise a nightly run silently undoes
         # a deliberate forward-delayed-tag.yaml fast-forward. Resolves the
-        # current ':delayed' commit per connector from the registry + packages
-        # API and compares it against the boundary in git history.
+        # current ':delayed' commit per connector from its revision label
+        # (falling back to the packages API) and compares it against the
+        # boundary in git history.
         # Reads:  /tmp/safe_plan.tsv
         # Writes: /tmp/final_plan.tsv      (image, sha7) — entries safe to tag
         #         /tmp/backward_skips.tsv  (image, boundary_sha7, current_sha7)
@@ -262,9 +263,10 @@ jobs:
             if [ -s /tmp/backward_skips.tsv ]; then
               echo "### ⏪ Held to avoid moving \`:delayed\` backward"
               echo ""
-              echo "These connectors' 2-week boundary is older than the image"
+              echo "These connectors' 2-week boundary is not newer than the image"
               echo "\`:delayed\` already points at (e.g. a forward-delayed-tag"
-              echo "fast-forward), so they were left untouched."
+              echo "fast-forward), or that image's commit is \`unresolved\`, so"
+              echo "they were left untouched."
               echo ""
               echo "| Connector | Boundary (skipped) | Current \`:delayed\` |"
               echo "|-----------|--------------------|---------------------|"
