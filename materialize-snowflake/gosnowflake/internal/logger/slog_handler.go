@@ -2,7 +2,7 @@ package logger
 
 import (
 	"context"
-	"github.com/snowflakedb/gosnowflake/v2/sflog"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/sflog"
 	"log/slog"
 )
 

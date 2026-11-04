@@ -3,16 +3,16 @@ package gosnowflake
 import (
 	"context"
 	"database/sql/driver"
-	"github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"io"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow"
-	ia "github.com/snowflakedb/gosnowflake/v2/internal/arrow"
-	"github.com/snowflakedb/gosnowflake/v2/internal/query"
-	"github.com/snowflakedb/gosnowflake/v2/internal/types"
+	ia "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/arrow"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/types"
 )
 
 const (

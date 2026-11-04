@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake/v2/internal/errors"
-	"github.com/snowflakedb/gosnowflake/v2/internal/types"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/types"
 )
 
 var (

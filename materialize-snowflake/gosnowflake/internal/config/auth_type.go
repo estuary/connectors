@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	sferrors "github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	sferrors "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 )
 
 // AuthType indicates the type of authentication in Snowflake

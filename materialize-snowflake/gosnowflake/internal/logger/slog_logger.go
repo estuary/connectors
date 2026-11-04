@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/snowflakedb/gosnowflake/v2/sflog"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/sflog"
 )
 
 // formatSource formats caller information for logging

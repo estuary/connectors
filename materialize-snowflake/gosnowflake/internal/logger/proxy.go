@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/snowflakedb/gosnowflake/v2/sflog"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/sflog"
 )
 
 // Proxy is a proxy that delegates all calls to the global logger.

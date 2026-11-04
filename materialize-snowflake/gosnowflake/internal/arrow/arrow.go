@@ -6,7 +6,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	"github.com/snowflakedb/gosnowflake/v2/internal/query"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
 )
 
 // contextKey is a private type for context keys used by this package.

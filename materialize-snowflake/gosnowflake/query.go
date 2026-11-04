@@ -2,7 +2,7 @@ package gosnowflake
 
 import (
 	"encoding/json"
-	"github.com/snowflakedb/gosnowflake/v2/internal/query"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
 	"time"
 )
 

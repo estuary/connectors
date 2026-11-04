@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	sferrors "github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	sferrors "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 )
 
 const (

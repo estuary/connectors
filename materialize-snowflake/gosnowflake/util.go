@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/memory"
-	ia "github.com/snowflakedb/gosnowflake/v2/internal/arrow"
-	sfconfig "github.com/snowflakedb/gosnowflake/v2/internal/config"
+	ia "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/arrow"
+	sfconfig "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/config"
 )
 
 // ContextKey is a type for context keys used in gosnowflake. Using a custom type helps avoid collisions with other context keys.

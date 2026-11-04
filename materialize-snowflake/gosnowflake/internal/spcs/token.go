@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	loggerinternal "github.com/snowflakedb/gosnowflake/v2/internal/logger"
+	loggerinternal "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/logger"
 )
 
 const (

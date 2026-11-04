@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	errors2 "github.com/snowflakedb/gosnowflake/v2/internal/errors"
-	"github.com/snowflakedb/gosnowflake/v2/internal/query"
-	"github.com/snowflakedb/gosnowflake/v2/internal/types"
+	errors2 "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/types"
 	"math"
 	"math/big"
 	"reflect"
@@ -23,7 +23,7 @@ import (
 	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
-	ia "github.com/snowflakedb/gosnowflake/v2/internal/arrow"
+	ia "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/arrow"
 )
 
 const format = "2006-01-02 15:04:05.999999999"

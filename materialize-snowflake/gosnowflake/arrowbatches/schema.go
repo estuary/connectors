@@ -1,11 +1,11 @@
 package arrowbatches
 
 import (
-	"github.com/snowflakedb/gosnowflake/v2/internal/query"
-	"github.com/snowflakedb/gosnowflake/v2/internal/types"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/types"
 	"time"
 
-	ia "github.com/snowflakedb/gosnowflake/v2/internal/arrow"
+	ia "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/arrow"
 
 	"github.com/apache/arrow-go/v18/arrow"
 )

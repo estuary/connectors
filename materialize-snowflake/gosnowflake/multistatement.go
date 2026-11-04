@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"strconv"
 	"strings"
 )

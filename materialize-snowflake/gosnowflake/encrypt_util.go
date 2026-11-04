@@ -8,7 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"io"
 	"os"
 	"strconv"

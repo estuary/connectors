@@ -3,7 +3,7 @@ package gosnowflake
 import (
 	"errors"
 	"fmt"
-	errors2 "github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	errors2 "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"io"
 	"os"
 	"path"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	loggerinternal "github.com/snowflakedb/gosnowflake/v2/internal/logger"
+	loggerinternal "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/logger"
 )
 
 type initTrials struct {

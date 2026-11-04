@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	sfconfig "github.com/snowflakedb/gosnowflake/v2/internal/config"
+	sfconfig "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/config"
 	"net"
 	"net/http"
 	"net/url"

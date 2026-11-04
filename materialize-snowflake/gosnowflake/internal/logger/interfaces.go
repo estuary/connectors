@@ -1,7 +1,7 @@
 package logger
 
 import (
-	"github.com/snowflakedb/gosnowflake/v2/sflog"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/sflog"
 )
 
 // Re-export types from sflog package to avoid circular dependencies

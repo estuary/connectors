@@ -1,7 +1,7 @@
 package gosnowflake
 
 import (
-	sfconfig "github.com/snowflakedb/gosnowflake/v2/internal/config"
+	sfconfig "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/config"
 )
 
 // Type aliases — re-exported from internal/config for backward compatibility.

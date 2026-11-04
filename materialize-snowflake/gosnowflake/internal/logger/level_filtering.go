@@ -3,7 +3,7 @@ package logger
 import (
 	"context"
 	"errors"
-	"github.com/snowflakedb/gosnowflake/v2/sflog"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/sflog"
 	"io"
 	"log/slog"
 )

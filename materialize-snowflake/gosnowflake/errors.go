@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	sferrors "github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	sferrors "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 )
 
 // SnowflakeError is a error type including various Snowflake specific information.

@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/ipc"
-	"github.com/snowflakedb/gosnowflake/v2/internal/query"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
 )
 
 // ArrowStreamLoader is a convenience interface for downloading

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	errors2 "github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	errors2 "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"io"
 	"net/http"
 	"net/url"

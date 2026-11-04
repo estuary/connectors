@@ -18,13 +18,13 @@ import (
 	"strings"
 	"time"
 
-	sferrors "github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	sferrors "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/snowflakedb/gosnowflake/v2/internal/compilation"
-	sfconfig "github.com/snowflakedb/gosnowflake/v2/internal/config"
-	internalos "github.com/snowflakedb/gosnowflake/v2/internal/os"
-	"github.com/snowflakedb/gosnowflake/v2/internal/spcs"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/compilation"
+	sfconfig "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/config"
+	internalos "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/os"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/spcs"
 )
 
 const (

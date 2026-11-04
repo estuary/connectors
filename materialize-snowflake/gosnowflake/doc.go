@@ -6,7 +6,7 @@ Clients can use the database/sql package directly. For example:
 	import (
 		"database/sql"
 
-		_ "github.com/snowflakedb/gosnowflake/v2"
+		_ "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 
 		"log"
 	)
@@ -328,7 +328,7 @@ Users can customize logging in two ways:
 		import (
 			"log/slog"
 	        "os"
-			sf "github.com/snowflakedb/gosnowflake/v2"
+			sf "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 		)
 
 		// Create your custom handler
@@ -364,7 +364,7 @@ If you want to define S3 client logging, override S3LoggingMode variable using c
 Example:
 
 	    import (
-	      sf "github.com/snowflakedb/gosnowflake/v2"
+	      sf "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 	      "github.com/aws/aws-sdk-go-v2/aws"
 	    )
 
@@ -837,7 +837,7 @@ If precision is important, you have to use string representation and use your ow
 # Arrow batches
 
 You can retrieve data in a columnar format similar to the format a server returns, without transposing them to rows.
-Arrow Batches mode is available through the separate `arrowbatches` sub-package (`github.com/snowflakedb/gosnowflake/v2/arrowbatches`).
+Arrow Batches mode is available through the separate `arrowbatches` sub-package (`github.com/estuary/connectors/materialize-snowflake/gosnowflake/arrowbatches`).
 This sub-package provides access to Arrow columnar data using ArrowBatch structs, which correspond to data chunks
 received from the backend. They allow for access to specific arrow.Record structs.
 
@@ -1075,7 +1075,7 @@ any subsequent time.Time type to the DATE, TIME, TIMESTAMP_LTZ, TIMESTAMP_NTZ
 or BINARY data type. The above example could be rewritten as follows:
 
 	import (
-		sf "github.com/snowflakedb/gosnowflake/v2"
+		sf "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 	)
 	dbt.mustExec("CREATE OR REPLACE TABLE tztest (id int, ntz, timestamp_ntz, ltz timestamp_ltz)")
 	// ...
@@ -1366,7 +1366,7 @@ and before retrieving the results. For a more elaborative example please see cmd
 			"fmt"
 			"log"
 			"os"
-			sf "github.com/snowflakedb/gosnowflake/v2"
+			sf "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 	    )
 
 		...

@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/snowflakedb/gosnowflake/v2/internal/errors"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"net/url"
 	"strconv"
 	"time"

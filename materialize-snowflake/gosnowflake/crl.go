@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	sfconfig "github.com/snowflakedb/gosnowflake/v2/internal/config"
+	sfconfig "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/config"
 )
 
 const snowflakeCrlCacheValidityTimeEnv = "SNOWFLAKE_CRL_CACHE_VALIDITY_TIME"

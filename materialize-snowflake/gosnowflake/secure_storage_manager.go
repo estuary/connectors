@@ -16,7 +16,7 @@ import (
 	"time"
 	"unicode"
 
-	sfconfig "github.com/snowflakedb/gosnowflake/v2/internal/config"
+	sfconfig "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/config"
 )
 
 type tokenType string
