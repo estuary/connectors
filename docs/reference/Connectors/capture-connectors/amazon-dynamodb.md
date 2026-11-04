@@ -204,6 +204,24 @@ Your capture definition may be more complex, with additional bindings for each D
 
 [Learn more about capture definitions.](../../../concepts/captures.md#specification)
 
+## Duplicate Events with Delta Updates
+
+Materializing data from a DynamoDB capture using [Delta Updates](/concepts/materialization/#delta-updates)
+may result in duplicate records during backfills since documents are not fully
+[reduced](/concepts/schemas/#reductions). This occurs when DynamoDB streams are
+active during the backfill: a document inserted or updated before the backfill
+scan reaches it may be emitted from both the stream and the backfill.
+
+Most CDC captures can get around this limitation by using [Precise mode](/reference/backfilling-data/#precise-mode)
+for the backfill. The DynamoDB connector, however, does not currently support
+precise backfills.
+
+[Reach out](/getting-started/support) if you need precise backfills for your
+DynamoDB use case to help us prioritize this feature based on interest.
+
+In the meantime, you may wish to implement your own deduplication logic in your
+destination.
+
 ## Troubleshooting
 
 ### "No OpenIDConnect provider found"
