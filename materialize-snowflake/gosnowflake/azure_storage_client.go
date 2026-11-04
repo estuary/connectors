@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/url"
@@ -266,12 +267,21 @@ func (util *snowflakeAzureClient) uploadFile(
 				meta.resStatus = needRetry
 				meta.lastError = err
 			}
+			// ESTUARY DEBUG
+			log.WithFields(estuaryStageFields(meta)).WithFields(estuaryErrFields(err)).
+				WithField("statusCode", se.StatusCode).Warn("ESTUARY DEBUG: Azure upload returned an error status")
 			return err
 		}
 		meta.resStatus = errStatus
+		// ESTUARY DEBUG: upstream leaves lastError unset here, which surfaces
+		// as "unkown error uploading".
+		meta.lastError = err
+		log.WithFields(estuaryStageFields(meta)).WithFields(estuaryErrFields(err)).
+			Warn("ESTUARY DEBUG: Azure upload failed without a response")
 		return err
 	}
 
+	log.WithFields(estuaryStageFields(meta)).Info("ESTUARY DEBUG: Azure upload succeeded")
 	meta.dstFileSize = meta.uploadSize
 	meta.resStatus = uploaded
 	return nil

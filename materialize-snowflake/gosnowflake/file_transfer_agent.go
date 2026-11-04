@@ -12,6 +12,7 @@ import (
 	"fmt"
 	errors2 "github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/errors"
 	"github.com/estuary/connectors/materialize-snowflake/gosnowflake/internal/query"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"math"
 	"net/url"
@@ -980,10 +981,31 @@ func (sfa *snowflakeFileTransferAgent) uploadOneFile(meta *fileMetadata) (*fileM
 		return meta, err
 	}
 
+	// ESTUARY DEBUG: the PUT's query ID ties this upload to Snowflake's query
+	// history, which records only the authorization.
+	startFields := estuaryStageFields(meta)
+	startFields["queryId"] = sfa.data.QueryID
+	startFields["encrypted"] = meta.encryptMeta != nil
+	log.WithFields(startFields).Info("ESTUARY DEBUG: stage upload starting")
+	uploadStart := time.Now()
+
 	client := sfa.getStorageClient(sfa.stageLocationType)
 	if err = client.uploadOneFileWithRetry(sfa.ctx, meta); err != nil {
+		f := estuaryErrFields(err)
+		f["queryId"] = sfa.data.QueryID
+		f["file"] = meta.realSrcFileName
+		f["took"] = time.Since(uploadStart).String()
+		f["resStatus"] = meta.resStatus.String()
+		log.WithFields(f).Error("ESTUARY DEBUG: stage upload failed")
 		return meta, err
 	}
+	log.WithFields(log.Fields{
+		"queryId":   sfa.data.QueryID,
+		"file":      meta.realSrcFileName,
+		"took":      time.Since(uploadStart).String(),
+		"resStatus": meta.resStatus.String(),
+		"dstSize":   meta.dstFileSize,
+	}).Info("ESTUARY DEBUG: stage upload finished")
 	return meta, nil
 }
 

@@ -3,6 +3,7 @@ package gosnowflake
 import (
 	"context"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"os"
 	"path"
@@ -70,6 +71,7 @@ func (rsu *remoteStorageUtil) uploadOneFile(ctx context.Context, meta *fileMetad
 	utilClass := rsu.getNativeCloudType(meta.stageInfo.LocationType, meta.sfa.sc.cfg)
 	maxConcurrency := int(meta.parallel)
 	var lastErr error
+	var lastAttemptErr error // ESTUARY DEBUG
 	var timer time.Time
 	var elapsedTime string
 	maxRetry := defaultMaxRetry
@@ -93,13 +95,41 @@ func (rsu *remoteStorageUtil) uploadOneFile(ctx context.Context, meta *fileMetad
 				return nil
 			}
 		}
+		var attemptErr error // ESTUARY DEBUG
 		if meta.overwrite || meta.resStatus == notFoundFile {
 			err := utilClass.uploadFile(ctx, meta.realSrcFileName, meta, maxConcurrency, meta.options.MultiPartThreshold)
 			if err != nil {
 				logger.Warnf("Error uploading %v. err: %v", meta.realSrcFileName, err)
+				attemptErr = err
+				lastAttemptErr = err
 			}
 		}
 		elapsedTime = time.Since(timer).String()
+		// ESTUARY DEBUG: one line per attempt with its outcome.
+		{
+			f := log.Fields{
+				"file":         meta.realSrcFileName,
+				"attempt":      retry + 1,
+				"maxAttempts":  maxRetry,
+				"took":         elapsedTime,
+				"resStatus":    meta.resStatus.String(),
+				"concurrency":  maxConcurrency,
+				"locationType": meta.stageInfo.LocationType,
+				"uploadSize":   meta.uploadSize,
+				"hasLastError": meta.lastError != nil,
+			}
+			if meta.lastError != nil {
+				f["lastError"] = meta.lastError.Error()
+			}
+			if attemptErr != nil {
+				for k, v := range estuaryErrFields(attemptErr) {
+					f[k] = v
+				}
+				log.WithFields(f).Warn("ESTUARY DEBUG: stage upload attempt failed")
+			} else {
+				log.WithFields(f).Info("ESTUARY DEBUG: stage upload attempt finished")
+			}
+		}
 		switch meta.resStatus {
 		case uploaded, renewToken, renewPresignedURL:
 			logger.Debugf("Uploading file: %v finished in %v ms with the status: %v.", meta.realSrcFileName, elapsedTime, meta.resStatus)
@@ -129,8 +159,19 @@ func (rsu *remoteStorageUtil) uploadOneFile(ctx context.Context, meta *fileMetad
 	}
 	if lastErr != nil {
 		logger.Errorf(`Failed to uploading file: %v, with error: %v`, meta.realSrcFileName, lastErr)
+		log.WithFields(estuaryErrFields(lastErr)).WithField("file", meta.realSrcFileName).
+			Error("ESTUARY DEBUG: stage upload failed after all attempts")
 		return lastErr
 	}
+	// ESTUARY DEBUG: an upload error that no cloud client recorded in
+	// meta.lastError is returned rather than lost.
+	if lastAttemptErr != nil {
+		log.WithFields(estuaryErrFields(lastAttemptErr)).WithField("file", meta.realSrcFileName).
+			Error("ESTUARY DEBUG: stage upload failed after all attempts with an unrecorded error")
+		return fmt.Errorf("uploading %v: %w", meta.realSrcFileName, lastAttemptErr)
+	}
+	log.WithFields(log.Fields{"file": meta.realSrcFileName, "resStatus": meta.resStatus.String()}).
+		Error("ESTUARY DEBUG: stage upload failed after all attempts with no error at all")
 	return fmt.Errorf("unkown error uploading %v", meta.realSrcFileName)
 }
 
@@ -146,8 +187,30 @@ func (rsu *remoteStorageUtil) uploadOneFileWithRetry(ctx context.Context, meta *
 		if meta.resStatus == uploaded || meta.resStatus == skipped {
 			for range 10 {
 				status := meta.resStatus
-				if _, err := utilClass.getFileHeader(ctx, meta, meta.dstFileName); err != nil {
-					logger.Warnf("error while getting file %v header. %v", meta.dstFileSize, err)
+				headStart := time.Now() // ESTUARY DEBUG
+				header, headErr := utilClass.getFileHeader(ctx, meta, meta.dstFileName)
+				if headErr != nil {
+					logger.Warnf("error while getting file %v header. %v", meta.dstFileSize, headErr)
+				}
+				// ESTUARY DEBUG: the post-upload existence check.
+				{
+					f := log.Fields{
+						"file":           meta.realSrcFileName,
+						"dstFileName":    meta.dstFileName,
+						"statusBefore":   status.String(),
+						"statusAfter":    meta.resStatus.String(),
+						"took":           time.Since(headStart).String(),
+						"headerReturned": header != nil,
+					}
+					if header != nil {
+						f["headerContentLength"] = header.contentLength
+					}
+					if headErr != nil {
+						for k, v := range estuaryErrFields(headErr) {
+							f[k] = v
+						}
+					}
+					log.WithFields(f).Info("ESTUARY DEBUG: stage upload verification")
 				}
 				// check file header status and verify upload/skip
 				if meta.resStatus == notFoundFile {
@@ -172,6 +235,8 @@ func (rsu *remoteStorageUtil) uploadOneFileWithRetry(ctx context.Context, meta *
 	if retryOuter {
 		// wanted to continue retrying but could not upload/find file
 		meta.resStatus = errStatus
+		log.WithField("file", meta.realSrcFileName).
+			Error("ESTUARY DEBUG: stage upload could not be verified after all rounds")
 	}
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/logging"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"strings"
@@ -250,6 +251,19 @@ func (util *snowflakeS3Client) uploadFile(
 	})
 
 	if err != nil {
+		// ESTUARY DEBUG
+		{
+			f := estuaryStageFields(meta)
+			for k, v := range estuaryErrFields(err) {
+				f[k] = v
+			}
+			var ae smithy.APIError
+			if errors.As(err, &ae) {
+				f["s3.errorCode"] = ae.ErrorCode()
+				f["s3.errorMessage"] = ae.ErrorMessage()
+			}
+			log.WithFields(f).Warn("ESTUARY DEBUG: S3 upload failed")
+		}
 		var ae smithy.APIError
 		if errors.As(err, &ae) {
 			if ae.ErrorCode() == expiredToken {
@@ -265,6 +279,7 @@ func (util *snowflakeS3Client) uploadFile(
 		meta.resStatus = needRetry
 		return fmt.Errorf("error while uploading file. %w", err)
 	}
+	log.WithFields(estuaryStageFields(meta)).Info("ESTUARY DEBUG: S3 upload succeeded")
 	meta.dstFileSize = meta.uploadSize
 	meta.resStatus = uploaded
 	return nil

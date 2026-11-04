@@ -11,6 +11,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -235,14 +238,30 @@ func (util *snowflakeGcsClient) uploadFile(
 		}(uploadSrc.(io.Closer))
 	}
 
+	// ESTUARY DEBUG: count the body bytes the client reads and trace the
+	// connection, so a failed PUT reports how far it got.
+	counter := &estuaryCountingReader{r: uploadSrc}
+	trace := newEstuaryTrace()
+	var reqContentLength int64
+	var reqTransferEncoding []string
+	debugFields := estuaryStageFields(meta)
+	debugFields["url"] = estuaryRedactURL(uploadURL)
+	debugFields["authByAccessToken"] = accessToken != ""
+	debugFields["contentEncodingHeader"] = contentEncoding
+	debugFields["maxConcurrency"] = maxConcurrency
+	debugFields["cloudStorageTimeout"] = util.cfg.CloudStorageTimeout.String()
+	log.WithFields(debugFields).Info("ESTUARY DEBUG: GCS PUT starting")
+
 	resp, err := withCloudStorageTimeout(ctx, util.cfg, func(ctx context.Context) (*http.Response, error) {
-		req, err := http.NewRequestWithContext(ctx, "PUT", uploadURL.String(), uploadSrc)
+		req, err := http.NewRequestWithContext(trace.withContext(ctx), "PUT", uploadURL.String(), counter)
 		if err != nil {
 			return nil, err
 		}
 		for k, v := range gcsHeaders {
 			req.Header.Add(k, v)
 		}
+		reqContentLength = req.ContentLength
+		reqTransferEncoding = req.TransferEncoding
 		client, err := newGcsClient(util.cfg, util.telemetry)
 		if err != nil {
 			return nil, err
@@ -254,7 +273,34 @@ func (util *snowflakeGcsClient) uploadFile(
 		return client.Do(req)
 	})
 
+	elapsed := time.Since(trace.start)
+	resultFields := log.Fields{}
+	for k, v := range debugFields {
+		resultFields[k] = v
+	}
+	for k, v := range trace.fields() {
+		resultFields[k] = v
+	}
+	resultFields["took"] = elapsed.String()
+	resultFields["bodyBytesRead"] = counter.n.Load()
+	resultFields["bodyReadToEOF"] = counter.eof.Load()
+	resultFields["throughputMiBps"] = estuaryRateMiBps(counter.n.Load(), elapsed)
+	if last := counter.last.Load(); last != 0 {
+		resultFields["sinceLastBodyRead"] = time.Since(time.Unix(0, last)).String()
+	}
+	resultFields["reqContentLength"] = reqContentLength
+	resultFields["reqTransferEncoding"] = reqTransferEncoding
+
 	if err != nil {
+		// ESTUARY DEBUG: upstream returns here without recording the error,
+		// so uploadOneFile retried without backoff and finally reported
+		// "unkown error uploading". Record it and mark it retryable.
+		for k, v := range estuaryErrFields(err) {
+			resultFields[k] = v
+		}
+		log.WithFields(resultFields).Warn("ESTUARY DEBUG: GCS PUT failed without a response")
+		meta.lastError = err
+		meta.resStatus = needRetry
 		return err
 	}
 	defer func() {
@@ -264,6 +310,26 @@ func (util *snowflakeGcsClient) uploadFile(
 			}
 		}
 	}()
+	resultFields["status"] = resp.Status
+	resultFields["proto"] = resp.Proto
+	resultFields["respHeaders"] = map[string]string{
+		"x-guploader-uploadid": resp.Header.Get("X-Guploader-Uploadid"),
+		"content-length":       resp.Header.Get("Content-Length"),
+		"content-type":         resp.Header.Get("Content-Type"),
+		"date":                 resp.Header.Get("Date"),
+		"server":               resp.Header.Get("Server"),
+		"etag":                 resp.Header.Get("Etag"),
+		"x-goog-generation":    resp.Header.Get("X-Goog-Generation"),
+		"x-goog-hash":          resp.Header.Get("X-Goog-Hash"),
+		"x-goog-stored-length": resp.Header.Get("X-Goog-Stored-Content-Length"),
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		resultFields["respBody"] = string(body)
+		log.WithFields(resultFields).Warn("ESTUARY DEBUG: GCS PUT returned a non-200 status")
+	} else {
+		log.WithFields(resultFields).Info("ESTUARY DEBUG: GCS PUT succeeded")
+	}
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == 403 || resp.StatusCode == 408 || resp.StatusCode == 429 || resp.StatusCode == 500 || resp.StatusCode == 503 {
 			meta.lastError = fmt.Errorf("%v", resp.Status)
