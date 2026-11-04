@@ -12,6 +12,7 @@ from delayed_tag import (
     PullRequest,
     PlanEntry,
     LaterEntry,
+    UNRESOLVED,
     Verdict,
     _http_error_body,
     _truncate_diff,
@@ -19,13 +20,16 @@ from delayed_tag import (
     build_claude_content,
     build_claude_prompt,
     call_claude,
+    current_delayed_commit,
     filter_backward_moves,
     find_boundary,
+    inspect_image,
     load_connector_images,
     load_verdict_cache,
     parse_claude_verdict,
     pr_touches_dir,
     resolve_family,
+    revision_label,
     select_commit_tag,
     verdict_cache_key,
     write_verdict_cache,
@@ -462,6 +466,8 @@ class TestFilterBackwardMoves(unittest.TestCase):
     ORDER = ['old1234', 'mid1234', 'new1234', 'tip1234']
 
     def is_ancestor(self, a, b):
+        if a not in self.ORDER or b not in self.ORDER:
+            return False
         return self.ORDER.index(a) <= self.ORDER.index(b)
 
     def run_filter(self, plan, current):
@@ -491,24 +497,139 @@ class TestFilterBackwardMoves(unittest.TestCase):
         self.assertEqual([e.image_name for e in kept], ['a'])
         self.assertEqual(skipped, [])
 
-    def test_keeps_when_current_unknown(self):
-        # No resolvable :delayed commit -> fail open, tag the boundary.
+    def test_keeps_when_no_delayed_tag(self):
         plan = [make_plan('a', sha7='mid1234')]
         kept, skipped = self.run_filter(plan, {})
         self.assertEqual([e.image_name for e in kept], ['a'])
         self.assertEqual(skipped, [])
 
+    def test_holds_when_current_unresolved(self):
+        plan = [make_plan('a', sha7='tip1234')]
+        kept, skipped = self.run_filter(plan, {'a': UNRESOLVED})
+        self.assertEqual(kept, [])
+        self.assertEqual([(e.image_name, cur) for e, cur in skipped], [('a', UNRESOLVED)])
+
+    def test_holds_when_history_unrelated(self):
+        # Neither commit is an ancestor of the other (or one is unknown to git).
+        plan = [make_plan('a', sha7='tip1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'side123'})
+        self.assertEqual(kept, [])
+        self.assertEqual([(e.image_name, cur) for e, cur in skipped], [('a', 'side123')])
+
     def test_mixed_plan(self):
         plan = [
-            make_plan('fwd', sha7='mid1234'),   # backward -> skip
-            make_plan('norm', sha7='tip1234'),  # forward  -> keep
-            make_plan('fresh', sha7='old1234'), # unknown  -> keep
+            make_plan('fwd', sha7='mid1234'),   # backward   -> skip
+            make_plan('norm', sha7='tip1234'),  # forward    -> keep
+            make_plan('fresh', sha7='old1234'), # no tag yet -> keep
+            make_plan('lost', sha7='tip1234'),  # unresolved -> skip
         ]
         kept, skipped = self.run_filter(
-            plan, {'fwd': 'tip1234', 'norm': 'mid1234'},
+            plan, {'fwd': 'tip1234', 'norm': 'mid1234', 'lost': UNRESOLVED},
         )
         self.assertEqual([e.image_name for e in kept], ['norm', 'fresh'])
-        self.assertEqual([e.image_name for e, _ in skipped], ['fwd'])
+        self.assertEqual([e.image_name for e, _ in skipped], ['fwd', 'lost'])
+
+
+# ---------------------------------------------------------------------------
+# current_delayed_commit
+# ---------------------------------------------------------------------------
+
+REV = '0123456789abcdef0123456789abcdef01234567'
+
+
+def labeled(rev: str) -> dict:
+    return {'config': {'Labels': {'org.opencontainers.image.revision': rev}}}
+
+
+class TestRevisionLabel(unittest.TestCase):
+
+    def test_single_platform_config(self):
+        self.assertEqual(revision_label(labeled(REV)), '0123456')
+
+    def test_platform_map(self):
+        self.assertEqual(revision_label({'linux/amd64': labeled(REV)}), '0123456')
+
+    def test_missing_or_malformed(self):
+        self.assertIsNone(revision_label({'config': {'Labels': None}}))
+        self.assertIsNone(revision_label(labeled('not-a-sha')))
+        self.assertIsNone(revision_label({}))
+
+
+class TestInspectImage(unittest.TestCase):
+
+    def run_with(self, returncode, stdout='', stderr=''):
+        result = mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+        with mock.patch('delayed_tag.subprocess.run', return_value=result):
+            return inspect_image('ghcr.io/estuary/a:delayed')
+
+    def test_parses_output(self):
+        self.assertEqual(self.run_with(0, '{"manifest": {}, "image": {}}'),
+                         {'manifest': {}, 'image': {}})
+
+    def test_not_found_is_none(self):
+        self.assertIsNone(self.run_with(
+            1, stderr='ERROR: ghcr.io/estuary/a:delayed: not found'))
+
+    def test_other_failure_raises(self):
+        with self.assertRaises(RuntimeError):
+            self.run_with(1, stderr='ERROR: unexpected status: 503')
+
+
+class TestCurrentDelayedCommit(unittest.TestCase):
+
+    def resolve(self, inspected, pages=(), token='tok'):
+        inspect = (mock.Mock(side_effect=inspected) if isinstance(inspected, Exception)
+                   else mock.Mock(return_value=inspected))
+        pages = list(pages)
+        list_versions = mock.Mock(
+            side_effect=lambda image, owner, token, page:
+                pages[page - 1] if page <= len(pages) else [])
+        with mock.patch('delayed_tag.inspect_image', inspect), \
+                mock.patch('delayed_tag._list_package_versions', list_versions), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            return current_delayed_commit('a', 'estuary', token, max_pages=2)
+
+    def unlabeled(self, digest='sha256:aaa'):
+        return {'manifest': {'digest': digest}, 'image': {'config': {}}}
+
+    def version(self, digest, tags):
+        return {'name': digest, 'metadata': {'container': {'tags': tags}}}
+
+    def test_no_delayed_tag(self):
+        self.assertIsNone(self.resolve(None))
+
+    def test_inspect_failure_is_unresolved(self):
+        self.assertEqual(self.resolve(RuntimeError('503')), UNRESOLVED)
+
+    def test_reads_revision_label(self):
+        inspected = {'manifest': {'digest': 'sha256:aaa'}, 'image': labeled(REV)}
+        self.assertEqual(self.resolve(inspected), '0123456')
+
+    def test_falls_back_to_package_versions(self):
+        pages = [[self.version('sha256:zzz', ['abcdef0']),
+                  self.version('sha256:aaa', ['delayed', 'fedcba9'])]]
+        self.assertEqual(self.resolve(self.unlabeled(), pages), 'fedcba9')
+
+    def test_untagged_match_keeps_scanning(self):
+        pages = [[self.version('sha256:aaa', [])],
+                 [self.version('sha256:aaa', ['fedcba9'])]]
+        inspected = {'manifest': {'digest': 'sha256:top', 'manifests': [
+            {'digest': 'sha256:aaa'}]}, 'image': {}}
+        self.assertEqual(self.resolve(inspected, pages), 'fedcba9')
+
+    def test_exhausted_pages_is_unresolved(self):
+        pages = [[self.version('sha256:zzz', ['abcdef0'])]] * 3
+        self.assertEqual(self.resolve(self.unlabeled(), pages), UNRESOLVED)
+
+    def test_api_failure_is_unresolved(self):
+        with mock.patch('delayed_tag.inspect_image', return_value=self.unlabeled()), \
+                mock.patch('delayed_tag._list_package_versions',
+                           side_effect=urllib.error.URLError('boom')), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.assertEqual(current_delayed_commit('a', 'estuary', 'tok'), UNRESOLVED)
+
+    def test_no_token_without_label_is_unresolved(self):
+        self.assertEqual(self.resolve(self.unlabeled(), token=''), UNRESOLVED)
 
 
 # ---------------------------------------------------------------------------
