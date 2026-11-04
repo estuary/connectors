@@ -100,6 +100,10 @@ type stagedFile struct {
 	// be written this transaction.
 	finished bool
 
+	// fileSizeLimit is the compressed size at which the current file is closed
+	// and uploaded.
+	fileSizeLimit int
+
 	// References to the current file being written.
 	buf    *fileBuffer
 	writer *writer.JsonWriter
@@ -113,10 +117,11 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(tempdir string, uploads *semaphore.Weighted) *stagedFile {
+func newStagedFile(tempdir string, uploads *semaphore.Weighted, fileSizeLimit int) *stagedFile {
 	return &stagedFile{
-		tempdir: tempdir,
-		uploads: uploads,
+		tempdir:       tempdir,
+		uploads:       uploads,
+		fileSizeLimit: fileSizeLimit,
 	}
 }
 
@@ -205,7 +210,7 @@ func (f *stagedFile) writeRow(row []interface{}) error {
 
 	// Concurrently start the PUT process for this file if the current file has reached
 	// fileSizeLimit.
-	if f.writer.Written() >= writer.DefaultJsonFileSizeLimit {
+	if f.writer.Written() >= f.fileSizeLimit {
 		if err := f.putFile(); err != nil {
 			return fmt.Errorf("writeRow putFile: %w", err)
 		}

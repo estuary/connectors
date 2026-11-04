@@ -507,8 +507,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 		}
 	}
 
-	b.load.stage = newStagedFile(os.TempDir(), d.uploads)
-	b.store.stage = newStagedFile(os.TempDir(), d.uploads)
+	b.load.stage = newStagedFile(os.TempDir(), d.uploads, d.cfg.fileSizeLimit())
+	b.store.stage = newStagedFile(os.TempDir(), d.uploads, d.cfg.fileSizeLimit())
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)

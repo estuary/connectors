@@ -12,6 +12,7 @@ import (
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/go/writer"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake/v2"
 )
@@ -103,6 +104,20 @@ type advancedConfig struct {
 	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures." jsonschema_extras:"nonsensitive=true"`
 	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	FileSizeLimit          int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size in bytes of each compressed file staged for loading into Snowflake. Smaller files mean more uploads per transaction\\, each with less data to resend if it fails. Defaults to 262144000 (250 MiB) if blank." jsonschema_extras:"nonsensitive=true"`
+}
+
+// minFileSizeLimit is the smallest fileSizeLimit accepted, because a limit
+// given in the wrong unit (such as 250 meaning MiB) would otherwise stage a
+// file for nearly every row.
+const minFileSizeLimit = 1 << 20
+
+// fileSizeLimit is the size at which a staged file is closed and uploaded.
+func (c config) fileSizeLimit() int {
+	if c.Advanced.FileSizeLimit == 0 {
+		return writer.DefaultJsonFileSizeLimit
+	}
+	return c.Advanced.FileSizeLimit
 }
 
 // toURI manually builds the DSN connection string. Most uses should set
@@ -239,6 +254,10 @@ func (c config) Validate() error {
 
 	if err := c.DBTJobTrigger.Validate(); err != nil {
 		return err
+	}
+
+	if limit := c.Advanced.FileSizeLimit; limit != 0 && limit < minFileSizeLimit {
+		return fmt.Errorf("fileSizeLimit %d must be at least %d bytes (1 MiB), or blank for the default", limit, minFileSizeLimit)
 	}
 
 	return validHost(c.Host)

@@ -267,6 +267,12 @@
             "title": "Feature Flags",
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
             "nonsensitive": true
+          },
+          "fileSizeLimit": {
+            "type": "integer",
+            "title": "File Size Limit",
+            "description": "Approximate maximum size in bytes of each compressed file staged for loading into Snowflake. Smaller files mean more uploads per transaction, each with less data to resend if it fails. Defaults to 262144000 (250 MiB) if blank.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,
