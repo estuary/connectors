@@ -221,6 +221,8 @@ async def test_every_unreadable_account_is_reported_together():
 
 @pytest.mark.asyncio
 async def test_other_errors_fail_discovery():
+    # Only access-denied faults mark an account unreadable. Anything else,
+    # such as a call-rate fault that outlasts its retries, fails as itself.
     http = _session(
         {
             "/User/Query": _user(),
@@ -229,7 +231,7 @@ async def test_other_errors_fail_discovery():
         }
     )
 
-    with pytest.raises(AccountAccessError, match="117"):
+    with pytest.raises(HTTPError, match="400"):
         await AccountDirectory(http, False, []).accounts(LOG)
 
 

@@ -304,8 +304,9 @@ class AccountDirectory:
                     )
                 except HTTPError as err:
                     fault = fault_of(err)
-                    detail = fault.describe() if fault else err.message
-                    return f"Account {account.Id} ({account.Name}) can't be read: {detail}"
+                    if fault is None or not (fault.codes() & ACCESS_DENIED_CODES):
+                        raise
+                    return f"Account {account.Id} ({account.Name}) can't be read: {fault.describe()}"
                 return AccountContext(
                     account=account, customer_id=customer_id, is_sandbox=self._is_sandbox
                 )
