@@ -1,5 +1,10 @@
 # materialize-snowflake
 
+## 2026-11-04
+
+### Added
+- New `fileSizeLimit` advanced option sets the maximum size of the files staged for loading into Snowflake.
+
 ## 2026-11-03
 
 ### Added

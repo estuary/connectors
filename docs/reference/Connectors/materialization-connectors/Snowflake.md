@@ -154,6 +154,7 @@ Use the below properties to configure a Snowflake materialization, which will di
 | `/credentials/private_key`    | Private Key         | Required if using jwt authentication                                                                                                                            | string | Required         |
 | `/advanced/disableFieldTruncation` | Disable Field Truncation | Disables truncation of large materialized fields | boolean | |
 | `/advanced/no_flow_document` | Exclude Flow Document | When enabled, the root document will not be required for standard updates. See [excluding flow_document with standard updates](/guides/customize-materialization-fields/#excluding-flow_document-with-standard-updates) for details. | boolean | `false` |
+| `/advanced/fileSizeLimit` | File Size Limit | Approximate maximum size in bytes of each compressed file staged for loading into Snowflake. Smaller files mean more uploads per transaction, each with less data to resend if it fails. Must be at least 1048576 (1 MiB). | integer | `262144000` (250 MiB) |
 
 #### Bindings
 
