@@ -3,16 +3,16 @@
     "acmeCo/accounts",
     {
       "AccountFinancialStatus": "ClearFinancialStatus",
-      "AccountLifeCycleStatus": "Pending",
+      "AccountLifeCycleStatus": "Pause",
       "AutoTagType": "Inactive",
       "BackUpPaymentInstrumentId": null,
       "BillToCustomerId": "387145414",
       "BillingThresholdAmount": null,
       "BusinessAddress": {
-        "BusinessName": "Example Domain",
+        "BusinessName": "AcmeCo",
         "City": "New York",
         "CountryCode": "US",
-        "Id": "641005255",
+        "Id": "641032780",
         "Line1": "123 Main Street",
         "Line2": null,
         "Line3": null,
@@ -28,23 +28,23 @@
           "Value": "0"
         }
       ],
-      "Id": "555638908",
+      "Id": "555628715",
       "Language": "English",
       "LastModifiedByUserId": "202544887",
-      "LastModifiedTime": "2026-10-29T16:25:43.157",
+      "LastModifiedTime": "2026-11-03T20:08:24.393",
       "LinkedAgencies": [],
-      "Name": "Example Domain",
-      "Number": "L104EQKR",
+      "Name": "estuary-second-account",
+      "Number": "L104ZNBN",
       "ParentCustomerId": "387145414",
-      "PauseReason": null,
+      "PauseReason": 2,
       "PaymentMethodId": null,
       "PaymentMethodType": null,
       "PrimaryUserId": "202544887",
       "SalesHouseCustomerId": null,
       "SoldToPaymentInstrumentId": null,
       "TaxInformation": [],
-      "TimeStamp": "AAAAABSiv8Q=",
-      "TimeZone": "PacificTimeUSCanadaTijuana",
+      "TimeStamp": "AAAAABSsYhs=",
+      "TimeZone": "EasternTimeUSCanada",
       "_meta": {
         "op": "c",
         "row_id": 0,
@@ -55,36 +55,266 @@
   [
     "acmeCo/campaigns",
     {
-      "AccountId": "555638908",
-      "AudienceAdsBidAdjustment": 0,
+      "AccountId": "555628715",
+      "AudienceAdsBidAdjustment": -75,
       "BiddingScheme": {
-        "MaxCpc": {
-          "Amount": null
-        },
-        "Type": "MaxConversions"
+        "Type": "EnhancedCpc"
       },
       "BudgetId": null,
       "BudgetType": "DailyBudgetStandard",
-      "CampaignType": "PerformanceMax",
-      "DailyBudget": 26.95,
+      "CampaignType": "Search",
+      "DailyBudget": 25,
       "ExperimentId": null,
       "FinalUrlSuffix": null,
       "ForwardCompatibilityMap": [],
-      "Id": "1150430564",
+      "Id": "1150435975",
       "Languages": [
         "English"
       ],
-      "Name": "PMax Example",
-      "Settings": [
-        {
-          "FinalUrlExpansionOptOut": false,
-          "Type": "PerformanceMaxSetting"
-        }
-      ],
+      "Name": "estuary-second-search",
+      "Settings": null,
       "Status": "Active",
       "SubType": null,
-      "TimeZone": "PacificTimeUSCanadaTijuana",
+      "TimeZone": "EasternTimeUSCanada",
       "TrackingUrlTemplate": null,
+      "UrlCustomParameters": null,
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/ad_groups",
+    {
+      "AccountId": "555628715",
+      "AdRotation": null,
+      "AudienceAdsBidAdjustment": null,
+      "BiddingScheme": {
+        "InheritedBidStrategyType": "EnhancedCpc",
+        "Type": "InheritFromParent"
+      },
+      "CampaignId": "1150435975",
+      "CpcBid": {
+        "Amount": 0.05
+      },
+      "EndDate": null,
+      "FinalUrlSuffix": null,
+      "ForwardCompatibilityMap": [],
+      "Id": "1207264094981949",
+      "Language": null,
+      "Name": "Ad Group 1",
+      "Network": "OwnedAndOperatedAndSyndicatedSearch",
+      "PrivacyStatus": null,
+      "Settings": null,
+      "StartDate": {
+        "Day": 3,
+        "Month": 11,
+        "Year": 2026
+      },
+      "Status": "Active",
+      "TrackingUrlTemplate": null,
+      "UrlCustomParameters": null,
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      }
+    }
+  ],
+  [
+    "acmeCo/ads",
+    {
+      "AccountId": "555628715",
+      "AdFormatPreference": "All",
+      "AdGroupId": "1207264094981949",
+      "CampaignId": "1150435975",
+      "Descriptions": [
+        {
+          "Asset": {
+            "Id": "1201766280723064",
+            "Name": null,
+            "Text": "Use this domain without any restrictions! Perfect for documentation examples.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1195169209309522",
+            "Name": null,
+            "Text": "No need for permissions\u2014just use this domain for all your documentation needs!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1200666766359575",
+            "Name": null,
+            "Text": "This domain is perfect for creating and showcasing documentation examples.",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1206164336654220",
+            "Name": null,
+            "Text": "Your go-to domain for creating effective documentation examples without any real content!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        }
+      ],
+      "DevicePreference": "0",
+      "Domain": "example.com",
+      "EditorialStatus": "Active",
+      "FinalAppUrls": null,
+      "FinalMobileUrls": null,
+      "FinalUrlSuffix": null,
+      "FinalUrls": [
+        "https://example.com"
+      ],
+      "ForwardCompatibilityMap": [],
+      "Headlines": [
+        {
+          "Asset": {
+            "Id": "1194069717698673",
+            "Name": null,
+            "Text": "{KeyWord:Stylish Sunglasses}",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1196268737745283",
+            "Name": null,
+            "Text": "Shop {KeyWord:Sunglasses}",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1203965299506602",
+            "Name": null,
+            "Text": "No Permissions Required!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1194069717698689",
+            "Name": null,
+            "Text": "No Permission Needed Here!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1201766280723080",
+            "Name": null,
+            "Text": "Your Go-To for Examples",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1199567281001014",
+            "Name": null,
+            "Text": "Document with Confidence!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1199567281001030",
+            "Name": null,
+            "Text": "Perfect for Documentation",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1199567281000998",
+            "Name": null,
+            "Text": "No Limits, Just Practice!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1195169209309538",
+            "Name": null,
+            "Text": "Practice Without Limits!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1207263838305533",
+            "Name": null,
+            "Text": "Your Testing Ground Awaits!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        },
+        {
+          "Asset": {
+            "Id": "1195169209309554",
+            "Name": null,
+            "Text": "Start Documenting Today!",
+            "Type": "TextAsset"
+          },
+          "AssetPerformanceLabel": "Unrated",
+          "EditorialStatus": "Active",
+          "PinnedField": null
+        }
+      ],
+      "Id": "75453998131791",
+      "Path1": "",
+      "Path2": "",
+      "Status": "Active",
+      "TrackingUrlTemplate": null,
+      "Type": "ResponsiveSearch",
       "UrlCustomParameters": null,
       "_meta": {
         "op": "c",
