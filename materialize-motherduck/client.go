@@ -41,7 +41,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	return withRetries(ctx, "create table", func() error {
+	return ddlRetry.Do(ctx, "create table", func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
 		return err
 	})
@@ -51,7 +51,7 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		return withRetries(ctx, "drop table", func() error {
+		return ddlRetry.Do(ctx, "drop table", func(ctx context.Context) error {
 			_, err := c.db.ExecContext(ctx, stmt)
 			return err
 		})
@@ -62,7 +62,7 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		return withRetries(ctx, "truncate table", func() error {
+		return ddlRetry.Do(ctx, "truncate table", func(ctx context.Context) error {
 			_, err := c.db.ExecContext(ctx, stmt)
 			return err
 		})
@@ -99,7 +99,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
-			if err := withRetries(ctx, "alter table", func() error {
+			if err := ddlRetry.Do(ctx, "alter table", func(ctx context.Context) error {
 				_, err := c.db.ExecContext(ctx, stmt)
 				return err
 			}); err != nil {
@@ -140,7 +140,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	var stmt string
-	err := withRetries(ctx, "create schema", func() (err error) {
+	err := ddlRetry.Do(ctx, "create schema", func(ctx context.Context) (err error) {
 		stmt, err = sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 		return err
 	})
@@ -182,7 +182,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var installed sql.Fence
-	err := withRetries(ctx, "install fence", func() (err error) {
+	err := ddlRetry.Do(ctx, "install fence", func(ctx context.Context) (err error) {
 		installed, err = sql.StdInstallFence(ctx, c.db, checkpoints, fence)
 		return err
 	})
