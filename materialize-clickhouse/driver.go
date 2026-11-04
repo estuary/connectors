@@ -19,6 +19,7 @@ import (
 	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/go/retry"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -656,7 +657,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// PrepareBatch fails before any rows have been sent, so retrying a
 			// transient connection drop is a clean no-op on the ClickHouse side.
 			var chBatch chdriver.Batch
-			if err := transientRetryPolicy.retry(ctx, "preparing load batch", isTransientErr, func() (err error) {
+			if err := idempotentRetry.Do(ctx, "preparing load batch", func(ctx context.Context) (err error) {
 				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
 				return err
 			}); err != nil {
@@ -702,7 +703,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				_ = t.load.conn.Exec(ctx, b.load.truncateSQL)
 				continue
 			}
-			if err = transientRetryPolicy.retry(ctx, "truncating load table after load", isTransientErr, func() error {
+			if err = idempotentRetry.Do(ctx, "truncating load table after load", func(ctx context.Context) error {
 				return t.load.conn.Exec(ctx, b.load.truncateSQL)
 			}); err != nil {
 				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, err)
@@ -716,7 +717,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// The load table exists (ensured at session start); truncate
 			// clears any keys left over from a previous round. TRUNCATE is
 			// idempotent, so a transient connection drop is simply retried.
-			if err = transientRetryPolicy.retry(ctx, "truncating load stage table", isTransientErr, func() error {
+			if err = idempotentRetry.Do(ctx, "truncating load stage table", func(ctx context.Context) error {
 				return t.load.conn.Exec(ctx, b.load.truncateSQL)
 			}); err != nil {
 				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
@@ -776,9 +777,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// transient failures seen in practice ("failed to read first block
 		// packet") surface from Query itself, before any rows are delivered.
 		var emitted bool
-		return transientRetryPolicy.retry(ctx, "querying Load documents",
-			func(err error) bool { return !emitted && isTransientErr(err) },
-			func() error {
+		var policy = idempotentRetry
+		policy.Classify = func(err error) retry.Outcome {
+			if emitted {
+				return retry.Fatal
+			}
+			return classify(err)
+		}
+		return policy.Do(ctx, "querying Load documents",
+			func(ctx context.Context) error {
 				rows, err := t.load.conn.Query(ctx, b.load.querySQL)
 				if err != nil {
 					return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
@@ -835,7 +842,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// As with the load batch, PrepareBatch fails before any rows have been
 		// sent and is safe to retry.
 		var chBatch chdriver.Batch
-		if err := transientRetryPolicy.retry(ctx, "preparing store batch", isTransientErr, func() (err error) {
+		if err := idempotentRetry.Do(ctx, "preparing store batch", func(ctx context.Context) (err error) {
 			chBatch, err = t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].store.insertSQL)
 			return err
 		}); err != nil {
@@ -1120,7 +1127,7 @@ func isUnknownTableErr(err error) bool {
 func (t *transactor) queryStoreParts(ctx context.Context, b *binding) (parts []stagedPartition, totalRows int64, err error) {
 	// The read has no side effects, so a transient connection drop restarts
 	// it from scratch.
-	err = transientRetryPolicy.retry(ctx, "querying store table partitions", isTransientErr, func() error {
+	err = idempotentRetry.Do(ctx, "querying store table partitions", func(ctx context.Context) error {
 		parts, totalRows = nil, 0
 
 		rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
@@ -1250,7 +1257,7 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 		// no remaining parts is a no-op, and the row accounting above plus the
 		// empty-stage check below still catch any genuinely stuck or partial
 		// move as a hard error.
-		if err = transientRetryPolicy.retry(ctx, "moving store table partition", isTransientErr, func() error {
+		if err = idempotentRetry.Do(ctx, "moving store table partition", func(ctx context.Context) error {
 			return t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID)
 		}); err != nil {
 			// Never truncate or drop here: unmoved staged rows must survive
@@ -1315,7 +1322,7 @@ func (t *transactor) truncateTarget(ctx context.Context, b *binding, boundary ti
 	// restarts the pair: rows deleted by a first attempt are absent from the
 	// second count.
 	var count uint64
-	if err := transientRetryPolicy.retry(ctx, "truncating target table", isTransientErr, func() error {
+	if err := idempotentRetry.Do(ctx, "truncating target table", func(ctx context.Context) error {
 		if err := t.store.conn.QueryRow(ctx, b.truncate.countSQL, before).Scan(&count); err != nil {
 			return fmt.Errorf("counting rows to truncate: %w", err)
 		}
@@ -1435,7 +1442,7 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 	// TRUNCATE), so a transient connection drop restarts the sequence from
 	// the top without changing its outcome.
 	ensure := func(createSQL, truncateSQL, dropSQL string, tableName string) error {
-		return transientRetryPolicy.retry(ctx, "ensuring temp table", isTransientErr, func() error {
+		return idempotentRetry.Do(ctx, "ensuring temp table", func(ctx context.Context) error {
 			return t.ensureTempTable(ctx, b, createSQL, truncateSQL, dropSQL, tableName)
 		})
 	}
@@ -1488,7 +1495,7 @@ func (t *transactor) storePartitionKeyDrifted(ctx context.Context, b *binding) (
 	var targetTable = b.target.Path[0]
 
 	var keys map[string]string
-	if err := transientRetryPolicy.retry(ctx, "querying partition keys", isTransientErr, func() error {
+	if err := idempotentRetry.Do(ctx, "querying partition keys", func(ctx context.Context) error {
 		rows, err := t.store.conn.Query(ctx,
 			"SELECT name, partition_key FROM system.tables WHERE database = currentDatabase() AND name IN (?, ?)",
 			storeTable, targetTable)
