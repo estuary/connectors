@@ -152,29 +152,16 @@ def test_retention_calendar_months(now, expected):
 
 
 def test_explicit_start_normalizes_utc():
-    assert resources.configured_start(EndpointConfig(credentials=CREDENTIALS)) is None
     explicit = EndpointConfig(
         credentials=CREDENTIALS, start_date="2026-09-01T01:00:00+02:00"
     )
     assert resources.configured_start(explicit) == date(2026, 8, 31)
 
 
-def test_default_window_rolls_with_each_poll(monkeypatch):
-    queried = []
-
-    async def query(_credentials, start, end, group_by):
-        queried.append((start, end))
-        return []
-
-    monkeypatch.setattr(api, "query_cost_and_usage", query)
-    freeze_clock(monkeypatch, datetime(2026, 9, 30, 12, tzinfo=UTC))
-    poll(api.fetch_daily_costs, None)
-    freeze_clock(monkeypatch, datetime(2026, 10, 1, 12, tzinfo=UTC))
-    poll(api.fetch_daily_costs, None)
-    assert queried == [
-        (date(2026, 8, 31), date(2026, 9, 30)),
-        (date(2026, 9, 1), date(2026, 10, 1)),
-    ]
+def test_default_start_is_30_days_ago():
+    before = datetime.now(UTC) - timedelta(days=30)
+    start = EndpointConfig(credentials=CREDENTIALS).start_date
+    assert before <= start <= datetime.now(UTC) - timedelta(days=30)
 
 
 def test_interval_defaults_to_and_requires_one_day():

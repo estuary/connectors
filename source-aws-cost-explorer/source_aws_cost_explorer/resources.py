@@ -92,9 +92,7 @@ def validate_intervals(configs: Iterable[CostResourceConfig]) -> None:
         )
 
 
-def configured_start(config: EndpointConfig) -> date | None:
-    if config.start_date is None:
-        return None
+def configured_start(config: EndpointConfig) -> date:
     return config.start_date.astimezone(UTC).date()
 
 
