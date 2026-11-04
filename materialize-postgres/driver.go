@@ -405,6 +405,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 
 	// Create templates using the dialect from the endpoint (which already has feature flags)
@@ -470,7 +474,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose the appropriate load query template based on configuration

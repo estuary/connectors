@@ -3,6 +3,7 @@ package connector
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/databricks/databricks-sdk-go"
@@ -18,6 +19,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"datetime_keys_as_string":          common.FlagEnabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"two_phase_loads":                  common.FlagDisabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 // config represents the endpoint configuration for sql server.
@@ -195,6 +197,7 @@ func (c config) ToURI(materializationName string) string {
 	params.Add("schema", c.SchemaName)
 	// Connection attribute for Estuary application reporting.
 	params.Add(productParameterDSN.key, productParameterDSN.value)
+	params.Add("maxDownloadThreads", strconv.Itoa(maxDownloadThreads))
 	if materializationName != "" {
 		// Query tag for Estuary task reporting.
 		// https://docs.databricks.com/aws/en/dev-tools/go-sql-driver#optional-parameters

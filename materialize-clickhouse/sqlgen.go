@@ -279,9 +279,9 @@ var clickHouseDialect = func(database string) sql.Dialect {
 			"datetime64(6, 'utc')": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"*":                    {sql.NewMigrationSpec([]string{"string"})},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s SETTINGS mutations_sync = 1", table.Identifier, m.Identifier, m.NullableDDL)
-		},
+		}),
 	}
 }
 
@@ -585,9 +585,9 @@ SETTINGS select_sequential_consistency = 1;
 {{ if not $.DeltaUpdates -}}
 SELECT
 concat('{',
-{{- range $i, $col := $.RootLevelColumns -}}
+{{- range $i, $col := $.RootPropertyColumns -}}
 	{{- if $i }}, ',',{{ end }}
-	'"{{ $col.Field }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
+	toJSONString({{ Literal $col.RootProperty }}), ':', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
 , '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL

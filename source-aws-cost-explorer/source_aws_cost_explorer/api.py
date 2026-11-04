@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import AsyncGenerator, Iterator
 from contextlib import closing
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from logging import Logger
 from typing import TYPE_CHECKING
 
@@ -31,7 +31,6 @@ COST_METRICS = (
     "NetUnblendedCost",
     "NetAmortizedCost",
 )
-DEFAULT_LOOKBACK = timedelta(days=30)
 
 
 async def query_cost_and_usage(
@@ -132,18 +131,17 @@ def monetary_metrics(metrics: dict[str, Metric]) -> dict[str, CostMetric]:
 
 async def poll_costs(
     credentials: AWSAccessKey,
-    start: date | None,
+    start: date,
     model: type[DailyCost],
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[DailyCost | datetime, None]:
     """Reread complete UTC days through yesterday.
 
-    The first poll reads from `start`, or the last `DEFAULT_LOOKBACK` days
-    without one. Later polls reread from the month before the previous poll,
-    since AWS finalizes a month's costs early in the next; anchoring on the
-    cursor also covers days missed while the capture was paused. Rows that
-    leave the window keep their last captured values.
+    The first poll reads from `start`. Later polls reread from the month
+    before the previous poll, since AWS finalizes a month's costs early in the
+    next; anchoring on the cursor also covers days missed while the capture
+    was paused. Rows that leave the window keep their last captured values.
     """
     assert isinstance(cursor, datetime)
     poll_started = utc_now()
@@ -151,7 +149,7 @@ async def poll_costs(
         return
     today = poll_started.date()
     refresh_from = months_before(cursor.date(), 1)
-    lower = available_start(max(start or today - DEFAULT_LOOKBACK, refresh_from), today)
+    lower = available_start(max(start, refresh_from), today)
     if lower < today:
         pages = await query_cost_and_usage(credentials, lower, today, model.group_by)
         count = 0
@@ -163,18 +161,18 @@ async def poll_costs(
 
 
 def fetch_daily_costs(
-    credentials: AWSAccessKey, start: date | None, log: Logger, cursor: LogCursor
+    credentials: AWSAccessKey, start: date, log: Logger, cursor: LogCursor
 ) -> AsyncGenerator[DailyCost | datetime, None]:
     return poll_costs(credentials, start, DailyCost, log, cursor)
 
 
 def fetch_daily_costs_by_service(
-    credentials: AWSAccessKey, start: date | None, log: Logger, cursor: LogCursor
+    credentials: AWSAccessKey, start: date, log: Logger, cursor: LogCursor
 ) -> AsyncGenerator[DailyCost | datetime, None]:
     return poll_costs(credentials, start, ServiceCost, log, cursor)
 
 
 def fetch_daily_costs_by_linked_account(
-    credentials: AWSAccessKey, start: date | None, log: Logger, cursor: LogCursor
+    credentials: AWSAccessKey, start: date, log: Logger, cursor: LogCursor
 ) -> AsyncGenerator[DailyCost | datetime, None]:
     return poll_costs(credentials, start, AccountCost, log, cursor)

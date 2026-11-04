@@ -1,5 +1,28 @@
 # materialize-postgres
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
+### Changed
+- Changing the type of several columns of a table now rewrites the table once
+  instead of once per column, which makes the migration faster and uses less
+  disk I/O and WAL.
+
+## 2026-10-31
+
+### Changed
+- A table that would exceed Postgres's limit of 1600 columns now fails before
+  any binding's table is created or altered, with an error naming the table
+  and its column count and asking you to exclude fields from the binding.
+
 ## 2026-10-23
 
 ### Fixed

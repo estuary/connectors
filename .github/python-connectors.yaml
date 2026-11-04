@@ -275,7 +275,19 @@
   type: capture
   version: v1
   usage_rate: "1.0"
+- name: source-pylon
+  type: capture
+  version: v1
+  usage_rate: "1.0"
 - name: source-okta
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-tiktok-ads-native
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-bing-ads-native
   type: capture
   version: v1
   usage_rate: "1.0"

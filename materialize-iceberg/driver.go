@@ -660,6 +660,10 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mapped],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	pyFiles, err := d.putPyFiles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("putting PySpark scripts: %w", err)

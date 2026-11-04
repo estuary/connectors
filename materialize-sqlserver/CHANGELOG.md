@@ -1,5 +1,16 @@
 # materialize-sqlserver
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains a dot or has a custom projection name.
+
 ## 2026-10-22
 
 ### Added

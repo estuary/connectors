@@ -295,9 +295,9 @@ JOIN {{ $.Identifier}} AS r
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Binding }}, 
 	JSON_OBJECT(
-		{{- range $i, $col := $.RootLevelColumns}}
+		{{- range $i, $col := $.RootPropertyColumns}}
 			{{- if $i}},{{end}}
-		{{Literal $col.Field}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}}: {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
 	) as flow_document
 FROM {{ template "temp_name_load" . }} AS l

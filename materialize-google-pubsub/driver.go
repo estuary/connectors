@@ -256,6 +256,10 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 }
 
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err

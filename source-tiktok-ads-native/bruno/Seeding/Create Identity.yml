@@ -1,0 +1,38 @@
+info:
+  name: Create Identity
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/identity/create/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "display_name": "Estuary Seed"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const data = res.getBody()?.data;
+        const item = Array.isArray(data) ? data[0] : data;
+        if (item?.identity_id != null) bru.setVar('seed_identity_id', String(item.identity_id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Create a Custom Identity" (`POST /open_api/v1.3/identity/create/`).
+
+  **WHY:** a custom identity (display name only) lets the seeded ads run
+  without linking a real TikTok profile.
+
+  **PENDING:** not yet run.

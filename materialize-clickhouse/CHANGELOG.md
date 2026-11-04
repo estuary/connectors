@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains quotes or backslashes, or has a custom projection
+  name.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
 ## 2026-10-22
 
 ### Added

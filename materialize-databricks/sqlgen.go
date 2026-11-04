@@ -201,9 +201,9 @@ SELECT -1, ""
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Table.Binding }},
 to_json(struct(
-{{- range $i, $col := $.Table.RootLevelColumns}}
+{{- range $i, $col := $.Table.RootPropertyColumns}}
 	{{- if $i}},{{end}}
-	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
 {{ template "loadJoin" $ }}
@@ -425,7 +425,8 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 	);
 {{ end }}
   `, template.FuncMap{
-		"BoundOn": func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+		"BoundOn":    func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+		"QuoteAlias": sql.QuoteTransform("`", "``"),
 	})
 
 	return templates{

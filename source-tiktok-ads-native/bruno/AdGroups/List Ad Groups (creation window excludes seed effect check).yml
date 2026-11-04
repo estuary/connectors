@@ -1,0 +1,24 @@
+info:
+  name: List Ad Groups (creation window excludes seed effect check)
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"creation_filter_start_time":"2026-10-09 00:00:00","creation_filter_end_time":"2026-10-10 00:00:00"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** effect check for the creation-time filter on ad groups: the seed ad group was created on 2026-10-08, so 0 results means the filter is honored.
+
+  **VERIFIED (2026-10-12, sandbox):** `total 0`: the creation-time filter is
+  honored for ad groups.

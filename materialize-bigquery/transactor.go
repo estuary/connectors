@@ -258,7 +258,7 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	if col, err := target.PublishedAtColumn(); err == nil {

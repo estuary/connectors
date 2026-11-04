@@ -417,9 +417,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 OBJECT(
-{{- range $i, $col := $.RootLevelColumns}}
+{{- range $i, $col := $.RootPropertyColumns}}
 	{{- if $i}},{{end}}
-	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+	{{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 {{- end}}
 ) as flow_document
 FROM {{ template "temp_name" . }} AS l

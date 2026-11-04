@@ -194,23 +194,6 @@ jobs:
         run: |
           bash source-mongodb/docker-compose-init.sh
 
-      # The snowflake tests build a venv for the Snowpipe Streaming sidecar
-      # with uv, so the venv holds the sidecar's locked dependencies.
-      - name: Install uv for the sidecar test venv
-        if: matrix.connector.name == 'materialize-snowflake'
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: "0.13.3"
-
-      # The sidecar is its own uv project with its own lock, and nothing else
-      # validates it: the Go test below and the Dockerfile both take `--frozen`,
-      # which installs the committed lock without checking it against the
-      # manifest. `--frozen` is right in both of those places; this is the step
-      # that notices a dependency added without re-locking.
-      - name: Check the Snowpipe sidecar's lock
-        if: matrix.connector.name == 'materialize-snowflake'
-        run: uv lock --check --project materialize-snowflake/sidecar
-
       # Run the tests of every in-repo helper package which this connector
       # transitively depends on. This list is computed on the fly so that we
       # don't have to keep an explicit list up-to-date. Likewise instead of
@@ -362,6 +345,10 @@ jobs:
       # both runtimes must leave the same destination -- and is snapshotted as
       # `<test>-runtime-v1` where the connector has one (see testutil's
       # runtimeV1Liveness, requireMatchesRuntimeNextSnapshot, runtimeV1SnapshotName).
+      # Only the materialize tests drive runtime v1, so this runs just the
+      # TestIntegration* tests that hold them, and everything in there that
+      # drives the connector directly or through preview-next skips itself
+      # (testutil.SkipRuntimeV1).
       - name: Materialization connector ${{ matrix.connector.name }} integration tests (runtime v1)
         if: startsWith(matrix.connector.name, 'materialize-')
         env:
@@ -369,11 +356,7 @@ jobs:
           FLOW_TEST_FLOWCTL: flowctl-v1
         run: |
           cd ${{ matrix.connector.name }}
-          TIMEOUT=20m
-          if [ "${{ matrix.connector.name }}" = "materialize-snowflake" ]; then
-            TIMEOUT=30m
-          fi
-          go test -v ./... -timeout $TIMEOUT
+          go test -v ./... -run '^TestIntegration' -timeout 20m
 
       # On a snapshot mismatch the harness writes this run's value beside the
       # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed

@@ -26,15 +26,3 @@ captures:
         name: organization_memberships
         interval: PT5M
       target: acmeCo/organization_memberships
-    - resource:
-        name: routing_forms
-        interval: PT5M
-      target: acmeCo/routing_forms
-    - resource:
-        name: groups
-        interval: PT5M
-      target: acmeCo/groups
-    - resource:
-        name: routing_form_submissions
-        interval: PT5M
-      target: acmeCo/routing_form_submissions

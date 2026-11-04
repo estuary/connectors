@@ -131,9 +131,15 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"jsonb": {sql.NewMigrationSpec([]string{"json", "text"}, sql.WithDirectCast())},
 			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
-			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
-				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
+		// Postgres rewrites the table for each statement that changes a column's
+		// type, so every column changes in one statement and the table is
+		// rewritten once.
+		DirectCastSQL: func(table sql.Table, migrations []sql.ColumnTypeMigration) []string {
+			clauses := make([]string, len(migrations))
+			for i, m := range migrations {
+				clauses[i] = fmt.Sprintf("ALTER COLUMN %s TYPE %s USING %s", m.Identifier, m.BareDDL, m.CastSQL(m))
+			}
+			return []string{fmt.Sprintf("ALTER TABLE %s\n\t%s", table.Identifier, strings.Join(clauses, ",\n\t"))}
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -160,6 +166,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		}),
 		TypeMapper:             mapper,
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
+		MaxColumns:             1600,
 		CaseInsensitiveColumns: false,
 	}
 }
@@ -331,13 +338,13 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 (
-{{- $chunks := ChunkColumns $.RootLevelColumns 49 -}}
+{{- $chunks := ChunkColumns $.RootPropertyColumns 49 -}}
 {{- range $chunkIdx, $chunk := $chunks }}
 	{{- if $chunkIdx }} || {{ end -}}
 	JSONB_BUILD_OBJECT(
 	{{- range $i, $col := $chunk}}
 		{{- if $i}},{{end}}
-		{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 	{{- end}}
 	)
 {{- end}}

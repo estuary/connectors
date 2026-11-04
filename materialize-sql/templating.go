@@ -188,7 +188,7 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 		if isDatetimeColumn(b.keyColumns[idx]) {
 			// Date-time strings order by their instant, which text order
 			// doesn't follow across offsets and precisions.
-			if lower, upper, ts, ok := minMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
+			if lower, upper, ts, ok := MinMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
 				b.lower[idx], b.upper[idx] = lower, upper
 				if b.rangeColumns != nil && b.rangeColumns[idx] && !b.unbounded[idx] {
 					b.spans[idx] = addDatetimeSpan(b.spans[idx], ts, k, spansPerRange*b.maxRanges)
@@ -208,7 +208,8 @@ func isDatetimeColumn(col Column) bool {
 	return ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time"
 }
 
-func parseDatetime(v any) (time.Time, bool) {
+// ParseDatetime parses a date-time key value, reporting false if it isn't one.
+func ParseDatetime(v any) (time.Time, bool) {
 	s, ok := v.(string)
 	if !ok {
 		return time.Time{}, false
@@ -217,13 +218,13 @@ func parseDatetime(v any) (time.Time, bool) {
 	return t, err == nil
 }
 
-// minMaxDatetime returns the earlier of lower and k, and the later of upper
+// MinMaxDatetime returns the earlier of lower and k, and the later of upper
 // and k, compared as instants, along with the instant of k. It reports false
 // if any isn't a date-time.
-func minMaxDatetime(lower, upper, k any) (any, any, time.Time, bool) {
-	tl, okL := parseDatetime(lower)
-	tu, okU := parseDatetime(upper)
-	tk, okK := parseDatetime(k)
+func MinMaxDatetime(lower, upper, k any) (any, any, time.Time, bool) {
+	tl, okL := ParseDatetime(lower)
+	tu, okU := ParseDatetime(upper)
+	tk, okK := ParseDatetime(k)
 	if !okL || !okU || !okK {
 		return nil, nil, time.Time{}, false
 	}
@@ -289,7 +290,7 @@ func maxKey(k1 any, k2 any) any {
 
 // Build outputs the computed merge conditions for this transaction and resets
 // the tracked values in preparation for the next transaction.
-func (b *MergeBoundsBuilder) Build() []MergeBound {
+func (b *MergeBoundsBuilder) Build() MergeBounds {
 	conditions := make([]MergeBound, len(b.lower))
 
 	for idx, col := range b.keyColumns {
@@ -310,8 +311,8 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 			// Endpoints compare a date-time literal to a stored value with
 			// differing precision or, for text columns, as text, so the bound
 			// is widened to dates to be safe under either.
-			lower, _ := parseDatetime(b.lower[idx])
-			upper, _ := parseDatetime(b.upper[idx])
+			lower, _ := ParseDatetime(b.lower[idx])
+			upper, _ := ParseDatetime(b.upper[idx])
 			if lo, hi, ok := dateBounds(lower, upper); ok {
 				conditions[idx].LiteralLower = b.literaler(lo)
 				conditions[idx].LiteralUpper = b.literaler(hi)

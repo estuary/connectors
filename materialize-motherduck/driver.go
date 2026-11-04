@@ -102,6 +102,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (_ m.Transactor, err error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 
 	db, err := cfg.db(ctx)
@@ -142,7 +146,7 @@ func newTransactor(
 			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
 		}
 		if cfg.Advanced.NoFlowDocument {
-			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+			b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		}
 		if col, err := target.PublishedAtColumn(); err != nil {
 			b.truncateReason = err

@@ -410,6 +410,10 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
+		if err := boilerplate.RequireSingleShard(open); err != nil {
+			return nil, err
+		}
+
 		var cfg = ep.Config
 		var d = &transactor{
 			templates:             templates,
@@ -483,7 +487,7 @@ type binding struct {
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
-	var b = &binding{target: target, nullFieldsToStrip: target.NullableFieldsToStrip()}
+	var b = &binding{target: target, nullFieldsToStrip: target.NullablePropertiesToStrip()}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template

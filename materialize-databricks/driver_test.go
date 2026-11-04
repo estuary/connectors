@@ -1,6 +1,8 @@
 package connector
 
 import (
+	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -40,6 +42,51 @@ func TestIntegration(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, sanitizers,
 			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityExact})
 	})
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+			db, err := stdsql.Open("databricks", cfg.ToURI(taskName))
+			require.NoError(t, err)
+			defer db.Close()
+
+			// Two shards, so that the primary truncates after applying a peer's
+			// staged stores.
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "2",
+				"--timeout", "10m",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var identifier = fmt.Sprintf("`%s`.`%s`.`%s`", cfg.CatalogName, cfg.SchemaName, task.Resource(t, table))
+				rows, err := db.QueryContext(ctx, "SELECT id FROM "+identifier+" ORDER BY id;")
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
+			}
+		})
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})

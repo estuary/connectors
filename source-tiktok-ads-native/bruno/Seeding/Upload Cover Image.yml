@@ -1,0 +1,68 @@
+info:
+  name: Upload Cover Image
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/file/image/ad/upload/"
+  body:
+    type: multipart-form
+    data:
+      - name: advertiser_id
+        type: text
+        value: "{{advertiser_id}}"
+      - name: upload_type
+        type: text
+        value: UPLOAD_BY_FILE
+      - name: file_name
+        type: text
+        value: estuary-seed-video-cover
+      - name: image_signature
+        type: text
+        value: "{{seed_cover_signature}}"
+      - name: image_file
+        type: file
+        value:
+          - "{{seed_cover_file}}"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // The image stays outside the repo; pass its absolute path at run time:
+        //   --env-var seed_cover_file=/path/to/cover.jpg
+        const fs = require('fs');
+        const crypto = require('crypto');
+        const coverPath = bru.getEnvVar('seed_cover_file');
+        if (!coverPath) throw new Error('pass the cover image path: --env-var seed_cover_file=/absolute/path');
+        // TikTok requires the file's MD5 as `image_signature`.
+        const md5 = crypto.createHash('md5').update(fs.readFileSync(coverPath)).digest('hex');
+        bru.setVar('seed_cover_signature', md5);
+    - type: after-response
+      code: |-
+        const data = res.getBody()?.data;
+        const item = Array.isArray(data) ? data[0] : data;
+        if (item?.image_id != null) bru.setVar('seed_cover_image_id', String(item.image_id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Upload an image" (`POST /open_api/v1.3/file/image/ad/upload/`).
+
+  **WHY:** a single-video ad needs a cover image.
+
+  **Prerequisites:** a local cover image (a frame of the seeded video, kept
+  out of the repo), passed with `--env-var seed_cover_file=/absolute/path`.
+  On macOS: `qlmanage -t -s 1920 -o <dir> <video>` then
+  `sips -s format jpeg -s formatOptions 70 -z 1280 720 <png> --out cover.jpg`.
+
+  **VERIFIED (2026-10-12, sandbox):** the sandbox's video upload returns no
+  `video_cover_url`, and `file/video/suggestcover` is unavailable there
+  (`code 40010`), so the cover is uploaded as a file.
+
+  **UNOBSERVABLE (2026-10-12, sandbox):** fails with `code 51004`, an
+  internal sandbox error ("interface is deprecated, please call ...
+  BindImagesToOwner instead"). Image upload does not work in the sandbox.

@@ -155,6 +155,29 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	}, nil
 }
 
+// Each ALTER TABLE is a Delta commit and a warehouse round trip, so columns are
+// added and dropped in one statement per step. Databricks renames only one
+// column per statement.
+var columnMigrationSteps = []sql.ColumnMigrationStep{
+	func(_ sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		cols := make([]string, len(instructions))
+		for i, ins := range instructions {
+			cols[i] = fmt.Sprintf("%s %s", ins.TempColumnIdentifier, ins.TypeMigration.NullableDDL)
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s ADD COLUMNS (%s);", table.Identifier, strings.Join(cols, ", "))}, nil
+	},
+	sql.StdMigrationSteps[1],
+	func(_ sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		cols := make([]string, len(instructions))
+		for i, ins := range instructions {
+			cols[i] = ins.TypeMigration.Identifier
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s DROP COLUMNS (%s);", table.Identifier, strings.Join(cols, ", "))}, nil
+	},
+	sql.StdMigrationSteps[3],
+	sql.StdMigrationSteps[4],
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
@@ -177,7 +200,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, columnMigrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
 			stmts = append(stmts, steps...)

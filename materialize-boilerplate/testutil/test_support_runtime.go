@@ -30,6 +30,9 @@ type rewrittenTask[RC any] struct {
 	rndSuffix       string
 	resources       []RC
 	resourcePaths   [][]string
+	// originalNames are the bindings' final resource path parts before
+	// rewriting, parallel to resourcePaths.
+	originalNames []string
 }
 
 func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -47,6 +50,7 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 
 	var snapshotResources []RC
 	var testResourcePaths [][]string
+	var originalNames []string
 	gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).ForEach(func(bindingIdx, binding gjson.Result) bool {
 		// Replace the final resource path part with a unique name for this test
 		// run, to prevent concurrent runs of the test from interfering with
@@ -55,6 +59,7 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 		require.NoError(t, boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
 		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
 		require.NoError(t, err)
+		originalNames = append(originalNames, path[len(path)-1])
 		lastPathPart := path[len(path)-1] + rndSuffix
 
 		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
@@ -95,7 +100,70 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 		rndSuffix:       rndSuffix,
 		resources:       snapshotResources,
 		resourcePaths:   testResourcePaths,
+		originalNames:   originalNames,
 	}
+}
+
+// TestTask is a task of a bundled spec renamed for one test run, for tests that
+// drive flowctl themselves. Its task and resources are removed when the test
+// ends.
+type TestTask struct {
+	// SourcePath is the rewritten spec, for flowctl's --source.
+	SourcePath string
+	// Name is the task's per-run name, for flowctl's --name.
+	Name string
+	// paths maps each binding's final resource path part in the original spec
+	// to its per-run resource path.
+	paths map[string][]string
+}
+
+// Path returns the per-run resource path of the binding named name in the
+// original spec.
+func (tt TestTask) Path(t *testing.T, name string) []string {
+	t.Helper()
+	path, ok := tt.paths[name]
+	require.True(t, ok, "no binding named %q", name)
+	return path
+}
+
+// Resource returns the per-run final path part of the binding named name in
+// the original spec.
+func (tt TestTask) Resource(t *testing.T, name string) string {
+	t.Helper()
+	path := tt.Path(t, name)
+	return path[len(path)-1]
+}
+
+// PrepareTestTask gives taskName and its bindings' resources unique per-run
+// names, so that concurrent runs of a test sharing a destination don't
+// interfere, and removes them when the test ends.
+func PrepareTestTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	bundled []byte,
+	taskName string,
+	cfg EC,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+) TestTask {
+	t.Helper()
+
+	ctx := context.Background()
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
+	paths := make(map[string][]string)
+	for i, name := range rt.originalNames {
+		paths[name] = rt.resourcePaths[i]
+	}
+
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
+		cleanupTestTasks(t, ctx, materializer, tsSuffix)
+	})
+
+	return TestTask{SourcePath: rt.sourcePath, Name: rt.workingTaskName, paths: paths}
 }
 
 // RuntimeConfig configures how a materialization integration test drives the
@@ -118,6 +186,9 @@ type RuntimeConfig struct {
 	// feature flags — e.g. the connector's scale-out flag, which multi-shard
 	// runs require.
 	ExtraFeatureFlags []string
+	// ConfigOverrides sets endpoint config values by sjson path, e.g.
+	// "advanced.no_flow_document", to re-run a suite in another mode.
+	ConfigOverrides map[string]any
 	// Timeout is a backstop against a hung run; a healthy run ends by
 	// transaction count. Zero defaults to ten minutes.
 	Timeout time.Duration
@@ -161,14 +232,21 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	// sets (later entries win in ParseFeatureFlags). flowctl passes a
 	// plaintext (non-sops) config to the connector unchanged, so writing the
 	// decrypted config back inline is sufficient.
-	if len(runtime.ExtraFeatureFlags) > 0 {
+	if len(runtime.ExtraFeatureFlags) > 0 || len(runtime.ConfigOverrides) > 0 {
 		rawCfg := decryptConfigRaw(t, bundled, taskName)
-		flags := strings.Join(runtime.ExtraFeatureFlags, ",")
-		if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
-			flags = baseFlags + "," + flags
+		var err error
+		if len(runtime.ExtraFeatureFlags) > 0 {
+			flags := strings.Join(runtime.ExtraFeatureFlags, ",")
+			if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
+				flags = baseFlags + "," + flags
+			}
+			rawCfg, err = sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
+			require.NoError(t, err)
 		}
-		rawCfg, err := sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
-		require.NoError(t, err)
+		for path, value := range runtime.ConfigOverrides {
+			rawCfg, err = sjson.SetBytes(rawCfg, path, value)
+			require.NoError(t, err)
+		}
 		bundled, err = sjson.SetRawBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), rawCfg)
 		require.NoError(t, err)
 	}
@@ -179,9 +257,12 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
+	// Bound now: the runtime v1 pass reassigns rt and materializer below, and
+	// its liveness tables must still be dropped.
+	firstRT, firstMaterializer := rt, materializer
 	t.Cleanup(func() {
-		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
-		cleanupTestTasks(t, ctx, materializer, tsSuffix)
+		CleanupTestResources(t, ctx, firstMaterializer, firstRT.resourcePaths, tsSuffix)
+		cleanupTestTasks(t, ctx, firstMaterializer, tsSuffix)
 	})
 
 	// One session runs every fixture transaction. A session halts after its
@@ -302,6 +383,25 @@ func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
 
 // RuntimeV1 reports whether FLOW_TEST_RUNTIME selects the runtime v1 pass.
 func RuntimeV1() bool { return os.Getenv("FLOW_TEST_RUNTIME") == "v1" }
+
+// SkipRuntimeV1 skips the runtime v1 pass of a test that never drives legacy
+// `flowctl preview`: it drives the connector directly or through preview-next,
+// so its outcome is the runtime-next pass's.
+func SkipRuntimeV1(t *testing.T) {
+	t.Helper()
+	if RuntimeV1() {
+		t.Skip("does not drive runtime v1; covered by the runtime-next pass")
+	}
+}
+
+// requireRuntimeV1Selected fails a materialization test that CI's runtime v1
+// pass, which runs only `-run '^TestIntegration'`, would never select.
+func requireRuntimeV1Selected(t *testing.T) {
+	t.Helper()
+	if !strings.HasPrefix(t.Name(), "TestIntegration") {
+		t.Fatalf("%s drives runtime v1 but CI's runtime v1 pass only runs TestIntegration* tests; rename it", t.Name())
+	}
+}
 
 // runtimeV1Liveness drives the task through legacy `flowctl preview` -- the
 // runtime v1 protocol, under which Acknowledge never carries statePatches -- as

@@ -1,5 +1,23 @@
 # materialize-mysql
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Changed
+- Changing the type of several columns of a table now alters all of them in
+  one statement per migration step, so MySQL and MariaDB rebuild the table far
+  fewer times.
+
+## 2026-10-31
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
 ## 2026-10-22
 
 ### Added

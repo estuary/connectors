@@ -14,6 +14,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -39,6 +40,8 @@ func mustGetCfg(t *testing.T) config {
 }
 
 func TestIntegration(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip()
 	}
@@ -144,6 +147,56 @@ func TestIntegration(t *testing.T) {
 		// the exact bindings still fail the suite.
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+	})
+
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+			dsn, err := cfg.toURI(true, taskName)
+			require.NoError(t, err)
+			db, err := stdsql.Open("snowflake", dsn)
+			require.NoError(t, err)
+			defer db.Close()
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "10m",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				rows, err := db.QueryContext(ctx, "SELECT id FROM "+task.Resource(t, table)+" ORDER BY id;")
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
+			}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {

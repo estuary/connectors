@@ -443,6 +443,10 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	var bindings []binding
 	tablesToBindings := make(map[string]int)
 	for idx, b := range mappedBindings {

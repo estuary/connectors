@@ -1,0 +1,90 @@
+info:
+  name: wrong customer id
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+  headers:
+    - name: CustomerId
+      value: "1"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AccountId": "{{account_id}}", "CampaignType": "Search,Shopping,DynamicSearchAds,Audience,Hotel,PerformanceMax,App,ObjectiveBased"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13
+
+  **WHY:** account discovery tries candidate `CustomerId` headers in turn and
+  moves on after access-denied faults (105, 106) (`_resolve_customer_id` in
+  `api.py`). This shows what a wrong `CustomerId` does.
+
+  **VERIFIED (2026-11-02):** for an account the user's own customer owns,
+  Campaign Management ignores `CustomerId`: `1` returns the same campaigns as
+  the right value. A report submit with `CustomerId: 1` was also accepted. So
+  for these accounts the first candidate always works.
+
+  **PENDING:** an account reached through a client link, where Microsoft's
+  docs disagree on which `CustomerId` to send. The sandbox has none.
+
+examples:
+  - name: 200 - wrong CustomerId is ignored
+    request:
+      url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "Campaigns": [
+              {
+                "Id": "1150430564",
+                "Name": "PMax Example",
+                "Status": "Active",
+                "DailyBudget": 26.95,
+                "BudgetType": "DailyBudgetStandard",
+                "TimeZone": "PacificTimeUSCanadaTijuana",
+                "Settings": [
+                  {
+                    "FinalUrlExpansionOptOut": false,
+                    "Type": "PerformanceMaxSetting"
+                  }
+                ],
+                "CampaignType": "PerformanceMax",
+                "SubType": null,
+                "AudienceAdsBidAdjustment": 0,
+                "TrackingUrlTemplate": null,
+                "FinalUrlSuffix": null,
+                "UrlCustomParameters": null,
+                "BiddingScheme": {
+                  "Type": "MaxConversions",
+                  "MaxCpc": {
+                    "Amount": null
+                  }
+                },
+                "BudgetId": null,
+                "Languages": [
+                  "English"
+                ],
+                "ExperimentId": null,
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }

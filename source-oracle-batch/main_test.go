@@ -102,7 +102,9 @@ func TestBasicCapture(t *testing.T) {
 					var d doc
 					err := json.Unmarshal(data, &d)
 					require.NoError(t, err)
-					ids[d.Id] = true
+					if d.Id != "" {
+						ids[d.Id] = true
+					}
 				}
 			})
 
@@ -122,6 +124,8 @@ func TestBasicCapture(t *testing.T) {
 	documentsPerCheckpoint = 1000
 }
 
+// doc picks the ID out of data passed to a capture callback. The callback
+// also receives checkpoints, which unmarshal with an empty ID.
 type doc struct {
 	Id string `json:"ID"`
 }
@@ -166,7 +170,9 @@ func TestCaptureCheckpointSCN(t *testing.T) {
 				var d doc
 				err := json.Unmarshal(data, &d)
 				require.NoError(t, err)
-				ids[d.Id] = true
+				if d.Id != "" {
+					ids[d.Id] = true
+				}
 			}
 		})
 		time.Sleep(5 * time.Second)
@@ -179,7 +185,9 @@ func TestCaptureCheckpointSCN(t *testing.T) {
 				var d doc
 				err := json.Unmarshal(data, &d)
 				require.NoError(t, err)
-				ids[d.Id] = true
+				if d.Id != "" {
+					ids[d.Id] = true
+				}
 			}
 		})
 

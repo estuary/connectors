@@ -1,0 +1,23 @@
+info:
+  name: Ad Report Lifetime
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["ad_id"]&metrics=["spend","impressions"]&page=1&page_size=1000&query_lifetime=true&filtering=[{"field_name":"ad_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** a lifetime report (`query_lifetime=true`, no dates) with the include-deleted filter.
+
+  **VERIFIED (2026-10-13, sandbox):** `code 0`: `query_lifetime=true` with no dates, combined with the `ad_status` include-deleted filter, is accepted.

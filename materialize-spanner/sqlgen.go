@@ -299,9 +299,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
-{{- range $i, $col := $.RootLevelColumns}}
+{{- range $i, $col := $.RootPropertyColumns}}
 	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
 FROM {{ template "temp_name" . }} AS l
@@ -329,7 +329,9 @@ UPDATE {{ Identifier $.TablePath }}
 -- Verify the update succeeded (Spanner doesn't have @@ROWCOUNT)
 -- We'll handle verification in the Go code instead
 {{ end }}
-`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
+`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix), template.FuncMap{
+		"QuoteAlias": sql.QuoteTransformEscapedBackslash("`", "\\`"),
+	})
 
 	return templates{
 		createLoadTable:         tplAll.Lookup("createLoadTable"),

@@ -132,9 +132,9 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			},
 			"*": {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s", table.Identifier, m.Identifier, m.BareDDL)
-		},
+		}),
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any
@@ -418,12 +418,14 @@ SELECT TOP 0 -1, NULL
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 (
-	SELECT
-		{{- range $i, $col := $.RootLevelColumns}}
+	{{- /* FOR JSON PATH would nest on a dot in a property; AUTO keeps it. */}}
+	SELECT * FROM (SELECT
+		{{- range $i, $col := $.RootPropertyColumns}}
 			{{- if $i}},{{end}}
-		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
-	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+	) AS d
+	FOR JSON AUTO, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l

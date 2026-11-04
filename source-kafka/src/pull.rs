@@ -19,6 +19,7 @@ use proto_flow::{
 use prost_reflect::DynamicMessage;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
+    error::{KafkaError, RDKafkaErrorCode},
     message::Headers,
     metadata::MetadataPartition,
     Message, Offset, Timestamp, TopicPartitionList,
@@ -56,6 +57,10 @@ struct ResourceState {
 struct BindingInfo {
     binding_index: u32,
     state_key: String,
+    // The topic's partition count when `setup_consumer` assigned partitions.
+    // Partitions added to the topic later aren't assigned until the connector
+    // restarts.
+    partition_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -83,6 +88,19 @@ enum Parsed {
     Value(serde_json::Value),
 }
 
+// With no timeout, `poll` returns only for a message or an error. So the
+// loop can't run between messages while every assigned partition is idle.
+// rdkafka already wakes up once a second while it waits, so a one-second
+// timeout adds no wake-ups.
+const POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+
+// How often the poll loop checks the bound topics for partitions added since
+// startup. Each check is one metadata request for every topic in the cluster,
+// and it blocks the polling thread, so it's kept infrequent.
+const PARTITION_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+// Bounds how long an unresponsive broker can hold up a partition check.
+const PARTITION_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
@@ -106,12 +124,59 @@ pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
 
     let topics_to_bindings =
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
+    let mut next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
 
     loop {
-        let msg = consumer
-            .poll(None)
-            .expect("polling without a timeout should always produce a message")
-            .context("receiving next message")?;
+        if std::time::Instant::now() >= next_partition_check {
+            next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
+
+            match consumer.fetch_metadata(None, PARTITION_CHECK_TIMEOUT) {
+                Ok(metadata) => {
+                    for topic in metadata.topics() {
+                        let Some(binding) = topics_to_bindings.get(topic.name()) else {
+                            continue;
+                        };
+                        let partitions = topic.partitions().len();
+                        if partitions > binding.partition_count {
+                            // A clean exit makes the runtime start a new
+                            // session, and `setup_consumer` then assigns the
+                            // added partitions. Every shard restarts, which
+                            // leaves `setup_consumer` as the only place that
+                            // decides ownership. Checking here before the next
+                            // poll means the previous message's checkpoint has
+                            // already been written.
+                            tracing::info!(
+                                eventType = "connectorStatus",
+                                topic = topic.name(),
+                                partitions_at_startup = binding.partition_count,
+                                partitions,
+                                "Restarting to capture new partitions of topic {}",
+                                topic.name(),
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "couldn't fetch metadata to check for added partitions");
+                }
+            }
+        }
+
+        let Some(result) = consumer.poll(POLL_TIMEOUT) else {
+            continue;
+        };
+        let msg = match result {
+            Ok(msg) => msg,
+            // The Kafka client reconnects on its own after a broker connection
+            // drops, so the connector keeps polling. We can't assume other
+            // non-fatal errors are safe to skip because some of them stop the
+            // client from fetching a partition.
+            Err(KafkaError::MessageConsumption(RDKafkaErrorCode::BrokerTransportFailure)) => {
+                continue;
+            }
+            Err(err) => return Err(err).context("receiving next message"),
+        };
 
         let mut op = "u";
         let payload = match msg.payload() {
@@ -321,6 +386,7 @@ async fn setup_consumer(
             BindingInfo {
                 binding_index: idx as u32,
                 state_key: state_key.to_string(),
+                partition_count: partition_info.len(),
             },
         );
     }
@@ -364,11 +430,16 @@ fn responsible_for_partition(range: &Option<RangeSpec>, topic: &str, partition: 
     hash >= range.key_begin && hash <= range.key_end
 }
 
+// Reversing the partition number's bits gives both halves of every midpoint
+// split the same number of a topic's partitions, give or take one. The topic's
+// hash keeps different topics from favoring the same shards. A partition's key
+// depends only on its topic and number, so adding partitions never moves
+// existing ones.
 fn partition_key(topic: &str, partition: i32) -> u32 {
     let mut hasher = HighwayHasher::new(bytes_to_key(&HIGHWAY_HASH_KEY));
     hasher.append(topic.as_bytes());
-    hasher.append(&partition.to_le_bytes());
-    (hasher.finalize64() >> 32) as u32
+    let topic_hash = (hasher.finalize64() >> 32) as u32;
+    topic_hash ^ (partition as u32).reverse_bits()
 }
 
 async fn parse_datum(
@@ -1017,6 +1088,22 @@ mod tests {
             ));
         }
         insta::assert_snapshot!(out);
+    }
+
+    #[test]
+    fn partition_key_balance() {
+        for topic in ["orders", "events", "a", ""] {
+            for partitions in 1..=40 {
+                for count in [2, 4, 8, 16] {
+                    let per_shard = partitions_per_shard(topic, partitions, &equal_shards(count));
+                    let floor = partitions as usize / count;
+                    assert!(
+                        per_shard.iter().all(|&n| n == floor || n == floor + 1),
+                        "topic {topic:?}, {partitions} partitions, {count} shards: {per_shard:?}"
+                    );
+                }
+            }
+        }
     }
 
     // A key on the edge of a shard's range must belong to that shard. An

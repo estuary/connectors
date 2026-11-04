@@ -375,6 +375,10 @@ func newTransactor(
 	_ *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 	t := &transactor{
 		dialect:           ep.Dialect,
@@ -541,7 +545,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 
 	var queryLoadTemplate = t.templates.queryLoadTable
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		queryLoadTemplate = t.templates.queryLoadTableNoFlowDocument
 	}
 

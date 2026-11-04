@@ -1,5 +1,48 @@
 # materialize-snowflake
 
+## 2026-11-03
+
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. Controlled by the `truncate_after_backfill`
+  feature flag, enabled by default; a binding without a `flow_published_at`
+  column, or in delta-updates mode, is unaffected.
+- Load, commit and truncation queries that run for at least five seconds are logged with
+  the metrics Snowflake records of them in its query history: time spent
+  queued, blocked, compiling and executing, the bytes and partitions they
+  scanned, and the bytes they spilled. Load and merge queries also log the key
+  bounds they were restricted to. The metrics are read in the background,
+  without holding up the transaction.
+
+### Changed
+- Tasks that run on more than one shard now fail at startup unless every
+  binding writes through `snowpipe_streaming_v2`.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+## 2026-10-26
+
+### Changed
+- The `snowpipe_streaming_v2` write path now calls the Snowpipe Streaming REST
+  API directly from the connector. The Python sidecar holding Snowflake's SDK,
+  and its memory, are gone. Rows are written to local batch files as
+  gzip-compressed NDJSON, and each file of up to 256 MiB of rows before
+  compression is appended straight from disk. A batch that compresses to more
+  than 4 MiB travels through the pipe's stage bucket instead, encrypted under
+  the pipe's key.
+
 ## 2026-10-22
 
 ### Added

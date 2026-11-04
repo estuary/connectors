@@ -93,6 +93,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Klaviyo](./klaviyo-native.md)
 - [LinkedIn Pages](./linkedin-pages.md)
 - [Mailchimp](./mailchimp-native.md)
+- [TikTok Ads](./tiktok-ads-native.md)
 
 #### BI and analytics
 
@@ -113,6 +114,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Hubspot](./HubSpot-real-time.md)
 - [Intercom](./intercom-native.md)
 - [Outreach](./outreach.md)
+- [Pylon](./pylon.md)
 - [RingCentral](./ringcentral.md)
 - [Salesforce](./Salesforce/salesforce-native.md)
 - [Zendesk Chat](./zendesk-chat.md)

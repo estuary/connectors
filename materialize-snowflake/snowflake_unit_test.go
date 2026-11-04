@@ -53,7 +53,7 @@ func TestAcknowledgeKeepsStreamV2Item(t *testing.T) {
 		bindings: []*binding{{target: sql.Table{StateKey: "a_table.v1"}, streamingV2: true}},
 		be:       m.NewBindingEvents(),
 		// The rows the item accounts for were committed as the checkpoint was
-		// produced, so Acknowledge needs nothing from the manager and no sidecar
+		// produced, so Acknowledge needs nothing from the manager and no client
 		// is started.
 		snowpipeStreamingV2: &streamV2Manager{},
 	}

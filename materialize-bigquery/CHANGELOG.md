@@ -1,5 +1,24 @@
 # materialize-bigquery
 
+## 2026-11-02
+
+### Changed
+- Changing the type of many columns at once is much faster: each step of the
+  migration now alters all of a table's columns in one statement, instead of
+  one statement per column that BigQuery's table update rate limit throttled.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field is a reserved word, contains special or non-ASCII characters,
+  or has a custom projection name.
+
 ## 2026-10-22
 
 ### Added

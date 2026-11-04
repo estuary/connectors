@@ -240,6 +240,12 @@ var featureFlagDefaults = map[string]bool{
 
 	// When true, per-table prerequisite checks are skipped. Implied by `skip_prerequisites`.
 	"skip_table_prerequisites": false,
+
+	// When true, pending streams are activated for replication before the initial catch-up
+	// stream and the replication cursor is preserved even when every binding is new, so a
+	// newly added or re-backfilled binding observes changes from the checkpointed cursor
+	// onward. Only safe when no DDL affected those tables since that cursor.
+	"activate_streams_before_catchup": false,
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -440,7 +446,7 @@ func (db *postgresDatabase) HistoryMode() bool {
 }
 
 func (db *postgresDatabase) ActivateStreamsBeforeCatchup() bool {
-	return false
+	return db.featureFlags["activate_streams_before_catchup"]
 }
 
 // The statement timeout applied to database connections when none is configured.

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rdkafka::client::{ClientContext, OAuthToken};
 use rdkafka::consumer::{BaseConsumer, ConsumerContext};
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
 use rdkafka::statistics::Statistics;
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
@@ -313,6 +314,17 @@ impl ClientContext for FlowConsumerContext {
 
     fn stats(&self, statistics: Statistics) {
         self.report_lag(&statistics);
+    }
+
+    // A dropped broker connection doesn't end the session, so it's logged as a
+    // warning.
+    fn error(&self, error: KafkaError, reason: &str) {
+        match error {
+            KafkaError::Global(RDKafkaErrorCode::BrokerTransportFailure) => {
+                tracing::warn!("librdkafka: {}: {}", error, reason)
+            }
+            _ => tracing::error!("librdkafka: {}: {}", error, reason),
+        }
     }
 }
 

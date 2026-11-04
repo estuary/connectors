@@ -269,6 +269,17 @@ You can enable delta updates on a per-binding basis:
         delta_updates: true
     source: ${PREFIX}/${source_collection}
 ```
+## Deleting rows after a backfill
+
+When a backfill of a source collection completes, the connector deletes the
+table's rows whose `flow_published_at` is earlier than the start of the
+backfill. The backfill re-sent every document the source still has, so these
+rows belong to documents that no longer exist. Delta-updates bindings keep
+every row, and so does a binding that excludes the `flow_published_at` field.
+To keep the old rows, disable the `truncate_after_backfill`
+[feature flag](/guides/advanced-usage/feature-flags), or set
+`retain_existing_data_on_backfill`.
+
 ## Performance considerations
 
 ### Optimizing performance for standard updates
@@ -314,10 +325,12 @@ Snowpipe Streaming is used by default for [delta updates](#delta-updates) bindin
 ### High-performance Snowpipe Streaming
 
 Snowflake's [high-performance Snowpipe Streaming architecture](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-overview)
-is available behind the `snowpipe_streaming_v2` [feature flag](/guides/advanced-usage/feature-flags). It uses Snowflake's official
-streaming SDK, and rows are sent to Snowflake as your collection documents are materialized rather than being staged first.
+is available behind the `snowpipe_streaming_v2` [feature flag](/guides/advanced-usage/feature-flags). The connector calls
+Snowflake's [Snowpipe Streaming REST API](https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api)
+directly, and rows are sent to Snowflake as your collection documents are materialized.
 Each shard of the task streams through four Snowflake channels, so a single shard can exceed the throughput limit that
-Snowflake places on one channel.
+Snowflake places on one channel. Snowflake limits one request on this API to 4 MiB after compression, so a larger
+batch of rows is uploaded to the table's Snowpipe stage and then registered with its channel.
 
 To use it, all of the following must be true:
 
