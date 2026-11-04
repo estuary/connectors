@@ -35,7 +35,7 @@ CostResource = common.Resource[BaseDocument, CostResourceConfig, common.Resource
 class CostStream:
     model: type[DailyCost]
     fetch_changes: Callable[
-        [AWSAccessKey, date | None, Logger, LogCursor],
+        [AWSAccessKey, date, Logger, LogCursor],
         AsyncGenerator[DailyCost | datetime, None],
     ]
 
