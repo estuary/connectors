@@ -62,8 +62,13 @@ def _campaign_row(day: str, campaign_id: str = "10", **overrides: str) -> dict[s
         TimePeriod=day,
         CampaignId=campaign_id,
         CampaignName="Spring",
+        AdDistribution="Search",
+        BidMatchType="Broad",
+        DeliveredMatchType="Broad",
+        DeviceOS="Windows",
         DeviceType="Computer",
         Network="Microsoft sites and select traffic",
+        TopVsOther="Microsoft sites and select traffic - top",
         Clicks="3",
         Ctr="1.50%",
         Spend="--",
@@ -529,11 +534,11 @@ async def test_new_account_backfill_and_incremental_cover_every_day_once(monkeyp
     assert days == [date(2026, 7, 1) + n * timedelta(days=1) for n in range(15)]
 
 
-def test_grain_columns_may_be_blank_but_not_missing():
+def test_grain_columns_may_not_be_blank_or_missing():
     model = CAMPAIGN_REPORT.row_model()
 
-    row = model.model_validate(_campaign_row("2026-10-01", DeviceOS=""))
-    assert row.DeviceOS is None  # type: ignore[attr-defined]
+    with pytest.raises(PydanticValidationError, match="DeviceOS"):
+        model.model_validate(_campaign_row("2026-10-01", DeviceOS=""))
 
     missing = _campaign_row("2026-10-01")
     del missing["DeviceOS"]

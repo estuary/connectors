@@ -411,81 +411,32 @@
           "type": "string"
         },
         "AdDistribution": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Addistribution"
+          "title": "Addistribution",
+          "type": "string"
         },
         "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Bidmatchtype"
+          "title": "Bidmatchtype",
+          "type": "string"
         },
         "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deliveredmatchtype"
+          "title": "Deliveredmatchtype",
+          "type": "string"
         },
         "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deviceos"
+          "title": "Deviceos",
+          "type": "string"
         },
         "DeviceType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Devicetype"
+          "title": "Devicetype",
+          "type": "string"
         },
         "Network": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Network"
+          "title": "Network",
+          "type": "string"
         },
         "TopVsOther": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Topvsother"
+          "title": "Topvsother",
+          "type": "string"
         }
       },
       "required": [
@@ -588,92 +539,36 @@
           "type": "string"
         },
         "AdDistribution": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Addistribution"
+          "title": "Addistribution",
+          "type": "string"
         },
         "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Bidmatchtype"
+          "title": "Bidmatchtype",
+          "type": "string"
         },
         "CampaignId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Campaignid"
+          "title": "Campaignid",
+          "type": "string"
         },
         "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deliveredmatchtype"
+          "title": "Deliveredmatchtype",
+          "type": "string"
         },
         "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deviceos"
+          "title": "Deviceos",
+          "type": "string"
         },
         "DeviceType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Devicetype"
+          "title": "Devicetype",
+          "type": "string"
         },
         "Network": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Network"
+          "title": "Network",
+          "type": "string"
         },
         "TopVsOther": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Topvsother"
+          "title": "Topvsother",
+          "type": "string"
         }
       },
       "required": [
@@ -778,114 +673,44 @@
           "type": "string"
         },
         "AdDistribution": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Addistribution"
+          "title": "Addistribution",
+          "type": "string"
         },
         "AdGroupId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Adgroupid"
+          "title": "Adgroupid",
+          "type": "string"
         },
         "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Bidmatchtype"
+          "title": "Bidmatchtype",
+          "type": "string"
         },
         "CampaignId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Campaignid"
+          "title": "Campaignid",
+          "type": "string"
         },
         "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deliveredmatchtype"
+          "title": "Deliveredmatchtype",
+          "type": "string"
         },
         "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deviceos"
+          "title": "Deviceos",
+          "type": "string"
         },
         "DeviceType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Devicetype"
+          "title": "Devicetype",
+          "type": "string"
         },
         "Language": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Language"
+          "title": "Language",
+          "type": "string"
         },
         "Network": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Network"
+          "title": "Network",
+          "type": "string"
         },
         "TopVsOther": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Topvsother"
+          "title": "Topvsother",
+          "type": "string"
         }
       },
       "required": [
@@ -994,125 +819,48 @@
           "type": "string"
         },
         "AdDistribution": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Addistribution"
+          "title": "Addistribution",
+          "type": "string"
         },
         "AdGroupId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Adgroupid"
+          "title": "Adgroupid",
+          "type": "string"
         },
         "AdId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Adid"
+          "title": "Adid",
+          "type": "string"
         },
         "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Bidmatchtype"
+          "title": "Bidmatchtype",
+          "type": "string"
         },
         "CampaignId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Campaignid"
+          "title": "Campaignid",
+          "type": "string"
         },
         "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deliveredmatchtype"
+          "title": "Deliveredmatchtype",
+          "type": "string"
         },
         "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deviceos"
+          "title": "Deviceos",
+          "type": "string"
         },
         "DeviceType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Devicetype"
+          "title": "Devicetype",
+          "type": "string"
         },
         "Language": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Language"
+          "title": "Language",
+          "type": "string"
         },
         "Network": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Network"
+          "title": "Network",
+          "type": "string"
         },
         "TopVsOther": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Topvsother"
+          "title": "Topvsother",
+          "type": "string"
         }
       },
       "required": [
@@ -1223,136 +971,52 @@
           "type": "string"
         },
         "AdDistribution": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Addistribution"
+          "title": "Addistribution",
+          "type": "string"
         },
         "AdGroupId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Adgroupid"
+          "title": "Adgroupid",
+          "type": "string"
         },
         "AdId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Adid"
+          "title": "Adid",
+          "type": "string"
         },
         "BidMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Bidmatchtype"
+          "title": "Bidmatchtype",
+          "type": "string"
         },
         "CampaignId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Campaignid"
+          "title": "Campaignid",
+          "type": "string"
         },
         "DeliveredMatchType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deliveredmatchtype"
+          "title": "Deliveredmatchtype",
+          "type": "string"
         },
         "DeviceOS": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Deviceos"
+          "title": "Deviceos",
+          "type": "string"
         },
         "DeviceType": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Devicetype"
+          "title": "Devicetype",
+          "type": "string"
         },
         "KeywordId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Keywordid"
+          "title": "Keywordid",
+          "type": "string"
         },
         "Language": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Language"
+          "title": "Language",
+          "type": "string"
         },
         "Network": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Network"
+          "title": "Network",
+          "type": "string"
         },
         "TopVsOther": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Topvsother"
+          "title": "Topvsother",
+          "type": "string"
         }
       },
       "required": [
@@ -1465,15 +1129,8 @@
           "type": "string"
         },
         "CampaignId": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Campaignid"
+          "title": "Campaignid",
+          "type": "string"
         }
       },
       "required": [
