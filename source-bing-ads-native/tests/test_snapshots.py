@@ -2,7 +2,34 @@ import json
 import subprocess
 
 import pytest
+from pydantic import JsonValue
 from pytest_insta import SnapshotFixture
+
+# Values that change without anyone touching the captured entity, so they
+# would make the snapshot fail on every re-run. The fields stay in the
+# snapshot; only their values are replaced.
+FIELDS_TO_REDACT = [
+    # Accounts: bumped by any edit to the account, including its settings.
+    "LastModifiedTime",
+    "TimeStamp",
+    # Ads and asset groups: Microsoft recomputes each asset's label itself.
+    "AssetPerformanceLabel",
+]
+
+
+def redact_nested_fields(
+    input: list[JsonValue] | dict[str, JsonValue], fields: list[str]
+):
+    if isinstance(input, list):
+        for element in input:
+            if isinstance(element, (list, dict)):
+                redact_nested_fields(element, fields)
+    elif isinstance(input, dict):
+        for key in list(input.keys()):
+            if key in fields:
+                input[key] = "redacted"
+            elif isinstance(input[key], (list, dict)):
+                redact_nested_fields(input[key], fields)
 
 
 # Copied from source-front. config.yaml holds sandbox credentials and sets
@@ -34,6 +61,7 @@ def test_capture(request: pytest.FixtureRequest, snapshot: SnapshotFixture):
     for line in lines:
         stream = line[0]
         if stream not in seen:
+            redact_nested_fields(line[1], FIELDS_TO_REDACT)
             unique_stream_lines.append(line)
             seen.add(stream)
 
