@@ -39,18 +39,10 @@
       },
       "properties": {
         "start_date": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "The UTC date you want to capture costs from. If you leave this empty, each refresh rereads the last 30 days. AWS only keeps the current month and the 13 months before it; costs older than that keep their last captured values.",
-          "title": "Start Date"
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Costs for usage before this date will not be replicated. If left blank, the start date will be set to 30 days before the present. AWS only keeps the current month and the 13 months before it; costs older than that keep their last captured values.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
         },
         "credentials": {
           "description": "The AWS credentials the connector uses to read Cost Explorer.",

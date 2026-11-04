@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal
 
 from estuary_cdk.capture.common import (
@@ -30,11 +30,15 @@ class AWSAccessKey(BaseModel):
     )
 
 
+def default_start_date() -> datetime:
+    return datetime.now(tz=UTC) - timedelta(days=30)
+
+
 class EndpointConfig(BaseModel):
-    start_date: AwareDatetime | None = Field(
-        default=None,
-        description="The UTC date you want to capture costs from. If you leave this empty, each refresh rereads the last 30 days. AWS only keeps the current month and the 13 months before it; costs older than that keep their last captured values.",
+    start_date: AwareDatetime = Field(
+        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Costs for usage before this date will not be replicated. If left blank, the start date will be set to 30 days before the present. AWS only keeps the current month and the 13 months before it; costs older than that keep their last captured values.",
         title="Start Date",
+        default_factory=default_start_date,
     )
     credentials: AWSAccessKey = Field(
         title="Authentication",

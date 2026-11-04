@@ -19,7 +19,7 @@ Each resource is mapped to its own collection. Keys are `date`, `date` plus `ser
 All resources include `date`, exclusive `period_end`, `estimated`, and a `metrics` object with `UnblendedCost`, `BlendedCost`, `AmortizedCost`, `NetUnblendedCost`, and `NetAmortizedCost`. Each metric contains `amount` as an exact decimal string and `unit`. Usage quantities are excluded because combining services can combine incompatible units.
 
 :::tip
-Each sync reads complete days through yesterday UTC. The first sync, and any backfill, reads from the start date. Later syncs reread from the first day of the month before the previous sync, which picks up estimates and billing corrections until AWS finalizes each month. Without a start date, each sync rereads the last 30 days.
+Each sync reads complete days through yesterday UTC. The first sync, and any backfill, reads from the start date. Later syncs reread from the first day of the month before the previous sync, which picks up estimates and billing corrections until AWS finalizes each month.
 
 Older captured rows remain as last observed when they leave AWS's available history. Missing rows do not produce deletion events, including missing service or account groups within the available range. Explicit zero-cost values returned by AWS update existing rows. Costs outside AWS's retention can no longer be refreshed, and data that expired before the connector first captured it cannot be recovered through this API.
 :::
@@ -62,7 +62,7 @@ Configure the connector in the Estuary web app or a catalog specification.
 | `/credentials/credentials_title` | Authentication | Set to `AWS Access Key`. | string | `AWS Access Key` |
 | **`/credentials/access_key_id`** | Access Key ID | AWS access key ID. | string | Required |
 | **`/credentials/secret_access_key`** | Secret Access Key | AWS secret access key. | string | Required |
-| `/start_date` | Start Date | Timestamp whose containing UTC date is the first usage day to capture. | string | The last 30 days |
+| `/start_date` | Start Date | Timestamp whose containing UTC date is the first usage day to capture. | string | 30 days before the present |
 
 ### Binding properties
 
