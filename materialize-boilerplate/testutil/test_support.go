@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -163,6 +164,26 @@ func stripRuntimeNextOutput(snapshot string) string {
 	return strings.Join(out, "\n")
 }
 
+// unsignedExponent matches a JSON number with an unsigned exponent, such as
+// `1e21`, where it stands as a value of its own: after `:`, `,`, `[` or
+// whitespace, and before `,`, `}`, `]` or whitespace. The bounds keep it off
+// the digits of strings such as UUIDs.
+var unsignedExponent = regexp.MustCompile(`([:,\[\s]|^)(-?\d+(?:\.\d+)?[eE])(\d+)([,}\]\s]|$)`)
+
+// signExponents writes every unsigned exponent with a `+`. The runtime v1 pass
+// runs a pinned flowctl whose serializer writes `1e21`, where runtime-next's
+// writes `1e+21`.
+func signExponents(s string) string {
+	for {
+		// Adjacent numbers share a bound, so each pass may leave one to the next.
+		var next = unsignedExponent.ReplaceAllString(s, "${1}${2}+${3}${4}")
+		if next == s {
+			return s
+		}
+		s = next
+	}
+}
+
 // requireMatchesRuntimeNextSnapshot requires the runtime v1 pass's value to
 // equal this test's runtime-next golden with the runtime-next-only output
 // lines removed: both runtimes must leave the same destination behind.
@@ -174,7 +195,7 @@ func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
 	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
 
 	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
-	if want == got {
+	if signExponents(want) == signExponents(got) {
 		return
 	}
 	if err := os.WriteFile(path+".runtime-v1.actual", []byte(got+"\n"), 0o644); err == nil {
