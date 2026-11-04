@@ -56,6 +56,8 @@ rust_select() {
         .github/workflows/* | .github/scripts/* | .github/*-connectors.yaml) return ;;
         # Go's module files, and the Rust crate only source-mongodb builds.
         go.mod | go.sum | bson-transcoder/*) return ;;
+        # The catalog sanitization scripts, which people run by hand.
+        scripts/obfuscation/*) return ;;
         # The shared materialization tests run for every materialize-* connector.
         tests/materialize/*)
             for name in $rust_connectors; do
