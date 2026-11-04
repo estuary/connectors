@@ -109,7 +109,11 @@ func TestIntegration(t *testing.T) {
 		}
 		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
-			var task = sql.PrepareTestTask(t, NewDriver().sqlDriver, bundled, taskName, cfg, makeResourceFn)
+			// Unlike makeResourceFn, keeps delta updates, which the delta binding's
+			// assertion depends on.
+			var task = sql.PrepareTestTask(t, NewDriver().sqlDriver, bundled, taskName, cfg, func(table string, delta bool) tableConfig {
+				return tableConfig{Table: table, Delta: delta}
+			})
 			var bq = bqTestClient(t, cfg)
 
 			// Two shards, so that the primary truncates after applying a peer's
