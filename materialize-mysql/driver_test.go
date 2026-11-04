@@ -66,31 +66,17 @@ func TestIntegration(t *testing.T) {
 		if boilerplate.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				var ctx = context.Background()
+				var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
 				db, err := stdsql.Open("mysql", cfg.ToURI())
 				require.NoError(t, err)
 				defer db.Close()
 
-				// SingleStore drops at most one table per statement.
-				for _, table := range []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"} {
-					_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table+";")
-					require.NoError(t, err)
-				}
-				var checkpoints int
-				require.NoError(t, db.QueryRowContext(ctx,
-					"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = 'flow_checkpoints_v1'",
-					cfg.Database,
-				).Scan(&checkpoints))
-				if checkpoints > 0 {
-					_, err = db.ExecContext(ctx, `DELETE FROM flow_checkpoints_v1 WHERE materialization = ?;`, taskName)
-					require.NoError(t, err)
-				}
-
 				boilerplate.RunFlowctl(t, "raw", "preview-next",
-					"--name", taskName,
-					"--source", "testdata/truncate.flow.yaml",
+					"--name", task.Name,
+					"--source", task.SourcePath,
 					"--fixture", "testdata/truncate.fixture.json",
 					"--shards", "1",
 					"--timeout", "5m",
@@ -105,7 +91,7 @@ func TestIntegration(t *testing.T) {
 					"truncate_delta":           {1, 1, 2, 3},
 					"truncate_no_published_at": {1, 2, 3},
 				} {
-					var rows, err = db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+					var rows, err = db.QueryContext(ctx, "SELECT id FROM "+task.Resource(t, table)+" ORDER BY id;")
 					require.NoError(t, err)
 					var ids []int64
 					for rows.Next() {

@@ -45,48 +45,44 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		var ctx = t.Context()
-		var cfg = testConfig()
-		conn, err := clickhouse.Open(cfg.newClickhouseOptions())
-		require.NoError(t, err)
-		defer conn.Close()
-
-		for _, table := range []string{"truncate_standard", "truncate_delta"} {
-			for _, prefix := range []string{"", "flow_temp_load_0_", "flow_temp_store_0_"} {
-				require.NoError(t, conn.Exec(ctx, fmt.Sprintf("DROP TABLE IF EXISTS `%s%s` SYNC;", prefix, table)))
-			}
-		}
-
-		testutil.RunFlowctl(t, "raw", "preview-next",
-			"--name", "acmeCo/tests/materialize-clickhouse-truncate",
-			"--source", "testdata/truncate.flow.yaml",
-			"--fixture", "testdata/truncate.fixture.json",
-			"--shards", "1",
-			"--timeout", "5m",
-			"--network", "flow-test",
-		)
-
-		// The fixture stores ids 1-3, then re-stores only id 1 during a
-		// backfill. Only the standard table loses the rows published before
-		// the backfill; a standard table always carries flow_published_at,
-		// because it is the ReplacingMergeTree version column. Rows are read
-		// without FINAL so that deduplication cannot stand in for deletion.
-		for table, want := range map[string][]int64{
-			"truncate_standard": {1},
-			"truncate_delta":    {1, 1, 2, 3},
-		} {
-			rows, err := conn.Query(ctx, fmt.Sprintf("SELECT id FROM `%s` ORDER BY id;", table))
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = t.Context()
+			var task = sql.PrepareTestTask(t, NewDriver().sqlDriver, bundled, taskName, cfg, makeResourceFn)
+			conn, err := clickhouse.Open(cfg.newClickhouseOptions())
 			require.NoError(t, err)
-			var ids []int64
-			for rows.Next() {
-				var id int64
-				require.NoError(t, rows.Scan(&id))
-				ids = append(ids, id)
+			defer conn.Close()
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table loses the rows published before
+			// the backfill; a standard table always carries flow_published_at,
+			// because it is the ReplacingMergeTree version column. Rows are read
+			// without FINAL so that deduplication cannot stand in for deletion.
+			for table, want := range map[string][]int64{
+				"truncate_standard": {1},
+				"truncate_delta":    {1, 1, 2, 3},
+			} {
+				rows, err := conn.Query(ctx, fmt.Sprintf("SELECT id FROM `%s` ORDER BY id;", task.Resource(t, table)))
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
 			}
-			require.NoError(t, rows.Err())
-			require.NoError(t, rows.Close())
-			require.Equal(t, want, ids, table)
-		}
+		})
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {

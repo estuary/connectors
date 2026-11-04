@@ -46,24 +46,18 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
 			db, err := stdsql.Open("databricks", cfg.ToURI(taskName))
 			require.NoError(t, err)
 			defer db.Close()
 
-			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
-			for _, table := range tables {
-				var identifier = fmt.Sprintf("`%s`.`%s`.`%s`", cfg.CatalogName, cfg.SchemaName, table)
-				_, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+identifier+";")
-				require.NoError(t, err)
-			}
-
 			// Two shards, so that the primary truncates after applying a peer's
 			// staged stores.
 			testutil.RunFlowctl(t, "raw", "preview-next",
-				"--name", taskName,
-				"--source", "testdata/truncate.flow.yaml",
+				"--name", task.Name,
+				"--source", task.SourcePath,
 				"--fixture", "testdata/truncate.fixture.json",
 				"--shards", "2",
 				"--timeout", "10m",
@@ -77,7 +71,7 @@ func TestIntegration(t *testing.T) {
 				"truncate_delta":           {1, 1, 2, 3},
 				"truncate_no_published_at": {1, 2, 3},
 			} {
-				var identifier = fmt.Sprintf("`%s`.`%s`.`%s`", cfg.CatalogName, cfg.SchemaName, table)
+				var identifier = fmt.Sprintf("`%s`.`%s`.`%s`", cfg.CatalogName, cfg.SchemaName, task.Resource(t, table))
 				rows, err := db.QueryContext(ctx, "SELECT id FROM "+identifier+" ORDER BY id;")
 				require.NoError(t, err)
 				var ids []int64
