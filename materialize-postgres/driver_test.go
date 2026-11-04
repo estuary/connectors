@@ -2,9 +2,7 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -15,7 +13,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -84,54 +81,40 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		var ctx = context.Background()
-		var rawCfg, err = os.ReadFile("testdata/config.local.yaml")
-		require.NoError(t, err)
-		var cfgMap map[string]any
-		require.NoError(t, yaml.Unmarshal(rawCfg, &cfgMap))
-		cfgJSON, err := json.Marshal(cfgMap)
-		require.NoError(t, err)
-		var cfg config
-		require.NoError(t, json.Unmarshal(cfgJSON, &cfg))
-		uri, err := cfg.ToURI(ctx)
-		require.NoError(t, err)
-
-		conn, err := pgx.Connect(ctx, uri)
-		require.NoError(t, err)
-		defer conn.Close(ctx)
-
-		_, err = conn.Exec(ctx, `DROP TABLE IF EXISTS truncate_standard, truncate_delta, truncate_no_published_at;`)
-		require.NoError(t, err)
-		_, err = conn.Exec(ctx, `DO $$ BEGIN
-			IF to_regclass('flow_checkpoints_v1') IS NOT NULL THEN
-				DELETE FROM flow_checkpoints_v1 WHERE materialization = 'acmeCo/tests/materialize-postgres-truncate';
-			END IF;
-		END $$;`)
-		require.NoError(t, err)
-
-		testutil.RunFlowctl(t, "raw", "preview-next",
-			"--name", "acmeCo/tests/materialize-postgres-truncate",
-			"--source", "testdata/truncate.flow.yaml",
-			"--fixture", "testdata/truncate.fixture.json",
-			"--shards", "1",
-			"--timeout", "5m",
-			"--network", "flow-test",
-		)
-
-		// The fixture stores ids 1-3, then re-stores only id 1 during a
-		// backfill. Only the standard table with a flow_published_at column
-		// loses the rows published before the backfill.
-		for table, want := range map[string][]int64{
-			"truncate_standard":        {1},
-			"truncate_delta":           {1, 1, 2, 3},
-			"truncate_no_published_at": {1, 2, 3},
-		} {
-			var rows, err = conn.Query(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+			uri, err := cfg.ToURI(ctx)
 			require.NoError(t, err)
-			ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+
+			conn, err := pgx.Connect(ctx, uri)
 			require.NoError(t, err)
-			require.Equal(t, want, ids, table)
-		}
+			defer conn.Close(ctx)
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var rows, err = conn.Query(ctx, "SELECT id FROM "+pgx.Identifier(task.Path(t, table)).Sanitize()+" ORDER BY id;")
+				require.NoError(t, err)
+				ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+				require.NoError(t, err)
+				require.Equal(t, want, ids, table)
+			}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {

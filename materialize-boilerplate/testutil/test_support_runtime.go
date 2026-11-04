@@ -30,6 +30,9 @@ type rewrittenTask[RC any] struct {
 	rndSuffix       string
 	resources       []RC
 	resourcePaths   [][]string
+	// originalNames are the bindings' final resource path parts before
+	// rewriting, parallel to resourcePaths.
+	originalNames []string
 }
 
 func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -47,6 +50,7 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 
 	var snapshotResources []RC
 	var testResourcePaths [][]string
+	var originalNames []string
 	gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).ForEach(func(bindingIdx, binding gjson.Result) bool {
 		// Replace the final resource path part with a unique name for this test
 		// run, to prevent concurrent runs of the test from interfering with
@@ -55,6 +59,7 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 		require.NoError(t, boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
 		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
 		require.NoError(t, err)
+		originalNames = append(originalNames, path[len(path)-1])
 		lastPathPart := path[len(path)-1] + rndSuffix
 
 		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
@@ -95,7 +100,70 @@ func rewriteTaskForTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 		rndSuffix:       rndSuffix,
 		resources:       snapshotResources,
 		resourcePaths:   testResourcePaths,
+		originalNames:   originalNames,
 	}
+}
+
+// TestTask is a task of a bundled spec renamed for one test run, for tests that
+// drive flowctl themselves. Its task and resources are removed when the test
+// ends.
+type TestTask struct {
+	// SourcePath is the rewritten spec, for flowctl's --source.
+	SourcePath string
+	// Name is the task's per-run name, for flowctl's --name.
+	Name string
+	// paths maps each binding's final resource path part in the original spec
+	// to its per-run resource path.
+	paths map[string][]string
+}
+
+// Path returns the per-run resource path of the binding named name in the
+// original spec.
+func (tt TestTask) Path(t *testing.T, name string) []string {
+	t.Helper()
+	path, ok := tt.paths[name]
+	require.True(t, ok, "no binding named %q", name)
+	return path
+}
+
+// Resource returns the per-run final path part of the binding named name in
+// the original spec.
+func (tt TestTask) Resource(t *testing.T, name string) string {
+	t.Helper()
+	path := tt.Path(t, name)
+	return path[len(path)-1]
+}
+
+// PrepareTestTask gives taskName and its bindings' resources unique per-run
+// names, so that concurrent runs of a test sharing a destination don't
+// interfere, and removes them when the test ends.
+func PrepareTestTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	bundled []byte,
+	taskName string,
+	cfg EC,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+) TestTask {
+	t.Helper()
+
+	ctx := context.Background()
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)
+	paths := make(map[string][]string)
+	for i, name := range rt.originalNames {
+		paths[name] = rt.resourcePaths[i]
+	}
+
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		CleanupTestResources(t, ctx, materializer, rt.resourcePaths, tsSuffix)
+		cleanupTestTasks(t, ctx, materializer, tsSuffix)
+	})
+
+	return TestTask{SourcePath: rt.sourcePath, Name: rt.workingTaskName, paths: paths}
 }
 
 // RuntimeConfig configures how a materialization integration test drives the
