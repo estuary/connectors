@@ -1153,7 +1153,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 	}
 
 	var affected map[*commitGroup]int64
-	if err := retry(ctx, func() error {
+	if err := commitRetry.Do(ctx, "applying staged data", func(ctx context.Context) error {
 		var err error
 		affected, err = d.applyStaged(ctx, conn, groups, tokensMap, legacyCheckpoint)
 		return err
