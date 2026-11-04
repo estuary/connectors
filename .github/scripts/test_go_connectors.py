@@ -100,6 +100,8 @@ class TestRules(unittest.TestCase):
             ".github/workflows/delayed-tag.yaml",
             ".github/scripts/delayed_tag.py",
             ".github/rust-connectors.yaml",
+            "scripts/obfuscation/config_allowlist.txt",
+            "scripts/obfuscation/strip_catalog.py",
         ]:
             with self.subTest(path=path):
                 self.assertEqual(pick(path), [])
