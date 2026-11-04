@@ -279,9 +279,31 @@ func (f *stagedFile) put(db *stdsql.DB, file string) error {
 	var attempt int
 	// Retry a few times on errors since there are occasionally transient
 	// network errors when running PUT queries.
+	// ESTUARY DEBUG
+	var localSize int64 = -1
+	if fi, statErr := os.Stat(file); statErr == nil {
+		localSize = fi.Size()
+	}
 	for attempt = 1; ; attempt++ {
 		ts := time.Now()
+		log.WithFields(log.Fields{
+			"file":      file,
+			"uuid":      f.uuid,
+			"attempt":   attempt,
+			"localSize": localSize,
+		}).Info("ESTUARY DEBUG: putWorker PUT starting")
 		err := db.QueryRowContext(putCtx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
+		log.WithFields(log.Fields{
+			"file":       file,
+			"uuid":       f.uuid,
+			"attempt":    attempt,
+			"localSize":  localSize,
+			"took":       time.Since(ts).String(),
+			"status":     status,
+			"message":    message,
+			"targetSize": targetSize,
+			"failed":     err != nil,
+		}).WithError(err).Info("ESTUARY DEBUG: putWorker PUT finished")
 		if err != nil && attempt > 3 {
 			return fmt.Errorf("putWorker PUT to stage: %w", err)
 		} else if err != nil {
