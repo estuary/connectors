@@ -112,6 +112,16 @@ type APIError struct {
 	Category      string          `json:"category"`
 }
 
+// RetryDelay is the least time to wait before repeating the request. After
+// a 429 Too Many Requests it waits out HubSpot's ten-second rolling rate limit
+// window.
+func (e *APIError) RetryDelay() time.Duration {
+	if e.StatusCode == http.StatusTooManyRequests {
+		return 10 * time.Second
+	}
+	return 0
+}
+
 func (e *APIError) Error() string {
 	if e.Message == "" {
 		return fmt.Sprintf("%d %s", e.StatusCode, http.StatusText(e.StatusCode))
@@ -434,7 +444,7 @@ func (c *Client) BatchRead(
 		Results []json.RawMessage `json:"results"`
 	}
 	var value Response
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = idempotentRetry.Do(ctx, "batch read", func(ctx context.Context) error {
 		uri := baseURL.JoinPath(objectPath, object.String(), "batch", "read")
 		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
@@ -493,7 +503,7 @@ func (c *Client) BatchUpsert(
 		return fmt.Errorf("unable to marshal request: %w", err)
 	}
 
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = idempotentRetry.Do(ctx, "batch upsert", func(ctx context.Context) error {
 		uri := baseURL.JoinPath(objectPath, object.String(), "batch/upsert")
 		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
@@ -547,7 +557,7 @@ func (c *Client) BatchUpdate(
 		return fmt.Errorf("unable to marshal request: %w", err)
 	}
 
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = idempotentRetry.Do(ctx, "batch update", func(ctx context.Context) error {
 		uri := baseURL.JoinPath(objectPath, object.String(), "batch/update")
 		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
@@ -601,7 +611,7 @@ func (c *Client) BatchCreate(
 		return fmt.Errorf("unable to marshal request: %w", err)
 	}
 
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = requestRetry.Do(ctx, "batch create", func(ctx context.Context) error {
 		uri := baseURL.JoinPath(objectPath, object.String(), "batch/create")
 		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
@@ -652,7 +662,7 @@ func (c *Client) Search(
 
 	var searchResponse SearchResponse
 
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = idempotentRetry.Do(ctx, "search", func(ctx context.Context) error {
 		uri := baseURL.JoinPath(objectPath, object.String(), "search")
 		req, err := c.newRequest(ctx, "POST", uri, bytes.NewReader(data))
 		if err != nil {
@@ -724,7 +734,7 @@ func (c *Client) Get(
 
 	var getResponse GetResponse
 
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "get object", func(ctx context.Context) error {
 		req, err := c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
@@ -768,7 +778,7 @@ func (c *Client) GetCustomObjectTypeIDs(ctx context.Context) (map[ObjectName]Obj
 	}
 
 	var value Response
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "list custom object schemas", func(ctx context.Context) error {
 		req, err := c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
@@ -818,7 +828,7 @@ func (c *Client) ListPropertyGroups(ctx context.Context, object ObjectTypeID) ([
 	}
 
 	var value Response
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "list property groups", func(ctx context.Context) error {
 		req, err := c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
@@ -864,7 +874,7 @@ func (c *Client) ListProperties(ctx context.Context, object ObjectTypeID) ([]*Pr
 	}
 
 	var value Response
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "list properties", func(ctx context.Context) error {
 		req, err := c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
@@ -906,7 +916,7 @@ func (c *Client) GetProperty(ctx context.Context, object ObjectTypeID, name stri
 	uri := baseURL.JoinPath(propertyPath, object.String(), name)
 
 	var property Property
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "get property", func(ctx context.Context) error {
 		req, err := c.newRequest(ctx, "GET", uri, nil)
 		if err != nil {
 			return err
@@ -998,7 +1008,7 @@ func (c *Client) RefreshTokens(ctx context.Context, now time.Time) (*TokenUpdate
 	uri := baseURL.JoinPath(tokenPath)
 
 	var tokens TokenResponse
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "refresh tokens", func(ctx context.Context) error {
 		reqBody := strings.NewReader(params.Encode())
 		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
 		if err != nil {
@@ -1053,7 +1063,7 @@ func (c *Client) AuthCode(ctx context.Context, now time.Time, code string, redir
 	uri := baseURL.JoinPath(tokenPath)
 
 	var tokens TokenResponse
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "exchange authorization code", func(ctx context.Context) error {
 		reqBody := strings.NewReader(params.Encode())
 		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
 		if err != nil {
@@ -1203,7 +1213,7 @@ func (c *Client) InspectTokens(ctx context.Context) (map[string]any, error) {
 	uri := baseURL.JoinPath(tokenPath, "introspect")
 
 	var responseBody map[string]any
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "inspect tokens", func(ctx context.Context) error {
 		reqBody := strings.NewReader(params.Encode())
 		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), reqBody)
 		if err != nil {
@@ -1294,12 +1304,6 @@ func parseAPIError(resp *http.Response) error {
 		}).Debug("unable to parse error response")
 	}
 
-	if resp.StatusCode >= 500 {
-		return &TemporaryError{err: apiError}
-	}
-	if resp.StatusCode == 429 {
-		return &TemporaryError{err: apiError, extraDelay: 10 * time.Second}
-	}
 	return apiError
 }
 
