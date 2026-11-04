@@ -15,7 +15,7 @@ import (
 	"github.com/estuary/connectors/go/writer"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/snowflakedb/gosnowflake/v2"
+	"github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )

@@ -9,7 +9,7 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake/v2"
+	sf "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 )
 
 // profileInterval is how often the history of awaiting queries is fetched.

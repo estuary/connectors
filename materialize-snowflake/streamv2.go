@@ -18,7 +18,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake/v2"
+	sf "github.com/estuary/connectors/materialize-snowflake/gosnowflake"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
