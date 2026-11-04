@@ -65,7 +65,6 @@ func TestStreamV2CheckpointHoldsOneItemPerChannel(t *testing.T) {
 // delivered. So the wait belongs to the call which produces the item.
 func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 
 	// Appends succeed and the committed token never advances, as a channel whose
 	// rows Snowflake accepted but never committed would report.
@@ -73,8 +72,8 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
 	streamV2WaitCommitTimeout = 3 * time.Second
 
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
@@ -97,11 +96,10 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 // opened rather than at the first file append.
 func TestStreamV2PipeBinaryFormatCheckedBeforeFirstAppend(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 	t.Setenv("FAKE_SNOWPIPE_MODE", "hex_binary_input")
 
-	var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/hexBinary",
-		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/hexBinary",
+		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 
 	m.addBinding("DB", "SCH", "TBL", sql.Table{
 		TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
@@ -119,7 +117,6 @@ func TestStreamV2PipeBinaryFormatCheckedBeforeFirstAppend(t *testing.T) {
 // it, and goes on rejecting the channel it was appended to.
 func TestStreamV2RejectedRows(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 
 	// The single channel of the binding under a one-channel layout, at the epoch a
 	// fresh binding mints.
@@ -127,8 +124,8 @@ func TestStreamV2RejectedRows(t *testing.T) {
 		streamV2Range{keyBegin: 0, keyEnd: math.MaxUint32}, "rejected.v1")
 
 	var newManager = func(t *testing.T, prior *streamV2ChannelCheckpointItem) *streamV2Manager {
-		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/rejectedRows",
-			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/rejectedRows",
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 
 		// The fake sidecar rejects a row which carries the REJECT column, as
 		// Snowflake rejects one it cannot store: the append and the commit both
@@ -182,7 +179,6 @@ func TestStreamV2RejectedRows(t *testing.T) {
 // from adopting its committed offset token as its own.
 func TestStreamV2DropChannel(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 
 	// The fake Snowpipe's channel state outlives the manager, so each manager
 	// below stands in for a separate session against one Snowflake.
@@ -200,8 +196,8 @@ func TestStreamV2DropChannel(t *testing.T) {
 	// task does — which is the point: a name derived from a key-begin is
 	// derived again, identically, by whichever shard next holds that key-begin.
 	var newSession = func(t *testing.T) *streamV2Manager {
-		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/channel-drop",
-			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/channel-drop",
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 		m.addBinding("DB", "SCH", "TBL", target, nil)
 		return m
 	}
@@ -259,7 +255,6 @@ func TestStreamV2DropChannel(t *testing.T) {
 // before the second opens anything.
 func TestStreamV2RejectsForeignTask(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var fullRange = streamV2Range{keyEnd: math.MaxUint32}
@@ -267,8 +262,8 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 	var unattributable = "someone_elses_channel"
 
 	var newSession = func(t *testing.T, task string) *streamV2Manager {
-		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
-			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 		m.addBinding("DB", "SCH", "TBL", sql.Table{
 			TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
 			Identifier: "TBL",
@@ -318,7 +313,6 @@ func TestStreamV2RejectsForeignTask(t *testing.T) {
 // falls to that shard.
 func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	var ctx = context.Background()
-	singleChannelLayout(t)
 	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
 	var full = streamV2Range{keyEnd: math.MaxUint32}
@@ -332,7 +326,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 
 	// The upper shard of the backfill drops the stale channel inside its range, and
 	// leaves the one whose first key lies in the lower shard's range.
-	var hi = newTopologyManager(t, "test/task", upper.keyBegin, upper.keyEnd, nil)
+	var hi = singleChannelLayout(newTopologyManager(t, "test/task", upper.keyBegin, upper.keyEnd, nil))
 	storeKeys(t, hi, keysHashingTo(upper, 1, "hi"))
 	_, err := hi.flush(ctx)
 	require.NoError(t, err)
@@ -344,7 +338,7 @@ func TestStreamV2SweepsBackfilledChannels(t *testing.T) {
 	require.Len(t, names, 2)
 
 	// The lower shard drops the channel spanning the key space.
-	var lo = newTopologyManager(t, "test/task", lower.keyBegin, lower.keyEnd, nil)
+	var lo = singleChannelLayout(newTopologyManager(t, "test/task", lower.keyBegin, lower.keyEnd, nil))
 	storeKeys(t, lo, keysHashingTo(lower, 1, "lo"))
 	_, err = lo.flush(ctx)
 	require.NoError(t, err)

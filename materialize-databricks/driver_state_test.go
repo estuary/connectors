@@ -29,14 +29,13 @@ const (
 )
 
 func testTransactor(rangeKey string, stateKeys ...string) *transactor {
-	var profiler, _ = testProfiler(nil, 0)
 	var d = &transactor{
 		cp:                    make(connectorState),
 		peerShardsCheckpoints: make(rangeCheckpoints),
 		primary:               rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
 		rangeKey:              rangeKey,
 		be:                    &m.BindingEvents{},
-		profiler:              profiler,
+		profiler:              boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -347,7 +346,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 		var db = recordingDB(t, conflict)
 		recording.failFirst = 2
 
-		require.NoError(t, d.execQueries(context.Background(), db, nil, []string{"COPY"}, false, noReport))
+		require.NoError(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
 		require.Equal(t, 3, recording.attempts)
 		require.Equal(t, []string{"COPY"}, recording.executed)
 	})
@@ -355,7 +354,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 	t.Run("gives up after the retry budget", func(t *testing.T) {
 		var db = recordingDB(t, conflict)
 
-		var err = d.execQueries(context.Background(), db, nil, []string{"COPY"}, false, noReport)
+		var err = d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
 		require.ErrorIs(t, err, conflict)
 		require.Equal(t, maxQueryRetries+1, recording.attempts)
 	})
@@ -363,7 +362,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 	t.Run("other errors are not retried", func(t *testing.T) {
 		var db = recordingDB(t, fmt.Errorf("[DELTA_CONCURRENT_APPEND] something else"))
 
-		require.Error(t, d.execQueries(context.Background(), db, nil, []string{"COPY"}, false, noReport))
+		require.Error(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
 		require.Equal(t, 1, recording.attempts)
 	})
 
@@ -374,7 +373,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		var err = d.execQueries(ctx, db, nil, []string{"COPY"}, false, noReport)
+		var err = d.execQueries(ctx, db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Equal(t, 1, recording.attempts)
 	})
@@ -1043,7 +1042,7 @@ func TestCopyIntoStagingTable(t *testing.T) {
 		var ctx = context.Background()
 		require.NoError(t, b.storeFile.start(ctx, db))
 		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
-		require.NoError(t, d.copyIntoStagingTable(ctx, db, b))
+		require.NoError(t, d.copyIntoStagingTable(ctx, db, 0, b))
 
 		if !tc.copies {
 			require.Len(t, recording.executed, 1)

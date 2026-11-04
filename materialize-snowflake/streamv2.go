@@ -277,6 +277,8 @@ type streamV2Manager struct {
 	materialization string
 	keyBegin        uint32
 	keyEnd          uint32
+	// channelsPerShard is streamV2ChannelsPerShard outside of tests.
+	channelsPerShard int
 
 	db        *stdsql.DB
 	dialect   sql.Dialect
@@ -311,17 +313,18 @@ func newStreamV2Manager(
 		return nil, err
 	}
 	return &streamV2Manager{
-		cfg:             cfg,
-		materialization: materialization,
-		keyBegin:        keyRange.KeyBegin,
-		keyEnd:          keyRange.KeyEnd,
-		db:              db,
-		dialect:         dialect,
-		streaming:       streaming,
-		client:          client,
-		batchBytes:      semaphore.NewWeighted(streamV2BatchFileBudget),
-		bindings:        make(map[int]*streamV2Binding),
-		lastBinding:     -1,
+		cfg:              cfg,
+		materialization:  materialization,
+		keyBegin:         keyRange.KeyBegin,
+		keyEnd:           keyRange.KeyEnd,
+		channelsPerShard: streamV2ChannelsPerShard,
+		db:               db,
+		dialect:          dialect,
+		streaming:        streaming,
+		client:           client,
+		batchBytes:       semaphore.NewWeighted(streamV2BatchFileBudget),
+		bindings:         make(map[int]*streamV2Binding),
+		lastBinding:      -1,
 	}, nil
 }
 
@@ -419,7 +422,7 @@ func (m *streamV2Manager) ensureOpened(ctx context.Context, b *streamV2Binding) 
 	}
 
 	var shardKeyRange = m.shardRange()
-	targetChannelKeyRanges, err := streamV2TargetLayout(m.keyBegin, m.keyEnd)
+	targetChannelKeyRanges, err := streamV2TargetLayout(m.keyBegin, m.keyEnd, m.channelsPerShard)
 	if err != nil {
 		return err
 	}

@@ -1,10 +1,13 @@
 package boilerplate
 
 import (
+	"math"
 	"testing"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/flow/go/labels"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	pb "go.gazette.dev/core/broker/protocol"
 	pc "go.gazette.dev/core/consumer/protocol"
@@ -73,6 +76,30 @@ func TestIsMaterializationSpecRuntimeV2(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, IsMaterializationSpecRuntimeV2(tt.spec))
+		})
+	}
+}
+
+func TestRequireSingleShard(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		r       *pf.RangeSpec
+		wantErr bool
+	}{
+		{name: "no range", r: nil},
+		{name: "full key range", r: &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}},
+		{name: "lower half", r: &pf.RangeSpec{KeyEnd: 0x7fffffff, RClockEnd: math.MaxUint32}, wantErr: true},
+		{name: "upper half", r: &pf.RangeSpec{KeyBegin: 0x80000000, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := RequireSingleShard(pm.Request_Open{Range: tc.r})
+			if tc.wantErr {
+				var userErr *cerrors.UserError
+				require.ErrorAs(t, err, &userErr)
+				require.ErrorContains(t, err, "does not support tasks split into multiple shards")
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

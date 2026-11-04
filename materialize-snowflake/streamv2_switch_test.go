@@ -102,13 +102,11 @@ func TestStreamV2ReturningToTheWritePathSkipsNewDocuments(t *testing.T) {
 	}
 
 	var newSession = func(t *testing.T, prior streamV2Checkpoint) *streamV2Manager {
-		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/roundTrip",
-			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/roundTrip",
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 		m.addBinding("DB", "SCH", "TBL", target, prior)
 		return m
 	}
-
-	singleChannelLayout(t)
 
 	var before = newSession(t, nil)
 	for i := range 3 {
@@ -169,7 +167,6 @@ func openChannelServer(t *testing.T, status int) *streamManager {
 func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/switch"
-	singleChannelLayout(t)
 
 	var target = func(stateKey string, delta bool) sql.Table {
 		return sql.Table{
@@ -186,8 +183,8 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	// and returns the checkpoint that session flushed.
 	var seed = func(t *testing.T, stateKey string) (streamV2Checkpoint, string) {
 		t.Helper()
-		var m = newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
-			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})
+		var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, task,
+			&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
 		m.addBinding("DB", "SCH", "TBL", target(stateKey, true), nil)
 		for i := range 3 {
 			require.NoError(t, testWriteRow(ctx, m, 0, []any{"k", i}))
@@ -212,7 +209,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 			_range:              &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
 			version:             "v1",
 			cp:                  checkpoint{stateKey: &checkpointItem{StreamV2: prior}},
-			snowpipeStreamingV2: newFakeStreamV2Manager(t, ctx, &cfg, task, &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}),
+			snowpipeStreamingV2: singleChannelLayout(newFakeStreamV2Manager(t, ctx, &cfg, task, &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32})),
 		}
 		return d
 	}
@@ -317,10 +314,11 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 // and one table, which is the only place the account they each keep of that
 // table can be compared.
 func TestStreamV2WritePathSwitch(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
-	singleChannelLayout(t)
 
 	var ctx = context.Background()
 	var cfg = mustGetCfg(t)
@@ -394,13 +392,15 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 	var newV2 = func(t *testing.T, tgt sql.Table, prior streamV2Checkpoint) *streamV2Manager {
 		var m, err = newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization, accountName, fullRange)
 		require.NoError(t, err)
+		singleChannelLayout(m)
 		m.addBinding(cfg.Database, cfg.Schema, tableName, tgt, prior)
 		return m
 	}
 
+	var batchRows = 0
 	var storeV2 = func(t *testing.T, m *streamV2Manager, lo, hi int) {
 		for i := lo; i < hi; i++ {
-			require.NoError(t, testWriteRow(ctx, m, 0, []any{fmt.Sprintf("key-%d", i), i}))
+			require.NoError(t, testWriteRowBatched(ctx, m, 0, []any{fmt.Sprintf("key-%d", i), i}, batchRows))
 		}
 	}
 
@@ -476,6 +476,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 		off.Path = []string{cfg.Schema, tableName}
 		sv2, err := newStreamV2Manager(&cfg, db, testDialect, sm, testMaterialization, accountName, fullRange)
 		require.NoError(t, err)
+		singleChannelLayout(sv2)
 		var d = &transactor{
 			cfg:                 cfg,
 			ep:                  &sql.Endpoint[config]{Dialect: testDialect},
@@ -498,8 +499,8 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 
 		// Cutting a batch per document is what leaves documents pending without
 		// a flush, which is the state an interruption has to find.
-		t.Cleanup(func() { testBatchRows = 0 })
-		testBatchRows = 1
+		t.Cleanup(func() { batchRows = 0 })
+		batchRows = 1
 
 		// An interrupted transaction: Snowflake commits three documents and the
 		// session dies before any checkpoint records them.

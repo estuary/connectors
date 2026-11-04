@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -145,7 +146,7 @@ func TestNewTransactorRejectsSortingKeyMismatch(t *testing.T) {
 	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var be = &m.BindingEvents{}
-	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
+	var open = pm.Request_Open{Range: &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}}
 
 	openTransactor := func(t *testing.T, table sql.Table) error {
 		txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)

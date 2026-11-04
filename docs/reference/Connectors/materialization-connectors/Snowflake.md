@@ -269,6 +269,17 @@ You can enable delta updates on a per-binding basis:
         delta_updates: true
     source: ${PREFIX}/${source_collection}
 ```
+## Deleting rows after a backfill
+
+When a backfill of a source collection completes, the connector deletes the
+table's rows whose `flow_published_at` is earlier than the start of the
+backfill. The backfill re-sent every document the source still has, so these
+rows belong to documents that no longer exist. Delta-updates bindings keep
+every row, and so does a binding that excludes the `flow_published_at` field.
+To keep the old rows, disable the `truncate_after_backfill`
+[feature flag](/guides/advanced-usage/feature-flags), or set
+`retain_existing_data_on_backfill`.
+
 ## Performance considerations
 
 ### Optimizing performance for standard updates

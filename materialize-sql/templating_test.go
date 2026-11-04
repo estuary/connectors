@@ -106,7 +106,7 @@ func TestMergeBoundsBuilder(t *testing.T) {
 		name       string
 		keyColumns []Column
 		keys       [][]any
-		want       []MergeBound
+		want       MergeBounds
 	}{
 		{
 			name:       "single key",

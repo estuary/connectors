@@ -35,7 +35,7 @@ CostResource = common.Resource[BaseDocument, CostResourceConfig, common.Resource
 class CostStream:
     model: type[DailyCost]
     fetch_changes: Callable[
-        [AWSAccessKey, date | None, Logger, LogCursor],
+        [AWSAccessKey, date, Logger, LogCursor],
         AsyncGenerator[DailyCost | datetime, None],
     ]
 
@@ -92,9 +92,7 @@ def validate_intervals(configs: Iterable[CostResourceConfig]) -> None:
         )
 
 
-def configured_start(config: EndpointConfig) -> date | None:
-    if config.start_date is None:
-        return None
+def configured_start(config: EndpointConfig) -> date:
     return config.start_date.astimezone(UTC).date()
 
 

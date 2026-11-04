@@ -678,6 +678,10 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, property],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	info, err := d.dataClient.info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting server info: %w", err)
