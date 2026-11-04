@@ -11,3 +11,5 @@ func dropPageCache(f *os.File) {}
 func flushAndDropPageCache(f *os.File) {}
 
 func dropPageCacheRange(f *os.File, off, length int64) {}
+
+func isMemoryBacked(dir string) bool { return false }

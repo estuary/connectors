@@ -34,3 +34,12 @@ func flushAndDropPageCache(f *os.File) {
 func dropPageCacheRange(f *os.File, off, length int64) {
 	_ = unix.Fadvise(int(f.Fd()), off, length, unix.FADV_DONTNEED)
 }
+
+// isMemoryBacked reports whether dir is on tmpfs or ramfs.
+func isMemoryBacked(dir string) bool {
+	var st unix.Statfs_t
+	if err := unix.Statfs(dir, &st); err != nil {
+		return false
+	}
+	return st.Type == unix.TMPFS_MAGIC || st.Type == unix.RAMFS_MAGIC
+}

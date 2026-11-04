@@ -8,9 +8,11 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/apache/arrow-go/v18/parquet/variant"
+	"github.com/estuary/connectors/go/common"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
@@ -54,7 +57,45 @@ const (
 	// The default approximate upper limit for row group byte sizes, after compression. Configurable
 	// via WithRowGroupByteLimit.
 	defaultRowGroupByteLimit = 512 * 1024 * 1024
+
+	// When the scratch file is memory-backed, the row group byte limit is capped to this fraction of
+	// the container memory limit.
+	memoryBackedScratchFraction = 8
 )
+
+var scratchIsMemoryBacked = sync.OnceValue(func() bool { return isMemoryBacked(os.TempDir()) })
+
+// memoryBackedScratchCap is the row group byte limit cap for a tmpfs scratch directory, or 0 if the
+// scratch directory is disk-backed. Its pages are resident memory charged to the cgroup, which no
+// page cache dropping can release and GOMEMLIMIT doesn't see, so the cap is also reserved out of
+// the Go memory limit to keep the heap from growing into it.
+var memoryBackedScratchCap = sync.OnceValue(func() int {
+	if !scratchIsMemoryBacked() {
+		return 0
+	}
+
+	scratchCap := common.MemoryLimit() / memoryBackedScratchFraction
+	goLimit := debug.SetMemoryLimit(-1)
+	if goLimit != math.MaxInt64 && goLimit > 2*scratchCap {
+		goLimit = goLimit - scratchCap
+		debug.SetMemoryLimit(goLimit)
+	}
+
+	log.WithFields(log.Fields{
+		"dir":        os.TempDir(),
+		"scratchCap": scratchCap,
+		"goMemLimit": goLimit,
+	}).Info("parquet scratch directory is memory-backed, capping row group size and reserving it from the Go memory limit")
+
+	return int(scratchCap)
+})
+
+func scratchByteLimit(configured int) int {
+	if c := memoryBackedScratchCap(); c > 0 {
+		return min(configured, c)
+	}
+	return configured
+}
 
 // rowSize is used to get a rough estimate of how much memory a row of values will take up when
 // buffered in the ParquetWriter's `buffer` slice. These estimates are used to bound how often a
@@ -214,6 +255,7 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 	for _, o := range opts {
 		o(&cfg)
 	}
+	cfg.rowGroupByteLimit = scratchByteLimit(cfg.rowGroupByteLimit)
 
 	fields := make(schema.FieldList, 0, len(sch))
 	for _, e := range sch {
