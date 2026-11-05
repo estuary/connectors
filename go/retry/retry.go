@@ -202,7 +202,9 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return fmt.Errorf("%w while waiting to retry %s after: %w", ctx.Err(), operation, err)
+			// The last error is only described, so that a cancelled Do isn't
+			// mistaken for one that failed with it.
+			return fmt.Errorf("%w while waiting to retry %s after: %v", ctx.Err(), operation, err)
 		case <-timer.C:
 		}
 
