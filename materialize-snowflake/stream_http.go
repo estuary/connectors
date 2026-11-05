@@ -389,7 +389,11 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 			return fmt.Errorf("channel offset token not persisted: max retries reached")
 		}
 
-		time.Sleep(backoff)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
 		backoff = min(backoff*2, maxBackoff)
 	}
 
