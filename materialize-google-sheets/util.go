@@ -5,13 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
 	"regexp"
-	"time"
 
+	"github.com/estuary/connectors/go/retry"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -138,7 +135,7 @@ func writeSheetHeaders(ctx context.Context, client *sheets.Service, spreadsheetI
 			})
 
 	}
-	return batchRequestWithRetry(ctx, client, spreadsheetID, actions)
+	return batchUpdate(ctx, idempotentRetry, client, spreadsheetID, actions)
 }
 
 // SheetState is the recovered state of a materialized sheet.
@@ -269,7 +266,7 @@ func writeSheetSentinels(ctx context.Context, client *sheets.Service, spreadshee
 			},
 		})
 	}
-	return batchRequestWithRetry(ctx, client, spreadsheetID, updates)
+	return batchUpdate(ctx, idempotentRetry, client, spreadsheetID, updates)
 }
 
 // loadSheetIDMapping retrieves a mapping of sheet titles to their integer API IDs.
@@ -290,10 +287,10 @@ func loadSheetIDMapping(client *sheets.Service, spreadsheetID string) (map[strin
 	return out, nil
 }
 
-// batchRequestWithRetry applies all `requests` in a single batch,
-// wrapped in a retry loop which handles rate limit errors from the sheets API.
-func batchRequestWithRetry(
+// batchUpdate applies all `requests` in a single, atomic batch.
+func batchUpdate(
 	ctx context.Context,
+	policy retry.Policy,
 	client *sheets.Service,
 	spreadsheetID string,
 	requests []*sheets.Request,
@@ -302,28 +299,13 @@ func batchRequestWithRetry(
 		return nil // Nothing to do, and an attempted actual request will fail.
 	}
 
-	for attempt := 1; true; attempt++ {
+	return policy.Do(ctx, "updating spreadsheet", func(ctx context.Context) error {
 		var _, err = client.Spreadsheets.BatchUpdate(spreadsheetID,
 			&sheets.BatchUpdateSpreadsheetRequest{Requests: requests}).
 			Context(ctx).
 			Do()
-
-		if err == nil {
-			return nil
-		}
-
-		// If we encounter a rate limit error, retry after exponential back-off.
-		if e, ok := err.(*googleapi.Error); ok && retryableErrorCodes[e.Code] {
-			var dur = time.Duration(1<<attempt) * time.Second
-			log.Println("received error ", e.Code, http.StatusText(e.Code), ", retrying after ", dur)
-			time.Sleep(dur)
-			continue
-		}
-
-		// All other errors bail out.
 		return err
-	}
-	panic("not reached")
+	})
 }
 
 // Example: https://docs.google.com/spreadsheets/d/1s7S1Abp8kAJEkReV10omef_ETZXKB2vHKPook49HpFk/edit#gid=1649530432
@@ -336,11 +318,4 @@ func parseSheetsID(sheetsURL string) (string, error) {
 		return "", fmt.Errorf("invalid Google Sheets URL: %s", sheetsURL)
 	}
 	return matches[1], nil
-}
-
-var retryableErrorCodes = map[int]bool{
-	http.StatusTooManyRequests:     true, // 429
-	http.StatusInternalServerError: true, // 500
-	http.StatusBadGateway:          true, // 502
-	http.StatusServiceUnavailable:  true, // 503
 }
