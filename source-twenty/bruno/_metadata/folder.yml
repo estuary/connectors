@@ -1,0 +1,11 @@
+info:
+  name: _metadata
+  type: folder
+  seq: 1
+
+docs: |-
+  **WHY:** establish the metadata envelope used for discovery and validation.
+
+  See `_metadata / objects` for the self-hosted discovery example and supplied
+  Cloud comparison facts, and `_metadata / validate` for the saved one-object
+  authentication probe.

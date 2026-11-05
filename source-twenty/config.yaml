@@ -1,0 +1,4 @@
+base_url: http://localhost:3000
+credentials:
+  credentials_title: API Key
+  access_token: PLACEHOLDER_REPLACE_WITH_REAL_TOKEN

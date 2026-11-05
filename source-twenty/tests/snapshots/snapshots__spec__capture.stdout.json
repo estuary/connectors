@@ -1,0 +1,110 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ApiKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "API Key",
+              "default": "API Key",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "description": "A Twenty API key, created in Twenty under Settings > APIs & Webhooks.",
+              "order": 1,
+              "secret": true,
+              "title": "API Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "base_url": {
+          "default": "https://api.twenty.com",
+          "description": "The address of your Twenty server's API. Leave the default for Twenty Cloud; for self-hosted Twenty, use your server's address, like https://twenty.example.com.",
+          "order": 0,
+          "pattern": "^https?://",
+          "title": "Base URL",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "API Key": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "order": 1,
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        },
+        "schedule": {
+          "default": "",
+          "description": "Schedule to automatically rebackfill this binding. Accepts a cron expression.",
+          "nonsensitive": true,
+          "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
+          "title": "Schedule",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfigWithSchedule",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-twenty",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

@@ -1,0 +1,137 @@
+opencollection: 1.0.0
+
+info:
+  name: Twenty
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Static-token house style A; path resolution follows
+        // source-mailchimp-native/bruno/opencollection.yml:15.
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        const token = JSON.parse(decrypted)?.credentials?.access_token;
+        if (!token) throw new Error('credentials.access_token missing from decrypted config');
+        req.setHeader('Authorization', `Bearer ${token}`);
+        req.setHeader('User-Agent', 'Estuary source-twenty');
+    - type: after-response
+      code: |-
+        // models.py excludes searchVector from captured documents. Snapshot tests
+        // have no additional redaction list. Keep cursor fields visible for probes.
+        const REDACTED_FIELDS = ['searchVector'];
+        function redact(value) {
+          if (Array.isArray(value)) return value.map(redact);
+          if (value && typeof value === 'object') {
+            return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+              key, REDACTED_FIELDS.includes(key) ? 'REDACTED' : redact(item),
+            ]));
+          }
+          return value;
+        }
+        const body = res.getBody();
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **DOCUMENTED (2026-11-03):** Twenty Cloud documents 100 requests per
+      minute and 60 records per batch write at
+      https://docs.twenty.com/developers/extend/api.
+    - Run history (2026-11-03, no saved example): neither self-hosted v2.52
+      nor Cloud sent rate-limit headers on any response, so a 429 can arrive
+      without `Retry-After`. The connector relies on the CDK's 429 backoff.
+    - **DOCUMENTED (2026-10):** Twenty Cloud sits behind Cloudflare, which
+      refuses some default user agents; every request sends
+      `User-Agent: Estuary source-twenty`.
+    - Run history (2026-11-03, no saved example): reading an object name that
+      doesn't exist returns HTTP 400 `BadRequestException`
+      (`object '<name>' not found`), not 404. The connector reports a bound
+      object missing from metadata by name at validation, before any read.
+
+    ## LIMITATION index
+
+    - `_metadata / objects` — system join objects need an explicit inclusion;
+      supplied run history records Cloud/self-hosted field metadata differences.
+    - `Records / backfill page` — record page sizes silently clamp to 200.
+    - `Records / incremental window` — timestamp comparisons use milliseconds.
+    - `Records / soft deleted` — default lists hide soft-deleted records.
+    - `Seeding` folder — permanent deletes and their side effects on other
+      records are UNOBSERVABLE by polling; bindings offer `schedule`.
+
+    ## Evidence and examples
+
+    Examples are projections of live responses captured on 2026-11-03 from
+    self-hosted Twenty v2.52 (`http://localhost:3000`) and, for the 401 checks,
+    Twenty Cloud (`https://api.twenty.com`); Cloud metadata comparison facts
+    are recorded in `_metadata / objects`. The records are made-up test data.
+    `searchVector` and API keys are never saved in examples. Computed facts
+    from full responses belong in the docs, outside the projected bodies.
+
+    This collection follows `.claude/skills/bruno-probe-endpoint/SKILL.md`.
+
+    ## Running requests
+
+    Use Bruno / bru CLI >= 3.0.0 and `sops`. From `source-twenty/bruno/`:
+
+    ```sh
+    bru run "_metadata/objects.yml" --env Twenty --sandbox developer
+    bru run "_metadata/validate.yml" --env Twenty --sandbox developer
+    bru run "_auth/bad key.yml" --env Twenty --sandbox developer
+    bru run "Records/backfill page.yml" --env Twenty --sandbox developer
+    bru run "Records/incremental window.yml" --env Twenty --sandbox developer
+    bru run "Records/soft deleted.yml" --env Twenty --sandbox developer
+    ```
+
+    The environment defaults to `http://localhost:3000`; use
+    `https://api.twenty.com` for Cloud, or your self-hosted server's base URL.
+    `config_path` is `../config.yaml`, resolved relative to the collection
+    root. The pre-request script decrypts `credentials.access_token` and puts
+    it only on the request's Bearer header, never in runtime or environment
+    variables. Select the developer JS sandbox in the desktop app too.
+
+    Repin historical IDs and timestamps to current test records before replay.
+    Use UTC `Z` with millisecond precision for timestamp variables. Keep the
+    backfill cutoff fixed while paging. `Records / incremental window` runs
+    the captured ID-scoped `gte` comparison; its examples cover five separate
+    timestamp predicates.
+
+    `Records / backfill page` captures `endCursor` into a runtime variable;
+    enable its `starting_after` query parameter to fetch the next page and
+    disable it to start again. Follow `pageInfo.hasNextPage` to completion.
+
+    Run individual read requests or read folders. Running the entire collection
+    also runs mutations in `Seeding/`. Only a human runs that folder; agents
+    never run it. Its three requests create, soft-delete, and restore one
+    example company in that order, passing `company_id` in memory:
+
+    ```sh
+    bru run Seeding --env Twenty --sandbox developer
+    ```
+
+    ## Redaction
+
+    The saved projections preserve the supplied test-record IDs, timestamps,
+    and cursors exactly. The after-response script replaces `searchVector`
+    contents with `REDACTED`, matching its exclusion from connector documents;
+    committed projections omit that field entirely. Non-JSON error bodies
+    are left alone. Use made-up test data for future captures and omit API
+    keys and request auth headers. Keep IDs and timestamp precision visible
+    for pagination checks; response headers were not supplied or saved.
+  type: text/markdown
+
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

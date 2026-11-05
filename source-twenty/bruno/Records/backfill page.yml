@@ -1,0 +1,197 @@
+info:
+  name: backfill page
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: '{{base_url}}/rest/people?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(updatedAt[lt]:"{{cutoff}}",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: depth
+      value: "0"
+      type: query
+    - name: order_by
+      value: updatedAt[AscNullsFirst],id[AscNullsFirst]
+      type: query
+    - name: filter
+      value: 'and(updatedAt[lt]:"{{cutoff}}",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      type: query
+    - name: starting_after
+      value: "{{starting_after}}"
+      type: query
+      disabled: true
+  auth: inherit
+
+runtime:
+  variables:
+    - name: cutoff
+      value: "2026-11-03T18:58:54.000Z"
+  scripts:
+    - type: after-response
+      code: |-
+        const page = res.getBody()?.pageInfo;
+        if (res.getStatus() === 200 && page?.hasNextPage && page.endCursor) {
+          bru.setVar('starting_after', page.endCursor);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - live self-hosted v2.52, depth 0 first page, first and last rows (projection)
+    request:
+      url: '{{base_url}}/rest/people?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(updatedAt[lt]:"2026-11-03T18:58:54.000Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "people": [
+                {
+                  "id": "7a93d1e5-3f74-4945-8a65-d7f996083f72",
+                  "updatedAt": "2026-10-29T04:16:13.179Z",
+                  "deletedAt": null
+                },
+                {
+                  "id": "764c5c99-1546-49d1-ad1a-d5efd18c9447",
+                  "updatedAt": "2026-10-29T07:48:33.413Z",
+                  "deletedAt": "2026-10-29T07:48:33.413Z"
+                }
+              ]
+            },
+            "pageInfo": {
+              "startCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTI5IDA0OjE2OjEzLjE3OTE5NSswMCIsImlkIjoiN2E5M2QxZTUtM2Y3NC00OTQ1LThhNjUtZDdmOTk2MDgzZjcyIn0",
+              "endCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTI5IDA3OjQ4OjMzLjQxMzg5OCswMCIsImlkIjoiNzY0YzVjOTktMTU0Ni00OWQxLWFkMWEtZDVlZmQxOGM5NDQ3In0",
+              "hasNextPage": true,
+              "hasPreviousPage": false
+            },
+            "totalCount": 19248
+          }
+  - name: 200 - live self-hosted v2.52, second page, first and last rows (projection)
+    request:
+      url: '{{base_url}}/rest/people?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(updatedAt[lt]:"2026-11-03T18:58:54.000Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))&starting_after=eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTI5IDA3OjQ4OjMzLjQxMzg5OCswMCIsImlkIjoiNzY0YzVjOTktMTU0Ni00OWQxLWFkMWEtZDVlZmQxOGM5NDQ3In0'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "people": [
+                {
+                  "id": "84f69b3c-69c4-4772-a0c7-5ce4ee45d050",
+                  "updatedAt": "2026-10-29T07:48:33.422Z",
+                  "deletedAt": "2026-10-29T07:48:33.422Z"
+                },
+                {
+                  "id": "7dd356f3-e800-48de-8df3-a23308d20eff",
+                  "updatedAt": "2026-10-30T07:28:23.005Z",
+                  "deletedAt": null
+                }
+              ]
+            },
+            "pageInfo": {
+              "startCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTI5IDA3OjQ4OjMzLjQyMjA5KzAwIiwiaWQiOiI4NGY2OWIzYy02OWM0LTQ3NzItYTBjNy01Y2U0ZWU0NWQwNTAifQ",
+              "endCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTMwIDA3OjI4OjIzLjAwNTYyNCswMCIsImlkIjoiN2RkMzU2ZjMtZTgwMC00OGRlLThkZjMtYTIzMzA4ZDIwZWZmIn0",
+              "hasNextPage": true,
+              "hasPreviousPage": true
+            },
+            "totalCount": 19248
+          }
+  - name: 200 - live self-hosted v2.52, limit 201 clamped to 200 (projection)
+    request:
+      url: '{{base_url}}/rest/people?limit=201&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(updatedAt[lt]:"2026-11-03T18:58:54.000Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "people": [
+                {
+                  "id": "7a93d1e5-3f74-4945-8a65-d7f996083f72",
+                  "updatedAt": "2026-10-29T04:16:13.179Z",
+                  "deletedAt": null
+                },
+                {
+                  "id": "764c5c99-1546-49d1-ad1a-d5efd18c9447",
+                  "updatedAt": "2026-10-29T07:48:33.413Z",
+                  "deletedAt": "2026-10-29T07:48:33.413Z"
+                }
+              ]
+            },
+            "pageInfo": {
+              "startCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTI5IDA0OjE2OjEzLjE3OTE5NSswMCIsImlkIjoiN2E5M2QxZTUtM2Y3NC00OTQ1LThhNjUtZDdmOTk2MDgzZjcyIn0",
+              "endCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTEwLTI5IDA3OjQ4OjMzLjQxMzg5OCswMCIsImlkIjoiNzY0YzVjOTktMTU0Ni00OWQxLWFkMWEtZDVlZmQxOGM5NDQ3In0",
+              "hasNextPage": true,
+              "hasPreviousPage": false
+            },
+            "totalCount": 19248
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  **WHY:** test backfill pagination, inclusion of trash, and handoff to
+  incremental capture at a shared cutoff. The RFC3339 `updatedAt` upper bound
+  is exclusive (`[lt]`); there is no lower bound. Keep the cutoff fixed across
+  all pages. These captures used `2026-11-03T18:58:54.000Z`.
+
+  **VERIFIED (2026-11-03):** self-hosted v2.52 returns
+  `{data: {people: [...]}, pageInfo, totalCount}` with the requested
+  `updatedAt[AscNullsFirst],id[AscNullsFirst]` ordering. Page 2 uses page 1's
+  `endCursor` as `starting_after`; both have `totalCount: 19248` and
+  `hasNextPage: true`. The full responses each returned 200 rows, and their
+  ID sets had zero overlap: page 1 to page 2 had no repeated IDs. Row counts
+  and overlap are facts computed from the full responses, not response
+  fields. Each saved body projects just the first and last rows.
+
+  **VERIFIED (2026-11-03):** page 1's `endCursor` is base64-encoded JSON:
+  `{"updatedAt":"2026-10-29 07:48:33.413898+00","id":"764c5c99-1546-49d1-ad1a-d5efd18c9447"}`.
+  The cursor retains microseconds while that row displays
+  `2026-10-29T07:48:33.413Z`. Pass the value-based `(updatedAt, id)` cursor
+  unchanged as `starting_after`; do not reconstruct it from the displayed
+  timestamp. The after-response script captures it. Enable the initially
+  disabled query parameter for another page, keeping filter and sort fixed.
+
+  **LIMITATION (VERIFIED 2026-11-03):** requesting `limit=201` returned 200
+  rows in the full response, with the same projected endpoints, cursors, and
+  `totalCount` as page 1 at `limit=200`. Pagination remained available through
+  `hasNextPage: true`. This is a silent clamp to 200 for the tested request.
+
+  Follow `pageInfo.hasNextPage`, not a comparison with the requested limit.
+  The connector requests 200.
+
+  **RUN HISTORY (2026-11-03):** a `limit=1&depth=1` probe with the same cutoff,
+  filter, and ordering returned 200. Full-response checks found `companyId`
+  present and `company` nested as an object; at `depth=0`, the `company` key
+  was absent. Only these presence/type facts were supplied for depth 1, with
+  no row values, so there is no saved depth-1 example. The connector uses
+  `depth=0`. No nested company fields are inferred from those checks.
+
+  Run history (2026-11-03, self-hosted v2.52, no saved example): paging
+  inside one millisecond. 60 companies from one batch create shared a single
+  microsecond `updatedAt`; 150 concurrent single creates gave 25 milliseconds
+  holding 2 or 3 different microsecond values. Walking each set with
+  `limit=1` and `starting_after` returned every id once, none missing, so the
+  cursor compares `updatedAt` at microsecond precision with `id` as the tie
+  break (a millisecond comparison would have skipped rows whose id sorts below
+  the cursor's). All probe records were destroyed afterwards.
