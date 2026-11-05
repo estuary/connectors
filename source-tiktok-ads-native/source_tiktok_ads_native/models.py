@@ -1,7 +1,7 @@
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, ClassVar
 from zoneinfo import ZoneInfo
@@ -310,17 +310,19 @@ class AccessTokenCredentials(AccessToken):
 AdvertiserId = Annotated[str, StringConstraints(pattern=r"^[0-9]+$")]
 
 
+def default_start_date() -> datetime:
+    return datetime.now(tz=UTC) - timedelta(days=30)
+
+
 class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials | AccessTokenCredentials = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
-    # Blank stays None, so that reports clamp only to a date the user set: a
-    # default computed here would move forward on every restart.
-    start_date: AwareDatetime | None = Field(
-        default=None,
+    start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Report data before this date will not be replicated; campaigns, ad groups and ads are captured in full. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
+        default_factory=default_start_date,
     )
     advertiser_ids: list[AdvertiserId] = Field(
         default=[],
