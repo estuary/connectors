@@ -192,18 +192,10 @@
           "title": "Authentication"
         },
         "start_date": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Report data before this date will not be replicated; campaigns, ad groups and ads are captured in full. If left blank, the start date will be set to 30 days before the present.",
-          "title": "Start Date"
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
         },
         "advertiser_ids": {
           "default": [],

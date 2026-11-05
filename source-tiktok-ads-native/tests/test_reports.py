@@ -277,26 +277,6 @@ async def test_incremental_never_reads_before_the_start_date(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_a_long_pause_with_a_blank_start_date_skips_no_day(monkeypatch):
-    # Last swept Aug 1, resumed Oct 13, more than 30 days later.
-    now = datetime(2026, 10, 13, 13, 0, tzinfo=UTC)
-    monkeypatch.setattr(reports, "_now", lambda: now)
-    http = ReportStub({"a1": "UTC"})
-    report = _report()
-
-    await _drain(
-        fetch_report(  # type: ignore[arg-type]
-            stub_client(http), "a1", _zone(http), report, report_document_model(report),
-            None, 28, LOG, datetime(2026, 8, 1, 12, 0, tzinfo=UTC),
-        )
-    )
-
-    # Nothing clamps the lookback before the cursor's date.
-    assert _windows_requested(http)[0][0] == "2026-07-04"
-    assert _windows_requested(http)[-1][1] == "2026-10-13"
-
-
-@pytest.mark.asyncio
 async def test_a_future_start_date_holds_back_the_incremental(monkeypatch):
     # Created Oct 12 with a start date of Oct 20.
     start = datetime(2026, 10, 20, tzinfo=UTC)
