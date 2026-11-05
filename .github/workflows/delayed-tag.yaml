@@ -21,8 +21,7 @@ name: Delayed tag
 # Finally, a guard step drops any connector whose boundary is not provably
 # newer than (or the same as) the commit ':delayed' already points at, so a
 # nightly run never moves ':delayed' backward — in particular it never silently
-# undoes a deliberate forward-delayed-tag.yaml fast-forward. A ':delayed' whose
-# commit can't be determined is held too.
+# undoes a deliberate forward-delayed-tag.yaml fast-forward.
 #
 # Core logic lives in .github/scripts/delayed_tag.py (unit-tested via
 # test_delayed_tag.py). This workflow handles auth, docker setup, and the
@@ -123,15 +122,11 @@ jobs:
         # Drop any connector whose 2-week boundary isn't newer than the image
         # ':delayed' already points at — otherwise a nightly run silently undoes
         # a deliberate forward-delayed-tag.yaml fast-forward. Resolves the
-        # current ':delayed' commit per connector from its revision label
-        # (falling back to the packages API) and compares it against the
-        # boundary in git history.
+        # current ':delayed' commit per connector from its revision label and
+        # compares it against the boundary in git history.
         # Reads:  /tmp/safe_plan.tsv
         # Writes: /tmp/final_plan.tsv      (image, sha7) — entries safe to tag
         #         /tmp/backward_skips.tsv  (image, boundary_sha7, current_sha7)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 .github/scripts/delayed_tag.py guard
 
       - name: Tag images as ':delayed'
@@ -265,8 +260,7 @@ jobs:
               echo ""
               echo "These connectors' 2-week boundary is not newer than the image"
               echo "\`:delayed\` already points at (e.g. a forward-delayed-tag"
-              echo "fast-forward), or that image's commit is \`unresolved\`, so"
-              echo "they were left untouched."
+              echo "fast-forward), so they were left untouched."
               echo ""
               echo "| Connector | Boundary (skipped) | Current \`:delayed\` |"
               echo "|-----------|--------------------|---------------------|"
