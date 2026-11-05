@@ -7,7 +7,9 @@ import (
 
 	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestFlushFeatureFlags(t *testing.T) {
@@ -71,4 +73,40 @@ func TestCheckpointCarriesTruncation(t *testing.T) {
 			"TruncateBefore": "2026-09-29T00:00:00.0000001Z",
 		},
 	}, got)
+}
+
+func TestMergeBoundsCoverOnlyTheirRound(t *testing.T) {
+	var key = sql.Column{
+		Projection: sql.Projection{Projection: pf.Projection{
+			Field:     "id",
+			Inference: pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST},
+		}},
+		Identifier: "ID",
+	}
+	var b = &binding{target: sql.Table{StateKey: "t", Identifier: "T", Keys: []sql.Column{key}}}
+	b.store.stage = &stagedFile{}
+	b.store.mergeBounds = sql.NewMergeBoundsBuilder(b.target.Keys, testDialect.Literal)
+	var d = &transactor{
+		bindings:  []*binding{b},
+		cp:        make(checkpoint),
+		templates: testTemplates,
+		profiler:  newQueryProfiler(nil, []*binding{b}),
+	}
+
+	var round = func(mustMerge bool, keys ...string) *checkpointItem {
+		b.store.stage.started, b.store.stage.finished = true, true
+		b.store.stage.group = &errgroup.Group{}
+		b.store.mustMerge = mustMerge
+		for _, k := range keys {
+			b.store.mergeBounds.NextKey([]any{k})
+		}
+		_, err := d.buildDriverCheckpoint(t.Context(), nil, 0)
+		require.NoError(t, err)
+		return d.cp["t"]
+	}
+
+	require.Contains(t, round(false, "a", "z").Query, "COPY INTO")
+	var merge = round(true, "m").Query
+	require.Contains(t, merge, "MERGE INTO")
+	require.Contains(t, merge, "l.ID >= 'm' AND l.ID <= 'm'")
 }
