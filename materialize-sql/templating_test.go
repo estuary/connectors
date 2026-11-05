@@ -2,6 +2,7 @@ package sql
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"slices"
 	"strings"
@@ -366,7 +367,10 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 					instants = append(instants, ts)
 				}
 			}
-			rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i]; instants[i], instants[j] = instants[j], instants[i] })
+			rng.Shuffle(len(keys), func(i, j int) {
+				keys[i], keys[j] = keys[j], keys[i]
+				instants[i], instants[j] = instants[j], instants[i]
+			})
 
 			got := build(keys, exact, WithDatetimeRanges(4))
 			require.LessOrEqual(t, len(got.Ranges), 4)
@@ -385,6 +389,144 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestMergeBoundsBuilderStringRanges(t *testing.T) {
+	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+	str := Column{Identifier: "id", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"string"}},
+	}}}
+	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}},
+	}}}
+	integer := Column{Identifier: "n", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"integer"}},
+	}}}
+
+	// A band of time-ordered IDs sharing a prefix, and two outliers before it.
+	band := func() []string {
+		var out []string
+		for i := 0; i < 500; i++ {
+			out = append(out, fmt.Sprintf("019a2b3c-%04x-7000-8000-000000000000", i))
+		}
+		return out
+	}()
+	withOutliers := append([]string{"0185aaaa-0000-7000-8000-000000000000", "0123ffff-0000-7000-8000-000000000000"}, band...)
+
+	build := func(col Column, keys []string, opts ...MergeBoundsOption) MergeBound {
+		b := NewMergeBoundsBuilder([]Column{col}, literaler, opts...)
+		for _, k := range keys {
+			b.NextKey([]any{k})
+		}
+		return b.Build()[0]
+	}
+
+	t.Run("outliers get ranges of their own", func(t *testing.T) {
+		got := build(str, withOutliers, WithStringRanges(8))
+		require.Equal(t, literaler(withOutliers[1]), got.LiteralLower)
+		require.Equal(t, literaler(band[len(band)-1]), got.LiteralUpper)
+		require.Equal(t, []MergeRange{
+			{literaler(withOutliers[1]), literaler(withOutliers[1])},
+			{literaler(withOutliers[0]), literaler(withOutliers[0])},
+			{literaler(band[0]), literaler(band[len(band)-1])},
+		}, got.Ranges)
+	})
+
+	t.Run("evenly spread keys aren't split", func(t *testing.T) {
+		require.Nil(t, build(str, band, WithStringRanges(8)).Ranges)
+	})
+
+	t.Run("uniformly random UUIDs aren't split", func(t *testing.T) {
+		rng := rand.New(rand.NewSource(1))
+		var keys []string
+		for i := 0; i < 10000; i++ {
+			var u [16]byte
+			rng.Read(u[:])
+			keys = append(keys, fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16]))
+		}
+		require.Nil(t, build(str, keys, WithStringRanges(8)).Ranges)
+	})
+
+	t.Run("ranges need the option and a plain string column", func(t *testing.T) {
+		require.Nil(t, build(str, withOutliers).Ranges)
+		require.Nil(t, build(str, withOutliers, WithDatetimeRanges(8)).Ranges)
+
+		dates := []string{"2025-11-30T00:00:00Z", "2026-10-26T12:00:00Z", "2026-10-26T12:00:01Z"}
+		require.Nil(t, build(datetime, dates, WithStringRanges(8)).Ranges)
+
+		b := NewMergeBoundsBuilder([]Column{integer}, literaler, WithStringRanges(8))
+		for _, k := range []int64{1, 2, 1000000} {
+			b.NextKey([]any{k})
+		}
+		require.Nil(t, b.Build()[0].Ranges)
+	})
+
+	t.Run("ranges enclose every key", func(t *testing.T) {
+		rng := rand.New(rand.NewSource(1))
+		const alphabet = "\x00\x01-09AZaz\x7f\xc3\xa9\xff"
+		// Prefixes run past the positions the alphabet tracks.
+		var randomKeys = func(maxPrefix int) []string {
+			var keys []string
+			for clusters := rng.Intn(100) + 1; clusters > 0; clusters-- {
+				var prefix = make([]byte, rng.Intn(maxPrefix))
+				for j := range prefix {
+					prefix[j] = alphabet[rng.Intn(len(alphabet))]
+				}
+				for n := rng.Intn(20) + 1; n > 0; n-- {
+					var suffix = make([]byte, rng.Intn(4))
+					for j := range suffix {
+						suffix[j] = alphabet[rng.Intn(len(alphabet))]
+					}
+					keys = append(keys, string(prefix)+string(suffix))
+				}
+			}
+			return keys
+		}
+		for i := 0; i < 200; i++ {
+			// A two-column key, whose columns' keys are drawn independently.
+			var cols = [2][]string{randomKeys(6), randomKeys(80)}
+			var n = min(len(cols[0]), len(cols[1]))
+
+			b := NewMergeBoundsBuilder([]Column{str, str}, func(v any) string { return v.(string) }, WithStringRanges(4))
+			for j := range n {
+				b.NextKey([]any{cols[0][j], cols[1][j]})
+			}
+			for c, got := range b.Build() {
+				require.LessOrEqual(t, len(got.Ranges), 4)
+				for j := 1; j < len(got.Ranges); j++ {
+					require.Less(t, got.Ranges[j-1].LiteralUpper, got.Ranges[j].LiteralLower)
+				}
+				for _, k := range cols[c][:n] {
+					require.True(t, k >= got.LiteralLower && k <= got.LiteralUpper, "%q is outside the bound", k)
+					require.True(t, len(got.Ranges) == 0 || slices.ContainsFunc(got.Ranges, func(r MergeRange) bool {
+						return r.LiteralLower <= k && k <= r.LiteralUpper
+					}), "%q is outside every range", k)
+				}
+			}
+		}
+	})
+}
+
+func TestDatetimePositionOrdersInstants(t *testing.T) {
+	var instants = []time.Time{
+		time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(1969, 12, 31, 23, 59, 59, 999999999, time.UTC),
+		time.Unix(0, 0),
+		time.Unix(0, 1),
+		time.Unix(1, 0),
+		time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC),
+	}
+	for i := 1; i < len(instants); i++ {
+		require.Less(t, datetimePosition(instants[i-1]), datetimePosition(instants[i]))
+	}
+
+	// A gap is proportional to the time it spans, across second boundaries too.
+	var at = time.Date(2026, 10, 26, 12, 0, 0, 999999000, time.UTC)
+	var gap = func(d time.Duration) float64 {
+		return (&spanSet{}).gap(datetimePosition(at), datetimePosition(at.Add(d)))
+	}
+	require.InDelta(t, 1, gap(2*time.Microsecond)-gap(time.Microsecond), 1e-9)
+	require.InDelta(t, math.Log2(3600), gap(time.Hour)-gap(time.Second), 1e-9)
 }
 
 // TestDateBoundsEncloseEverySpelling checks the property the date widening
