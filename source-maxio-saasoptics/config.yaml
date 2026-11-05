@@ -1,0 +1,6 @@
+subdomain: PLACEHOLDER_SUBDOMAIN
+account_name: PLACEHOLDER_ACCOUNT_NAME
+credentials:
+  credentials_title: API Token
+  access_token: PLACEHOLDER_REPLACE_WITH_REAL_TOKEN
+start_date: "2024-01-01T00:00:00Z"

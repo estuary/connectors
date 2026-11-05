@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-maxio-saasoptics:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_maxio_saasoptics
+        config: config.yaml
+    bindings: []
