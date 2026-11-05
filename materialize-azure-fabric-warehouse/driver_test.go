@@ -2,9 +2,7 @@ package connector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,36 +12,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
-
-// mustGetCfg decrypts testdata/config.yaml, which uses sops's
-// encrypted_suffix convention: encrypted values keep a "_sops" suffix on
-// their key after decryption, so it's stripped here to match the connector's
-// own json tags.
-func mustGetCfg(t *testing.T) config {
-	t.Helper()
-
-	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.yaml").Output()
-	require.NoError(t, err)
-
-	var raw map[string]any
-	require.NoError(t, json.Unmarshal(jsonBytes, &raw))
-	for k, v := range raw {
-		if stripped, ok := strings.CutSuffix(k, "_sops"); ok {
-			raw[stripped] = v
-			delete(raw, k)
-		}
-	}
-	delete(raw, "sops")
-
-	strippedJSON, err := json.Marshal(raw)
-	require.NoError(t, err)
-
-	var cfg config
-	require.NoError(t, json.Unmarshal(strippedJSON, &cfg))
-	require.NoError(t, cfg.Validate())
-
-	return cfg
-}
 
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
@@ -81,56 +49,47 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		var ctx = context.Background()
-		var cfg = mustGetCfg(t)
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
 
-		db, err := cfg.db()
-		require.NoError(t, err)
-		defer db.Close()
-
-		for _, table := range []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"} {
-			_, err := db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", testDialect.Identifier(cfg.Warehouse, cfg.Schema, table)))
+			db, err := cfg.db()
 			require.NoError(t, err)
-		}
+			defer db.Close()
 
-		checkpoints := testDialect.Identifier(cfg.Warehouse, cfg.Schema, "flow_checkpoints_v1")
-		_, err = db.ExecContext(ctx, fmt.Sprintf(
-			"IF OBJECT_ID(N'%s.flow_checkpoints_v1', N'U') IS NOT NULL DELETE FROM %s WHERE materialization = %s;",
-			cfg.Schema, checkpoints, testDialect.Literal("acmeCo/tests/materialize-azure-fabric-warehouse-truncate"),
-		))
-		require.NoError(t, err)
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
 
-		testutil.RunFlowctl(t, "raw", "preview-next",
-			"--name", "acmeCo/tests/materialize-azure-fabric-warehouse-truncate",
-			"--source", "testdata/truncate.flow.yaml",
-			"--fixture", "testdata/truncate.fixture.json",
-			"--shards", "1",
-			"--timeout", "5m",
-			"--network", "flow-test",
-		)
-
-		// The fixture stores ids 1-3, then re-stores only id 1 during a
-		// backfill. A table with a flow_published_at column loses the rows
-		// published before the backfill, unless it's in delta-updates mode:
-		// delta-updates both skips truncation and never upserts, so every
-		// store appends a row.
-		for table, want := range map[string][]int64{
-			"truncate_standard":        {1},
-			"truncate_delta":           {1, 1, 2, 3},
-			"truncate_no_published_at": {1, 2, 3},
-		} {
-			rows, err := db.QueryContext(ctx, "SELECT id FROM "+testDialect.Identifier(cfg.Warehouse, cfg.Schema, table)+" ORDER BY id;")
-			require.NoError(t, err)
-			var ids []int64
-			for rows.Next() {
-				var id int64
-				require.NoError(t, rows.Scan(&id))
-				ids = append(ids, id)
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. A table with a flow_published_at column loses the rows
+			// published before the backfill, unless it's in delta-updates mode:
+			// delta-updates both skips truncation and never upserts, so every
+			// store appends a row.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				identifier := testDialect.Identifier(cfg.Warehouse, cfg.Schema, task.Resource(t, table))
+				rows, err := db.QueryContext(ctx, "SELECT id FROM "+identifier+" ORDER BY id;")
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
 			}
-			require.NoError(t, rows.Err())
-			require.NoError(t, rows.Close())
-			require.Equal(t, want, ids, table)
-		}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
