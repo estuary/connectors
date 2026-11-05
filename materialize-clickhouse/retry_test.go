@@ -80,9 +80,9 @@ func TestClassify(t *testing.T) {
 			want: retry.Fatal,
 		},
 		{
-			name: "context deadline is not retryable",
+			name: "operation deadline",
 			err:  fmt.Errorf("querying: %w", context.DeadlineExceeded),
-			want: retry.Fatal,
+			want: retry.Ambiguous,
 		},
 		{
 			name: "arbitrary error is not retryable",

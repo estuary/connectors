@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"syscall"
@@ -89,10 +90,11 @@ func TestNetwork(t *testing.T) {
 			want: Fatal,
 		},
 		{
-			name: "context deadline, which is also a net.Error",
+			name: "operation deadline",
 			err:  fmt.Errorf("querying: %w", context.DeadlineExceeded),
-			want: Fatal,
+			want: Ambiguous,
 		},
+
 		{
 			name: "anything else",
 			err:  errors.New("syntax error"),
@@ -103,6 +105,17 @@ func TestNetwork(t *testing.T) {
 			require.Equal(t, tt.want, Network(tt.err))
 		})
 	}
+}
+
+func TestNetworkHTTPClientTimeout(t *testing.T) {
+	var server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	var _, err = (&http.Client{Timeout: 10 * time.Millisecond}).Get(server.URL)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.Equal(t, Ambiguous, Network(err))
 }
 
 func TestHTTPStatus(t *testing.T) {
