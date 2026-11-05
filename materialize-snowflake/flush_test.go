@@ -48,7 +48,8 @@ func TestCheckpointCarriesTruncation(t *testing.T) {
 	var boundary = time.Date(2026, 9, 29, 0, 0, 0, 100, time.UTC)
 	var newBinding = func(stateKey string) *binding {
 		var b = &binding{target: sql.Table{StateKey: stateKey, Identifier: stateKey}}
-		b.store.stage = &stagedFile{}
+		b.store.mergeStage = &stagedFile{}
+		b.store.copyStage = &stagedFile{}
 		return b
 	}
 	var d = &transactor{
@@ -84,7 +85,6 @@ func TestMergeBoundsCoverOnlyTheirRound(t *testing.T) {
 		Identifier: "ID",
 	}
 	var b = &binding{target: sql.Table{StateKey: "t", Identifier: "T", Keys: []sql.Column{key}}}
-	b.store.stage = &stagedFile{}
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(b.target.Keys, testDialect.Literal)
 	var d = &transactor{
 		bindings:  []*binding{b},
@@ -93,11 +93,12 @@ func TestMergeBoundsCoverOnlyTheirRound(t *testing.T) {
 		profiler:  newQueryProfiler(nil, []*binding{b}),
 	}
 
-	var round = func(mustMerge bool, keys ...string) *checkpointItem {
-		b.store.stage.started, b.store.stage.finished = true, true
-		b.store.stage.group = &errgroup.Group{}
-		b.store.mustMerge = mustMerge
-		for _, k := range keys {
+	var staged = func(started bool) *stagedFile {
+		return &stagedFile{started: started, finished: started, group: &errgroup.Group{}}
+	}
+	var round = func(copied bool, merged ...string) *checkpointItem {
+		b.store.mergeStage, b.store.copyStage = staged(len(merged) > 0), staged(copied)
+		for _, k := range merged {
 			b.store.mergeBounds.NextKey([]any{k})
 		}
 		_, err := d.buildDriverCheckpoint(t.Context(), nil, 0)
@@ -105,8 +106,9 @@ func TestMergeBoundsCoverOnlyTheirRound(t *testing.T) {
 		return d.cp["t"]
 	}
 
-	require.Contains(t, round(false, "a", "z").Query, "COPY INTO")
-	var merge = round(true, "m").Query
+	require.Contains(t, round(true, "a", "z").CopyQuery, "COPY INTO")
+	require.Contains(t, round(true).Query, "COPY INTO")
+	var merge = round(false, "m").Query
 	require.Contains(t, merge, "MERGE INTO")
 	require.Contains(t, merge, "l.ID >= 'm' AND l.ID <= 'm'")
 }
