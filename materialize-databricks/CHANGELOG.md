@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-05
+### Changed
+- A MERGE of fewer than 100,000 rows of a binding reads them straight from
+  the staged files, instead of first copying them into a staging table. This
+  saves a query of several seconds from each commit of small batches, more
+  when many bindings commit at once.
+
 ## 2026-11-02
 ### Fixed
 - A load of many bindings no longer runs out of memory, restarting the task,

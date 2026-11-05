@@ -422,6 +422,7 @@ type binding struct {
 	// stagingTable is the Delta table of this transaction's store rows,
 	// relative to rootStagingPath. It's set only when the rows are merged.
 	stagingTable string
+	storeRows    int
 
 	// a binding needs to be merged if there are updates to existing documents
 	// otherwise we just do a direct copy by moving all data from temporary table
@@ -1014,6 +1015,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
+			b.storeRows++
 		}
 
 		if it.Exists {
@@ -1050,7 +1052,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			NeedsMerge:   !b.target.DeltaUpdates && b.needsMerge,
 			round:        it.Round,
 		})
-		b.needsMerge, b.stagingTable = false, "" // reset for next round
+		b.needsMerge, b.stagingTable, b.storeRows = false, "", 0 // reset for next round
 	}
 
 	for binding, boundary := range d.truncations {
@@ -1073,14 +1075,19 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}, nil
 }
 
+// minStagingTableRows is the fewest store rows that are copied into a staging
+// table before their MERGE. Below it, the copies take longer than they save
+// the MERGEs, even with many bindings: their copies queue on the warehouse.
+const minStagingTableRows = 100_000
+
 // copyIntoStagingTable waits for the binding's store files to upload and, if
-// they need a MERGE, copies them into a Delta table. The MERGE reads that table rather than
+// they need a MERGE of many rows, copies them into a Delta table. The MERGE reads that table rather than
 // the JSON files, so Databricks doesn't materialize the files during MERGE time. The table lives
 // in the staging volume by path and isn't registered in the catalog.
 func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, idx int, b *binding) error {
 	if err := b.storeFile.wait(); err != nil {
 		return err
-	} else if b.target.DeltaUpdates || !b.needsMerge {
+	} else if b.target.DeltaUpdates || !b.needsMerge || b.storeRows < minStagingTableRows {
 		return nil
 	}
 
