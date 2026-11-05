@@ -50,6 +50,10 @@ class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState
     backfillComplete: response.BackfillComplete | None = None
 
 
+def serialize_response(message: Response[Any, Any, Any]) -> bytes:
+    return message.model_dump_json(by_alias=True, exclude_unset=True).encode()
+
+
 # Bounds applied to SourcedSchema locations that don't declare their own. They
 # start deliberately tight because inference widens them to fit real data
 # (maxLength and maximum grow, minLength and minimum shrink).
@@ -259,6 +263,10 @@ class _BaseTask:
         self.requires_ack = requires_ack
         self.catalog_task_name = catalog_task_name
 
+    def _write_response(self, message: Response[Any, Any, Any]):
+        self._buffer.write(serialize_response(message))
+        self._buffer.write(b"\n")
+
     def _captured(self, binding: int, document: Any):
         if isinstance(document, dict):
             b = orjson.dumps(
@@ -271,10 +279,8 @@ class _BaseTask:
                 default=orjson_default,
             )
         else:
-            b = (
+            b = serialize_response(
                 Response(captured=response.Captured(binding=binding, doc=document))
-                .model_dump_json(by_alias=True, exclude_unset=True)
-                .encode()
             )
 
         self._buffer.write(b)
@@ -285,18 +291,13 @@ class _BaseTask:
         return self._hasher.digest().hex()
 
     def _sourced_schema(self, binding_index: int, schema: dict[str, Any]):
-        b = (
+        self._write_response(
             Response(
                 sourcedSchema=response.SourcedSchema(
                     binding=binding_index, schema_json=with_sourced_schema_defaults(schema)
                 )
             )
-            .model_dump_json(by_alias=True, exclude_unset=True)
-            .encode()
         )
-
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
 
     def _reset(self):
         self._buffer.truncate(0)
@@ -317,10 +318,7 @@ class _BaseTask:
                 state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
             )
         )
-        self._buffer.write(
-            checkpoint.model_dump_json(by_alias=True, exclude_unset=True).encode()
-        )
-        self._buffer.write(b"\n")
+        self._write_response(checkpoint)
 
         completion = await self.transactor.commit(
             self._buffer, wait_for_ack=self.requires_ack
@@ -405,13 +403,9 @@ class Task(_BaseTask):
             raise RuntimeError(
                 "Implementation error: a BackfillBegin must stand alone in its checkpoint, but this task has buffered output"
             )
-        b = (
+        self._write_response(
             Response(backfillBegin=response.BackfillBegin(binding=binding))
-            .model_dump_json(by_alias=True, exclude_unset=True)
-            .encode()
         )
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
         await self.checkpoint(state)
 
     async def _backfill_complete(
@@ -426,13 +420,9 @@ class Task(_BaseTask):
             raise RuntimeError(
                 "Implementation error: a BackfillComplete must stand alone in its checkpoint, but this task has buffered output"
             )
-        b = (
+        self._write_response(
             Response(backfillComplete=response.BackfillComplete(binding=binding))
-            .model_dump_json(by_alias=True, exclude_unset=True)
-            .encode()
         )
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
         await self.checkpoint(state)
 
     def spawn_child(
