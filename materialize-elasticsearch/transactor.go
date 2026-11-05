@@ -13,6 +13,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/go/retry"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -349,17 +350,26 @@ type docError struct {
 }
 
 func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func(int, json.RawMessage) error) error {
-	res, err := t.client.es.Mget(
-		esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}),
-		t.client.es.Mget.WithContext(ctx),
-	)
-	if err != nil {
+	// Only the request is retried: once results stream into loaded, a repeat
+	// would load documents twice.
+	var res *esapi.Response
+	if err := requestRetry.Do(ctx, "loading documents", func(ctx context.Context) error {
+		r, err := t.client.es.Mget(
+			esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}),
+			t.client.es.Mget.WithContext(ctx),
+		)
+		if err != nil {
+			return &transportError{err}
+		} else if r.IsError() {
+			defer r.Body.Close()
+			return newResponseError(r)
+		}
+		res = r
+		return nil
+	}); err != nil {
 		return fmt.Errorf("loadDocs mGet: %w", err)
 	}
 	defer res.Body.Close()
-	if res.IsError() {
-		return fmt.Errorf("loadDocs mGet error response [%s] %s", res.Status(), res.String())
-	}
 
 	// Stream the results of the request directly into the loaded callback from the response body.
 	dec := json.NewDecoder(res.Body)
@@ -430,8 +440,6 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 	return nil
 }
 
-const maxStoreRetries = 5
-
 // retryableBulkErrorTypes are Elasticsearch per-item error types that are
 // transient and safe to retry by re-sending only the affected items. They show
 // up inside an HTTP 200 bulk response (the request as a whole succeeded), most
@@ -497,7 +505,7 @@ func (b bulkResponse) rowCounts() (inserted, updated, deleted int64) {
 }
 
 // itemError returns the formatted error for the first errored item at one of
-// the given indices, for use when retries are exhausted.
+// the given indices.
 func (b bulkResponse) itemError(idx []int) error {
 	for _, i := range idx {
 		for action, res := range b.Items[i] {
@@ -510,9 +518,8 @@ func (b bulkResponse) itemError(idx []int) error {
 }
 
 // sendBulk submits a single bulk request and returns the parsed per-item
-// response. A non-nil error indicates a transport- or HTTP-level failure (the
-// go-elasticsearch client has already retried those per its RetryOnStatus
-// config); per-item errors are carried in the returned bulkResponse.
+// response. A non-nil error indicates a transport- or HTTP-level failure;
+// per-item errors are carried in the returned bulkResponse.
 func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*bulkResponse, error) {
 	opts := []func(*esapi.BulkRequest){
 		t.client.es.Bulk.WithContext(ctx),
@@ -541,12 +548,12 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 
 	res, err := t.client.es.Bulk(bytes.NewReader(body), opts...)
 	if err != nil {
-		return nil, fmt.Errorf("bulk request submission failed: %w", err)
+		return nil, fmt.Errorf("bulk request submission failed: %w", &transportError{err})
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("bulk request to index %q failed with status %d: %s", index, res.StatusCode, res.String())
+		return nil, newResponseError(res)
 	}
 
 	var parsed bulkResponse
@@ -558,9 +565,8 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 
 func (t *transactor) doStore(ctx context.Context, items [][]byte, binding int, round int) error {
 	b := t.bindings[binding]
-	stats, err := retryBulkStore(ctx, items, maxStoreRetries,
-		func(body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, b.index) },
-		storeRetryDelay,
+	stats, err := storeBulk(ctx, requestRetry, items,
+		func(ctx context.Context, body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, b.index) },
 	)
 	if err != nil {
 		return fmt.Errorf("bulk request to index %q failed: %w", b.index, err)
@@ -569,40 +575,31 @@ func (t *transactor) doStore(ctx context.Context, items [][]byte, binding int, r
 	return nil
 }
 
-// retryBulkStore sends items as a single bulk request and, if any items fail
-// with a retryable per-item error, re-sends only those items after a delay,
-// up to maxAttempts times. Re-sending only the failed items is safe for both
-// standard and delta-updates bindings: a failed item did not land, so it is
-// never duplicated, and items that succeeded are never re-sent. The returned
-// stats tally the items that succeeded across all attempts.
-func retryBulkStore(
+// storeBulk sends items as a single bulk request and, if any items fail with a
+// retryable per-item error, re-sends only those items. A failed item did not
+// land, so re-sending it never duplicates it. The returned stats tally the
+// items that succeeded across all attempts.
+func storeBulk(
 	ctx context.Context,
+	policy retry.Policy,
 	items [][]byte,
-	maxAttempts int,
-	send func(body []byte) (*bulkResponse, error),
-	delay func(ctx context.Context, attempt int) error,
+	send func(ctx context.Context, body []byte) (*bulkResponse, error),
 ) (m.RowStats, error) {
 	pending := items
 	var inserted, updated, deleted int64
-	stats := func() m.RowStats { return m.ExactRowStats(inserted, updated, deleted) }
-	for attempt := 0; ; attempt++ {
-		resp, err := send(bytes.Join(pending, nil))
+	err := policy.Do(ctx, "storing documents", func(ctx context.Context) error {
+		resp, err := send(ctx, bytes.Join(pending, nil))
 		if err != nil {
-			return stats(), err
+			return err
 		}
 		i, u, d := resp.rowCounts()
 		inserted, updated, deleted = inserted+i, updated+u, deleted+d
 
 		terminal, retryableIdx := resp.classify()
 		if terminal != nil {
-			return stats(), terminal
-		}
-		if len(retryableIdx) == 0 {
-			return stats(), nil
-		}
-		if attempt+1 >= maxAttempts {
-			return stats(), fmt.Errorf("%d items still failing after %d attempts: %w",
-				len(retryableIdx), attempt+1, resp.itemError(retryableIdx))
+			return terminal
+		} else if len(retryableIdx) == 0 {
+			return nil
 		}
 
 		next := make([][]byte, len(retryableIdx))
@@ -610,23 +607,7 @@ func retryBulkStore(
 			next[i] = pending[idx]
 		}
 		pending = next
-
-		if err := delay(ctx, attempt); err != nil {
-			return stats(), err
-		}
-	}
-}
-
-// storeRetryDelay waits before re-sending failed bulk items, with exponential
-// backoff capped at 5s, mirroring the go-elasticsearch client's RetryBackoff.
-func storeRetryDelay(ctx context.Context, attempt int) error {
-	d := min(time.Duration(1<<attempt)*time.Second, 5*time.Second)
-	log.WithFields(log.Fields{"attempt": attempt, "delay": d.String()}).
-		Info("waiting to retry bulk items on retryable error")
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(d):
-		return nil
-	}
+		return &bulkItemsError{count: len(retryableIdx), err: resp.itemError(retryableIdx)}
+	})
+	return m.ExactRowStats(inserted, updated, deleted), err
 }

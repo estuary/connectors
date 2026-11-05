@@ -248,7 +248,7 @@ func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 
 // toClient initializes a client for connecting to Elasticsearch, starting the network tunnel if
 // configured.
-func (c config) toClient(disableRetry bool) (*client, error) {
+func (c config) toClient() (*client, error) {
 	endpoint := c.Endpoint
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
@@ -290,18 +290,9 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			// header when it is absent so the product check passes. Genuine
 			// Elasticsearch always sends this header, so its responses are never
 			// modified and the check still validates against it.
-			Transport:     productHeaderInjector{inner: http.DefaultTransport},
-			RetryOnStatus: []int{429, 502, 503, 504},
-			RetryBackoff: func(i int) time.Duration {
-				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
-				log.WithFields(log.Fields{
-					"attempt": i,
-					"delay":   d.String(),
-				}).Info("waiting to retry request on retryable error")
-				return d
-			},
-			MaxRetries:   10,
-			DisableRetry: disableRetry,
+			Transport: productHeaderInjector{inner: http.DefaultTransport},
+			// Requests that are safe to repeat are retried by the caller.
+			DisableRetry: true,
 		},
 	)
 	if err != nil {
@@ -487,12 +478,12 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
-	metaClient, err := cfg.toClient(true)
+	metaClient, err := cfg.toClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata client: %w", err)
 	}
 
-	dataClient, err := cfg.toClient(false)
+	dataClient, err := cfg.toClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating data client: %w", err)
 	}
