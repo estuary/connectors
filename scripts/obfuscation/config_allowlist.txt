@@ -54,6 +54,11 @@ stream_type
 feed
 hardDelete
 hard_delete
+delete_mode
+restore_deleted
+null_values
+unique_conflict
+rejected_records
 delta_updates
 no_flow_document
 disableFieldTruncation
@@ -138,6 +143,7 @@ node_id
 page_size
 search_page_size
 max_batch_size
+requests_per_minute
 max_concurrent_bulk_ops
 incremental_limit
 backfill_limit
