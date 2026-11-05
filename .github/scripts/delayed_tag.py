@@ -155,23 +155,6 @@ def build_safe_plan(
     return safe, held
 
 
-def select_commit_tag(tags: list) -> Optional[str]:
-    """
-    Return the first commit-SHA tag in `tags`, or None.
-
-    CI tags every published image with the 7-char commit SHA (`git rev-parse
-    HEAD | head -c7`), alongside non-commit tags like 'dev', 'delayed', 'local'
-    and ':vN' version tags. A commit tag is exactly 7 lowercase hex chars, which
-    none of the others match (':vN' starts with 'v', 'dev' contains 'v', etc.).
-    """
-    return next((t for t in tags if re.fullmatch(r'[0-9a-f]{7}', t)), None)
-
-
-# current_delayed_commit's result when ':delayed' exists but its commit can't be
-# determined.
-UNRESOLVED = 'unresolved'
-
-
 def filter_backward_moves(
     plan: list,
     current_commit: Callable,
@@ -183,23 +166,20 @@ def filter_backward_moves(
     (forward-delayed-tag.yaml) or otherwise regresses ':delayed'.
 
       current_commit(image_name) -> Optional[str]
-          the commit (sha7) ':delayed' currently points at, None when there is
-          no ':delayed' tag yet, or UNRESOLVED.
+          the commit (sha7) ':delayed' currently points at, or None when it
+          points at none.
       is_ancestor(a, b) -> bool
-          True when commit a is an ancestor of b (a is older-or-equal).
+          True when commit a is an ancestor of, or equal to, b.
 
-    An entry is kept iff there is no ':delayed' yet, or the current commit is
-    an ancestor of (or equal to) its boundary. Anything else is held: a
-    boundary that is older, unrelated in history, or compared against an
-    UNRESOLVED commit could move ':delayed' backward.
+    An entry is kept iff ':delayed' points at no commit, or its commit is an
+    ancestor of (or equal to) the boundary. A boundary that is older or
+    unrelated in history is held.
     Returns (kept, skipped) where skipped is [(entry, current_sha7), ...].
     """
     kept, skipped = [], []
     for e in plan:
         cur = current_commit(e.image_name)
-        if cur is None or cur == e.chosen_sha7:
-            kept.append(e)
-        elif cur != UNRESOLVED and is_ancestor(cur, e.chosen_sha7):
+        if cur is None or is_ancestor(cur, e.chosen_sha7):
             kept.append(e)
         else:
             skipped.append((e, cur))
@@ -585,13 +565,13 @@ def check_is_ancestor(ancestor: str, descendant: str) -> bool:
 
 def inspect_image(ref: str) -> Optional[dict]:
     """
-    Return {'manifest': ..., 'image': ...} for an image ref, from
-    `docker buildx imagetools inspect`, or None when the ref does not exist.
+    Return the image config of an image ref (`.Image` from
+    `docker buildx imagetools inspect`), or None when the ref does not exist.
     Raises RuntimeError on any other failure.
     """
     proc = subprocess.run(
         ['docker', 'buildx', 'imagetools', 'inspect', ref,
-         '--format', '{"manifest": {{json .Manifest}}, "image": {{json .Image}}}'],
+         '--format', '{{json .Image}}'],
         capture_output=True, text=True,
     )
     if proc.returncode != 0:
@@ -616,99 +596,16 @@ def revision_label(image: dict) -> Optional[str]:
     return rev[:7] if re.fullmatch(r'[0-9a-f]{40}', rev) else None
 
 
-def manifest_digests(manifest: dict) -> frozenset:
+def current_delayed_commit(image: str) -> Optional[str]:
     """
-    Return the set of content digests of an inspected manifest: the top-level
-    digest plus every child (platform) manifest digest.
-
-    The nightly and forward workflows both publish ':delayed' via
-    `docker buildx imagetools create`. The deploy action pushes each ':<sha7>'
-    as an index holding the image and its attestations, which imagetools copies
-    as is, so ':delayed' carries the same top-level digest as ':<sha7>'. An
-    older single-arch ':<sha7>' image is instead wrapped in a fresh manifest
-    LIST, whose digest matches no ':<sha7>' tag while its child digest equals
-    the single-arch image. Returning both lets a caller match ':delayed' back
-    to its originating commit regardless of which layer the ':<sha7>' tag sits
-    on.
+    Return the commit (sha7) ':delayed' points at, from the revision label the
+    deploy action sets to the commit it built, or None when there is no
+    ':delayed' tag or it carries no label. Raises RuntimeError when the
+    registry can't be read, so a registry outage fails the guard rather than
+    letting it through.
     """
-    digests = set()
-    top = manifest.get('digest')
-    if top:
-        digests.add(top)
-    for child in manifest.get('manifests') or []:
-        d = child.get('digest')
-        if d:
-            digests.add(d)
-    return frozenset(digests)
-
-
-def _list_package_versions(
-    image: str, owner: str, token: str, page: int,
-) -> list:
-    """One page (newest-first) of an org container package's versions."""
-    url = (
-        f'https://api.github.com/orgs/{owner}/packages/container/{image}'
-        f'/versions?per_page=100&page={page}'
-    )
-    req = urllib.request.Request(url, headers={
-        'Authorization': f'bearer {token}',
-        'Accept': 'application/vnd.github+json',
-    })
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())
-
-
-def current_delayed_commit(
-    image: str, owner: str, token: str, max_pages: int = 10,
-) -> Optional[str]:
-    """
-    Return the commit (sha7) that ':delayed' currently points at, None when
-    there is no ':delayed' tag, or UNRESOLVED when it exists but its commit
-    can't be determined.
-
-    The commit comes from the image's revision label, which the deploy action
-    sets to the commit it built. An image without the label is matched instead
-    by scanning the package's versions (newest-first, up to `max_pages`) for
-    the version carrying one of ':delayed''s digests and reading its
-    commit-SHA tag.
-    """
-    ref = f'ghcr.io/estuary/{image}:delayed'
-    try:
-        inspected = inspect_image(ref)
-    except RuntimeError as exc:
-        print(f'::warning::{image}: could not inspect {ref} ({exc})', file=sys.stderr)
-        return UNRESOLVED
-    if inspected is None:
-        return None
-
-    sha = revision_label(inspected.get('image') or {})
-    if sha:
-        return sha
-
-    digests = manifest_digests(inspected.get('manifest') or {})
-    if not owner or not token:
-        print(f'::warning::{image}: {ref} has no revision label, and GH_TOKEN/owner '
-              'are unavailable to match it to a commit tag', file=sys.stderr)
-        return UNRESOLVED
-    try:
-        for page in range(1, max_pages + 1):
-            versions = _list_package_versions(image, owner, token, page)
-            if not versions:
-                break
-            for v in versions:
-                if v.get('name') not in digests:
-                    continue
-                tags = (v.get('metadata') or {}).get('container', {}).get('tags', [])
-                sha = select_commit_tag(tags)
-                if sha:
-                    return sha
-    except (urllib.error.URLError, KeyError, json.JSONDecodeError) as exc:
-        print(f'::warning::{image}: could not list package versions ({exc})',
-              file=sys.stderr)
-        return UNRESOLVED
-    print(f'::warning::{image}: no commit tag found for {ref} in {max_pages} '
-          'pages of package versions', file=sys.stderr)
-    return UNRESOLVED
+    image = inspect_image(f'ghcr.io/estuary/{image}:delayed')
+    return revision_label(image) if image is not None else None
 
 
 # ---------------------------------------------------------------------------
@@ -1324,16 +1221,13 @@ def cmd_guard(args: argparse.Namespace) -> None:
     to output_safe and the dropped ones to output_skips.
     """
     plan = read_safe_plan(args.plan)
-    gh_repo = os.environ.get('GITHUB_REPOSITORY', args.repo)
-    owner = gh_repo.split('/', 1)[0] if '/' in gh_repo else ''
-    token = os.environ.get('GH_TOKEN', '')
 
     # Resolve each connector's current ':delayed' commit at most once.
     commit_cache: dict = {}
 
     def current_commit(image: str) -> Optional[str]:
         if image not in commit_cache:
-            commit_cache[image] = current_delayed_commit(image, owner, token)
+            commit_cache[image] = current_delayed_commit(image)
         return commit_cache[image]
 
     kept, skipped = filter_backward_moves(plan, current_commit, check_is_ancestor)
@@ -1342,9 +1236,8 @@ def cmd_guard(args: argparse.Namespace) -> None:
     write_skips(skipped, args.output_skips)
 
     for entry, current in skipped:
-        why = ('its current commit is unresolved' if current == UNRESOLVED
-               else f'boundary {entry.chosen_sha7} is not newer')
-        print(f'::warning::{entry.image_name}: holding :delayed at {current}: {why}')
+        print(f'::warning::{entry.image_name}: holding :delayed at {current}: '
+              f'boundary {entry.chosen_sha7} is not newer')
     print(f'Guard: {len(kept)} to tag, {len(skipped)} held to avoid moving backward')
 
 
@@ -1427,7 +1320,6 @@ def main(argv: Optional[list] = None) -> None:
         'guard',
         help="drop plan entries that would move ':delayed' backward",
     )
-    p.add_argument('--repo',         default=os.environ.get('GITHUB_REPOSITORY', ''))
     p.add_argument('--plan',         default='/tmp/safe_plan.tsv')
     p.add_argument('--output-safe',  default='/tmp/final_plan.tsv')
     p.add_argument('--output-skips', default='/tmp/backward_skips.tsv')
