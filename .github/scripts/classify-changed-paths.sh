@@ -2,28 +2,95 @@
 #
 # Work out which connector CI lanes a set of changed paths affects.
 #
-# Reads changed paths on stdin, one per line, and writes three lines to stdout:
+# Reads changed paths on stdin, one per line, and writes four lines to stdout:
 #
-#   python=true|false        a path in the Python lane changed; it can be true
-#                            while python_connectors is [], for a Python
-#                            directory missing from the connector list
-#   go_rust=true|false       the Go & Rust connector workflow must run
+#   cdk=true|false           estuary-cdk's own tests and checks must run
 #   python_connectors=...    the Python connectors to build: `all` when a path
 #                            shared by every one of them changed, otherwise a
 #                            compact JSON list of connector directories
+#   go_connectors=...        the Go connectors to build, in the same form
+#   rust_connectors=...      the Rust connectors to build, in the same form
+#
+# Go connectors are selected by go_connectors.py from the import graph in the
+# file $GO_IMPORT_GRAPH names (see that script). Without one, any change that
+# could affect a Go connector selects all of them.
 #
 # The lane chosen for each path is logged to stderr.
 set -euo pipefail
 
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 
-python=false
-go_rust=false
+cdk=false
 
 # Set when a changed path feeds every Python connector. Otherwise only the
 # connector directories collected in $python_dirs are affected.
 python_all=false
 python_dirs=()
+
+# Likewise for the Go connectors, whose candidate paths go to go_connectors.py
+# once they're all collected.
+go_all=false
+go_paths=()
+
+# Likewise for the Rust connectors.
+rust_all=false
+rust_dirs=()
+rust_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT/.github/rust-connectors.yaml")
+
+# Every connector directory, from all three lanes' lists.
+all_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT"/.github/{python,go,rust}-connectors.yaml)
+
+# Which Rust connectors a path in the Go & Rust lane affects. A Rust
+# connector's image is built only from its own directory and base-image, so
+# path rules are enough. Anything they don't recognise builds every one.
+rust_select() {
+    local path=$1 top=${1%%/*} sub name
+    case "$path" in
+        # The workflow, its list, and the classifier that decides for it.
+        .github/workflows/rust.yaml | .github/rust-connectors.yaml | \
+        .github/scripts/classify-changed-paths.sh | .github/scripts/test_classify_changed_paths.py | \
+        base-image/*)
+            rust_all=true; return ;;
+        # Other workflows, CI scripts and connector lists build no Rust connector.
+        .github/workflows/* | .github/scripts/* | .github/*-connectors.yaml) return ;;
+        # Go's module files, and the Rust crate only source-mongodb builds.
+        go.mod | go.sum | bson-transcoder/*) return ;;
+        # The catalog sanitization scripts, which people run by hand.
+        scripts/obfuscation/*) return ;;
+        # The shared materialization tests run for every materialize-* connector.
+        tests/materialize/*)
+            for name in $rust_connectors; do
+                case "$name" in materialize-*) rust_dirs+=("$name") ;; esac
+            done
+            return ;;
+    esac
+
+    if [ "$top" != "$path" ] && grep -qxF "$top" <<< "$rust_connectors"; then
+        rust_dirs+=("$top"); return
+    fi
+
+    # A connector's own test fixtures, or shared test tooling.
+    case "$path" in
+        tests/*)
+            sub=${path#tests/}; sub=${sub%%/*}
+            if grep -qxF "$sub" <<< "$rust_connectors"; then
+                rust_dirs+=("$sub")
+            else
+                rust_all=true
+            fi
+            return ;;
+    esac
+
+    # Go code, which no Rust connector builds from: a .go file, or anything in
+    # a top-level directory holding Go code, such as a Go connector.
+    if [[ "$path" == *.go ]] ||
+       { [ "$top" != "$path" ] && [ -n "$(find "$REPO_ROOT/$top" -name '*.go' -print -quit 2>/dev/null)" ]; }; then
+        return
+    fi
+
+    rust_all=true
+}
 
 # Read stdin up front so it can be scanned before classifying. Deleting a
 # connector takes its pyproject.toml off disk, so the changed paths are the only
@@ -43,22 +110,35 @@ while IFS= read -r path || [ -n "$path" ]; do
     lane=""
     case "$path" in
         # Documentation and agent tooling build nothing.
-        *.md | docs/* | .claude/*) lane="none" ;;
+        docs/* | .claude/*) lane="none" ;;
+        # Except a connector's own docs, such as its README or CHANGELOG. A
+        # change to them says the connector changed, so they build it like
+        # any other file in its directory.
+        *.md)
+            if ! grep -qxF "${path%%/*}" <<< "$all_connectors"; then
+                lane="none"
+            fi
+            ;;
 
         # Each workflow is triggered by edits to itself so a change to one
         # verifies itself rather than waiting on an unrelated connector edit.
-        # estuary-cdk.yaml drives its own separate workflow, and
-        # python-auto-rerun.yaml only re-runs python.yaml's failed jobs.
+        # connectors-auto-rerun.yaml only re-runs the connector workflows' failed jobs.
         .github/workflows/python.yaml) lane="python" ;;
-        .github/workflows/ci.yaml) lane="go_rust" ;;
-        .github/workflows/estuary-cdk.yaml) lane="none" ;;
-        .github/workflows/python-auto-rerun.yaml) lane="none" ;;
-        # The shared ruff config only feeds report-only lint steps, so it
-        # builds nothing. estuary-cdk.yaml lints the CDK when it changes.
-        ruff.toml) lane="none" ;;
+        .github/workflows/go.yaml) lane="go_rust" ;;
+        .github/workflows/rust.yaml) lane="go_rust" ;;
+        .github/workflows/connectors-auto-rerun.yaml) lane="none" ;;
+        # The shared ruff config builds no connector, since connector lint only
+        # reports, but estuary-cdk's lint gates on it.
+        ruff.toml) lane="none"; cdk=true ;;
 
         # The Python connector matrix, which python.yaml reads as data.
         .github/python-connectors.yaml) lane="python" ;;
+
+        # The uv workspace resolves every member from these two files, so a
+        # change to either reaches every Python connector. They are named here
+        # because the directory heuristic below only looks at a path's first
+        # segment, and theirs is the file itself.
+        uv.lock | pyproject.toml) lane="python" ;;
 
         # Shared build plumbing that both workflows invoke. Both workflows also
         # build images with the repo root as the Docker context, so the root
@@ -95,29 +175,38 @@ while IFS= read -r path || [ -n "$path" ]; do
 
     case "$lane" in
         python)
-            python=true
             case "$path" in
                 # The CDK (and the Dockerfiles connectors symlink to), the
-                # workflow and its connector list feed every Python connector.
-                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml)
+                # workflow and its connector list, and the workspace manifest
+                # and lock, feed every Python connector.
+                estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml | uv.lock | pyproject.toml)
                     python_all=true ;;
                 *) python_dirs+=("${path%%/*}") ;;
             esac
             ;;
-        go_rust) go_rust=true ;;
+        go_rust)
+            go_paths+=("$path")
+            rust_select "$path"
+            ;;
         both)
-            # Anything shared by both lanes is shared by every Python connector.
-            python=true
+            # Anything shared by both lanes is shared by every connector.
             python_all=true
-            go_rust=true
+            go_all=true
+            rust_all=true
             ;;
     esac
 
     echo "  ${lane}: ${path}" >&2
 done <<< "$input"
 
-echo "python=${python}"
-echo "go_rust=${go_rust}"
+# A change that rebuilds every Python connector also runs estuary-cdk's checks.
+# That covers the CDK itself, the workspace manifest and lock, and python.yaml,
+# and the few other paths it sweeps in cost little next to the full rebuild.
+if [ "$python_all" = true ]; then
+    cdk=true
+fi
+
+echo "cdk=${cdk}"
 if [ "$python_all" = true ]; then
     echo "python_connectors=all"
 else
@@ -125,4 +214,26 @@ else
     # under `set -u`.
     jq -cn '$ARGS.positional | unique' --args ${python_dirs[@]+"${python_dirs[@]}"} |
         sed 's/^/python_connectors=/'
+fi
+if [ "$go_all" = true ]; then
+    echo "go_connectors=all"
+elif [ "${#go_paths[@]}" -eq 0 ]; then
+    echo "go_connectors=[]"
+elif [ -z "${GO_IMPORT_GRAPH:-}" ]; then
+    echo "  no import graph; every Go connector" >&2
+    echo "go_connectors=all"
+elif ! go_connectors=$(printf '%s\n' "${go_paths[@]}" |
+        python3 -I "$SCRIPT_DIR/go_connectors.py" --graph "$GO_IMPORT_GRAPH" \
+            --connectors "$REPO_ROOT/.github/go-connectors.yaml" \
+            --rust-connectors "$REPO_ROOT/.github/rust-connectors.yaml"); then
+    echo "  go_connectors.py failed; every Go connector" >&2
+    echo "go_connectors=all"
+else
+    echo "go_connectors=${go_connectors}"
+fi
+if [ "$rust_all" = true ]; then
+    echo "rust_connectors=all"
+else
+    jq -cn '$ARGS.positional | unique' --args ${rust_dirs[@]+"${rust_dirs[@]}"} |
+        sed 's/^/rust_connectors=/'
 fi

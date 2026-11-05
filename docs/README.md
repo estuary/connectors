@@ -30,12 +30,47 @@ The Docusaurus site that hosts these pages lives in
 [`estuary/docs`](https://github.com/estuary/docs), which sources this
 directory via git submodule.
 
+### Deprecating a connector page
+
+When a newer connector replaces an old one that customers still run, keep
+the old page and mark it deprecated:
+
+1. Add a `:::deprecated` admonition near the top that links to the
+   replacement connector.
+2. Add `(deprecated)` to the H1 and to the front matter `title:`. Without
+   `title:`, the sidebar shows the file name.
+3. Set the front matter `description:` to say the connector is deprecated
+   and name the replacement.
+4. Add this block below the front matter. It removes the page from search
+   results and from `sitemap.xml`, and the URL keeps working. Front matter
+   `noindex: true` does nothing.
+
+   ```html
+   <head>
+     <meta name="robots" content="noindex, follow" />
+   </head>
+   ```
+
+5. Add `(deprecated)` to the connector's title in the web app (the `title`
+   column of the control-plane `connectors` table).
+6. When no paying customer has an enabled task on the connector, remove the
+   page as the next section describes. Ask the Solutions team to check usage.
+
 ### Removing or renaming a connector page
 
 The docs site is rebuilt from this directory, so deleting a `.md` file here
-removes the page from the site. To avoid a broken URL, add a redirect in
-[`redirects.yaml`](redirects.yaml) in the **same PR** as the removal or
-rename. The site build reads that file and emits a redirect from the old
-URL to whatever you point it at (a replacement connector, or the connector
-category index).
+removes the page from the site. In the **same PR** as the removal or rename:
+
+1. Add a redirect in [`redirects.yaml`](redirects.yaml). The site build reads
+   that file and emits a redirect from the old URL to whatever you point it
+   at (a replacement connector, or the connector category index).
+2. Fix links to the old page. Search this directory and
+   [`estuary/docs`](https://github.com/estuary/docs) for the file name and
+   the URL path, then update or remove each link. The category indexes
+   (`capture-connectors/README.md`, `materialization-connectors/README.md`)
+   and sibling pages that point to each other often link to it.
+
+   ```sh
+   grep -rnE 'old-page(\.md|/)' docs/reference
+   ```
 

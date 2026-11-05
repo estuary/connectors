@@ -1,0 +1,114 @@
+info:
+  name: parent apps includeNonDeleted
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/apps?limit=200&includeNonDeleted=true"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: includeNonDeleted
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/listApplications
+
+  **WHY:** Silent-data-loss audit of the parent drain. The spec documents
+  `includeNonDeleted` (default `false`) as "include non-active, but not deleted apps",
+  so the default listing may hide INACTIVE apps — and with them every user still
+  assigned to one. Compare against `Application users / parent apps`.
+
+  **VERIFIED (2026-10-07):** refuted — the default listing already returns the 2
+  INACTIVE apps; `includeNonDeleted=true` returns the same 9 apps. The connector
+  sends `includeNonDeleted=true` anyway, since the spec documents the default as
+  excluding non-active apps even though the observed default lists them.
+
+  **DOCUMENTED (2026-10-07):** deleted apps are excluded either way ("include
+  non-active, but not deleted apps" — `listApplications` in
+  https://raw.githubusercontent.com/okta/okta-management-openapi-spec/master/dist/current/management-oneOfInheritance.yaml).
+
+examples:
+  - name: "200 \u2014 same 9 apps as the default listing (projection: id/label/status/signOnMode)"
+    request:
+      url: "{{base_url}}/apps?limit=200&includeNonDeleted=true"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps?limit=200>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zmw7qZJAJpl698",
+              "label": "Okta Admin Console",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa176zmw8iMaksJz698",
+              "label": "Okta Dashboard",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa176zmwamcqJF5N698",
+              "label": "Okta Browser Plugin",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa176zrvqhR5udPy698",
+              "label": "Okta OIN Submission Tester",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa176zuoqmvHWXNq698",
+              "label": "Okta Access Certification Reviews",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa176zvegnWi4f8y698",
+              "label": "Okta Workflows",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa176zvem7OQnQlX698",
+              "label": "Okta Workflows OAuth",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT"
+            },
+            {
+              "id": "0oa18guruj0FfvFkL698",
+              "label": "estuary-members-bookmark",
+              "status": "INACTIVE",
+              "signOnMode": "BOOKMARK"
+            },
+            {
+              "id": "0oa18gus6s1DyA92Z698",
+              "label": "Estuary Seed Bookmark (inactive)",
+              "status": "INACTIVE",
+              "signOnMode": "BOOKMARK"
+            }
+          ]

@@ -1,0 +1,36 @@
+info:
+  name: Add User C to Group
+  type: http
+  seq: 31
+
+http:
+  method: PUT
+  url: "{{base_url}}/groups/{{members_seed_group_id}}/users/{{members_seed_user_c_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_group_id')) await bru.runRequest('Group members/parent groups');
+        if (!bru.getVar('members_seed_group_id')) bru.setVar('members_seed_group_id', bru.getVar('group_id'));
+        if (!bru.getVar('members_seed_user_c_id')) await bru.runRequest('Seeding/Create Member User C');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/assignUserToGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** adds User C to `estuary-members-group`. Run twice in the sequence: once before
+  `Seeding / Remove User C from Group` and again before `Seeding / Deactivate Member User C`,
+  so the hard delete happens while C is still a member. The group id falls back to the
+  existing fixture found by `Group members / parent groups` (it prefers `estuary-members-group`).
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

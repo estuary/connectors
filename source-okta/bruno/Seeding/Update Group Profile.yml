@@ -1,0 +1,53 @@
+info:
+  name: Update Group Profile
+  type: http
+  seq: 7
+
+http:
+  method: PUT
+  url: "{{base_url}}/groups/{{seed_group_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "name": "estuary-updated-group",
+          "description": "Estuary connector test fixture (updated cluster) - profile edited"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // An env-var pin (`--env-var seed_group_id=…`) targets the existing fixture
+        // from a later session; without either, seed a fresh group first.
+        if (!bru.getVar('seed_group_id') && !bru.getEnvVar('seed_group_id')) {
+          await bru.runRequest('Seeding/Create Group');
+        }
+        // Stamp the description so every run is a real change and bumps lastUpdated.
+        const body = req.getBody();
+        body.profile.description = `Estuary connector test fixture (updated cluster) - edited ${new Date().toISOString()}`;
+        req.setBody(body);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Replace a group](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/replaceGroup)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** a profile edit. It should bump the group's `lastUpdated` past its
+  `lastMembershipUpdated`, which separates the two fields in time for
+  `Groups / cursor filter`. It is reused (with the env-var pin) by
+  `Groups / after fallout probe` to move the anchor group out of a filter
+  mid-walk.
+
+  **Outcome:** ran 2026-10-07, twice: `lastUpdated` moved to 16:20:31 and then to
+  16:25:58, with `lastMembershipUpdated` unchanged both times. VERIFIED in
+  `Groups / cursor filter` and `Groups / after fallout probe`.

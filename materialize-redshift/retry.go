@@ -23,8 +23,8 @@ var retriableErrors = []pgErrorMatch{
 }
 
 func isRetriable(err error) bool {
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
+	var pgErr, ok = errors.AsType[*pgconn.PgError](err)
+	if !ok {
 		return false
 	}
 	for _, m := range retriableErrors {

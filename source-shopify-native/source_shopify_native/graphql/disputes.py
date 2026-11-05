@@ -171,7 +171,7 @@ class Disputes(ShopifyGraphQLResource):
     ]
 
     def get_cursor_value(self) -> AwareDatetime:
-        raw_value = getattr(self, "initiatedAt")
+        raw_value = self.initiatedAt
 
         if isinstance(raw_value, str):
             return str_to_dt(raw_value)

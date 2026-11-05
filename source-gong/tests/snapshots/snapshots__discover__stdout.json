@@ -75,6 +75,9 @@
     },
     "key": [
       "/callId"
+    ],
+    "resourcePath": [
+      "call_transcripts"
     ]
   },
   {
@@ -153,6 +156,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "calls"
     ]
   },
   {
@@ -245,6 +251,9 @@
     },
     "key": [
       "/metaData/id"
+    ],
+    "resourcePath": [
+      "extensive_calls"
     ]
   },
   {
@@ -316,6 +325,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "scorecard_definitions"
     ]
   },
   {
@@ -394,6 +406,9 @@
     },
     "key": [
       "/scorecardId"
+    ],
+    "resourcePath": [
+      "scorecards"
     ]
   },
   {
@@ -473,6 +488,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

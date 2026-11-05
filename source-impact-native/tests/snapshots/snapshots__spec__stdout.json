@@ -8,9 +8,6 @@
             "credentials_title": {
               "const": "Username & Password",
               "default": "Username & Password",
-              "enum": [
-                "Username & Password"
-              ],
               "title": "Credentials Title",
               "type": "string"
             },
@@ -44,19 +41,11 @@
       "additionalProperties": true,
       "properties": {
         "credentials": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/BasicAuth"
-            }
-          ],
+          "$ref": "#/$defs/BasicAuth",
           "title": "API Key"
         },
         "api_catalog": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/CatalogEnum"
-            }
-          ],
+          "$ref": "#/$defs/CatalogEnum",
           "description": "As of now, only BRAND catalogs are allowed",
           "title": "API Catalog (Brand, Agency, Partner)"
         },
@@ -81,6 +70,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {

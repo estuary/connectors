@@ -247,6 +247,10 @@
   type: capture
   version: v1
   usage_rate: "1.0"
+- name: source-aircall-native
+  type: capture
+  version: v1
+  usage_rate: "1.0"
 - name: source-smartsheet
   type: capture
   version: v1
@@ -260,6 +264,30 @@
   version: v2
   usage_rate: "1.0"
 - name: source-commercetools
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-estuary
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-aws-cost-explorer
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-pylon
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-okta
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-tiktok-ads-native
+  type: capture
+  version: v1
+  usage_rate: "1.0"
+- name: source-bing-ads-native
   type: capture
   version: v1
   usage_rate: "1.0"

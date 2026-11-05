@@ -1,0 +1,65 @@
+info:
+  name: limit 1 page
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/apps/{{app_id}}/users?limit=1"
+  params:
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('app_id')) await bru.runRequest('Application users/parent apps');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/#pagination
+
+  **WHY:** Pagination contract below the cap: with more assignments than `limit`,
+  the response must carry `Link: <…after=…>; rel="next"`; the last page must carry
+  no next link.
+
+  **VERIFIED (2026-10-07):** `limit=1` over 2 assignments returns 1 row and
+  `Link: <…?after=0ua…&limit=1>; rel="next"`; the `limit=500` request
+  (`Application users / bare`) returns only `rel="self"`. The `after` token is an
+  opaque app-user id (`0ua…`) — followed within one sweep only, never checkpointed,
+  so `GATE-OPAQUE-CURSOR` does not apply.
+
+examples:
+  - name: "200 \u2014 limit=1 of 2, rel=next present (projection: id/scope/status/app href)"
+    request:
+      url: "{{base_url}}/apps/0oa18guruj0FfvFkL698/users?limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698/users?limit=1>; rel=\"self\", <https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698/users?after=0ua18gust39xBX866698&limit=1>; rel=\"next\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "scope": "USER",
+              "status": "ACTIVE",
+              "_links.app.href": "https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698"
+            }
+          ]

@@ -1,0 +1,26 @@
+info:
+  name: Ad Report Daily (default report)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["ad_id","stat_time_day"]&metrics=["spend","impressions","clicks","ctr","cpc","cpm","reach","frequency","conversion","cost_per_conversion","conversion_rate","video_play_actions","video_watched_2s","video_watched_6s","likes","comments","shares","follows","profile_visits"]&page=1&page_size=1000&start_date=2026-09-14&end_date=2026-10-13&filtering=[{"field_name":"ad_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** the connector's one default report exactly as it requests it: BASIC, ad level, daily, its 19 metrics, a full 30-day window, and the include-deleted filter.
+
+  **VERIFIED (2026-10-13, sandbox):** `code 0`, accepted with all 19 metrics, the full 30-day window and the `ad_status` include-deleted filter; no rows (sandbox ads are never delivered).
+  **PENDING:** row shape, metric value formats and the `stat_time_day` format, which need delivered ads.
+
+  **DOCUMENTED:** rows are unsorted unless `order_field` is set ("Not sorting by default"), and only metrics can be sorted on. The connector sends no `order_field`, since sorting by a metric that changes between requests could shift rows across pages.

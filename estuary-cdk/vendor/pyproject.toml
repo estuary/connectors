@@ -1,0 +1,32 @@
+[project]
+name = "estuary-cdk-airbyte-shim"
+# Never published and never pinned; the number is inert.
+version = "0.0.0"
+description = "Vendored Airbyte CDK subset backing estuary_cdk.shim_airbyte_cdk"
+authors = [
+    { name = "Joseph Shearer", email = "joseph@estuary.dev" },
+    { name = "Johnny Graettinger", email = "johnny@estuary.dev" },
+]
+# Matches estuary-cdk's floor: this is only ever installed alongside it.
+requires-python = ">=3.11,<4.0"
+# The fork's own constraints, not `airbyte-cdk` 0.52.10's. The major bounds are
+# there because the fork is never re-synced upstream, so a breaking major has to
+# be absorbed by editing this tree by hand.
+dependencies = [
+    "backoff",
+    "dpath>=2.1,<3.0",
+    "jsonref>=1.1,<2.0",
+    "jsonschema>=4,<5",
+    "pendulum>=3,<4",
+    "pydantic>=2.12,<3",
+    "PyYAML>=6.0.1",
+    "requests",
+    "requests-cache",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["airbyte_cdk", "airbyte_protocol"]
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

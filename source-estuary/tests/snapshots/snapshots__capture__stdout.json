@@ -1,0 +1,136 @@
+{
+  "acmeCo/alert_configs": [
+    "_meta",
+    "catalogPrefixOrName",
+    "config",
+    "createdAt",
+    "detail",
+    "id",
+    "lastModifiedBy",
+    "updatedAt"
+  ],
+  "acmeCo/alert_subscriptions": [
+    "_meta",
+    "alertTypes",
+    "catalogPrefix",
+    "createdAt",
+    "destination",
+    "detail",
+    "email",
+    "updatedAt"
+  ],
+  "acmeCo/alerts": [
+    "_meta",
+    "alertType",
+    "arguments",
+    "catalogName",
+    "firedAt",
+    "resolvedArguments",
+    "resolvedAt"
+  ],
+  "acmeCo/catalog_stats_daily": [
+    "_meta",
+    "catalogName",
+    "grain",
+    "statsSummary",
+    "taskStats",
+    "timestamp"
+  ],
+  "acmeCo/catalog_stats_hourly": [
+    "_meta",
+    "catalogName",
+    "grain",
+    "statsSummary",
+    "taskStats",
+    "timestamp"
+  ],
+  "acmeCo/catalog_stats_monthly": [
+    "_meta",
+    "catalogName",
+    "grain",
+    "statsSummary",
+    "taskStats",
+    "timestamp"
+  ],
+  "acmeCo/connectors": [
+    "_meta",
+    "createdAt",
+    "defaultImageTag",
+    "detail",
+    "externalUrl",
+    "id",
+    "imageName",
+    "logoUrl",
+    "protocol",
+    "recommended",
+    "title"
+  ],
+  "acmeCo/data_planes": [
+    "_meta",
+    "awsIamUserArn",
+    "azureApplicationClientId",
+    "azureApplicationName",
+    "cidrBlocks",
+    "closed",
+    "cloudProvider",
+    "fqdn",
+    "gcpServiceAccountEmail",
+    "id",
+    "isPublic",
+    "name",
+    "reactorAddress",
+    "region",
+    "tag"
+  ],
+  "acmeCo/invoices": [
+    "_meta",
+    "dateEnd",
+    "dateStart",
+    "extra",
+    "invoiceType",
+    "lineItems",
+    "subtotal",
+    "tenant"
+  ],
+  "acmeCo/live_specs": [
+    "_meta",
+    "catalogName",
+    "catalogType",
+    "createdAt",
+    "dataPlaneId",
+    "isDisabled",
+    "lastBuildId",
+    "lastPubId",
+    "liveSpecId",
+    "readsFrom",
+    "sourceCapture",
+    "updatedAt",
+    "writesTo"
+  ],
+  "acmeCo/publication_history": [
+    "_meta",
+    "catalogName",
+    "catalogType",
+    "detail",
+    "publicationId",
+    "publishedAt",
+    "userEmail",
+    "userFullName",
+    "userId"
+  ],
+  "acmeCo/storage_mappings": [
+    "_meta",
+    "catalogPrefix",
+    "dataPlanes",
+    "detail",
+    "fragmentStores"
+  ],
+  "acmeCo/task_status": [
+    "_meta",
+    "catalogName",
+    "connector",
+    "controller",
+    "summary",
+    "type"
+  ]
+}

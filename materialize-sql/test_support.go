@@ -50,6 +50,20 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	testutil.RunMaterializationTest(t, driver.NewMaterializer, source, makeResourceFn, actionDescSanitizers, runtime)
 }
 
+// PrepareTestTask renames a task and its resources for one test run. See the
+// testutil function of the same name.
+func PrepareTestTask[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	bundled []byte,
+	taskName string,
+	cfg EC,
+	makeResourceFn func(string, bool) RC,
+) testutil.TestTask {
+	t.Helper()
+	return testutil.PrepareTestTask(t, driver.NewMaterializer, bundled, taskName, cfg, makeResourceFn)
+}
+
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
 	driver *Driver[EC, RC],
@@ -188,6 +202,8 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 	createTableTpl *template.Template,
 	updateFence func(context.Context, Client, Fence) error,
 ) {
+	testutil.SkipRuntimeV1(t)
+
 	// runTest takes zero or more key range fixtures, followed by a final pair
 	// which is the key range under test.
 	var runTest = func(t *testing.T, taskName string, cfg EC, ranges ...uint32) {
@@ -640,8 +656,15 @@ func compareValues(a, b any) int {
 		}
 	}
 
-	sa := fmt.Sprintf("%v", a)
-	sb := fmt.Sprintf("%v", b)
+	// A json.RawMessage is compared by its byte slice formatting, which is how
+	// fmt printed it before Go 1.27 made it a fmt.Stringer. This keeps the row
+	// order of existing snapshots.
+	fmtValue := func(v any) string {
+		if raw, ok := v.(json.RawMessage); ok {
+			return fmt.Sprintf("%v", []byte(raw))
+		}
+		return fmt.Sprintf("%v", v)
+	}
 
-	return cmp.Compare(sa, sb)
+	return cmp.Compare(fmtValue(a), fmtValue(b))
 }

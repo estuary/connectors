@@ -1,5 +1,3 @@
-import estuary_cdk.pydantic_polyfill  # Must be first.
-
 import asyncio
 import json
 

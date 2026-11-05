@@ -80,6 +80,9 @@
     "key": [
       "/Date",
       "/Package Name"
+    ],
+    "resourcePath": [
+      "crashes"
     ]
   },
   {
@@ -163,6 +166,9 @@
     "key": [
       "/Date",
       "/Package Name"
+    ],
+    "resourcePath": [
+      "installs"
     ]
   },
   {
@@ -264,6 +270,9 @@
       "/Package Name",
       "/Row Number",
       "/Year"
+    ],
+    "resourcePath": [
+      "reviews"
     ]
   }
 ]

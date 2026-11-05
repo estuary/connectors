@@ -34,7 +34,7 @@ def test_profiles_normalizes_space_separated_datetimes():
         }
     )
 
-    properties = getattr(profile.attributes, "properties")
+    properties = profile.attributes.properties
     assert properties["$consent_timestamp"] == "2026-06-23T00:15:23.918411+00:00"
     assert properties["custom_signup_date"] == "2026-06-23T00:15:23+00:00"
     assert properties["favorite_month"] == "May 5, 2021"
@@ -42,7 +42,7 @@ def test_profiles_normalizes_space_separated_datetimes():
     assert properties["notes"] == "2026-06-23 00:15:23+00:00\n"
     assert properties["tags"] == ["2026-06-23T00:15:23+00:00", "plain tag"]
 
-    subscriptions = getattr(profile.attributes, "subscriptions")
+    subscriptions = profile.attributes.subscriptions
     assert (
         subscriptions["email"]["marketing"]["consent_timestamp"]
         == "2026-06-23T00:15:23.918411+00:00"
@@ -65,12 +65,12 @@ def test_events_normalizes_datetime_cursor_and_keeps_transform():
         }
     )
 
-    assert getattr(event.attributes, "datetime") == "2026-06-23T00:15:23+00:00"
-    assert getattr(event.attributes, "event_properties")["Last Opened"] == (
+    assert event.attributes.datetime == "2026-06-23T00:15:23+00:00"
+    assert event.attributes.event_properties["Last Opened"] == (
         "2026-06-23T00:15:23.918411+00:00"
     )
     # The pre-existing Events validator that hoists flow/campaign ids must still run.
-    assert getattr(event, "flow_id") == "FLOW_ID"
+    assert event.flow_id == "FLOW_ID"
 
 
 def test_full_refresh_stream_normalizes_space_separated_datetimes():
@@ -85,4 +85,4 @@ def test_full_refresh_stream_normalizes_space_separated_datetimes():
         }
     )
 
-    assert getattr(metric, "attributes")["created"] == "2026-06-23T00:15:23+00:00"
+    assert metric.attributes["created"] == "2026-06-23T00:15:23+00:00"

@@ -20,7 +20,7 @@ const (
 )
 
 type binding struct {
-	object     CRMObject
+	object     ObjectTypeID
 	path       []string
 	properties map[string]*Property
 	idProperty *Property

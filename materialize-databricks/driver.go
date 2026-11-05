@@ -14,8 +14,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
@@ -45,6 +48,17 @@ const deleteConcurrency = 16
 
 // maxConcurrentCommits is how many bindings commit at once.
 const maxConcurrentCommits = 5
+
+// maxConcurrentLoads is how many bindings' load queries run at once.
+const maxConcurrentLoads = 5
+
+// maxDownloadThreads is how many result files a query downloads ahead and
+// holds in memory, so concurrent loads together hold no more than the driver's
+// default of 10 for a single query.
+const maxDownloadThreads = 2
+
+// maxBoundRanges is the most ranges a date-time key's merge bound splits into.
+const maxBoundRanges = 8
 
 const sweepAge = 24 * time.Hour
 
@@ -168,6 +182,17 @@ type transactor struct {
 	stagingPrefix         string
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
+	profiler              *boilerplate.QueryProfiler
+	// twoPhaseLoads uses two queries to prune files: one that finds files
+	// where the rows matching the keys exist on, and another to read
+	// flow_document from those specific files.
+	twoPhaseLoads bool
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging by Store.
+	truncations map[int]time.Time
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -320,7 +345,10 @@ func newTransactor(
 		be:                    be,
 		ep:                    ep,
 		templates:             renderTemplates(ep.Dialect),
+		materializationName:   materializationName,
 		stagingPrefix:         stagingPrefix(materializationName),
+		twoPhaseLoads:         featureFlags["two_phase_loads"],
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 	db, err := d.openDB()
 	if err != nil {
@@ -359,6 +387,7 @@ func newTransactor(
 	} else {
 		d.localStagingPath = tempDir
 	}
+	d.profiler = newQueryProfiler(wsClient.QueryHistory, d.bindings)
 
 	return d, nil
 }
@@ -374,6 +403,11 @@ func (t *transactor) openDB() (*stdsql.DB, error) {
 type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
+
+	// truncateSQL deletes rows published before a backfill's boundary, with
+	// %s for the boundary literal. Empty if the binding excludes
+	// flow_published_at and so cannot be truncated.
+	truncateSQL string
 
 	// path to where we store staging files
 	rootStagingPath string
@@ -399,11 +433,19 @@ type binding struct {
 	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
+// isTimestampColumn reports whether a date-time key is a TIMESTAMP column,
+// which parses any RFC3339 form of a bound literal to the same instant. A
+// STRING column, which datetime_keys_as_string selects, compares values as
+// text, where equal instants in different forms don't sort together.
+func isTimestampColumn(col sql.Column) bool {
+	return col.BareDDL == "TIMESTAMP"
+}
+
 func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
@@ -420,8 +462,12 @@ func (t *transactor) addBinding(target sql.Table) error {
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
-	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
-	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
+	}
 
 	t.bindings = append(t.bindings, b)
 
@@ -436,8 +482,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	defer db.Close()
 
+	var profile = d.profiler.NewProfile()
 	for it.Next() {
 		var b = d.bindings[it.Binding]
+		profile.AddKeys(it.Binding, 1)
 
 		if err := b.loadFile.start(ctx, db); err != nil {
 			return fmt.Errorf("starting load file: %w", err)
@@ -452,8 +500,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	// Copy the staged files in parallel
-	var queries []string
+	var loadTemplate = d.templates.loadQuery
+	if d.cfg.Advanced.NoFlowDocument {
+		loadTemplate = d.templates.loadQueryNoFlowDocument
+	}
+
+	var loads []bindingLoad
 	var toDelete []string
 	for idx, b := range d.bindings {
 		if !b.loadFile.started {
@@ -464,17 +516,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
 
-		var loadTemplate = d.templates.loadQuery
-		if d.cfg.Advanced.NoFlowDocument {
-			loadTemplate = d.templates.loadQueryNoFlowDocument
-		}
-
-		if loadQuery, err := RenderTableWithStaged(b.target, []string{b.loadFile.remoteDir()}, nil, b.loadSchema, loadTemplate, b.loadMergeBounds.Build()); err != nil {
-			return fmt.Errorf("loadQuery template: %w", err)
-		} else {
-			queries = append(queries, loadQuery)
-			toDelete = append(toDelete, b.loadFile.remoteDir())
-		}
+		var bounds = b.loadMergeBounds.Build()
+		profile.SetBounds(idx, bounds)
+		loads = append(loads, bindingLoad{
+			binding: idx,
+			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
+		})
+		toDelete = append(toDelete, b.loadFile.remoteDir())
 	}
 	defer d.cleanUp(ctx, toDelete, nil)
 
@@ -482,42 +530,186 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	if len(queries) > 0 {
-		// Issue a union join of the target tables and their (now staged) load keys,
-		// and send results to the |loaded| callback.
-		d.be.StartedEvaluatingLoads()
-		var unionQuery = strings.Join(queries, "\nUNION ALL\n")
-		rows, err := db.QueryContext(ctx, unionQuery)
-		if err != nil {
-			return fmt.Errorf("querying Load documents: %w", err)
-		}
-		defer rows.Close()
-		d.be.FinishedEvaluatingLoads()
-
-		for rows.Next() {
-			var binding int
-			var document string
-
-			if err = rows.Scan(&binding, &document); err != nil {
-				return fmt.Errorf("scanning Load document: %w", err)
-			} else if binding > -1 {
-				doc := json.RawMessage([]byte(document))
-				if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
-					if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
-						return fmt.Errorf("stripping null fields: %w", err)
-					}
-				}
-				if err = loaded(binding, doc); err != nil {
-					return err
-				}
-			}
-		}
-
-		if err = rows.Err(); err != nil {
-			return fmt.Errorf("querying Loads: %w", err)
-		}
+	if len(loads) == 0 {
+		return nil
 	}
 
+	// Each binding's join of its target table and (now staged) load keys runs
+	// as its own query, so the warehouse can run them at once. One goroutine
+	// sends their documents, since Loaded responses are written in sequence.
+	var loadCtx, cancel = context.WithCancel(ctx)
+	defer cancel()
+	var docs = make(chan loadedDoc)
+	var sendErr = make(chan error, 1)
+	go func() {
+		var err = d.sendLoaded(docs, loaded)
+		if err != nil {
+			cancel()
+		}
+		sendErr <- err
+	}()
+
+	d.be.StartedEvaluatingLoads()
+	var evaluating atomic.Int32
+	evaluating.Store(int32(len(loads)))
+
+	var group, groupCtx = errgroup.WithContext(loadCtx)
+	group.SetLimit(maxConcurrentLoads)
+	for _, load := range loads {
+		group.Go(func() (err error) {
+			var finishEvaluating = sync.OnceFunc(func() {
+				if evaluating.Add(-1) == 0 {
+					d.be.FinishedEvaluatingLoads()
+				}
+			})
+			defer finishEvaluating()
+
+			if d.twoPhaseLoads {
+				if matched, err := d.matchLoadFiles(groupCtx, db, profile, load); err != nil {
+					return err
+				} else if !matched {
+					return nil
+				}
+			}
+			query, err := renderTemplate(loadTemplate, load.data)
+			if err != nil {
+				return fmt.Errorf("loadQuery template: %w", err)
+			}
+
+			var queryCtx, trace = profile.Trace(groupCtx, load.binding, "load")
+			defer func() { trace.Finish(err) }()
+
+			rows, err := db.QueryContext(queryCtx, query)
+			trace.Executed()
+			finishEvaluating()
+			if err != nil {
+				return fmt.Errorf("querying Load documents: %w", err)
+			}
+			defer rows.Close()
+
+			for rows.Next() {
+				var doc loadedDoc
+				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
+					return fmt.Errorf("scanning Load document: %w", err)
+				} else if doc.binding < 0 {
+					continue
+				}
+				trace.AddDocument(len(doc.document))
+				select {
+				case docs <- doc:
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				}
+			}
+			if err := rows.Err(); err != nil {
+				return fmt.Errorf("querying Loads: %w", err)
+			}
+			return nil
+		})
+	}
+
+	var queryErr = group.Wait()
+	close(docs)
+	// A failure to send cancels the queries, so it's the cause of theirs.
+	if err := <-sendErr; err != nil {
+		return err
+	}
+	return queryErr
+}
+
+// bindingLoad is the load query parameters of a binding.
+type bindingLoad struct {
+	binding int
+	data    *tableWithFiles
+}
+
+// maxMatchedFiles is the maximum number of files a two-phase load filters on.
+// A load that matches more, will omit the filter altogether, reading all the
+// files. With usually 256 MB to 1 GB per table file in Databricks, 10,000
+// files is about 2.5 to 10 TB of table. Each file path is about 280 bytes so
+// the longest list is about 2.9 MB that takes about 3s to compile.
+const maxMatchedFiles = 10000
+
+// matchLoadFiles is the first phase of a two-phase load. It pins the load to
+// the table's current version, so that both phases read the same files, and
+// restricts it to the files holding rows that match its keys, found by reading
+// only the key columns. It reports whether any rows matched.
+func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, profile *boilerplate.QueryProfile, load bindingLoad) (bool, error) {
+	version, err := tableVersion(ctx, db, load.data.Table.Identifier)
+	if err != nil {
+		return false, err
+	}
+	load.data.Version = strconv.FormatInt(version, 10)
+	profile.Set(load.binding, "version", version)
+
+	query, err := renderTemplate(d.templates.loadMatchFiles, load.data)
+	if err != nil {
+		return false, fmt.Errorf("loadMatchFiles template: %w", err)
+	}
+	var queryCtx, trace = profile.Trace(ctx, load.binding, "loadMatch")
+	files, err := queryStrings(queryCtx, db, query)
+	profile.Set(load.binding, "matchedFiles", len(files))
+	trace.Finish(err)
+	if err != nil {
+		return false, fmt.Errorf("matching Load files: %w", err)
+	}
+
+	if len(files) <= maxMatchedFiles {
+		load.data.MatchedFiles = files
+	}
+	return len(files) > 0, nil
+}
+
+// tableVersion is the latest version of a Delta table.
+func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64, error) {
+	var latest struct {
+		Version int64 `db:"version"`
+	}
+	if err := sqlx.NewDb(db, "databricks").Unsafe().GetContext(ctx, &latest, "DESCRIBE HISTORY "+identifier+" LIMIT 1"); err != nil {
+		return 0, fmt.Errorf("describing history of %s: %w", identifier, err)
+	}
+	return latest.Version, nil
+}
+
+// queryStrings runs a query and returns the values of its first column.
+func queryStrings(ctx context.Context, db *stdsql.DB, query string) ([]string, error) {
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			return nil, err
+		}
+		out = append(out, value)
+	}
+	return out, rows.Err()
+}
+
+// loadedDoc is a document read by a binding's load query.
+type loadedDoc struct {
+	binding  int
+	document string
+}
+
+// sendLoaded sends each of docs as a Loaded response.
+func (d *transactor) sendLoaded(docs <-chan loadedDoc, loaded func(int, json.RawMessage) error) error {
+	for doc := range docs {
+		var raw = json.RawMessage(doc.document)
+		if b := d.bindings[doc.binding]; len(b.nullFieldsToStrip) > 0 {
+			var err error
+			if raw, err = sql.StripNullFields(raw, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if err := loaded(doc.binding, raw); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -547,6 +739,11 @@ type checkpointItem struct {
 	// NeedsMerge marks entries whose files must MERGE into the target table;
 	// otherwise a direct COPY INTO suffices.
 	NeedsMerge bool `json:",omitempty"`
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. The entry's apply deletes the target's rows published
+	// before it, after the entry's stores. It is omitted when unset, so that
+	// the entry stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 
 	// round is the transaction round this session staged the entry in, for
 	// attributing its commit's row stats. Recovered and peer entries are
@@ -561,12 +758,22 @@ type checkpointItem struct {
 type mergeBoundLiterals struct {
 	Lower string `json:",omitempty"`
 	Upper string `json:",omitempty"`
+	// Ranges are the sql.MergeBound's ranges, if its values split at gaps.
+	Ranges []mergeRangeLiterals `json:",omitempty"`
+}
+
+type mergeRangeLiterals struct {
+	Lower string
+	Upper string
 }
 
 func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 	var out = make([]mergeBoundLiterals, len(bounds))
 	for i, b := range bounds {
 		out[i] = mergeBoundLiterals{Lower: b.LiteralLower, Upper: b.LiteralUpper}
+		for _, r := range b.Ranges {
+			out[i].Ranges = append(out[i].Ranges, mergeRangeLiterals{Lower: r.LiteralLower, Upper: r.LiteralUpper})
+		}
 	}
 	return out
 }
@@ -780,7 +987,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	var copyIntoStaging = func(idx int) {
 		var done = make(chan error, 1)
 		stagingTableCopies[idx] = done
-		go func() { done <- d.copyIntoStagingTable(ctx, db, d.bindings[idx]) }()
+		go func() { done <- d.copyIntoStagingTable(ctx, db, idx, d.bindings[idx]) }()
 	}
 
 	var lastBinding = -1
@@ -846,6 +1053,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		b.needsMerge, b.stagingTable = false, "" // reset for next round
 	}
 
+	for binding, boundary := range d.truncations {
+		var b = d.bindings[binding]
+		var item = d.cp[b.target.StateKey][d.rangeKey]
+		if item == nil {
+			item = &checkpointItem{round: it.Round}
+			d.cp.add(b.target.StateKey, d.rangeKey, item)
+		}
+		item.TruncateBefore = &boundary
+	}
+	d.truncations = nil
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		if state, err := d.startCommitState(); err != nil {
 			return nil, m.FinishedOperation(err)
@@ -859,7 +1077,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 // they need a MERGE, copies them into a Delta table. The MERGE reads that table rather than
 // the JSON files, so Databricks doesn't materialize the files during MERGE time. The table lives
 // in the staging volume by path and isn't registered in the catalog.
-func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b *binding) error {
+func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, idx int, b *binding) error {
 	if err := b.storeFile.wait(); err != nil {
 		return err
 	} else if b.target.DeltaUpdates || !b.needsMerge {
@@ -869,9 +1087,14 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, b 
 	var name = b.storeFile.txnDir + "_delta"
 	var data = &stagingCopy{Target: &b.target, Identifier: stagingIdentifier(b, name), Directory: b.storeFile.remoteDir()}
 	for _, tpl := range []*template.Template{d.templates.createStagingTable, d.templates.copyIntoStaging} {
-		if query, err := renderTemplate(tpl, data); err != nil {
+		query, err := renderTemplate(tpl, data)
+		if err != nil {
 			return fmt.Errorf("%s template: %w", tpl.Name(), err)
-		} else if _, err := db.ExecContext(ctx, query); err != nil {
+		}
+		var queryCtx, trace = d.profiler.Trace(ctx, idx, tpl.Name())
+		_, err = db.ExecContext(queryCtx, query)
+		trace.Finish(err)
+		if err != nil {
 			return fmt.Errorf("%s: %w", tpl.Name(), err)
 		}
 	}
@@ -903,7 +1126,33 @@ func (d *transactor) startCommitState() (*pf.ConnectorState, error) {
 	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 }
 
-func (d *transactor) Flush(context.Context, map[int]time.Time) error {
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged work.
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	if !d.primary {
+		return nil
+	}
+
+	d.truncations = make(map[int]time.Time, len(completes))
+
+	for binding, boundary := range completes {
+		var b = d.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			d.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		d.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -975,7 +1224,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 	var group, groupCtx = errgroup.WithContext(ctx)
 	group.SetLimit(maxConcurrentCommits)
 	var committed []string
-	for _, b := range d.bindings {
+	for idx, b := range d.bindings {
 		var sk = b.target.StateKey
 		if !shouldProcess(sk) {
 			continue
@@ -999,7 +1248,7 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 
 		committed = append(committed, sk)
 		group.Go(func() error {
-			return d.commitBindingCheckpointItems(groupCtx, db, b, items)
+			return d.commitBindingCheckpointItems(groupCtx, db, idx, b, items)
 		})
 	}
 	if err := group.Wait(); err != nil {
@@ -1049,14 +1298,18 @@ func (d *transactor) acknowledgeApply(ctx context.Context, db *stdsql.DB, should
 // shards before a new transaction begins, and files are already cleaned up once all queries have
 // run. Thus a missing file means the whole query has already run, and during recovery that is
 // acceptable: we may have run the query but not have been able to clear the checkpoint.
-func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsql.DB, b *binding, items []*checkpointItem) error {
+func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsql.DB, idx int, b *binding, items []*checkpointItem) error {
 	var coalesce []*checkpointItem
 	d.be.StartedResourceCommit(b.target.Path)
 	// items[0] is this shard's own entry when it has one.
 	var report = func(stats m.RowStats) {
 		d.be.ReportRowStats(items[0].round, b.target.Path, stats)
 	}
+	var truncateBefore *time.Time
 	for _, item := range items {
+		if item.TruncateBefore != nil && (truncateBefore == nil || item.TruncateBefore.After(*truncateBefore)) {
+			truncateBefore = item.TruncateBefore
+		}
 		if item.Directory != "" || len(item.StagedFiles) > 0 {
 			coalesce = append(coalesce, item)
 			continue
@@ -1069,7 +1322,7 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			}
 			queries = []string{item.Query}
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
+		if err := d.execQueries(ctx, db, d.profiler.NewProfile(), idx, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
@@ -1080,14 +1333,39 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 			needsMerge = needsMerge || item.NeedsMerge
 		}
 
-		queries, err := d.renderCommitQueries(b, coalesce, combineBounds(b.target.Keys, coalesce), needsMerge)
+		var bounds = combineBounds(b.target.Keys, coalesce)
+		queries, err := d.renderCommitQueries(b, coalesce, bounds, needsMerge)
 		if err != nil {
 			return err
 		}
-		if err := d.execQueries(ctx, db, queries, d.cpRecovery, report); err != nil {
+		var profile = d.profiler.NewProfile()
+		if needsMerge {
+			profile.SetBounds(idx, bounds)
+		}
+		if err := d.execQueries(ctx, db, profile, idx, queries, d.cpRecovery, report); err != nil {
 			return err
 		}
 	}
+
+	// The truncation runs after the stores, so that it keeps the rows they
+	// just wrote, which were published after the boundary.
+	if truncateBefore == nil {
+		// Pass.
+	} else if b.truncateSQL == "" {
+		var _, reason = b.target.PublishedAtColumn()
+		return fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
+			truncateBefore.Format(time.RFC3339), b.target.Identifier, reason)
+	} else if stats, err := d.execQuery(ctx, db, d.profiler.NewProfile(), idx, b.truncateSQL, truncateBefore.UTC().Truncate(time.Microsecond)); err != nil {
+		return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+	} else {
+		report(m.ExactRowStats(0, 0, 0).WithTruncated(stats.Total))
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": *truncateBefore,
+			"deleted":  stats.Total,
+		}).Info("truncated rows published before the backfill")
+	}
+
 	d.be.FinishedResourceCommit(b.target.Path)
 
 	var dirs, files []string
@@ -1107,14 +1385,15 @@ func (d *transactor) commitBindingCheckpointItems(ctx context.Context, db *stdsq
 }
 
 // execQueries runs the given queries in order, passing each one's row stats
-// to report. tolerateMissing is set when recovering entries which may already
-// have been applied by a previous session whose state clearing didn't commit:
-// their staged files and staging tables (and possibly their target table) were
-// already deleted, or partly deleted, and it is okay to skip them in this case.
-func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
+// to report, and profiles them as the binding's. tolerateMissing is set
+// when recovering entries which may already have been applied by a previous
+// session whose state clearing didn't commit: their staged files and staging
+// tables (and possibly their target table) were already deleted, or partly
+// deleted, and it is okay to skip them in this case.
+func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, profile *boilerplate.QueryProfile, binding int, queries []string, tolerateMissing bool, report func(m.RowStats)) error {
 	for _, query := range queries {
-		if stats, err := d.execQuery(ctx, db, query); err != nil {
-			if tolerateMissing && (strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES") || strings.Contains(err.Error(), "COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") || strings.Contains(err.Error(), "DELTA_TABLE_NOT_FOUND") || strings.Contains(err.Error(), "DELTA_TRUNCATED_TRANSACTION_LOG") || strings.Contains(err.Error(), "DELTA_FILE_NOT_FOUND") || strings.Contains(err.Error(), "FAILED_READ_FILE")) {
+		if stats, err := d.execQuery(ctx, db, profile, binding, query); err != nil {
+			if tolerateMissing && isMissingError(err) {
 				continue
 			}
 			return fmt.Errorf("query %q failed: %w", query, err)
@@ -1123,6 +1402,30 @@ func (d *transactor) execQueries(ctx context.Context, db *stdsql.DB, queries []s
 		}
 	}
 	return nil
+}
+
+// missingErrorMessages identify a commit query error caused by its staged
+// files, staging table or target table having been deleted, in whole or in
+// part.
+var missingErrorMessages = []string{
+	"PATH_NOT_FOUND",
+	"Path does not exist",
+	"CF_PATH_DOES_NOT_EXIST_FOR_READ_FILES",
+	"COPY_INTO_SOURCE_SCHEMA_INFERENCE_FAILED",
+	"Table doesn't exist",
+	"TABLE_OR_VIEW_NOT_FOUND",
+	"DELTA_TABLE_NOT_FOUND",
+	"DELTA_TRUNCATED_TRANSACTION_LOG",
+	"DELTA_MISSING_TRANSACTION_LOG",
+	"DELTA_FILE_NOT_FOUND",
+	"FAILED_READ_FILE",
+}
+
+func isMissingError(err error) bool {
+	var text = err.Error()
+	return slices.ContainsFunc(missingErrorMessages, func(msg string) bool {
+		return strings.Contains(text, msg)
+	})
 }
 
 // retriableErrorClasses are the Databricks error classes of a commit query
@@ -1145,15 +1448,19 @@ var queryRetryDelay = func(attempt int) time.Duration {
 }
 
 func isRetriableError(err error) bool {
+	var text = err.Error()
 	return slices.ContainsFunc(retriableErrorClasses, func(class string) bool {
-		return strings.Contains(err.Error(), class)
+		return strings.Contains(text, class)
 	})
 }
 
-// execQuery runs a commit query and returns the row counts of its result row.
-func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, query string) (m.RowStats, error) {
+// execQuery runs a commit query of the binding, profiled as the binding's, and
+// returns the row counts of its result row.
+func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile *boilerplate.QueryProfile, binding int, query string, args ...any) (m.RowStats, error) {
 	for attempt := 0; ; attempt++ {
-		var rows, err = db.QueryContext(ctx, query)
+		var queryCtx, trace = profile.Trace(ctx, binding, boilerplate.StatementKind(query))
+		var rows, err = db.QueryContext(queryCtx, query, args...)
+		trace.Finish(err)
 		if err == nil {
 			return scanRowStats(rows), nil
 		} else if !isRetriableError(err) || attempt >= maxQueryRetries {
@@ -1264,14 +1571,23 @@ func (d *transactor) renderCommitQueries(b *binding, items []*checkpointItem, bo
 // entries. A column keeps a bound only when every entry carries one, and
 // differing literals combine with LEAST/GREATEST cast to the column's type:
 // those functions compare in their operands' type, and comparing e.g.
-// timestamp literals as strings can pick the wrong extremum.
-func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound {
+// timestamp literals as strings can pick the wrong extremum. When any entry's
+// bound splits into ranges, the combined bound is the union of every entry's
+// ranges, taking an unsplit bound as a single range.
+func combineBounds(keys []sql.Column, items []*checkpointItem) sql.MergeBounds {
 	var out = make([]sql.MergeBound, len(keys))
 	for i, key := range keys {
 		out[i] = sql.MergeBound{Column: key}
 
-		var valid = true
+		var valid, split = true, false
 		var lowers, uppers []string
+		var ranges []sql.MergeRange
+		var addRange = func(lower, upper string) {
+			var r = sql.MergeRange{LiteralLower: lower, LiteralUpper: upper}
+			if !slices.Contains(ranges, r) {
+				ranges = append(ranges, r)
+			}
+		}
 		for _, item := range items {
 			if len(item.Bounds) != len(keys) || item.Bounds[i].Lower == "" || item.Bounds[i].Upper == "" {
 				valid = false
@@ -1283,6 +1599,13 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 			if !slices.Contains(uppers, item.Bounds[i].Upper) {
 				uppers = append(uppers, item.Bounds[i].Upper)
 			}
+			if len(item.Bounds[i].Ranges) == 0 {
+				addRange(item.Bounds[i].Lower, item.Bounds[i].Upper)
+			}
+			for _, r := range item.Bounds[i].Ranges {
+				split = true
+				addRange(r.Lower, r.Upper)
+			}
 		}
 		if !valid {
 			continue
@@ -1290,6 +1613,9 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 
 		out[i].LiteralLower = extremumExpr("LEAST", lowers, key)
 		out[i].LiteralUpper = extremumExpr("GREATEST", uppers, key)
+		if split {
+			out[i].Ranges = ranges
+		}
 	}
 	return out
 }
@@ -1317,4 +1643,5 @@ func pathsWithRoot(root string, paths []string) []string {
 }
 
 func (d *transactor) Destroy() {
+	d.profiler.Stop()
 }

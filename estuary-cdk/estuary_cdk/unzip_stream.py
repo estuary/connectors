@@ -46,7 +46,7 @@ class UnzipStream:
             self.done = True
             raise
 
-    async def _stream(self) -> bytes:
+    async def _stream(self) -> AsyncGenerator[bytes, None]:
         async for _, _, uncompressed_chunks in async_stream_unzip(self.input):
             async for chunk in uncompressed_chunks:
                 yield chunk

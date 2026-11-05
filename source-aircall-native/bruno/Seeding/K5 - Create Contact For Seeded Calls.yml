@@ -1,0 +1,33 @@
+info:
+  name: K5 - Create Contact For Seeded Calls
+  type: http
+  seq: 30
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts"
+  body:
+    type: json
+    data: |-
+      {
+        "first_name": "Estuary",
+        "last_name": "Seed Delta",
+        "information": "estuary connector test seed",
+        "phone_numbers": [{"label": "Work", "value": "+16176105413"}]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** The seeded calls dial +1 617-610-5413, which matches no contact, so `Calls / fetch contact` returns `contact: null` and can't show the embedded contact's shape. This contact gives those calls a match.
+
+    Outcome: ran 2026-10-13 by the user; created 523993310. Embedded contact VERIFIED in `Calls / fetch contact`.
+  type: text/markdown

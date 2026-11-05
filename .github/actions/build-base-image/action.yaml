@@ -1,0 +1,75 @@
+name: Build Base Image
+description: >-
+  Build base-image and push it under this commit's SHA tag, for the connector
+  images of this run to build on.
+
+inputs:
+  github_token:
+    description: GitHub token used to push to ghcr.io.
+    required: true
+  push_dev_tags:
+    description: >-
+      Whether a push to main also moves base-image's `dev` and version tags.
+      Only one workflow should, so that two workflows building the same commit
+      don't race on them.
+    default: "true"
+
+outputs:
+  tag:
+    description: >-
+      The base-image tag connector builds should use. PRs from dependabot don't
+      have access to repository secrets and cannot push new images, so for them
+      this is the existing version tag instead of the image built here.
+    value: ${{ github.actor == 'dependabot[bot]' && steps.prep.outputs.version || steps.prep.outputs.tag }}
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Prepare
+      id: prep
+      shell: bash
+      run: |
+        TAG=$(echo $GITHUB_SHA | head -c7)
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        VERSION=$(cat base-image/VERSION | tr -d '\n')
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+    - name: Login to GitHub package docker registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github_token }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+      with:
+        driver-opts: |
+          network=host
+
+    - name: Build base-image Docker Image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: base-image/Dockerfile
+        load: true
+        tags: ghcr.io/estuary/base-image:local
+
+    - name: Push base-image image
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: base-image/Dockerfile
+        push: true
+        tags: ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+
+    - name: Push base-image image with 'dev' tag
+      if: github.event_name == 'push' && inputs.push_dev_tags == 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: base-image/Dockerfile
+        push: true # See 'if' above
+        tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}

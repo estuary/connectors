@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "advertisers"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "audiences"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "ad_sets"
     ]
   },
   {
@@ -277,6 +286,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -366,6 +378,9 @@
       "/Day",
       "/Campaign",
       "/CampaignId"
+    ],
+    "resourcePath": [
+      "custom_report_MyReport"
     ]
   }
 ]

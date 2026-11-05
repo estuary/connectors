@@ -1,0 +1,71 @@
+info:
+  name: stale after probe
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?sortOrder=ASCENDING&limit=1&after={{logs_after}}"
+  params:
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "1"
+      type: query
+    - name: after
+      value: "{{logs_after}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** what a checkpointed `after` token does once its position has aged
+  past retention (a capture paused > 90 / > 180 days). The connector mints
+  only its seed token (`<cutoff ms>_0`, `System Log / polling resume
+  after`); this probe sets `logs_after` to a hand-built `<epoch-ms>_1` value
+  positioned past retention, purely to learn the failure mode a paused
+  capture would hit.
+
+  **LIMITATION (VERIFIED 2026-10-07):** a token positioned 189 days back is
+  not rejected. Okta clamps it to now − 180 days (the `self` link is
+  rewritten to `after=1775830842624_1`) and serves from the oldest retained
+  event. A capture paused past retention therefore resumes without error;
+  events that aged out in the gap (> 90 days) are lost, and nothing in the
+  response says so.
+
+examples:
+- name: 200 - after 189d back clamped to now-180d in self link (projection)
+  request:
+    url: '{{base_url}}/logs?sortOrder=ASCENDING&limit=1&after=1775001600000_1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '56'
+    - name: x-rate-limit-reset
+      value: '1791382870'
+    - name: link
+      value: <{{base_url}}/logs?limit=1&sortOrder=ASCENDING&after=1775830842624_1>; rel="self", <{{base_url}}/logs?limit=1&sortOrder=ASCENDING&after=1788464187011_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z"
+          }
+        ]

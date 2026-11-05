@@ -1,0 +1,65 @@
+info:
+  name: nested prefix overlap
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query NestedPrefixes($parent: Prefix!, $child: Prefix!) {\n  parent: liveSpecs(by: { prefix: $parent }, first: 1000) { edges { node { catalogName } } }\n  child: liveSpecs(by: { prefix: $child }, first: 1000) { edges { node { catalogName } } }\n}",
+        "variables": {
+          "parent": "{{nested_parent_prefix}}",
+          "child": "Artificial-Industries/databricks/"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — child 1 spec ⊂ parent 66 specs (projection)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "parent": {
+                "edgeCount": 66
+              },
+              "child": {
+                "edgeCount": 1,
+                "names": [
+                  "Artificial-Industries/databricks/materialize-databricks"
+                ]
+              },
+              "childSubsetOfParent": true
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [liveSpecs resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs)
+
+  **WHY:** Shows that the prefix filter is a plain `starts_with` (`^@`), so
+  `child` is a subset of `parent`. The connector must dedupe nested authorized or
+  configured prefixes before walking; otherwise every document under the child
+  is emitted twice per sweep (harmless for keyed collections, but double cost and
+  duplicate snapshot rows).
+
+  **VERIFIED (2026-10-07):** `Artificial-Industries/` → 66 specs; `Artificial-Industries/databricks/` → 1 spec, which is also in the parent's 66. Walking both would emit it twice.

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+## 2026-10-27
+
+### Changed
+- The bucket access check no longer requires `s3:DeleteObject`. It now writes
+  and reads a fixed `.estuary-prerequisites-check` object under the configured
+  prefix, overwriting it on each check instead of creating and deleting a new
+  object.
+
 ## 2026-08-25
 
 ### Added

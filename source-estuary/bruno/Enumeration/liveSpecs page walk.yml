@@ -1,0 +1,68 @@
+info:
+  name: liveSpecs page walk
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { liveSpecs(by: {prefix: \"Jonathan_Wihl/\"}, first: 2) { pageInfo { hasNextPage endCursor } edges { cursor node { catalogName } } } }"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs` (`LiveSpecsQuery::live_specs`, `DEFAULT_PAGE_SIZE = 50`)
+  
+  **WHY:** proves `hasNextPage` / `endCursor` drive forward pagination and
+  that edges sort ascending by `catalogName` (the cursor *is* the name).
+
+  **VERIFIED (2026-10-07):** `first: 2` → 2 edges, `hasNextPage: true`,
+  `endCursor = "Jonathan_Wihl/gpt-notion"`; each edge `cursor` equals its
+  `catalogName`, ascending.
+
+examples:
+  - name: "200 — first:2, hasNextPage true, cursor = catalogName"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Jonathan_Wihl/gpt-notion"
+                },
+                "edges": [
+                  {
+                    "cursor": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gen_ai_demo_1/blocks"
+                    }
+                  },
+                  {
+                    "cursor": "Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion"
+                    }
+                  }
+                ]
+              }
+            }
+          }

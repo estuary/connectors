@@ -1,0 +1,15 @@
+variables:
+  - name: customer_management_url
+    value: https://clientcenter.api.sandbox.bingads.microsoft.com/CustomerManagement/v13
+  - name: config_path
+    value: ../config.yaml
+  - name: oauth_scope
+    value: https://si.ads.microsoft.com/msads.manage offline_access
+  - name: campaign_management_url
+    value: https://campaign.api.sandbox.bingads.microsoft.com/CampaignManagement/v13
+  - name: customer_id
+    value: "387145414"
+  - name: account_id
+    value: "555638908"
+  - name: reporting_url
+    value: https://reporting.api.sandbox.bingads.microsoft.com/Reporting/v13

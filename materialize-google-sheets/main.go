@@ -134,8 +134,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	if err != nil {
 		return nil, err
 	} else if _, err = loadSheetIDMapping(svc, cfg.spreadsheetID()); err != nil {
-		var googleErr *googleapi.Error
-		if errors.As(err, &googleErr) {
+		if googleErr, ok := errors.AsType[*googleapi.Error](err); ok {
 			if googleErr.Code == http.StatusNotFound {
 				return nil, cerrors.NewUserError(err, "configured sheet doesn't exist")
 			} else if googleErr.Code == http.StatusForbidden {
@@ -241,6 +240,10 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 }
 
 func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)

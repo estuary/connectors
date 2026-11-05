@@ -1,0 +1,77 @@
+info:
+  name: page size 1
+  type: graphql
+  seq: 3
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Invoices($tenant: String!) {
+        tenant(name: $tenant) {
+          billing {
+            invoices(first: 1) {
+              pageInfo { hasNextPage endCursor }
+              edges { cursor node { dateStart dateEnd invoiceType } }
+            }
+          }
+        }
+      }
+    variables: |-
+      {
+        "tenant": "{{test_tenant}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/billing/invoices.rs
+
+  **WHY:** Forward Relay contract for invoices: `first` honored, `hasNextPage`
+  true when more rows exist.
+
+  **VERIFIED (2026-10-07):** `first: 1` gives 1 invoice (the PREVIEW), `hasNextPage: true`, `endCursor` = its cursor. The forward Relay contract holds.
+
+examples:
+  - name: 200 - first 1, hasNextPage true
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "tenant": {
+                "billing": {
+                  "invoices": {
+                    "pageInfo": {
+                      "hasNextPage": true,
+                      "endCursor": "2026-10-31;2026-10-01;preview"
+                    },
+                    "edges": [
+                      {
+                        "cursor": "2026-10-31;2026-10-01;preview",
+                        "node": {
+                          "dateStart": "2026-10-01",
+                          "dateEnd": "2026-10-31",
+                          "invoiceType": "PREVIEW"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }

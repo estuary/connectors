@@ -1,60 +1,56 @@
 [
   {
+    "protocol": 3032023,
     "configSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "access_token": {
-          "airbyte_secret": true,
-          "description": "The value of the Access Token generated. See  https://go.estuary.dev/toHj38 for more information.",
-          "title": "Access Token",
-          "type": "string"
-        },
-        "start_date": {
-          "description": "The date from which you'd like to replicate data for Recharge API, in the format YYYY-MM-DDT00:00:00Z. Any data before this date will not be replicated.",
-          "examples": [
-            "2021-05-14T00:00:00Z"
-          ],
-          "format": "date-time",
-          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
-          "title": "Start Date",
-          "type": "string"
-        },
-        "use_orders_deprecated_api": {
-          "default": true,
-          "description": "Define whether or not the `Orders` stream should use the deprecated `2021-01` API version, or use `2021-11`, otherwise.",
-          "title": "Use `Orders` Deprecated API",
-          "type": "boolean"
-        }
-      },
+      "title": "Recharge Spec",
+      "type": "object",
       "required": [
         "start_date",
         "access_token"
       ],
-      "title": "Recharge Spec",
-      "type": "object"
+      "additionalProperties": true,
+      "properties": {
+        "start_date": {
+          "type": "string",
+          "title": "Start Date",
+          "description": "The date from which you'd like to replicate data for Recharge API, in the format YYYY-MM-DDT00:00:00Z. Any data before this date will not be replicated.",
+          "examples": [
+            "2021-05-14T00:00:00Z"
+          ],
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+          "format": "date-time"
+        },
+        "access_token": {
+          "type": "string",
+          "title": "Access Token",
+          "description": "The value of the Access Token generated. See  https://go.estuary.dev/toHj38 for more information.",
+          "airbyte_secret": true
+        },
+        "use_orders_deprecated_api": {
+          "type": "boolean",
+          "title": "Use `Orders` Deprecated API",
+          "description": "Define whether or not the `Orders` stream should use the deprecated `2021-01` API version, or use `2021-11`, otherwise.",
+          "default": true
+        }
+      }
     },
-    "documentationUrl": "https://go.estuary.dev/toHj38",
-    "protocol": 3032023,
     "resourceConfigSchema": {
       "additionalProperties": false,
       "description": "ResourceConfig encodes a configured resource stream",
       "properties": {
         "_meta": {
-          "title": "Meta",
-          "type": "object"
-        },
-        "cursorField": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Cursor Field",
-          "type": "array"
-        },
-        "namespace": {
-          "description": "Enclosing schema namespace of this resource",
-          "title": "Namespace",
-          "type": "string"
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
         },
         "stream": {
           "description": "Name of this stream",
@@ -69,6 +65,18 @@
           ],
           "title": "Sync Mode",
           "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
+          "type": "string"
+        },
+        "cursorField": {
+          "title": "Cursor Field",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -78,6 +86,7 @@
       "title": "ResourceConfig",
       "type": "object"
     },
+    "documentationUrl": "https://go.estuary.dev/toHj38",
     "resourcePathPointers": [
       "/namespace",
       "/stream"

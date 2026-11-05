@@ -1,0 +1,61 @@
+info:
+  name: limit 10001 probe
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/groups/{{group_id}}/users?limit=10001"
+  params:
+    - name: limit
+      value: "10001"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('group_id')) await bru.runRequest('Group members/parent groups');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroupUsers
+
+  **WHY:** The spec gives no maximum for this endpoint's `limit` (default 1000,
+  recommended 200). Probe one past the sibling `/groups` maximum (10000) to learn
+  whether any ceiling is enforced. The connector uses 1000
+  (`GroupMember.PAGE_SIZE`).
+
+  **VERIFIED (2026-10-07):** silent clamp to 1000 — 200, `rel="self"` rewritten to
+  `limit=1000`. The effective maximum is 1000 (the documented default).
+
+examples:
+  - name: "200 \u2014 limit 10001 silently clamped to 1000 (self link; projection: id/status)"
+    request:
+      url: "{{base_url}}/groups/00g176zmw9j1Wyxqf698/users?limit=10001"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups/00g176zmw9j1Wyxqf698/users?limit=1000>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u176zmwbsJ1Uak8698",
+              "status": "ACTIVE"
+            }
+          ]

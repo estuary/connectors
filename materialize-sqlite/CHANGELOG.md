@@ -1,5 +1,21 @@
 # materialize-sqlite
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+### Changed
+- The warning about rows a backfill did not delete now names every affected
+  table instead of only the latest one.
+
 ## 2026-10-01
 
 ### Added

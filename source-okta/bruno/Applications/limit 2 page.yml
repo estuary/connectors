@@ -1,0 +1,74 @@
+info:
+  name: limit 2 page
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: '{{base_url}}/apps?limit=2'
+  params:
+    - name: limit
+      value: '2'
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Capture the opaque `after` from the rel="next" link for `Applications / next page`.
+        // Non-secret pagination state; runtime vars are in-memory only.
+        const link = [].concat(res.getHeader('link') || []).join(', ');
+        const m = /<([^>]+)>;\s*rel="next"/.exec(link);
+        bru.setVar('apps_after', m ? new URL(m[1]).searchParams.get('after') : '');
+
+examples:
+  - name: "200 - page 1 of a limit=2 walk, rel=next present (projection)"
+    request:
+      url: "{{base_url}}/apps?limit=2"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/apps?limit=2>; rel=\"self\", <https://integrator-9297012.okta.com/api/v1/apps?after=0oa176zmw8iMaksJz698&limit=2>; rel=\"next\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zmw7qZJAJpl698",
+              "name": "saasure"
+            },
+            {
+              "id": "0oa176zmw8iMaksJz698",
+              "name": "okta_enduser"
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all applications](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/listApplications)
+
+  **WHY:** Link-header pagination contract on /apps: a `rel="next"` link appears while more
+  rows remain, carrying an opaque `after`. The after-response script captures the next
+  link's `after` into runtime var `apps_after` for `Applications / next page`.
+
+  **VERIFIED (2026-10-07):** `limit=2` returns 2 items and a `Link` header with `rel="self"` and
+  `rel="next"`. The next link carries `after=<id of the last item on this page>` and
+  repeats `limit`. Items come back in ascending `id` order. The connector follows the full
+  next URL as given (never builds `after` itself) and stops when no `rel="next"` is present
+  (see `Applications / bare`: a complete single page carries only `rel="self"`).
+
+  The `after` token is never checkpointed (Applications is a snapshot that restarts from
+  page 1 every run), so its durability across restarts is irrelevant.

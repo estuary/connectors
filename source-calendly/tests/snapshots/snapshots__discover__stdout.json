@@ -80,6 +80,9 @@
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "event_invitees"
     ]
   },
   {
@@ -163,76 +166,9 @@
     },
     "key": [
       "/uri"
-    ]
-  },
-  {
-    "recommendedName": "groups",
-    "resourceConfig": {
-      "name": "groups",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "description": "Document metadata"
-        }
-      },
-      "title": "BaseDocument",
-      "type": "object",
-      "x-infer-schema": true,
-      "if": {
-        "required": [
-          "_meta"
-        ],
-        "properties": {
-          "_meta": {
-            "required": [
-              "op"
-            ],
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "reduce": {
-          "strategy": "merge",
-          "delete": true
-        }
-      }
-    },
-    "key": [
-      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "event_types"
     ]
   },
   {
@@ -303,146 +239,9 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
-  },
-  {
-    "recommendedName": "routing_form_submissions",
-    "resourceConfig": {
-      "name": "routing_form_submissions",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "description": "Document metadata"
-        }
-      },
-      "title": "BaseDocument",
-      "type": "object",
-      "x-infer-schema": true,
-      "if": {
-        "required": [
-          "_meta"
-        ],
-        "properties": {
-          "_meta": {
-            "required": [
-              "op"
-            ],
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "reduce": {
-          "strategy": "merge",
-          "delete": true
-        }
-      }
-    },
-    "key": [
-      "/_meta/row_id"
-    ]
-  },
-  {
-    "recommendedName": "routing_forms",
-    "resourceConfig": {
-      "name": "routing_forms",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "description": "Document metadata"
-        }
-      },
-      "title": "BaseDocument",
-      "type": "object",
-      "x-infer-schema": true,
-      "if": {
-        "required": [
-          "_meta"
-        ],
-        "properties": {
-          "_meta": {
-            "required": [
-              "op"
-            ],
-            "properties": {
-              "op": {
-                "const": "d"
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "reduce": {
-          "strategy": "merge",
-          "delete": true
-        }
-      }
-    },
-    "key": [
-      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "organization_memberships"
     ]
   },
   {
@@ -526,6 +325,9 @@
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "scheduled_events"
     ]
   }
 ]

@@ -64,6 +64,17 @@ func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFu
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
 }
 
+// ctxWithIdleQueryTimeout is ctxWithQueryTimeout for a query that streams its
+// results: calling touch restarts the timeout, so a query that is slow but still
+// returning rows is never cancelled.
+func ctxWithIdleQueryTimeout(ctx context.Context, timeout time.Duration) (_ context.Context, touch func(), cancel func()) {
+	ctx, cancelCause := context.WithCancelCause(ctx)
+	var timer = time.AfterFunc(timeout, func() {
+		cancelCause(fmt.Errorf("no query results for %s", timeout))
+	})
+	return ctx, func() { timer.Reset(timeout) }, func() { timer.Stop(); cancelCause(context.Canceled) }
+}
+
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
@@ -110,7 +121,7 @@ type config struct {
 	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password,omitempty" jsonschema:"-"`
 	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=2"`
-	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=3"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table" jsonschema_extras:"order=3"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
 
 	Credentials *credentialConfig `json:"credentials" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://ossrdbms-aad.database.windows.net/.default,order=5"`
@@ -394,6 +405,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 
 	// Create templates using the dialect from the endpoint (which already has feature flags)
@@ -459,7 +474,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose the appropriate load query template based on configuration
@@ -533,11 +548,7 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 		}
 		if b.truncateSQL == "" {
 			var _, reason = b.target.PublishedAtColumn()
-			log.WithFields(log.Fields{
-				"eventType": "connectorStatus",
-				"table":     b.target.Identifier,
-				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
 			continue
 		}
 		t.truncations[binding] = boundary
@@ -603,18 +614,19 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	loadCtx, cancel := ctxWithQueryTimeout(ctx)
+	loadCtx, touch, cancel := ctxWithIdleQueryTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	d.be.StartedEvaluatingLoads()
 	rows, err := txn.Query(loadCtx, d.load.unionSQL)
 	if err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
+		return fmt.Errorf("querying Load documents: %w", errors.Join(err, context.Cause(loadCtx)))
 	}
 	defer rows.Close()
 	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
+		touch()
 		var binding int
 		var document json.RawMessage
 
@@ -633,7 +645,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("querying Loads: %w", err)
+		return fmt.Errorf("querying Loads: %w", errors.Join(err, context.Cause(loadCtx)))
 	} else if err = txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing Load transaction: %w", err)
 	}

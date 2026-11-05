@@ -7,9 +7,8 @@ import (
 )
 
 // streamV2ChannelsPerShard is the number of channels a shard subdivides its key
-// range into, per binding. It is a package var so that tests can exercise other
-// values; it is not user-configurable.
-var streamV2ChannelsPerShard = 4
+// range into, per binding.
+const streamV2ChannelsPerShard = 4
 
 // packedKeyHashHH64 is used to route documents to Snowflake channels by the
 // same hash function used to route documents to connector shards. This way, a
@@ -17,20 +16,20 @@ var streamV2ChannelsPerShard = 4
 var packedKeyHashHH64 = keyhash.PackedKeyHash_HH64
 
 // streamV2TargetLayout cuts the shard key range [keyBegin, keyEnd], inclusive on
-// both ends, into streamV2ChannelsPerShard equal key ranges.
-func streamV2TargetLayout(keyBegin, keyEnd uint32) ([]streamV2Range, error) {
+// both ends, into channels equal key ranges.
+func streamV2TargetLayout(keyBegin, keyEnd uint32, channels int) ([]streamV2Range, error) {
 	// Math uses uint64 because the full range spans 1<<32 key hashes.
 	var width = uint64(keyEnd) - uint64(keyBegin) + 1
-	var n = uint64(streamV2ChannelsPerShard)
+	var n = uint64(channels)
 	if width%n != 0 {
 		return nil, fmt.Errorf(
 			"shard key range [%08x, %08x] cannot be subdivided evenly into %d channels",
-			keyBegin, keyEnd, streamV2ChannelsPerShard,
+			keyBegin, keyEnd, channels,
 		)
 	}
 
 	var step = width / n
-	var layout = make([]streamV2Range, 0, streamV2ChannelsPerShard)
+	var layout = make([]streamV2Range, 0, channels)
 	for i := range n {
 		var begin = uint64(keyBegin) + i*step
 		layout = append(layout, streamV2Range{

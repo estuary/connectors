@@ -1,0 +1,49 @@
+info:
+  name: Remove Temp Schema Attribute
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{base_url}}/meta/schemas/user/default"
+  body:
+    type: json
+    data: |-
+      {
+        "definitions": {
+          "custom": {
+            "id": "#custom",
+            "type": "object",
+            "properties": {
+              "estuaryProbeTemp": null
+            }
+          }
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user schema](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Schema/#tag/Schema/operation/updateUserProfile)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`. It changes
+  the org-wide default user schema.
+
+  **WHY:** deletes the throwaway attribute from the schema. The spec says "You
+  must set properties explicitly to `null` to remove them from the schema;
+  otherwise, `POST` is interpreted as a partial update." Afterwards,
+  `Users / get by id` shows whether the user's value disappears from `profile`
+  and whether the deletion moves the user's `lastUpdated`. If it doesn't, the
+  Users incremental task never re-captures the user, and the stale value stays
+  in the collection until the user's next unrelated change.
+
+  **Outcome:** ran 2026-10-08 (schema `lastUpdated` 12:29:40); custom properties
+  are back to `estuarySeedCostCode` only. The user's `estuaryProbeTemp` value
+  vanished from `profile`, but `lastUpdated` stayed at 12:29:33, and
+  `Users / incremental window` over `(12:29:33, 12:30:30]` returned nothing.
+  This is a LIMITATION, VERIFIED in `Users / get by id`.

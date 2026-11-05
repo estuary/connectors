@@ -124,6 +124,13 @@
             "default": "15m",
             "pattern": "^[0-9]+(ms|s|m|h)$"
           },
+          "max_startup_delay": {
+            "type": "string",
+            "title": "Maximum Startup Delay",
+            "description": "How long the connector waits at most before connecting to the database and replicating changes on startup. The actual wait is random between zero and this duration. This is useful when many captures against the same server start at once because it spreads out the load on the database. Accepts duration strings like '30s' or '10m30s' or '2h'. No delay when unspecified.",
+            "nonsensitive": true,
+            "pattern": "^([0-9]+(ms|s|m|h))+$"
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

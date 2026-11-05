@@ -1,0 +1,36 @@
+info:
+  name: Deactivate Member User C
+  type: http
+  seq: 33
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{members_seed_user_c_id}}/lifecycle/deactivate?sendEmail=false"
+  params:
+    - name: sendEmail
+      value: "false"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_user_c_id')) await bru.runRequest('Seeding/Add User C to Group');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/UserLifecycle/#tag/UserLifecycle/operation/deactivateUser
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** Okta only hard-deletes DEPROVISIONED users; prerequisite of
+  `Seeding / Delete Member User C`.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

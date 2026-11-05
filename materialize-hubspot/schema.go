@@ -1,18 +1,22 @@
 package hubspot
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 type CRMObjectSchema struct {
+	ObjectTypeID   ObjectTypeID
 	PropertyGroups map[string]*PropertyGroup
 	Properties     map[string]*Property
 }
 
 type CRMSchema struct {
-	Objects map[CRMObject]*CRMObjectSchema
+	Objects map[ObjectName]*CRMObjectSchema
 }
 
 func NewCRMSchema() *CRMSchema {
-	return &CRMSchema{Objects: make(map[CRMObject]*CRMObjectSchema)}
+	return &CRMSchema{Objects: make(map[ObjectName]*CRMObjectSchema)}
 }
 
 // Schema contains information about the current HubSpot configuration.
@@ -24,13 +28,35 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 	schema := &Schema{
 		CRM: NewCRMSchema(),
 	}
+
+	var objectTypeIDs map[ObjectName]ObjectTypeID
 	for _, resource := range resources {
 		object, err := resource.CRMObject()
 		if err != nil {
 			return nil, err
 		}
+		objectName, err := resource.ObjectName()
+		if err != nil {
+			return nil, err
+		}
 
-		groups, err := client.ListPropertyGroups(ctx, object)
+		objectTypeID := ObjectTypeID(objectName)
+		if object == CustomObjectObject {
+			if objectTypeIDs == nil {
+				objectTypeIDs, err = client.GetCustomObjectTypeIDs(ctx)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if id, ok := objectTypeIDs[objectName]; ok {
+				objectTypeID = id
+			} else {
+				return nil, fmt.Errorf("definition not found for Custom Object: %q", objectName)
+			}
+		}
+
+		groups, err := client.ListPropertyGroups(ctx, objectTypeID)
 		if err != nil {
 			return nil, err
 		}
@@ -39,7 +65,7 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 			groupMap[group.Name] = group
 		}
 
-		properties, err := client.ListProperties(ctx, object)
+		properties, err := client.ListProperties(ctx, objectTypeID)
 		if err != nil {
 			return nil, err
 		}
@@ -48,7 +74,8 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 			propMap[prop.Name] = prop
 		}
 
-		schema.CRM.Objects[object] = &CRMObjectSchema{
+		schema.CRM.Objects[objectName] = &CRMObjectSchema{
+			ObjectTypeID:   objectTypeID,
 			PropertyGroups: groupMap,
 			Properties:     propMap,
 		}
@@ -58,8 +85,8 @@ func LoadSchema(ctx context.Context, client *Client, resources []Resource) (*Sch
 	return schema, nil
 }
 
-func (s *Schema) GetProperty(object CRMObject, propName string) (*Property, bool) {
-	objectSchema, ok := s.CRM.Objects[object]
+func (s *Schema) GetProperty(objectName ObjectName, propName string) (*Property, bool) {
+	objectSchema, ok := s.CRM.Objects[objectName]
 	if !ok {
 		return nil, false
 	}

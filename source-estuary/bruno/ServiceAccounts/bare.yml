@@ -1,0 +1,64 @@
+info:
+  name: bare
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query ServiceAccounts {
+        serviceAccounts(first: 100) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node {
+            catalogName createdByEmail createdAt lastUsedAt
+            grants { prefix capability detail createdAt updatedAt }
+            apiKeys { id detail createdByEmail createdAt expiresAt lastUsedAt }
+          } }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/service_accounts.rs
+
+  **WHY:** No filter argument exists; scope is every prefix where the key holds
+  QueryServiceAccounts. Confirms shape, `createdAt DESC` order, and the cursor
+  (a timestamp). The connector must client-side filter `catalogName` to the
+  configured prefixes.
+
+  **UNOBSERVABLE (2026-10-07):** Returned **empty** for this key (`edges: []`), so the node shape, `createdAt DESC` order and nested `grants`/`apiKeys` are unobserved. Service accounts can't be deleted, so seeding one (`Seeding / A1`, `A2`) would leave it on the account permanently; the user chose not to. The design rests on the SDL plus `service_accounts.rs` (DOCUMENTED 2026-10-07): no filter argument, scope = all QueryServiceAccounts prefixes, error when there are >20 such prefixes, cursor = `createdAt` with strict `<`. Re-run this request against an account that has service accounts to verify.
+
+examples:
+  - name: 200 - empty, no service accounts
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "serviceAccounts": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": null
+                },
+                "edges": []
+              }
+            }
+          }

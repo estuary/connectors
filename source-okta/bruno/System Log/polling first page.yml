@@ -1,0 +1,3173 @@
+info:
+  name: polling first page
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since={{logs_since}}&sortOrder=ASCENDING&limit={{logs_limit}}"
+  params:
+    - name: since
+      value: "{{logs_since}}"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "{{logs_limit}}"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Capture the `after` token from the rel="next" link (read verbatim, never
+        // constructed) for `System Log / polling resume after`.
+        const link = res.getHeader('link') || '';
+        const next = link.split(',').find((l) => /rel="next"/.test(l));
+        const m = next && next.match(/[?&]after=([^&>]+)/);
+        if (m) bru.setVar('logs_after', decodeURIComponent(m[1]));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** the request shape the incremental task starts from: a polling
+  request (`since` set, no `until`, ASCENDING) at the max page size. Learns the
+  next-link shape (are `since`/`sortOrder`/`limit` carried? is `since` dropped
+  in favor of `after`?) and the `after` token format, whose stability decides
+  GATE-OPAQUE-CURSOR.
+
+  **VERIFIED (2026-10-07):**
+  - Polling pages are ordered by persistence time, not `published`: 76 of
+    440 adjacent pairs in the full sandbox log step backwards in
+    `published`, by up to 298 ms behind the running max.
+  - The next link carries `since`, `limit`, `sortOrder` and `after` together
+    (although the docs call `since` and `after` mutually exclusive). The
+    `after` token is `<epoch-ms>_<n>`, where `<epoch-ms>` is the persistence
+    time of the last event returned. It lands 56–207 ms after that event's
+    `published`, and `System Log / polling since boundary probe` pins it as
+    the persistence ms.
+  - Paging `limit=200` and resuming from the token (`System Log / polling
+    resume after`) reassembles the single `limit=1000` page exactly: 441
+    uuids, same order, no overlap.
+  - **LIMITATION (VERIFIED 2026-10-07):** polling withholds fresh events
+    server-side. Seeded events published 14:28:10/14:28:13 were returned by
+    `System Log / bounded recent window` at 14:28:20, but polling still
+    withheld them at 14:29:00 and released them by 14:29:19, roughly 45–65 s
+    after persistence. An earlier seeded pair showed the same ~75 s gap. This
+    holdback is the server-side settle that makes the polling head safe to
+    checkpoint; it also sets the incremental stream's minimum latency.
+
+examples:
+- name: '200 - since 89d, limit 1000, all 441 events (projection: uuid, published, eventType)'
+  request:
+    url: '{{base_url}}/logs?since=2026-07-10T00%3A00%3A00Z&sortOrder=ASCENDING&limit=1000'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '59'
+    - name: x-rate-limit-reset
+      value: '1791382732'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-07-10T00%3A00%3A00Z&limit=1000&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-07-10T00%3A00%3A00Z&limit=1000&sortOrder=ASCENDING&after=1791382154413_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c0ff62d3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.826Z",
+            "eventType": "system.brand.create"
+          },
+          {
+            "uuid": "c11b012f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.007Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c110ef0d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.941Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c1203151-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.041Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c136c696-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.189Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c13e40a7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.238Z",
+            "eventType": "system.rate_limit.configuration.update"
+          },
+          {
+            "uuid": "c140ffc8-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.256Z",
+            "eventType": "system.mfa.factor.activate"
+          },
+          {
+            "uuid": "c147b68d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.300Z",
+            "eventType": "application.policy.sign_on.rule.create"
+          },
+          {
+            "uuid": "c1532843-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.375Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c14fcce2-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.353Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c15c28f7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.434Z",
+            "eventType": "directory.user_profile.bootstrap"
+          },
+          {
+            "uuid": "c17640b3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.605Z",
+            "eventType": "application.policy.sign_on.update"
+          },
+          {
+            "uuid": "c1c942df-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:28.149Z",
+            "eventType": "security.threat.configuration.update"
+          },
+          {
+            "uuid": "c23fab7e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:28.925Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c24d4019-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.014Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c26004d1-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.137Z",
+            "eventType": "application.policy.sign_on.rule.create"
+          },
+          {
+            "uuid": "c264e6d7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.169Z",
+            "eventType": "zone.create"
+          },
+          {
+            "uuid": "c28f5249-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.447Z",
+            "eventType": "system.mfa.factor.activate"
+          },
+          {
+            "uuid": "c2a3015d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.576Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c29e948c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.547Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c2b8372e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.715Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c2bc2dd4-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.741Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c2c2967d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.783Z",
+            "eventType": "user.lifecycle.create"
+          },
+          {
+            "uuid": "c2cfb5e1-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.869Z",
+            "eventType": "user.lifecycle.activate"
+          },
+          {
+            "uuid": "c2d77e14-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.920Z",
+            "eventType": "application.user_membership.add"
+          },
+          {
+            "uuid": "c2dbeae7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.949Z",
+            "eventType": "user.account.subscriptions.update"
+          },
+          {
+            "uuid": "c2df4648-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.971Z",
+            "eventType": "user.account.privilege.grant"
+          },
+          {
+            "uuid": "c2f1bcca-a7ce-11f1-9d31-472be02a71c4",
+            "published": "2026-09-03T19:36:30.092Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c2eed6ad-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.073Z",
+            "eventType": "app.oauth2.key.rollover"
+          },
+          {
+            "uuid": "c3080410-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.238Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c32e29bc-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.488Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c333f61e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.526Z",
+            "eventType": "application.user_membership.add"
+          },
+          {
+            "uuid": "c33aace3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.570Z",
+            "eventType": "zone.create"
+          },
+          {
+            "uuid": "c33b7034-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.575Z",
+            "eventType": "zone.create"
+          },
+          {
+            "uuid": "c35c65d9-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.791Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c36f038a-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.913Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c36120cc-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.822Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c36bf647-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.893Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c356996f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.753Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c371748d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.929Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c369ac56-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.878Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c3ad1e1c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.320Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c38c9db9-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.107Z",
+            "eventType": "policy.lifecycle.update"
+          },
+          {
+            "uuid": "c399bd21-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.193Z",
+            "eventType": "system.mfa.factor.activate"
+          },
+          {
+            "uuid": "c38dd63c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.115Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c3b35faf-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.361Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c3cf9a52-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.546Z",
+            "eventType": "directory.app_user_profile.bootstrap"
+          },
+          {
+            "uuid": "c3c1426c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.452Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c3d7d7b7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.600Z",
+            "eventType": "directory.mapping.update"
+          },
+          {
+            "uuid": "c3c958bf-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.505Z",
+            "eventType": "directory.linked_object.create"
+          },
+          {
+            "uuid": "c3d8e928-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.607Z",
+            "eventType": "directory.mapping.update"
+          },
+          {
+            "uuid": "c3b9a146-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.402Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c3e8eec9-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.712Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c405507f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.898Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c3e87998-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.709Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c40a0b72-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.929Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c41492c8-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.998Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c3e71a07-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.700Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c40f62a6-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.964Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c3f94288-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.819Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c4344fd5-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.206Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c4333e64-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.199Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c435132b-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.211Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c459ff59-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.453Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c4576746-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.436Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c465e63c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.531Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c454a824-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.418Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c472df1b-a7ce-11f1-a0af-c327650d70dc",
+            "published": "2026-09-03T19:36:32.616Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c473f08c-a7ce-11f1-a0af-c327650d70dc",
+            "published": "2026-09-03T19:36:32.623Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c47a321f-a7ce-11f1-a0af-c327650d70dc",
+            "published": "2026-09-03T19:36:32.664Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "c47f3aa8-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.697Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c47af4e7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.669Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c4a70e05-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.958Z",
+            "eventType": "oauth2.as.created"
+          },
+          {
+            "uuid": "c4a6e6f4-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.957Z",
+            "eventType": "app.oauth2.as.key.rollover"
+          },
+          {
+            "uuid": "c506e173-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:33.586Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c6005d20-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.221Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c5fd9dff-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.203Z",
+            "eventType": "policy.rule.add"
+          },
+          {
+            "uuid": "c5eb9c9a-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.085Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c5f894ed-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.170Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c5fc657e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.195Z",
+            "eventType": "policy.lifecycle.create"
+          },
+          {
+            "uuid": "c5ef6d2c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.110Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c5ed715b-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.097Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c62d5ff5-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.516Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c6377217-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.582Z",
+            "eventType": "app.oauth2.credentials.lifecycle.create"
+          },
+          {
+            "uuid": "c6379929-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z",
+            "eventType": "app.oauth2.credentials.lifecycle.create"
+          },
+          {
+            "uuid": "c637992b-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z",
+            "eventType": "app.oauth2.credentials.lifecycle.create"
+          },
+          {
+            "uuid": "c637992c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z",
+            "eventType": "app.oauth2.credentials.lifecycle.activate"
+          },
+          {
+            "uuid": "c6377218-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.582Z",
+            "eventType": "app.oauth2.credentials.lifecycle.activate"
+          },
+          {
+            "uuid": "c637992a-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z",
+            "eventType": "app.oauth2.credentials.lifecycle.activate"
+          },
+          {
+            "uuid": "c66b0505-a7ce-11f1-bef3-274fa84898cc",
+            "published": "2026-09-03T19:36:35.920Z",
+            "eventType": "application.user_membership.add"
+          },
+          {
+            "uuid": "c683966e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.081Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c680d74c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.063Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "c6798447-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.015Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c67cdfab-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.037Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c68e44d0-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.151Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "c6948662-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.192Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c69c75a4-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.244Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "c6a1ccd6-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.279Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d62868d6-a7ce-11f1-ad97-b93b79a5c29d",
+            "published": "2026-09-03T19:37:02.327Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "d6b58da3-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.252Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d6c17489-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.330Z",
+            "eventType": "directory.mapping.update"
+          },
+          {
+            "uuid": "d6c6a4ac-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.364Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "d6ca000f-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.386Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "d6bae4d7-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.287Z",
+            "eventType": "directory.app_user_profile.bootstrap"
+          },
+          {
+            "uuid": "d6dcebd5-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.510Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d6d5bfe3-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.463Z",
+            "eventType": "app.oauth2.admin.consent.grant"
+          },
+          {
+            "uuid": "d6e7c148-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.581Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d6f248a0-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.650Z",
+            "eventType": "application.user_membership.add"
+          },
+          {
+            "uuid": "d7ce510c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.092Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d7f64b76-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.354Z",
+            "eventType": "directory.mapping.update"
+          },
+          {
+            "uuid": "d80602f0-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.457Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d81f7e75-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.624Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "d809fa92-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.483Z",
+            "eventType": "directory.app_user_profile.bootstrap"
+          },
+          {
+            "uuid": "d82264a7-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.643Z",
+            "eventType": "app.oauth2.credentials.lifecycle.create"
+          },
+          {
+            "uuid": "d814f71e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.555Z",
+            "eventType": "directory.mapping.update"
+          },
+          {
+            "uuid": "d81656af-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.564Z",
+            "eventType": "directory.mapping.update"
+          },
+          {
+            "uuid": "d81c2313-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.602Z",
+            "eventType": "policy.mapping.create"
+          },
+          {
+            "uuid": "d82b3e4c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.701Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "d83cf093-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.817Z",
+            "eventType": "application.user_membership.add"
+          },
+          {
+            "uuid": "d834660e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.761Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "ea1aea8e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:35.793Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "eaa0bcd6-a7ce-11f1-aacb-bfe857eca70a",
+            "published": "2026-09-03T19:37:36.670Z",
+            "eventType": "user.account.update_password"
+          },
+          {
+            "uuid": "eaa63b18-a7ce-11f1-aacb-bfe857eca70a",
+            "published": "2026-09-03T19:37:36.706Z",
+            "eventType": "user.mfa.factor.activate"
+          },
+          {
+            "uuid": "eaa550b7-a7ce-11f1-aacb-bfe857eca70a",
+            "published": "2026-09-03T19:37:36.700Z",
+            "eventType": "user.account.reset_password"
+          },
+          {
+            "uuid": "f2c56459-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:50.332Z",
+            "eventType": "application.user_membership.update"
+          },
+          {
+            "uuid": "f2c7d55b-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:50.348Z",
+            "eventType": "app.app_instance.provision_sync_job.completed"
+          },
+          {
+            "uuid": "f2be5f77-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:50.286Z",
+            "eventType": "app.app_instance.provision_sync_job.started"
+          },
+          {
+            "uuid": "f30b6de6-a7ce-11f1-a019-394290f9be1d",
+            "published": "2026-09-03T19:37:50.791Z",
+            "eventType": "application.provision.user.push"
+          },
+          {
+            "uuid": "f321dc20-a7ce-11f1-a019-394290f9be1d",
+            "published": "2026-09-03T19:37:50.938Z",
+            "eventType": "application.provision.user.sync"
+          },
+          {
+            "uuid": "f321b50f-a7ce-11f1-a019-394290f9be1d",
+            "published": "2026-09-03T19:37:50.937Z",
+            "eventType": "app.user_management.push_new_user_success"
+          },
+          {
+            "uuid": "f9cb07c5-a7ce-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:38:02.113Z",
+            "eventType": "system.email.delivery"
+          },
+          {
+            "uuid": "f9eac41f-a7ce-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:38:02.321Z",
+            "eventType": "system.email.delivery"
+          },
+          {
+            "uuid": "32eba9e4-a7cf-11f1-9104-3fcdea9404b1",
+            "published": "2026-09-03T19:39:37.957Z",
+            "eventType": "application.provision.user.push"
+          },
+          {
+            "uuid": "346921eb-a7cf-11f1-9104-3fcdea9404b1",
+            "published": "2026-09-03T19:39:40.457Z",
+            "eventType": "app.user_management.push_new_user_success"
+          },
+          {
+            "uuid": "346948fc-a7cf-11f1-9104-3fcdea9404b1",
+            "published": "2026-09-03T19:39:40.458Z",
+            "eventType": "application.provision.user.sync"
+          },
+          {
+            "uuid": "b8d52031-a7cf-11f1-b6a8-8b7b2246693d",
+            "published": "2026-09-03T19:43:22.624Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "b8cb0e10-a7cf-11f1-b6a8-8b7b2246693d",
+            "published": "2026-09-03T19:43:22.558Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "b94435d5-a7cf-11f1-be51-efca198e6c98",
+            "published": "2026-09-03T19:43:23.352Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "be00d37a-a7cf-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:43:31.299Z",
+            "eventType": "application.user_membership.update"
+          },
+          {
+            "uuid": "be65142e-a7cf-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:43:31.956Z",
+            "eventType": "application.provision.user.push_profile"
+          },
+          {
+            "uuid": "f69da024-a7cf-11f1-93fe-07437a3a8ca5",
+            "published": "2026-09-03T19:45:06.279Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "f69514a3-a7cf-11f1-93fe-07437a3a8ca5",
+            "published": "2026-09-03T19:45:06.223Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "f6eecccf-a7cf-11f1-965a-734c6835bf29",
+            "published": "2026-09-03T19:45:06.811Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "1738563f-a7d0-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:46:00.980Z",
+            "eventType": "system.email.delivery"
+          },
+          {
+            "uuid": "4fde0625-a7d1-11f1-b1bf-79d4affc4c33",
+            "published": "2026-09-03T19:54:45.515Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "4fe8b48f-a7d1-11f1-b1bf-79d4affc4c33",
+            "published": "2026-09-03T19:54:45.585Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "537843b1-a7d1-11f1-90e6-d172e72f1f47",
+            "published": "2026-09-03T19:54:51.559Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "82a523ec-a7d1-11f1-bf20-a9eed8054f50",
+            "published": "2026-09-03T19:56:10.706Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "82b02072-a7d1-11f1-bf20-a9eed8054f50",
+            "published": "2026-09-03T19:56:10.778Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "85ed709f-a7d1-11f1-ac2d-735f95e3925c",
+            "published": "2026-09-03T19:56:16.213Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "978fc0a9-a7d1-11f1-9459-99bc1ca0bbed",
+            "published": "2026-09-03T19:56:45.798Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "9796c58b-a7d1-11f1-9459-99bc1ca0bbed",
+            "published": "2026-09-03T19:56:45.844Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "97e3d3f7-a7d1-11f1-9e35-89bd3fba8940",
+            "published": "2026-09-03T19:56:46.349Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "7af47b73-a862-11f1-be51-efca198e6c98",
+            "published": "2026-09-04T13:13:54.830Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "7ae51216-a862-11f1-be51-efca198e6c98",
+            "published": "2026-09-04T13:13:54.729Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "869f6426-a862-11f1-8207-b1f3138e9611",
+            "published": "2026-09-04T13:14:14.405Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "8ac195f8-a862-11f1-82a6-8de31846ea0d",
+            "published": "2026-09-04T13:14:21.340Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "8ab97fa4-a862-11f1-82a6-8de31846ea0d",
+            "published": "2026-09-04T13:14:21.287Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "8b2c65af-a862-11f1-ace0-97f1d0526628",
+            "published": "2026-09-04T13:14:22.040Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "92e8d6a1-a862-11f1-8c0d-577d505a257a",
+            "published": "2026-09-04T13:14:35.019Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "92f077c4-a862-11f1-8c0d-577d505a257a",
+            "published": "2026-09-04T13:14:35.069Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "94cd9b6b-a862-11f1-ba80-81758585ab7d",
+            "published": "2026-09-04T13:14:38.196Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "9baf02ff-bd4f-11f1-a642-a7146fc71277",
+            "published": "2026-10-01T04:21:43.720Z",
+            "eventType": "application.lifecycle.update"
+          },
+          {
+            "uuid": "0a7c5aee-bf65-11f1-bfd0-3fcea26d3d70",
+            "published": "2026-10-03T20:00:11.372Z",
+            "eventType": "system.api_token.revoke"
+          },
+          {
+            "uuid": "7b68f30e-c24a-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:27:37.904Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "7b796dd2-c24a-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:27:38.012Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "7dcd2202-c24a-11f1-9178-2f3620e4bf92",
+            "published": "2026-10-07T12:27:41.916Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "d5f86498-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.839Z",
+            "eventType": "device.lifecycle.activate"
+          },
+          {
+            "uuid": "d5f4e227-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.816Z",
+            "eventType": "device.enrollment.create"
+          },
+          {
+            "uuid": "d5fe5809-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.878Z",
+            "eventType": "device.user.add"
+          },
+          {
+            "uuid": "d60f6f0f-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.990Z",
+            "eventType": "user.mfa.factor.activate"
+          },
+          {
+            "uuid": "d610f5b0-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:10.000Z",
+            "eventType": "user.mfa.factor.activate"
+          },
+          {
+            "uuid": "d60d9a4e-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.978Z",
+            "eventType": "user.mfa.factor.activate"
+          },
+          {
+            "uuid": "d85148b9-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:13.777Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "d84e3b78-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:13.757Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "d8619c6b-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:13.884Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "d8c69fce-c24a-11f1-94d7-0739b8937221",
+            "published": "2026-10-07T12:30:14.546Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "da38f4a5-c24a-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T12:30:16.973Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "da3a0616-c24a-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T12:30:16.980Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "da38f4a4-c24a-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T12:30:16.973Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "dbefa495-c24a-11f1-8338-0f038325e062",
+            "published": "2026-10-07T12:30:19.848Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "dc00bb9d-c24a-11f1-8338-0f038325e062",
+            "published": "2026-10-07T12:30:19.960Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "dc94beec-c24a-11f1-af55-67ed662500b5",
+            "published": "2026-10-07T12:30:20.930Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "dccbd3b0-c24a-11f1-8811-9b6f2ba4cfaf",
+            "published": "2026-10-07T12:30:21.291Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "dccbd3b1-c24a-11f1-8811-9b6f2ba4cfaf",
+            "published": "2026-10-07T12:30:21.291Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "dccd3342-c24a-11f1-8811-9b6f2ba4cfaf",
+            "published": "2026-10-07T12:30:21.300Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "dcd52289-c24a-11f1-bcff-3f375af3cc49",
+            "published": "2026-10-07T12:30:21.352Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "de6649f1-c24a-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:30:23.981Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "de714672-c24a-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:30:24.053Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "de79aaea-c24a-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:30:24.108Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "dfac1073-c24a-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:30:26.116Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "e001f8ea-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.679Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "e0041bcd-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.693Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "e003f4bc-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.692Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "e001f8e9-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.679Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "faeadc10-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.826Z",
+            "eventType": "security.authenticator.lifecycle.create"
+          },
+          {
+            "uuid": "fae843fe-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.809Z",
+            "eventType": "policy.lifecycle.update"
+          },
+          {
+            "uuid": "faeb0321-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.827Z",
+            "eventType": "security.authenticator.lifecycle.activate"
+          },
+          {
+            "uuid": "fae97c7f-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.817Z",
+            "eventType": "system.mfa.factor.activate"
+          },
+          {
+            "uuid": "527634bd-c24b-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:33:38.701Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "552bb7bc-c24b-11f1-b7b7-b3442cb35896",
+            "published": "2026-10-07T12:33:43.246Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "5554004a-c24b-11f1-b7b7-b3442cb35896",
+            "published": "2026-10-07T12:33:43.510Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "59ce165b-c24b-11f1-bec5-b36eeb547479",
+            "published": "2026-10-07T12:33:51.021Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "5cba1320-c24b-11f1-ace2-159d018ae57c",
+            "published": "2026-10-07T12:33:55.923Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "5cae052f-c24b-11f1-ace2-159d018ae57c",
+            "published": "2026-10-07T12:33:55.844Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "6250e3eb-c24b-11f1-9841-b71be104fcf6",
+            "published": "2026-10-07T12:34:05.300Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "62641dce-c24b-11f1-9841-b71be104fcf6",
+            "published": "2026-10-07T12:34:05.426Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "62bee77a-c24b-11f1-b7f2-c7f93cfd6ad4",
+            "published": "2026-10-07T12:34:06.021Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "64091b2a-c24b-11f1-9441-dfa504afba9f",
+            "published": "2026-10-07T12:34:08.185Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "6408f419-c24b-11f1-9441-dfa504afba9f",
+            "published": "2026-10-07T12:34:08.184Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "640aefeb-c24b-11f1-9441-dfa504afba9f",
+            "published": "2026-10-07T12:34:08.197Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "655bb2fb-c24b-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T12:34:10.404Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "656f620f-c24b-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T12:34:10.533Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "65f31098-c24b-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T12:34:11.396Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "65f2e987-c24b-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T12:34:11.395Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "65f4e55a-c24b-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T12:34:11.408Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "65fd7179-c24b-11f1-81d2-a3700ca8ea62",
+            "published": "2026-10-07T12:34:11.464Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "67c622a3-c24b-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:34:14.457Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "67d1e274-c24b-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:34:14.534Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "67db3147-c24b-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:34:14.595Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "687ca1ad-c24b-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T12:34:15.653Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "68d01893-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.200Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "68d17825-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.209Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "68d01892-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.200Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "68d17824-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:34:16.209Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "933d4d9c-c24b-11f1-b7b7-b3442cb35896",
+            "published": "2026-10-07T12:35:27.380Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "9b48c807-c24b-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:35:40.877Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "9b5b8cb9-c24b-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:35:41.000Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "9b9a6a84-c24b-11f1-b7f2-c7f93cfd6ad4",
+            "published": "2026-10-07T12:35:41.412Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "9bfe83dd-c24b-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:35:42.068Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "9bfd726b-c24b-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:35:42.061Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "9bfd726a-c24b-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:35:42.061Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "9c073649-c24b-11f1-a0f4-bffdd986e45b",
+            "published": "2026-10-07T12:35:42.125Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "9f47465f-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:35:47.578Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "9f476d70-c24b-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T12:35:47.579Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "4dff0eb0-c24c-11f1-8847-9d79c87ea4a0",
+            "published": "2026-10-07T12:40:40.706Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "505421fb-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:40:44.619Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "505e823f-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:40:44.687Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "e9a6c645-c24c-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:45:01.852Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "ec13a7c0-c24c-11f1-a4a0-2b2f60362a93",
+            "published": "2026-10-07T12:45:05.921Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "ec3c3e6e-c24c-11f1-a4a0-2b2f60362a93",
+            "published": "2026-10-07T12:45:06.187Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "f9163096-c24c-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:45:27.748Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "f926ab5a-c24c-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:45:27.856Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "f982fccd-c24c-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T12:45:28.461Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "faedd6ae-c24c-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:45:30.839Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "faecec4c-c24c-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:45:30.833Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "faecec4d-c24c-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:45:30.833Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "fc711b3a-c24c-11f1-a051-313a74336e16",
+            "published": "2026-10-07T12:45:33.377Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "fc858da9-c24c-11f1-a051-313a74336e16",
+            "published": "2026-10-07T12:45:33.511Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "fd02acbc-c24c-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:45:34.331Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "fd02acbb-c24c-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:45:34.331Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "fd03e53e-c24c-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:45:34.339Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "fd0b118e-c24c-11f1-9fa4-379f4584bb1e",
+            "published": "2026-10-07T12:45:34.386Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "fe8d44d4-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:45:36.917Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "fea4eb89-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:45:37.072Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "fe9b75a6-c24c-11f1-b592-8537813d7c20",
+            "published": "2026-10-07T12:45:37.010Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "ff3607bc-c24c-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T12:45:38.023Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "ffa1e96e-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.730Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "ffa1e96f-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.730Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "ffa34902-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.739Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "ffa34901-c24c-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:45:38.739Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "1490cc07-c24d-11f1-a453-af8a27b3e645",
+            "published": "2026-10-07T12:46:13.850Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "1490cc06-c24d-11f1-a453-af8a27b3e645",
+            "published": "2026-10-07T12:46:13.850Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "1514c996-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:46:14.715Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "1514c995-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:46:14.715Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "162b1b7e-c24d-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:46:16.539Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "162af46d-c24d-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:46:16.538Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "168ac6ff-c24d-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T12:46:17.166Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "168aee10-c24d-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T12:46:17.167Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "179e3378-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:46:18.971Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "179e3379-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:46:18.971Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "186ea308-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:46:20.337Z",
+            "eventType": "app.oauth2.token.revoke"
+          },
+          {
+            "uuid": "18f7a885-c24d-11f1-9296-7178f00a6621",
+            "published": "2026-10-07T12:46:21.235Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "1e9e3126-c24d-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T12:46:30.715Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "1eb14403-c24d-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T12:46:30.840Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "1f0a12ab-c24d-11f1-b19a-f5d0c13e9bcd",
+            "published": "2026-10-07T12:46:31.422Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "1f9f9b5a-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.402Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "1f9f9b59-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.402Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "1f9e14b7-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.392Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "1f9e14b8-c24d-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:46:32.392Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "33ad6d92-c24d-11f1-9178-2f3620e4bf92",
+            "published": "2026-10-07T12:47:06.047Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "37569f7d-c24d-11f1-ad7e-2124dee33144",
+            "published": "2026-10-07T12:47:12.189Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "3cff233f-c24d-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T12:47:21.682Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "49ec2921-c24d-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:47:43.368Z",
+            "eventType": "user.mfa.factor.activate"
+          },
+          {
+            "uuid": "49f4b4a3-c24d-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T12:47:43.424Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "5c24c5fb-c24d-11f1-959a-bd5140e79657",
+            "published": "2026-10-07T12:48:13.938Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "5fd28b43-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:48:20.110Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "5fe09507-c24d-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:48:20.202Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "636b69e0-c24d-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:48:26.145Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "63792582-c24d-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:48:26.235Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "63d43d44-c24d-11f1-bec5-b36eeb547479",
+            "published": "2026-10-07T12:48:26.832Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "64efbf58-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:48:28.690Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "64efbf57-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:48:28.690Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "64f1bb2a-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:48:28.703Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "6627f1dd-c24d-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T12:48:30.736Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "66d28912-c24d-11f1-afe3-85406e610534",
+            "published": "2026-10-07T12:48:31.854Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "66e54dcc-c24d-11f1-afe3-85406e610534",
+            "published": "2026-10-07T12:48:31.977Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "673ce3a3-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:32.551Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "67813f9d-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:48:32.999Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "678add14-c24d-11f1-86f3-114741b99ae4",
+            "published": "2026-10-07T12:48:33.062Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "67813f9e-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:48:32.999Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "678229ff-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:48:33.005Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "68d42547-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:48:35.220Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "68e0815c-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:48:35.301Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "68eba4f3-c24d-11f1-910b-5bd59910e782",
+            "published": "2026-10-07T12:48:35.374Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "6982407c-c24d-11f1-a3c7-b71a2ac173c7",
+            "published": "2026-10-07T12:48:36.361Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "69be3749-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.754Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "69be5e5a-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.755Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "69c05a2c-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.768Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "69c0813d-c24d-11f1-8831-2b9cfb04b340",
+            "published": "2026-10-07T12:48:36.769Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "76d385a6-c24d-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T12:48:58.704Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "76d385a7-c24d-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T12:48:58.704Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "b6122aa9-c24d-11f1-97d2-d9eb3ebb9923",
+            "published": "2026-10-07T12:50:44.811Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "b6abab5e-c24d-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:50:45.817Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "bb9a06eb-c24d-11f1-8847-9d79c87ea4a0",
+            "published": "2026-10-07T12:50:54.090Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "bdf50e9a-c24d-11f1-8604-effc0a7ae1d0",
+            "published": "2026-10-07T12:50:58.042Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "be038d8e-c24d-11f1-8604-effc0a7ae1d0",
+            "published": "2026-10-07T12:50:58.137Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "be402070-c24d-11f1-b33f-21de9b895bf6",
+            "published": "2026-10-07T12:50:58.534Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "bea60e58-c24d-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:50:59.202Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "bea80a2a-c24d-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:50:59.215Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "bea60e59-c24d-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T12:50:59.202Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "beac4fc8-c24d-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T12:50:59.243Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "bf12da68-c24d-11f1-bc6f-4feac054d1c9",
+            "published": "2026-10-07T12:50:59.915Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "bf1dd6eb-c24d-11f1-bc6f-4feac054d1c9",
+            "published": "2026-10-07T12:50:59.987Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "deadabb1-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:51:52.939Z",
+            "eventType": "security.attack_protection.settings.update"
+          },
+          {
+            "uuid": "deae47f3-c24d-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T12:51:52.943Z",
+            "eventType": "security.authenticator.lifecycle.update"
+          },
+          {
+            "uuid": "dedafd90-c24d-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:51:53.236Z",
+            "eventType": "security.authenticator.lifecycle.update"
+          },
+          {
+            "uuid": "0fb8c1e3-c24e-11f1-9225-eda60891f8ad",
+            "published": "2026-10-07T12:53:15.220Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "10630b86-c24e-11f1-826e-3f6f2021b37f",
+            "published": "2026-10-07T12:53:16.336Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "1358cc3a-c24e-11f1-b33f-21de9b895bf6",
+            "published": "2026-10-07T12:53:21.302Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "16422fb0-c24e-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:53:26.187Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "16543117-c24e-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:53:26.305Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "16924ba7-c24e-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T12:53:26.712Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "171585f3-c24e-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:53:27.572Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "171585f2-c24e-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:53:27.572Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "1716be75-c24e-11f1-bc03-d35c903043aa",
+            "published": "2026-10-07T12:53:27.580Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "171c158c-c24e-11f1-832f-3be49f786063",
+            "published": "2026-10-07T12:53:27.615Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "176309a8-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:28.080Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "17738470-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:28.188Z",
+            "eventType": "policy.rule.update"
+          },
+          {
+            "uuid": "229ce045-c24e-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T12:53:46.914Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "25cdae7e-c24e-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:53:52.267Z",
+            "eventType": "user.session.start"
+          },
+          {
+            "uuid": "25c39c59-c24e-11f1-82e8-4533ebef180a",
+            "published": "2026-10-07T12:53:52.201Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "279156c9-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:55.227Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "27a972af-c24e-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:53:55.385Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "28030479-c24e-11f1-bcff-3f375af3cc49",
+            "published": "2026-10-07T12:53:55.972Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "291dc3c5-c24e-11f1-977d-3dbb6c8cdd6b",
+            "published": "2026-10-07T12:53:57.825Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "291c1613-c24e-11f1-977d-3dbb6c8cdd6b",
+            "published": "2026-10-07T12:53:57.814Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "291c1614-c24e-11f1-977d-3dbb6c8cdd6b",
+            "published": "2026-10-07T12:53:57.814Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "2a878c75-c24e-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:54:00.196Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "2a9d5e70-c24e-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:54:00.339Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "2b241afd-c24e-11f1-ae1b-158e049ee200",
+            "published": "2026-10-07T12:54:01.222Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "2b25a19e-c24e-11f1-ae1b-158e049ee200",
+            "published": "2026-10-07T12:54:01.232Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "2b241afc-c24e-11f1-ae1b-158e049ee200",
+            "published": "2026-10-07T12:54:01.222Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "2b2ec904-c24e-11f1-81d2-a3700ca8ea62",
+            "published": "2026-10-07T12:54:01.292Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "3edc5d22-c24f-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T13:01:43.803Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "41e09c79-c24f-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T13:01:48.864Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "41f0c920-c24f-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T13:01:48.970Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "4246d880-c24f-11f1-a453-af8a27b3e645",
+            "published": "2026-10-07T13:01:49.534Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "42dbc5c6-c24f-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:01:50.510Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "42e2f112-c24f-11f1-aee2-8df93fcf6710",
+            "published": "2026-10-07T13:01:50.557Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "42ddc198-c24f-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:01:50.523Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "42dbc5c7-c24f-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:01:50.510Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "45bb8c99-c24f-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T13:01:55.332Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "45bb8c98-c24f-11f1-b3c9-f50c491cf335",
+            "published": "2026-10-07T13:01:55.332Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "82cc3b5e-c254-11f1-8c7f-1792e03994cf",
+            "published": "2026-10-07T13:39:25.266Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "8c30ddbb-c254-11f1-9bd6-ad097185acaa",
+            "published": "2026-10-07T13:39:41.025Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "8c4688a4-c254-11f1-9bd6-ad097185acaa",
+            "published": "2026-10-07T13:39:41.167Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "8ca1a09e-c254-11f1-a4a0-2b2f60362a93",
+            "published": "2026-10-07T13:39:41.764Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "8d23f047-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:42.618Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "8d241758-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:42.619Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "8d2576ea-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:42.628Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "8d2fb032-c254-11f1-81d2-a3700ca8ea62",
+            "published": "2026-10-07T13:39:42.695Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "8ecac267-c254-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T13:39:45.389Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "8f7be9fc-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:46.550Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "8f90f8a8-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:46.688Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "8f8a4239-c254-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T13:39:46.644Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "8f886d24-c254-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:39:46.632Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "8f96502b-c254-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T13:39:46.723Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "8f9eb3a0-c254-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T13:39:46.778Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "906bc7a6-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.122Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "906ab634-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.115Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "906ab635-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.115Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "906bc7a7-c254-11f1-9004-8113be6d7e60",
+            "published": "2026-10-07T13:39:48.122Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "906dc40a-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.135Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "906dc409-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.135Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "906fbfdd-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.148Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "906fbfdc-c254-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T13:39:48.148Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "d533820c-c254-11f1-826e-3f6f2021b37f",
+            "published": "2026-10-07T13:41:43.516Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "d5cd51a2-c254-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T13:41:44.524Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "d87c6be7-c254-11f1-85c3-453a446d9aba",
+            "published": "2026-10-07T13:41:49.027Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "db533259-c254-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T13:41:53.790Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "db61632c-c254-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T13:41:53.883Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "dbbacdf0-c254-11f1-b8d8-85c061bc7942",
+            "published": "2026-10-07T13:41:54.469Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "dc4497be-c254-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T13:41:55.372Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "dc3f18da-c254-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T13:41:55.336Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "dc3db948-c254-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T13:41:55.327Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "dc3de059-c254-11f1-bc7e-25b284b9bb18",
+            "published": "2026-10-07T13:41:55.328Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "dc8d5fc6-c254-11f1-a9b6-db86b38265fe",
+            "published": "2026-10-07T13:41:55.849Z",
+            "eventType": "system.api_token.create"
+          },
+          {
+            "uuid": "dc865ae2-c254-11f1-a9b6-db86b38265fe",
+            "published": "2026-10-07T13:41:55.803Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "6f326c5c-c255-11f1-87f2-4f70815e88b4",
+            "published": "2026-10-07T13:46:01.878Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "b5bce4c9-c255-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:48:00.226Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "b5bce4c8-c255-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T13:48:00.226Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "4ee0504e-c258-11f1-a0e6-ad0f7ca67798",
+            "published": "2026-10-07T14:06:36.143Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "5a042edf-c258-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T14:06:54.833Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "5a140d68-c258-11f1-85e1-b32a0f5a920c",
+            "published": "2026-10-07T14:06:54.937Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "5a7120b4-c258-11f1-99bb-dfb638dee144",
+            "published": "2026-10-07T14:06:55.547Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "5af7b682-c258-11f1-80f2-f13bff043800",
+            "published": "2026-10-07T14:06:56.429Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "5af7b681-c258-11f1-80f2-f13bff043800",
+            "published": "2026-10-07T14:06:56.429Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "5b028c29-c258-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T14:06:56.500Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "5af9b254-c258-11f1-80f2-f13bff043800",
+            "published": "2026-10-07T14:06:56.442Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "5d147c4a-c258-11f1-9a68-9bca56112272",
+            "published": "2026-10-07T14:06:59.973Z",
+            "eventType": "app.oauth2.token.grant"
+          },
+          {
+            "uuid": "5d836a24-c258-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T14:07:00.700Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "5d97dd0c-c258-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T14:07:00.834Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "5d903b6a-c258-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T14:07:00.784Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "5d89ac38-c258-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T14:07:00.741Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "5d998a42-c258-11f1-b462-11c022eb99a0",
+            "published": "2026-10-07T14:07:00.845Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "5da17a01-c258-11f1-8d95-279f9bcccbc6",
+            "published": "2026-10-07T14:07:00.897Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "5e470891-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.982Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "5e490462-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.995Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "5e470890-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.982Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "5e490463-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:01.995Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "5e76a423-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.294Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "5e76a424-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.294Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "5e77dca7-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.302Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "5e77dca8-c258-11f1-bbcb-c5eba5d96588",
+            "published": "2026-10-07T14:07:02.302Z",
+            "eventType": "app.oauth2.token.grant.refresh_token"
+          },
+          {
+            "uuid": "66b6c367-c258-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T14:07:16.136Z",
+            "eventType": "system.api_token.revoke"
+          },
+          {
+            "uuid": "7742c13c-c258-11f1-9454-9dd0998af94c",
+            "published": "2026-10-07T14:07:43.897Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "77ee913d-c258-11f1-94dc-83ca3fef92c7",
+            "published": "2026-10-07T14:07:45.023Z",
+            "eventType": "policy.evaluate_sign_on"
+          },
+          {
+            "uuid": "7aff061d-c258-11f1-a0df-4908782dc7be",
+            "published": "2026-10-07T14:07:50.164Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "7d027688-c258-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T14:07:53.542Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          },
+          {
+            "uuid": "7d14ed1e-c258-11f1-afd5-0ff8a1c8c335",
+            "published": "2026-10-07T14:07:53.663Z",
+            "eventType": "user.authentication.verify"
+          },
+          {
+            "uuid": "7d6d6dd3-c258-11f1-8c1f-8f3a0d574c30",
+            "published": "2026-10-07T14:07:54.243Z",
+            "eventType": "app.oauth2.authorize.code"
+          },
+          {
+            "uuid": "7deed2e3-c258-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T14:07:55.091Z",
+            "eventType": "app.oauth2.token.grant.id_token"
+          },
+          {
+            "uuid": "7df5d7c5-c258-11f1-a051-313a74336e16",
+            "published": "2026-10-07T14:07:55.137Z",
+            "eventType": "user.session.access_admin_app"
+          },
+          {
+            "uuid": "7df0ceb7-c258-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T14:07:55.104Z",
+            "eventType": "app.oauth2.token.grant.access_token"
+          },
+          {
+            "uuid": "7deed2e4-c258-11f1-91ed-4db1bc5180a4",
+            "published": "2026-10-07T14:07:55.091Z",
+            "eventType": "user.authentication.sso"
+          },
+          {
+            "uuid": "7e36d7f3-c258-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T14:07:55.563Z",
+            "eventType": "security.protected_action.attempt"
+          },
+          {
+            "uuid": "7e3d8eb6-c258-11f1-af64-6b9316f9ec89",
+            "published": "2026-10-07T14:07:55.607Z",
+            "eventType": "system.api_token.create"
+          },
+          {
+            "uuid": "ad2ddb3b-c258-11f1-bf43-49f73071f241",
+            "published": "2026-10-07T14:09:14.357Z",
+            "eventType": "user.authentication.auth_via_mfa"
+          }
+        ]
+- name: '200 - since 89d, limit 200, first 200 of 441 (projection: uuid, published)'
+  request:
+    url: '{{base_url}}/logs?since=2026-07-10T00%3A00%3A00Z&sortOrder=ASCENDING&limit=200'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '57'
+    - name: x-rate-limit-reset
+      value: '1791382732'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-07-10T00%3A00%3A00Z&limit=200&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-07-10T00%3A00%3A00Z&limit=200&sortOrder=ASCENDING&after=1791376271999_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z"
+          },
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z"
+          },
+          {
+            "uuid": "c0ff62d3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.826Z"
+          },
+          {
+            "uuid": "c11b012f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.007Z"
+          },
+          {
+            "uuid": "c110ef0d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.941Z"
+          },
+          {
+            "uuid": "c1203151-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.041Z"
+          },
+          {
+            "uuid": "c136c696-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.189Z"
+          },
+          {
+            "uuid": "c13e40a7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.238Z"
+          },
+          {
+            "uuid": "c140ffc8-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.256Z"
+          },
+          {
+            "uuid": "c147b68d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.300Z"
+          },
+          {
+            "uuid": "c1532843-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.375Z"
+          },
+          {
+            "uuid": "c14fcce2-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.353Z"
+          },
+          {
+            "uuid": "c15c28f7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.434Z"
+          },
+          {
+            "uuid": "c17640b3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.605Z"
+          },
+          {
+            "uuid": "c1c942df-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:28.149Z"
+          },
+          {
+            "uuid": "c23fab7e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:28.925Z"
+          },
+          {
+            "uuid": "c24d4019-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.014Z"
+          },
+          {
+            "uuid": "c26004d1-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.137Z"
+          },
+          {
+            "uuid": "c264e6d7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.169Z"
+          },
+          {
+            "uuid": "c28f5249-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.447Z"
+          },
+          {
+            "uuid": "c2a3015d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.576Z"
+          },
+          {
+            "uuid": "c29e948c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.547Z"
+          },
+          {
+            "uuid": "c2b8372e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.715Z"
+          },
+          {
+            "uuid": "c2bc2dd4-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.741Z"
+          },
+          {
+            "uuid": "c2c2967d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.783Z"
+          },
+          {
+            "uuid": "c2cfb5e1-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.869Z"
+          },
+          {
+            "uuid": "c2d77e14-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.920Z"
+          },
+          {
+            "uuid": "c2dbeae7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.949Z"
+          },
+          {
+            "uuid": "c2df4648-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:29.971Z"
+          },
+          {
+            "uuid": "c2f1bcca-a7ce-11f1-9d31-472be02a71c4",
+            "published": "2026-09-03T19:36:30.092Z"
+          },
+          {
+            "uuid": "c2eed6ad-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.073Z"
+          },
+          {
+            "uuid": "c3080410-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.238Z"
+          },
+          {
+            "uuid": "c32e29bc-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.488Z"
+          },
+          {
+            "uuid": "c333f61e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.526Z"
+          },
+          {
+            "uuid": "c33aace3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.570Z"
+          },
+          {
+            "uuid": "c33b7034-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.575Z"
+          },
+          {
+            "uuid": "c35c65d9-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.791Z"
+          },
+          {
+            "uuid": "c36f038a-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.913Z"
+          },
+          {
+            "uuid": "c36120cc-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.822Z"
+          },
+          {
+            "uuid": "c36bf647-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.893Z"
+          },
+          {
+            "uuid": "c356996f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.753Z"
+          },
+          {
+            "uuid": "c371748d-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.929Z"
+          },
+          {
+            "uuid": "c369ac56-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:30.878Z"
+          },
+          {
+            "uuid": "c3ad1e1c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.320Z"
+          },
+          {
+            "uuid": "c38c9db9-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.107Z"
+          },
+          {
+            "uuid": "c399bd21-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.193Z"
+          },
+          {
+            "uuid": "c38dd63c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.115Z"
+          },
+          {
+            "uuid": "c3b35faf-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.361Z"
+          },
+          {
+            "uuid": "c3cf9a52-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.546Z"
+          },
+          {
+            "uuid": "c3c1426c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.452Z"
+          },
+          {
+            "uuid": "c3d7d7b7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.600Z"
+          },
+          {
+            "uuid": "c3c958bf-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.505Z"
+          },
+          {
+            "uuid": "c3d8e928-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.607Z"
+          },
+          {
+            "uuid": "c3b9a146-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.402Z"
+          },
+          {
+            "uuid": "c3e8eec9-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.712Z"
+          },
+          {
+            "uuid": "c405507f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.898Z"
+          },
+          {
+            "uuid": "c3e87998-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.709Z"
+          },
+          {
+            "uuid": "c40a0b72-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.929Z"
+          },
+          {
+            "uuid": "c41492c8-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.998Z"
+          },
+          {
+            "uuid": "c3e71a07-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.700Z"
+          },
+          {
+            "uuid": "c40f62a6-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.964Z"
+          },
+          {
+            "uuid": "c3f94288-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:31.819Z"
+          },
+          {
+            "uuid": "c4344fd5-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.206Z"
+          },
+          {
+            "uuid": "c4333e64-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.199Z"
+          },
+          {
+            "uuid": "c435132b-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.211Z"
+          },
+          {
+            "uuid": "c459ff59-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.453Z"
+          },
+          {
+            "uuid": "c4576746-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.436Z"
+          },
+          {
+            "uuid": "c465e63c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.531Z"
+          },
+          {
+            "uuid": "c454a824-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.418Z"
+          },
+          {
+            "uuid": "c472df1b-a7ce-11f1-a0af-c327650d70dc",
+            "published": "2026-09-03T19:36:32.616Z"
+          },
+          {
+            "uuid": "c473f08c-a7ce-11f1-a0af-c327650d70dc",
+            "published": "2026-09-03T19:36:32.623Z"
+          },
+          {
+            "uuid": "c47a321f-a7ce-11f1-a0af-c327650d70dc",
+            "published": "2026-09-03T19:36:32.664Z"
+          },
+          {
+            "uuid": "c47f3aa8-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.697Z"
+          },
+          {
+            "uuid": "c47af4e7-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.669Z"
+          },
+          {
+            "uuid": "c4a70e05-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.958Z"
+          },
+          {
+            "uuid": "c4a6e6f4-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:32.957Z"
+          },
+          {
+            "uuid": "c506e173-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:33.586Z"
+          },
+          {
+            "uuid": "c6005d20-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.221Z"
+          },
+          {
+            "uuid": "c5fd9dff-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.203Z"
+          },
+          {
+            "uuid": "c5eb9c9a-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.085Z"
+          },
+          {
+            "uuid": "c5f894ed-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.170Z"
+          },
+          {
+            "uuid": "c5fc657e-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.195Z"
+          },
+          {
+            "uuid": "c5ef6d2c-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.110Z"
+          },
+          {
+            "uuid": "c5ed715b-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:35.097Z"
+          },
+          {
+            "uuid": "c62d5ff5-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.516Z"
+          },
+          {
+            "uuid": "c6377217-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.582Z"
+          },
+          {
+            "uuid": "c6379929-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z"
+          },
+          {
+            "uuid": "c637992b-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z"
+          },
+          {
+            "uuid": "c637992c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z"
+          },
+          {
+            "uuid": "c6377218-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.582Z"
+          },
+          {
+            "uuid": "c637992a-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:35.583Z"
+          },
+          {
+            "uuid": "c66b0505-a7ce-11f1-bef3-274fa84898cc",
+            "published": "2026-09-03T19:36:35.920Z"
+          },
+          {
+            "uuid": "c683966e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.081Z"
+          },
+          {
+            "uuid": "c680d74c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.063Z"
+          },
+          {
+            "uuid": "c6798447-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.015Z"
+          },
+          {
+            "uuid": "c67cdfab-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.037Z"
+          },
+          {
+            "uuid": "c68e44d0-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.151Z"
+          },
+          {
+            "uuid": "c6948662-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.192Z"
+          },
+          {
+            "uuid": "c69c75a4-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.244Z"
+          },
+          {
+            "uuid": "c6a1ccd6-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:36:36.279Z"
+          },
+          {
+            "uuid": "d62868d6-a7ce-11f1-ad97-b93b79a5c29d",
+            "published": "2026-09-03T19:37:02.327Z"
+          },
+          {
+            "uuid": "d6b58da3-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.252Z"
+          },
+          {
+            "uuid": "d6c17489-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.330Z"
+          },
+          {
+            "uuid": "d6c6a4ac-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.364Z"
+          },
+          {
+            "uuid": "d6ca000f-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.386Z"
+          },
+          {
+            "uuid": "d6bae4d7-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.287Z"
+          },
+          {
+            "uuid": "d6dcebd5-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.510Z"
+          },
+          {
+            "uuid": "d6d5bfe3-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.463Z"
+          },
+          {
+            "uuid": "d6e7c148-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.581Z"
+          },
+          {
+            "uuid": "d6f248a0-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:03.650Z"
+          },
+          {
+            "uuid": "d7ce510c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.092Z"
+          },
+          {
+            "uuid": "d7f64b76-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.354Z"
+          },
+          {
+            "uuid": "d80602f0-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.457Z"
+          },
+          {
+            "uuid": "d81f7e75-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.624Z"
+          },
+          {
+            "uuid": "d809fa92-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.483Z"
+          },
+          {
+            "uuid": "d82264a7-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.643Z"
+          },
+          {
+            "uuid": "d814f71e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.555Z"
+          },
+          {
+            "uuid": "d81656af-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.564Z"
+          },
+          {
+            "uuid": "d81c2313-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.602Z"
+          },
+          {
+            "uuid": "d82b3e4c-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.701Z"
+          },
+          {
+            "uuid": "d83cf093-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.817Z"
+          },
+          {
+            "uuid": "d834660e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:05.761Z"
+          },
+          {
+            "uuid": "ea1aea8e-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:35.793Z"
+          },
+          {
+            "uuid": "eaa0bcd6-a7ce-11f1-aacb-bfe857eca70a",
+            "published": "2026-09-03T19:37:36.670Z"
+          },
+          {
+            "uuid": "eaa63b18-a7ce-11f1-aacb-bfe857eca70a",
+            "published": "2026-09-03T19:37:36.706Z"
+          },
+          {
+            "uuid": "eaa550b7-a7ce-11f1-aacb-bfe857eca70a",
+            "published": "2026-09-03T19:37:36.700Z"
+          },
+          {
+            "uuid": "f2c56459-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:50.332Z"
+          },
+          {
+            "uuid": "f2c7d55b-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:50.348Z"
+          },
+          {
+            "uuid": "f2be5f77-a7ce-11f1-8d64-4f73b35b67a5",
+            "published": "2026-09-03T19:37:50.286Z"
+          },
+          {
+            "uuid": "f30b6de6-a7ce-11f1-a019-394290f9be1d",
+            "published": "2026-09-03T19:37:50.791Z"
+          },
+          {
+            "uuid": "f321dc20-a7ce-11f1-a019-394290f9be1d",
+            "published": "2026-09-03T19:37:50.938Z"
+          },
+          {
+            "uuid": "f321b50f-a7ce-11f1-a019-394290f9be1d",
+            "published": "2026-09-03T19:37:50.937Z"
+          },
+          {
+            "uuid": "f9cb07c5-a7ce-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:38:02.113Z"
+          },
+          {
+            "uuid": "f9eac41f-a7ce-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:38:02.321Z"
+          },
+          {
+            "uuid": "32eba9e4-a7cf-11f1-9104-3fcdea9404b1",
+            "published": "2026-09-03T19:39:37.957Z"
+          },
+          {
+            "uuid": "346921eb-a7cf-11f1-9104-3fcdea9404b1",
+            "published": "2026-09-03T19:39:40.457Z"
+          },
+          {
+            "uuid": "346948fc-a7cf-11f1-9104-3fcdea9404b1",
+            "published": "2026-09-03T19:39:40.458Z"
+          },
+          {
+            "uuid": "b8d52031-a7cf-11f1-b6a8-8b7b2246693d",
+            "published": "2026-09-03T19:43:22.624Z"
+          },
+          {
+            "uuid": "b8cb0e10-a7cf-11f1-b6a8-8b7b2246693d",
+            "published": "2026-09-03T19:43:22.558Z"
+          },
+          {
+            "uuid": "b94435d5-a7cf-11f1-be51-efca198e6c98",
+            "published": "2026-09-03T19:43:23.352Z"
+          },
+          {
+            "uuid": "be00d37a-a7cf-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:43:31.299Z"
+          },
+          {
+            "uuid": "be65142e-a7cf-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:43:31.956Z"
+          },
+          {
+            "uuid": "f69da024-a7cf-11f1-93fe-07437a3a8ca5",
+            "published": "2026-09-03T19:45:06.279Z"
+          },
+          {
+            "uuid": "f69514a3-a7cf-11f1-93fe-07437a3a8ca5",
+            "published": "2026-09-03T19:45:06.223Z"
+          },
+          {
+            "uuid": "f6eecccf-a7cf-11f1-965a-734c6835bf29",
+            "published": "2026-09-03T19:45:06.811Z"
+          },
+          {
+            "uuid": "1738563f-a7d0-11f1-ae5e-070b6d20d923",
+            "published": "2026-09-03T19:46:00.980Z"
+          },
+          {
+            "uuid": "4fde0625-a7d1-11f1-b1bf-79d4affc4c33",
+            "published": "2026-09-03T19:54:45.515Z"
+          },
+          {
+            "uuid": "4fe8b48f-a7d1-11f1-b1bf-79d4affc4c33",
+            "published": "2026-09-03T19:54:45.585Z"
+          },
+          {
+            "uuid": "537843b1-a7d1-11f1-90e6-d172e72f1f47",
+            "published": "2026-09-03T19:54:51.559Z"
+          },
+          {
+            "uuid": "82a523ec-a7d1-11f1-bf20-a9eed8054f50",
+            "published": "2026-09-03T19:56:10.706Z"
+          },
+          {
+            "uuid": "82b02072-a7d1-11f1-bf20-a9eed8054f50",
+            "published": "2026-09-03T19:56:10.778Z"
+          },
+          {
+            "uuid": "85ed709f-a7d1-11f1-ac2d-735f95e3925c",
+            "published": "2026-09-03T19:56:16.213Z"
+          },
+          {
+            "uuid": "978fc0a9-a7d1-11f1-9459-99bc1ca0bbed",
+            "published": "2026-09-03T19:56:45.798Z"
+          },
+          {
+            "uuid": "9796c58b-a7d1-11f1-9459-99bc1ca0bbed",
+            "published": "2026-09-03T19:56:45.844Z"
+          },
+          {
+            "uuid": "97e3d3f7-a7d1-11f1-9e35-89bd3fba8940",
+            "published": "2026-09-03T19:56:46.349Z"
+          },
+          {
+            "uuid": "7af47b73-a862-11f1-be51-efca198e6c98",
+            "published": "2026-09-04T13:13:54.830Z"
+          },
+          {
+            "uuid": "7ae51216-a862-11f1-be51-efca198e6c98",
+            "published": "2026-09-04T13:13:54.729Z"
+          },
+          {
+            "uuid": "869f6426-a862-11f1-8207-b1f3138e9611",
+            "published": "2026-09-04T13:14:14.405Z"
+          },
+          {
+            "uuid": "8ac195f8-a862-11f1-82a6-8de31846ea0d",
+            "published": "2026-09-04T13:14:21.340Z"
+          },
+          {
+            "uuid": "8ab97fa4-a862-11f1-82a6-8de31846ea0d",
+            "published": "2026-09-04T13:14:21.287Z"
+          },
+          {
+            "uuid": "8b2c65af-a862-11f1-ace0-97f1d0526628",
+            "published": "2026-09-04T13:14:22.040Z"
+          },
+          {
+            "uuid": "92e8d6a1-a862-11f1-8c0d-577d505a257a",
+            "published": "2026-09-04T13:14:35.019Z"
+          },
+          {
+            "uuid": "92f077c4-a862-11f1-8c0d-577d505a257a",
+            "published": "2026-09-04T13:14:35.069Z"
+          },
+          {
+            "uuid": "94cd9b6b-a862-11f1-ba80-81758585ab7d",
+            "published": "2026-09-04T13:14:38.196Z"
+          },
+          {
+            "uuid": "9baf02ff-bd4f-11f1-a642-a7146fc71277",
+            "published": "2026-10-01T04:21:43.720Z"
+          },
+          {
+            "uuid": "0a7c5aee-bf65-11f1-bfd0-3fcea26d3d70",
+            "published": "2026-10-03T20:00:11.372Z"
+          },
+          {
+            "uuid": "7b68f30e-c24a-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:27:37.904Z"
+          },
+          {
+            "uuid": "7b796dd2-c24a-11f1-9039-a5150c5ea7ca",
+            "published": "2026-10-07T12:27:38.012Z"
+          },
+          {
+            "uuid": "7dcd2202-c24a-11f1-9178-2f3620e4bf92",
+            "published": "2026-10-07T12:27:41.916Z"
+          },
+          {
+            "uuid": "d5f86498-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.839Z"
+          },
+          {
+            "uuid": "d5f4e227-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.816Z"
+          },
+          {
+            "uuid": "d5fe5809-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.878Z"
+          },
+          {
+            "uuid": "d60f6f0f-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.990Z"
+          },
+          {
+            "uuid": "d610f5b0-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:10.000Z"
+          },
+          {
+            "uuid": "d60d9a4e-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:09.978Z"
+          },
+          {
+            "uuid": "d85148b9-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:13.777Z"
+          },
+          {
+            "uuid": "d84e3b78-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:13.757Z"
+          },
+          {
+            "uuid": "d8619c6b-c24a-11f1-b311-336b82ae6f3b",
+            "published": "2026-10-07T12:30:13.884Z"
+          },
+          {
+            "uuid": "d8c69fce-c24a-11f1-94d7-0739b8937221",
+            "published": "2026-10-07T12:30:14.546Z"
+          },
+          {
+            "uuid": "da38f4a5-c24a-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T12:30:16.973Z"
+          },
+          {
+            "uuid": "da3a0616-c24a-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T12:30:16.980Z"
+          },
+          {
+            "uuid": "da38f4a4-c24a-11f1-bb8c-a3fb5ad73a47",
+            "published": "2026-10-07T12:30:16.973Z"
+          },
+          {
+            "uuid": "dbefa495-c24a-11f1-8338-0f038325e062",
+            "published": "2026-10-07T12:30:19.848Z"
+          },
+          {
+            "uuid": "dc00bb9d-c24a-11f1-8338-0f038325e062",
+            "published": "2026-10-07T12:30:19.960Z"
+          },
+          {
+            "uuid": "dc94beec-c24a-11f1-af55-67ed662500b5",
+            "published": "2026-10-07T12:30:20.930Z"
+          },
+          {
+            "uuid": "dccbd3b0-c24a-11f1-8811-9b6f2ba4cfaf",
+            "published": "2026-10-07T12:30:21.291Z"
+          },
+          {
+            "uuid": "dccbd3b1-c24a-11f1-8811-9b6f2ba4cfaf",
+            "published": "2026-10-07T12:30:21.291Z"
+          },
+          {
+            "uuid": "dccd3342-c24a-11f1-8811-9b6f2ba4cfaf",
+            "published": "2026-10-07T12:30:21.300Z"
+          },
+          {
+            "uuid": "dcd52289-c24a-11f1-bcff-3f375af3cc49",
+            "published": "2026-10-07T12:30:21.352Z"
+          },
+          {
+            "uuid": "de6649f1-c24a-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:30:23.981Z"
+          },
+          {
+            "uuid": "de714672-c24a-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:30:24.053Z"
+          },
+          {
+            "uuid": "de79aaea-c24a-11f1-a5c2-a964b1fcfad5",
+            "published": "2026-10-07T12:30:24.108Z"
+          },
+          {
+            "uuid": "dfac1073-c24a-11f1-8689-2917e0d2f1b6",
+            "published": "2026-10-07T12:30:26.116Z"
+          },
+          {
+            "uuid": "e001f8ea-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.679Z"
+          },
+          {
+            "uuid": "e0041bcd-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.693Z"
+          },
+          {
+            "uuid": "e003f4bc-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.692Z"
+          },
+          {
+            "uuid": "e001f8e9-c24a-11f1-9869-35fdd5e0395f",
+            "published": "2026-10-07T12:30:26.679Z"
+          },
+          {
+            "uuid": "faeadc10-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.826Z"
+          },
+          {
+            "uuid": "fae843fe-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.809Z"
+          },
+          {
+            "uuid": "faeb0321-c24a-11f1-8b18-130f03ab1bb6",
+            "published": "2026-10-07T12:31:11.827Z"
+          }
+        ]
+- name: 200 - 14:29:00, +47s after seeded events, polling still withholds them
+  request:
+    url: '{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&sortOrder=ASCENDING&limit=1000'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '54'
+    - name: x-rate-limit-reset
+      value: '1791383360'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&limit=1000&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&limit=1000&sortOrder=ASCENDING>; rel="next"
+    body:
+      type: json
+      data: '[]'
+- name: 200 - 14:29:19, <=+66s, polling releases both; next token = persistence ms of last (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&sortOrder=ASCENDING&limit=1000'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '52'
+    - name: x-rate-limit-reset
+      value: '1791383360'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&limit=1000&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-10-07T14%3A27%3A30Z&limit=1000&sortOrder=ASCENDING&after=1791383293584_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "524b11e2-c25b-11f1-9db6-f9a1157e2679",
+            "published": "2026-10-07T14:28:10.366Z",
+            "eventType": "group.lifecycle.create"
+          },
+          {
+            "uuid": "54168337-c25b-11f1-8c1f-8f3a0d574c30",
+            "published": "2026-10-07T14:28:13.377Z",
+            "eventType": "group.lifecycle.delete"
+          }
+        ]

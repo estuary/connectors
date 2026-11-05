@@ -152,7 +152,7 @@ class ExportManager:
                 await asyncio.sleep(wait)
         # The final attempt always returns or re-raises above, so the loop never
         # exits normally. This assert satisfies the type checker's return path.
-        assert False, "unreachable"
+        raise AssertionError("unreachable")
 
     async def _submit(self, query: str) -> str:
         url = f"{self.base_url}/v1/batch-query/"

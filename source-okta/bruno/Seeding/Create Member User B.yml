@@ -1,0 +1,51 @@
+info:
+  name: Create Member User B
+  type: http
+  seq: 21
+
+http:
+  method: POST
+  url: "{{base_url}}/users?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "firstName": "Estuary",
+          "lastName": "Members B",
+          "email": "estuary-members-b@example.com",
+          "login": "estuary-members-b@example.com"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('members_seed_user_b_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/createUser
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** second test user, later deactivated by `Seeding / Deactivate Member User B`
+  to learn whether DEPROVISIONED users stay listed as group members and app users.
+  Also gives the group two members, so `Group members / limit 1 page` can observe a
+  `rel="next"` link.
+
+  **Cleanup:** `DELETE /users/{id}` (already deactivated).
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

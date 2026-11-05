@@ -1,0 +1,53 @@
+info:
+  name: Create Active User
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/users?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "firstName": "Estuary",
+          "lastName": "Updated",
+          "email": "nicolas+okta-updated-user@estuary.dev",
+          "login": "nicolas+okta-updated-user@estuary.dev"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('seed_user_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create a user](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/createUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** a user to profile-update (`Seeding / Update User Profile`) and add to
+  a group (`Seeding / Add User To Group`). It gives the `lastUpdated` boundary
+  probes a fresh timestamp distinct from the other users' and brings the
+  population to at least 4 users for the `after` page walk. Created STAGED so no
+  activation email goes out.
+
+  **Cleanup:** deactivate, then `DELETE /users/{id}`.
+
+  **Outcome:** ran 2026-10-07 and created `00u18h00o173Yc9fV698` (STAGED,
+  16:20:12). It also bumped the Everyone group's `lastMembershipUpdated` to
+  16:20:12 (`Groups / bare`).

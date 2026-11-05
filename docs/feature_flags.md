@@ -67,7 +67,7 @@ setting which opts into the new behavior.
 Materialization connectors can gate a flag's default on when a task was created,
 which changes the default for new tasks only, with no config edits and no
 coordinated merge. This is the preferred approach; the manual bulk-editing process in
-the next section remains for captures, which don't yet resolve flags this way.
+the next section remains for most captures, which don't yet resolve flags this way.
 
 The default-values map holds `common.FlagDefault` values rather than plain booleans:
 
@@ -405,6 +405,55 @@ point(s):
 
 ```go
 captureConfig.Advanced.FeatureFlags = *testFeatureFlags
+```
+
+## Appendix: Python (estuary-cdk) Boilerplate
+
+The connector's `advanced` config model subclasses `FeatureFlagsConfig`, which adds the
+`feature_flags` property. Declare a default for every flag in `FEATURE_FLAG_DEFAULTS`,
+keyed by a `StrEnum` of flag names:
+
+```python
+from datetime import date
+from enum import StrEnum
+from typing import ClassVar
+
+from estuary_cdk.feature_flags import FLAG_DISABLED, FeatureFlagsConfig, FlagDefault
+
+class FeatureFlag(StrEnum):
+    DO_SOMETHING = "do_something"
+    NEW_THING = "new_thing"
+
+class Advanced(FeatureFlagsConfig):
+    FEATURE_FLAG_DEFAULTS: ClassVar[dict[str, FlagDefault]] = {
+        # A short (one or two line) description of what this flag does when set/unset.
+        FeatureFlag.DO_SOMETHING: FLAG_DISABLED,
+        # Applies only to tasks created on or after the date this flag was released.
+        FeatureFlag.NEW_THING: FlagDefault.enabled_for_tasks_created_after(date(2026, 6, 10)),
+    }
+```
+
+The CDK resolves the flags against the task's creation date before each request
+reaches the connector. It doesn't [record](#recording-the-resolved-value-in-the-config)
+date-gated values in the config, but logs the resolved flags at Open.
+
+Read flags in the resource layer (`all_resources`, `validate_credentials`) and pass each
+one down as a boolean named for the behavior it controls. API functions should never
+receive `config` or `config.advanced` directly, which keeps credentials out of code
+that might log its arguments:
+
+```python
+# resources.py
+should_do_something = config.advanced.flag(FeatureFlag.DO_SOMETHING)
+
+fetch_changes=functools.partial(fetch_widgets, http, config.domain, should_do_something),
+
+# api.py
+async def fetch_widgets(
+    http: HTTPSession, domain: str, should_do_something: bool, log: Logger, log_cursor: LogCursor
+):
+    if should_do_something:
+        ...
 ```
 
 ## Appendix: Script Usage Notes and Error Conditions

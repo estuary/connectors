@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -81,7 +82,35 @@ func TestMain(m *testing.M) {
 	// Set a 900MiB memory limit, same as we use in production.
 	debug.SetMemoryLimit(900 * 1024 * 1024)
 
-	os.Exit(m.Run())
+	os.Exit(runTests(m))
+}
+
+// connectorBinary is the path to the connector built by runTests, which every capture in
+// this package is pointed at.
+var connectorBinary string
+
+// runTests builds the connector once and runs the suite against that binary. Each test
+// performs many flowctl invocations and each one spawns the connector, so building here
+// avoids paying `go run`'s link step hundreds of times over. It also keeps `go run`'s
+// `exit status 1` line from intermittently appearing in snapshots of connector failures.
+//
+// Split out from TestMain because os.Exit would skip deferred cleanup of the build.
+func runTests(m *testing.M) int {
+	buildDir, err := os.MkdirTemp("", "source-postgres-build-*")
+	if err != nil {
+		log.WithField("err", err).Error("error creating build directory")
+		return 1
+	}
+	defer os.RemoveAll(buildDir)
+
+	connectorBinary = buildDir + "/connector"
+	var build = exec.Command("go", "build", "-o", connectorBinary, ".")
+	build.Stderr = os.Stderr
+	if err := build.Run(); err != nil {
+		log.WithField("err", err).Error("error building connector for tests")
+		return 1
+	}
+	return m.Run()
 }
 
 func blackboxTestSetup(t testing.TB) (*postgresTestDatabase, *blackbox.TranscriptCapture) {
@@ -105,6 +134,7 @@ func blackboxTestSetup(t testing.TB) (*postgresTestDatabase, *blackbox.Transcrip
 	require.NoError(t, err)
 	tc.Capture.Logger = t.Log
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
+	require.NoError(t, tc.Capture.SetLocalCommand(connectorBinary))
 	tc.DocumentSanitizers = documentSanitizers
 	tc.CheckpointSanitizers = checkpointSanitizers
 

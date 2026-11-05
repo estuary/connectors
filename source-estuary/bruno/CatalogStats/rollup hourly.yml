@@ -1,0 +1,405 @@
+info:
+  name: rollup hourly
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query($names:[String!]!,$grain:CatalogStatsGrain!,$start:DateTime!,$end:DateTime!){ catalogStats(by:{names:$names,grain:$grain,start:$start,end:$end}){ pageInfo{hasNextPage} edges{ node{ catalogName grain timestamp statsSummary{ readByMe{docsTotal bytesTotal} readFromMe{docsTotal bytesTotal} writtenByMe{docsTotal bytesTotal} writtenToMe{docsTotal bytesTotal} warnings errors failures usageSeconds txnCount lastPublishedAt } taskStats{ capture{collection right{docsTotal bytesTotal} out{docsTotal bytesTotal} lastPublishedAt} derive{ transforms{transform source input{docsTotal bytesTotal} lastSourcePublishedAt bytesBehind} published{docsTotal bytesTotal} out{docsTotal bytesTotal} lastPublishedAt } materialize{collection left{docsTotal bytesTotal} right{docsTotal bytesTotal} out{docsTotal bytesTotal} lastSourcePublishedAt bytesBehind} } } } } }","variables":{"names":["Jonathan_Wihl/","Artificial-Industries/"],"grain":"HOURLY","start":"2026-10-06T00:00:00Z","end":"2026-10-08T00:00:00Z"}}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs` (`CatalogStatsQuery::catalog_stats`, `MAX_BUCKETS = 10_000`, 30 s timeout)
+  
+  **WHY:** the shape probe — the full node field set the connector will
+  request, on the two tenant rollups. Confirms rollup rows carry
+  `taskStats: null`, UInt64-as-string, ordering (name, then ts asc), that an
+  `end` in the future is accepted, and whether the current (open) hour
+  already has a row. Re-run minutes apart to see the open bucket change.
+
+  **VERIFIED (2026-10-07):** 94 rows = 47 per tenant (10-06T00 … 10-07T22, the
+  open hour at run time 22:45Z), ordered by name then timestamp ascending; an
+  `end` in the future is accepted. Rollup rows carry `taskStats: null`.
+  UInt64 fields are decimal strings; `timestamp` is `+00:00`-offset RFC3339.
+  Row size ≈ 490 bytes.
+
+  **VERIFIED (2026-10-07) — bucket finality / lag:** read at 22:45Z and again at
+  23:06Z. The 21:00 bucket (closed 45 min before the first read) was
+  byte-identical in both. The 22:00 bucket was open at 22:45Z (51,873 docs for
+  Artificial-Industries/) and had grown to 77,796 by 23:06Z. The 23:00 bucket
+  already held data stamped 23:06:35Z when read at 23:06:43Z, so pipeline lag is
+  seconds. A 1-day lookback therefore re-reads well past the observed settle time.
+
+examples:
+  - name: "200 — 94 rollup rows (projection: first and last row per tenant)"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "catalogStats": {
+                "pageInfo": {
+                  "hasNextPage": false
+                },
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Artificial-Industries/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-06T00:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "77898",
+                          "bytesTotal": "50739046"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "77898",
+                          "bytesTotal": "50739046"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "77898",
+                          "bytesTotal": "50739046"
+                        },
+                        "warnings": "0",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "3600",
+                        "txnCount": "66661",
+                        "lastPublishedAt": "2026-10-06T00:59:06.139059+00:00"
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Artificial-Industries/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T22:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "51873",
+                          "bytesTotal": "33786446"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "51873",
+                          "bytesTotal": "33786446"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "51873",
+                          "bytesTotal": "33786446"
+                        },
+                        "warnings": "0",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "5220",
+                        "txnCount": "45244",
+                        "lastPublishedAt": "2026-10-07T22:43:56.248716100+00:00"
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-06T00:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "304776",
+                          "bytesTotal": "434659879"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "174498",
+                          "bytesTotal": "18463441"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "174498",
+                          "bytesTotal": "18463441"
+                        },
+                        "warnings": "719",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "48765",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T22:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "279000",
+                          "bytesTotal": "403916928"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "158423",
+                          "bytesTotal": "16654515"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "158423",
+                          "bytesTotal": "16654515"
+                        },
+                        "warnings": "530",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "46152",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": null
+                    }
+                  }
+                ]
+              }
+            }
+          }
+  - name: "200 — re-read 23:06Z: 21:00 unchanged, 22:00 closed and grown, 23:00 open (projection: 21:00+ rows)"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "catalogStats": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Artificial-Industries/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T21:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "77784",
+                          "bytesTotal": "50664219"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "77784",
+                          "bytesTotal": "50664219"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "77784",
+                          "bytesTotal": "50664219"
+                        },
+                        "warnings": "0",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "7200",
+                        "txnCount": "67431",
+                        "lastPublishedAt": "2026-10-07T21:59:50.880857200+00:00"
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Artificial-Industries/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T22:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "77796",
+                          "bytesTotal": "50676325"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "77796",
+                          "bytesTotal": "50676325"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "77796",
+                          "bytesTotal": "50676325"
+                        },
+                        "warnings": "0",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "7200",
+                        "txnCount": "68855",
+                        "lastPublishedAt": "2026-10-07T22:59:07.488212100+00:00"
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Artificial-Industries/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T23:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "2373",
+                          "bytesTotal": "1542591"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "2423",
+                          "bytesTotal": "1574996"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "2423",
+                          "bytesTotal": "1574996"
+                        },
+                        "warnings": "0",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "720",
+                        "txnCount": "1920",
+                        "lastPublishedAt": "2026-10-07T23:06:35.485473700+00:00"
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T21:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "407798",
+                          "bytesTotal": "592339065"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "235498",
+                          "bytesTotal": "24782424"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "235498",
+                          "bytesTotal": "24782424"
+                        },
+                        "warnings": "720",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "66860",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T22:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "366216",
+                          "bytesTotal": "531381353"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "208055",
+                          "bytesTotal": "21887237"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "208055",
+                          "bytesTotal": "21887237"
+                        },
+                        "warnings": "720",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "60931",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": null
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "HOURLY",
+                      "timestamp": "2026-10-07T23:00:00+00:00",
+                      "statsSummary": {
+                        "readByMe": {
+                          "docsTotal": "35147",
+                          "bytesTotal": "51018648"
+                        },
+                        "readFromMe": {
+                          "docsTotal": "0",
+                          "bytesTotal": "0"
+                        },
+                        "writtenByMe": {
+                          "docsTotal": "19319",
+                          "bytesTotal": "2041028"
+                        },
+                        "writtenToMe": {
+                          "docsTotal": "19319",
+                          "bytesTotal": "2041028"
+                        },
+                        "warnings": "79",
+                        "errors": "0",
+                        "failures": "0",
+                        "usageSeconds": "0",
+                        "txnCount": "5716",
+                        "lastPublishedAt": null
+                      },
+                      "taskStats": null
+                    }
+                  }
+                ]
+              }
+            }
+          }

@@ -1,0 +1,131 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?limit=3"
+  params:
+    - name: limit
+      value: "3"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/SystemLog/#tag/SystemLog/operation/listLogEvents
+
+  **WHY:** response envelope (bare array?) and LogEvent key set; the `Link`
+  header shape; rate-limit headers for the `/logs` bucket. With no
+  `since`/`until`/`sortOrder` this is a polling request (default `since` = 7
+  days ago, ASCENDING).
+
+  **VERIFIED (2026-10-07):** the body is a bare JSON array of LogEvent (no
+  envelope). Top-level keys across all 443 sandbox events: `actor`,
+  `authenticationContext`, `client`, `debugContext`, `device`,
+  `displayMessage`, `eventType`, `gatewayContext`, `legacyEventType`,
+  `outcome`, `published`, `request`, `securityContext`, `severity`, `target`,
+  `transaction`, `uuid`, `version` — every key present on all 441 events of
+  `System Log / polling first page`; `target` is `null` on 3 of them. `published` is
+  RFC3339 with milliseconds and `Z`. `uuid` was unique across every page.
+  `Link` carries `rel="self"` and `rel="next"` with `after=<digits>_<digits>`.
+  The `/logs` bucket reported `X-Rate-Limit-Limit: 60` for this token (the
+  brief's free-tier figure was 20/min; the header is authoritative).
+
+examples:
+- name: 200 - bare array of LogEvent, polling next link (one full item, IPs and geolocation redacted)
+  request:
+    url: '{{base_url}}/logs?limit=3'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '59'
+    - name: x-rate-limit-reset
+      value: '1791389311'
+    - name: link
+      value: <{{base_url}}/logs?limit=3>; rel="self", <{{base_url}}/logs?limit=3&after=1791376058053_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "actor": {
+              "id": "spr176zmw7hcrHYPh698",
+              "type": "SystemPrincipal",
+              "alternateId": "supportuser@okta.com",
+              "displayName": "supportuser@okta.com",
+              "detailEntry": null
+            },
+            "client": {
+              "userAgent": null,
+              "zone": null,
+              "device": null,
+              "id": null,
+              "ipAddress": "REDACTED",
+              "geographicalContext": "REDACTED"
+            },
+            "device": null,
+            "authenticationContext": {
+              "authenticationProvider": null,
+              "credentialProvider": null,
+              "credentialType": null,
+              "issuer": null,
+              "interface": null,
+              "authenticationStep": 0,
+              "rootSessionId": "trs3VROXPfaS_OaVZZ_bdNCdA",
+              "externalSessionId": "trs1paCsySET0S3LyErlBZw6g"
+            },
+            "displayMessage": "Update application",
+            "eventType": "application.lifecycle.update",
+            "outcome": {
+              "result": "SUCCESS",
+              "reason": null
+            },
+            "published": "2026-10-01T04:21:43.720Z",
+            "securityContext": {
+              "asNumber": null,
+              "asOrg": null,
+              "isp": null,
+              "domain": null,
+              "isProxy": null
+            },
+            "severity": "INFO",
+            "debugContext": {
+              "debugData": {}
+            },
+            "gatewayContext": null,
+            "legacyEventType": "app.generic.config.app_updated",
+            "transaction": {
+              "type": "JOB",
+              "id": "moi188lfw78hcOETA698",
+              "detail": {}
+            },
+            "uuid": "9baf02ff-bd4f-11f1-a642-a7146fc71277",
+            "version": "0",
+            "request": {
+              "ipChain": []
+            },
+            "target": [
+              {
+                "id": "0oa176zuj9npxcqqN698",
+                "type": "AppInstance",
+                "alternateId": "Okta IGA Connector",
+                "displayName": "Okta IGA Connector",
+                "detailEntry": null
+              }
+            ]
+          }
+        ]

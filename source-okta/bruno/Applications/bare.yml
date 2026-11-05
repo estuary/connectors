@@ -1,0 +1,370 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/apps"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - 8 apps after seeding (projection of all 8)"
+    request:
+      url: "{{base_url}}/apps"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/apps?limit=20>; rel=\"self\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zmw7qZJAJpl698",
+              "name": "saasure",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:26.000Z"
+            },
+            {
+              "id": "0oa176zmw8iMaksJz698",
+              "name": "okta_enduser",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:27.000Z"
+            },
+            {
+              "id": "0oa176zmwamcqJF5N698",
+              "name": "okta_browser_plugin",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:28.000Z"
+            },
+            {
+              "id": "0oa176zrvqhR5udPy698",
+              "name": "okta_oin_submission_tester_app",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:35.000Z"
+            },
+            {
+              "id": "0oa176zuoqmvHWXNq698",
+              "name": "okta_iga_reviewer",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:36.000Z"
+            },
+            {
+              "id": "0oa176zvegnWi4f8y698",
+              "name": "okta_flow_sso",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:37:35.000Z"
+            },
+            {
+              "id": "0oa176zvem7OQnQlX698",
+              "name": "flow",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:37:05.000Z"
+            },
+            {
+              "id": "0oa18gus6s1DyA92Z698",
+              "name": "bookmark",
+              "status": "INACTIVE",
+              "signOnMode": "BOOKMARK",
+              "lastUpdated": "2026-10-07T14:36:53.000Z"
+            }
+          ]
+  - name: "200 - representative OPENID_CONNECT and BOOKMARK items (2 of 8, full)"
+    request:
+      url: "{{base_url}}/apps"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/apps?limit=20>; rel=\"self\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zvegnWi4f8y698",
+              "orn": "orn:okta:idp:00o176zmw7gF31989698:apps:okta_flow_sso:0oa176zvegnWi4f8y698",
+              "name": "okta_flow_sso",
+              "label": "Okta Workflows",
+              "status": "ACTIVE",
+              "lastUpdated": "2026-09-03T19:37:35.000Z",
+              "created": "2026-09-03T19:37:03.000Z",
+              "accessibility": {
+                "selfService": false,
+                "errorRedirectUrl": null,
+                "loginRedirectUrl": null
+              },
+              "visibility": {
+                "autoLaunch": false,
+                "autoSubmitToolbar": false,
+                "hide": {
+                  "iOS": false,
+                  "web": false
+                },
+                "appLinks": {
+                  "workflow_login": true
+                }
+              },
+              "features": [
+                "IMPORT_PROFILE_UPDATES",
+                "PUSH_NEW_USERS",
+                "PUSH_USER_DEACTIVATION",
+                "SCIM_PROVISIONING",
+                "GROUP_PUSH",
+                "REACTIVATE_USERS",
+                "IMPORT_NEW_USERS",
+                "PUSH_PROFILE_UPDATES"
+              ],
+              "signOnMode": "OPENID_CONNECT",
+              "credentials": {
+                "userNameTemplate": {
+                  "template": "${source.login}",
+                  "type": "BUILT_IN"
+                },
+                "signing": {
+                  "kid": "AvKBkW3uEUPBhp08oyRT6bhzIkwcD6DGtzHFX_AIt38"
+                }
+              },
+              "universalLogout": {
+                "status": "UNSUPPORTED"
+              },
+              "settings": {
+                "app": {
+                  "redirectURI": "https://integrator-9297012.workflows.okta.com/oidc/0oa176zvegnWi4f8y698/cb",
+                  "initiateLoginURI": "https://integrator-9297012.workflows.okta.com/oidc/0oa176zvegnWi4f8y698/login"
+                },
+                "notifications": {
+                  "vpn": {
+                    "network": {
+                      "connection": "DISABLED"
+                    },
+                    "message": null,
+                    "helpUrl": null
+                  }
+                },
+                "manualProvisioning": false,
+                "implicitAssignment": false,
+                "emOptInStatus": "NONE",
+                "notes": {
+                  "admin": null,
+                  "enduser": null
+                }
+              },
+              "_links": {
+                "uploadLogo": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa176zvegnWi4f8y698/logo",
+                  "hints": {
+                    "allow": [
+                      "POST"
+                    ]
+                  }
+                },
+                "appLinks": [
+                  {
+                    "name": "workflow_login",
+                    "href": "https://integrator-9297012.okta.com/home/okta_flow_sso/0oa176zvegnWi4f8y698/alnbibn6b0OPFATt20g7",
+                    "type": "text/html"
+                  }
+                ],
+                "profileEnrollment": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/policies/rst176zmwctHchRL2698"
+                },
+                "policies": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa176zvegnWi4f8y698/policies",
+                  "hints": {
+                    "allow": [
+                      "PUT"
+                    ]
+                  }
+                },
+                "groups": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa176zvegnWi4f8y698/groups"
+                },
+                "logo": [
+                  {
+                    "name": "medium",
+                    "href": "https://ok14static.oktacdn.com/assets/img/logos/okta-workflows.27df74eb53570679e5cc3a4b0f160602.png",
+                    "type": "image/png"
+                  }
+                ],
+                "clientCredentials": [
+                  {
+                    "name": "jwks",
+                    "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa176zvegnWi4f8y698/credentials/jwks"
+                  }
+                ],
+                "accessPolicy": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/policies/rst176zmwcrhSQVAh698"
+                },
+                "users": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa176zvegnWi4f8y698/users"
+                },
+                "deactivate": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa176zvegnWi4f8y698/lifecycle/deactivate"
+                }
+              }
+            },
+            {
+              "id": "0oa18gus6s1DyA92Z698",
+              "orn": "orn:okta:idp:00o176zmw7gF31989698:apps:bookmark:0oa18gus6s1DyA92Z698",
+              "name": "bookmark",
+              "label": "Estuary Seed Bookmark (inactive)",
+              "status": "INACTIVE",
+              "lastUpdated": "2026-10-07T14:36:53.000Z",
+              "created": "2026-10-07T14:36:53.000Z",
+              "accessibility": {
+                "selfService": false,
+                "errorRedirectUrl": null,
+                "loginRedirectUrl": null
+              },
+              "visibility": {
+                "autoLaunch": false,
+                "autoSubmitToolbar": false,
+                "hide": {
+                  "iOS": false,
+                  "web": false
+                },
+                "appLinks": {
+                  "login": true
+                }
+              },
+              "features": [],
+              "signOnMode": "BOOKMARK",
+              "credentials": {
+                "userNameTemplate": {
+                  "template": "${source.login}",
+                  "type": "BUILT_IN"
+                },
+                "signing": {}
+              },
+              "universalLogout": {
+                "status": "UNSUPPORTED"
+              },
+              "settings": {
+                "app": {
+                  "requestIntegration": false,
+                  "url": "https://example.com/estuary-seed-bookmark.html"
+                },
+                "notifications": {
+                  "vpn": {
+                    "network": {
+                      "connection": "DISABLED"
+                    },
+                    "message": null,
+                    "helpUrl": null
+                  }
+                },
+                "manualProvisioning": false,
+                "implicitAssignment": false,
+                "emOptInStatus": "NONE",
+                "notes": {
+                  "admin": null,
+                  "enduser": null
+                }
+              },
+              "_links": {
+                "uploadLogo": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa18gus6s1DyA92Z698/logo",
+                  "hints": {
+                    "allow": [
+                      "POST"
+                    ]
+                  }
+                },
+                "appLinks": [
+                  {
+                    "name": "login",
+                    "href": "https://integrator-9297012.okta.com/home/bookmark/0oa18gus6s1DyA92Z698/2557",
+                    "type": "text/html"
+                  }
+                ],
+                "profileEnrollment": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/policies/rst176zmwctHchRL2698"
+                },
+                "activate": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa18gus6s1DyA92Z698/lifecycle/activate"
+                },
+                "policies": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa18gus6s1DyA92Z698/policies",
+                  "hints": {
+                    "allow": [
+                      "PUT"
+                    ]
+                  }
+                },
+                "groups": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa18gus6s1DyA92Z698/groups"
+                },
+                "logo": [
+                  {
+                    "name": "medium",
+                    "href": "https://ok14static.oktacdn.com/assets/img/logos/bookmark-app.b81c03e2607468e5b5f9c9351c99313e.png",
+                    "type": "image/png"
+                  }
+                ],
+                "accessPolicy": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/policies/rst176zmwcrhSQVAh698"
+                },
+                "users": {
+                  "href": "https://integrator-9297012.okta.com/api/v1/apps/0oa18gus6s1DyA92Z698/users"
+                }
+              }
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all applications](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/listApplications)
+
+  **WHY:** the request the connector's snapshot sends minus `limit`. Establishes the
+  envelope, per-item key set, the `signOnMode` polymorphism, which `status` values appear
+  with no filter, and the `/apps` rate-limit bucket.
+
+  **VERIFIED (2026-10-07):** envelope is a bare JSON array (no wrapper object). Every item, of
+  both observed `signOnMode`s (`OPENID_CONNECT`, `BOOKMARK`), carries the same top-level
+  keys: `id`, `orn`, `name`, `label`, `status`, `created`, `lastUpdated`, `signOnMode`,
+  `accessibility`, `visibility`, `features`, `credentials`, `universalLogout`,
+  `settings`, `_links`. Timestamps are RFC3339 with milliseconds and `Z`.
+  No secrets in the list response (`credentials` holds `userNameTemplate` and
+  `signing.kid` only).
+
+  **VERIFIED (2026-10-07):** with no params, the INACTIVE app seeded by
+  `Seeding / Create Inactive Bookmark App` **is listed** alongside the ACTIVE ones —
+  the `includeNonDeleted=false` default does not hide INACTIVE apps (see
+  `Applications / includeNonDeleted`).
+
+  **VERIFIED (2026-10-07):** default page size is 20 (`self` link carries `limit=20`).
+
+  **VERIFIED (2026-10-07):** `X-Rate-Limit-Limit: 50` for this token on `/apps` (the brief's
+  10/min estimate was conservative). Org has 8 apps, so a snapshot is one request.
+
+  **UNOBSERVABLE:** `SAML_2_0`, `AUTO_LOGIN`, `WS_FEDERATION` etc. items. Their extra
+  fields live under `settings`/`credentials`; the connector relies on schema inference,
+  so new shapes widen the inferred schema rather than fail. Seeding a SAML app needs
+  certificate and ACS configuration — out of proportion for a probe.

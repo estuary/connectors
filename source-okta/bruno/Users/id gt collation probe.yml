@@ -1,0 +1,175 @@
+info:
+  name: id gt collation probe
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"{{users_id_gt_bound}}\"&sortBy=id&sortOrder=asc"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: search
+      value: '(lastUpdated gt "1970-01-01T00:00:00.000Z" and lastUpdated le "2100-01-01T00:00:00.000Z") and id gt "{{users_id_gt_bound}}"'
+      type: query
+    - name: sortBy
+      value: id
+      type: query
+    - name: sortOrder
+      value: asc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - id gt 00u176zmwbsa includes 00u176zmwbsJ1Uak8698 (ids only)
+    request:
+      url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"00u176zmwbsa\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            "00u176zmwbsJ1Uak8698",
+            "00u18gupu552EU005698",
+            "00u18gut4epTYtsK2698",
+            "00u18gzxz10URexK9698",
+            "00u18h00o173Yc9fV698"
+          ]
+  - name: 200 - id gt 00u176zmwbsk excludes 00u176zmwbsJ1Uak8698 (ids only)
+    request:
+      url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"00u176zmwbsk\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            "00u18gupu552EU005698",
+            "00u18gut4epTYtsK2698",
+            "00u18gzxz10URexK9698",
+            "00u18h00o173Yc9fV698"
+          ]
+  - name: 200 - id gt 00u176zmwbsj includes 00u176zmwbsJ1Uak8698 (ids only)
+    request:
+      url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"00u176zmwbsj\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            "00u176zmwbsJ1Uak8698",
+            "00u18gupu552EU005698",
+            "00u18gut4epTYtsK2698",
+            "00u18gzxz10URexK9698",
+            "00u18h00o173Yc9fV698"
+          ]
+  - name: 200 - id gt 00u176zmwbsB includes 00u176zmwbsJ1Uak8698 (ids only)
+    request:
+      url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"00u176zmwbsB\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            "00u176zmwbsJ1Uak8698",
+            "00u18gupu552EU005698",
+            "00u18gut4epTYtsK2698",
+            "00u18gzxz10URexK9698",
+            "00u18h00o173Yc9fV698"
+          ]
+  - name: 200 - id gt 00u176zmwbsZ excludes 00u176zmwbsJ1Uak8698 (ids only)
+    request:
+      url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"00u176zmwbsZ\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            "00u18gupu552EU005698",
+            "00u18gut4epTYtsK2698",
+            "00u18gzxz10URexK9698",
+            "00u18h00o173Yc9fV698"
+          ]
+  - name: 200 - id gt 00u176zmwbsJ1Uak8698 excludes 00u176zmwbsJ1Uak8698 (ids only)
+    request:
+      url: "{{base_url}}/users?limit=200&search=(lastUpdated gt \"1970-01-01T00:00:00.000Z\" and lastUpdated le \"2100-01-01T00:00:00.000Z\") and id gt \"00u176zmwbsJ1Uak8698\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            "00u18gupu552EU005698",
+            "00u18gut4epTYtsK2698",
+            "00u18gzxz10URexK9698",
+            "00u18h00o173Yc9fV698"
+          ]
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** the users backfill resumes each page with the exact `search` shape
+  sent here, `(<window>) and id gt "<last id>"`. Resuming is gapless only if
+  `id gt` compares ids the same way `sortBy=id` orders them
+  (`Users / id sort probe`). Okta ids mix upper and lower case, so the two
+  candidate comparisons, byte order and case-insensitive order, disagree on
+  some bounds. Run with `--env-var users_id_gt_bound=<bound>`, using
+  bounds built from an existing id so that the comparisons disagree on it.
+
+  Each bound copies `00u176zmwbsJ1Uak8698` up to its first mixed-case
+  character, `J` at index 11, then varies that character:
+
+  | bound ends | byte order | case-insensitive | lower before upper | observed |
+  |---|---|---|---|---|
+  | `…a` | excluded | included | included | included |
+  | `…k` | excluded | excluded | included | excluded |
+  | `…j` (prefix) | excluded | included | included | included |
+  | `…B` | included | included | included | included |
+  | `…Z` | excluded | excluded | excluded | excluded |
+  | exact id | excluded | excluded | excluded | excluded |
+
+  **VERIFIED (2026-10-19):** `id gt` inside `search` compares ids
+  case-insensitively, and strictly: the exact id is excluded. Only the
+  case-insensitive column matches every observed row. Whether `sortBy=id` orders
+  the same way is UNOBSERVABLE (`Users / id sort probe`).

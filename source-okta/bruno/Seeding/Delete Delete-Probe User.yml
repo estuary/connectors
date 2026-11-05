@@ -1,0 +1,41 @@
+info:
+  name: Delete Delete-Probe User
+  type: http
+  seq: 16
+
+http:
+  method: DELETE
+  url: "{{base_url}}/users/{{delprobe_user_id}}?sendEmail=false"
+  params:
+    - name: sendEmail
+      value: "false"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('delprobe_user_id') && !bru.getEnvVar('delprobe_user_id')) {
+          await bru.runRequest('Seeding/Deactivate Delete-Probe User');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete a user](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/deleteUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** hard-deletes the DEPROVISIONED throwaway user. The System Log event it
+  produces, read by `Deletes / delete events`, is what the Users stream's delete
+  step turns into a delete document.
+
+  **Outcome:** ran 2026-10-08 and returned 204, producing
+  `user.lifecycle.delete.initiated` (17:24:54.290Z) and
+  `user.lifecycle.delete.completed` (17:24:54.412Z). VERIFIED in
+  `Deletes / delete events`.

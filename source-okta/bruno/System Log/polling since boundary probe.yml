@@ -1,0 +1,113 @@
+info:
+  name: polling since boundary probe
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since={{logs_since}}&sortOrder=ASCENDING&limit=3"
+  params:
+    - name: since
+      value: "{{logs_since}}"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "3"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** the incremental task's first request is a polling request with
+  `since = cutoff`, filtered on persistence time, which no event body
+  carries. A `limit=1` next link's `after` token encodes the persistence
+  epoch-ms of the event just returned (see `System Log / since retention
+  probe`: event `c1035a75…` → `after=1788464187011_1`). Setting `since` to
+  that exact millisecond, then 1 ms later, pins the inclusivity of polling
+  `since` (FETCH-SERVER-SIDE-BOUNDARIES) for the backfill→incremental seam.
+
+  **VERIFIED (2026-10-07):** polling `since` is inclusive on persistence time
+  at 1 ms. `since=…27.011Z` includes `c1035a75…`; `since=…27.012Z` excludes
+  it. This also confirms that a token's epoch-ms is exactly the persistence
+  time of the last event returned.
+
+examples:
+- name: 200 - since = persistence ms of c1035a75 includes it (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-09-03T19%3A36%3A27.011Z&sortOrder=ASCENDING&limit=3'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '57'
+    - name: x-rate-limit-reset
+      value: '1791383435'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-09-03T19%3A36%3A27.011Z&limit=3&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-09-03T19%3A36%3A27.011Z&limit=3&sortOrder=ASCENDING&after=1788464187057_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z"
+          },
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z"
+          },
+          {
+            "uuid": "c0ff62d3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.826Z"
+          }
+        ]
+- name: 200 - since = persistence ms + 1 excludes it (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-09-03T19%3A36%3A27.012Z&sortOrder=ASCENDING&limit=3'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '54'
+    - name: x-rate-limit-reset
+      value: '1791383435'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-09-03T19%3A36%3A27.012Z&limit=3&sortOrder=ASCENDING>; rel="self", <{{base_url}}/logs?since=2026-09-03T19%3A36%3A27.012Z&limit=3&sortOrder=ASCENDING&after=1788464187096_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c10a8669-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.899Z"
+          },
+          {
+            "uuid": "c0ff62d3-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.826Z"
+          },
+          {
+            "uuid": "c11b012f-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:27.007Z"
+          }
+        ]

@@ -86,7 +86,8 @@ def main(argv):
     observed_docs = 0
     observed_bytes = 0
     for i, tx in enumerate(state["transactions"]):
-        bytes_ = tx["doc_count"] * tx["doc_size"]
+        # TPC-DS documents vary in size, so its transactions record bytes.
+        bytes_ = tx.get("bytes", tx["doc_count"] * tx["doc_size"])
         total_docs  += tx["doc_count"]
         total_bytes += bytes_
         entry = {
@@ -95,9 +96,10 @@ def main(argv):
             "doc_count": tx["doc_count"],
             "doc_size":  tx["doc_size"],
             "bytes":     bytes_,
-            "fresh":     tx["fresh"],
-            "overlaps":  tx["overlaps"],
         }
+        for k in ("fresh", "overlaps", "tables"):
+            if k in tx:
+                entry[k] = tx[k]
         if i < len(tx_boundaries):
             observed_docs += tx["doc_count"]
             observed_bytes += bytes_
@@ -129,6 +131,7 @@ def main(argv):
         "observed_bytes": observed_bytes,
         "docs_per_sec": (observed_docs  / data_wall) if data_wall > 0 else None,
         "mb_per_sec":   (observed_bytes / data_wall / (1024*1024)) if data_wall > 0 else None,
+        "tpcds": state.get("tpcds"),
         "transactions": txs,
     }, indent=2))
 

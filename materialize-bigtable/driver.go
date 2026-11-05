@@ -415,6 +415,10 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	bindings := make([]binding, 0, len(mappedBindings))
 	for _, mb := range mappedBindings {
 		b := binding{

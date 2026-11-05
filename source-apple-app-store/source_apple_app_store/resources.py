@@ -14,7 +14,6 @@ from .api import (
     fetch_incremental_analytics,
     fetch_incremental_reviews,
 )
-from .auth import AppleJWTTokenSource
 from .client import AppleAppStoreClient
 from .models import (
     ApiFetchChangesFn,
@@ -116,18 +115,10 @@ async def _reconcile_connector_state(
             )
 
 
-async def analytics_resources(
-    log: Logger,
-    http: HTTPMixin,
-    config: EndpointConfig,
+def analytics_resources(
+    client: AppleAppStoreClient,
+    app_ids: list[str],
 ) -> list[Resource]:
-    client = AppleAppStoreClient(log, config.credentials, http)
-
-    if config.app_ids:
-        app_ids = config.app_ids
-    else:
-        app_ids = await client.list_apps()
-
     initial_state = _create_initial_state(app_ids)
 
     async def open(
@@ -182,16 +173,9 @@ async def analytics_resources(
     ]
 
 
-async def api_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+def api_resources(
+    client: AppleAppStoreClient, app_ids: list[str]
 ) -> list[Resource]:
-    client = AppleAppStoreClient(log, config.credentials, http)
-
-    if config.app_ids:
-        app_ids = config.app_ids
-    else:
-        app_ids = await client.list_apps()
-
     initial_state = _create_initial_state(app_ids)
 
     async def open(
@@ -251,9 +235,14 @@ async def api_resources(
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
-    http.token_source = AppleJWTTokenSource(config.credentials)
+    client = AppleAppStoreClient(log, config.credentials, http)
+
+    if config.app_ids:
+        app_ids = config.app_ids
+    else:
+        app_ids = await client.list_apps()
 
     return [
-        *await analytics_resources(log, http, config),
-        *await api_resources(log, http, config),
+        *analytics_resources(client, app_ids),
+        *api_resources(client, app_ids),
     ]

@@ -219,7 +219,7 @@ services:
       start_period: 120s
     stop_grace_period: 1s
 
-  # Second Spark set on Spark 4.0.2 + Iceberg 1.10.1 (the EMR emr-spark-8.0.0
+  # Second Spark set on Spark 4.1.1 + Iceberg 1.11.0 (the EMR emr-spark-8.1.0
   # pairing) sharing Polaris and RustFS with the 3.5 set above. Variant
   # columns need it; the 3.5 set keeps the JSON-string path covered.
   spark4-master:

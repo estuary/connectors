@@ -55,11 +55,6 @@ var (
 	}
 )
 
-// TODO(whb): It would be nice to have a configuration for making the table use
-// "Merge on Read" when performing DML, but that is broken in the latest version
-// of Spark. The default is "Copy on Write" which may be suboptimal for some
-// cases. See https://github.com/apache/iceberg/issues/11341 &
-// https://github.com/apache/iceberg/issues/11709
 type config struct {
 	URL                   string                `json:"url" jsonschema:"title=URL,description=Base URL for the catalog. If you are using AWS Glue as a catalog this should look like 'https://glue.<region>.amazonaws.com/iceberg'. Otherwise it may look like 'https://yourserver.com/api/catalog'." jsonschema_extras:"order=0"`
 	Warehouse             string                `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to. For AWS Glue this is the account ID." jsonschema_extras:"order=1"`

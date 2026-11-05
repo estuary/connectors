@@ -1,0 +1,51 @@
+info:
+  name: Create Member User C
+  type: http
+  seq: 30
+
+http:
+  method: POST
+  url: "{{base_url}}/users?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "firstName": "Estuary",
+          "lastName": "Members C",
+          "email": "estuary-members-c@example.com",
+          "login": "estuary-members-c@example.com"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('members_seed_user_c_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/createUser
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** a throwaway member whose lifecycle produces the System Log events an
+  incremental Group_members depends on: an explicit removal
+  (`Seeding / Remove User C from Group`) and a hard delete while still a member
+  (`Seeding / Delete Member User C`). Feeds `Group members / membership events cascade`.
+
+  **Cleanup:** none — `Seeding / Delete Member User C` deletes it.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

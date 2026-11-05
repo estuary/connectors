@@ -57,6 +57,9 @@
     },
     "key": [
       "/key"
+    ],
+    "resourcePath": [
+      "application_roles"
     ]
   },
   {
@@ -117,6 +120,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "avatars"
     ]
   },
   {
@@ -176,6 +182,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "boards"
     ]
   },
   {
@@ -238,6 +247,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "board_issues"
     ]
   },
   {
@@ -298,6 +310,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "dashboards"
     ]
   },
   {
@@ -359,6 +374,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "filters"
     ]
   },
   {
@@ -420,6 +438,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "filter_sharing"
     ]
   },
   {
@@ -480,6 +501,9 @@
     },
     "key": [
       "/groupId"
+    ],
+    "resourcePath": [
+      "groups"
     ]
   },
   {
@@ -543,6 +567,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issues"
     ]
   },
   {
@@ -606,6 +633,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_comments"
     ]
   },
   {
@@ -666,6 +696,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_fields"
     ]
   },
   {
@@ -726,6 +759,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_field_configurations"
     ]
   },
   {
@@ -786,6 +822,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_custom_field_contexts"
     ]
   },
   {
@@ -846,6 +885,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_custom_field_options"
     ]
   },
   {
@@ -906,6 +948,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_link_types"
     ]
   },
   {
@@ -966,6 +1011,9 @@
     },
     "key": [
       "/value"
+    ],
+    "resourcePath": [
+      "issue_navigator_settings"
     ]
   },
   {
@@ -1026,6 +1074,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_notification_schemes"
     ]
   },
   {
@@ -1086,6 +1137,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_priorities"
     ]
   },
   {
@@ -1146,6 +1200,9 @@
     },
     "key": [
       "/key"
+    ],
+    "resourcePath": [
+      "issue_properties"
     ]
   },
   {
@@ -1206,6 +1263,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_remote_links"
     ]
   },
   {
@@ -1266,6 +1326,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_resolutions"
     ]
   },
   {
@@ -1327,6 +1390,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_security_schemes"
     ]
   },
   {
@@ -1397,6 +1463,9 @@
     "key": [
       "/issueId",
       "/id"
+    ],
+    "resourcePath": [
+      "issue_transitions"
     ]
   },
   {
@@ -1457,6 +1526,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_type_schemes"
     ]
   },
   {
@@ -1518,6 +1590,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_types"
     ]
   },
   {
@@ -1578,6 +1653,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_type_screen_schemes"
     ]
   },
   {
@@ -1639,6 +1717,9 @@
     },
     "key": [
       "/self"
+    ],
+    "resourcePath": [
+      "issue_votes"
     ]
   },
   {
@@ -1700,6 +1781,9 @@
     },
     "key": [
       "/self"
+    ],
+    "resourcePath": [
+      "issue_watchers"
     ]
   },
   {
@@ -1764,6 +1848,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issue_worklogs"
     ]
   },
   {
@@ -1824,6 +1911,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "jira_settings"
     ]
   },
   {
@@ -1883,6 +1973,9 @@
     },
     "key": [
       "/label"
+    ],
+    "resourcePath": [
+      "labels"
     ]
   },
   {
@@ -1943,6 +2036,9 @@
     },
     "key": [
       "/key"
+    ],
+    "resourcePath": [
+      "permissions"
     ]
   },
   {
@@ -2004,6 +2100,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "permission_schemes"
     ]
   },
   {
@@ -2064,6 +2163,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "projects"
     ]
   },
   {
@@ -2124,6 +2226,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "project_roles"
     ]
   },
   {
@@ -2184,6 +2289,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "project_avatars"
     ]
   },
   {
@@ -2245,6 +2353,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "project_categories"
     ]
   },
   {
@@ -2306,6 +2417,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "project_components"
     ]
   },
   {
@@ -2366,6 +2480,9 @@
     },
     "key": [
       "/projectId"
+    ],
+    "resourcePath": [
+      "project_email"
     ]
   },
   {
@@ -2426,6 +2543,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "project_permission_schemes"
     ]
   },
   {
@@ -2487,6 +2607,9 @@
     },
     "key": [
       "/key"
+    ],
+    "resourcePath": [
+      "project_types"
     ]
   },
   {
@@ -2548,6 +2671,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "project_versions"
     ]
   },
   {
@@ -2608,6 +2734,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "screens"
     ]
   },
   {
@@ -2669,6 +2798,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "screen_tabs"
     ]
   },
   {
@@ -2730,6 +2862,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "screen_tab_fields"
     ]
   },
   {
@@ -2790,6 +2925,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "screen_schemes"
     ]
   },
   {
@@ -2849,6 +2987,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "sprints"
     ]
   },
   {
@@ -2911,6 +3052,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "sprint_issues"
     ]
   },
   {
@@ -2971,6 +3115,9 @@
     },
     "key": [
       "/key"
+    ],
+    "resourcePath": [
+      "time_tracking"
     ]
   },
   {
@@ -3031,6 +3178,9 @@
     },
     "key": [
       "/accountId"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -3091,6 +3241,9 @@
     },
     "key": [
       "/accountId"
+    ],
+    "resourcePath": [
+      "users_groups_detailed"
     ]
   },
   {
@@ -3150,6 +3303,9 @@
     },
     "key": [
       "/entity_id"
+    ],
+    "resourcePath": [
+      "workflows"
     ]
   },
   {
@@ -3211,6 +3367,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "workflow_schemes"
     ]
   },
   {
@@ -3272,6 +3431,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "workflow_statuses"
     ]
   },
   {
@@ -3333,6 +3495,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "workflow_status_categories"
     ]
   }
 ]

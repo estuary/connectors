@@ -20,27 +20,34 @@ from typing_extensions import override
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
+from .._background import spawn
 from ..cron import next_fire
 from ..logger import OBSERVABLE_FIELD
+# `from x import Y as Y` marks Y as an explicit re-export: this package ships
+# py.typed, and connectors import these names from this module.
 from ..flow import (
-    AccessToken,
-    AuthorizationCodeFlowOAuth2Credentials,
-    BaseOAuth2Credentials,
-    BasicAuth,
+    AccessToken as AccessToken,
+    AuthorizationCodeFlowOAuth2Credentials as AuthorizationCodeFlowOAuth2Credentials,
+    BaseOAuth2Credentials as BaseOAuth2Credentials,
+    BasicAuth as BasicAuth,
     CaptureBinding,
-    ClientCredentialsOAuth2Credentials,
-    LongLivedClientCredentialsOAuth2Credentials,
-    OAuth2Spec,
-    OAuth2TokenFlowSpec,
-    ResourceOwnerPasswordOAuth2Credentials,
-    RotatingOAuth2Credentials,
+    ClientCredentialsOAuth2Credentials as ClientCredentialsOAuth2Credentials,
+    LongLivedClientCredentialsOAuth2Credentials as LongLivedClientCredentialsOAuth2Credentials,
+    OAuth2Spec as OAuth2Spec,
+    OAuth2TokenFlowSpec as OAuth2TokenFlowSpec,
+    ResourceOwnerPasswordOAuth2Credentials as ResourceOwnerPasswordOAuth2Credentials,
+    RotatingOAuth2Credentials as RotatingOAuth2Credentials,
     ValidationError,
 )
-from ..pydantic_polyfill import GenericModel
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .webhook.match import CollectionMatchingSpec, UrlMatch
-from .document import _BaseDocument, AssociatedDocument, BaseDocument
+# _BaseDocument is a package-internal TypeVar shared across these modules.
+from .document import (
+    _BaseDocument,  # pyright: ignore[reportPrivateUsage]
+    AssociatedDocument as AssociatedDocument,
+    BaseDocument as BaseDocument,
+)
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -60,12 +67,12 @@ the tuple type allows for str or integer values to be used
 CURSOR_MARKER = "__flow_cursor__"
 
 
-def is_cursor_dict(item: dict) -> bool:
+def is_cursor_dict(item: dict[str, Any]) -> bool:
     """Check if a dict is a cursor by looking for the cursor marker."""
     return item.get(CURSOR_MARKER) is True
 
 
-def make_cursor_dict(data: dict) -> dict:
+def make_cursor_dict(data: dict[str, Any]) -> dict[str, Any]:
     """Convert a regular dict to a cursor dict by adding the marker.
     
     The intended way of using this is to first call `make_cursor_dict` on a dictionary that
@@ -99,7 +106,7 @@ def make_cursor_dict(data: dict) -> dict:
     return {CURSOR_MARKER: True, **data}
 
 
-def pop_cursor_marker(cursor: dict) -> dict:
+def pop_cursor_marker(cursor: dict[str, Any]) -> dict[str, Any]:
     """Remove the cursor marker from a cursor dict."""
     cursor.pop(CURSOR_MARKER, None)
     return cursor
@@ -139,7 +146,7 @@ class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
 
     PATH_POINTERS: ClassVar[list[str]]
 
-    meta_: dict | None = Field(
+    meta_: dict[str, Any] | None = Field(
         default=None, alias="_meta", title="Meta",
     )
 
@@ -289,16 +296,16 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 
 
-class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
+class ConnectorState(BaseModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
     bindingStateV1: dict[str, _BaseResourceState | None] = {}
     backfillRequests: dict[str, bool | None] = {}
 
 
-_ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
+_ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState[Any])
 
-FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
+FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict[str, Any], None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 
@@ -310,7 +317,7 @@ not emitted by the connector.
 
 FetchPageFn = Callable[
     [Logger, PageCursor, LogCursor],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | dict[str, Any] | AssociatedDocument[Any] | PageCursor, None],
 ]
 """
 FetchPageFn fetches available checkpoints since the provided last PageCursor.
@@ -335,7 +342,7 @@ returning without yielding a final PageCursor.
 
 RecurringFetchPageFn = Callable[
     [Logger, PageCursor, LogCursor, bool],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | dict[str, Any] | AssociatedDocument[Any] | PageCursor, None],
 ]
 """
 RecurringFetchPagesFn fetches available checkpoints since the provided last PageCursor.
@@ -366,7 +373,7 @@ returning without yielding a final PageCursor.
 
 FetchChangesFn = Callable[
     [Logger, LogCursor],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
+    AsyncGenerator[_BaseDocument | dict[str, Any] | AssociatedDocument[Any] | LogCursor, None],
 ]
 """
 FetchChangesFn fetches available checkpoints since the provided last LogCursor.
@@ -400,7 +407,7 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 """
 
 
-def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+def is_recurring_fetch_page_fn(fn: FetchPageFn[Any] | RecurringFetchPageFn[Any], log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
     """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
     try:
         inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
@@ -433,7 +440,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
         as the model schema, rather than dynamically generating a schema.
         """
 
-        value: dict
+        value: dict[str, Any]
 
     name: str
     key: list[str]
@@ -448,8 +455,8 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
             Task,
             list[
                 tuple[
-                    CaptureBinding[_ResourceConfig],
-                    "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
+                    CaptureBinding[_BaseResourceConfig],
+                    "Resource[_BaseDocument, _BaseResourceConfig, _BaseResourceState]",
                 ]
             ],
         ],
@@ -460,6 +467,10 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+    # A fallback key is one the connector chose for lack of a natural identifier.
+    # The control plane uses it to create the collection, and the user may change it
+    # afterwards. A key the connector emits deletions for is not a fallback.
+    is_fallback_key: bool = False
     requires_explicit_acks: bool = False
 
 
@@ -477,7 +488,9 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
 
     key: list[str] = field(default_factory=lambda: ["/_meta/row_id"])
     initial_state: ResourceState = field(default_factory=ResourceState)
-    model: type[BaseDocument] | Resource.FixedSchema = BaseDocument
+    # A mutable attribute is invariant, so narrowing the generic to a
+    # concrete default can never match the base exactly.
+    model: type[BaseDocument] | Resource.FixedSchema = BaseDocument  # pyright: ignore[reportIncompatibleVariableOverride]
     schema_inference: bool = True
 
     def __post_init__(self):
@@ -485,12 +498,16 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
             f"A SnapshotResource must be keyed on /_meta/row_id, which is how "
             f"the CDK addresses the document a deletion removes. Got: {self.key}"
         )
+        assert not self.is_fallback_key, (
+            "A SnapshotResource's key can't be a fallback key because the CDK "
+            "emits deletions against /_meta/row_id."
+        )
 
 
 def discovered(
     resources: list["Resource[_BaseDocument, _BaseResourceConfig, _BaseResourceState]"],
 ) -> response.Discovered[_BaseResourceConfig]:
-    bindings: list[response.DiscoveredBinding] = []
+    bindings: list[response.DiscoveredBinding[_BaseResourceConfig]] = []
 
     for resource in resources:
         if isinstance(resource.model, Resource.FixedSchema):
@@ -543,9 +560,11 @@ def discovered(
             response.DiscoveredBinding(
                 documentSchema=schema,
                 key=resource.key,
+                isFallbackKey=resource.is_fallback_key,
                 recommendedName=resource.name,
                 resourceConfig=resource.initial_config,
                 disable=resource.disable,
+                resourcePath=resource.initial_config.path(),
             )
         )
 
@@ -553,7 +572,7 @@ def discovered(
 
 
 _ResolvableBinding = TypeVar(
-    "_ResolvableBinding", bound=CaptureBinding | request.ValidateBinding
+    "_ResolvableBinding", bound=CaptureBinding[Any] | request.ValidateBinding[Any]
 )
 """_ResolvableBinding is either a CaptureBinding or a request.ValidateBinding"""
 
@@ -561,7 +580,7 @@ _ResolvableBinding = TypeVar(
 def resolve_bindings(
     bindings: list[_ResolvableBinding],
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
-    resource_term="Resource",
+    resource_term: str = "Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
 
     resolved: list[
@@ -576,13 +595,9 @@ def resolve_bindings(
         if isinstance(resource.initial_config, WebhookResourceConfig)
     ]
     errors.extend(
-        filter(
-            bool,
-            (
-                rule.list_compatibility_errors(other)
-                for rule, other in combinations(webhook_match_rules, 2)
-            ),
-        )
+        error
+        for rule, other in combinations(webhook_match_rules, 2)
+        if (error := rule.list_compatibility_errors(other))
     )
 
     for binding in bindings:
@@ -662,20 +677,18 @@ def open(
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
     async def _run(task: Task):
-        backfill_requests = []
-        if open.state.backfillRequests is not None:
-            for stateKey in open.state.backfillRequests.keys():
-                task.log.info(
-                    "clearing checkpoint due to backfill trigger",
-                    {"stateKey": stateKey},
-                )
-                backfill_requests.append(stateKey)
-                await task.checkpoint(
-                    ConnectorState(
-                        bindingStateV1={stateKey: None},
-                        backfillRequests={stateKey: None},
-                    )
-                )
+        backfill_requests: list[str] = []
+        for stateKey in open.state.backfillRequests.keys():
+            task.log.info(
+                "clearing checkpoint due to backfill trigger",
+                {"stateKey": stateKey},
+            )
+            backfill_requests.append(stateKey)
+            cleared: ConnectorState[_ResourceState] = ConnectorState(
+                bindingStateV1={stateKey: None},
+                backfillRequests={stateKey: None},
+            )
+            await task.checkpoint(cleared)
 
         soonest_future_scheduled_initialization: datetime | None = None
         NOW = datetime.now(tz=UTC)
@@ -748,6 +761,9 @@ def open(
                     )
                 )
 
+            # Every branch above either found a state or built one from
+            # initial_state.
+            assert state is not None
             result = resource.open(
                 binding,
                 index,
@@ -762,7 +778,7 @@ def open(
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
             # re-initialization schedules.
-            asyncio.create_task(
+            _ = spawn(
                 scheduled_stop(task, soonest_future_scheduled_initialization)
             )
 
@@ -790,13 +806,13 @@ def _assert_tombstone_covers_key(tombstone: BaseDocument, key: list[str]) -> Non
         if key_pointer == "/_meta/row_id":
             continue
         node: Any = dump
-        for field in key_pointer.strip("/").split("/"):
-            assert isinstance(node, dict) and field in node, (
+        for field_name in key_pointer.strip("/").split("/"):
+            assert isinstance(node, dict) and field_name in node, (
                 f"A snapshot tombstone must have every collection key field "
                 f"other than /_meta/row_id pre-set, but {key_pointer} is unset. "
                 f"Key: {key}, tombstone: {dump}"
             )
-            node = node[field]
+            node = cast(dict[str, Any], node)[field_name]
 
 
 def _tombstone_discriminator_values(
@@ -814,8 +830,8 @@ def _tombstone_discriminator_values(
         if key_pointer == "/_meta/row_id":
             continue
         node: Any = dump
-        for field in key_pointer.strip("/").split("/"):
-            node = node[field]
+        for field_name in key_pointer.strip("/").split("/"):
+            node = node[field_name]
         values.append(node)
     return tuple(values)
 
@@ -823,7 +839,7 @@ def _tombstone_discriminator_values(
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
-    resource_state: _ResourceState,
+    resource_state: ResourceState,
     task: Task,
     fetch_changes: FetchChangesFn[_BaseDocument]
     | dict[str, FetchChangesFn[_BaseDocument]]
@@ -871,7 +887,10 @@ def open_binding(
 
         if isinstance(fetch_changes, dict):
             assert resource_state.inc and isinstance(resource_state.inc, dict)
-            for subtask_id, subtask_fetch_changes in fetch_changes.items():
+            # isinstance() against a union of callables narrows to a synthesized
+            # dict-and-callable intersection, so the subtask map is re-stated.
+            subtask_changes = cast(dict[str, FetchChangesFn[_BaseDocument]], fetch_changes)
+            for subtask_id, subtask_fetch_changes in subtask_changes.items():
                 inc_state = resource_state.inc.get(subtask_id)
                 assert inc_state
 
@@ -899,7 +918,7 @@ def open_binding(
 
         async def backfill_closure(
             task: Task,
-            fetch_page: FetchPageFn[_BaseDocument] | RecurringFetchPageFn,
+            fetch_page: FetchPageFn[_BaseDocument] | RecurringFetchPageFn[_BaseDocument],
             state: ResourceState.Backfill,
             subtask_id: str | None = None,
         ):
@@ -919,7 +938,8 @@ def open_binding(
 
         if isinstance(fetch_page, dict):
             assert resource_state.backfill and isinstance(resource_state.backfill, dict)
-            for subtask_id, subtask_fetch_page in fetch_page.items():
+            subtask_pages = cast(dict[str, FetchPageFn[_BaseDocument]], fetch_page)
+            for subtask_id, subtask_fetch_page in subtask_pages.items():
                 backfill_state = resource_state.backfill.get(subtask_id)
 
                 if not backfill_state:
@@ -1011,7 +1031,10 @@ def open_binding(
             snapshot_state = resource_state.snapshot
             assert snapshot_state is None or isinstance(snapshot_state, dict)
 
-            for subtask_id, subtask_fetch_snapshot in fetch_snapshot.items():
+            subtask_snapshots = cast(
+                dict[str, FetchSnapshotFn[_BaseDocument]], fetch_snapshot
+            )
+            for subtask_id, subtask_fetch_snapshot in subtask_snapshots.items():
                 subtask_state = (
                     snapshot_state.get(subtask_id) if snapshot_state else None
                 )
@@ -1151,7 +1174,9 @@ async def _binding_backfill_task(
     task: Task,
     subtask_id: str | None = None,
 ):
-    def _initialize_connector_state(state: ResourceState.Backfill) -> ConnectorState:
+    def _initialize_connector_state(
+        state: ResourceState.Backfill,
+    ) -> ConnectorState[ResourceState]:
         if subtask_id is not None:
             connector_state = ConnectorState(
                 bindingStateV1={
@@ -1190,10 +1215,10 @@ async def _binding_backfill_task(
 
         # Distinguish between FetchPageFn and RecurringFetchPageFn to provide the correct arguments.
         if is_recurring_fetch_page_fn(fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated):
-            fn = cast(RecurringFetchPageFn, fetch_page)
+            fn = cast(RecurringFetchPageFn[_BaseDocument], fetch_page)
             pages = fn(task.log, state.next_page, state.cutoff, is_connector_initiated)
         else:
-            fn = cast(FetchPageFn, fetch_page)
+            fn = cast(FetchPageFn[_BaseDocument], fetch_page)
             pages = fn(task.log, state.next_page, state.cutoff)
 
         async for item in pages:
@@ -1271,7 +1296,7 @@ async def _binding_backfill_task(
             task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
             task.stopping.event.set()
         elif future_scheduled_initialization:
-            asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))
+            _ = spawn(scheduled_stop(task, future_scheduled_initialization))
 
 
 async def _binding_incremental_task(
@@ -1341,9 +1366,10 @@ async def _binding_incremental_task(
                     "incremental task triggered backfill", {"subtask_id": subtask_id}
                 )
                 task.stopping.event.set()
-                await task.checkpoint(
-                    ConnectorState(backfillRequests={binding.stateKey: True})
+                requested: ConnectorState[ResourceState] = ConnectorState(
+                    backfillRequests={binding.stateKey: True}
                 )
+                await task.checkpoint(requested)
                 return
             else:
                 # Ensure LogCursor types match

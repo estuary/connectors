@@ -1,10 +1,11 @@
 import asyncio
-from typing import AsyncIterator, TypeVar
+from collections.abc import AsyncGenerator
+from typing import AsyncIterator, TypeVar, cast
 
 T = TypeVar("T")
 
 
-async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
+async def merge(*iterators: AsyncGenerator[T, None]) -> AsyncIterator[T]:
     """
     Merge multiple async iterators into a single stream in completion order.
 
@@ -65,6 +66,11 @@ async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
 
     tasks = [asyncio.create_task(_drain(aiter)) for aiter in iterators]
 
+    async def _reap() -> None:
+        """Discard queued items so blocked producers can finish unwinding."""
+        while True:
+            await queue.get()
+
     def _cancel_all_tasks() -> None:
         nonlocal cancelling
         cancelling = True
@@ -82,15 +88,25 @@ async def merge(*iterators: AsyncIterator[T]) -> AsyncIterator[T]:
             if item is _DONE:
                 active_count -= 1
             else:
-                yield item
+                # Neither the _DONE sentinel nor an exception, so an item of T.
+                yield cast(T, item)
 
     finally:
         _cancel_all_tasks()
-        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # A `_drain` task cancelled while blocked on a full queue still runs its
+        # own `finally`, which awaits `queue.put(_DONE)`. By now nothing is
+        # consuming the queue, so that put would never complete and the gather
+        # below would wait forever. Keep draining until the tasks have exited.
+        reaper = asyncio.create_task(_reap())
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            reaper.cancel()
+            await asyncio.gather(reaper, return_exceptions=True)
 
         for iterator in iterators:
-            if hasattr(iterator, "aclose"):
-                try:
-                    await iterator.aclose()
-                except Exception:
-                    pass
+            try:
+                await iterator.aclose()
+            except Exception:
+                pass

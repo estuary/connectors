@@ -99,6 +99,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "issues"
     ]
   },
   {
@@ -201,6 +204,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "projects"
     ]
   },
   {
@@ -303,6 +309,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "initiatives"
     ]
   },
   {
@@ -373,6 +382,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "labels"
     ]
   }
 ]

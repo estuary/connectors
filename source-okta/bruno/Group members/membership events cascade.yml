@@ -1,0 +1,189 @@
+info:
+  name: membership events cascade
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since=2026-10-09T17:04:00.000Z&until=2026-10-09T17:10:00.000Z&filter=eventType sw \"group.user_membership\" or eventType sw \"user.lifecycle\"&sortOrder=ASCENDING&limit=100"
+  params:
+    - name: since
+      value: "2026-10-09T17:04:00.000Z"
+      type: query
+    - name: until
+      value: "2026-10-09T17:10:00.000Z"
+      type: query
+    - name: filter
+      value: eventType sw "group.user_membership" or eventType sw "user.lifecycle"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** The window covers the 2026-10-09 User C sequence: `Seeding / Create Member User C`,
+  `Seeding / Add User C to Group`, `Seeding / Remove User C from Group`, a second add, then
+  `Seeding / Deactivate Member User C` and `Seeding / Delete Member User C` while C was still
+  a member. It answers: the shape of `group.user_membership.remove`, and whether a hard user
+  delete logs a membership removal for each of the user's groups.
+
+  **VERIFIED (2026-10-09):** `group.user_membership.remove` has the same `target[]` shape as
+  the add (`User` + `UserGroup`). A hard delete logs, in order,
+  `user.lifecycle.delete.initiated`, a `group.user_membership.remove` for the explicit group,
+  then `user.lifecycle.delete.completed`; nothing is logged for leaving Everyone.
+  `user.lifecycle.create` targets only the `User`. Deactivation logs
+  `user.lifecycle.deactivate` and no membership removal (deprovisioned users stay members —
+  `Group members / bare`).
+
+examples:
+  - name: "200 \u2014 explicit remove logged; hard delete logs a remove for the explicit group (projection: eventType/published/outcome/target)"
+    request:
+      url: "{{base_url}}/logs?since=2026-10-09T17%3A04%3A00.000Z&until=2026-10-09T17%3A10%3A00.000Z&filter=eventType%20sw%20%22group.user_membership%22%20or%20eventType%20sw%20%22user.lifecycle%22&sortOrder=ASCENDING&limit=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/logs?since=2026-10-09T17%3A04%3A00.000Z&until=2026-10-09T17%3A10%3A00.000Z&limit=100&sortOrder=ASCENDING&filter=eventType+sw+%22group.user_membership%22+or+eventType+sw+%22user.lifecycle%22>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "60"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "eventType": "user.lifecycle.create",
+              "published": "2026-10-09T17:05:02.025Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.add",
+              "published": "2026-10-09T17:05:17.229Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.remove",
+              "published": "2026-10-09T17:05:28.321Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.add",
+              "published": "2026-10-09T17:05:39.640Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "user.lifecycle.deactivate",
+              "published": "2026-10-09T17:05:50.850Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                }
+              ]
+            },
+            {
+              "eventType": "user.lifecycle.delete.initiated",
+              "published": "2026-10-09T17:06:02.052Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.remove",
+              "published": "2026-10-09T17:06:02.095Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "user.lifecycle.delete.completed",
+              "published": "2026-10-09T17:06:02.211Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                }
+              ]
+            }
+          ]

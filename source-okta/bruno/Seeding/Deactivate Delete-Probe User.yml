@@ -1,0 +1,38 @@
+info:
+  name: Deactivate Delete-Probe User
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{delprobe_user_id}}/lifecycle/deactivate?sendEmail=false"
+  params:
+    - name: sendEmail
+      value: "false"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('delprobe_user_id') && !bru.getEnvVar('delprobe_user_id')) {
+          await bru.runRequest('Seeding/Create Delete-Probe User');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Deactivate a user](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/UserLifecycle/#tag/UserLifecycle/operation/deactivateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** Okta deletes only DEPROVISIONED users, so the throwaway user has to be
+  deactivated before `Seeding / Delete Delete-Probe User`.
+
+  **Outcome:** ran 2026-10-08 and returned 200, producing
+  `user.lifecycle.deactivate` at 17:24:46.509Z (`Deletes / delete events`).

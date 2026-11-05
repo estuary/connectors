@@ -26,6 +26,8 @@ from .resources import all_resources, validate_credentials
 class Connector(
     BaseCaptureConnector[EndpointConfig, ZohoResourceConfigWithSchedule, ConnectorState],
 ):
+    retain_projections = False
+
     @override
     def request_class(self):
         return Request[EndpointConfig, ZohoResourceConfigWithSchedule, ConnectorState]

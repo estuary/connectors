@@ -1,0 +1,98 @@
+info:
+  name: Add Custom User Attribute
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/meta/schemas/user/default"
+  body:
+    type: json
+    data: |-
+      {
+        "definitions": {
+          "custom": {
+            "id": "#custom",
+            "type": "object",
+            "properties": {
+              "estuarySeedCostCode": {
+                "title": "Estuary Seed Cost Code",
+                "description": "Seeded by the source-okta Bruno collection to populate definitions.custom.",
+                "type": "string",
+                "required": false,
+                "permissions": [{ "principal": "SELF", "action": "READ_ONLY" }]
+              }
+            }
+          }
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - default schema now has estuarySeedCostCode (custom only; base elided)"
+    request:
+      url: "{{base_url}}/meta/schemas/user/default"
+      method: POST
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "500"
+      body:
+        type: json
+        data: |-
+          {
+            "definitions": {
+              "custom": {
+                "id": "#custom",
+                "type": "object",
+                "properties": {
+                  "estuarySeedCostCode": {
+                    "title": "Estuary Seed Cost Code",
+                    "description": "Seeded by the source-okta Bruno collection to populate definitions.custom.",
+                    "type": "string",
+                    "mutability": "READ_WRITE",
+                    "scope": "NONE",
+                    "permissions": [
+                      {
+                        "principal": "SELF",
+                        "action": "READ_ONLY"
+                      }
+                    ],
+                    "master": {
+                      "type": "PROFILE_MASTER"
+                    }
+                  }
+                },
+                "required": []
+              }
+            },
+            "lastUpdated": "2026-10-07T14:36:56.000Z"
+          }
+
+docs: |-
+  **REFERENCE:** [Update a user schema](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Schema/#tag/Schema/operation/updateUserProfile)
+
+  **WHY:** `definitions.custom.properties` is `{}` on this org, so the shape of a custom
+  attribute definition (the thing User_Custom_Profile exists to capture) can't be
+  observed. A partial-update POST adds one string attribute to the default user type.
+  Feeds `User Custom Profile / default schema` (custom attribute shape) and
+  `User Custom Profile / user profile values` (whether an unset custom attribute
+  appears in every user's `profile` as `null`).
+
+  **Side effect on sibling streams:** none observed. Users without a value get no
+  `estuarySeedCostCode` key (VERIFIED 2026-10-07, `User Custom Profile / user profile values`).
+
+  **Cleanup:** POST the same body with `"estuarySeedCostCode": null` to remove it
+  (the endpoint treats an explicit `null` as removal).
+
+  Outcome: ran 2026-10-07 (assistant, `seeding: assistant`). Finding VERIFIED in `User Custom Profile / default schema`.

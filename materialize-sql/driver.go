@@ -169,6 +169,10 @@ func (s *sqlMaterialization[EC, RC]) CreateResource(ctx context.Context, binding
 		}
 	}
 
+	if err := checkColumnLimit(s.endpoint.Dialect, table, 0, len(table.Columns())); err != nil {
+		return "", nil, err
+	}
+
 	createStatement, err := RenderTableTemplate(table, s.endpoint.CreateTableTemplate)
 	if err != nil {
 		return "", nil, err
@@ -372,7 +376,29 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 		return "", nil, nil
 	}
 
+	if err := checkColumnLimit(s.endpoint.Dialect, table, len(existingResource.AllFields()), len(alter.AddColumns)); err != nil {
+		return "", nil, err
+	}
+
 	return s.client.AlterTable(ctx, alter)
+}
+
+// checkColumnLimit fails a table that would exceed the dialect's column limit.
+// It runs while Apply actions are planned, before any binding's table changes.
+func checkColumnLimit(dialect Dialect, table Table, existing, added int) error {
+	if dialect.MaxColumns == 0 || added == 0 || existing+added <= dialect.MaxColumns {
+		return nil
+	}
+
+	var count = fmt.Sprintf("%d columns", existing+added)
+	if existing > 0 {
+		count += fmt.Sprintf(" (%d existing and %d new)", existing, added)
+	}
+
+	return cerrors.NewUserError(nil, fmt.Sprintf(
+		"table %s for collection %q would have %s, which exceeds the destination's limit of %d columns per table: exclude fields from this binding to reduce the number of columns",
+		table.Identifier, table.Source, count, dialect.MaxColumns,
+	))
 }
 
 func (s *sqlMaterialization[EC, RC]) NewTransactor(

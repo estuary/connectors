@@ -28,7 +28,7 @@ func init() {
 }
 
 // fakeSnowflakeDB opens a connection to the fake Snowflake, which lists the channels
-// the fake sidecar holds committed offset tokens for.
+// the fake Snowpipe holds committed offset tokens for.
 func fakeSnowflakeDB(t *testing.T) *stdsql.DB {
 	t.Helper()
 	db, err := stdsql.Open("fakesnowflake", "")
@@ -37,10 +37,10 @@ func fakeSnowflakeDB(t *testing.T) *stdsql.DB {
 	return db
 }
 
-// fakeSidecarChannels reports the channels the fake sidecar holds committed offset
+// fakeSnowpipeChannels reports the channels the fake Snowpipe holds committed offset
 // tokens for, which stand in for the channels on a table's default pipe.
-func fakeSidecarChannels() ([]string, error) {
-	var path = os.Getenv("FAKE_SIDECAR_STATE")
+func fakeSnowpipeChannels() ([]string, error) {
+	var path = os.Getenv("FAKE_SNOWPIPE_STATE")
 	if path == "" {
 		return nil, nil
 	}
@@ -64,7 +64,7 @@ func fakeSidecarChannels() ([]string, error) {
 }
 
 // fakeSnowflakeDriver is a database/sql driver whose one statement is SHOW CHANNELS.
-// The PIPE form answers from the fake sidecar's state and the TABLE form answers
+// The PIPE form answers from the fake Snowpipe's state and the TABLE form answers
 // nothing, as a table streamed into only through its default pipe would.
 type fakeSnowflakeDriver struct{}
 
@@ -83,7 +83,7 @@ func (fakeSnowflakeConn) Begin() (driver.Tx, error) {
 func (fakeSnowflakeConn) QueryContext(_ context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
 	switch {
 	case strings.HasPrefix(query, "SHOW CHANNELS IN PIPE "):
-		names, err := fakeSidecarChannels()
+		var names, err = fakeSnowpipeChannels()
 		return &fakeChannelRows{names: names}, err
 	case strings.HasPrefix(query, "SHOW CHANNELS IN TABLE "):
 		return &fakeChannelRows{}, nil
@@ -143,14 +143,15 @@ func fakeStreamManager(t *testing.T, task string) (*streamManager, func() []stri
 }
 
 // newFakeStreamV2Manager builds a streaming v2 manager for one shard of a task,
-// backed by the fake Snowflake and the fake sidecar, whose shared state outlives
-// the manager through FAKE_SIDECAR_STATE.
+// backed by the fake Snowflake and the fake Snowpipe, whose shared state outlives
+// the manager through FAKE_SNOWPIPE_STATE.
 func newFakeStreamV2Manager(t *testing.T, ctx context.Context, cfg *config, task string, keyRange *pf.RangeSpec) *streamV2Manager {
 	t.Helper()
 	sm, _ := fakeStreamManager(t, task)
-	var m = newStreamV2Manager(ctx, cfg, fakeSnowflakeDB(t), testDialect, sm, task, "acct", keyRange)
-	m.argv = fakeSidecarArgv(t)
-	t.Cleanup(m.stop)
+	fakeStreamV2Credentials(cfg)
+	var m, err = newStreamV2Manager(cfg, fakeSnowflakeDB(t), testDialect, sm, task, "acct", keyRange)
+	require.NoError(t, err)
+	fakeStreamV2Backend(t, m)
 	return m
 }
 
@@ -163,7 +164,27 @@ func packKey(key tuple.TupleElement) []byte {
 // testWriteRow stores one converted row under the key in its first value, which is
 // the KEY column of every table these tests store into.
 func testWriteRow(ctx context.Context, m *streamV2Manager, binding int, converted []any) error {
-	return m.writeRow(ctx, binding, packKey(converted[0]), converted)
+	return testWriteRowBatched(ctx, m, binding, converted, 0)
+}
+
+// testWriteRowBatched is testWriteRow that, when batchRows is not zero, sends a
+// channel's batch once it holds that many documents, so that a handful of
+// documents spans several appends.
+func testWriteRowBatched(ctx context.Context, m *streamV2Manager, binding int, converted []any, batchRows int) error {
+	if err := m.writeRow(ctx, binding, packKey(converted[0]), converted); err != nil {
+		return err
+	}
+	if batchRows == 0 {
+		return nil
+	}
+	for _, c := range m.bindings[binding].activeChannels {
+		if c.batch.rows >= batchRows {
+			if err := c.sendBatch(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // soleItem returns the one non-nil checkpoint item a flush produced for a binding,
@@ -182,14 +203,13 @@ func soleCheckpointItem(t *testing.T, entries map[int]streamV2Checkpoint, bindin
 	return sv2Checkpoint[0]
 }
 
-// singleChannelLayout pins streamV2ChannelsPerShard to one for a test whose
+// singleChannelLayout pins m to one channel per shard, for a test whose
 // assertions follow a single channel's counter, committed offset, or token. The write
 // path's behavior per channel is identical at any depth; these tests are about that
 // behavior, not about routing, which has coverage of its own.
-func singleChannelLayout(t *testing.T) {
-	var restore = streamV2ChannelsPerShard
-	t.Cleanup(func() { streamV2ChannelsPerShard = restore })
-	streamV2ChannelsPerShard = 1
+func singleChannelLayout(m *streamV2Manager) *streamV2Manager {
+	m.channelsPerShard = 1
+	return m
 }
 
 // fullKeyRange is the key range of a single-channel layout on an unsplit task.

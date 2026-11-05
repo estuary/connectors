@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -163,6 +164,26 @@ func stripRuntimeNextOutput(snapshot string) string {
 	return strings.Join(out, "\n")
 }
 
+// unsignedExponent matches a JSON number with an unsigned exponent, such as
+// `1e21`, where it stands as a value of its own: after `:`, `,`, `[` or
+// whitespace, and before `,`, `}`, `]` or whitespace. The bounds keep it off
+// the digits of strings such as UUIDs.
+var unsignedExponent = regexp.MustCompile(`([:,\[\s]|^)(-?\d+(?:\.\d+)?[eE])(\d+)([,}\]\s]|$)`)
+
+// signExponents writes every unsigned exponent with a `+`. The runtime v1 pass
+// runs a pinned flowctl whose serializer writes `1e21`, where runtime-next's
+// writes `1e+21`.
+func signExponents(s string) string {
+	for {
+		// Adjacent numbers share a bound, so each pass may leave one to the next.
+		var next = unsignedExponent.ReplaceAllString(s, "${1}${2}+${3}${4}")
+		if next == s {
+			return s
+		}
+		s = next
+	}
+}
+
 // requireMatchesRuntimeNextSnapshot requires the runtime v1 pass's value to
 // equal this test's runtime-next golden with the runtime-next-only output
 // lines removed: both runtimes must leave the same destination behind.
@@ -174,7 +195,7 @@ func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
 	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
 
 	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
-	if want == got {
+	if signExponents(want) == signExponents(got) {
 		return
 	}
 	if err := os.WriteFile(path+".runtime-v1.actual", []byte(got+"\n"), 0o644); err == nil {
@@ -257,6 +278,8 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	actionDescSanitizers []func(string) string,
 	runtime RuntimeConfig,
 ) {
+	requireRuntimeV1Selected(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
@@ -287,6 +310,8 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	actionDescSanitizers []func(string) string,
 	runtime RuntimeConfig,
 ) {
+	requireRuntimeV1Selected(t)
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -329,6 +354,8 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -390,6 +417,8 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -466,6 +495,8 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -511,6 +542,8 @@ func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate
 	phases []FeatureFlagMigrationPhase,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -635,6 +668,8 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -1240,6 +1275,8 @@ func logSweep(t *testing.T, kind string, outcomes []SweepOutcome) {
 // shouldCleanup reports whether a test resource or task should be removed, along
 // with the reason, which callers log.
 func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
+	// Destinations such as Snowflake fold unquoted names to upper case.
+	item, suffix = strings.ToLower(item), strings.ToLower(suffix)
 	if item == flowCheckpointsTableName {
 		// Never cleanup the meta checkpoints table: leaving it in place keeps
 		// it out of the next run's Apply action description (so snapshots stay

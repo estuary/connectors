@@ -1,0 +1,46 @@
+info:
+  name: K2 - Comment a Call
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/calls/{{seed_call_id}}/comments"
+  body:
+    type: json
+    data: |-
+      {
+        "content": "estuary connector test comment (safe to ignore)"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_call_id: `Calls / window asc`'s pin_call_id if run in this session,
+        // else the 2026-09-28 seeded call 4186784158 (outbound, answered).
+        if (!bru.getVar('seed_call_id')) bru.setVar('seed_call_id', bru.getVar('pin_call_id') || '4186784158');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#comment-a-call
+
+    **ONLY THE USER RUNS THIS — never the assistant.** It mutates Aircall state.
+
+    **WHY:** provokes a post-creation mutation on a call to confirm (a) the
+    List endpoint reflects it on re-read, (b) no timestamp on the Call itself
+    moves (i.e. there is no update cursor), and (c) `comments[].posted_at`
+    format. Re-run `Calls / window asc` afterwards. Targets seeded call
+    4186784158 by default (or `Calls / window asc`'s pin in the same session).
+
+    **Outcome:** ran 2026-09-28 (4 times — call 4186784158 carries 4
+    identical test comments; there is no delete-comment endpoint). Finding
+    VERIFIED in `Calls / window asc`.
+  type: text/markdown

@@ -1,0 +1,40 @@
+name: Connectors Gate
+description: >-
+  Decide a lane's single status check from its jobs' results, whichever
+  connectors ran. The calling job must run with `if: always()`: GitHub counts a
+  skipped job as passing a required check, and `!cancelled()` would let a
+  manually cancelled run pass.
+
+inputs:
+  results:
+    description: >-
+      The space-separated results of every job the gate covers, typically
+      `join(needs.*.result, ' ')`.
+    required: true
+  run:
+    description: >-
+      The `run` output the build job gates on: whether connectors were due to
+      build.
+    required: true
+  build_result:
+    description: The result of the lane's connector build job.
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Check the lane's job results
+      shell: bash
+      env:
+        RESULTS: ${{ inputs.results }}
+        RUN: ${{ inputs.run }}
+        BUILD: ${{ inputs.build_result }}
+      run: |
+        for r in $RESULTS; do
+          case "$r" in success|skipped) ;; *) echo "::error::a job ended $r"; exit 1 ;; esac
+        done
+        # "skipped" only counts as OK when there was nothing to build.
+        if [ "$RUN" = true ] && [ "$BUILD" != success ]; then
+          echo "::error::connectors were due to build but the build ended $BUILD"; exit 1
+        fi

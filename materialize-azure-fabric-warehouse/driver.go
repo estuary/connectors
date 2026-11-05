@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -28,7 +29,7 @@ type config struct {
 	ClientID           string           `json:"clientID" jsonschema:"title=Client ID,description=Client ID for the service principal used to connect to the Azure Fabric Warehouse." jsonschema_extras:"order=0"`
 	ClientSecret       string           `json:"clientSecret" jsonschema:"title=Client Secret,description=Client Secret for the service principal used to connect to the Azure Fabric Warehouse." jsonschema_extras:"order=1,secret=true"`
 	Warehouse          string           `json:"warehouse" jsonschema:"title=Warehouse,description=Name of the Azure Fabric Warehouse to connect to." jsonschema_extras:"order=2"`
-	Schema             string           `json:"schema" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
+	Schema             string           `json:"schema" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table." jsonschema_extras:"order=3"`
 	ConnectionString   string           `json:"connectionString" jsonschema:"title=Connection String,description=SQL connection string for the Azure Fabric Warehouse." jsonschema_extras:"order=4"`
 	StorageAccountName string           `json:"storageAccountName" jsonschema:"title=Storage Account Name,description=Name of the storage account that temporary files will be written to." jsonschema_extras:"order=5"`
 	StorageAccountKey  string           `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that temporary files will be written to." jsonschema_extras:"order=6,secret=true"`
@@ -152,6 +153,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("opening database connection: %w", err)
 			}
 			defer db.Close()
+
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
 
 			caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
 			if err != nil {

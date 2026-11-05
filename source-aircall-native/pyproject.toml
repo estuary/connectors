@@ -1,0 +1,21 @@
+[project]
+name = "source-aircall-native"
+version = "0.1.0"
+description = ""
+authors = [
+    { name = "Jonathan Wihl", email = "jonathan@estuary.dev" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "estuary-cdk",
+    "pydantic>=2,<3",
+]
+
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

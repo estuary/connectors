@@ -308,8 +308,7 @@ const (
 // during its own work and re-raises it as error 22834, quoting the original 1205 only in
 // the message text.
 func isDeadlockError(err error) bool {
-	var mssqlErr mssqldb.Error
-	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverDeadlockVictim {
+	if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok && mssqlErr.Number == sqlserverDeadlockVictim {
 		return true
 	}
 	return strings.Contains(err.Error(), "was deadlocked on lock resources")
@@ -355,8 +354,7 @@ var cdcMetadataLock sync.Mutex
 const sqlserverCaptureInstanceExists = 22926
 
 func isCaptureInstanceExistsError(err error) bool {
-	var mssqlErr mssqldb.Error
-	if errors.As(err, &mssqlErr) && mssqlErr.Number == sqlserverCaptureInstanceExists {
+	if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok && mssqlErr.Number == sqlserverCaptureInstanceExists {
 		return true
 	}
 	return strings.Contains(err.Error(), "already exists in the current database")

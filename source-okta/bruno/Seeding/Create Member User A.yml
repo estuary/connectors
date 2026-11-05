@@ -1,0 +1,51 @@
+info:
+  name: Create Member User A
+  type: http
+  seq: 20
+
+http:
+  method: POST
+  url: "{{base_url}}/users?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "firstName": "Estuary",
+          "lastName": "Members A",
+          "email": "estuary-members-a@example.com",
+          "login": "estuary-members-a@example.com"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('members_seed_user_a_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/createUser
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** a test user (created STAGED via `activate=false`, so no activation email
+  is sent) that stays ACTIVE-assigned throughout. Feeds `Group members / bare` and
+  `Application users / bare` (direct, `scope: USER` assignment).
+
+  **Cleanup:** deactivate then delete the user (`POST /users/{id}/lifecycle/deactivate`,
+  `DELETE /users/{id}`) in the Admin Console or via API.
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

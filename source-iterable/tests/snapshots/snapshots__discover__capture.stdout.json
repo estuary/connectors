@@ -158,6 +158,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -225,6 +228,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "campaigns_metrics"
     ]
   },
   {
@@ -299,6 +305,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "channels"
     ]
   },
   {
@@ -375,6 +384,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "lists"
     ]
   },
   {
@@ -443,6 +455,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "message_types"
     ]
   },
   {
@@ -496,6 +511,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "metadata"
     ]
   },
   {
@@ -598,6 +616,9 @@
     },
     "key": [
       "/templateId"
+    ],
+    "resourcePath": [
+      "templates"
     ]
   },
   {
@@ -1289,6 +1310,9 @@
     },
     "key": [
       "/email"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -1348,6 +1372,9 @@
     },
     "key": [
       "/listId"
+    ],
+    "resourcePath": [
+      "list_users"
     ]
   },
   {
@@ -1465,6 +1492,9 @@
     "key": [
       "/messageId",
       "/email"
+    ],
+    "resourcePath": [
+      "email_bounce"
     ]
   },
   {
@@ -1630,6 +1660,9 @@
     "key": [
       "/messageId",
       "/email"
+    ],
+    "resourcePath": [
+      "email_click"
     ]
   },
   {
@@ -1747,6 +1780,9 @@
     "key": [
       "/messageId",
       "/email"
+    ],
+    "resourcePath": [
+      "email_complaint"
     ]
   },
   {
@@ -1894,6 +1930,9 @@
     "key": [
       "/messageId",
       "/email"
+    ],
+    "resourcePath": [
+      "email_open"
     ]
   },
   {
@@ -2188,6 +2227,9 @@
     "key": [
       "/messageId",
       "/email"
+    ],
+    "resourcePath": [
+      "email_send"
     ]
   },
   {
@@ -2483,6 +2525,9 @@
     "key": [
       "/messageId",
       "/email"
+    ],
+    "resourcePath": [
+      "email_send_skip"
     ]
   },
   {
@@ -2608,6 +2653,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "email_subscribe"
     ]
   },
   {
@@ -2758,6 +2806,9 @@
     },
     "key": [
       "/email"
+    ],
+    "resourcePath": [
+      "email_unsubscribe"
     ]
   },
   {
@@ -2863,6 +2914,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "push_send"
     ]
   },
   {
@@ -2968,6 +3022,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "push_send_skip"
     ]
   },
   {
@@ -3073,6 +3130,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "push_open"
     ]
   },
   {
@@ -3178,6 +3238,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "push_uninstall"
     ]
   },
   {
@@ -3283,6 +3346,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "push_bounce"
     ]
   },
   {
@@ -3388,6 +3454,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "web_push_send"
     ]
   },
   {
@@ -3493,6 +3562,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "web_push_click"
     ]
   },
   {
@@ -3598,6 +3670,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "web_push_send_skip"
     ]
   },
   {
@@ -3703,6 +3778,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_send"
     ]
   },
   {
@@ -3808,6 +3886,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_open"
     ]
   },
   {
@@ -3913,6 +3994,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_click"
     ]
   },
   {
@@ -4018,6 +4102,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_close"
     ]
   },
   {
@@ -4123,6 +4210,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_delete"
     ]
   },
   {
@@ -4228,6 +4318,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_delivery"
     ]
   },
   {
@@ -4333,6 +4426,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "in_app_send_skip"
     ]
   },
   {
@@ -4438,6 +4534,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "inbox_session"
     ]
   },
   {
@@ -4543,6 +4642,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "inbox_message_impression"
     ]
   },
   {
@@ -4648,6 +4750,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "sms_send"
     ]
   },
   {
@@ -4753,6 +4858,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "sms_bounce"
     ]
   },
   {
@@ -4858,6 +4966,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "sms_click"
     ]
   },
   {
@@ -4963,6 +5074,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "sms_received"
     ]
   },
   {
@@ -5068,6 +5182,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "sms_send_skip"
     ]
   },
   {
@@ -5173,6 +5290,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "sms_usage_info"
     ]
   },
   {
@@ -5278,6 +5398,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "purchase"
     ]
   },
   {
@@ -5383,6 +5506,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "custom_event"
     ]
   },
   {
@@ -5488,6 +5614,9 @@
     "key": [
       "/email",
       "/createdAt"
+    ],
+    "resourcePath": [
+      "hosted_unsubscribe_click"
     ]
   }
 ]

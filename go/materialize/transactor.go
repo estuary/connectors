@@ -10,7 +10,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/gogo/protobuf/types"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
@@ -201,6 +200,9 @@ func RunTransactions(
 	be := NewBindingEvents()
 	health := newHealthTracker(open)
 	be.health = health
+	be.status = newStatusTracker(open)
+	stopStatus := be.status.start()
+	defer stopStatus()
 
 	openStart := time.Now()
 	log.Info("requesting materialization Open")
@@ -242,7 +244,6 @@ func RunTransactions(
 	if err != nil {
 		return err
 	}
-	logrus.WithField("eventType", "connectorStatus").Info("Running")
 
 	health.start()
 	defer health.close()

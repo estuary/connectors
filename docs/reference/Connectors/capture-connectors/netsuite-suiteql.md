@@ -10,7 +10,7 @@ To use SuiteAnalytics Connect to sync your data instead, see the [Netsuite Suite
 
 ## Supported data resources
 
-Currently, this connector supports a subset of NetSuite tables, such as:
+By default, the connector captures these tables:
 
 * Account
 * Customer
@@ -23,8 +23,23 @@ Currently, this connector supports a subset of NetSuite tables, such as:
 * TransactionShippingAddress
 * TransactionStatus
 
-If you need to capture a table that is not yet supported, [contact support](mailto:support@estuary.dev) with the table name(s).
-Estuary support will be able to confirm availability and, if needed, add the table(s) to the connector.
+To capture any other SuiteQL table, add it to the endpoint's [`/tables`](#endpoint) setting with its name and key fields:
+
+```yaml
+tables:
+  - name: employee
+    keys: [id]
+```
+
+Most NetSuite records use `id` as their key. To capture a table without a key, set `keys: []`. The table is then captured as a [snapshot](#paginated-backfill-vs-snapshot).
+
+Before adding a table, check that:
+
+- **Your custom role can view the record.** If it can't, the binding fails or captures no rows.
+- **The table has 100 columns or fewer.** If it has more, list the columns you need in the binding's [`columns`](#bindings) field. Otherwise SuiteQL returns no rows and no error.
+- **The keys are unique for every row.** Rows that share a key are merged into one document.
+
+If a table still doesn't capture correctly, [contact support](mailto:support@estuary.dev) with the table name.
 
 ## Sync modes and data loading
 
@@ -50,7 +65,7 @@ The SuiteQL connector does **not** read NetSuite's `DeletedRecord` table to corr
 
 SuiteQL has several hard API limits that shape how the connector operates. Plan your bindings with these in mind:
 
-- **No metadata introspection.** Unlike the SuiteAnalytics ODBC driver, SuiteQL has no way to programmatically discover table schemas, primary keys, or foreign keys. The connector relies on a static list of supported tables and keys; if you need a table that isn't supported, [contact support](mailto:support@estuary.dev).
+- **No metadata introspection.** Unlike the SuiteAnalytics ODBC driver, SuiteQL has no way to programmatically discover table schemas, primary keys, or foreign keys. The connector can't list the tables you have, so it captures a default list plus any tables you add to [`/tables`](#endpoint), using the keys you give it.
 - **100-column limit.** SuiteQL silently returns zero rows for any query that selects more than 100 columns. To capture wide tables, set the binding's [`columns`](#bindings) field to an explicit list of 100 or fewer columns.
 - **100,000-row result limit.** SuiteQL caps query results at 100,000 rows. For tables with keys, this is not a practical concern: the connector pages through results using the key's sort order, and each page fetches only unread rows. For tables without keys on the other hand, the connector uses a limit-offset strategy. Each subquery must re-examine the full table scan to locate its window of rows, so performance degrades as the table grows. Snapshot bindings are best suited to small reference/lookup tables.
 - **Date-only timestamps.** SuiteQL returns date-time columns as date-only strings. The connector emits these as-is — hour, minute, and second information is not available.
@@ -181,7 +196,7 @@ See [connectors](/concepts/connectors.md#using-connectors) to learn more about u
 | --- | --- | --- | --- | --- |
 | `/account` | Netsuite Account ID | Netsuite realm/Account ID e.g. 2344535, as for `production` or 2344535_SB1, as for `sandbox` | string | Required |
 | `/authentication` | Authentication Details | Credentials to access your NetSuite account | object | Required |
-| `/tables` | Tables | List of tables to capture with their keys | array of objects, each containing a string name and array of keys | Defaults to all supported data resources |
+| `/tables` | Tables | List of tables to capture with their keys | array of objects, each containing a string name and array of keys | Defaults to the tables listed in [Supported data resources](#supported-data-resources) |
 | `/advanced` | Advanced | Any advanced options to use for the connector | object |  |
 
 #### Authentication Config

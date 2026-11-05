@@ -1,0 +1,86 @@
+info:
+  name: parent groups
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?limit=200"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: capture a group id for `Group members / bare`. Prefer the seeded
+        // fixture (`Seeding / Create Members Group`), then any OKTA_GROUP, then the
+        // first (BUILT_IN Everyone).
+        const groups = res.getBody();
+        if (Array.isArray(groups) && groups.length) {
+          const seeded = groups.find((g) => g.profile?.name === 'estuary-members-group');
+          const okta = groups.find((g) => g.type === 'OKTA_GROUP');
+          bru.setVar('group_id', (seeded ?? okta ?? groups[0]).id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroups
+
+  **WHY:** Group_members iterates every group as its parent. Proves the parent
+  drain at the connector's page size (`limit=200`, Okta's recommendation) and which
+  group types the default listing returns.
+
+  **VERIFIED (2026-10-07):** the default listing returns BUILT_IN (Everyone, Okta
+  Administrators) and OKTA_GROUP groups; no hidden partition. APP_GROUP not present
+  in this tenant (**UNOBSERVABLE:** needs a directory/app import integration; the
+  spec lists no default filter on `type`, so APP_GROUPs are assumed included —
+  fallback if not: add a `type` sweep). Order is not by id (OKTA_GROUP listed first)
+  but was identical across runs.
+
+examples:
+  - name: "200 \u2014 BUILT_IN and OKTA_GROUP types listed (projection: id/type/name/lastMembershipUpdated)"
+    request:
+      url: "{{base_url}}/groups?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups?limit=200>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00g18gur2rc3zz7MS698",
+              "type": "OKTA_GROUP",
+              "profile.name": "estuary-members-group",
+              "lastMembershipUpdated": "2026-10-07T14:37:12.000Z"
+            },
+            {
+              "id": "00g176zmw9j1Wyxqf698",
+              "type": "BUILT_IN",
+              "profile.name": "Everyone",
+              "lastMembershipUpdated": "2026-10-07T14:36:39.000Z"
+            },
+            {
+              "id": "00g176zmw9kqvHDny698",
+              "type": "BUILT_IN",
+              "profile.name": "Okta Administrators",
+              "lastMembershipUpdated": "2026-09-03T19:36:27.000Z"
+            }
+          ]

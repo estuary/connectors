@@ -1,0 +1,20 @@
+name: Aircall
+variables:
+  - name: base_url
+    value: https://api.aircall.io/v1
+  - name: base_url_v2
+    value: https://api.aircall.io/v2
+  - name: config_path
+    value: ../config.yaml
+  - name: resource
+    value: tags
+  # Contacts/ pins (contacts stream-builder). Seeds from Seeding/C1-C6 (2026-09-28):
+  # Alpha created 1790603975 / updated 1790603985; Charlie created+updated 1790603982.
+  - name: updated_floor
+    value: "1790603983"
+  - name: window_from
+    value: "1790603975"
+  - name: window_to
+    value: "1790603982"
+  - name: contact_id
+    value: "518778695"

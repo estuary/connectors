@@ -1,5 +1,77 @@
 # materialize-snowflake
 
+## 2026-11-03
+
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. Controlled by the `truncate_after_backfill`
+  feature flag, enabled by default; a binding without a `flow_published_at`
+  column, or in delta-updates mode, is unaffected.
+- Load, commit and truncation queries that run for at least five seconds are logged with
+  the metrics Snowflake records of them in its query history: time spent
+  queued, blocked, compiling and executing, the bytes and partitions they
+  scanned, and the bytes they spilled. Load and merge queries also log the key
+  bounds they were restricted to. The metrics are read in the background,
+  without holding up the transaction.
+
+### Changed
+- Tasks that run on more than one shard now fail at startup unless every
+  binding writes through `snowpipe_streaming_v2`.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+## 2026-10-26
+
+### Changed
+- The `snowpipe_streaming_v2` write path now calls the Snowpipe Streaming REST
+  API directly from the connector. The Python sidecar holding Snowflake's SDK,
+  and its memory, are gone. Rows are written to local batch files as
+  gzip-compressed NDJSON, and each file of up to 256 MiB of rows before
+  compression is appended straight from disk. A batch that compresses to more
+  than 4 MiB travels through the pipe's stage bucket instead, encrypted under
+  the pipe's key.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+## 2026-10-15
+
+### Fixed
+- Delta-updates bindings using Snowpipe Streaming can now write to a schema
+  whose name needs quoting, such as one containing a hyphen. Previously
+  opening the streaming channel failed with "The supplied schema does not
+  exist or is not authorized. (code 9)".
+
+## 2026-10-13
+
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to the date range of each transaction's keys.
+
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as a
+  `TIMESTAMP_TYPE_MAPPING` query error. This also applies when the
+  materialization is saved, so messages such as "incorrect username or
+  password" are shown again.
+
 ## 2026-09-28
 
 ### Fixed

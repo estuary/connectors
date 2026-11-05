@@ -1,0 +1,31 @@
+info:
+  name: A1 - Create Team
+  type: http
+  seq: 5
+http:
+  method: POST
+  url: '{{base_url}}/teams'
+  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary Bruno Seed Team"
+      }
+runtime:
+  scripts:
+  - type: after-response
+    code: if (res.getStatus() === 201) bru.setVar('seed_team_id', res.getBody().team.id);
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#create-a-team
+    **ONLY THE USER RUNS THIS — never the assistant** (state-mutating).
+    **WHY:** `Teams / bare` is empty (2026-09-28), so the item shape is unobserved. Seeds one team; A2 adds the account's user so the nested `users` array is populated.
+    Captures `seed_team_id` for A2 / D2.
+    Outcome: ran 2026-09-28 by the user (team 262615). Finding VERIFIED in `Teams / bare`.
+  type: text/markdown

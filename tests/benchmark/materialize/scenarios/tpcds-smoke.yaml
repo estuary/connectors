@@ -1,0 +1,5 @@
+# All 24 TPC-DS tables at scale 0.01 (~278K documents), from the source-tpc-ds
+# capture. A quick end-to-end check of the TPC-DS path, not a measurement.
+tpcds:
+  scale: 0.01
+  transaction_size: 32MB

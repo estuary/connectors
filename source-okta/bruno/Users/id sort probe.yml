@@ -1,0 +1,97 @@
+info:
+  name: id sort probe
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=200&search=created gt \"1970-01-01T00:00:00.000Z\"&sortBy=id&sortOrder=asc"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: search
+      value: created gt "1970-01-01T00:00:00.000Z"
+      type: query
+    - name: sortBy
+      value: id
+      type: query
+    - name: sortOrder
+      value: asc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - 5 users in sortBy=id order (projection)
+    request:
+      url: "{{base_url}}/users?limit=200&search=created gt \"1970-01-01T00:00:00.000Z\"&sortBy=id&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u176zmwbsJ1Uak8698",
+              "created": "2026-09-03T19:36:29.000Z",
+              "status": "ACTIVE"
+            },
+            {
+              "id": "00u18gupu552EU005698",
+              "created": "2026-10-07T14:36:28.000Z",
+              "status": "STAGED"
+            },
+            {
+              "id": "00u18gut4epTYtsK2698",
+              "created": "2026-10-07T14:36:39.000Z",
+              "status": "DEPROVISIONED"
+            },
+            {
+              "id": "00u18gzxz10URexK9698",
+              "created": "2026-10-07T16:20:03.000Z",
+              "status": "DEPROVISIONED"
+            },
+            {
+              "id": "00u18h00o173Yc9fV698",
+              "created": "2026-10-07T16:20:12.000Z",
+              "status": "STAGED"
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** the users backfill walks `search` with `sortBy=id&sortOrder=asc` and
+  resumes each page on `id gt "<last id>"`. That is gapless only if `sortBy=id`
+  really orders by id (not by `created`), under the same comparison `id gt`
+  applies (`Users / id gt collation probe`). This lists every user in
+  `sortBy=id` order next to `created`, to tell id order from creation order and
+  byte order from case-insensitive order.
+
+  **VERIFIED (2026-10-19):** all 5 users come back in id order, which is also
+  their `created` order. Every pair of ids first differs on a digit or a
+  lowercase letter, where byte order and case-insensitive order agree, so
+  these users cannot tell the comparisons apart.
+
+  **UNOBSERVABLE:** whether `sortBy=id` orders case-insensitively, as `id gt`
+  compares (`Users / id gt collation probe`). Every id seen so far is digits
+  and lowercase letters through index 10, where ids minted at different times
+  already differ (`00u18gupu…`, `00u18gut4…`; `Everyone` and `Okta
+  Administrators`, minted in the same second, differ at index 10). So two ids
+  first differ on a mixed-case character only when minted within the same
+  instant, as in a bulk import. Users created one request at a time never do, so no seeding
+  in this collection can produce such a pair. The connector assumes `sortBy`
+  and `id gt` order the same index field the same way, and
+  `_backfill_entities` raises on a page whose ids do not strictly ascend
+  case-insensitively past the resume id, instead of checkpointing past rows.

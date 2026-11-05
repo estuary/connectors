@@ -57,7 +57,10 @@
     "resourceConfig": {
       "stream": "accounts",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "accounts"
+    ]
   },
   {
     "documentSchema": {
@@ -120,7 +123,10 @@
       ],
       "stream": "account_users",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "account_users"
+    ]
   },
   {
     "documentSchema": {
@@ -189,7 +195,10 @@
       ],
       "stream": "ad_campaign_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_campaign_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -258,7 +267,10 @@
       ],
       "stream": "ad_creative_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_creative_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -327,7 +339,10 @@
       ],
       "stream": "ad_impression_device_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_impression_device_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -396,7 +411,10 @@
       ],
       "stream": "ad_member_company_size_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_company_size_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -465,7 +483,10 @@
       ],
       "stream": "ad_member_country_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_country_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -534,7 +555,10 @@
       ],
       "stream": "ad_member_job_function_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_job_function_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -603,7 +627,10 @@
       ],
       "stream": "ad_member_job_title_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_job_title_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -672,7 +699,10 @@
       ],
       "stream": "ad_member_industry_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_industry_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -741,7 +771,10 @@
       ],
       "stream": "ad_member_seniority_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_seniority_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -810,7 +843,10 @@
       ],
       "stream": "ad_member_region_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_region_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -879,7 +915,10 @@
       ],
       "stream": "ad_member_company_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_company_analytics"
+    ]
   },
   {
     "documentSchema": {
@@ -942,7 +981,10 @@
       ],
       "stream": "campaign_groups",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "campaign_groups"
+    ]
   },
   {
     "documentSchema": {
@@ -1013,7 +1055,10 @@
       ],
       "stream": "campaigns",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "campaigns"
+    ]
   },
   {
     "documentSchema": {
@@ -1076,7 +1121,10 @@
       ],
       "stream": "creatives",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "creatives"
+    ]
   },
   {
     "documentSchema": {
@@ -1138,6 +1186,9 @@
       ],
       "stream": "conversions",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "conversions"
+    ]
   }
 ]

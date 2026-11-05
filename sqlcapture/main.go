@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -127,6 +129,9 @@ type Driver struct {
 	DocumentationURL string
 
 	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
+
+	// Optional: if set, Pull waits a random time up to the returned duration before connecting.
+	MaxStartupDelay func(cfg json.RawMessage) (time.Duration, error)
 }
 
 type prerequisitesError struct {
@@ -194,35 +199,7 @@ func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_S
 
 // Apply applies a new or updated capture to the store.
 func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
-	// If there are no bindings in the request, then it may represent the deletion of the capture,
-	// or it may also be that the all of the bindings were deleted but the capture remains.
-	if len(req.Capture.Bindings) > 0 {
-		var db, err = d.Connect(ctx, string(req.Capture.Name), req.Capture.ConfigJson)
-		if err != nil {
-			return nil, fmt.Errorf("error connecting to database: %w", err)
-		}
-		defer db.Close(ctx)
-
-		var requested = make([]TableID, 0, len(req.Capture.Bindings))
-		for _, binding := range req.Capture.Bindings {
-			var res Resource
-			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-				return nil, fmt.Errorf("error parsing resource config: %w", err)
-			}
-			res.SetDefaults()
-			requested = append(requested, TableID{Schema: res.Namespace, Table: res.Stream})
-		}
-		discoveredTables, err := db.DiscoverTableDetails(ctx, requested)
-		if err != nil {
-			return nil, fmt.Errorf("error discovering database tables: %w", err)
-		}
-		for _, req := range requested {
-			var streamID = JoinStreamID(req.Schema, req.Table)
-			if _, ok := discoveredTables[streamID]; !ok {
-				return nil, fmt.Errorf("could not find or access table %q", streamID)
-			}
-		}
-	}
+	// SQL captures have nothing to apply.
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
@@ -397,6 +374,30 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var ctx = stream.Context()
+
+	// Notify Flow that we're ready and would like to receive acknowledgements. This comes before
+	// the startup delay and connecting because Flow can't move the task to a newly published spec
+	// until the connector is ready.
+	if err := stream.Ready(true); err != nil {
+		return err
+	}
+
+	// Wait a random time before connecting, so that captures which start together spread out.
+	if d.MaxStartupDelay != nil {
+		var maxDelay, err = d.MaxStartupDelay(open.Capture.ConfigJson)
+		if err != nil {
+			return fmt.Errorf("error parsing max startup delay: %w", err)
+		}
+		if maxDelay > 0 {
+			var delay = time.Duration(rand.Int63n(int64(maxDelay)))
+			log.WithField("eventType", "connectorStatus").Infof("Waiting %s before connecting to database", delay.Round(time.Second))
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
 	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
 	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
@@ -460,11 +461,6 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		State:    &state,
 		Output:   stream,
 		Database: db,
-	}
-
-	// Notify Flow that we're ready and would like to receive acknowledgements.
-	if err := c.Output.Ready(true); err != nil {
-		return err
 	}
 
 	err = c.Run(ctx)

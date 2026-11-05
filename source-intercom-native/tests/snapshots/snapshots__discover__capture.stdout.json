@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "admins"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -277,6 +286,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "company_attributes"
     ]
   },
   {
@@ -347,6 +359,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "contact_attributes"
     ]
   },
   {
@@ -417,6 +432,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "conversation_attributes"
     ]
   },
   {
@@ -499,6 +517,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "contacts"
     ]
   },
   {
@@ -581,6 +602,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "conversation_parts"
     ]
   },
   {
@@ -663,6 +687,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "tickets"
     ]
   },
   {
@@ -745,6 +772,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "conversations"
     ]
   },
   {
@@ -827,6 +857,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "segments"
     ]
   },
   {
@@ -909,6 +942,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "companies"
     ]
   },
   {
@@ -991,6 +1027,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "company_segments"
     ]
   }
 ]

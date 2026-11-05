@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "channels"
     ]
   },
   {
@@ -137,6 +140,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "inboxes"
     ]
   },
   {
@@ -207,6 +213,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -277,6 +286,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "teammates"
     ]
   },
   {
@@ -347,6 +359,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -429,6 +444,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "events"
     ]
   },
   {
@@ -511,6 +529,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "contacts"
     ]
   },
   {
@@ -588,6 +609,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "conversations"
     ]
   }
 ]

@@ -194,7 +194,7 @@ func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) 
 	var query = fmt.Sprintf(`MERGE INTO %s USING dual ON (slot=:slot) WHEN MATCHED THEN UPDATE SET watermark=:watermark WHEN NOT MATCHED THEN INSERT (slot, watermark) VALUES (:slot,:watermark)`, db.config.Advanced.WatermarksTable)
 	var _, err = db.conn.ExecContext(ctx, query, sql.Named("slot", db.config.Advanced.NodeID), sql.Named("watermark", watermark))
 	if err != nil {
-		return fmt.Errorf("error upserting new watermark for slot %q: %w", db.config.Advanced.NodeID, err)
+		return fmt.Errorf("error upserting new watermark for slot %d: %w", db.config.Advanced.NodeID, err)
 	}
 	return nil
 }

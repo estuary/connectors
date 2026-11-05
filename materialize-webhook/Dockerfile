@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.25-trixie AS builder
+FROM --platform=linux/amd64 golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
@@ -17,7 +17,7 @@ COPY materialize-webhook     ./materialize-webhook
 
 # Test and build the connector.
 RUN go test  -tags nozstd -short -v ./materialize-webhook/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-webhook/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-webhook/cmd/connector
 
 # Runtime Stage
 ################################################################################

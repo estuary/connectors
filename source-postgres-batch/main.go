@@ -18,11 +18,15 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
 	truncateColumnThreshold = 1 * 1024 * 1024
+
+	infinityTimestamp         = "9999-12-31T23:59:59Z"
+	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
 )
 
 var featureFlagDefaults = map[string]bool{
@@ -288,6 +292,17 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 			return json.RawMessage(bs), nil
 		}
 		return val, nil
+	case "DATE", "TIMESTAMP", "TIMESTAMPTZ":
+		// The pgx database/sql adapter returns infinite dates and timestamps as the strings
+		// "infinity" and "-infinity" instead of a time.Time. We map them to the same
+		// sentinel values the CDC source-postgres connector uses to avoid schema violation
+		// errors since "infinity" doesn't validate against `format: date-time`.
+		switch val {
+		case pgtype.Infinity.String():
+			return infinityTimestamp, nil
+		case pgtype.NegativeInfinity.String():
+			return negativeInfinityTimestamp, nil
+		}
 	}
 
 	if val, ok := val.(time.Time); ok {
@@ -295,7 +310,7 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 			// We could in theory clamp excessively large years to positive infinity, but this
 			// is of limited usefulness since these are never real dates, they're mostly just
 			// dumb typos like `20221` and so we might as well normalize all errors consistently.
-			return "0000-01-01T00:00:00Z", nil
+			return negativeInfinityTimestamp, nil
 		}
 		return val.Format(time.RFC3339Nano), nil
 	}

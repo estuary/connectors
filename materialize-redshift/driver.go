@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -86,7 +87,7 @@ type config struct {
 	User               string           `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password           string           `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database           string           `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
-	Schema             string           `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
+	Schema             string           `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table." jsonschema_extras:"order=4"`
 	Bucket             string           `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
 	AWSAccessKeyID     string           `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
 	AWSSecretAccessKey string           `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
@@ -269,6 +270,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("opening db: %w", err)
 			}
 			defer db.Close()
+
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
 
 			var caseSensitiveIdentifier string
 			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
@@ -490,7 +500,7 @@ func (t *transactor) addBinding(target sql.Table, is *boilerplate.InfoSchema) er
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose appropriate templates based on configuration
@@ -920,10 +930,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // Flush records completed backfills on the primary only, since every shard
 // receives the same completions and only the primary applies staged work.
 func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
-	d.truncations = make(map[int]time.Time, len(completes))
 	if !d.primary {
 		return nil
 	}
+	d.truncations = make(map[int]time.Time, len(completes))
 	for binding, boundary := range completes {
 		var b = d.bindings[binding]
 		if b.target.DeltaUpdates {
@@ -937,11 +947,7 @@ func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 		}
 		if b.truncateSQL == "" {
 			var _, reason = b.target.PublishedAtColumn()
-			log.WithFields(log.Fields{
-				"eventType": "connectorStatus",
-				"table":     b.target.Identifier,
-				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason)
+			d.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
 			continue
 		}
 		d.truncations[binding] = boundary
@@ -1119,8 +1125,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 				// updated this column. Practically this means we will try to set a column that is
 				// already VARCHAR(MAX) to VARCHAR(MAX), and Redshift returns a specific error in
 				// this case that can be safely discarded.
-				var pgErr *pgconn.PgError
-				if errors.As(err, &pgErr) {
+				if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 					if pgErr.Code == "0A000" && strings.Contains(pgErr.Message, "target column size should be different") {
 						log.WithFields(log.Fields{
 							"table":  b.target.Identifier,
@@ -1267,11 +1272,8 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			// Pass.
 		} else if b.truncateSQL == "" {
 			var _, reason = b.target.PublishedAtColumn()
-			log.WithFields(log.Fields{
-				"table":    b.target.Identifier,
-				"boundary": *g.merged.TruncateBefore,
-				"reason":   reason.Error(),
-			}).Warn("skipping staged truncation because the binding no longer supports it")
+			return nil, fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
+				g.merged.TruncateBefore.Format(time.RFC3339), b.target.Identifier, reason)
 		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
 			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 		} else {

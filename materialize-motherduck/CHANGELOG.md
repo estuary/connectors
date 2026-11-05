@@ -1,5 +1,45 @@
 # materialize-motherduck
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains a single quote or has a custom projection name.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+### Fixed
+- On DuckLake databases, a column whose field becomes optional now has its
+  `NOT NULL` constraint dropped, so commits no longer fail when that field is
+  missing.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+### Changed
+- The warning about rows a backfill did not delete now names every affected
+  table instead of only the latest one.
+
+## 2026-10-13
+
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to the date range of each transaction's keys.
+
 ## 2026-10-08
 
 ### Changed

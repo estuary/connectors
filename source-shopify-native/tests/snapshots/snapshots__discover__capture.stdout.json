@@ -82,6 +82,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "abandoned_checkouts"
     ]
   },
   {
@@ -167,6 +170,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "customers"
     ]
   },
   {
@@ -252,6 +258,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "customer_metafields"
     ]
   },
   {
@@ -337,6 +346,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "products"
     ]
   },
   {
@@ -422,6 +434,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_media"
     ]
   },
   {
@@ -507,6 +522,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_metafields"
     ]
   },
   {
@@ -592,6 +610,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_variants"
     ]
   },
   {
@@ -677,6 +698,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_variant_metafields"
     ]
   },
   {
@@ -762,6 +786,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "fulfillment_orders"
     ]
   },
   {
@@ -847,6 +874,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "fulfillments"
     ]
   },
   {
@@ -932,6 +962,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "orders"
     ]
   },
   {
@@ -1017,6 +1050,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_agreements"
     ]
   },
   {
@@ -1102,6 +1138,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_metafields"
     ]
   },
   {
@@ -1187,6 +1226,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_transactions"
     ]
   },
   {
@@ -1272,6 +1314,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_refunds"
     ]
   },
   {
@@ -1357,6 +1402,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_returns"
     ]
   },
   {
@@ -1442,6 +1490,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_risks"
     ]
   },
   {
@@ -1527,6 +1578,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "inventory_items"
     ]
   },
   {
@@ -1612,6 +1666,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "inventory_levels"
     ]
   },
   {
@@ -1697,6 +1754,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "custom_collections"
     ]
   },
   {
@@ -1782,6 +1842,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "smart_collections"
     ]
   },
   {
@@ -1867,6 +1930,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "custom_collection_metafields"
     ]
   },
   {
@@ -1952,6 +2018,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "smart_collection_metafields"
     ]
   },
   {
@@ -2037,6 +2106,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "locations"
     ]
   },
   {
@@ -2122,6 +2194,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "location_metafields"
     ]
   },
   {
@@ -2207,6 +2282,9 @@
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "disputes"
     ]
   },
   {
@@ -2284,6 +2362,9 @@
     "key": [
       "/_meta/store",
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "markets"
     ]
   }
 ]

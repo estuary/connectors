@@ -35,6 +35,7 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 		primary:               rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
 		rangeKey:              rangeKey,
 		be:                    &m.BindingEvents{},
+		profiler:              boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -323,7 +324,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 		var db = recordingDB(t, conflict)
 		recording.failFirst = 2
 
-		require.NoError(t, d.execQueries(context.Background(), db, []string{"COPY"}, false, noReport))
+		require.NoError(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
 		require.Equal(t, 3, recording.attempts)
 		require.Equal(t, []string{"COPY"}, recording.executed)
 	})
@@ -331,7 +332,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 	t.Run("gives up after the retry budget", func(t *testing.T) {
 		var db = recordingDB(t, conflict)
 
-		var err = d.execQueries(context.Background(), db, []string{"COPY"}, false, noReport)
+		var err = d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
 		require.ErrorIs(t, err, conflict)
 		require.Equal(t, maxQueryRetries+1, recording.attempts)
 	})
@@ -339,7 +340,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 	t.Run("other errors are not retried", func(t *testing.T) {
 		var db = recordingDB(t, fmt.Errorf("[DELTA_CONCURRENT_APPEND] something else"))
 
-		require.Error(t, d.execQueries(context.Background(), db, []string{"COPY"}, false, noReport))
+		require.Error(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
 		require.Equal(t, 1, recording.attempts)
 	})
 
@@ -350,7 +351,7 @@ func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 
-		var err = d.execQueries(ctx, db, []string{"COPY"}, false, noReport)
+		var err = d.execQueries(ctx, db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Equal(t, 1, recording.attempts)
 	})
@@ -531,6 +532,16 @@ func TestAcknowledge(t *testing.T) {
 		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
 		_, err = d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("some PATH_NOT_FOUND error")), allKeys)
 		require.Error(t, err) // no longer a recovery apply
+	})
+
+	t.Run("recovery tolerates a staging table without its transaction log", func(t *testing.T) {
+		var d = testTransactor(lowerRangeKey, "a_table.v1")
+		d.cp.add("a_table.v1", lowerRangeKey, item("Q1"))
+		d.cpRecovery = true
+
+		_, err := d.acknowledgeApply(context.Background(), recordingDB(t, fmt.Errorf("[DELTA_MISSING_TRANSACTION_LOG] Incompatible format detected")), allKeys)
+		require.NoError(t, err)
+		require.False(t, d.cpRecovery)
 	})
 }
 
@@ -833,6 +844,27 @@ func TestCombineBounds(t *testing.T) {
 		require.Empty(t, out[1].LiteralUpper)
 	})
 
+	t.Run("ranges union across entries", func(t *testing.T) {
+		var split = bound("'2026-03-01T00:00:00Z'", "'2026-10-26T12:15:00Z'")
+		split.Ranges = []mergeRangeLiterals{
+			{"'2026-03-01T00:00:00Z'", "'2026-03-01T00:00:00Z'"},
+			{"'2026-10-26T12:00:00Z'", "'2026-10-26T12:15:00Z'"},
+		}
+		var items = []*checkpointItem{
+			{Bounds: []mergeBoundLiterals{bound("1", "10"), split}},
+			{Bounds: []mergeBoundLiterals{bound("5", "50"), bound("'2026-10-26T12:10:00Z'", "'2026-10-26T12:30:00Z'")}},
+			{Bounds: []mergeBoundLiterals{bound("5", "50"), split}},
+		}
+		var out = combineBounds(keys, items)
+		require.Nil(t, out[0].Ranges)
+		require.Equal(t, "GREATEST('2026-10-26T12:15:00Z'::TIMESTAMP, '2026-10-26T12:30:00Z'::TIMESTAMP)", out[1].LiteralUpper)
+		require.Equal(t, []sql.MergeRange{
+			{LiteralLower: "'2026-03-01T00:00:00Z'", LiteralUpper: "'2026-03-01T00:00:00Z'"},
+			{LiteralLower: "'2026-10-26T12:00:00Z'", LiteralUpper: "'2026-10-26T12:15:00Z'"},
+			{LiteralLower: "'2026-10-26T12:10:00Z'", LiteralUpper: "'2026-10-26T12:30:00Z'"},
+		}, out[1].Ranges)
+	})
+
 	t.Run("a length mismatch drops all bounds of that entry's columns", func(t *testing.T) {
 		var items = []*checkpointItem{
 			{Bounds: []mergeBoundLiterals{bound("1", "10"), bound("'a'", "'b'")}},
@@ -847,6 +879,31 @@ func TestCombineBounds(t *testing.T) {
 
 // Root-level files from a checkpoint written before staging directories existed
 // merge in their own query, ahead of the directories.
+// A recovered entry's bound ranges survive the persisted state and bound its
+// MERGE.
+func TestAcknowledgeMergesWithRecoveredRanges(t *testing.T) {
+	var d = renderingTransactor(fullRangeKey)
+	require.NoError(t, d.UnmarshalState(json.RawMessage(`{"a_table.v1": {"00000000-ffffffff": {
+		"Directory": "txn-1",
+		"NeedsMerge": true,
+		"Bounds": [
+			{"Lower": "1", "Upper": "10"},
+			{"Lower": "'2026-03-01T00:00:00Z'", "Upper": "'2026-10-26T12:15:00Z'", "Ranges": [
+				{"Lower": "'2026-03-01T00:00:00Z'", "Upper": "'2026-03-01T00:00:00Z'"},
+				{"Lower": "'2026-10-26T12:00:00Z'", "Upper": "'2026-10-26T12:15:00Z'"}
+			]}
+		]
+	}}}`)))
+
+	_, err := d.acknowledgeApply(context.Background(), recordingDB(t, nil), allKeys)
+	require.NoError(t, err)
+	require.Len(t, recording.executed, 1)
+	require.Contains(t, recording.executed[0], "l.id = r.id AND l.id >= 1 AND l.id <= 10")
+	require.Contains(t, recording.executed[0], "l.ts = r.ts AND ("+
+		"(l.ts >= '2026-03-01T00:00:00Z' AND l.ts <= '2026-03-01T00:00:00Z') OR "+
+		"(l.ts >= '2026-10-26T12:00:00Z' AND l.ts <= '2026-10-26T12:15:00Z'))")
+}
+
 func TestAcknowledgeMergesRootFilesWithDirectories(t *testing.T) {
 	var d = renderingTransactor(lowerRangeKey)
 	d.cp.add("a_table.v1", lowerRangeKey, structuredItem(true,
@@ -955,7 +1012,7 @@ func TestCopyIntoStagingTable(t *testing.T) {
 		var ctx = context.Background()
 		require.NoError(t, b.storeFile.start(ctx, db))
 		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
-		require.NoError(t, d.copyIntoStagingTable(ctx, db, b))
+		require.NoError(t, d.copyIntoStagingTable(ctx, db, 0, b))
 
 		if !needsMerge {
 			require.Len(t, recording.executed, 1)

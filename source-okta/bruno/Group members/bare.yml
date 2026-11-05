@@ -1,0 +1,162 @@
+info:
+  name: bare
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/groups/{{group_id}}/users?limit=200"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('group_id')) await bru.runRequest('Group members/parent groups');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroupUsers
+
+  **WHY:** Shape of the Group_members document at the connector's page size
+  (`limit=200`, Okta's recommendation). Establishes: bare-array envelope, that items
+  are full User objects, and that no groupId / membership timestamp is present
+  (decides stamping and the cursor question).
+
+  **VERIFIED (2026-10-07):** bare JSON array of full User objects (`id`, `status`,
+  `created`, `activated`, `statusChanged`, `lastLogin`, `lastUpdated`,
+  `passwordChanged`, `type`, `profile`, `credentials`, `_links.self`).
+
+  **LIMITATION (VERIFIED 2026-10-07):** no group id anywhere in the body (not even
+  in `_links`) and no membership timestamp — the connector stamps the group id from
+  the request's parent, and there is no per-membership cursor.
+
+  **VERIFIED (2026-10-07):** DEPROVISIONED users remain listed as members (after
+  `Seeding / Deactivate Member User B`, still 2 rows, B `status: DEPROVISIONED`).
+  STAGED users are listed too.
+
+  **DOCUMENTED (2026-10-07):** removed members vanish from the list (spec "Lists all
+  users that are a member of a group"); no tombstone or filter exists.
+
+examples:
+  - name: "200 \u2014 two seeded members, full User objects, no group id"
+    request:
+      url: "{{base_url}}/groups/00g18gur2rc3zz7MS698/users?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups/00g18gur2rc3zz7MS698/users?limit=200>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "status": "STAGED",
+              "created": "2026-10-07T14:36:28.000Z",
+              "activated": null,
+              "statusChanged": null,
+              "lastLogin": null,
+              "lastUpdated": "2026-10-07T14:36:28.000Z",
+              "passwordChanged": null,
+              "type": {
+                "id": "oty176zmw9ti8gVdP698"
+              },
+              "profile": {
+                "firstName": "Estuary",
+                "lastName": "Members A",
+                "mobilePhone": null,
+                "secondEmail": null,
+                "login": "estuary-members-a@example.com",
+                "email": "estuary-members-a@example.com"
+              },
+              "credentials": {
+                "provider": {
+                  "type": "OKTA",
+                  "name": "OKTA"
+                }
+              },
+              "_links": {
+                "self": {
+                  "href": "https://okta-domain/api/v1/users/00u18gupu552EU005698"
+                }
+              }
+            },
+            {
+              "id": "00u18gut4epTYtsK2698",
+              "status": "STAGED",
+              "created": "2026-10-07T14:36:39.000Z",
+              "activated": null,
+              "statusChanged": null,
+              "lastLogin": null,
+              "lastUpdated": "2026-10-07T14:36:39.000Z",
+              "passwordChanged": null,
+              "type": {
+                "id": "oty176zmw9ti8gVdP698"
+              },
+              "profile": {
+                "firstName": "Estuary",
+                "lastName": "Members B",
+                "mobilePhone": null,
+                "secondEmail": null,
+                "login": "estuary-members-b@example.com",
+                "email": "estuary-members-b@example.com"
+              },
+              "credentials": {
+                "provider": {
+                  "type": "OKTA",
+                  "name": "OKTA"
+                }
+              },
+              "_links": {
+                "self": {
+                  "href": "https://okta-domain/api/v1/users/00u18gut4epTYtsK2698"
+                }
+              }
+            }
+          ]
+  - name: "200 \u2014 after User B deprovisioned, B is still a member (projection: id/status/login)"
+    request:
+      url: "{{base_url}}/groups/00g18gur2rc3zz7MS698/users?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups/00g18gur2rc3zz7MS698/users?limit=200>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "status": "STAGED",
+              "profile.login": "estuary-members-a@example.com"
+            },
+            {
+              "id": "00u18gut4epTYtsK2698",
+              "status": "DEPROVISIONED",
+              "profile.login": "estuary-members-b@example.com"
+            }
+          ]

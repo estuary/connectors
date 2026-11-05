@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	m "github.com/estuary/connectors/go/materialize"
@@ -54,6 +55,17 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	require.Nil(t, state)
 	require.NotNil(t, tr.cp["a_table.v1"])
 	require.NotNil(t, tr.cp["b_table.v1"])
+}
+
+func TestEntryWithoutTruncationOmitsIt(t *testing.T) {
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(mustMarshal(t, &checkpointItem{JobPrefix: "jp"}), &fields))
+	require.NotContains(t, fields, "TruncateBefore")
+}
+
+func TestTimestampLiteralFloorsToMicroseconds(t *testing.T) {
+	var ts = time.Date(2026, 9, 29, 12, 34, 56, 999_999_999, time.FixedZone("x", 3600))
+	require.Equal(t, "TIMESTAMP '2026-09-29 11:34:56.999999 UTC'", timestampLiteral(ts))
 }
 
 func TestUnmarshalStateRouting(t *testing.T) {

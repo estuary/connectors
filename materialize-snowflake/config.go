@@ -21,7 +21,7 @@ const (
 	// bindings that use JWT authentication.
 	flagSnowpipeStreaming = "snowpipe_streaming"
 	// flagSnowpipeStreamingV2 enables the high-performance Snowpipe Streaming
-	// architecture, via the Python SDK sidecar, for delta-updates bindings that
+	// architecture, through its REST API, for delta-updates bindings that
 	// use JWT authentication. It requires the v2 materialization runtime; see
 	// requireStreamingV2Runtime.
 	flagSnowpipeStreamingV2 = "snowpipe_streaming_v2"
@@ -33,6 +33,7 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"datetime_keys_as_string":          common.FlagEnabled,
 	"retain_existing_data_on_backfill": common.FlagDisabled,
 	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 // snowflakeTimestampType specifies how timestamp columns should be handled in Snowflake.

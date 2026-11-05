@@ -1,0 +1,33 @@
+info:
+  name: A3 - Revoke Api Keys
+  type: graphql
+  seq: 3
+
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      mutation Cleanup($name: Name!) {
+        revokeAllApiKeys(catalogName: $name) { catalogName apiKeys { id } }
+      }
+    variables: |-
+      {
+        "name": "Jonathan_Wihl/source-estuary-test-sa"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/service_accounts.rs
+
+  **MUTATION — only the user runs this; never the assistant.**
+
+  **WHY:** Cleanup after `ServiceAccounts / bare` has been re-run against the
+  seeded account: makes the A2 key inert. Optional — the key also expires in
+  1 day. Run only after re-verification.

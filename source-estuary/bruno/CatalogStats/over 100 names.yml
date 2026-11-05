@@ -1,0 +1,69 @@
+info:
+  name: over 100 names
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query($names:[String!]!){ catalogStats(by:{names:$names,grain:DAILY,start:\"2026-10-06T00:00:00Z\",end:\"2026-10-07T00:00:00Z\"}){ edges{ node{ catalogName } } } }","variables":{"names":["PLACEHOLDER_FILLED_BY_SCRIPT"]}}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const body = req.getBody();
+        body.variables.names = Array.from({ length: 101 }, (_, i) => `Jonathan_Wihl/probe-${i}`);
+        req.setBody(body);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs` (`CatalogStatsQuery::catalog_stats`, `MAX_BUCKETS = 10_000`, 30 s timeout)
+  
+  **WHY:** the +1 probe on the 100-name ceiling — expect a validator error,
+  not a clamp. The before-request script shapes this single request's body
+  with 101 synthetic names under `Jonathan_Wihl/` (readable, nonexistent).
+
+  **LIMITATION (VERIFIED 2026-10-07):** rejected — `the value length is 101, must be
+  less than or equal to 100`. No clamp; the connector chunks names by 100.
+
+examples:
+  - name: "200 — errors: 101 names rejected"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": null,
+            "errors": [
+              {
+                "message": "Failed to parse \"[String!]\": the value length is 101, must be less than or equal to 100 (occurred while parsing \"CatalogStatsBy\")",
+                "locations": [
+                  {
+                    "line": 1,
+                    "column": 43
+                  }
+                ],
+                "path": [
+                  "catalogStats"
+                ]
+              }
+            ]
+          }

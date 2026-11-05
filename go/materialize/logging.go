@@ -321,8 +321,9 @@ func (l *extendedLogger) finishedCommitLogFn(round int) func() {
 
 func (l *extendedLogger) waitingForAckDelayLogFn(round int) func() {
 	l.ackDelayStart = time.Now()
+	msg := syncWaitMessage(l.be.status.nextSync())
 	return func() {
-		l.log(log.Fields{"round": round}, "waiting to acknowledge materialization commit")
+		l.log(log.Fields{"round": round}, msg)
 	}
 }
 
@@ -373,6 +374,7 @@ func (l *extendedLogger) finishedWaitingForDocsLogFn(round int) func() {
 type BindingEvents struct {
 	enabled              bool
 	health               *healthTracker
+	status               *statusTracker
 	log                  func(log.Fields, string)
 	wg                   sync.WaitGroup
 	stopLogger           chan struct{}
@@ -424,7 +426,7 @@ func (l *BindingEvents) StartedEvaluatingLoads() {
 			for {
 				select {
 				case <-ticker.C:
-					l.log(log.Fields{"round": l.round}, "evaluting loads")
+					l.log(log.Fields{"round": l.round}, "evaluating loads")
 				case <-l.stopLogger:
 					l.log(log.Fields{"round": l.round, "took": time.Since(l.evaluatingLoadsStart).String()}, "finished evaluating loads")
 					return
@@ -479,6 +481,18 @@ func (l *BindingEvents) ReportRowStats(round int, path []string, stats RowStats)
 	if l != nil && l.health != nil {
 		l.health.report(round, path, stats)
 	}
+}
+
+// Warn sets the connector status to a condition that needs the user's
+// attention, such as rows a backfill did not delete. Warnings are kept in the
+// status, replacing progress, until the connector stops. Active regardless of
+// extended logging.
+func (l *BindingEvents) Warn(key, msg string) {
+	if l != nil && l.status != nil {
+		l.status.warn(key, msg)
+		return
+	}
+	log.Warn(msg)
 }
 
 func repeatAsync(repeat func(), every time.Duration) (stop func(onStop func())) {

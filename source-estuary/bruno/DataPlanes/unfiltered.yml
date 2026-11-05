@@ -1,0 +1,399 @@
+info:
+  name: unfiltered
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query DataPlanes {
+        dataPlanes(first: 100) {
+          pageInfo { hasNextPage endCursor }
+          edges { cursor node { id name fqdn reactorAddress cloudProvider region tag isPublic closed cidrBlocks gcpServiceAccountEmail awsIamUserArn azureApplicationName azureApplicationClientId } }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/data_planes.rs
+
+  **WHY:** Data planes are not prefix-scoped: the resolver returns every plane the
+  key can read (public planes plus private planes under tenants it can read).
+  Baseline shape and volume. Private-link fields are omitted (empty unless the
+  caller has ViewDataPlanePrivateNetworking; volatile controller output).
+
+  **VERIFIED (2026-10-07):** 15 planes sorted by `name`: 9 `ops/dp/public/*` plus 6 private `ops/dp/private/estuary|solutions/*`. The private ones are readable only because this key has read on `ops/dp/private/...`. So **unfiltered output depends on the key's grants, not on configured prefixes**. Cursor = `name`.
+
+examples:
+  - name: 200 - 15 planes incl. estuary-private via ops grants
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "dataPlanes": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "ops/dp/public/gcp-us-central1-c3"
+                },
+                "edges": [
+                  {
+                    "cursor": "ops/dp/private/estuary/aws-us-east-1-c1",
+                    "node": {
+                      "id": "1181093c69806400",
+                      "name": "ops/dp/private/estuary/aws-us-east-1-c1",
+                      "fqdn": "c34525fd491857d8.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.c34525fd491857d8.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-east-1",
+                      "tag": "c1",
+                      "isPublic": false,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f18:3b95:7d00::/56",
+                        "23.20.21.47/32",
+                        "3.232.93.248/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-b3cov8cfokr70fan@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-37kosek57ebm0ihf",
+                      "azureApplicationName": "data-plane-c34525fd491857d8.dp.estuary-data.com",
+                      "azureApplicationClientId": "a2181a46-49bb-4716-a63b-c18cd0ed7cfd"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/private/estuary/aws-us-west-1-c98",
+                    "node": {
+                      "id": "14cac324dd616000",
+                      "name": "ops/dp/private/estuary/aws-us-west-1-c98",
+                      "fqdn": "bce6e3acfce2df8c.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.bce6e3acfce2df8c.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-west-1",
+                      "tag": "c98",
+                      "isPublic": false,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f1c:161:1800::/56",
+                        "13.52.59.165/32",
+                        "54.177.68.17/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-7nbjjig4cavgo7hf@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-svc09k9j3fpaslp8",
+                      "azureApplicationName": "data-plane-bce6e3acfce2df8c.dp.estuary-data.com",
+                      "azureApplicationClientId": "6f6467a2-99f9-4500-9cc5-a26033b2fc88"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/private/estuary/aws-us-west-2-c99",
+                    "node": {
+                      "id": "14be214d6aae1000",
+                      "name": "ops/dp/private/estuary/aws-us-west-2-c99",
+                      "fqdn": "1a405995ca25cae2.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.1a405995ca25cae2.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-west-2",
+                      "tag": "c99",
+                      "isPublic": false,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f14:786:e00::/56",
+                        "184.33.126.113/32",
+                        "52.36.36.74/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-ir8eo0cjmqasot9s@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-esbjpn0qpsd92olv",
+                      "azureApplicationName": "data-plane-1a405995ca25cae2.dp.estuary-data.com",
+                      "azureApplicationClientId": "5601e5e1-ed7a-4a56-88c3-ef1f86683090"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/private/estuary/azure-eastus-c1",
+                    "node": {
+                      "id": "118ff1335854b400",
+                      "name": "ops/dp/private/estuary/azure-eastus-c1",
+                      "fqdn": "f150af58a80cd052.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.f150af58a80cd052.dp.estuary-data.com",
+                      "cloudProvider": "AZURE",
+                      "region": "eastus",
+                      "tag": "c1",
+                      "isPublic": false,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "172.172.141.186/32",
+                        "20.124.232.172/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-cojrvl6ednkagllk@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-dmgkv32tjkm9q1ig",
+                      "azureApplicationName": "data-plane-f150af58a80cd052.dp.estuary-data.com",
+                      "azureApplicationClientId": "4c5c1a28-81f4-4c52-8f49-20503a835464"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/private/estuary/gcp-us-central1-c5",
+                    "node": {
+                      "id": "1130fa47eb647400",
+                      "name": "ops/dp/private/estuary/gcp-us-central1-c5",
+                      "fqdn": "f7002c61f85f2b5e.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.f7002c61f85f2b5e.dp.estuary-data.com",
+                      "cloudProvider": "GCP",
+                      "region": "us-central1",
+                      "tag": "c5",
+                      "isPublic": false,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1900:4000:a339::/64",
+                        "104.198.31.80/32",
+                        "34.68.179.39/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-r6rq1rqk2rp2ilsl@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-6tnir0jlgdmssf2c",
+                      "azureApplicationName": "data-plane-f7002c61f85f2b5e.dp.estuary-data.com",
+                      "azureApplicationClientId": "e2d660f9-3826-4f3f-a406-64a8b0d0171c"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/private/solutions/aws-us-east-1-c1",
+                    "node": {
+                      "id": "15fcff17155ef800",
+                      "name": "ops/dp/private/solutions/aws-us-east-1-c1",
+                      "fqdn": "c3ac30662a57cf0c.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.c3ac30662a57cf0c.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-east-1",
+                      "tag": "c1",
+                      "isPublic": false,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f10:4a1c:ce00::/56",
+                        "34.199.45.31/32",
+                        "44.214.94.156/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-c73pg5dah1tajvgr@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-t3d1q89s7iih22qr",
+                      "azureApplicationName": "data-plane-c3ac30662a57cf0c.dp.estuary-data.com",
+                      "azureApplicationClientId": "af531984-230e-4450-beb6-c261443f1aec"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/aws-ap-southeast-2-c1",
+                    "node": {
+                      "id": "13300087b9760400",
+                      "name": "ops/dp/public/aws-ap-southeast-2-c1",
+                      "fqdn": "aws-ap-southeast-2-c1.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.aws-ap-southeast-2-c1.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "ap-southeast-2",
+                      "tag": "c1",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2406:da1c:463:cd00::/56",
+                        "15.134.198.216/32",
+                        "3.24.170.247/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-r2ht42anamce4e4u@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-29dmej81ghjohrht",
+                      "azureApplicationName": "data-plane-aws-ap-southeast-2-c1.dp.estuary-data.com",
+                      "azureApplicationClientId": "82b7d516-09d8-44be-ae20-80568daef6d3"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/aws-eu-west-1-c1",
+                    "node": {
+                      "id": "0eae476e9d7f1c00",
+                      "name": "ops/dp/public/aws-eu-west-1-c1",
+                      "fqdn": "aws-eu-west-1-c1.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.aws-eu-west-1-c1.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "eu-west-1",
+                      "tag": "c1",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2a05:d018:1b4e:2800::/56",
+                        "18.200.127.124/32",
+                        "34.247.94.19/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-48vsfi8i91j6c1ns@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-342o84ecos0opkov",
+                      "azureApplicationName": "data-plane-aws-eu-west-1-c1.dp.estuary-data.com",
+                      "azureApplicationClientId": "24bedcf9-4b7b-4417-b91b-6cc126b57e20"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/aws-us-east-1-c1",
+                    "node": {
+                      "id": "129baaf7ca04c400",
+                      "name": "ops/dp/public/aws-us-east-1-c1",
+                      "fqdn": "aws-us-east-1-c1.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.aws-us-east-1-c1.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-east-1",
+                      "tag": "c1",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f18:7371:d200::/56",
+                        "107.20.68.5/32",
+                        "98.89.112.85/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-fl9tim6meq69s01a@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-hsfgjfu7id8daor4",
+                      "azureApplicationName": "data-plane-aws-us-east-1-c1.dp.estuary-data.com",
+                      "azureApplicationClientId": "b04ba278-574e-499c-a7db-ef2949242484"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/aws-us-east-1-c2",
+                    "node": {
+                      "id": "15da6e23e0e2bc00",
+                      "name": "ops/dp/public/aws-us-east-1-c2",
+                      "fqdn": "aws-us-east-1-c2.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.aws-us-east-1-c2.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-east-1",
+                      "tag": "c2",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f18:6a21:3e00::/56",
+                        "3.213.32.214/32",
+                        "3.228.123.194/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-npps7t6d6qa0qg0g@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-dnpkq6ikfb8kgg46",
+                      "azureApplicationName": "data-plane-aws-us-east-1-c2.dp.estuary-data.com",
+                      "azureApplicationClientId": "13b504dd-a338-4313-817f-682c5a115256"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/aws-us-west-2-c1",
+                    "node": {
+                      "id": "129980e32e854000",
+                      "name": "ops/dp/public/aws-us-west-2-c1",
+                      "fqdn": "aws-us-west-2-c1.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.aws-us-west-2-c1.dp.estuary-data.com",
+                      "cloudProvider": "AWS",
+                      "region": "us-west-2",
+                      "tag": "c1",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1f14:1e3d:e400::/56",
+                        "34.213.10.188/32",
+                        "52.34.175.198/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-lbq60nc9j53rvbsv@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-6urqu22rnp0ulooe",
+                      "azureApplicationName": "data-plane-aws-us-west-2-c1.dp.estuary-data.com",
+                      "azureApplicationClientId": "5482be16-35e7-41fd-b75f-d8ecd99bd8a9"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/azure-centralus-c1",
+                    "node": {
+                      "id": "149a267d94a94800",
+                      "name": "ops/dp/public/azure-centralus-c1",
+                      "fqdn": "azure-centralus-c1.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.azure-centralus-c1.dp.estuary-data.com",
+                      "cloudProvider": "AZURE",
+                      "region": "centralus",
+                      "tag": "c1",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "20.9.5.18/32",
+                        "52.173.106.208/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-m082n2o2c04u12jn@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-qr7tp1tefbv5da1b",
+                      "azureApplicationName": "data-plane-azure-centralus-c1.dp.estuary-data.com",
+                      "azureApplicationClientId": "4a7b7428-da31-4761-88ea-6e2192383d32"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/gcp-us-central1-c1",
+                    "node": {
+                      "id": "0e8e17d04facd400",
+                      "name": "ops/dp/public/gcp-us-central1-c1",
+                      "fqdn": "gcp-us-central1-c1.dp.estuary-data.com",
+                      "reactorAddress": "http://flow-reactor.flow.svc.cluster.local:8080",
+                      "cloudProvider": "GCP",
+                      "region": "us-central1",
+                      "tag": "c1",
+                      "isPublic": true,
+                      "closed": true,
+                      "cidrBlocks": [],
+                      "gcpServiceAccountEmail": null,
+                      "awsIamUserArn": null,
+                      "azureApplicationName": null,
+                      "azureApplicationClientId": ""
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/gcp-us-central1-c2",
+                    "node": {
+                      "id": "11900caf66f59800",
+                      "name": "ops/dp/public/gcp-us-central1-c2",
+                      "fqdn": "gcp-us-central1-c2.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.gcp-us-central1-c2.dp.estuary-data.com",
+                      "cloudProvider": "GCP",
+                      "region": "us-central1",
+                      "tag": "c2",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1900:4000:2be5::/64",
+                        "35.226.75.135/32"
+                      ],
+                      "gcpServiceAccountEmail": "flow-258@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::789740162118:user/flow-aws",
+                      "azureApplicationName": "Estuary Storage Mappings Prod",
+                      "azureApplicationClientId": "42cb0c6c-dab0-411f-9c21-16d5a2b1b025"
+                    }
+                  },
+                  {
+                    "cursor": "ops/dp/public/gcp-us-central1-c3",
+                    "node": {
+                      "id": "1582c86373a75400",
+                      "name": "ops/dp/public/gcp-us-central1-c3",
+                      "fqdn": "gcp-us-central1-c3.dp.estuary-data.com",
+                      "reactorAddress": "https://reactor.gcp-us-central1-c3.dp.estuary-data.com",
+                      "cloudProvider": "GCP",
+                      "region": "us-central1",
+                      "tag": "c3",
+                      "isPublic": true,
+                      "closed": false,
+                      "cidrBlocks": [
+                        "2600:1900:4000:17ef::/64",
+                        "34.56.184.215/32",
+                        "35.202.15.59/32"
+                      ],
+                      "gcpServiceAccountEmail": "data-plane-klb5otc4p4p612ns@helpful-kingdom-273219.iam.gserviceaccount.com",
+                      "awsIamUserArn": "arn:aws:iam::770785070253:user/data-planes/data-plane-2urmkavpqs9ckfuu",
+                      "azureApplicationName": "data-plane-gcp-us-central1-c3.dp.estuary-data.com",
+                      "azureApplicationClientId": "823e58a9-401d-4841-90e9-67f1ad3be8d9"
+                    }
+                  }
+                ]
+              }
+            }
+          }

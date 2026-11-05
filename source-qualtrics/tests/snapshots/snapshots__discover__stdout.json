@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "survey_questions"
     ]
   },
   {
@@ -168,6 +171,9 @@
     "key": [
       "/surveyId",
       "/responseId"
+    ],
+    "resourcePath": [
+      "survey_responses"
     ]
   },
   {
@@ -238,6 +244,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "surveys"
     ]
   }
 ]

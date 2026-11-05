@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+### Fixed
+- Bindings keyed on a date-time field could miss existing rows when keys in
+  the same transaction had different fractional-second precisions or time
+  zone offsets, inserting duplicates instead of updating them.
+
 ## 2026-09-30
 
 ### Fixed

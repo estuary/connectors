@@ -98,10 +98,10 @@ func createDuckDialect(featureFlags map[string]bool, isDuckLake bool) sql.Dialec
 			"json": {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
 			"*":    {sql.NewMigrationSpec([]string{"json"}, directCast, sql.WithCastSQL(toJsonCast))},
 		},
-		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
 				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
-		},
+		}),
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),
@@ -297,9 +297,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ else -}}                                                                                                                                                        
 SELECT {{ $.Binding }} AS binding,                                                                                                                                 
 json_object(                                                                                                                                                       
-{{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
+{{- range $i, $col := $.RootPropertyColumns}}                                                                                                                         
        {{- if $i}}, {{end}}                                                                                                                                        
-       '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
+       {{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       

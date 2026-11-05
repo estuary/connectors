@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/estuary/connectors/go/common"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
@@ -24,6 +25,11 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
+	if createdAt, err := common.ParseCreatedAt(req.CreatedAt); err != nil {
+		return nil, fmt.Errorf("resolving feature flags: %w", err)
+	} else {
+		cfg.resolveFeatureFlags(createdAt)
+	}
 
 	var db, err = drv.Connect(ctx, &cfg)
 	if err != nil {

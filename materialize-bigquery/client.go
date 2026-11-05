@@ -71,34 +71,42 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 				return fmt.Errorf("table iterator next: %w", err)
 			}
 
-			group.Go(func() error {
-				md, err := tableMetadataWithRetry(groupCtx, table)
-				if err != nil {
-					return fmt.Errorf("getting metadata for %s.%s: %w", table.DatasetID, table.TableID, err)
-				}
-
-				mu.Lock()
-				defer mu.Unlock()
-
-				res := is.PushResource(table.DatasetID, table.TableID)
-				res.Meta = md.Schema
-				for _, f := range md.Schema {
-					res.PushField(boilerplate.ExistingField{
-						Name:               f.Name,
-						Nullable:           !f.Required,
-						Type:               string(f.Type),
-						CharacterMaxLength: int(f.MaxLength),
-						HasDefault:         len(f.DefaultValueExpression) > 0,
-					})
-				}
-
-				return nil
-			})
+			group.Go(func() error { return pushTableMetadata(groupCtx, is, &mu, table) })
 		}
 	}
 
 	if err := group.Wait(); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// pushTableMetadata records a listed table and its fields in is.
+func pushTableMetadata(ctx context.Context, is *boilerplate.InfoSchema, mu *sync.Mutex, table *bigquery.Table) error {
+	md, err := tableMetadataWithRetry(ctx, table)
+	if gErr, ok := errors.AsType[*googleapi.Error](err); ok && gErr.Code == 404 {
+		// The table was dropped after the listing returned it, so it is
+		// simply not part of the information schema.
+		log.WithField("table", fmt.Sprintf("%s.%s", table.DatasetID, table.TableID)).Debug("listed table no longer exists; skipping")
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("getting metadata for %s.%s: %w", table.DatasetID, table.TableID, err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	res := is.PushResource(table.DatasetID, table.TableID)
+	res.Meta = md.Schema
+	for _, f := range md.Schema {
+		res.PushField(boilerplate.ExistingField{
+			Name:               f.Name,
+			Nullable:           !f.Required,
+			Type:               string(f.Type),
+			CharacterMaxLength: int(f.MaxLength),
+			HasDefault:         len(f.DefaultValueExpression) > 0,
+		})
 	}
 
 	return nil
@@ -120,8 +128,7 @@ func tableMetadataWithRetry(ctx context.Context, table *bigquery.Table) (*bigque
 		if err == nil {
 			return md, nil
 		}
-		var gErr *googleapi.Error
-		if !errors.As(err, &gErr) || gErr.Code != 404 || attempt == maxAttempts {
+		if gErr, ok := errors.AsType[*googleapi.Error](err); !ok || gErr.Code != 404 || attempt == maxAttempts {
 			return nil, err
 		}
 		log.WithFields(log.Fields{
@@ -160,11 +167,19 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	}, nil
 }
 
+// BigQuery allows a table only about 5 metadata updates every 10 seconds, so
+// each step alters all of its columns in a single multi-clause statement.
 var columnMigrationSteps = []sql.ColumnMigrationStep{
-	sql.StdMigrationSteps[0],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("ADD COLUMN %s %s", ins.TempColumnIdentifier, ins.TypeMigration.NullableDDL)
+	}),
 	sql.StdMigrationSteps[1],
-	sql.StdMigrationSteps[2],
-	sql.StdMigrationSteps[3],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("DROP COLUMN %s", ins.TypeMigration.Identifier)
+	}),
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("RENAME COLUMN %s TO %s", ins.TempColumnIdentifier, ins.TypeMigration.Identifier)
+	}),
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		// BigQuery does not support making a column REQUIRED when it is NULLABLE
 		// TODO: do we prefer to backfill in these instances for BigQuery, or just continue
@@ -281,8 +296,7 @@ func checkDatasetLocation(ctx context.Context, cfg config) error {
 	defer bq.Close()
 
 	md, err := bq.bigqueryClient.DatasetInProject(cfg.ProjectID, cfg.Dataset).Metadata(ctx)
-	var apiErr *googleapi.Error
-	if errors.As(err, &apiErr) && apiErr.Code == 404 {
+	if apiErr, ok := errors.AsType[*googleapi.Error](err); ok && apiErr.Code == 404 {
 		return nil
 	} else if err != nil {
 		return fmt.Errorf("getting metadata for dataset %q: %w", cfg.Dataset, err)

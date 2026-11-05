@@ -148,13 +148,18 @@ func TestFlushSignals(t *testing.T) {
 
 		var logged = make(map[string]log.Fields)
 		for _, e := range hook.AllEntries() {
-			if e.Message == "backfill began" || e.Message == "backfill completed" {
+			if e.Data["eventType"] == "connectorStatus" {
+				if _, ok := logged["status"]; !ok {
+					logged["status"] = log.Fields{"message": e.Message}
+				}
+			} else if e.Message == "backfill began" || e.Message == "backfill completed" {
 				require.Equal(t, log.InfoLevel, e.Level)
 				logged[e.Message] = e.Data
 			}
 		}
 		require.Equal(t, log.Fields{"binding": uint32(1), "boundary": begin}, logged["backfill began"])
 		require.Equal(t, log.Fields{"binding": uint32(0), "boundary": complete}, logged["backfill completed"])
+		require.Equal(t, log.Fields{"message": "Starting up: connecting to the destination"}, logged["status"])
 	})
 
 	t.Run("no signals", func(t *testing.T) {

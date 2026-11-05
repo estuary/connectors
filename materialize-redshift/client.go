@@ -149,6 +149,26 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
+	if pgErr, ok := errors.AsType[*pgconn.ConnectError](err); ok {
+		err = pgErr.Unwrap()
+		if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
+			err = fmt.Errorf("incorrect username or password")
+		} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
+			err = fmt.Errorf("database %q does not exist", cfg.Database)
+		} else if strings.Contains(errStr, "context deadline exceeded") {
+			errStr := `connection to host at address %q timed out, possible causes:
+				* Redshift endpoint is not set to be publicly accessible
+				* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
+				* the configured address is incorrect, possibly with an incorrect host or port
+				* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
+			err = fmt.Errorf(errStr, cfg.Address)
+		}
+	}
+	return err
+}
+
 func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
@@ -165,26 +185,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	defer cancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
-		// Provide a more user-friendly representation of some common error causes.
-		var pgErr *pgconn.ConnectError
-
-		if errors.As(err, &pgErr) {
-			err = pgErr.Unwrap()
-			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
-				err = fmt.Errorf("incorrect username or password")
-			} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
-				err = fmt.Errorf("database %q does not exist", cfg.Database)
-			} else if strings.Contains(errStr, "context deadline exceeded") {
-				errStr := `connection to host at address %q timed out, possible causes:
-					* Redshift endpoint is not set to be publicly accessible
-					* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
-					* the configured address is incorrect, possibly with an incorrect host or port
-					* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
-				err = fmt.Errorf(errStr, cfg.Address)
-			}
-		}
-
-		errs.Err(err)
+		errs.Err(connectError(err, cfg))
 	}
 
 	s3client, err := cfg.toS3Client(ctx, featureFlags)
@@ -198,13 +199,12 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
 	testKey := path.Join(cfg.effectiveBucketPath(), uuid.NewString())
 
-	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
-		if errors.As(err, &awsErr) {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
 			// exist but the configured credentials aren't authorized to write to it.
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
@@ -218,7 +218,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)
@@ -226,7 +226,7 @@ func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cer
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)

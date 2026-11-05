@@ -80,6 +80,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Account"
     ]
   },
   {
@@ -163,6 +166,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Campaign"
     ]
   },
   {
@@ -246,6 +252,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Case"
     ]
   },
   {
@@ -329,6 +338,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Contact"
     ]
   },
   {
@@ -412,6 +424,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Entitlement"
     ]
   },
   {
@@ -495,6 +510,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Lead"
     ]
   },
   {
@@ -578,6 +596,95 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "LeadHistory"
+    ]
+  },
+  {
+    "recommendedName": "LiveChatTranscript",
+    "resourceConfig": {
+      "name": "LiveChatTranscript",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
+      }
+    },
+    "key": [
+      "/Id"
+    ],
+    "resourcePath": [
+      "LiveChatTranscript"
     ]
   },
   {
@@ -661,6 +768,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "MessagingSession"
     ]
   },
   {
@@ -744,6 +854,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Opportunity"
     ]
   },
   {
@@ -827,6 +940,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ServiceAppointment"
     ]
   },
   {
@@ -910,6 +1026,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ServiceContract"
     ]
   },
   {
@@ -993,6 +1112,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Task"
     ]
   },
   {
@@ -1076,6 +1198,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "User"
     ]
   },
   {
@@ -1159,6 +1284,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "WorkOrder"
     ]
   },
   {
@@ -1242,6 +1370,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "WorkOrderLineItem"
     ]
   }
 ]

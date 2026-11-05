@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
-from typing import TypeVar, Callable, AsyncGenerator, Generic
+from typing import Any, Awaitable, ClassVar, TypeVar, Callable, AsyncGenerator, Generic
 import abc
+from types import FrameType
 import asyncio
 import signal
 import sys
 import traceback
 
 from .logger import init_logger, FlowLogger
-from .flow import ValidationError
+from .flow import ValidationError, set_retain_projections
 from .utils import get_running_tasks_info
 
 # Request type served by this connector.
@@ -32,9 +33,29 @@ async def stdin_jsonl(cls: type[Request]) -> AsyncGenerator[Request, None]:
 # Mixins may implement a protocol like Python's Asynchronous Context Manager pattern:
 # they're entered prior to handling any requests, and exited after all requests have
 # been fully processed.
-class Mixin(abc.ABC):
-    async def _mixin_enter(self, log: Logger): ...
-    async def _mixin_exit(self, log: Logger): ...
+class Mixin:
+    # Parameters are positional-only so overrides may name them freely, and the
+    # return is Any because serve() discards it while implementations commonly
+    # return self.
+    async def _mixin_enter(self, log: Logger, /) -> Any: ...
+    async def _mixin_exit(self, log: Logger, /) -> Any: ...
+
+
+# Walks the MRO rather than the direct bases: BaseCaptureConnector already
+# mixes in HTTPMixin, so a connector that lists its own HTTPMixin subclass
+# would otherwise open a second session and never close it.
+def _mixin_hooks(
+    cls: type, hook: str
+) -> list[Callable[[Any, Logger], Awaitable[Any]]]:
+    definers = [c for c in cls.__mro__ if c is not Mixin and hook in c.__dict__]
+    # Skip a hook that a subclass overrides, so an override that calls super()
+    # doesn't run its parent twice, and one that doesn't really replaces it.
+    return [
+        f
+        for c in definers
+        if not any(d is not c and issubclass(d, c) for d in definers)
+        if (f := getattr(c, hook)) is not None
+    ]
 
 
 @dataclass
@@ -52,15 +73,26 @@ class Stopped(Exception):
 # BaseConnector from which all Flow Connectors inherit.
 class BaseConnector(Generic[Request], abc.ABC):
 
+    retain_projections: ClassVar[bool] = True
+    """Whether this connector reads `CollectionSpec.projections`.
+
+    Set it to False to drop them as each specification is parsed, which costs
+    nothing and saves a capture of many fields tens of megabytes held for its
+    whole life. A connector which reads `binding.collection.projections` --
+    a materialization computing its field selection, say -- leaves it True.
+    """
+
     # request_class() returns the concrete class instance for Request served
     # by this connector. It's required to implement to enable parsing of
     # Requests prior to their being dispatched by the connector.
     #
     # Python classes are type-erased, so it's not possible to determine the
     # concrete class at runtime using only type annotations.
-    @classmethod
-    @abc.abstractclassmethod
-    def request_class(cls) -> type[Request]:
+    # It is an instance method, not a classmethod, because connectors
+    # idiomatically override it as `def request_class(self)`; serve() calls it
+    # through the instance, so either form works at runtime.
+    @abc.abstractmethod
+    def request_class(self) -> type[Request]:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -85,11 +117,13 @@ class BaseConnector(Generic[Request], abc.ABC):
 
         assert isinstance(log, FlowLogger)  # Narrow type to non-None.
 
+        set_retain_projections(self.retain_projections)
+
         loop = asyncio.get_running_loop()
         this_task = asyncio.current_task(loop)
         original_sigquit = signal.getsignal(signal.SIGQUIT)
 
-        def dump_all_tasks(signum, frame):
+        def dump_all_tasks(signum: int, frame: FrameType | None):
             task_infos = get_running_tasks_info(exclude_tasks={this_task} if this_task else None)
 
             for info in task_infos:
@@ -122,10 +156,8 @@ class BaseConnector(Generic[Request], abc.ABC):
 
         signal.signal(signal.SIGQUIT, dump_all_tasks)
 
-        # Call _mixin_enter() on all mixed-in base classes.
-        for base in self.__class__.__bases__:
-            if enter := getattr(base, "_mixin_enter", None):
-                await enter(self, log)
+        for enter in _mixin_hooks(type(self), "_mixin_enter"):
+            await enter(self, log)
 
         failed = False
         try:
@@ -153,10 +185,8 @@ class BaseConnector(Generic[Request], abc.ABC):
                     failed = True
 
         finally:
-            # Call _mixin_exit() on all mixed-in base classes, in reverse order.
-            for base in reversed(self.__class__.__bases__):
-                if exit := getattr(base, "_mixin_exit", None):
-                    await exit(self, log)
+            for exit in reversed(_mixin_hooks(type(self), "_mixin_exit")):
+                await exit(self, log)
 
             await self.exit(log)
 

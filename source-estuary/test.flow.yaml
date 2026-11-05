@@ -1,0 +1,68 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-estuary:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_estuary
+        config: config.yaml
+    bindings:
+    - resource:
+        name: catalog_stats_hourly
+        interval: PT15M
+      target: acmeCo/catalog_stats_hourly
+    - resource:
+        name: catalog_stats_daily
+        interval: PT1H
+      target: acmeCo/catalog_stats_daily
+    - resource:
+        name: catalog_stats_monthly
+        interval: PT1H
+      target: acmeCo/catalog_stats_monthly
+    - resource:
+        name: live_specs
+        interval: PT5M
+      target: acmeCo/live_specs
+    - resource:
+        name: task_status
+        interval: PT5M
+      target: acmeCo/task_status
+    - resource:
+        name: publication_history
+        interval: PT5M
+      target: acmeCo/publication_history
+    - resource:
+        name: alerts
+        interval: PT5M
+      target: acmeCo/alerts
+    - resource:
+        name: alert_configs
+        interval: PT5M
+      target: acmeCo/alert_configs
+    - resource:
+        name: alert_subscriptions
+        interval: PT5M
+      target: acmeCo/alert_subscriptions
+    - resource:
+        name: storage_mappings
+        interval: PT5M
+      target: acmeCo/storage_mappings
+    - resource:
+        name: data_planes
+        interval: PT5M
+      target: acmeCo/data_planes
+    - resource:
+        name: service_accounts
+        interval: PT5M
+      target: acmeCo/service_accounts
+    - resource:
+        name: connectors
+        interval: PT5M
+      target: acmeCo/connectors
+    - resource:
+        name: invoices
+        interval: PT1H
+      target: acmeCo/invoices

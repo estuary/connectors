@@ -8,9 +8,6 @@
             "credentials_title": {
               "const": "API Key",
               "default": "API Key",
-              "enum": [
-                "API Key"
-              ],
               "order": 0,
               "title": "Credentials Title",
               "type": "string"
@@ -58,6 +55,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {

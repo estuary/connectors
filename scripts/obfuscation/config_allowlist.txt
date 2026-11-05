@@ -41,6 +41,11 @@ exclusiveCollectionFilter
 disable_real_time
 disable_backfill
 is_free_plan
+lookback_window_days
+report_type
+data_level
+granularity
+breakdowns
 capture_intermediate
 captureMode
 backfillMode
@@ -102,7 +107,9 @@ incremental_window_size
 lookback_window
 lookback_window_size
 lookback_window_minutes
+lookback_window_days
 calls_lookback_window
+catalog_stats_lookback_hours
 insights_lookback_window
 conversion_window_days
 attribution_window
@@ -175,3 +182,4 @@ fail_after
 exit_after
 rediscovery_interval
 scale
+max_startup_delay

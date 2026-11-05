@@ -1,0 +1,50 @@
+info:
+  name: unknown group 404 probe
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/groups/00g00000000000000000/users?limit=200"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroupUsers
+
+  **WHY:** Same race as `Application users / unknown app 404 probe`, for groups
+  deleted between the parent drain and the member listing.
+
+  **VERIFIED (2026-10-07):** 404 with `errorCode: "E0000007"` ("Resource not found …
+  (UserGroup)").
+
+examples:
+  - name: "404 \u2014 E0000007 Resource not found (UserGroup)"
+    request:
+      url: "{{base_url}}/groups/00g00000000000000000/users?limit=200"
+      method: GET
+    response:
+      status: 404
+      statusText: "Not Found"
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "errorCode": "E0000007",
+            "errorSummary": "Not found: Resource not found: 00g00000000000000000 (UserGroup)",
+            "errorLink": "E0000007",
+            "errorId": "oaedkLQnuvdT--AW7OxRyrPfA",
+            "errorCauses": []
+          }

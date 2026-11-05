@@ -34,11 +34,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -84,6 +80,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Actions"
     ]
   },
   {
@@ -121,11 +120,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -171,6 +166,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ActionInquiries"
     ]
   },
   {
@@ -208,11 +206,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -252,6 +246,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Invoices"
     ]
   },
   {
@@ -289,11 +286,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -333,6 +326,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Jobs"
     ]
   },
   {
@@ -370,11 +366,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -414,6 +406,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "PromoCodes"
     ]
   },
   {
@@ -451,11 +446,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -495,6 +486,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Deals"
     ]
   },
   {
@@ -532,11 +526,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -576,6 +566,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ExceptionLists"
     ]
   },
   {
@@ -613,11 +606,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -657,6 +646,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "UniqueUrls"
     ]
   },
   {
@@ -694,11 +686,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -738,6 +726,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "TrackingValueRequests"
     ]
   },
   {
@@ -775,11 +766,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -812,6 +799,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Campaigns"
     ]
   },
   {
@@ -849,11 +839,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -886,6 +872,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Ads"
     ]
   },
   {
@@ -923,11 +912,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -960,6 +945,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Catalogs"
     ]
   },
   {
@@ -997,11 +985,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -1034,6 +1018,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "Reports"
     ]
   },
   {
@@ -1071,11 +1058,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -1108,6 +1091,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "PhoneNumbers"
     ]
   },
   {
@@ -1145,11 +1131,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1189,6 +1171,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Contracts"
     ]
   },
   {
@@ -1226,11 +1211,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1270,6 +1251,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tasks"
     ]
   },
   {
@@ -1307,11 +1291,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1351,6 +1331,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Notes"
     ]
   },
   {
@@ -1388,11 +1371,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
         "Id": {
@@ -1432,6 +1411,9 @@
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "BlockRedirectRules"
     ]
   },
   {
@@ -1469,11 +1451,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
@@ -1506,6 +1484,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "MediaPartnerGroups"
     ]
   }
 ]

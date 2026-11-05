@@ -24,14 +24,23 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// When true, the fallback collection key for keyless source tables will be
 	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
-	"keyless_row_id": true,
+	"keyless_row_id": common.FlagEnabled,
 
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
-	"emit_sourced_schemas": true,
+	"emit_sourced_schemas": common.FlagEnabled,
+
+	// When set, backfills certain to restate a binding's source in full are bracketed by
+	// BackfillBegin and BackfillComplete messages. See shouldEmitBackfillSignals.
+	"emit_backfill_signals": common.FlagEnabledForTasksCreatedAfter("2026-10-21"),
+
+	// When set, backfill signals are sent even when the endpoint or resource configuration
+	// means a backfill might not capture every row of the source, e.g. a query template
+	// override.
+	"ignore_config_for_backfill_signals": common.FlagDisabled,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -80,13 +89,16 @@ func (c *Config) Validate() error {
 	if err := c.sslSettings().Validate(); err != nil {
 		return err
 	}
-	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
-	// method that we can be sure always gets called before the config is used.
-	c.Advanced.parsedFeatureFlags = common.ParseFeatureFlags(c.Advanced.FeatureFlags, featureFlagDefaults)
+	return nil
+}
+
+// resolveFeatureFlags resolves the feature flags of a task created on createdAt.
+// It must be called before parsedFeatureFlags is read.
+func (c *Config) resolveFeatureFlags(createdAt common.CreatedAt) {
+	c.Advanced.parsedFeatureFlags = common.ResolveFlags(c.Advanced.FeatureFlags, featureFlagDefaults, createdAt)
 	if c.Advanced.FeatureFlags != "" {
 		log.WithField("flags", c.Advanced.parsedFeatureFlags).Info("parsed feature flags")
 	}
-	return nil
 }
 
 // sslSettings returns the TLS settings for connections to the database. An
@@ -183,7 +195,6 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	defer connectionTimer.Stop()
 
 	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
-	var mysqlErr *mysql.MyError
 	var withTimeouts = func(c *client.Conn) error {
 		// Some polling queries can take a long time to start yielding results,
 		// especially for large tables with unindexed cursor columns. While we
@@ -217,7 +228,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	if tlsConfig == nil {
 		if conn, err = dial(nil); err == nil {
 			log.WithField("addr", cfg.Address).Info("connected without TLS")
-		} else if errors.As(err, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		} else if mysqlErr, ok := errors.AsType[*mysql.MyError](err); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 			return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 		} else {
 			return nil, fmt.Errorf("unable to connect to database without TLS: %w", err)
@@ -225,7 +236,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	} else if connWithTLS, errWithTLS := dial(tlsConfig); errWithTLS == nil {
 		log.WithFields(log.Fields{"addr": cfg.Address, "sslmode": settings.EffectiveMode()}).Info("connected with TLS")
 		conn = connWithTLS
-	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithTLS); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if !settings.AllowsPlaintextFallback() {
 		if msg := settings.FailureMessage(errWithTLS, cfg.serverHost(), true); msg != "" {
@@ -240,10 +251,10 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		// - Otherwise we report both errors.
 		log.WithFields(log.Fields{"addr": cfg.Address, "errWithTLS": errWithTLS}).Warn("connected without TLS")
 		conn = connWithoutTLS
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithoutTLS); ok && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		log.WithFields(log.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
+	} else if mysqlErr, ok := errors.AsType[*mysql.MyError](errWithoutTLS); ok && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
 		return nil, fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)

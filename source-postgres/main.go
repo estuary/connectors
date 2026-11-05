@@ -180,6 +180,10 @@ type advancedConfig struct {
 }
 
 var featureFlagDefaults = map[string]bool{
+	// Raise the per-field truncation threshold from 8 MiB to 32 MiB for captures
+	// with a single large column per row. The 64 MiB document limit still applies.
+	"extended_field_truncation_threshold": false,
+
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": true,
@@ -236,6 +240,12 @@ var featureFlagDefaults = map[string]bool{
 
 	// When true, per-table prerequisite checks are skipped. Implied by `skip_prerequisites`.
 	"skip_table_prerequisites": false,
+
+	// When true, pending streams are activated for replication before the initial catch-up
+	// stream and the replication cursor is preserved even when every binding is new, so a
+	// newly added or re-backfilled binding observes changes from the checkpointed cursor
+	// onward. Only safe when no DDL affected those tables since that cursor.
+	"activate_streams_before_catchup": false,
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -436,7 +446,7 @@ func (db *postgresDatabase) HistoryMode() bool {
 }
 
 func (db *postgresDatabase) ActivateStreamsBeforeCatchup() bool {
-	return false
+	return db.featureFlags["activate_streams_before_catchup"]
 }
 
 // The statement timeout applied to database connections when none is configured.
@@ -490,10 +500,15 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return nil
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err == nil {
+		// The pool connects lazily, so without a ping a connection failure
+		// surfaces from whichever query happens to run first.
+		if err = pool.Ping(ctx); err != nil {
+			pool.Close()
+		}
+	}
 	if err != nil {
-		var pgErr *pgconn.PgError
-
-		if errors.As(err, &pgErr) {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 			switch pgErr.Code {
 			case "28P01":
 				return cerrors.NewUserError(err, "incorrect username or password")

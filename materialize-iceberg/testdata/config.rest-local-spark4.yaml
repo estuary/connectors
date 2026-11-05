@@ -15,7 +15,7 @@ advanced:
     # (e.g. s3://warehouse/flow/), so the table location must start with
     # s3://warehouse/flow/ rather than s3://warehouse/flow_<table>_<hash>.
     #
-    # variant_columns: this set runs Spark 4.0.2 + Iceberg 1.10.1 and covers
+    # variant_columns: this set runs Spark 4.1.1 + Iceberg 1.11.0 and covers
     # the variant path. Once the flag's default becomes cutoff-gated, test
     # specs carry no creation date and resolve it on, and the explicit entry
     # can be dropped.

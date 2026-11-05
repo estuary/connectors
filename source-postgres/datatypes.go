@@ -20,13 +20,21 @@ import (
 )
 
 const (
-	infinityTimestamp         = "9999-12-31T23:59:59Z"
-	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
-	infinityDate              = "9999-12-31"
-	negativeInfinityDate      = "0000-01-01"
-	rfc3339TimeFormat         = "15:04:05.999999999Z07:00"
-	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
+	infinityTimestamp               = "9999-12-31T23:59:59Z"
+	negativeInfinityTimestamp       = "0000-01-01T00:00:00Z"
+	infinityDate                    = "9999-12-31"
+	negativeInfinityDate            = "0000-01-01"
+	rfc3339TimeFormat               = "15:04:05.999999999Z07:00"
+	truncateColumnThreshold         = 8 * 1024 * 1024 // Leave room for several large fields within the 64 MiB document limit.
+	extendedTruncateColumnThreshold = 32 * 1024 * 1024
 )
+
+func (db *postgresDatabase) fieldTruncationThreshold() int {
+	if db.featureFlags["extended_field_truncation_threshold"] {
+		return extendedTruncateColumnThreshold
+	}
+	return truncateColumnThreshold
+}
 
 func registerDatatypeTweaks(ctx context.Context, conn *pgx.Conn, m *pgtype.Map) error {
 	// Prefer text format for 'timestamptz' column results. This is important because the
@@ -420,6 +428,7 @@ func (db *postgresDatabase) translateRecordField(discoveredColumnType postgresTy
 		}
 		return nil, fmt.Errorf("unexpected value for column of type %q: %#v", discoveredColumnType, val)
 	}
+	var truncateColumnThreshold = db.fieldTruncationThreshold()
 	switch x := val.(type) {
 	case net.HardwareAddr: // column types 'macaddr' and 'macaddr8'
 		return x.String(), nil

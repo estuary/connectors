@@ -1,0 +1,58 @@
+info:
+  name: page past cap
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/calls?per_page=50&page=201"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 400 - page 201 x 50 rejected even with total 0
+    request:
+      url: "{{base_url}}/calls?per_page=50&page=201"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "error": "Bad Request",
+            "data": null,
+            "message": "BAD_REQUEST",
+            "errors": "Your query is limited to 10k results and pagination is out of bound, please use timestamps or other filters.",
+            "troubleshoot": "BAD_REQUEST",
+            "success": false
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#pagination
+
+    **WHY:** page 201 × 50 starts at item 10,001. The customer's Airbyte
+    failure was `page=501&per_page=20` → 400 BAD_REQUEST. Confirms the error
+    body/status the connector must never trigger (and, if `Calls / bare`'s
+    `meta.total` ≤ 10,000, whether the 400 is cap-based or plain past-the-end).
+
+    **LIMITATION (VERIFIED 2026-09-28):** `page=201&per_page=50` → **400** with
+    `errors: "Your query is limited to 10k results and pagination is out of
+    bound, please use timestamps or other filters."` — **even though
+    `meta.total` is 0**. The cap is enforced on the requested *position*
+    (`page * per_page > 10000`), not on the size of the result set. The
+    connector must never request `page > 10000 / per_page` (= 200 at 50), and
+    must narrow the `from`/`to` window instead whenever a window's
+    `meta.total` exceeds 10,000. This is the customer's Airbyte failure
+    (`page=501&per_page=20`).
+  type: text/markdown

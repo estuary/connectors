@@ -1,0 +1,16 @@
+materializations:
+  acmeCo/tests/materialize-webhook:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-webhook-fields:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.fields.yaml
+    bindings: []

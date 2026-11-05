@@ -1,0 +1,39 @@
+info:
+  name: Remove User From Group
+  type: http
+  seq: 8
+
+http:
+  method: DELETE
+  url: "{{base_url}}/groups/{{seed_group_id}}/users/{{seed_user_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Env-var pins (`--env-var seed_group_id=… --env-var seed_user_id=…`) target
+        // the existing fixtures from a later session; otherwise add the membership first.
+        const pinned = bru.getEnvVar('seed_group_id') && bru.getEnvVar('seed_user_id');
+        if (!pinned && (!bru.getVar('seed_group_id') || !bru.getVar('seed_user_id'))) {
+          await bru.runRequest('Seeding/Add User To Group');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Unassign a user from a group](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/unassignUserFromGroup)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** a membership removal. It checks whether removals also bump the
+  group's `lastMembershipUpdated`, which decides whether the members cluster's
+  per-group re-snapshot can be keyed on that field. Read the result with
+  `Groups / cursor filter`.
+
+  **Outcome:** ran 2026-10-07 and returned 204. `lastMembershipUpdated` moved to
+  16:26:48 and `lastUpdated` was unchanged. VERIFIED in `Groups / cursor filter`.

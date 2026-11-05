@@ -1,0 +1,109 @@
+info:
+  name: user query
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{customer_management_url}}/User/Query"
+  body:
+    type: json
+    data: |-
+      {
+        "UserId": null
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the user id into `Accounts / bare`. Not a credential.
+        const id = res.getBody()?.User?.Id;
+        if (id) bru.setVar('user_id', String(id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/customer-management-service/getuser?view=bingads-13
+
+  **WHY:** the cheapest authenticated call, and the connector's own first call
+  (`query_user` in `api.py`, used by `validate_credentials`). A 200 proves the
+  whole auth chain: client ID and secret, refresh token, the
+  `msads.manage` scope, and the developer token. It's a POST, but a read: it
+  changes nothing.
+
+  **DOCUMENTED (2026-10-29):** a null `UserId` returns the authenticated user,
+  and the response has `User` and `CustomerRoles` (one per customer, with
+  `AccountIds`). It needs only `Authorization: Bearer …` and `DeveloperToken`,
+  no `CustomerId` or `CustomerAccountId`.
+
+  **VERIFIED (2026-10-29):** `200` for `estuary-connectors-dev@outlook.com`
+  (user `202544887`, customer `387145414`, `RoleId` 41 = Super Admin,
+  `UserLifeCycleStatus` `Active`) with a token for the sandbox scope
+  `https://si.ads.microsoft.com/msads.manage offline_access`. That scope comes
+  from Microsoft's Python SDK (`bingads/authorization.py`, sandbox with
+  `use_msa_prod`), not the sandbox guide. `CustomerRoles[].AccountIds` is null
+  for a Super Admin.
+
+  **VERIFIED (2026-10-29):** earlier the same day, this request returned `401`
+  `{"Code": 105, "ErrorCode": "InvalidCredentials"}` for the same user with
+  both the production and sandbox scopes (TrackingIds
+  `a65e0389-72f0-40fb-9ae2-0bae481c9e09`, `e0c44da1-ea5d-48c2-9a78-8b8ffd2c61aa`,
+  `ad014883-b7b6-4cc0-8218-7bccdf1acbc1`), then started passing with no change
+  to the request. The user's `LastModifiedTime` (`2026-10-29T16:25:34`) falls
+  between the two, so the sandbox user record likely changed on Microsoft's
+  side. If a fresh sandbox user gets 105, wait and retry before debugging. A
+  REST call with an `AuthenticationToken` header and a SOAP `GetUser` also
+  returned 200 at that point, so the header style wasn't the cause.
+
+examples:
+  - name: 200 - authenticated sandbox user
+    request:
+      url: "{{customer_management_url}}/User/Query"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "User": {
+              "ContactInfo": "REDACTED",
+              "CustomerId": "387145414",
+              "Id": "202544887",
+              "JobTitle": null,
+              "LastModifiedByUserId": "202544887",
+              "LastModifiedTime": "2026-10-29T16:25:34.733",
+              "Lcid": "EnglishUS",
+              "Name": {
+                "FirstName": "Estuary",
+                "LastName": "Technologies",
+                "MiddleInitial": null
+              },
+              "Password": null,
+              "SecretAnswer": null,
+              "SecretQuestion": "None",
+              "UserLifeCycleStatus": "Active",
+              "TimeStamp": "AAAAABSiv8I=",
+              "UserName": "estuary-connectors-dev@outlook.com",
+              "ForwardCompatibilityMap": null
+            },
+            "CustomerRoles": [
+              {
+                "RoleId": 41,
+                "CustomerId": "387145414",
+                "AccountIds": null,
+                "LinkedAccountIds": null,
+                "CustomerLinkPermission": null
+              }
+            ]
+          }

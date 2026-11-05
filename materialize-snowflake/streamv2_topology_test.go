@@ -20,12 +20,12 @@ import (
 // hands whole channels — committed offset tokens included — to the shards that
 // inherit their key ranges, and those shards skip by offset and then converge
 // back to their own target layout. Every scenario drives real managers against
-// the fake sidecar, whose channel state outlives each manager through
-// FAKE_SIDECAR_STATE, so successive managers stand for successive sessions —
+// the fake Snowpipe, whose channel state outlives each manager through
+// FAKE_SNOWPIPE_STATE, so successive managers stand for successive sessions —
 // and successive topologies — against one "Snowflake".
 
 // newTopologyManager builds a manager standing for one shard of a task. Its
-// sessions share whatever FAKE_SIDECAR_STATE names.
+// sessions share whatever FAKE_SNOWPIPE_STATE names.
 func newTopologyManager(t *testing.T, task string, keyBegin, keyEnd uint32, prior streamV2Checkpoint) *streamV2Manager {
 	t.Helper()
 	var m = newFakeStreamV2Manager(t, context.Background(),
@@ -89,7 +89,7 @@ func deletionsOf(entries map[int]streamV2Checkpoint) []streamV2Range {
 	return deleted
 }
 
-// fakeCommittedTokens reads the committed offset tokens the fake sidecar's
+// fakeCommittedTokens reads the committed offset tokens the fake Snowpipe's
 // "Snowflake" holds, which is the ground truth every scenario ends on.
 func fakeCommittedTokens(t *testing.T, path string) map[string]string {
 	t.Helper()
@@ -137,9 +137,9 @@ func activeNames(m *streamV2Manager) []string {
 func TestStreamV2SteadyStateRouting(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologySteady"
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
 	var rows []string
@@ -163,7 +163,6 @@ func TestStreamV2SteadyStateRouting(t *testing.T) {
 		require.Equal(t, int64(3), sv2Checkpoint[q].Routed)
 		require.Equal(t, channelNames(task, 0, quarters)[i], sv2Checkpoint[q].ChannelName)
 	}
-	first.stop()
 
 	// A later session opens every channel at a clean boundary — nothing to
 	// skip, nothing rejected — and continues the routed offsets where they stood.
@@ -194,9 +193,9 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologySplit"
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 	var parentNames = channelNames(task, 0, quarters)
 
@@ -217,7 +216,6 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	storeKeys(t, parent, interrupted)
 	_, err = parent.flush(ctx)
 	require.NoError(t, err) // the crash lands after the appends: the entries are never checkpointed
-	parent.stop()
 
 	var children = []struct {
 		name             string
@@ -232,7 +230,7 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 	for _, child := range children {
 		t.Run(child.name, func(t *testing.T) {
 			var shard = streamV2Range{keyBegin: child.keyBegin, keyEnd: child.keyEnd}
-			targets, err := streamV2TargetLayout(child.keyBegin, child.keyEnd)
+			targets, err := streamV2TargetLayout(child.keyBegin, child.keyEnd, streamV2ChannelsPerShard)
 			require.NoError(t, err)
 
 			// The runtime replays the interrupted transaction, routing to this
@@ -283,7 +281,6 @@ func TestStreamV2SplitInheritsChannels(t *testing.T) {
 			for _, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
 				require.Equal(t, int64(2), sv2ChannelCheckpointItem.Routed)
 			}
-			m.stop()
 
 			// The ground truth: the inherited channels are gone from Snowflake,
 			// and the child's own channels hold exactly the fresh rows.
@@ -305,7 +302,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyJoin"
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 
 	var halves = []struct {
 		keyBegin, keyEnd uint32
@@ -321,7 +318,7 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 	var eighths []streamV2Range
 	var interrupted []string
 	for _, half := range halves {
-		targets, err := streamV2TargetLayout(half.keyBegin, half.keyEnd)
+		targets, err := streamV2TargetLayout(half.keyBegin, half.keyEnd, streamV2ChannelsPerShard)
 		require.NoError(t, err)
 		eighths = append(eighths, targets...)
 
@@ -341,12 +338,11 @@ func TestStreamV2JoinInheritsChannels(t *testing.T) {
 		storeKeys(t, child, replay)
 		_, err = child.flush(ctx)
 		require.NoError(t, err) // interrupted: appended and committed, never checkpointed
-		child.stop()
 
 		interrupted = append(interrupted, replay...)
 	}
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
 	var joined = newTopologyManager(t, task, 0, math.MaxUint32, prior)
@@ -392,14 +388,14 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyWindows"
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 	var parentNames = channelNames(task, 0, quarters)
 
 	const loBegin, loEnd = 0, 0x7fffffff
-	targets, err := streamV2TargetLayout(loBegin, loEnd)
+	targets, err := streamV2TargetLayout(loBegin, loEnd, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 	var targetNames = channelNames(task, 1, targets)
 
@@ -418,7 +414,6 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	storeKeys(t, parent, interrupted)
 	_, err = parent.flush(ctx)
 	require.NoError(t, err)
-	parent.stop()
 
 	var loShard = streamV2Range{keyBegin: loBegin, keyEnd: loEnd}
 	var replay []string
@@ -445,7 +440,6 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 		require.ElementsMatch(t, rangeKeys(quarters)[:2], deletionsOf(entries))
 		switched = mergeCheckpoints(entries)
 		require.Len(t, switched, 4)
-		switching.stop()
 	}
 	var tokens = fakeCommittedTokens(t, statePath)
 	require.Contains(t, tokens, parentNames[0])
@@ -463,7 +457,6 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	require.Equal(t, targetNames, activeNames(appending))
 	_, err = appending.flush(ctx)
 	require.NoError(t, err)
-	appending.stop()
 
 	tokens = fakeCommittedTokens(t, statePath)
 	require.NotContains(t, tokens, parentNames[0])
@@ -487,7 +480,6 @@ func TestStreamV2RebalanceCrashWindows(t *testing.T) {
 	for _, sv2ChannelCheckpointItem := range converged {
 		require.Equal(t, int64(2), sv2ChannelCheckpointItem.Routed)
 	}
-	resumed.stop()
 
 	// The checkpoint finally lands, and the next session is plain steady
 	// state: four channels, clean boundaries, nothing dropped.
@@ -508,7 +500,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyRejoin"
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 
 	var prior = make(streamV2Checkpoint)
 	var eighths []streamV2Range
@@ -516,7 +508,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 		{keyBegin: 0, keyEnd: 0x7fffffff},
 		{keyBegin: 0x80000000, keyEnd: math.MaxUint32},
 	} {
-		targets, err := streamV2TargetLayout(half.keyBegin, half.keyEnd)
+		targets, err := streamV2TargetLayout(half.keyBegin, half.keyEnd, streamV2ChannelsPerShard)
 		require.NoError(t, err)
 		eighths = append(eighths, targets...)
 
@@ -531,10 +523,9 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 		for channel, sv2ChannelCheckpointItem := range mergeCheckpoints(entries) {
 			prior[channel] = sv2ChannelCheckpointItem
 		}
-		child.stop()
 	}
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
 	// The joined shard is not replaying anything: both children committed and
@@ -571,7 +562,7 @@ func TestStreamV2SplitThenJoinBack(t *testing.T) {
 // depth the new boundary cuts through. The rows that channel holds beyond its
 // routed offset belong to both children, so the only safe answer is a rejection.
 func TestStreamV2MisalignedSplitRejected(t *testing.T) {
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyMisaligned"
 
 	// A channel covering the parent's low half, presented to a shard covering
@@ -601,10 +592,10 @@ func fullLayoutCheckpoint(task string, layout []streamV2Range) streamV2Checkpoin
 // committed offset token while the checkpoint records documents appended to it:
 // the account of what Snowflake holds is gone, so the binding is rejected.
 func TestStreamV2LostChannelRejected(t *testing.T) {
-	t.Setenv("FAKE_SIDECAR_STATE", filepath.Join(t.TempDir(), "channels.json"))
+	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 	const task = "test/topologyLost"
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
 	var prior = fullLayoutCheckpoint(task, quarters)
@@ -621,10 +612,10 @@ func TestStreamV2LostChannelRejected(t *testing.T) {
 // path cannot account for, and nothing it counts may be skipped.
 func TestStreamV2ForeignTokenRejected(t *testing.T) {
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 	const task = "test/topologyForeign"
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 	var name = streamV2FormatChannelName(task, 0, quarters[0], "topology.v1")
 
@@ -656,9 +647,9 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyEmptyInherit"
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 	var parentNames = channelNames(task, 0, quarters)
 
@@ -675,12 +666,11 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	require.NoError(t, err)
 	var prior = mergeCheckpoints(entries)
 	require.Zero(t, prior[quarters[0]].Routed)
-	parent.stop()
 
 	// The low child inherits the empty first quarter alongside the second,
 	// which holds rows. Both continue: the empty one as a fresh channel.
 	var child = newTopologyManager(t, task, 0, 0x7fffffff, prior)
-	targets, err := streamV2TargetLayout(0, 0x7fffffff)
+	targets, err := streamV2TargetLayout(0, 0x7fffffff, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
 	var fresh = append(
@@ -699,7 +689,6 @@ func TestStreamV2SplitInheritsAnEmptyChannel(t *testing.T) {
 	require.Equal(t, streamV2FormatOffsetToken(2, quarters[0]), fakeCommittedTokens(t, statePath)[parentNames[0]])
 	storeKeys(t, child, keysHashingTo(targets[0], 1, "empty-inherit-post"))
 	require.Equal(t, channelNames(task, 1, targets), activeNames(child))
-	child.stop()
 }
 
 // TestStreamV2SweepDropsAPriorSessionsOrphan covers the sweep of a channel no
@@ -711,9 +700,9 @@ func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
 	var ctx = context.Background()
 	const task = "test/topologyOrphan"
 	var statePath = filepath.Join(t.TempDir(), "channels.json")
-	t.Setenv("FAKE_SIDECAR_STATE", statePath)
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
 
-	quarters, err := streamV2TargetLayout(0, math.MaxUint32)
+	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
 	// A session at epoch zero commits into every quarter and is gone.
@@ -725,7 +714,6 @@ func TestStreamV2SweepDropsAPriorSessionsOrphan(t *testing.T) {
 	storeKeys(t, first, rows)
 	_, err = first.flush(ctx)
 	require.NoError(t, err)
-	first.stop()
 	for _, name := range channelNames(task, 0, quarters) {
 		require.Contains(t, fakeCommittedTokens(t, statePath), name)
 	}

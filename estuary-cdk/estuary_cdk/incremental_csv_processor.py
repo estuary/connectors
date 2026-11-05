@@ -3,9 +3,9 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, overload
+from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, cast, overload
 from dataclasses import dataclass
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from estuary_cdk.capture.common import BaseDocument
 
 
@@ -29,16 +29,16 @@ class BaseCSVRow(BaseDocument):
     # can subclass and override NULL_VALUES as needed.
     NULL_VALUES: ClassVar[set[str]] = {""}
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     @model_validator(mode='before')
     @classmethod
     def handle_null_values(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            fields = cast(dict[str, Any], data)
             return {
                 key: None if isinstance(value, str) and value in cls.NULL_VALUES else value
-                for key, value in data.items()
+                for key, value in fields.items()
             }
         return data
 
@@ -60,7 +60,7 @@ class CSVConfig:
 class CSVProcessingError(Exception):
     """Exception raised when CSV processing fails."""
 
-    def __init__(self, message: str, config: dict | None = None):
+    def __init__(self, message: str, config: dict[str, Any] | None = None):
         self.config = config
         if config:
             config_str = ", ".join([f"{k}={repr(v)}" for k, v in config.items()])
@@ -103,24 +103,30 @@ class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
         self._exhausted = False
 
     async def read(self, size: int = -1) -> str:
-        """Read and incrementally decode data from the byte stream."""
-        if self._exhausted:
-            return ""
+        """Read and incrementally decode data from the byte stream.
 
-        try:
-            chunk = await self.byte_gen.__anext__()
+        aiocsv takes an empty string as the end of the file, so a chunk that
+        decodes to no text (an empty chunk, a lone byte-order mark, or part of
+        a multi-byte character) is never returned; the next chunk is read
+        instead.
+        """
+        while not self._exhausted:
+            try:
+                chunk = await self.byte_gen.__anext__()
+            except StopAsyncIteration:
+                self._exhausted = True
+
+                # Finalize the decoder to get any remaining characters.
+                # This will raise UnicodeDecodeError if there are incomplete characters.
+                return self.decoder.decode(b'', final=True)
+
             # Use incremental decoder to handle multi-byte characters
             # that may be split across chunk boundaries.
-            return self.decoder.decode(chunk, final=False)
+            text = self.decoder.decode(chunk, final=False)
+            if text:
+                return text
 
-        except StopAsyncIteration:
-            self._exhausted = True
-
-            # Finalize the decoder to get any remaining characters.
-            # This will raise UnicodeDecodeError if there are incomplete characters.
-            final_chunk = self.decoder.decode(b'', final=True)
-
-            return final_chunk if final_chunk else ""
+        return ""
 
 
 class IncrementalCSVProcessor(Generic[T]):

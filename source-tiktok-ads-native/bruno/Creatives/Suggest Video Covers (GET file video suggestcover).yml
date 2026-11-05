@@ -1,0 +1,27 @@
+info:
+  name: Suggest Video Covers (GET file video suggestcover)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/file/video/suggestcover/?advertiser_id={{advertiser_id}}&video_id={{seed_video_id}}&poster_number=1"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get suggested thumbnails for a video"
+  (`GET /open_api/v1.3/file/video/suggestcover/`).
+
+  **WHY:** a single-video ad needs a cover image. The sandbox's video upload
+  returns no `video_cover_url`, so this checks whether TikTok can supply a
+  cover image ID for the seeded video without uploading an image.
+  Run with `--env-var seed_video_id=<id from Upload Video>`.
+
+  **UNOBSERVABLE (2026-10-12, sandbox):** `code 40010`, "The domain name or API
+  version has been deprecated": not served by the sandbox host.

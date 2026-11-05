@@ -1,0 +1,32 @@
+info:
+  name: Add User A to Group
+  type: http
+  seq: 23
+
+http:
+  method: PUT
+  url: "{{base_url}}/groups/{{members_seed_group_id}}/users/{{members_seed_user_a_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('members_seed_group_id')) await bru.runRequest('Seeding/Create Members Group');
+        if (!bru.getVar('members_seed_user_a_id')) await bru.runRequest('Seeding/Create Member User A');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/assignUserToGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** first membership of `estuary-members-group`; feeds `Group members / bare`.
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

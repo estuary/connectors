@@ -1,0 +1,162 @@
+info:
+  name: cursor filter
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?limit=200&filter={{groups_filter}}"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: filter
+      value: "{{groups_filter}}"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - lastUpdated gt 16:20:27 → only the profile-edited group (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=lastUpdated gt \"2026-10-07T16:20:27.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18h004ubJFvh3C698", "lastUpdated": "2026-10-07T16:20:31.000Z", "lastMembershipUpdated": "2026-10-07T16:20:27.000Z" }
+          ]
+  - name: 200 - lastMembershipUpdated gt 16:20:22 → only the group whose membership changed (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=lastMembershipUpdated gt \"2026-10-07T16:20:22.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18h004ubJFvh3C698", "lastUpdated": "2026-10-07T16:20:31.000Z", "lastMembershipUpdated": "2026-10-07T16:20:27.000Z" }
+          ]
+  - name: 200 - lastUpdated gt X or lastMembershipUpdated gt X → 2, Everyone via membership leg (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=lastUpdated gt \"2026-10-07T16:20:00.000Z\" or lastMembershipUpdated gt \"2026-10-07T16:20:00.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18h004ubJFvh3C698", "lastUpdated": "2026-10-07T16:20:31.000Z", "lastMembershipUpdated": "2026-10-07T16:20:27.000Z" },
+            { "id": "00g176zmw9j1Wyxqf698", "lastUpdated": "2026-09-03T19:36:27.000Z", "lastMembershipUpdated": "2026-10-07T16:20:12.000Z" }
+          ]
+  - name: 200 - nested (lU in (X,H]) or (lMU in (X,H]) window → 2, fixture via lMU leg only (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=(lastUpdated gt \"2026-10-07T16:20:00.000Z\" and lastUpdated le \"2026-10-07T16:20:27.000Z\") or (lastMembershipUpdated gt \"2026-10-07T16:20:00.000Z\" and lastMembershipUpdated le \"2026-10-07T16:20:27.000Z\")"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18h004ubJFvh3C698", "lastUpdated": "2026-10-07T16:20:31.000Z", "lastMembershipUpdated": "2026-10-07T16:20:27.000Z" },
+            { "id": "00g176zmw9j1Wyxqf698", "lastUpdated": "2026-09-03T19:36:27.000Z", "lastMembershipUpdated": "2026-10-07T16:20:12.000Z" }
+          ]
+  - name: 200 - backfill form lU le C and lMU le C → 3, excludes the group past C (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=lastUpdated le \"2026-10-07T16:20:30.000Z\" and lastMembershipUpdated le \"2026-10-07T16:20:30.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18gur2rc3zz7MS698", "lastUpdated": "2026-10-07T14:36:50.000Z", "lastMembershipUpdated": "2026-10-07T14:37:12.000Z" },
+            { "id": "00g176zmw9j1Wyxqf698", "lastUpdated": "2026-09-03T19:36:27.000Z", "lastMembershipUpdated": "2026-10-07T16:20:12.000Z" },
+            { "id": "00g176zmw9kqvHDny698", "lastUpdated": "2026-09-03T19:36:27.000Z", "lastMembershipUpdated": "2026-09-03T19:36:27.000Z" }
+          ]
+  - name: 200 - after member removal, lMU gt 16:25 → fixture bumped to 16:26:48 (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=lastMembershipUpdated gt \"2026-10-07T16:25:00.000Z\""
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g18h004ubJFvh3C698", "lastUpdated": "2026-10-07T16:25:58.000Z", "lastMembershipUpdated": "2026-10-07T16:26:48.000Z" }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all groups](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroups)
+
+  **WHY:** the Groups cursor has to catch both profile edits (`lastUpdated`)
+  and membership changes (`lastMembershipUpdated`). This request checks whether
+  the filter accepts an `or` of the two fields, including the nested two-sided
+  window the connector would send, and whether each leg narrows independently.
+  Run once per variant with `--env-var groups_filter=…`. The anchors are fixture
+  group `00g18h004ubJFvh3C698` (`Seeding / Create Fixture Group` at 16:20:22, member
+  added at 16:20:27, profile edited at 16:20:31) and the BUILT_IN Everyone group
+  (membership moved at 16:20:12 by a user creation).
+
+  **DOCUMENTED (2026-10-07):** filterable properties are `id`, `type`,
+  `lastUpdated` and `lastMembershipUpdated` (OpenAPI spec v2026.09.2,
+  `listGroups`). `lastUpdated` is "Timestamp when the group's profile was last
+  updated".
+
+  **VERIFIED (2026-10-07):** a membership add (`Seeding / Add User To Group`)
+  bumped only `lastMembershipUpdated` (16:20:27). A profile edit
+  (`Seeding / Update Group Profile`) bumped only `lastUpdated` (16:20:31). A
+  membership removal (`Seeding / Remove User From Group`) bumped only
+  `lastMembershipUpdated` (16:26:48), and `filter` saw it within seconds of the
+  write. **LIMITATION:** a `lastUpdated`-only cursor misses every membership
+  change; the Groups cursor must cover both fields.
+
+  **VERIFIED (2026-10-07):** each leg narrows on its own (1 of 4 each). The
+  flat `or` returns their union (2), with Everyone reached only through the
+  membership leg. The nested window
+  `(lastUpdated gt X and lastUpdated le H) or (lastMembershipUpdated gt X and lastMembershipUpdated le H)`
+  is accepted with parentheses and correctly admits the fixture through its
+  membership leg alone (its `lastUpdated` of 16:20:31 lies past H = 16:20:27).
+  The backfill complement `lastUpdated le C and lastMembershipUpdated le C`
+  returns exactly the 3 groups with both fields at or before C.
+
+  **VERIFIED (2026-10-07):** a membership change does not bump the member
+  user's `lastUpdated`. The user added at 16:20:27 kept `lastUpdated` 16:20:17
+  (`Users / bare`), so Users needs no membership cursor.

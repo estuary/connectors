@@ -1,7 +1,9 @@
 package writer
 
 import (
+	"bytes"
 	"compress/flate"
+	stdjson "encoding/json"
 	"fmt"
 	"io"
 
@@ -44,11 +46,15 @@ func WithJsonSkipNulls() JsonOption {
 }
 
 type JsonWriter struct {
-	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
-	cwc   *countingWriteCloser
-	gz    *pgzip.Writer
-	shape *encrow.Shape
-	buf   []byte
+	w            io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
+	cwc          *countingWriteCloser
+	gz           *pgzip.Writer
+	shape        *encrow.Shape
+	buf          []byte
+	uncompressed int
+
+	// fields names the values of a row, for errors about a single value.
+	fields []string
 }
 
 // NewJsonWriter creates a JsonWriter from w. w is closed when JsonWriter is closed. If `fields`
@@ -60,7 +66,8 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 	}
 
 	jw := &JsonWriter{
-		cwc: &countingWriteCloser{w: w},
+		cwc:    &countingWriteCloser{w: w},
+		fields: fields,
 	}
 
 	if !cfg.disableCompression {
@@ -91,6 +98,10 @@ func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonW
 }
 
 func (w *JsonWriter) Write(vals []any) (err error) {
+	if vals, err = w.compactLineBreaks(vals); err != nil {
+		return err
+	}
+
 	w.buf = w.buf[:0]
 	if w.shape == nil {
 		// Serialize as a JSON array of values.
@@ -116,12 +127,53 @@ func (w *JsonWriter) Write(vals []any) (err error) {
 	if _, err := w.w.Write(w.buf); err != nil {
 		return fmt.Errorf("writing gzip bytes: %w", err)
 	}
+	w.uncompressed += len(w.buf)
 
 	return nil
 }
 
+// compactLineBreaks returns vals with each pre-serialized JSON value that contains a
+// line break replaced by its compacted form, so that every row is written on a single
+// line. vals itself is left unchanged, and an empty value is an error.
+func (w *JsonWriter) compactLineBreaks(vals []any) ([]any, error) {
+	var out, copied = vals, false
+	for i, v := range vals {
+		raw, ok := v.(stdjson.RawMessage)
+		if !ok || raw == nil {
+			continue
+		} else if len(raw) == 0 {
+			return nil, fmt.Errorf("field %q: empty pre-serialized JSON value", w.fieldName(i))
+		} else if bytes.IndexByte(raw, '\n') < 0 && bytes.IndexByte(raw, '\r') < 0 {
+			continue
+		}
+
+		var compacted bytes.Buffer
+		if err := stdjson.Compact(&compacted, raw); err != nil {
+			return nil, fmt.Errorf("field %q: %w", w.fieldName(i), err)
+		}
+		if !copied {
+			out, copied = append([]any(nil), vals...), true
+		}
+		out[i] = stdjson.RawMessage(compacted.Bytes())
+	}
+	return out, nil
+}
+
+func (w *JsonWriter) fieldName(i int) string {
+	if i < len(w.fields) {
+		return w.fields[i]
+	}
+	return fmt.Sprintf("%d", i)
+}
+
+// Written returns the number of bytes written to the underlying writer, after compression.
 func (w *JsonWriter) Written() int {
-	return w.cwc.written
+	return int(w.cwc.written.Load())
+}
+
+// WrittenUncompressed returns the number of bytes of rows written, before compression.
+func (w *JsonWriter) WrittenUncompressed() int {
+	return w.uncompressed
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing

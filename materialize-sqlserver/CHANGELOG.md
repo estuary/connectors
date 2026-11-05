@@ -1,5 +1,34 @@
 # materialize-sqlserver
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains a dot or has a custom projection name.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+### Changed
+- The warning about rows a backfill did not delete now names every affected
+  table instead of only the latest one.
+
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as a
+  collation check error. This also applies when the materialization is saved,
+  so messages such as "host cannot be found" are shown again.
+
 ## 2026-10-01
 
 ### Added

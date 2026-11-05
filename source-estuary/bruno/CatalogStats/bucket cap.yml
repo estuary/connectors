@@ -1,0 +1,63 @@
+info:
+  name: bucket cap
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { catalogStats(by:{names:[\"Jonathan_Wihl/\",\"Artificial-Industries/\",\"Dave/\",\"Dani/\",\"dani-demo/\",\"demo/\"],grain:HOURLY,start:\"2025-10-01T00:00:00Z\",end:\"2026-10-01T00:00:00Z\"}){ edges{ node{ catalogName timestamp } } } }"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs` (`CatalogStatsQuery::catalog_stats`, `MAX_BUCKETS = 10_000`, 30 s timeout)
+  
+  **WHY:** six tenant rollups x 8,760 hours can exceed the 10,000-bucket cap. Expect
+  an error rather than truncation; the connector sizes windows so
+  `names x buckets_per_window` stays under the cap.
+
+  **LIMITATION (VERIFIED 2026-10-07):** rejected — `query matches more than 10000
+  buckets; narrow 'names' or the time range, or request a coarser grain`.
+  An error, not a truncation: the connector sizes windows to stay far below it.
+  (The same window with only 2 tenant names returned 5,584 rows.)
+
+examples:
+  - name: "200 — errors: more than 10000 buckets rejected"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": null,
+            "errors": [
+              {
+                "message": "query matches more than 10000 buckets; narrow `names` or the time range, or request a coarser grain",
+                "locations": [
+                  {
+                    "line": 1,
+                    "column": 9
+                  }
+                ],
+                "path": [
+                  "catalogStats"
+                ]
+              }
+            ]
+          }

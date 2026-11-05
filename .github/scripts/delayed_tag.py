@@ -4,7 +4,7 @@ delayed_tag.py — compute the ':delayed' image tag plan for Estuary connectors.
 
 Subcommands
 -----------
-plan   Read ci.yaml / python-connectors.yaml, query GitHub for merged PRs,
+plan   Read the connector lists, query GitHub for merged PRs,
        then for each connector pick the most recent PR that (a) touched that
        connector's directory, (b) was merged at least CUTOFF_DAYS ago, and
        (c) has not been reverted on main. Writes plan.tsv and later.tsv.
@@ -210,10 +210,12 @@ def filter_backward_moves(
 # Connector image discovery
 # ---------------------------------------------------------------------------
 
-def load_connector_images(ci_yaml: str, python_connectors: str) -> list:
+def load_connector_images(
+    go_connectors: str, python_connectors: str, rust_connectors: str
+) -> list:
     """
-    Return the list of (image_name, source_dir) pairs from the workflow
-    matrix entries.  Variants in <connector>/VARIANTS inherit their parent's
+    Return the list of (image_name, source_dir) pairs from the connector
+    lists.  Variants in <connector>/VARIANTS inherit their parent's
     source_dir.
     """
     def yq_list(query: str, path: str) -> list:
@@ -225,19 +227,20 @@ def load_connector_images(ci_yaml: str, python_connectors: str) -> list:
         except subprocess.CalledProcessError:
             return []
 
-    # yq_list reads an unreadable file as an empty list. For the Python list
-    # that would silently drop every Python connector from the plan, so an
+    # yq_list reads an unreadable file as an empty list. For a connector list
+    # that would silently drop all of its connectors from the plan, so an
     # empty result is an error.
-    python_names = yq_list('.[].name', python_connectors)
-    if not python_names:
-        print(f'::error::no Python connectors read from {python_connectors}',
-              file=sys.stderr)
-        sys.exit(1)
+    def list_names(path: str) -> list:
+        names = yq_list('.[].name', path)
+        if not names:
+            print(f'::error::no connectors read from {path}', file=sys.stderr)
+            sys.exit(1)
+        return names
 
     raw_connectors = (
-        yq_list('.jobs.build_connectors.strategy.matrix.connector[]', ci_yaml) +
-        yq_list('.jobs.build_connectors.strategy.matrix.include[].connector', ci_yaml) +
-        python_names
+        list_names(go_connectors) +
+        list_names(rust_connectors) +
+        list_names(python_connectors)
     )
 
     seen: set = set()
@@ -586,12 +589,14 @@ def image_digests(ref: str) -> frozenset:
     digest plus every child (platform) manifest digest.
 
     The nightly and forward workflows both publish ':delayed' via
-    `docker buildx imagetools create`, which wraps a connector's single-arch
-    image in a fresh manifest LIST. So ':delayed' carries a list digest that
-    matches no ':<sha7>' tag, while its child digest equals the single-arch
-    image that the ':<sha7>' tag points at. Returning both lets a caller match
-    ':delayed' back to its originating commit regardless of which layer the
-    ':<sha7>' tag sits on. Empty when the ref cannot be inspected.
+    `docker buildx imagetools create`. The deploy action pushes each ':<sha7>'
+    as an index holding the image and its attestations, which imagetools copies
+    as is, so ':delayed' carries the same top-level digest as ':<sha7>'. An
+    older single-arch ':<sha7>' image is instead wrapped in a fresh manifest
+    LIST, whose digest matches no ':<sha7>' tag while its child digest equals
+    the single-arch image. Returning both lets a caller match ':delayed' back
+    to its originating commit regardless of which layer the ':<sha7>' tag sits
+    on. Empty when the ref cannot be inspected.
     """
     try:
         out = subprocess.check_output(
@@ -631,7 +636,7 @@ def _list_package_versions(
 
 
 def current_delayed_commit(
-    image: str, owner: str, token: str, max_pages: int = 3,
+    image: str, owner: str, token: str, max_pages: int = 10,
 ) -> Optional[str]:
     """
     Return the commit (sha7) that ':delayed' currently points at, or None.
@@ -639,9 +644,13 @@ def current_delayed_commit(
     Inspects the live ':delayed' manifest to learn its content digests, then
     scans the package's versions (newest-first, stopping at the first match) for
     the version carrying one of those digests and reads its commit-SHA tag.
-    Stops after `max_pages`; ':delayed' always points at a recent image, so the
-    match is on the first page or two. Returns None on any failure so the guard
-    fails open (never blocks a legitimate forward move on a transient error).
+    Stops after `max_pages`. ':delayed' points at a recent image, but for an
+    image pushed with attestations the version that matches is the one its
+    ':<sha7>' push created, and each such deploy adds three versions (an index,
+    its image and its attestation manifest), so the pages allow for a few
+    hundred deploys since then.
+    Returns None on any failure so the guard fails open (never blocks a
+    legitimate forward move on a transient error).
     """
     digests = image_digests(f'ghcr.io/estuary/{image}:delayed')
     if not digests:
@@ -1079,7 +1088,9 @@ def cmd_plan(args: argparse.Namespace) -> None:
     print(f'Cutoff: {datetime.datetime.utcfromtimestamp(cutoff_epoch).isoformat()}Z')
     print(f'HEAD:   {head_sha[:7]}')
 
-    connector_images = load_connector_images(args.ci_yaml, args.python_connectors)
+    connector_images = load_connector_images(
+        args.go_connectors, args.python_connectors, args.rust_connectors
+    )
     print(f'Considering {len(connector_images)} connector image(s)')
 
     prs = fetch_merged_prs(owner, repo, token, lookback_days=args.lookback_days)
@@ -1315,12 +1326,14 @@ def cmd_forward(args: argparse.Namespace) -> None:
     workflow's tagging step. Includes all variants of the selected connector.
     """
     selected = args.connector.strip()
-    images = load_connector_images(args.ci_yaml, args.python_connectors)
+    images = load_connector_images(
+        args.go_connectors, args.python_connectors, args.rust_connectors
+    )
     family = resolve_family(images, selected)
     if not family:
         print(
             f'::error::unknown connector {selected!r}: not found in the '
-            f'ci.yaml matrix / python-connectors.yaml',
+            'connector lists',
             file=sys.stderr,
         )
         sys.exit(1)
@@ -1355,8 +1368,9 @@ def main(argv: Optional[list] = None) -> None:
 
     p = sub.add_parser('plan', help='compute per-connector boundary PRs')
     p.add_argument('--repo',          default=os.environ.get('GITHUB_REPOSITORY', ''))
-    p.add_argument('--ci-yaml',       default='.github/workflows/ci.yaml')
+    p.add_argument('--go-connectors', default='.github/go-connectors.yaml')
     p.add_argument('--python-connectors', default='.github/python-connectors.yaml')
+    p.add_argument('--rust-connectors', default='.github/rust-connectors.yaml')
     p.add_argument('--cutoff-days',   type=int, default=14)
     p.add_argument('--lookback-days', type=int, default=60)
     p.add_argument('--output-plan',   default='/tmp/plan.tsv')
@@ -1394,8 +1408,9 @@ def main(argv: Optional[list] = None) -> None:
     )
     p.add_argument('--connector',   required=True,
                    help='connector image name, e.g. source-postgres')
-    p.add_argument('--ci-yaml',     default='.github/workflows/ci.yaml')
+    p.add_argument('--go-connectors', default='.github/go-connectors.yaml')
     p.add_argument('--python-connectors', default='.github/python-connectors.yaml')
+    p.add_argument('--rust-connectors', default='.github/rust-connectors.yaml')
     p.add_argument('--output',      default='/tmp/forward_plan.tsv')
 
     args = parser.parse_args(argv)

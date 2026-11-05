@@ -29,3 +29,12 @@ materializations:
       source: tests/data-types
       fields:
         recommended: true
+    - resource:
+        table: merge_renamed
+      source: tests/merge-renamed
+      fields:
+        recommended: true
+        exclude: [renamedString, renamedTotal]
+        include:
+          renamed_string: {}
+          renamed_total: {}

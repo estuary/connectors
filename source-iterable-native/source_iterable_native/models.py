@@ -166,7 +166,7 @@ class IterableResource(BaseDocument, extra="allow"):
     KEY_PROPERTIES: ClassVar[dict[str, Any]] = {}
 
 
-TIterableResource = TypeVar(name="TIterableResource", bound=IterableResource)
+TIterableResource = TypeVar("TIterableResource", bound=IterableResource)
 
 
 class ResourceWithId(IterableResource, extra="allow"):
@@ -380,7 +380,7 @@ class ExportResource(IterableResource):
         raise NotImplementedError
 
 
-TExportResource = TypeVar(name="TExportResource", bound=ExportResource)
+TExportResource = TypeVar("TExportResource", bound=ExportResource)
 
 
 @dataclass

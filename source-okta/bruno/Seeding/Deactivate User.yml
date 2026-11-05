@@ -1,0 +1,37 @@
+info:
+  name: Deactivate User
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_deprov_user_id}}/lifecycle/deactivate?sendEmail=false"
+  params:
+    - name: sendEmail
+      value: "false"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_deprov_user_id')) await bru.runRequest('Seeding/Create Staged User');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Deactivate a user](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/UserLifecycle/#tag/UserLifecycle/operation/deactivateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** moves the seeded user to DEPROVISIONED, the status the unfiltered
+  list is documented to omit. It feeds `Users / deprovisioned coverage`.
+
+  **Outcome:** ran 2026-10-07 and returned 200 with an empty body. The user went
+  DEPROVISIONED at 16:20:07, with `lastUpdated = statusChanged`. The finding is
+  VERIFIED in `Users / deprovisioned coverage`.

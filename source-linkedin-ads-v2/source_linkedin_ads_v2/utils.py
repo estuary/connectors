@@ -3,7 +3,7 @@
 #
 
 import json
-from typing import Any, Dict, Iterable, List, Mapping
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 import pendulum as pdm
 
@@ -29,7 +29,7 @@ def get_parent_stream_values(record: Mapping[str, Any], key_value_map: Mapping[s
 
 
 def transform_change_audit_stamps(
-    record: Dict, dict_key: str = "changeAuditStamps", props: List = ["created", "lastModified"], fields: List = ["time"]
+    record: Dict, dict_key: str = "changeAuditStamps", props: Sequence[str] = ("created", "lastModified"), fields: Sequence[str] = ("time",)
 ) -> Mapping[str, Any]:
     """
     :: EXAMPLE `changeAuditStamps` input structure:
@@ -85,8 +85,8 @@ def date_str_from_date_range(record: Dict, prefix: str) -> str:
 def transform_date_range(
     record: Dict,
     dict_key: str = "dateRange",
-    props: List = ["start", "end"],
-    fields: List = ["year", "month", "day"],
+    props: Sequence[str] = ("start", "end"),
+    fields: Sequence[str] = ("year", "month", "day"),
 ) -> Mapping[str, Any]:
     """
     :: EXAMPLE `dateRange` input structure in Analytics streams:
@@ -291,7 +291,7 @@ def transform_variables(record: Dict, dict_key: str = "variables") -> Mapping[st
     return record
 
 
-def transform_col_names(record: Dict, dict_keys: list = []) -> Mapping[str, Any]:
+def transform_col_names(record: Dict, dict_keys: Sequence[str] = ()) -> Mapping[str, Any]:
     """
     Rename records keys (columns) indicated in `dict_keys` to avoid normalization issues for certain destinations.
     Example:

@@ -81,7 +81,7 @@ def _extract_resource_cursor(
     resource: OutreachResource,
     cursor_field: str,
 ) -> datetime:
-    return _str_to_dt(getattr(resource, 'attributes')[cursor_field])
+    return _str_to_dt(resource.attributes[cursor_field])
 
 
 async def _do_request(

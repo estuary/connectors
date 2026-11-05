@@ -11,6 +11,10 @@ import (
 	"github.com/estuary/connectors/go/common"
 )
 
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"truncate_after_backfill": common.FlagEnabled,
+}
+
 type sshForwarding struct {
 	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
@@ -63,7 +67,7 @@ func (c config) DefaultNamespace() string {
 }
 
 func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
-	return c.Advanced.FeatureFlags, nil
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 // UnmarshalJSON removes any login from the address as the config is parsed, so

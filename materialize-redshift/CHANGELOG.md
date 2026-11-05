@@ -1,5 +1,37 @@
 # materialize-redshift
 
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+### Changed
+- The warning about rows a backfill did not delete now names every affected
+  table instead of only the latest one.
+
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as an
+  `enable_case_sensitive_identifier` query error. This also applies when the
+  materialization is saved, so messages such as "incorrect username or
+  password" are shown again.
+
 ## 2026-09-29
 
 ### Added

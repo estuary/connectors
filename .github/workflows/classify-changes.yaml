@@ -9,6 +9,8 @@ on:
     paths: &classifier_paths
       - ".github/scripts/classify-changed-paths.sh"
       - ".github/scripts/test_classify_changed_paths.py"
+      - ".github/scripts/go_connectors.py"
+      - ".github/scripts/test_go_connectors.py"
       - ".github/actions/classify-changes/action.yaml"
       - ".github/workflows/classify-changes.yaml"
 
@@ -26,5 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # For the tests that read the repository's real import graph.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
       - name: Classifier unit tests
-        run: cd .github/scripts && python3 -m unittest test_classify_changed_paths -v
+        run: cd .github/scripts && python3 -m unittest test_classify_changed_paths test_go_connectors -v

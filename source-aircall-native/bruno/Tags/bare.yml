@@ -1,0 +1,104 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/tags?per_page=50'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-tags
+    **WHY:** the `tags` stream; confirms envelope and key set.
+
+    **VERIFIED (2026-09-28):** envelope `{tags:[…], meta:{full meta}}`. Item keys are **only** `id`, `name`, `color`, `description`, which contradicts the docs (no `direct_link`, no `created_at`). So there's no cursor of any kind.
+  type: text/markdown
+examples:
+- name: 200 - populated list (9 tags)
+  request:
+    url: '{{base_url}}/tags?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "tags": [
+            {
+              "id": 3037353,
+              "name": "Callback Request",
+              "color": "#29C8FF",
+              "description": "queue_callback"
+            },
+            {
+              "id": 3037354,
+              "name": "Called Back",
+              "color": "#B285D1",
+              "description": "queue_called_back"
+            },
+            {
+              "id": 3037355,
+              "name": "Conference",
+              "color": "#000000",
+              "description": "conference"
+            },
+            {
+              "id": 3037356,
+              "name": "Follow Up",
+              "color": "#ff7d03",
+              "description": "follow_up_self_assign"
+            },
+            {
+              "id": 3037357,
+              "name": "Voicemail Drop",
+              "color": "#FCBB26",
+              "description": "voicemail_drop"
+            },
+            {
+              "id": 3037358,
+              "name": "Voice Virtual Agent",
+              "color": "#00B388",
+              "description": "voice_virtual_agent"
+            },
+            {
+              "id": 3037359,
+              "name": "Outbound Campaign",
+              "color": "#6454F3",
+              "description": "outbound_campaign"
+            },
+            {
+              "id": 3037360,
+              "name": "Native to GSM",
+              "color": "#0091FF",
+              "description": "native_to_gsm"
+            },
+            {
+              "id": 3037361,
+              "name": "Local Presence",
+              "color": "#00B388",
+              "description": "local_presence"
+            }
+          ],
+          "meta": {
+            "count": 9,
+            "total": 9,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

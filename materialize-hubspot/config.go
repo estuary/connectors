@@ -137,6 +137,9 @@ type Resource struct {
 	DeltaUpdates bool `json:"delta_updates" jsonschema_extras:"nonsensitive=true"`
 	// Object is the title case representation of the CRMObject.
 	Object string `json:"object"`
+	// CustomObjectName is the name of the custom object, if the object type is
+	// not CustomObject then this field has no meaning.
+	CustomObjectName string `json:"custom_object_name,omitempty"`
 }
 
 // JSONSchema defines the jsonschema for the Resource.
@@ -187,6 +190,17 @@ func (Resource) JSONSchema() *jsonschema.Schema {
 					},
 				},
 			},
+			orderedmap.Pair[string, *jsonschema.Schema]{
+				Key: "custom_object_name",
+				Value: &jsonschema.Schema{
+					Type:        "string",
+					Title:       "Custom Object name",
+					Description: "If Custom Object is selected, the plural internal name of the object.",
+					Extras: map[string]any{
+						"order": 3,
+					},
+				},
+			},
 		)),
 		Required: []string{
 			"name",
@@ -200,12 +214,23 @@ func (r Resource) CRMObject() (CRMObject, error) {
 }
 
 func (r Resource) Validate() error {
-	_, err := r.CRMObject()
+	_, err := r.ObjectName()
 	return err
 }
 
-func (r Resource) Path() ([]string, error) {
+func (r Resource) ObjectName() (ObjectName, error) {
 	object, err := r.CRMObject()
+	if err != nil {
+		return "", err
+	}
+	if object == CustomObjectObject {
+		return CustomObjectName(r.CustomObjectName)
+	}
+	return ObjectName(object.String()), nil
+}
+
+func (r Resource) Path() ([]string, error) {
+	object, err := r.ObjectName()
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,7 @@ import (
 
 type writerConfig struct {
 	metadata map[string]string
+	etag     *string
 }
 
 type WriterOption func(*writerConfig)
@@ -29,6 +30,21 @@ type WriterOption func(*writerConfig)
 func WithObjectMetadata(metadata map[string]string) WriterOption {
 	return func(cfg *writerConfig) {
 		cfg.metadata = metadata
+	}
+}
+
+// WithETag sets *etag, once an upload succeeds, to the ETag the store assigned
+// the object, exactly as the store returned it.
+func WithETag(etag *string) WriterOption {
+	return func(cfg *writerConfig) {
+		cfg.etag = etag
+	}
+}
+
+// setETag reports etag through the WithETag option, if one was given.
+func (cfg writerConfig) setETag(etag string) {
+	if cfg.etag != nil {
+		*cfg.etag = etag
 	}
 }
 
@@ -100,6 +116,21 @@ type ObjectInfo struct {
 	Key string
 }
 
+// readSeeker returns r as an io.ReadSeeker, reading it fully into memory if it
+// is not one already. A single-request upload needs the body's length up front
+// and must be able to rewind it for retries.
+func readSeeker(r io.Reader) (io.ReadSeeker, error) {
+	if rs, ok := r.(io.ReadSeeker); ok {
+		return rs, nil
+	}
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("reading body: %w", err)
+	}
+	return bytes.NewReader(data), nil
+}
+
 type uploadFn func(context.Context, string, io.Reader, ...WriterOption) error
 
 // blobWriteCloser adapts a synchronous uploadFn into an io.WriterCloser.
@@ -160,8 +191,7 @@ func checkPermissions[T error](
 	handleErr func(err T) error,
 ) error {
 	adaptErr := func(err error) error {
-		var asErr T
-		if errors.As(err, &asErr) {
+		if asErr, ok := errors.AsType[T](err); ok {
 			// Log the original error message, since it can sometimes contain
 			// useful (although potentially confusing) information.
 			log.WithField("err", err).Error("bucket permissions check failed")

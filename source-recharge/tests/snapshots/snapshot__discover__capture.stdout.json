@@ -139,6 +139,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "addresses"
     ]
   },
   {
@@ -661,6 +664,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "charges"
     ]
   },
   {
@@ -716,6 +722,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "collections"
     ]
   },
   {
@@ -931,6 +940,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "customers"
     ]
   },
   {
@@ -1139,6 +1151,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "discounts"
     ]
   },
   {
@@ -1230,6 +1245,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "metafields"
     ]
   },
   {
@@ -1360,6 +1378,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "onetimes"
     ]
   },
   {
@@ -2285,6 +2306,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "orders"
     ]
   },
   {
@@ -2442,6 +2466,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "products"
     ]
   },
   {
@@ -2581,6 +2608,9 @@
     },
     "key": [
       "/store_id"
+    ],
+    "resourcePath": [
+      "shop"
     ]
   },
   {
@@ -2834,6 +2864,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "subscriptions"
     ]
   }
 ]

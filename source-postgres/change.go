@@ -300,6 +300,7 @@ func (db *postgresDatabase) constructJSONTranscoder(discoveredColumnType any, is
 
 	switch codec.(type) {
 	case pgtype.TextCodec:
+		var truncateColumnThreshold = db.fieldTruncationThreshold()
 		// Special case for the text codec (used for TEXT and VARCHAR and a few other column
 		// types), which just casts its input bytes to a Go string. That cast can be relatively
 		// expensive, and in our particular case we know that we are never going to modify the

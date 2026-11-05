@@ -1,0 +1,24 @@
+info:
+  name: A2 - Add User To Team
+  type: http
+  seq: 6
+http:
+  method: POST
+  url: '{{base_url}}/teams/{{seed_team_id}}/users/{{seed_user_id}}'
+  auth: inherit
+runtime:
+  scripts:
+  - type: before-request
+    code: if (!bru.getVar('seed_user_id')) bru.setVar('seed_user_id', '2078847');
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#add-a-user-to-a-team
+    **ONLY THE USER RUNS THIS — never the assistant** (state-mutating).
+    **WHY:** populates `teams[].users[]` so `Teams / bare` shows the nested user shape the stream will carry. Run A1 first in a fresh session (seed_team_id comes from A1). `seed_user_id` falls back to the single account user seen in `Users / bare`.
+    Outcome: ran 2026-09-28 by the user (user 2078847 → team 262615). Nested users VERIFIED in `Teams / bare`.
+  type: text/markdown

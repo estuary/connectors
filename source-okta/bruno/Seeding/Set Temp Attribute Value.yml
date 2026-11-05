@@ -1,0 +1,44 @@
+info:
+  name: Set Temp Attribute Value
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_user_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "estuaryProbeTemp": "probe-value"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id') && !bru.getEnvVar('seed_user_id')) {
+          await bru.runRequest('Seeding/Create Active User');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user (partial)](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/updateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`. Run
+  `Seeding / Add Temp Schema Attribute` first; the attribute must exist.
+
+  **WHY:** gives the fixture user a value for the throwaway attribute, so the
+  schema-level deletion in `Seeding / Remove Temp Schema Attribute` has a value
+  to remove. Read the result with `Users / get by id`.
+
+  **Outcome:** ran 2026-10-08. `profile.estuaryProbeTemp` became
+  `"probe-value"` and `lastUpdated` moved to 12:29:33.

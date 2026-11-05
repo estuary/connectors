@@ -1,0 +1,170 @@
+info:
+  name: first without after
+  type: graphql
+  seq: 4
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Alerts($prefix: String!) {
+        alerts(by: { prefix: $prefix }, first: 3) {
+          pageInfo { hasPreviousPage hasNextPage startCursor endCursor }
+          edges { node { catalogName alertType firedAt } }
+        }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alerts.rs
+
+  **WHY:** Server source says `first` is ignored unless `after` is set (the
+  resolver branches on `after`, then uses `last.unwrap_or(20)`). If true, a
+  connector that pages forward with `first` would silently get 20 rows and no
+  `hasNextPage` — a data-loss trap. Expect 20 edges (or all, if fewer), not 3.
+
+  **LIMITATION (VERIFIED 2026-10-07):** `first: 3` without `after` is **ignored**: 15 alerts came back (all of them, under the default 20). Forward paging with `first` alone would silently cap at 20 with no more-flag. Page backward with `last` + `before`.
+
+examples:
+  - name: 200 - first 3 ignored, 15 returned
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alerts": {
+                "pageInfo": {
+                  "hasPreviousPage": false,
+                  "hasNextPage": false,
+                  "startCursor": "2026-06-02T13:14:14.852195+00:00;shard_failed;Jonathan_Wihl/wikipedia/user-fact-table",
+                  "endCursor": "2024-02-13T21:58:23.429321+00:00;missing_payment_method;Jonathan_Wihl/alerts/missing_payment_method"
+                },
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/wikipedia/user-fact-table",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T13:14:14.852195+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T13:00:34.735123+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T12:48:43.441117+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/wikipedia/top-users",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T11:59:50.759409+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/wikipedia/user-summary-limit",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-06-02T11:51:27.861417+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial_stalled",
+                      "alertType": "free_trial_stalled",
+                      "firedAt": "2026-05-27T00:42:41.566979+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial_ending",
+                      "alertType": "free_trial_ending",
+                      "firedAt": "2026-05-17T00:34:06.519159+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial",
+                      "alertType": "free_trial",
+                      "firedAt": "2026-04-23T22:21:17.352572+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "alertType": "task_auto_disabled_idle",
+                      "firedAt": "2026-03-30T21:02:29.102472+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "alertType": "task_auto_disabled_idle",
+                      "firedAt": "2026-03-30T18:44:21.201645+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/user-fact-table",
+                      "alertType": "shard_failed",
+                      "firedAt": "2026-03-24T15:29:55.834226+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "alertType": "task_idle",
+                      "firedAt": "2026-03-23T19:55:19.412658+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "alertType": "task_idle",
+                      "firedAt": "2026-03-23T18:22:32.481778+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial_stalled",
+                      "alertType": "free_trial_stalled",
+                      "firedAt": "2025-03-13T20:00:00.018903+00:00"
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/alerts/missing_payment_method",
+                      "alertType": "missing_payment_method",
+                      "firedAt": "2024-02-13T21:58:23.429321+00:00"
+                    }
+                  }
+                ]
+              }
+            }
+          }

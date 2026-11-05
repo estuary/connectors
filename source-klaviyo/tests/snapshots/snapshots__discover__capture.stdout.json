@@ -58,7 +58,10 @@
       ],
       "stream": "campaigns",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "campaigns"
+    ]
   },
   {
     "documentSchema": {
@@ -119,7 +122,10 @@
       ],
       "stream": "events",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "events"
+    ]
   },
   {
     "documentSchema": {
@@ -180,7 +186,10 @@
       ],
       "stream": "global_exclusions",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "global_exclusions"
+    ]
   },
   {
     "documentSchema": {
@@ -241,7 +250,10 @@
       ],
       "stream": "lists",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "lists"
+    ]
   },
   {
     "documentSchema": {
@@ -302,7 +314,10 @@
       ],
       "stream": "metrics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "metrics"
+    ]
   },
   {
     "documentSchema": {
@@ -363,7 +378,10 @@
       ],
       "stream": "flows",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "flows"
+    ]
   },
   {
     "documentSchema": {
@@ -424,7 +442,10 @@
       ],
       "stream": "email_templates",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "email_templates"
+    ]
   },
   {
     "documentSchema": {
@@ -485,6 +506,9 @@
       ],
       "stream": "profiles",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "profiles"
+    ]
   }
 ]

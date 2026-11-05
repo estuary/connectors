@@ -29,7 +29,6 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 	iso8601 "github.com/senseyeio/duration"
 	log "github.com/sirupsen/logrus"
@@ -427,15 +426,16 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 	}
 
 	s3client := s3store.Client()
-	testKey := path.Join(d.cfg.Prefix, uuid.NewString())
+	// Overwriting a fixed key on each check leaves no object behind without
+	// requiring s3:DeleteObject.
+	testKey := path.Join(d.cfg.Prefix, ".estuary-prerequisites-check")
 
-	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
-		if errors.As(err, &awsErr) {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
 				err = fmt.Errorf("bucket %q does not exist", d.cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
@@ -447,16 +447,8 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
-		}
-		errs.Err(err)
-	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(d.cfg.Bucket),
-		Key:    aws.String(testKey),
-	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 		}
 		errs.Err(err)
 	}
@@ -573,6 +565,10 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	var resourcePaths [][]string
 	var bindings []binding
 

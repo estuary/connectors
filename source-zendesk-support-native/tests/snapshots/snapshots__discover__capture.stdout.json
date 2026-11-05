@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "account_attributes"
     ]
   },
   {
@@ -150,6 +153,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "articles"
     ]
   },
   {
@@ -233,6 +239,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "audit_logs"
     ]
   },
   {
@@ -316,6 +325,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "automations"
     ]
   },
   {
@@ -399,6 +411,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "brands"
     ]
   },
   {
@@ -482,6 +497,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "call_legs"
     ]
   },
   {
@@ -565,6 +583,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "calls"
     ]
   },
   {
@@ -648,6 +669,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "categories"
     ]
   },
   {
@@ -731,6 +755,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "custom_roles"
     ]
   },
   {
@@ -801,6 +828,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "custom_ticket_statuses"
     ]
   },
   {
@@ -884,6 +914,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "group_memberships"
     ]
   },
   {
@@ -967,6 +1000,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "groups"
     ]
   },
   {
@@ -1050,6 +1086,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "macros"
     ]
   },
   {
@@ -1133,6 +1172,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "organization_memberships"
     ]
   },
   {
@@ -1216,6 +1258,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "organizations"
     ]
   },
   {
@@ -1293,6 +1338,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "post_comment_votes"
     ]
   },
   {
@@ -1370,6 +1418,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "post_comments"
     ]
   },
   {
@@ -1447,6 +1498,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "post_votes"
     ]
   },
   {
@@ -1530,6 +1584,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "posts"
     ]
   },
   {
@@ -1607,6 +1664,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "satisfaction_ratings"
     ]
   },
   {
@@ -1677,6 +1737,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "schedules"
     ]
   },
   {
@@ -1754,6 +1817,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "side_conversations"
     ]
   },
   {
@@ -1824,6 +1890,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "sla_policies"
     ]
   },
   {
@@ -1894,6 +1963,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -1971,6 +2043,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_activities"
     ]
   },
   {
@@ -2048,6 +2123,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_audits"
     ]
   },
   {
@@ -2125,6 +2203,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_comments"
     ]
   },
   {
@@ -2208,6 +2289,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_fields"
     ]
   },
   {
@@ -2291,6 +2375,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_forms"
     ]
   },
   {
@@ -2368,6 +2455,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_metric_events"
     ]
   },
   {
@@ -2445,6 +2535,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_metrics"
     ]
   },
   {
@@ -2522,6 +2615,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "ticket_skips"
     ]
   },
   {
@@ -2605,6 +2701,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "tickets"
     ]
   },
   {
@@ -2688,6 +2787,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "topics"
     ]
   },
   {
@@ -2771,6 +2873,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

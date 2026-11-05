@@ -1,0 +1,150 @@
+info:
+  name: user types
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: '{{base_url}}/meta/types/user'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Capture the schema id of the first NON-default user type (falls back to the default
+        // type) from `_links.schema.href` for `User Custom Profile / schema by type`.
+        // Non-secret resource id; runtime vars are in-memory only.
+        const types = res.getBody();
+        if (Array.isArray(types) && types.length) {
+          const t = types.find((x) => !x.default) || types[0];
+          const href = t?._links?.schema?.href || '';
+          bru.setVar('user_schema_id', href.split('/').pop());
+        }
+
+examples:
+  - name: "200 - before seeding: only the default type"
+    request:
+      url: "{{base_url}}/meta/types/user"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "500"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "oty176zmw9ti8gVdP698",
+              "displayName": "User",
+              "name": "user",
+              "description": "Okta user profile template with default permission settings",
+              "createdBy": "spr176zmw7hcrHYPh698",
+              "lastUpdatedBy": "spr176zmw7hcrHYPh698",
+              "created": "2026-09-03T19:36:27.000Z",
+              "lastUpdated": "2026-09-03T19:36:27.000Z",
+              "default": true,
+              "_links": {
+                "schema": {
+                  "rel": "schema",
+                  "href": "https://integrator-9297012.okta.com/api/v1/meta/schemas/user/osc176zmw9ti8gVdP698",
+                  "method": "GET"
+                },
+                "self": {
+                  "rel": "self",
+                  "href": "https://integrator-9297012.okta.com/api/v1/meta/types/user/oty176zmw9ti8gVdP698",
+                  "method": "GET"
+                }
+              }
+            }
+          ]
+  - name: "200 - after seeding: default + estuarySeedContractor"
+    request:
+      url: "{{base_url}}/meta/types/user"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "500"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "oty176zmw9ti8gVdP698",
+              "displayName": "User",
+              "name": "user",
+              "description": "Okta user profile template with default permission settings",
+              "createdBy": "spr176zmw7hcrHYPh698",
+              "lastUpdatedBy": "00u176zmwbsJ1Uak8698",
+              "created": "2026-09-03T19:36:27.000Z",
+              "lastUpdated": "2026-10-07T14:36:56.000Z",
+              "default": true,
+              "_links": {
+                "schema": {
+                  "rel": "schema",
+                  "href": "https://integrator-9297012.okta.com/api/v1/meta/schemas/user/osc176zmw9ti8gVdP698",
+                  "method": "GET"
+                },
+                "self": {
+                  "rel": "self",
+                  "href": "https://integrator-9297012.okta.com/api/v1/meta/types/user/oty176zmw9ti8gVdP698",
+                  "method": "GET"
+                }
+              }
+            },
+            {
+              "id": "oty18gusqxw7j8TeA698",
+              "displayName": "Estuary Seed Contractor",
+              "name": "estuarySeedContractor",
+              "description": "Seeded by the source-okta Bruno collection: a second user type, with its own profile schema.",
+              "createdBy": "00u176zmwbsJ1Uak8698",
+              "lastUpdatedBy": "00u176zmwbsJ1Uak8698",
+              "created": "2026-10-07T14:36:59.000Z",
+              "lastUpdated": "2026-10-07T14:36:59.000Z",
+              "default": false,
+              "_links": {
+                "schema": {
+                  "rel": "schema",
+                  "href": "https://integrator-9297012.okta.com/api/v1/meta/schemas/user/osc18gusqxw7j8TeA698",
+                  "method": "GET"
+                },
+                "self": {
+                  "rel": "self",
+                  "href": "https://integrator-9297012.okta.com/api/v1/meta/types/user/oty18gusqxw7j8TeA698",
+                  "method": "GET"
+                }
+              }
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all user types](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/UserType/#tag/UserType/operation/listUserTypes)
+
+  **WHY:** each user type owns its own profile schema (`_links.schema.href`). Establishes how
+  many types the org has, the envelope, and the schema-id shape, which decides whether
+  User_Custom_Profile iterates types or reads only `default`. The after-response script
+  captures a schema id into `user_schema_id` for `User Custom Profile / schema by type`.
+
+  **VERIFIED (2026-10-07):** bare JSON array of `UserType`, no `Link` header at all (not
+  paginated; Okta caps an org at 10 types: `default` + 9, OpenAPI spec v2026.09.2 (`management-oneOfInheritance.yaml`) `createUserType`).
+  Each type carries `id` (`oty…`), `name`, `displayName`, `default`, `created`,
+  `lastUpdated`, `createdBy`, `lastUpdatedBy`, and `_links.schema.href` =
+  `…/api/v1/meta/schemas/user/osc…`. The schema id shares the type id's suffix
+  (`oty176zmw9ti8gVdP698` ↔ `osc176zmw9ti8gVdP698`), but the connector takes it from the
+  link, not by string surgery.

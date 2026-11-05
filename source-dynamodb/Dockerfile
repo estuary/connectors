@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM golang:1.25-trixie AS builder
+FROM golang:1.27-trixie AS builder
 
 WORKDIR /builder
 

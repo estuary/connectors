@@ -3,10 +3,13 @@ package writer
 import (
 	"fmt"
 	"io"
+	"sync/atomic"
 )
 
+// countingWriteCloser counts the bytes written to w. The count is atomic so that it
+// can be read while another goroutine writes.
 type countingWriteCloser struct {
-	written int
+	written atomic.Int64
 	w       io.WriteCloser
 }
 
@@ -15,7 +18,7 @@ func (c *countingWriteCloser) Write(p []byte) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("countingWriteCloser writing to w: %w", err)
 	}
-	c.written += n
+	c.written.Add(int64(n))
 
 	return n, nil
 }

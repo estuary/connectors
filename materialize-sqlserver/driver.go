@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -107,7 +108,7 @@ type config struct {
 	User        string             `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password    string             `json:"password" jsonschema:"-" jsonschema_extras:"secret=true,order=2"`
 	Database    string             `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table" jsonschema_extras:"order=4"`
 	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5,nonsensitive=true"`
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default,order=6"`
 
@@ -322,6 +323,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 			db := stdsql.OpenDB(connector)
 			defer db.Close()
 
+			// sql.OpenDB does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
+
 			collation, err := getCollation(ctx, db)
 			if err != nil {
 				return nil, fmt.Errorf("check collations: %w", err)
@@ -400,6 +410,10 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
+		if err := boilerplate.RequireSingleShard(open); err != nil {
+			return nil, err
+		}
+
 		var cfg = ep.Config
 		var d = &transactor{
 			templates:             templates,
@@ -473,7 +487,7 @@ type binding struct {
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
-	var b = &binding{target: target, nullFieldsToStrip: target.NullableFieldsToStrip()}
+	var b = &binding{target: target, nullFieldsToStrip: target.NullablePropertiesToStrip()}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
@@ -568,11 +582,7 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 			continue
 		}
 		if b.truncateSQL == "" {
-			log.WithFields(log.Fields{
-				"eventType": "connectorStatus",
-				"table":     b.target.Identifier,
-				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason)
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason))
 			continue
 		}
 		t.truncations[binding] = boundary

@@ -1,0 +1,195 @@
+info:
+  name: bare
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/apps/{{app_id}}/users?limit=500"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('app_id')) await bru.runRequest('Application users/parent apps');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/ApplicationUsers/#tag/ApplicationUsers/operation/listApplicationUsers
+
+  **WHY:** Shape of the Application_users document at the connector's page size
+  (`limit=500`, the documented max). Establishes: bare-array envelope, AppUser key
+  set, that `id` is the Okta user id, and whether the app id appears anywhere other
+  than `_links.app.href` (decides whether the connector must stamp it).
+
+  **VERIFIED (2026-10-07):** bare JSON array of AppUser; no envelope. `id` is the
+  Okta user id (`_links.user.href` ends with it). Keys observed: `id`, `externalId`,
+  `created`, `lastUpdated`, `scope`, `status`, `statusChanged`, `passwordChanged`,
+  `syncState`, `credentials`, `profile`, `_links`.
+
+  **LIMITATION (VERIFIED 2026-10-07):** the app id is absent from the body except
+  inside `_links.app.href`; the connector stamps it from the request's parent id.
+
+  **VERIFIED (2026-10-07):** a user assigned both directly and via a group appears
+  once, `scope: USER`; group-only assignees appear with `scope: GROUP` and a
+  `_links.group` entry — `(app id, id)` is unique.
+
+  **VERIFIED (2026-10-07):** deactivating a user (DEPROVISIONED) removes their row
+  from this list (2 → 1); unassignment likewise vanishes the row
+  (**DOCUMENTED (2026-10-07):** spec "Lists all assigned users for an app",
+  https://raw.githubusercontent.com/okta/okta-management-openapi-spec/master/dist/current/management-oneOfInheritance.yaml).
+  No tombstone, no filter, no sort → deletions are only observable by re-listing.
+
+  **VERIFIED (2026-10-07):** an INACTIVE app's assignments remain listable (200, 1 row).
+
+  **VERIFIED (2026-10-07):** built-in Okta apps (e.g. Okta Dashboard) return `[]` —
+  their access is not modelled as per-user assignments.
+
+examples:
+  - name: "200 \u2014 USER + GROUP scoped assignments (full)"
+    request:
+      url: "{{base_url}}/apps/0oa18guruj0FfvFkL698/users?limit=500"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698/users?limit=500>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "externalId": null,
+              "created": "2026-10-07T14:37:35.000Z",
+              "lastUpdated": "2026-10-07T14:37:35.000Z",
+              "scope": "USER",
+              "status": "ACTIVE",
+              "statusChanged": "2026-10-07T14:37:35.000Z",
+              "passwordChanged": null,
+              "syncState": "DISABLED",
+              "credentials": {
+                "userName": "estuary-members-a@example.com"
+              },
+              "profile": {},
+              "_links": {
+                "app": {
+                  "href": "https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698"
+                },
+                "user": {
+                  "href": "https://okta-domain/api/v1/users/00u18gupu552EU005698"
+                }
+              }
+            },
+            {
+              "id": "00u18gut4epTYtsK2698",
+              "externalId": null,
+              "created": "2026-10-07T14:37:47.000Z",
+              "lastUpdated": "2026-10-07T14:37:47.000Z",
+              "scope": "GROUP",
+              "status": "ACTIVE",
+              "statusChanged": "2026-10-07T14:37:47.000Z",
+              "passwordChanged": null,
+              "syncState": "DISABLED",
+              "credentials": {
+                "userName": "estuary-members-b@example.com"
+              },
+              "profile": {},
+              "_links": {
+                "app": {
+                  "href": "https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698"
+                },
+                "user": {
+                  "href": "https://okta-domain/api/v1/users/00u18gut4epTYtsK2698"
+                },
+                "group": {
+                  "name": "estuary-members-group",
+                  "href": "https://okta-domain/api/v1/groups/00g18gur2rc3zz7MS698"
+                }
+              }
+            }
+          ]
+  - name: "200 \u2014 after User B deprovisioned, B is gone (projection: id/scope/status/app href)"
+    request:
+      url: "{{base_url}}/apps/0oa18guruj0FfvFkL698/users?limit=500"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698/users?limit=500>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "scope": "USER",
+              "status": "ACTIVE",
+              "_links.app.href": "https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698"
+            }
+          ]
+  - name: "200 \u2014 INACTIVE app still lists its assignment (projection: id/scope/status/app href)"
+    request:
+      url: "{{base_url}}/apps/0oa18guruj0FfvFkL698/users?limit=500"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698/users?limit=500>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "scope": "USER",
+              "status": "ACTIVE",
+              "_links.app.href": "https://okta-domain/api/v1/apps/0oa18guruj0FfvFkL698"
+            }
+          ]
+  - name: "200 \u2014 built-in Okta Dashboard has no per-user assignments"
+    request:
+      url: "{{base_url}}/apps/0oa176zmw8iMaksJz698/users?limit=500"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps/0oa176zmw8iMaksJz698/users?limit=500>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          []

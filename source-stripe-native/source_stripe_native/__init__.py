@@ -26,6 +26,8 @@ class Connector(
     StripeHTTPMixin,
     BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
 ):
+    retain_projections = False
+
     def request_class(self):
         return Request[EndpointConfig, ResourceConfigWithSchedule, ConnectorState]
 

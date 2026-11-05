@@ -6,11 +6,11 @@ import traceback
 from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, BinaryIO, Callable, Generic
+from typing import Any, BinaryIO, Callable, Generic, cast
 
 import orjson
 import xxhash
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from estuary_cdk.capture.connector_status import ConnectorStatus
 from estuary_cdk.capture.document import AssociatedDocument, BaseDocument
@@ -22,12 +22,11 @@ from ..flow import (
     EndpointConfig,
     ResourceConfig,
 )
-from ..pydantic_polyfill import GenericModel
 from . import request, response
 from .transactor import Transactor
 
 
-class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Request(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     spec: request.Spec | None = None
     discover: request.Discover[EndpointConfig] | None = None
     validate_: request.Validate[EndpointConfig, ResourceConfig] | None = Field(
@@ -38,7 +37,7 @@ class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSta
     acknowledge: request.Acknowledge | None = None
 
 
-class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     spec: ConnectorSpec | None = None
     discovered: response.Discovered[ResourceConfig] | None = None
     validated: response.Validated | None = None
@@ -78,31 +77,32 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     """
 
     def normalize(location: dict[str, Any]) -> dict[str, Any]:
-        out = dict(location)
+        out: dict[str, Any] = dict(location)
 
         for keyword in ("properties", "patternProperties", "$defs", "definitions"):
             if isinstance(subschemas := out.get(keyword), dict):
                 out[keyword] = {
-                    name: normalize(s) if isinstance(s, dict) else s
-                    for name, s in subschemas.items()
+                    name: normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for name, s in cast(dict[str, Any], subschemas).items()
                 }
 
         for keyword in ("oneOf", "anyOf", "allOf", "prefixItems"):
             if isinstance(subschemas := out.get(keyword), list):
                 out[keyword] = [
-                    normalize(s) if isinstance(s, dict) else s for s in subschemas
+                    normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for s in cast(list[Any], subschemas)
                 ]
 
         # `items` may be a single schema or a tuple of them, and
         # `additionalProperties` is usually the boolean False.
         for keyword in ("items", "additionalProperties"):
-            match out.get(keyword):
-                case dict() as subschema:
-                    out[keyword] = normalize(subschema)
-                case list() as subschemas:
-                    out[keyword] = [
-                        normalize(s) if isinstance(s, dict) else s for s in subschemas
-                    ]
+            if isinstance(subschema := out.get(keyword), dict):
+                out[keyword] = normalize(cast(dict[str, Any], subschema))
+            elif isinstance(subschemas := out.get(keyword), list):
+                out[keyword] = [
+                    normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for s in cast(list[Any], subschemas)
+                ]
 
         # A location declaring properties is an object, and must be a closed one.
         if out.get("properties") or out.get("patternProperties"):
@@ -155,7 +155,7 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     return normalize(root)
 
 
-def orjson_default(obj):
+def orjson_default(obj: Any) -> Any:
     # Pydantic automatically serializes Decimals as strings, but orjson doesn't
     # know about that. In order to handle this, we must provide this as
     # the default= kwarg to orjson.dumps
@@ -215,7 +215,7 @@ class _BaseTask:
     """When True, checkpoint() blocks until Flow ACKs the emitted checkpoint.
     Inherited by children via spawn_child."""
 
-    _buffer: tempfile.SpooledTemporaryFile
+    _buffer: tempfile.SpooledTemporaryFile[bytes]
     _hasher: xxhash.xxh3_128
     _name: str
     _output: BinaryIO
@@ -301,8 +301,14 @@ class _BaseTask:
         self._buffer.seek(0)
         self._hasher.reset()
 
+    # ConnectorState parameterises the pydantic generic below, so it is
+    # load-bearing at runtime even though it appears once here: substituting
+    # its bound drops the state's fields from the serialised checkpoint
+    # (tests/test_snapshot_subtasks.py covers it).
     async def _emit_checkpoint(
-        self, state: ConnectorState, merge_patch: bool = True
+        self,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+        merge_patch: bool = True,
     ) -> asyncio.Future[None] | None:
         checkpoint = Response[Any, Any, ConnectorState](
             checkpoint=response.Checkpoint(
@@ -353,7 +359,11 @@ class Task(_BaseTask):
         """Discard any captured documents, resetting to an empty state."""
         self._reset()
 
-    async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
+    async def checkpoint(
+        self,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+        merge_patch: bool = True,
+    ):
         """Emit previously-queued, captured documents followed by a checkpoint.
 
         When this Task's `requires_ack` is True, the call blocks on Flow's
@@ -383,7 +393,7 @@ class Task(_BaseTask):
 
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]
-    ) -> asyncio.Task:
+    ) -> asyncio.Task[None]:
         """
         Spawn a child Task of this Task, using the given name suffix and coroutine.
         The child coroutine will be invoked with a child Task and be polled concurrently.
@@ -463,8 +473,8 @@ class MultipleWritersTask(_BaseTask):
 
     async def emit(
         self,
-        items: Iterable[AssociatedDocument],
-        state: ConnectorState,
+        items: Iterable[AssociatedDocument[Any]],
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
     ) -> None:
         """Capture each item against its binding and write one checkpoint.
 

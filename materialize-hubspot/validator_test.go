@@ -63,8 +63,8 @@ func TestValidateBinding(t *testing.T) {
 		{
 			name: "no keys selected",
 			schema: &Schema{
-				CRM: &CRMSchema{Objects: map[CRMObject]*CRMObjectSchema{
-					CompaniesObject: &CRMObjectSchema{
+				CRM: &CRMSchema{Objects: map[ObjectName]*CRMObjectSchema{
+					ObjectName(CompaniesObject.String()): &CRMObjectSchema{
 						Properties: companiesProperties,
 					},
 				}},
@@ -119,8 +119,8 @@ func TestValidateBinding(t *testing.T) {
 			name: "one primary key",
 			schema: &Schema{
 				CRM: &CRMSchema{
-					Objects: map[CRMObject]*CRMObjectSchema{
-						CompaniesObject: &CRMObjectSchema{
+					Objects: map[ObjectName]*CRMObjectSchema{
+						ObjectName(CompaniesObject.String()): &CRMObjectSchema{
 							Properties: companiesProperties,
 						},
 					},
@@ -161,8 +161,8 @@ func TestValidateBinding(t *testing.T) {
 			name: "two keys not allowed",
 			schema: &Schema{
 				CRM: &CRMSchema{
-					Objects: map[CRMObject]*CRMObjectSchema{
-						ContactsObject: &CRMObjectSchema{
+					Objects: map[ObjectName]*CRMObjectSchema{
+						ObjectName(ContactsObject.String()): &CRMObjectSchema{
 							Properties: contactsProperties,
 						},
 					},
@@ -232,8 +232,8 @@ func TestValidateBinding(t *testing.T) {
 			name: "incompatible property type",
 			schema: &Schema{
 				CRM: &CRMSchema{
-					Objects: map[CRMObject]*CRMObjectSchema{
-						ContactsObject: &CRMObjectSchema{
+					Objects: map[ObjectName]*CRMObjectSchema{
+						ObjectName(ContactsObject.String()): &CRMObjectSchema{
 							Properties: contactsProperties,
 						},
 					},

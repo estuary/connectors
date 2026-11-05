@@ -1,0 +1,232 @@
+sql> CREATE TABLE test.activatestreamsbeforecatchup_enabled_738742 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.activatestreamsbeforecatchup_enabled_738742 VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_enabled_738742"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_enabled_738742"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_enabled_738742"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_enabled_738742"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Factivatestreamsbeforecatchup_enabled_738742": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> UPDATE test.activatestreamsbeforecatchup_enabled_738742 SET data = 'one-updated' WHERE id = 1
+sql> UPDATE test.activatestreamsbeforecatchup_enabled_738742 SET data = 'three-updated' WHERE id = 3
+sql> INSERT INTO test.activatestreamsbeforecatchup_enabled_738742 VALUES (5, 'five'), (6, 'six')
+sql> DELETE FROM test.activatestreamsbeforecatchup_enabled_738742 WHERE id = 4
+=== Run: Filtered Re-Backfill ===
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "activatestreamsbeforecatchup_enabled_738742",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one-updated",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "activatestreamsbeforecatchup_enabled_738742",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three-updated",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "activatestreamsbeforecatchup_enabled_738742",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "activatestreamsbeforecatchup_enabled_738742",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "activatestreamsbeforecatchup_enabled_738742",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_enabled_738742"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one-updated",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_enabled_738742",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_enabled_738742"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Factivatestreamsbeforecatchup_enabled_738742": {
+      "backfilled": 0,
+      "mode": "Ignore"
+    },
+    "test%2Factivatestreamsbeforecatchup_enabled_738742.v1": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

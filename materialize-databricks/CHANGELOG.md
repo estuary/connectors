@@ -1,5 +1,92 @@
 # Changelog
 
+## 2026-11-02
+### Fixed
+- A load of many bindings no longer runs out of memory, restarting the task,
+  while it reads the documents its queries return. Each load query now
+  downloads two files of its results at a time, instead of ten, so the
+  queries that run at once hold no more results in memory than a single
+  query did before loads ran concurrently.
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field contains special or non-ASCII characters, or has a custom
+  projection name.
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. Controlled by the `truncate_after_backfill`
+  feature flag, enabled by default; a binding without a `flow_published_at`
+  column, or in delta-updates mode, is unaffected.
+
+### Changed
+- Changing the type of several columns of a table is faster: the temporary
+  columns are added, and the original columns dropped, in one statement each
+  instead of one statement per column.
+
+## 2026-10-31
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+## 2026-10-29
+### Fixed
+- Load, staging and commit queries now carry the `materialization_name` query
+  tag, so Databricks query history attributes them to the Estuary task.
+  Previously only the queries that create and alter tables carried it.
+
+## 2026-10-28
+### Fixed
+- A load no longer fails, restarting the task, when Databricks rate-limits
+  the download of its results (`cloud fetch batch loader failed to download
+  results: HTTP error 429`). Downloads that fail with a transient error are
+  now retried with backoff, honoring the `Retry-After` header.
+
+### Changed
+- With `two_phase_loads`, a load restricts its read of documents to the files
+  holding its matching rows for up to 10,000 matched files, instead of 5,000.
+  Loads matching more files read every file within their key bounds.
+
+## 2026-10-27
+### Added
+- Load, staging and commit queries that run for at least five seconds are
+  logged with the metrics Databricks records of them in its query history:
+  time spent queued, compiling, executing and returning results, and the
+  files and bytes they read and pruned. Load and merge queries also log the
+  key bounds they were restricted to. The metrics are fetched in the
+  background, without holding up the transaction.
+- A `two_phase_loads` feature flag, off by default. With it, each table's
+  load first finds the files holding rows that match its keys, reading only
+  the key columns, then reads documents from those files alone. Both queries
+  read the same version of the table. Loads whose matching rows are
+  concentrated in a few of the files they would otherwise read get faster,
+  and a load that matches no rows skips reading documents altogether.
+
+## 2026-10-26
+### Changed
+- A transaction's tables are loaded with one query each, up to five at a time,
+  instead of in a single query.
+- Load and merge queries on tables with a `TIMESTAMP` key column split the
+  key range at wide gaps between the transaction's keys, so a few keys far
+  from the rest no longer widen the scan to everything in between.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+## 2026-10-13
+### Changed
+- Load and merge queries on tables with a date-time key column now restrict
+  the scan to each transaction's key range, exact for `TIMESTAMP` keys and
+  by date for `STRING` keys.
+
+## 2026-10-12
+### Fixed
+- A materialization that restarts partway through a commit no longer fails on
+  every restart after it when a table's staging data was already cleaned up.
+
 ## 2026-10-07
 ### Changed
 - A transaction's tables are committed concurrently, up to five at a time,

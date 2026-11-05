@@ -7,15 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"iter"
 	"math"
-	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -42,13 +40,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
-)
-
-const (
-	polarisCatalogURL    = "http://localhost:9700/api/catalog"
-	polarisManagementURL = "http://localhost:9700/api/management/v1"
-	polarisClientID      = "root"
-	polarisClientSecret  = "s3cr3t"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSpec(t *testing.T) {
@@ -121,6 +113,50 @@ func ensureNamespace(t *testing.T, cfg config) {
 	}
 }
 
+// staleTestTable matches the names testutil gives per-run test tables.
+var staleTestTable = regexp.MustCompile(`_flow_test_(\d+)$`)
+
+// sweepStaleTestTables drops test tables in cfg.Namespace left by runs that
+// never reached their cleanup, such as cancelled CI jobs. The boilerplate
+// sweep cannot see them: it enumerates through PopulateInfoSchema, which
+// reports only the bound tables. Glue is shared and persistent, so leftovers
+// would otherwise accumulate and slow every info-schema scan, which lists the
+// namespace. The age threshold matches testutil's, so a concurrent run's
+// in-use tables are left alone.
+func sweepStaleTestTables(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	var stale []icebergtable.Identifier
+	for ident, err := range cat.cat.ListTables(ctx, icebergtable.Identifier{cfg.Namespace}) {
+		require.NoError(t, err)
+		m := staleTestTable.FindStringSubmatch(ident[len(ident)-1])
+		if m == nil {
+			continue
+		}
+		secs, err := strconv.ParseInt(m[1], 10, 64)
+		if err == nil && time.Since(time.Unix(secs, 0)) > 60*time.Minute {
+			stale = append(stale, ident)
+		}
+	}
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10)
+	for _, ident := range stale {
+		g.Go(func() error {
+			if err := cat.cat.DropTable(gctx, ident); err != nil {
+				t.Logf("failed to drop stale test table %s: %v", pathToFQN(ident), err)
+			}
+			return nil
+		})
+	}
+	require.NoError(t, g.Wait())
+	t.Logf("dropped %d stale test tables from %s", len(stale), cfg.Namespace)
+}
+
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
@@ -132,10 +168,6 @@ func TestIntegration(t *testing.T) {
 	})
 
 	cfg := loadTestConfig(t)
-
-	// Create the rustfs bucket and the Polaris catalog backed by it.
-	createTestBucket(t, cfg)
-	createTestWarehouse(t, cfg)
 	ensureNamespace(t, cfg)
 
 	d := true
@@ -321,6 +353,7 @@ func TestIntegrationGlue(t *testing.T) {
 
 	cfg := loadGlueTestConfig(t)
 	ensureNamespace(t, cfg)
+	sweepStaleTestTables(t, cfg)
 
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
@@ -408,6 +441,7 @@ func TestRestGlueSnapshotParity(t *testing.T) {
 // year 10000; clampTimestamp rewrites it to the year-9999 boundary before the
 // writer sees it, so the append round-trips without error.
 func runTimestampOverflowRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	ctx := context.Background()
 
 	rt := newRegressionTable(t, ctx, cfg, "ts_overflow_regression", nil,
@@ -541,6 +575,7 @@ func (rt *regressionTable) uploadParquetRows(t *testing.T, ctx context.Context, 
 // clampDate rewrites a year > 9999 (which time.Parse rejects outright) to the
 // year-9999 boundary before the writer sees it, so the append round-trips.
 func runDateOverflowRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	ctx := context.Background()
 
 	rt := newRegressionTable(t, ctx, cfg, "date_overflow_regression", nil,
@@ -566,6 +601,7 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 // appendFiles does not scan existing manifests for duplicate paths, matching
 // the pyiceberg 0.7.0 behavior this connector originally shipped with.
 func runCheckpointFenceRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	ctx := context.Background()
 
 	const materialization = "acmeCo/tests/regression"
@@ -797,6 +833,7 @@ func withAdvanced(cfg config, set func(*advancedConfig)) config {
 //   - encode exact int64 nanosecond values in the produced Parquet file
 //     (asserted against the raw column bytes)
 func runNanosecondTimestampTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -859,6 +896,7 @@ func runNanosecondTimestampTest(t *testing.T, cfg config) {
 // backfill), and UpdateResource must upgrade it to v3 for the AddColumn to be
 // valid.
 func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -909,6 +947,7 @@ func runNanosecondV2UpgradeTest(t *testing.T, cfg config) {
 // explicit error, and a clean create yields a format v3 table with a
 // timestamptz_ns column.
 func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -973,6 +1012,7 @@ func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 // nanosecond precision. A second migration back to microseconds proves the
 // reverse direction.
 func runNanosecondMigrateTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1163,162 +1203,6 @@ func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
 	return out
 }
 
-func createTestBucket(t *testing.T, cfg config) {
-	t.Helper()
-
-	ctx := context.Background()
-	client := s3.New(s3.Options{
-		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
-		BaseEndpoint: aws.String(cfg.S3Endpoint),
-		UsePathStyle: true,
-	})
-
-	if _, err := client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String(cfg.Bucket)}); err != nil {
-		// Tolerate already-exists; rustfs bucket persists across container restarts
-		// only when /data is a volume. Even so, surface unexpected errors.
-		if !strings.Contains(err.Error(), "BucketAlreadyOwnedByYou") &&
-			!strings.Contains(err.Error(), "BucketAlreadyExists") {
-			t.Fatalf("creating rustfs bucket %q: %v", cfg.Bucket, err)
-		}
-	}
-
-	t.Cleanup(func() {
-		// Best-effort wipe so reruns start clean.
-		paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{Bucket: aws.String(cfg.Bucket)})
-		for paginator.HasMorePages() {
-			page, err := paginator.NextPage(ctx)
-			if err != nil {
-				return
-			}
-			for _, obj := range page.Contents {
-				_, _ = client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(cfg.Bucket), Key: obj.Key})
-			}
-		}
-	})
-}
-
-func polarisToken(t *testing.T) string {
-	t.Helper()
-
-	form := url.Values{}
-	form.Set("grant_type", "client_credentials")
-	form.Set("client_id", polarisClientID)
-	form.Set("client_secret", polarisClientSecret)
-	form.Set("scope", "PRINCIPAL_ROLE:ALL")
-
-	var resp *http.Response
-	var err error
-	for i := 0; i < 30; i++ {
-		resp, err = http.Post(
-			polarisCatalogURL+"/v1/oauth/tokens",
-			"application/x-www-form-urlencoded",
-			strings.NewReader(form.Encode()),
-		)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			break
-		}
-		if resp != nil {
-			resp.Body.Close()
-		}
-		time.Sleep(time.Second)
-	}
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equalf(t, http.StatusOK, resp.StatusCode, "token response: %s", body)
-
-	tok := gjson.GetBytes(body, "access_token").String()
-	require.NotEmpty(t, tok, "missing access_token in response: %s", body)
-	return tok
-}
-
-func createTestWarehouse(t *testing.T, cfg config) {
-	t.Helper()
-
-	token := polarisToken(t)
-
-	baseLocation := "s3://" + cfg.Bucket + "/" + cfg.Prefix
-
-	body, err := json.Marshal(map[string]any{
-		"catalog": map[string]any{
-			"name":     cfg.Catalog.Warehouse,
-			"type":     "INTERNAL",
-			"readOnly": false,
-			"properties": map[string]any{
-				"default-base-location": baseLocation,
-				"s3.endpoint":           cfg.S3Endpoint,
-				"s3.access-key-id":      cfg.Credentials.AWSAccessKeyID,
-				"s3.secret-access-key":  cfg.Credentials.AWSSecretAccessKey,
-				"s3.region":             cfg.Region,
-				"s3.path-style-access":  "true",
-			},
-			"storageConfigInfo": map[string]any{
-				"storageType":      "S3",
-				"allowedLocations": []string{baseLocation + "/"},
-				"roleArn":          "arn:aws:iam::000000000000:role/dummy",
-				"region":           cfg.Region,
-				// Client-visible endpoint (host port mapped from rustfs).
-				"endpoint": cfg.S3Endpoint,
-				// Polaris-side endpoint uses the docker-network name.
-				"endpointInternal": "http://rustfs:9000",
-				"pathStyleAccess":  true,
-				// Disable STS-based credential vending: rustfs has no STS.
-				// Clients will use the s3.* properties on the catalog instead.
-				"stsUnavailable": true,
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	// Drop a previous catalog if one exists from an earlier failed run.
-	delReq, _ := http.NewRequest(http.MethodDelete, polarisManagementURL+"/catalogs/"+cfg.Catalog.Warehouse, nil)
-	delReq.Header.Set("Authorization", "Bearer "+token)
-	if delResp, err := http.DefaultClient.Do(delReq); err == nil {
-		delResp.Body.Close()
-	}
-
-	req, err := http.NewRequest(http.MethodPost, polarisManagementURL+"/catalogs", bytes.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		t.Fatalf("creating polaris catalog failed with status %d: %s", resp.StatusCode, respBody)
-	}
-
-	// Grant the bootstrap principal full access on the catalog so the
-	// connector (using the same OAuth client) can read/write everything.
-	grantPrincipalRole(t, token, "service_admin", cfg.Catalog.Warehouse, "catalog_admin")
-}
-
-func grantPrincipalRole(t *testing.T, token, principalRole, catalog, catalogRole string) {
-	t.Helper()
-
-	url := polarisManagementURL + "/principal-roles/" + principalRole + "/catalog-roles/" + catalog
-	body, err := json.Marshal(map[string]any{
-		"catalogRole": map[string]any{"name": catalogRole},
-	})
-	require.NoError(t, err)
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
-	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(resp.Body)
-	require.Truef(t, resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusNoContent,
-		"granting principal role failed: status %d body %s", resp.StatusCode, respBody)
-}
-
 // TestMapTypeIgnoreStringFormatOnNonStringField guards against a regression
 // where MapType returned a zero mappedType (nil iceberg.Type) when
 // projectionToParquetSchemaElement errored, panicking in String/Compatible.
@@ -1435,6 +1319,7 @@ func TestCreateResourceFormatVersionConflictNamesOptions(t *testing.T) {
 // while the (multi-type) collection key and an ignoreStringFormat-overridden
 // field keep their string mapping.
 func runVariantCreateResourceTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1570,6 +1455,7 @@ func duckdbAttachQuery(t *testing.T, cfg config, query string) string {
 // the REST catalog: DuckDB cannot attach the Glue catalog with this mechanism,
 // and the variant encoding under test is identical for both.
 func runVariantDuckDBRegression(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1767,6 +1653,7 @@ func nameMappingNames(t *testing.T, tbl *icebergtable.Table) map[string]bool {
 // does, and recomputing it after the flip yields nothing, pinning that
 // repeated applies cause no schema churn.
 func runVariantMigrateTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 
@@ -1915,6 +1802,7 @@ func runVariantMigrateTest(t *testing.T, cfg config) {
 // set after the flip yields nothing, pinning that repeated applies cause no
 // schema churn.
 func runVariantDisableFlipTest(t *testing.T, cfg config) {
+	boilerplate.SkipRuntimeV1(t)
 	t.Helper()
 	ctx := context.Background()
 

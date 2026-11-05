@@ -74,6 +74,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "accounts"
     ]
   },
   {
@@ -151,6 +154,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "call_dispositions"
     ]
   },
   {
@@ -228,6 +234,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "call_purposes"
     ]
   },
   {
@@ -305,6 +314,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "calls"
     ]
   },
   {
@@ -382,6 +394,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "email_addresses"
     ]
   },
   {
@@ -459,6 +474,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "events"
     ]
   },
   {
@@ -536,6 +554,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "mailboxes"
     ]
   },
   {
@@ -613,6 +634,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "mailings"
     ]
   },
   {
@@ -690,6 +714,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "opportunities"
     ]
   },
   {
@@ -767,6 +794,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "opportunity_stages"
     ]
   },
   {
@@ -844,6 +874,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "prospects"
     ]
   },
   {
@@ -921,6 +954,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "stages"
     ]
   },
   {
@@ -998,6 +1034,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "tasks"
     ]
   },
   {
@@ -1075,6 +1114,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -1152,6 +1194,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "templates"
     ]
   },
   {
@@ -1229,6 +1274,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

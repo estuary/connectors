@@ -1,0 +1,104 @@
+info:
+  name: stripe fields
+  type: graphql
+  seq: 2
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Invoices($tenant: String!) {
+        tenant(name: $tenant) {
+          billing {
+            invoices(first: 3) {
+              edges { node { dateStart dateEnd invoiceType amountDue status invoicePdf hostedInvoiceUrl paymentDetails { status receiptUrl } } }
+            }
+          }
+        }
+      }
+    variables: |-
+      {
+        "tenant": "{{test_tenant}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/billing/invoices.rs
+
+  **WHY:** The Stripe-backed fields resolve live per invoice (one Stripe invoice
+  search per row + one payment-intent retrieve). Shows what they return for this
+  tenant (null when the tenant has no Stripe customer) to inform whether the
+  connector selects them. URLs are redacted in the saved example.
+
+  **DECISION (2026-10-07, plan gate):** the connector selects `status` + `amountDue` only. `invoicePdf`, `hostedInvoiceUrl` and `paymentDetails` are not captured.
+
+  **VERIFIED (2026-10-07):** `amountDue`, `status`, `invoicePdf`, `hostedInvoiceUrl` and `paymentDetails` are all `null` for this tenant (no Stripe customer). The non-null shape is **UNOBSERVABLE** with this account (it needs a paying Stripe customer; it can't be seeded via the API). Each non-null row costs one live Stripe invoice search plus a payment-intent retrieve on every call (`billing/loaders.rs`).
+
+examples:
+  - name: 200 - stripe fields all null, no Stripe customer
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "tenant": {
+                "billing": {
+                  "invoices": {
+                    "edges": [
+                      {
+                        "node": {
+                          "dateStart": "2026-10-01",
+                          "dateEnd": "2026-10-31",
+                          "invoiceType": "PREVIEW",
+                          "amountDue": null,
+                          "status": null,
+                          "invoicePdf": null,
+                          "hostedInvoiceUrl": null,
+                          "paymentDetails": null
+                        }
+                      },
+                      {
+                        "node": {
+                          "dateStart": "2026-09-01",
+                          "dateEnd": "2026-09-30",
+                          "invoiceType": "FINAL",
+                          "amountDue": null,
+                          "status": null,
+                          "invoicePdf": null,
+                          "hostedInvoiceUrl": null,
+                          "paymentDetails": null
+                        }
+                      },
+                      {
+                        "node": {
+                          "dateStart": "2026-08-01",
+                          "dateEnd": "2026-08-31",
+                          "invoiceType": "FINAL",
+                          "amountDue": null,
+                          "status": null,
+                          "invoicePdf": null,
+                          "hostedInvoiceUrl": null,
+                          "paymentDetails": null
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }

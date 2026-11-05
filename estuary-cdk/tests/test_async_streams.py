@@ -163,7 +163,7 @@ async def test_merge_generator_cleanup_on_exception():
             cleanup_flags["gen3"] = True
 
     with pytest.raises(RuntimeError, match="Intentional error"):
-        async for item in merge(gen1(), gen2(), gen3()):
+        async for _ in merge(gen1(), gen2(), gen3()):
             pass
 
     # Give cleanup a moment to complete

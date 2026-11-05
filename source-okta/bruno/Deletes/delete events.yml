@@ -1,0 +1,152 @@
+info:
+  name: delete events
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since={{logs_since}}&until={{logs_until}}&filter={{logs_filter}}&sortOrder=ASCENDING&limit=1000"
+  params:
+    - name: since
+      value: "{{logs_since}}"
+      type: query
+    - name: until
+      value: "{{logs_until}}"
+      type: query
+    - name: filter
+      value: "{{logs_filter}}"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - every event targeting the two delete-probe objects, 8 events (projection)
+    request:
+      url: "{{base_url}}/logs?since=2026-10-08T17:24:00.000Z&until=2026-10-08T17:26:59.999Z&filter=target.id eq \"00u18ijfskhIUfYlp698\" or target.id eq \"00g18ijkhmo0VBRTQ698\"&sortOrder=ASCENDING&limit=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: x-rate-limit-limit
+          value: "60"
+      body:
+        type: json
+        data: |-
+          [
+            { "published": "2026-10-08T17:24:38.246Z", "eventType": "user.mfa.factor.activate", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00u18ijfskhIUfYlp698", "type": "User" }] },
+            { "published": "2026-10-08T17:24:38.259Z", "eventType": "user.lifecycle.create", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00u18ijfskhIUfYlp698", "type": "User" }] },
+            { "published": "2026-10-08T17:24:46.509Z", "eventType": "user.lifecycle.deactivate", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00u18ijfskhIUfYlp698", "type": "User" }] },
+            { "published": "2026-10-08T17:24:46.541Z", "eventType": "user.session.clear", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00u18ijfskhIUfYlp698", "type": "User" }] },
+            { "published": "2026-10-08T17:24:54.290Z", "eventType": "user.lifecycle.delete.initiated", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00u18ijfskhIUfYlp698", "type": "User" }] },
+            { "published": "2026-10-08T17:24:54.412Z", "eventType": "user.lifecycle.delete.completed", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00u18ijfskhIUfYlp698", "type": "User" }] },
+            { "published": "2026-10-08T17:25:02.479Z", "eventType": "group.lifecycle.create", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00g18ijkhmo0VBRTQ698", "type": "UserGroup" }] },
+            { "published": "2026-10-08T17:25:10.332Z", "eventType": "group.lifecycle.delete", "outcome": { "result": "SUCCESS" }, "target": [{ "id": "00g18ijkhmo0VBRTQ698", "type": "UserGroup" }] }
+          ]
+  - name: 200 - Users delete filter, 8 narrowed to 1 (projection)
+    request:
+      url: "{{base_url}}/logs?since=2026-10-08T17:24:00.000Z&until=2026-10-08T17:26:59.999Z&filter=eventType eq \"user.lifecycle.delete.completed\" and outcome.result eq \"SUCCESS\"&sortOrder=ASCENDING&limit=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "uuid": "2d35d577-c33d-11f1-8338-0f038325e062",
+              "published": "2026-10-08T17:24:54.412Z",
+              "eventType": "user.lifecycle.delete.completed",
+              "legacyEventType": "core.user.config.user_status.delete.completed",
+              "displayMessage": "Delete Okta user completed",
+              "outcome": { "result": "SUCCESS", "reason": null },
+              "target": [
+                {
+                  "id": "00u18ijfskhIUfYlp698",
+                  "type": "User",
+                  "alternateId": "00u18ijfskhIUfYlp698",
+                  "displayName": "Estuary DeleteProbe",
+                  "detailEntry": null
+                }
+              ]
+            }
+          ]
+  - name: 200 - Groups delete filter, 8 narrowed to 1 (projection)
+    request:
+      url: "{{base_url}}/logs?since=2026-10-08T17:24:00.000Z&until=2026-10-08T17:26:59.999Z&filter=eventType eq \"group.lifecycle.delete\" and outcome.result eq \"SUCCESS\"&sortOrder=ASCENDING&limit=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "published": "2026-10-08T17:25:10.332Z",
+              "eventType": "group.lifecycle.delete",
+              "outcome": { "result": "SUCCESS" },
+              "target": [
+                {
+                  "id": "00g18ijkhmo0VBRTQ698",
+                  "type": "UserGroup",
+                  "alternateId": "unknown",
+                  "displayName": "estuary-updated-delprobe-group",
+                  "detailEntry": null
+                }
+              ]
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** the second read of the Users and Groups incremental functions: a
+  bounded `/logs` window over the same span as the entity filter, narrowed to the
+  stream's delete event. It establishes which event types a hard delete
+  produces and each event's `target[]` shape (the id and type of the deleted
+  object). Run with
+  `--env-var logs_since=… --env-var logs_until=… --env-var logs_filter=…`.
+  Saved examples are projections: full events also carry the caller's IP,
+  geolocation and API token id, which have no place in a committed collection.
+
+  **VERIFIED (2026-10-08):** a hard user delete
+  (`Seeding / Delete Delete-Probe User`) emits `user.lifecycle.delete.initiated`
+  then, 122 ms later, `user.lifecycle.delete.completed`. A group delete
+  (`Seeding / Delete Delete-Probe Group`) emits `group.lifecycle.delete`.
+  Deactivation emits `user.lifecycle.deactivate`, but the Users entity drain
+  already captures that as a status change.
+
+  **VERIFIED (2026-10-08):** the deleted object is the single `target[]` entry,
+  with `id` set to the user or group id and `type` set to `User` or `UserGroup`.
+  On `.completed`, the user's `alternateId` is the id itself (the login is
+  already gone); on groups it is `"unknown"`. Key delete documents on
+  `target[].id` filtered by `type`, never on `alternateId`.
+
+  **VERIFIED (2026-10-08):** the connector's exact filters each narrow 8 events
+  to 1: `eventType eq "user.lifecycle.delete.completed" and outcome.result eq
+  "SUCCESS"` and `eventType eq "group.lifecycle.delete" and outcome.result eq
+  "SUCCESS"`. `.completed`, not `.initiated`, is the user signal, because only
+  it confirms the delete finished. The `outcome.result` clause keeps a failed
+  delete from tombstoning an object that still exists. All 8 events were
+  readable about 1 minute after the deletes.

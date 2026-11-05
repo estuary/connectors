@@ -86,6 +86,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "application_stages"
     ]
   },
   {
@@ -175,6 +178,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "applications"
     ]
   },
   {
@@ -264,6 +270,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "applied_candidate_tags"
     ]
   },
   {
@@ -353,6 +362,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "approval_flows"
     ]
   },
   {
@@ -442,6 +454,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "approver_groups"
     ]
   },
   {
@@ -531,6 +546,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "approvers"
     ]
   },
   {
@@ -620,6 +638,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "attachments"
     ]
   },
   {
@@ -709,6 +730,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidate_attribute_types"
     ]
   },
   {
@@ -798,6 +822,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidate_educations"
     ]
   },
   {
@@ -887,6 +914,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidate_employments"
     ]
   },
   {
@@ -976,6 +1006,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidate_tags"
     ]
   },
   {
@@ -1065,6 +1098,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "candidates"
     ]
   },
   {
@@ -1154,6 +1190,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "close_reasons"
     ]
   },
   {
@@ -1243,6 +1282,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "custom_field_options"
     ]
   },
   {
@@ -1332,6 +1374,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "custom_fields"
     ]
   },
   {
@@ -1421,6 +1466,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "demographic_answers"
     ]
   },
   {
@@ -1510,6 +1558,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "demographic_question_sets"
     ]
   },
   {
@@ -1580,6 +1631,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "demographic_questions"
     ]
   },
   {
@@ -1669,6 +1723,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "departments"
     ]
   },
   {
@@ -1758,6 +1815,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "eeoc"
     ]
   },
   {
@@ -1847,6 +1907,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "email_templates"
     ]
   },
   {
@@ -1936,6 +1999,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interviewer_tags"
     ]
   },
   {
@@ -2025,6 +2091,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interviewers"
     ]
   },
   {
@@ -2114,6 +2183,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "interviews"
     ]
   },
   {
@@ -2203,6 +2275,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "job_hiring_managers"
     ]
   },
   {
@@ -2292,6 +2367,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "job_interview_stages"
     ]
   },
   {
@@ -2381,6 +2459,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "job_notes"
     ]
   },
   {
@@ -2470,6 +2551,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "job_posts"
     ]
   },
   {
@@ -2559,6 +2643,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "jobs"
     ]
   },
   {
@@ -2648,6 +2735,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "offers"
     ]
   },
   {
@@ -2737,6 +2827,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "offices"
     ]
   },
   {
@@ -2826,6 +2919,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "openings"
     ]
   },
   {
@@ -2915,6 +3011,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "prospect_pool_stages"
     ]
   },
   {
@@ -3004,6 +3103,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "prospect_pools"
     ]
   },
   {
@@ -3093,6 +3195,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "referrers"
     ]
   },
   {
@@ -3182,6 +3287,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "rejection_details"
     ]
   },
   {
@@ -3271,6 +3379,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "rejection_reasons"
     ]
   },
   {
@@ -3360,6 +3471,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "scorecard_questions"
     ]
   },
   {
@@ -3449,6 +3563,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "scorecards"
     ]
   },
   {
@@ -3538,6 +3655,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "sources"
     ]
   },
   {
@@ -3627,6 +3747,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "user_emails"
     ]
   },
   {
@@ -3716,6 +3839,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "user_job_permissions"
     ]
   },
   {
@@ -3805,6 +3931,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "user_roles"
     ]
   },
   {
@@ -3894,6 +4023,9 @@
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

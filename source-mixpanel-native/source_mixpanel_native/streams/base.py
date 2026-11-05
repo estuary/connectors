@@ -180,7 +180,7 @@ class DateSlicesMixin:
                     "Your project timezone must be misconfigured. Please set it to the one defined in your Mixpanel project settings. "
                     "Stopping current stream sync."
                 )
-                setattr(self, "raise_on_http_errors", False)
+                self.raise_on_http_errors = False
                 return False
         return super().should_retry(response)
 

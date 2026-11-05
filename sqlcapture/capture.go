@@ -206,6 +206,8 @@ type Capture struct {
 	// setStreamState after that, so per-chunk logic can avoid scanning every binding.
 	backfillingStreams map[boilerplate.StateKey]struct{}
 
+	backfillRun backfillRun // Progress of the current backfill run, for status updates.
+
 	// bindingsByStateKey indexes the capture's bindings by state key. It is built on
 	// first use, which is safe because bindings never change during a capture run.
 	bindingsByStateKey map[boilerplate.StateKey]*Binding
@@ -290,6 +292,21 @@ func ParseRediscoveryInterval(interval string) time.Duration {
 		return 0
 	}
 	return parsed
+}
+
+// ParseMaxStartupDelay parses a connector's 'max_startup_delay' config setting.
+// An empty value means "no delay".
+func ParseMaxStartupDelay(delay string) (time.Duration, error) {
+	if delay == "" {
+		return 0, nil
+	}
+	var parsed, err = time.ParseDuration(delay)
+	if err != nil {
+		return 0, fmt.Errorf("invalid 'max_startup_delay' configuration %q: %w", delay, err)
+	} else if parsed < 0 {
+		return 0, fmt.Errorf("invalid 'max_startup_delay' configuration %q: must not be negative", delay)
+	}
+	return parsed, nil
 }
 
 // streamingDiagnosticsThreshold returns how long a single streaming cycle must run before it's
@@ -439,6 +456,7 @@ func (c *Capture) mainLoopIteration(ctx context.Context) (done bool, err error) 
 			c.statusUpdate("Backfilling Tables")
 			c.statusUpdateAfter = time.Now().Add(statusUpdateInterval)
 		}
+		c.backfillRun.rate.update(time.Now())
 		if err := c.backfillStreams(ctx); err != nil {
 			return false, fmt.Errorf("error performing backfill: %w", err)
 		} else if err := c.streamToFence(ctx, 0, false); err != nil {
@@ -1039,10 +1057,13 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	state.BackfilledCount += eventCount
+	c.backfillRun.rate.rows += eventCount
 	if backfillComplete {
 		log.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableStateActive
 		state.Scanned = nil
+		c.backfillRun.tablesFinished++
+		c.backfillRun.rowsFinished += state.BackfilledCount
 	} else {
 		state.Scanned = resumeCursor
 	}
@@ -1077,7 +1098,8 @@ func (c *Capture) setStreamState(stateKey boilerplate.StateKey, state *TableStat
 	c.updateBackfillSet(stateKey, state.Mode)
 }
 
-// updateBackfillSet updates the backfilling-streams set to match a stream's current mode.
+// updateBackfillSet updates the backfilling-streams set to match a stream's current mode,
+// and ends the backfill run once no streams remain backfilling.
 func (c *Capture) updateBackfillSet(stateKey boilerplate.StateKey, mode string) {
 	switch mode {
 	case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
@@ -1086,7 +1108,12 @@ func (c *Capture) updateBackfillSet(stateKey boilerplate.StateKey, mode string) 
 		}
 		c.backfillingStreams[stateKey] = struct{}{}
 	default:
-		delete(c.backfillingStreams, stateKey)
+		if _, ok := c.backfillingStreams[stateKey]; ok {
+			delete(c.backfillingStreams, stateKey)
+			if len(c.backfillingStreams) == 0 {
+				c.backfillRun = backfillRun{} // The backfill run is over.
+			}
+		}
 	}
 }
 
@@ -1187,47 +1214,8 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 }
 
 func (c *Capture) statusUpdate(status string) {
-	// Add backfill information with percentage progress
-	var backfillingBindings = c.bindingsCurrentlyBackfilling()
-	if len(backfillingBindings) > 0 {
-		// Build list of tables to query for estimated row counts
-		var tables []TableID
-		for _, binding := range backfillingBindings {
-			tables = append(tables, TableID{
-				Schema: binding.Resource.Namespace,
-				Table:  binding.Resource.Stream,
-			})
-		}
-
-		// Query estimated row counts for all backfilling tables
-		estimatedCounts, err := c.Database.EstimatedRowCounts(context.Background(), tables)
-		if err != nil {
-			log.WithError(err).Warn("error querying estimated row counts for backfill progress")
-			status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
-		} else {
-			// Sum up backfilled and estimated counts
-			var totalBackfilled, totalEstimated int
-			var allCountsKnown = true
-			for _, binding := range backfillingBindings {
-				var state = c.State.Streams[binding.StateKey]
-				var tableID = TableID{binding.Resource.Namespace, binding.Resource.Stream}
-				if estimated, ok := estimatedCounts[tableID]; ok && estimated > 0 {
-					totalBackfilled += state.BackfilledCount
-					totalEstimated += estimated
-				} else {
-					allCountsKnown = false
-				}
-			}
-
-			if allCountsKnown {
-				// Calculate and display percentage, clamped to 99% since we're still backfilling.
-				var percentage = min(float64(totalBackfilled)/float64(totalEstimated)*100, 99)
-				status += fmt.Sprintf(" (backfilled %.0f%% of %d tables)", percentage, len(backfillingBindings))
-			} else {
-				// Fallback when some table sizes are unknown, to avoid giving bad data.
-				status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
-			}
-		}
+	if c.AnyBindingsCurrentlyBackfilling() {
+		status += " (" + c.backfillProgress() + ")"
 	}
 
 	// TODO(wgd): Add replication backlog metrics if available

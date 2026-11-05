@@ -67,6 +67,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -155,6 +158,9 @@
     },
     "key": [
       "/conversationId"
+    ],
+    "resourcePath": [
+      "conversations"
     ]
   },
   {
@@ -225,6 +231,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "messaging_campaigns"
     ]
   },
   {
@@ -295,6 +304,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "queue_members"
     ]
   },
   {
@@ -365,6 +377,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "queues"
     ]
   },
   {
@@ -435,6 +450,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -505,6 +523,9 @@
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "users"
     ]
   }
 ]

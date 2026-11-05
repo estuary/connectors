@@ -102,6 +102,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (_ m.Transactor, err error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 
 	db, err := cfg.db(ctx)
@@ -142,7 +146,7 @@ func newTransactor(
 			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
 		}
 		if cfg.Advanced.NoFlowDocument {
-			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+			b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		}
 		if col, err := target.PublishedAtColumn(); err != nil {
 			b.truncateReason = err
@@ -209,11 +213,7 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 			continue
 		}
 		if b.truncateSQL == "" {
-			log.WithFields(log.Fields{
-				"eventType": "connectorStatus",
-				"table":     b.target.Identifier,
-				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason)
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason))
 			continue
 		}
 		t.truncations[binding] = boundary

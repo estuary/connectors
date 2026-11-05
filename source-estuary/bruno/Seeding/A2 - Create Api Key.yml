@@ -1,0 +1,47 @@
+info:
+  name: A2 - Create Api Key
+  type: graphql
+  seq: 2
+
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      mutation Seed($name: Name!) {
+        createApiKey(catalogName: $name, detail: "source-estuary bruno seed", validFor: "P1D") {
+          id
+          secret
+          serviceAccount { catalogName apiKeys { id detail createdAt expiresAt lastUsedAt } }
+        }
+      }
+    variables: |-
+      {
+        "name": "Jonathan_Wihl/source-estuary-test-sa"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // The minted bearer secret is returned exactly once. Drop it before the
+        // response can be displayed or saved as an example (API-TOKEN-EPHEMERAL).
+        const body = res.getBody();
+        const r = body?.data?.createApiKey;
+        if (r) { r.secret = 'REDACTED'; res.setBody(body); }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/service_accounts.rs
+
+  **MUTATION — only the user runs this; never the assistant.** Run `A1` first.
+
+  **WHY:** Populates `apiKeys` on the seeded account so `ServiceAccounts / bare`
+  shows the nested key shape. 1-day validity; the secret is discarded by the
+  after-response script and never used. Revoke with `A3`.

@@ -1,0 +1,159 @@
+info:
+  name: membership window
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since=2026-10-09T17:04:00.000Z&until=2026-10-09T17:09:59.999Z&filter=(eventType eq \"group.user_membership.add\" or eventType eq \"group.user_membership.remove\" or eventType eq \"user.lifecycle.create\" or eventType eq \"user.lifecycle.delete.completed\") and outcome.result eq \"SUCCESS\"&sortOrder=ASCENDING&limit=1000"
+  params:
+    - name: since
+      value: "2026-10-09T17:04:00.000Z"
+      type: query
+    - name: until
+      value: "2026-10-09T17:09:59.999Z"
+      type: query
+    - name: filter
+      value: (eventType eq "group.user_membership.add" or eventType eq "group.user_membership.remove" or eventType eq "user.lifecycle.create" or eventType eq "user.lifecycle.delete.completed") and outcome.result eq "SUCCESS"
+      type: query
+    - name: sortOrder
+      value: ASCENDING
+      type: query
+    - name: limit
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** The exact request one incremental Group_members window sends: the four event types
+  that change membership (Everyone's via user create / delete), successful outcomes only,
+  ascending, with `until` at the window's last millisecond as in the Users/Groups delete leg.
+  Over the 2026-10-09 User C window it must return create, add, remove, add, remove (delete
+  cascade), delete.completed — and drop deactivate and delete.initiated.
+
+  **VERIFIED (2026-10-09):** the filter (parenthesized `or` chain `and` outcome) is
+  honored: exactly create, add, remove, add, remove, delete.completed, ascending; deactivate
+  and delete.initiated are excluded. Bounded `since`/`until` mode ends with `rel="self"` only.
+
+examples:
+  - name: "200 — exactly the six membership-changing events, ascending (projection: eventType/published/outcome/target)"
+    request:
+      url: "{{base_url}}/logs?since=2026-10-09T17%3A04%3A00.000Z&until=2026-10-09T17%3A09%3A59.999Z&filter=(eventType%20eq%20%22group.user_membership.add%22%20or%20eventType%20eq%20%22group.user_membership.remove%22%20or%20eventType%20eq%20%22user.lifecycle.create%22%20or%20eventType%20eq%20%22user.lifecycle.delete.completed%22)%20and%20outcome.result%20eq%20%22SUCCESS%22&sortOrder=ASCENDING&limit=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/logs?since=2026-10-09T17%3A04%3A00.000Z&until=2026-10-09T17%3A09%3A59.999Z&limit=1000&sortOrder=ASCENDING&filter=%28eventType+eq+%22group.user_membership.add%22+or+eventType+eq+%22group.user_membership.remove%22+or+eventType+eq+%22user.lifecycle.create%22+or+eventType+eq+%22user.lifecycle.delete.completed%22%29+and+outcome.result+eq+%22SUCCESS%22>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "60"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "eventType": "user.lifecycle.create",
+              "published": "2026-10-09T17:05:02.025Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.add",
+              "published": "2026-10-09T17:05:17.229Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.remove",
+              "published": "2026-10-09T17:05:28.321Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.add",
+              "published": "2026-10-09T17:05:39.640Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "group.user_membership.remove",
+              "published": "2026-10-09T17:06:02.095Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                },
+                {
+                  "type": "UserGroup",
+                  "id": "00g18gur2rc3zz7MS698"
+                }
+              ]
+            },
+            {
+              "eventType": "user.lifecycle.delete.completed",
+              "published": "2026-10-09T17:06:02.211Z",
+              "outcome": {
+                "result": "SUCCESS"
+              },
+              "target": [
+                {
+                  "type": "User",
+                  "id": "00u18jwzptzknRQmQ698"
+                }
+              ]
+            }
+          ]

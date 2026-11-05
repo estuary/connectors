@@ -80,6 +80,9 @@
     },
     "key": [
       "/uuid"
+    ],
+    "resourcePath": [
+      "bookings"
     ]
   }
 ]

@@ -333,7 +333,7 @@ func (w *ParquetWriter) Write(row []any) error {
 // row groups from the scratch file are flushed to the output, which happens whenever there is
 // enough data (either by rows or bytes) in the scratch file to fill a complete row group.
 func (w *ParquetWriter) Written() int {
-	return w.cwc.written
+	return int(w.cwc.written.Load())
 }
 
 // Close flushes the buffered rows and scratch file, and closes the output writer.

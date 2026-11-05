@@ -18,7 +18,7 @@ If the connector name is missing, stop and report that before doing anything des
 
 These apply in every phase. Re-read them before each phase boundary.
 
-1. Activate the connector's Python venv before invoking `flowctl`. A fresh Bash invocation will not have it active; the connector subprocess will fail with `ModuleNotFoundError: No module named '<package>'`. Use `source "$(poetry env info --path)/bin/activate"` from the connector dir.
+1. Activate the connector's Python venv before invoking `flowctl`. A fresh Bash invocation will not have it active; the connector subprocess will fail with `ModuleNotFoundError: No module named '<package>'`. Use `uv run --group dev <cmd>` from the connector dir.
 2. When emptying `bindings:` in `test.flow.yaml`, use `Write` (full file rewrite), **not** `Edit`. A partial Edit can leave orphaned `- resource:` entries dangling under an empty list, which produces invalid YAML that's hard to spot.
 3. After discover, audit `git diff --stat`. If the diff includes schema changes unrelated to the new stream (uniform per-file deltas across many existing schemas), recommend the user split the schema sweep into its own commit so the new-stream PR diff stays scoped.
 4. **`flowctl raw preview-next` and the pytest snapshot tests that drive it do hit the provider's API**. If the caller confirmed every required endpoint allows > 20 requests/hour, run them freely. Otherwise: ask before each run (via AskUserQuestion), and use `disable: true` on unrelated bindings in `test.flow.yaml` to cut the request count to just what's needed.
@@ -60,7 +60,7 @@ Gated by Law 7: if `tests/test_snapshots.py` has no `test_capture`, skip this ph
 Run from the connector dir:
 
 ```bash
-poetry run flowctl raw discover --source test.flow.yaml
+uv run --group dev flowctl raw discover --source test.flow.yaml
 ```
 
 Expect output like `Wrote N specifications under file://…/test.flow.yaml.`
@@ -83,7 +83,7 @@ If the new schema file is missing despite a successful discover, check that `flo
 ## Phase 5 — Snapshot Refresh
 
 ```bash
-poetry run pytest tests/ > /tmp/discover-pytest-1.log 2>&1
+uv run --group dev pytest tests/ > /tmp/discover-pytest-1.log 2>&1
 ```
 
 Read `/tmp/discover-pytest-1.log` to see what failed. Expect at least the discover snapshot test (`test_discover`, or whatever the connector calls it) to fail because of the new stream slotted into a new alphabetical position.
@@ -91,10 +91,10 @@ Read `/tmp/discover-pytest-1.log` to see what failed. Expect at least the discov
 Then refresh:
 
 ```bash
-poetry run pytest tests/ --insta=update > /tmp/discover-pytest-update.log 2>&1
+uv run --group dev pytest tests/ --insta=update > /tmp/discover-pytest-update.log 2>&1
 ```
 
-Re-run `poetry run pytest` to confirm all tests now pass and the snapshot file(s) were updated.
+Re-run `uv run --group dev pytest` to confirm all tests now pass and the snapshot file(s) were updated.
 
 Verify post-refresh:
 

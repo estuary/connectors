@@ -149,11 +149,18 @@ def print_results(data: dict) -> None:
     mb_s = data.get("mb_per_sec")
     docs_s = data.get("docs_per_sec")
     throughput_color = GREEN if (mb_s and mb_s > 10) else YELLOW if (mb_s and mb_s > 1) else RED
+    mb_s_str = f"{mb_s:.1f} MB/s" if mb_s is not None else "N/A"
     print(
-        f"  {BOLD}Throughput{RESET}   {throughput_color}{BOLD}"
-        f"{mb_s:.1f} MB/s{RESET}"
+        f"  {BOLD}Throughput{RESET}   {throughput_color}{BOLD}{mb_s_str}{RESET}"
         f"     {BOLD}Docs/sec{RESET}    {_human_count(int(docs_s)) if docs_s else 'N/A'}"
     )
+    tpcds = data.get("tpcds")
+    if tpcds:
+        status = f"{GREEN}complete{RESET}" if tpcds["complete"] else f"{RED}{BOLD}incomplete{RESET}"
+        print(
+            f"  {BOLD}TPC-DS{RESET}       scale {tpcds['scale']:g}"
+            f"     {len(tpcds['tables'])} tables     {status}"
+        )
     print()
 
     # Transaction table
@@ -167,7 +174,7 @@ def print_results(data: dict) -> None:
 
     rows: list[list[str]] = []
     for tx in txs:
-        fresh = tx["fresh"]
+        fresh = tx.get("fresh")
         tx_wall = tx.get("wall_seconds")
         tx_mbs = tx.get("mb_per_sec")
         wall_str = _human_duration(tx_wall) if tx_wall is not None else DIM + "—" + RESET
@@ -180,8 +187,8 @@ def print_results(data: dict) -> None:
             _human_bytes(tx["bytes"]),
             wall_str,
             mbs_str,
-            f'{GREEN}{_human_count(fresh["count"])}{fresh["op"]}{RESET}',
-            _overlap_summary(tx["overlaps"]),
+            f'{GREEN}{_human_count(fresh["count"])}{fresh["op"]}{RESET}' if fresh else DIM + "—" + RESET,
+            _overlap_summary(tx.get("overlaps", [])),
         ])
 
     # Compute column widths (clamp to terminal).

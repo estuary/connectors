@@ -73,6 +73,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "attachments_compact"
     ]
   },
   {
@@ -244,6 +247,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "attachments"
     ]
   },
   {
@@ -500,6 +506,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "custom_fields"
     ]
   },
   {
@@ -723,6 +732,9 @@
     },
     "key": [
       "/created_at"
+    ],
+    "resourcePath": [
+      "events"
     ]
   },
   {
@@ -793,6 +805,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "portfolios_compact"
     ]
   },
   {
@@ -1076,6 +1091,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "portfolios"
     ]
   },
   {
@@ -1195,6 +1213,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "portfolios_memberships"
     ]
   },
   {
@@ -1744,6 +1765,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "projects"
     ]
   },
   {
@@ -1814,6 +1838,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "sections_compact"
     ]
   },
   {
@@ -1917,6 +1944,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "sections"
     ]
   },
   {
@@ -2032,6 +2062,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "stories_compact"
     ]
   },
   {
@@ -2267,6 +2300,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "stories"
     ]
   },
   {
@@ -2407,6 +2443,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "tags"
     ]
   },
   {
@@ -3239,6 +3278,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "tasks"
     ]
   },
   {
@@ -3353,6 +3395,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "teams"
     ]
   },
   {
@@ -3475,6 +3520,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "team_memberships"
     ]
   },
   {
@@ -3621,6 +3669,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "users"
     ]
   },
   {
@@ -3706,6 +3757,9 @@
     },
     "key": [
       "/gid"
+    ],
+    "resourcePath": [
+      "workspaces"
     ]
   }
 ]

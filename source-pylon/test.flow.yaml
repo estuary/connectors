@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-pylon:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_pylon
+        config: config.yaml
+    bindings: []

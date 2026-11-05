@@ -462,11 +462,7 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 			continue
 		}
 		if b.truncateSQL == "" {
-			log.WithFields(log.Fields{
-				"eventType": "connectorStatus",
-				"table":     b.target.Identifier,
-				"boundary":  boundary,
-			}).Warnf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason)
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason))
 			continue
 		}
 		t.truncations[binding] = boundary
@@ -502,6 +498,10 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
+		if err := boilerplate.RequireSingleShard(open); err != nil {
+			return nil, err
+		}
+
 		var cfg = ep.Config
 		var d = &transactor{
 			dialect:               ep.Dialect,
@@ -601,7 +601,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose the appropriate load query template based on configuration

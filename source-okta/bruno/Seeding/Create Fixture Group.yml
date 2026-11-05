@@ -1,0 +1,44 @@
+info:
+  name: Create Fixture Group
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/groups"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "name": "estuary-updated-group",
+          "description": "Estuary connector test fixture (updated cluster)"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('seed_group_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Add a group](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/addGroup)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** an OKTA_GROUP whose `lastUpdated` and `lastMembershipUpdated` can be
+  moved independently (`Seeding / Add User To Group` and
+  `Seeding / Update Group Profile`), to test the Groups dual-field cursor filter.
+
+  **Cleanup:** `DELETE /groups/{id}`.
+
+  **Outcome:** ran 2026-10-07 and created `00g18h004ubJFvh3C698` at 16:20:22,
+  with `lastUpdated` and `lastMembershipUpdated` both equal to `created`.
