@@ -195,6 +195,31 @@ func TestDoErrorMessages(t *testing.T) {
 	})
 }
 
+func TestDoPermanent(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var policy = testPolicy
+		policy.RetryAmbiguous = true
+
+		var err, at = run(t.Context(), policy, errRetryable, Permanent(errRetryable))
+		require.Len(t, at, 2)
+		require.EqualError(t, err, "after 2 attempts: retryable")
+		require.ErrorIs(t, err, errRetryable)
+
+		// A Permanent error from an attempt that timed out is still Fatal.
+		policy.AttemptTimeout = time.Second
+		var calls int
+		err = policy.Do(t.Context(), "test op", func(ctx context.Context) error {
+			calls++
+			<-ctx.Done()
+			return Permanent(ctx.Err())
+		})
+		require.Equal(t, 1, calls)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		require.NoError(t, Permanent(nil))
+	})
+}
+
 func TestDoJitter(t *testing.T) {
 	var policy = Policy{
 		Classify:       classifyTestErr,

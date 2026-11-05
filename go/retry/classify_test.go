@@ -2,11 +2,13 @@ package retry
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"syscall"
 	"testing"
@@ -60,6 +62,26 @@ func TestNetwork(t *testing.T) {
 			name: "read timeout",
 			err:  &net.OpError{Op: "read", Net: "tcp", Err: errors.New("i/o timeout")},
 			want: Ambiguous,
+		},
+		{
+			name: "HTTP request refused",
+			err:  &url.Error{Op: "Post", URL: "http://x", Err: &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}},
+			want: Retryable,
+		},
+		{
+			name: "HTTP request reset",
+			err:  &url.Error{Op: "Post", URL: "http://x", Err: &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}},
+			want: Ambiguous,
+		},
+		{
+			name: "HTTP request with an untrusted certificate",
+			err:  &url.Error{Op: "Post", URL: "https://x", Err: x509.UnknownAuthorityError{}},
+			want: Ambiguous,
+		},
+		{
+			name: "HTTP request cancelled",
+			err:  &url.Error{Op: "Post", URL: "http://x", Err: context.Canceled},
+			want: Fatal,
 		},
 		{
 			name: "context cancelled",

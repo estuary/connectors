@@ -15,6 +15,10 @@ import (
 // Retryable, since nothing was sent. A connection that ends or times out
 // once open is Ambiguous: the request may already have been received. Context
 // cancellation and deadlines, and every other error, are Fatal.
+//
+// A failed net/http request is an *url.Error, which is itself a net.Error, so
+// it is Ambiguous unless it failed to connect, even when its cause won't go
+// away on a retry, such as an untrusted TLS certificate.
 func Network(err error) Outcome {
 	// context.DeadlineExceeded is itself a net.Error, so it is checked first.
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {

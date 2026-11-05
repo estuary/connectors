@@ -11,10 +11,12 @@
 //     response to a write, says nothing about whether the write happened.
 //   - Fatal: anything else, returned to the caller without retrying.
 //
-// A Policy retries Ambiguous errors only when its RetryAmbiguous field is set,
-// which a caller should do only for idempotent operations. Retrying a
-// non-idempotent write after an ambiguous failure can apply it twice, which
-// for an append is a permanent duplicate.
+// A Policy retries Ambiguous errors only when its RetryAmbiguous field is set.
+// Retrying a non-idempotent write after an ambiguous failure can apply it
+// twice, which for an append is a permanent duplicate. A caller sets it for
+// idempotent operations, and for those whose failure would repeat them anyway:
+// a destination that keeps no checkpoint of its own has a failed transaction
+// replayed in full, so retrying the one request re-sends less.
 //
 // Classifiers for a destination's own errors live with its connector. This
 // package provides the retry loop and classifiers for errors that are the
@@ -80,6 +82,20 @@ func (e *delayError) Error() string             { return e.err.Error() }
 func (e *delayError) Unwrap() error             { return e.err }
 func (e *delayError) RetryDelay() time.Duration { return e.delay }
 
+// Permanent marks err Fatal, whatever the Classifier would say of it. It
+// returns nil if err is nil.
+func Permanent(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &permanentError{err: err}
+}
+
+type permanentError struct{ err error }
+
+func (e *permanentError) Error() string { return e.err.Error() }
+func (e *permanentError) Unwrap() error { return e.err }
+
 // Policy decides which failed attempts are retried, and how long to wait
 // before each retry.
 //
@@ -89,7 +105,8 @@ type Policy struct {
 	Classify Classifier
 	// RetryAmbiguous retries errors classified Ambiguous. Set it only for
 	// operations that leave the same result when run again after they
-	// already took effect.
+	// already took effect, or whose failure would make the caller repeat
+	// them anyway.
 	RetryAmbiguous bool
 
 	// MaxAttempts bounds the number of attempts, including the first. Zero
@@ -148,7 +165,9 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 		}
 
 		var outcome = Ambiguous
-		if !timedOut {
+		if _, ok := errors.AsType[*permanentError](err); ok {
+			outcome = Fatal
+		} else if !timedOut {
 			outcome = p.Classify(err)
 		}
 		var giveUp = func() error {
