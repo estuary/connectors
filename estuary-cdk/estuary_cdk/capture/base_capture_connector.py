@@ -26,6 +26,7 @@ from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
 # Package-internal TypeVar, shared across this package's modules.
 from .common import _ConnectorState  # pyright: ignore[reportPrivateUsage]
+from .task import serialize_response
 from .transactor import Transactor
 
 # Default encryption service URL, can be overridden via ENCRYPTION_URL environment variable
@@ -321,8 +322,7 @@ class BaseCaptureConnector(
     async def _emit(
         self, response: Response[EndpointConfig, ResourceConfig, _ConnectorState]
     ):
-        data = response.model_dump_json(by_alias=True, exclude_unset=True).encode()
-        await emit_bytes(data + b"\n", self.output)
+        await emit_bytes(serialize_response(response) + b"\n", self.output)
 
     async def _encrypt_config(
         self,
