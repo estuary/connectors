@@ -127,6 +127,11 @@ type Policy struct {
 	// failed together don't retry together.
 	Jitter float64
 
+	// QuietRetries is how many retries, from the first, are logged at debug
+	// level rather than as warnings, for policies whose first retries are
+	// routine, such as re-sending throttled writes.
+	QuietRetries int
+
 	// AttemptTimeout, if set, bounds each attempt with its own deadline
 	// rather than leaving one deadline to span every attempt. An attempt
 	// that runs out of time is Ambiguous, whatever Classify says. The
@@ -141,7 +146,8 @@ var randFloat = rand.Float64
 // Do runs fn until it succeeds, fails with an error the policy doesn't retry,
 // or runs out of attempts or time. It never retries once ctx is done, nor
 // waits for a retry that ctx's deadline would cut short. Each retry logs one
-// warning naming the operation, the attempt and its error.
+// warning, or a debug line within QuietRetries, naming the operation, the
+// attempt and its error.
 //
 // When Do gives up after retrying, the returned error wraps fn's last error
 // and says how many attempts were made.
@@ -191,12 +197,16 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 			return giveUp()
 		}
 
+		var level = log.WarnLevel
+		if attempt <= p.QuietRetries {
+			level = log.DebugLevel
+		}
 		log.WithFields(log.Fields{
 			"operation": operation,
 			"attempt":   attempt,
 			"outcome":   outcome.String(),
 			"delay":     delay.String(),
-		}).WithError(err).Warn("retrying failed operation")
+		}).WithError(err).Log(level, "retrying failed operation")
 
 		var timer = time.NewTimer(delay)
 		select {
