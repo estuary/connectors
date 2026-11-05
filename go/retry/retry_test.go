@@ -270,8 +270,9 @@ func TestDoContext(t *testing.T) {
 			cancel()
 
 			var err = <-done
+			require.EqualError(t, err, "context canceled while waiting to retry test op after: retryable")
 			require.ErrorIs(t, err, context.Canceled)
-			require.ErrorIs(t, err, errRetryable)
+			require.NotErrorIs(t, err, errRetryable)
 			require.Equal(t, 1, calls)
 		})
 	})
