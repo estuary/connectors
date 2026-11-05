@@ -898,7 +898,11 @@ func (ov *ocspValidator) downloadOCSPCacheServer() {
 
 func (ov *ocspValidator) getAllRevocationStatus(ctx context.Context, verifiedChains []*x509.Certificate) []*ocspStatus {
 	cached := ov.validateWithCacheForAllCertificates(verifiedChains)
-	if !cached {
+	// A leaf with no OCSP responder cannot benefit from downloading the
+	// shared cache. Preserve getRevocationStatus and fail-open/fail-closed
+	// handling below, including validation of any already-cached response.
+	leafHasResponder := len(verifiedChains) > 1 && len(verifiedChains[0].OCSPServer) != 0
+	if !cached && (leafHasResponder || os.Getenv(ocspTestResponderURLEnv) != "") {
 		ov.downloadOCSPCacheServer()
 	}
 	n := len(verifiedChains) - 1
