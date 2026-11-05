@@ -413,6 +413,27 @@ func TestDoLogsEachRetry(t *testing.T) {
 	}
 }
 
+func TestDoQuietRetries(t *testing.T) {
+	var hook = logtest.NewGlobal()
+	t.Cleanup(hook.Reset)
+	var level = log.GetLevel()
+	log.SetLevel(log.DebugLevel)
+	t.Cleanup(func() { log.SetLevel(level) })
+
+	synctest.Test(t, func(t *testing.T) {
+		var p = testPolicy
+		p.QuietRetries = 2
+		var err, _ = run(t.Context(), p, errRetryable, errRetryable, errRetryable)
+		require.NoError(t, err)
+	})
+
+	var levels []log.Level
+	for _, e := range hook.AllEntries() {
+		levels = append(levels, e.Level)
+	}
+	require.Equal(t, []log.Level{log.DebugLevel, log.DebugLevel, log.WarnLevel}, levels)
+}
+
 func TestDoRequiresBounds(t *testing.T) {
 	var noop = func(context.Context) error { return nil }
 	require.PanicsWithValue(t, "retry: Policy.Classify is required", func() {
