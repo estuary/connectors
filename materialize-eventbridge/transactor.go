@@ -16,20 +16,6 @@ import (
 )
 
 // Per the EventBridge PutEvents API limits.
-//
-// Retry layering: connection-level errors and 5xx responses bubble out of
-// t.client.PutEvents and are handled by the AWS SDK's built-in retryer
-// (default standard mode: 3 attempts, exponential backoff with jitter, max
-// ~20s). The putEventsRetry* constants below govern a *separate* loop for
-// PutEvents 200 responses with FailedEntryCount > 0 (per-entry partial
-// failures, e.g. ThrottlingException on a subset of entries) — the SDK
-// retryer does not see those because the HTTP call succeeded. 4 attempts
-// with 200ms base gives 200/400/800ms backoff = ~1.4s cumulative wait
-// across 4 RPCs. A sustained per-entry throttle that exhausts this budget
-// surfaces an error and the Flow runtime retries the whole transaction
-// (at-least-once delivery is contractual, so re-publishing duplicates is
-// safe). Do not raise this without a concrete throttling incident — bigger
-// numbers just delay the bounce; they do not improve correctness.
 const (
 	// putEventsMaxBatch is the AWS-side hard cap on entries per PutEvents
 	// request; an 11th entry returns 413. See API reference Entries field:
@@ -56,8 +42,6 @@ const (
 	// is not counted.
 	putEventsMaxEntrySize   = 256 * 1024
 	putEventsMaxRequestSize = 1024 * 1024
-	putEventsRetryAttempts  = 4
-	putEventsRetryBaseWait  = 200 * time.Millisecond
 	// storeConcurrency caps in-flight PutEvents calls per Store transaction.
 	// 8 * 10-entry batches stays well under default per-region PutEvents rate
 	// limits while keeping the pipeline filled across typical call latency;
@@ -178,72 +162,42 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	return nil, nil
 }
 
-// putEvents publishes a batch and retries any individually-failed entries.
-// PutEvents returns 200 OK even when some entries fail (partial-failure
-// semantics), so we must inspect each result.
+// putEvents publishes a batch, re-sending the entries that failed individually
+// with a transient error. PutEvents returns 200 OK even when some entries fail,
+// so each result must be inspected.
 func (t *transactor) putEvents(ctx context.Context, entries []types.PutEventsRequestEntry) error {
-	for attempt := range putEventsRetryAttempts {
-		if attempt > 0 {
-			wait := putEventsRetryBaseWait << (attempt - 1)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(wait):
-			}
-		}
-
+	return putEventsRetry.Do(ctx, "PutEvents", func(ctx context.Context) error {
 		out, err := t.client.PutEvents(ctx, &eventbridge.PutEventsInput{Entries: entries})
 		if err != nil {
 			return fmt.Errorf("PutEvents: %w", err)
-		}
-		if out.FailedEntryCount == 0 {
+		} else if out.FailedEntryCount == 0 {
 			return nil
 		}
 
-		var retry []types.PutEventsRequestEntry
-		// Track the first non-retryable failure so the returned error
-		// describes a genuinely permanent entry, not whatever happened to
-		// be last in iteration order. At-least-once semantics make
-		// fail-fast on permanent codes preferable to silently abandoning
-		// the still-retryable entries: the runtime retries the whole
-		// transaction, so surfacing the permanent failure loudly is the
-		// safer signal.
-		var permIdx = -1
-		var permCode, permMsg string
+		var failed []types.PutEventsRequestEntry
+		var first *types.PutEventsResultEntry
 		for i, r := range out.Entries {
 			if r.ErrorCode == nil && r.ErrorMessage == nil {
 				continue
 			}
 			code := aws.ToString(r.ErrorCode)
 			if !retryableCode(code) {
-				if permIdx == -1 {
-					permIdx, permCode, permMsg = i, code, aws.ToString(r.ErrorMessage)
-				}
-				continue
+				return fmt.Errorf("entry %d: %s: %s", i, code, aws.ToString(r.ErrorMessage))
 			}
-			retry = append(retry, entries[i])
+			if first == nil {
+				first = &out.Entries[i]
+			}
+			failed = append(failed, entries[i])
 		}
-		if permIdx != -1 {
-			return fmt.Errorf("entry %d: %s: %s", permIdx, permCode, permMsg)
-		}
-		if len(retry) == 0 {
-			// Defensive: FailedEntryCount > 0 but no entries flagged. Treat as success.
+		if len(failed) == 0 {
+			// Defensive: FailedEntryCount > 0 but no entries flagged.
 			return nil
 		}
-		entries = retry
-	}
-	return fmt.Errorf("PutEvents: %d entries still failing after %d attempts",
-		len(entries), putEventsRetryAttempts)
-}
-
-// retryableCode returns true for EventBridge per-entry error codes that
-// indicate transient failures. These codes are surfaced on
-// PutEventsResultEntry.ErrorCode and are stable across SDK versions.
-func retryableCode(code string) bool {
-	switch code {
-	case "ThrottlingException", "Throttling",
-		"InternalFailure", "ServiceUnavailable":
-		return true
-	}
-	return false
+		entries = failed
+		return &failedEntriesError{
+			count:   len(failed),
+			code:    aws.ToString(first.ErrorCode),
+			message: aws.ToString(first.ErrorMessage),
+		}
+	})
 }
