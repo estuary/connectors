@@ -285,6 +285,18 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 {{- end }}
 {{ end }}
 
+-- The range condition of a key column's merge bound: one range of its lower
+-- and upper literals, or the union of its ranges when it has them.
+
+{{ define "boundCondition" -}}
+{{- if $.Bound.Ranges }} AND (
+	{{- range $i, $r := $.Bound.Ranges }}{{ if $i }} OR {{ end -}}
+	({{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $r.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $r.LiteralUpper }})
+	{{- end }})
+{{- else if $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $.Bound.LiteralUpper }}
+{{- end }}
+{{- end }}
+
 -- Templated query which joins keys from the load table with the target table, and returns values. It
 -- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
 
@@ -302,7 +314,7 @@ SELECT {{ $.Table.Binding }}, {{ if eq $.Table.Document.BareDDL "VARIANT" }}TO_J
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
 	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
@@ -347,7 +359,7 @@ JOIN (
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
 {{- end }}
 {{ end }}
 
@@ -396,7 +408,7 @@ USING (
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{ end -}}
 	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn "l" $bound) }}
 {{- end }}
 WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE
@@ -431,7 +443,9 @@ SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE, ROW_COUNT FROM TABLE(INFORMATION_
 )) WHERE
 FILE_NAME IN ('{{ Join $.Files "','" }}')
 {{ end }}
-  `)
+  `, template.FuncMap{
+		"BoundOn": func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+	})
 
 	return templates{
 		createTargetTable:       tplAll.Lookup("createTargetTable"),
@@ -510,6 +524,12 @@ func renderCopyHistoryTemplate(tableName string, files []string, tpl *template.T
 		"files":     files,
 	}).Debug("rendered template")
 	return s, nil
+}
+
+// boundOn is a merge bound on a key column of the table under alias.
+type boundOn struct {
+	Alias string
+	Bound sql.MergeBound
 }
 
 type boundedQueryInput struct {
