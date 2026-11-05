@@ -866,8 +866,8 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			return nil, err
 		}
 
+		var bounds = b.store.mergeBounds.Build()
 		if b.store.mustMerge {
-			var bounds = b.store.mergeBounds.Build()
 			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, bounds)
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
