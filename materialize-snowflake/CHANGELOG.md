@@ -1,5 +1,11 @@
 # materialize-snowflake
 
+## 2026-11-05
+
+### Changed
+- Waiting for a newly created Snowpipe pipe to become visible now gives up
+  after 10 minutes instead of waiting indefinitely.
+
 ## 2026-11-03
 
 ### Added

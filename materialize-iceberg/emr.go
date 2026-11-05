@@ -364,27 +364,20 @@ func (e *emrClient) clientCredSecretName() string {
 	return e.cfg.SystemsManagerPrefix + sanitizeAndAppendHash(e.materializationName)
 }
 
-func ssmPutParameterWithRetry(ctx context.Context, client *ssm.Client, name, value string) error {
-	var err error
-	for attempt := range 5 {
-		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 2 * time.Second)
-		}
-		_, err = client.PutParameter(ctx, &ssm.PutParameterInput{
+type parameterPutter interface {
+	PutParameter(ctx context.Context, params *ssm.PutParameterInput, optFns ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
+}
+
+func ssmPutParameterWithRetry(ctx context.Context, client parameterPutter, name, value string) error {
+	return ssmPutRetry.Do(ctx, "put SSM parameter "+name, func(ctx context.Context) error {
+		_, err := client.PutParameter(ctx, &ssm.PutParameterInput{
 			Name:      aws.String(name),
 			Value:     aws.String(value),
 			Type:      ssmTypes.ParameterTypeSecureString,
 			Overwrite: aws.Bool(true),
 		})
-		if err == nil {
-			return nil
-		}
-		if _, ok := errors.AsType[*ssmTypes.TooManyUpdates](err); !ok {
-			return err
-		}
-		log.WithField("attempt", attempt+1).Warn("SSM PutParameter TooManyUpdates, retrying")
-	}
-	return err
+		return err
+	})
 }
 
 func isAccessDeniedErr(err error) bool {

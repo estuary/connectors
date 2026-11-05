@@ -5,10 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
-	"math/rand"
 	"net/http"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -68,18 +65,19 @@ type StatusError struct {
 func (e *StatusError) Error() string { return e.msg }
 
 func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]Embedding, error) {
-	res, err := withRetry(ctx, func() (*http.Response, error) {
-		body := new(bytes.Buffer)
-		if err := json.NewEncoder(body).Encode(&OpenAIEmbeddingsRequest{
-			Model: c.embeddingModel,
-			Input: input,
-		}); err != nil {
-			return nil, err
-		}
+	body, err := json.Marshal(&OpenAIEmbeddingsRequest{
+		Model: c.embeddingModel,
+		Input: input,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/embeddings", body)
+	var embeddings OpenAIEmbeddingsResponse
+	if err := embeddingsRetry.Do(ctx, "create embeddings", func(ctx context.Context) error {
+		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/embeddings", bytes.NewReader(body))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		req.Header.Set("accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
@@ -88,28 +86,27 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 			req.Header.Set("OpenAI-Organization", c.org)
 		}
 
-		return c.http.Do(req)
-	})
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
+		res, err := c.http.Do(req)
+		if err != nil {
+			return err
+		}
+		defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
-		var errorBody openAiEmbeddingsError
-		if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
-			log.WithField("error", err).Warn("could not decode error response body")
-		} else if errorBody.Error.Message != "" {
-			return nil, &StatusError{res.StatusCode, fmt.Sprintf("creating embeddings failed (%s): %s", res.Status, errorBody.Error.Message)}
-		} else {
-			log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
+		if res.StatusCode != http.StatusOK {
+			var errorBody openAiEmbeddingsError
+			if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
+				log.WithField("error", err).Warn("could not decode error response body")
+			} else if errorBody.Error.Message != "" {
+				return &StatusError{res.StatusCode, fmt.Sprintf("creating embeddings failed (%s): %s", res.Status, errorBody.Error.Message)}
+			} else {
+				log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
+			}
+
+			return &StatusError{res.StatusCode, fmt.Sprintf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)}
 		}
 
-		return nil, &StatusError{res.StatusCode, fmt.Sprintf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)}
-	}
-
-	embeddings := OpenAIEmbeddingsResponse{}
-	if err := json.NewDecoder(res.Body).Decode(&embeddings); err != nil {
+		return json.NewDecoder(res.Body).Decode(&embeddings)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -146,73 +143,4 @@ func (c *OpenAiClient) VerifyModelExists(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-var (
-	maxRetries             = 10
-	initialBackoff float64 = 200 // Milliseconds
-	maxBackoff             = time.Duration(60 * time.Second)
-	retryableCodes         = []int{http.StatusTooManyRequests, http.StatusInternalServerError}
-)
-
-func withRetry(ctx context.Context, fn func() (*http.Response, error)) (*http.Response, error) {
-	n := 0
-	backoff := initialBackoff
-
-	for {
-		n++
-
-		res, err := fn()
-		if err != nil {
-			return nil, fmt.Errorf("withRetry: %w", err)
-		}
-
-		if containsCode(retryableCodes, res.StatusCode) {
-			if n > maxRetries {
-				log.WithFields(log.Fields{
-					"host":       res.Request.URL.Host,
-					"path":       res.Request.URL.Path,
-					"attempts":   n,
-					"lastCode":   res.StatusCode,
-					"lastStatus": res.Status,
-				}).Warn("exceeded retry limit")
-				return res, nil
-			}
-
-			res.Body.Close()
-			backoff *= math.Pow(2, 1+rand.Float64())
-			delay := time.Duration(backoff * float64(time.Millisecond))
-			if delay > maxBackoff {
-				delay = maxBackoff
-			}
-
-			log.WithFields(log.Fields{
-				"host":       res.Request.URL.Host,
-				"path":       res.Request.URL.Path,
-				"attempts":   n,
-				"lastCode":   res.StatusCode,
-				"lastStatus": res.Status,
-				"delay":      delay.String(),
-			}).Info("waiting to retry request on retryable error")
-
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(delay):
-				continue
-			}
-		}
-
-		return res, nil
-	}
-}
-
-func containsCode(src []int, in int) bool {
-	for _, c := range src {
-		if c == in {
-			return true
-		}
-	}
-
-	return false
 }
