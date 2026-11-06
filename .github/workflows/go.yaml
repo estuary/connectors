@@ -96,7 +96,10 @@ jobs:
     needs: classify_changes
     if: needs.classify_changes.outputs.run == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -134,6 +137,69 @@ jobs:
             ~/go/pkg/mod
             ~/.cache/go-build
           key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+
+      # Image builds compile in a golang image at /builder, where the runner's
+      # cache doesn't match. So this also publishes each golang image that more
+      # than one Dockerfile builds in, with every package and test compiled in
+      # it, once per tag set (`-tags nozstd` changes every package's cache key).
+      # The build jobs substitute it for the golang image. An image is rebuilt
+      # when go.mod, go.sum or its Go version changes, but not for the Debian
+      # updates that move its digest almost daily. Its layers are zstd, which
+      # decompresses several times faster than gzip: pulling it is most of
+      # what it costs a build job.
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Publish golang images with a compiled Go cache
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+        run: |
+          for f in */Dockerfile; do .github/scripts/golang-cache-image.sh $f; done \
+            | sort | uniq -c | awk '$1 > 1 { print $2, $3 }' \
+            | while read image tags; do
+            GOV=$(docker buildx imagetools inspect $image \
+              --format '{{json (index .Image "linux/amd64").Config.Env}}' \
+              | jq -r '.[] | select(startswith("GOLANG_VERSION=")) | ltrimstr("GOLANG_VERSION=")')
+            NAME=ghcr.io/estuary/build-cache:golang-${image#golang:}-$tags
+            KEY=$NAME-$GOV-${{ hashFiles('go.mod', 'go.sum') }}
+            if docker buildx imagetools inspect $KEY > /dev/null 2>&1; then continue; fi
+            docker buildx build --platform linux/amd64 --provenance=false \
+              --build-arg IMAGE=$image --build-arg TAGS=$tags --tag $KEY --tag $NAME-latest \
+              --output type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true \
+              -f - . <<'EOF'
+          ARG IMAGE
+          FROM $IMAGE
+          ARG TAGS
+          WORKDIR /builder
+          RUN --mount=type=bind,target=/builder go mod download
+          RUN --mount=type=bind,target=/builder,rw \
+              [ "$TAGS" = default ] && TAGS=; \
+              go build -tags "$TAGS" ./... > /dev/null 2>&1; \
+              go test -tags "$TAGS" -count=1 -run '^$' ./... > /dev/null 2>&1; \
+              du -sh /go/pkg/mod /root/.cache/go-build
+          EOF
+          done
+
+      # Only the -latest tags are used, so the images they've moved off are
+      # deleted. Each holds about 2 GB.
+      - name: Delete superseded golang images
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --paginate /orgs/estuary/packages/container/build-cache/versions \
+            --jq '.[] | select(.metadata.container.tags as $t
+              | ($t | length) > 0
+              and all($t[]; startswith("golang-"))
+              and all($t[]; endswith("-latest") | not)) | .id' \
+            | while read id; do
+              gh api -X DELETE /orgs/estuary/packages/container/build-cache/versions/$id
+            done
 
   build_connectors:
     runs-on: ubuntu-24.04
@@ -309,6 +375,17 @@ jobs:
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
 
+      # Substitute the golang image with warm_go_cache's copy that has every
+      # package compiled in it, when there's one for this Dockerfile.
+      - id: golang
+        run: |
+          read image tags < <(.github/scripts/golang-cache-image.sh ${{ matrix.connector.name }}/Dockerfile) || true
+          [ -n "$image" ] || exit 0
+          CACHE=ghcr.io/estuary/build-cache:golang-${image#golang:}-$tags-latest
+          if docker buildx imagetools inspect $CACHE > /dev/null 2>&1; then
+            echo "context=$image=docker-image://$CACHE" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build ${{ matrix.connector.name }} Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -319,6 +396,7 @@ jobs:
             BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          build-contexts: ${{ steps.golang.outputs.context }}
           # Layers come from the connector's build-cache tag and only main writes
           # it back, so PR builds can't overwrite each other's cache. The GitHub
           # Actions cache is too small for every connector's builder stage.
