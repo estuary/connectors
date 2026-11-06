@@ -10,19 +10,20 @@ This connector captures data from Incident.io into Estuary collections.
 
 The following data resources are supported through the Incident.io API:
 
-* [catalog entries](https://api-docs.incident.io/tag/Catalog-V3#operation/Catalog%20V3_ListEntries)
-* [catalog resources](https://api-docs.incident.io/tag/Catalog-V3#operation/Catalog%20V3_ListResources)
-* [catalog types](https://api-docs.incident.io/tag/Catalog-V3#operation/Catalog%20V3_ListTypes)
-* [custom fields](https://api-docs.incident.io/tag/Custom-Fields-V2#operation/Custom%20Fields%20V2_List)
-* [incident attachments](https://api-docs.incident.io/tag/Incident-Attachments-V1#operation/Incident%20Attachments%20V1_List)
-* [incident roles](https://api-docs.incident.io/tag/Incident-Roles-V2#operation/Incident%20Roles%20V2_List)
-* [incident statuses](https://api-docs.incident.io/tag/Incident-Statuses-V1)
-* [incident timestamps](https://api-docs.incident.io/tag/Incident-Timestamps-V2)
-* [incident types](https://api-docs.incident.io/tag/Incident-Types-V1)
-* [incidents](https://api-docs.incident.io/tag/Incidents-V2)
-* [severities](https://api-docs.incident.io/tag/Severities-V1)
-* [users](https://api-docs.incident.io/tag/Users-V2#operation/Users%20V2_List)
-
+| Resource | Replication Mode |
+| --- | --- |
+| [catalog entries](https://api-docs.incident.io/tag/Catalog-V3#operation/Catalog%20V3_ListEntries) | Incremental |
+| [catalog resources](https://api-docs.incident.io/tag/Catalog-V3#operation/Catalog%20V3_ListResources) | Snapshot |
+| [catalog types](https://api-docs.incident.io/tag/Catalog-V3#operation/Catalog%20V3_ListTypes) | Incremental |
+| [custom fields](https://api-docs.incident.io/tag/Custom-Fields-V2#operation/Custom%20Fields%20V2_List) | Incremental |
+| [incident attachments](https://api-docs.incident.io/tag/Incident-Attachments-V1#operation/Incident%20Attachments%20V1_List) | Snapshot |
+| [incident roles](https://api-docs.incident.io/tag/Incident-Roles-V2#operation/Incident%20Roles%20V2_List) | Incremental |
+| [incident statuses](https://api-docs.incident.io/tag/Incident-Statuses-V1) | Incremental |
+| [incident timestamps](https://api-docs.incident.io/tag/Incident-Timestamps-V2) | Snapshot |
+| [incident types](https://api-docs.incident.io/tag/Incident-Types-V1) | Incremental |
+| [incidents](https://api-docs.incident.io/tag/Incidents-V2) | Incremental |
+| [severities](https://api-docs.incident.io/tag/Severities-V1) | Incremental |
+| [users](https://api-docs.incident.io/tag/Users-V2#operation/Users%20V2_List) | Snapshot |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

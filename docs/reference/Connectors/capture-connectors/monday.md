@@ -10,11 +10,13 @@ This connector captures data from Monday.com into Estuary collections.
 
 The following data resources are supported through the Monday.com API:
 
-* [Boards](https://developer.monday.com/api-reference/reference/boards)
-* [Items](https://developer.monday.com/api-reference/reference/items)
-* [Users](https://developer.monday.com/api-reference/reference/users)
-* [Teams](https://developer.monday.com/api-reference/reference/teams)
-* [Tags](https://developer.monday.com/api-reference/reference/tags)
+| Resource | Replication Mode |
+| --- | --- |
+| [Boards](https://developer.monday.com/api-reference/reference/boards) | Incremental |
+| [Items](https://developer.monday.com/api-reference/reference/items) | Incremental |
+| [Tags](https://developer.monday.com/api-reference/reference/tags) | Snapshot |
+| [Teams](https://developer.monday.com/api-reference/reference/teams) | Snapshot |
+| [Users](https://developer.monday.com/api-reference/reference/users) | Snapshot |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

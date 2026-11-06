@@ -10,25 +10,27 @@ This connector captures data from Impact into Estuary collections.
 
 The following data resources are supported through Impact's Brand API:
 
-* [Ads](https://integrations.impact.com/brand-api-reference/reference/ads)
-* [Campaign Actions](https://integrations.impact.com/brand-api-reference/reference/actions)
-* [Campaign Action Inquiries](https://integrations.impact.com/brand-api-reference/reference/action-inquiries)
-* [Campaign Block Redirect Rules](https://integrations.impact.com/brand-api-reference/reference/routing-rules)
-* [Campaign Contracts](https://integrations.impact.com/brand-api-reference/reference/contracts)
-* [Campaign Media Partner Groups](https://integrations.impact.com/brand-api-reference/reference/partner-groups)
-* [Campaign Notes](https://integrations.impact.com/brand-api-reference/reference/notes)
-* [Campaign Tasks](https://integrations.impact.com/brand-api-reference/reference/tasks)
-* [Campaigns](https://integrations.impact.com/brand-api-reference/reference/programs)
-* [Catalogs](https://integrations.impact.com/brand-api-reference/reference/catalogs)
-* [Deals](https://integrations.impact.com/brand-api-reference/reference/deals)
-* [Exception Lists](https://integrations.impact.com/brand-api-reference/reference/exception-lists)
-* [Invoices](https://integrations.impact.com/brand-api-reference/reference/invoices)
-* [Jobs](https://integrations.impact.com/brand-api-reference/reference/jobs)
-* [Phone Numbers](https://integrations.impact.com/brand-api-reference/reference/phone-numbers)
-* [Promo Codes](https://integrations.impact.com/brand-api-reference/reference/promo-codes)
-* [Reports](https://integrations.impact.com/brand-api-reference/reference/report-export/reports-legacy)
-* [Tracking Value Requests](https://integrations.impact.com/brand-api-reference/reference/tracking-value-requests)
-* [Unique URLs](https://integrations.impact.com/brand-api-reference/readme/introduction#unique-urls)
+| Resource | Replication Mode |
+| --- | --- |
+| [Ads](https://integrations.impact.com/brand-api-reference/reference/ads) | Snapshot |
+| [Campaign Actions](https://integrations.impact.com/brand-api-reference/reference/actions) | Incremental |
+| [Campaign Action Inquiries](https://integrations.impact.com/brand-api-reference/reference/action-inquiries) | Incremental |
+| [Campaign Block Redirect Rules](https://integrations.impact.com/brand-api-reference/reference/routing-rules) | Incremental |
+| [Campaign Contracts](https://integrations.impact.com/brand-api-reference/reference/contracts) | Incremental |
+| [Campaign Media Partner Groups](https://integrations.impact.com/brand-api-reference/reference/partner-groups) | Snapshot |
+| [Campaign Notes](https://integrations.impact.com/brand-api-reference/reference/notes) | Incremental |
+| [Campaign Tasks](https://integrations.impact.com/brand-api-reference/reference/tasks) | Incremental |
+| [Campaigns](https://integrations.impact.com/brand-api-reference/reference/programs) | Snapshot |
+| [Catalogs](https://integrations.impact.com/brand-api-reference/reference/catalogs) | Snapshot |
+| [Deals](https://integrations.impact.com/brand-api-reference/reference/deals) | Incremental |
+| [Exception Lists](https://integrations.impact.com/brand-api-reference/reference/exception-lists) | Incremental |
+| [Invoices](https://integrations.impact.com/brand-api-reference/reference/invoices) | Incremental |
+| [Jobs](https://integrations.impact.com/brand-api-reference/reference/jobs) | Incremental |
+| [Phone Numbers](https://integrations.impact.com/brand-api-reference/reference/phone-numbers) | Snapshot |
+| [Promo Codes](https://integrations.impact.com/brand-api-reference/reference/promo-codes) | Incremental |
+| [Reports](https://integrations.impact.com/brand-api-reference/reference/report-export/reports-legacy) | Snapshot |
+| [Tracking Value Requests](https://integrations.impact.com/brand-api-reference/reference/tracking-value-requests) | Incremental |
+| [Unique URLs](https://integrations.impact.com/brand-api-reference/readme/introduction#unique-urls) | Incremental |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

@@ -16,7 +16,7 @@ The following data resources are supported:
 | [campaigns](https://api.iterable.com/api/docs#campaigns_campaigns) | Incremental |
 | [channels](https://api.iterable.com/api/docs#channels_channels) | Full Refresh |
 | [events](https://api.iterable.com/api/docs#export_startExport) | Incremental |
-| [list_users](https://api.iterable.com/api/docs#lists_getUsers) | Full Refresh |
+| [list_users](https://api.iterable.com/api/docs#lists_getUsers) | Incremental Backfill |
 | [lists](https://api.iterable.com/api/docs#lists_getLists) | Full Refresh |
 | [message_types](https://api.iterable.com/api/docs#messageTypes_messageTypes) | Full Refresh |
 | [metadata_tables](https://api.iterable.com/api/docs#metadata_list_tables) | Full Refresh |

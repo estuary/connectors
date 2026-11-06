@@ -10,21 +10,23 @@ This connector captures data from Klaviyo into Estuary collections.
 
 The following data resources are supported through the Klaviyo API:
 
-* [Campaigns](https://developers.klaviyo.com/en/reference/get_campaigns)
-* [Coupon Codes](https://developers.klaviyo.com/en/reference/get_coupon_codes)
-* [Coupons](https://developers.klaviyo.com/en/reference/get_coupons)
-* [Flows](https://developers.klaviyo.com/en/reference/get_flows)
-* [Forms](https://developers.klaviyo.com/en/reference/get_forms)
-* [Events](https://developers.klaviyo.com/en/reference/get_events)
-* [Images](https://developers.klaviyo.com/en/reference/get_images)
-* [Lists](https://developers.klaviyo.com/en/reference/get_lists)
-* [Metrics](https://developers.klaviyo.com/en/reference/get_metrics)
-* [Profiles](https://developers.klaviyo.com/en/reference/get_profiles)
-* [Push Tokens](https://developers.klaviyo.com/en/reference/get_push_tokens)
-* [Segments](https://developers.klaviyo.com/en/reference/get_segments)
-* [Tag Groups](https://developers.klaviyo.com/en/reference/get_tag_groups)
-* [Tags](https://developers.klaviyo.com/en/reference/get_tags)
-* [Templates](https://developers.klaviyo.com/en/reference/get_templates)
+| Resource | Replication Mode |
+| --- | --- |
+| [Campaigns](https://developers.klaviyo.com/en/reference/get_campaigns) | Incremental |
+| [Coupon Codes](https://developers.klaviyo.com/en/reference/get_coupon_codes) | Snapshot |
+| [Coupons](https://developers.klaviyo.com/en/reference/get_coupons) | Snapshot |
+| [Events](https://developers.klaviyo.com/en/reference/get_events) | Incremental |
+| [Flows](https://developers.klaviyo.com/en/reference/get_flows) | Incremental |
+| [Forms](https://developers.klaviyo.com/en/reference/get_forms) | Incremental |
+| [Images](https://developers.klaviyo.com/en/reference/get_images) | Incremental |
+| [Lists](https://developers.klaviyo.com/en/reference/get_lists) | Incremental |
+| [Metrics](https://developers.klaviyo.com/en/reference/get_metrics) | Snapshot |
+| [Profiles](https://developers.klaviyo.com/en/reference/get_profiles) | Incremental |
+| [Push Tokens](https://developers.klaviyo.com/en/reference/get_push_tokens) | Snapshot |
+| [Segments](https://developers.klaviyo.com/en/reference/get_segments) | Incremental |
+| [Tag Groups](https://developers.klaviyo.com/en/reference/get_tag_groups) | Snapshot |
+| [Tags](https://developers.klaviyo.com/en/reference/get_tags) | Snapshot |
+| [Templates](https://developers.klaviyo.com/en/reference/get_templates) | Incremental |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 
