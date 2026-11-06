@@ -86,6 +86,7 @@ members = [
     "source-smartsheet",
     "source-stripe-native",
     "source-tiktok-ads-native",
+    "source-twenty",
     "source-twilio",
     "source-zendesk-support",
     "source-zendesk-support-native",

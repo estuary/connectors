@@ -117,6 +117,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Pylon](./pylon.md)
 - [RingCentral](./ringcentral.md)
 - [Salesforce](./Salesforce/salesforce-native.md)
+- [Twenty](./twenty.md)
 - [Zendesk Chat](./zendesk-chat.md)
 - [Zendesk Support](./zendesk-support-native.md)
 - [Zoho CRM](./zoho-crm.md)

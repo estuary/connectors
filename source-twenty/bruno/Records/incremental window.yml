@@ -1,0 +1,205 @@
+info:
+  name: incremental window
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: '{{base_url}}/rest/companies?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(id[eq]:"{{probe_id}}",updatedAt[gte]:"{{cursor}}",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: depth
+      value: "0"
+      type: query
+    - name: order_by
+      value: updatedAt[AscNullsFirst],id[AscNullsFirst]
+      type: query
+    - name: filter
+      value: 'and(id[eq]:"{{probe_id}}",updatedAt[gte]:"{{cursor}}",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      type: query
+  auth: inherit
+
+runtime:
+  variables:
+    - name: probe_id
+      value: "0769073a-d7b9-46ff-8475-286562f96e05"
+    - name: cursor
+      value: "2026-11-03T19:01:16.500Z"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - live self-hosted v2.52, gte includes displayed millisecond (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(id[eq]:"0769073a-d7b9-46ff-8475-286562f96e05",updatedAt[gte]:"2026-11-03T19:01:16.500Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": [
+                {
+                  "id": "0769073a-d7b9-46ff-8475-286562f96e05",
+                  "updatedAt": "2026-11-03T19:01:16.500Z",
+                  "deletedAt": null
+                }
+              ]
+            },
+            "pageInfo": {
+              "startCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTExLTAzIDE5OjAxOjE2LjUwMDQ3NCswMCIsImlkIjoiMDc2OTA3M2EtZDdiOS00NmZmLTg0NzUtMjg2NTYyZjk2ZTA1In0",
+              "endCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTExLTAzIDE5OjAxOjE2LjUwMDQ3NCswMCIsImlkIjoiMDc2OTA3M2EtZDdiOS00NmZmLTg0NzUtMjg2NTYyZjk2ZTA1In0",
+              "hasNextPage": false,
+              "hasPreviousPage": false
+            },
+            "totalCount": 1
+          }
+  - name: 200 - live self-hosted v2.52, eq includes displayed millisecond (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(id[eq]:"0769073a-d7b9-46ff-8475-286562f96e05",updatedAt[eq]:"2026-11-03T19:01:16.500Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": [
+                {
+                  "id": "0769073a-d7b9-46ff-8475-286562f96e05",
+                  "updatedAt": "2026-11-03T19:01:16.500Z",
+                  "deletedAt": null
+                }
+              ]
+            },
+            "pageInfo": {
+              "startCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTExLTAzIDE5OjAxOjE2LjUwMDQ3NCswMCIsImlkIjoiMDc2OTA3M2EtZDdiOS00NmZmLTg0NzUtMjg2NTYyZjk2ZTA1In0",
+              "endCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTExLTAzIDE5OjAxOjE2LjUwMDQ3NCswMCIsImlkIjoiMDc2OTA3M2EtZDdiOS00NmZmLTg0NzUtMjg2NTYyZjk2ZTA1In0",
+              "hasNextPage": false,
+              "hasPreviousPage": false
+            },
+            "totalCount": 1
+          }
+  - name: 200 - live self-hosted v2.52, lte includes displayed millisecond (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(id[eq]:"0769073a-d7b9-46ff-8475-286562f96e05",updatedAt[lte]:"2026-11-03T19:01:16.500Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": [
+                {
+                  "id": "0769073a-d7b9-46ff-8475-286562f96e05",
+                  "updatedAt": "2026-11-03T19:01:16.500Z",
+                  "deletedAt": null
+                }
+              ]
+            },
+            "pageInfo": {
+              "startCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTExLTAzIDE5OjAxOjE2LjUwMDQ3NCswMCIsImlkIjoiMDc2OTA3M2EtZDdiOS00NmZmLTg0NzUtMjg2NTYyZjk2ZTA1In0",
+              "endCursor": "eyJ1cGRhdGVkQXQiOiIyMDI2LTExLTAzIDE5OjAxOjE2LjUwMDQ3NCswMCIsImlkIjoiMDc2OTA3M2EtZDdiOS00NmZmLTg0NzUtMjg2NTYyZjk2ZTA1In0",
+              "hasNextPage": false,
+              "hasPreviousPage": false
+            },
+            "totalCount": 1
+          }
+  - name: 200 - live self-hosted v2.52, gt excludes displayed millisecond (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(id[eq]:"0769073a-d7b9-46ff-8475-286562f96e05",updatedAt[gt]:"2026-11-03T19:01:16.500Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": []
+            },
+            "pageInfo": {
+              "startCursor": null,
+              "endCursor": null,
+              "hasNextPage": false,
+              "hasPreviousPage": false
+            },
+            "totalCount": 0
+          }
+  - name: 200 - live self-hosted v2.52, lt excludes displayed millisecond (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&order_by=updatedAt[AscNullsFirst],id[AscNullsFirst]&filter=and(id[eq]:"0769073a-d7b9-46ff-8475-286562f96e05",updatedAt[lt]:"2026-11-03T19:01:16.500Z",or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL))'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": []
+            },
+            "pageInfo": {
+              "startCursor": null,
+              "endCursor": null,
+              "hasNextPage": false,
+              "hasPreviousPage": false
+            },
+            "totalCount": 0
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  **WHY:** test the timestamp boundaries used for incremental capture's
+  inclusive lower / exclusive upper `updatedAt` window (`[gte, lt)`) and its
+  handoff from backfill. Both cursors are RFC3339 timestamps rendered in UTC
+  `Z` to milliseconds; pages use the unchanged `(updatedAt, id)` keyset cursor
+  from `Records / backfill page`.
+
+  The runnable request matches the captured `gte` probe against `companies`.
+  All five probes included `id[eq]` for
+  `0769073a-d7b9-46ff-8475-286562f96e05` to keep the result small; they tested
+  one timestamp comparison at a time, not a combined window. The connector's
+  window reads are not scoped to this probe ID. Repin `probe_id` and `cursor`
+  to a current test record before rerunning these historical captures.
+
+  **VERIFIED (2026-11-03):** the saved self-hosted v2.52 responses display
+  `updatedAt: 2026-11-03T19:01:16.500Z`. Their non-empty cursor decodes to
+  `{"updatedAt":"2026-11-03 19:01:16.500474+00","id":"0769073a-d7b9-46ff-8475-286562f96e05"}`.
+  The stored fractional timestamp is `.500474`, displayed as `.500Z`.
+  At that displayed millisecond, `gte`, `eq`, and `lte` return the record
+  with `totalCount: 1`; `gt` and `lt` return empty lists with `totalCount: 0`.
+  The decoded cursor is a computed fact, not an additional response field.
+
+  **LIMITATION (VERIFIED 2026-11-03):** these comparisons use millisecond
+  precision even though keyset cursors retain microseconds. For this boundary,
+  `[lt]` excludes the row and `[gte]` includes it. An exclusive lower bound
+  would skip records at the checkpoint's displayed millisecond.
+
+  The connector uses adjacent `[gte, lt)` windows to cover the boundary,
+  floors its horizon to milliseconds, and holds recent writes back by one
+  minute to let them settle. Its default poll interval is five minutes.
+  A restart may replay a checkpoint's millisecond; the collection key `/id`
+  identifies the same record across those emissions.

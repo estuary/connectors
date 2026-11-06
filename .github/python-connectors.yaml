@@ -291,3 +291,7 @@
   type: capture
   version: v1
   usage_rate: "1.0"
+- name: source-twenty
+  type: capture
+  version: v1
+  usage_rate: "1.0"

@@ -1,0 +1,326 @@
+[
+  [
+    "acmeCo/companies",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accountOwnerId": null,
+      "address": {
+        "addressCity": "",
+        "addressCountry": "",
+        "addressLat": null,
+        "addressLng": null,
+        "addressPostcode": "",
+        "addressState": "",
+        "addressStreet1": "",
+        "addressStreet2": ""
+      },
+      "annualRevenue": {
+        "amountMicros": null,
+        "currencyCode": null
+      },
+      "createdAt": "2026-11-03T17:14:32.280Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "d365AccountKey": "",
+      "d365CreditLimit": {
+        "amountMicros": null,
+        "currencyCode": null
+      },
+      "d365Deleted": false,
+      "d365DeletedAt": null,
+      "d365Id": "",
+      "deletedAt": null,
+      "domainName": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "",
+        "secondaryLinks": []
+      },
+      "externalAccountKey": "",
+      "externalDeleted": null,
+      "externalDeletedAt": null,
+      "externalId": "ct-8d0b2d04-a",
+      "id": "00b53e43-7474-41a0-bf9b-9f985469fe2c",
+      "linkedinLink": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "",
+        "secondaryLinks": []
+      },
+      "name": "Contract a",
+      "position": -93,
+      "updatedAt": "2026-11-03T17:14:36.756000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/connectorTypeProbes",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-11-03T06:21:20.338Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "externalId": "ct-87371182-a",
+      "id": "0e0b22d4-d6d8-44d6-a66d-06e9128cb476",
+      "name": "",
+      "pAddress": {
+        "addressCity": "",
+        "addressCountry": "",
+        "addressLat": null,
+        "addressLng": null,
+        "addressPostcode": "",
+        "addressState": "",
+        "addressStreet1": "",
+        "addressStreet2": ""
+      },
+      "pArray": [],
+      "pBoolean": null,
+      "pCompanyId": null,
+      "pCurrency": {
+        "amountMicros": null,
+        "currencyCode": null
+      },
+      "pDate": null,
+      "pDateTime": null,
+      "pEmails": {
+        "additionalEmails": [],
+        "primaryEmail": ""
+      },
+      "pFiles": null,
+      "pFullName": {
+        "firstName": "",
+        "lastName": ""
+      },
+      "pLinks": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "",
+        "secondaryLinks": []
+      },
+      "pMorphCompanyId": null,
+      "pMorphPersonId": null,
+      "pMultiSelect": [],
+      "pNumber": null,
+      "pParentId": null,
+      "pPhones": {
+        "additionalPhones": [],
+        "primaryPhoneCallingCode": "",
+        "primaryPhoneCountryCode": "",
+        "primaryPhoneNumber": ""
+      },
+      "pRating": null,
+      "pRawJson": null,
+      "pRichText": {
+        "blocknote": null,
+        "markdown": "",
+        "tiptap": null
+      },
+      "pSelect": null,
+      "pText": "",
+      "pUuid": null,
+      "position": -9,
+      "updatedAt": "2026-11-03T06:21:24.844000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/dashboards",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-10-29T07:47:29.427Z",
+      "createdBy": {
+        "context": {},
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "f31ecf3b-87d3-4e8a-a84b-b6f0f3f8c7e2",
+      "pageLayoutId": "961b946e-273f-472c-9565-a2a4f9db752c",
+      "position": 0,
+      "title": "My First Dashboard",
+      "updatedAt": "2026-10-29T07:47:29.427000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/noteTargets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-11-03T23:09:56.668Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "externalId": "ct-7b91b10a-l3",
+      "id": "12a9361f-51e3-4709-861e-078a29905290",
+      "noteId": "7579bf52-1f30-4a87-9756-03c01fc1acd0",
+      "position": -1,
+      "targetCompanyId": null,
+      "targetConnectorTypeProbeId": null,
+      "targetOpportunityId": null,
+      "targetPersonId": null,
+      "updatedAt": "2026-11-03T23:09:56.668000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/notes",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "bodyV2": {
+        "blocknote": null,
+        "markdown": "",
+        "tiptap": null
+      },
+      "createdAt": "2026-11-03T23:11:13.250Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "externalId": "ct-1d4bcb0c-n",
+      "id": "04372e3c-6074-49ec-9bda-cc5a847c6ae8",
+      "position": -6,
+      "title": "Renamed",
+      "updatedAt": "2026-11-03T23:11:27.009000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/opportunities",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "amount": {
+        "amountMicros": 75000000000,
+        "currencyCode": "USD"
+      },
+      "closeDate": "2026-01-25T16:26:00.000Z",
+      "companyId": "1f70157c-4ea5-4d81-bc49-e1401abfbb94",
+      "createdAt": "2026-10-29T07:47:29.427Z",
+      "createdBy": {
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "2beb07b0-340c-41d7-be33-5aa91757f329",
+      "name": "API Integration Deal",
+      "ownerId": "9658bad8-73c9-4908-a160-8e848c410185",
+      "pointOfContactId": "edf6d445-13a7-4373-9a47-8f89e8c0a877",
+      "position": 4,
+      "stage": "SCREENING",
+      "updatedAt": "2026-10-29T07:47:29.427000Z",
+      "updatedBy": {
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/people",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "avatarFile": null,
+      "avatarUrl": "",
+      "companyId": "afb84f43-b0ac-41dc-bd90-b285ef62666b",
+      "createdAt": "2026-11-03T05:15:02.498Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "d365CompanyKey": "",
+      "d365Deleted": false,
+      "d365DeletedAt": null,
+      "d365Id": "",
+      "deletedAt": null,
+      "emails": {
+        "additionalEmails": [],
+        "primaryEmail": ""
+      },
+      "externalDeleted": null,
+      "externalDeletedAt": null,
+      "externalId": "ct-fb1222c6-p",
+      "id": "18bd0a81-0096-4e32-ac0e-552dac91dc7b",
+      "jobTitle": "Kept",
+      "linkedinLink": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "",
+        "secondaryLinks": []
+      },
+      "name": {
+        "firstName": "",
+        "lastName": ""
+      },
+      "phones": {
+        "additionalPhones": [],
+        "primaryPhoneCallingCode": "",
+        "primaryPhoneCountryCode": "",
+        "primaryPhoneNumber": ""
+      },
+      "position": -8,
+      "updatedAt": "2026-11-03T05:15:18.947000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ]
+]
