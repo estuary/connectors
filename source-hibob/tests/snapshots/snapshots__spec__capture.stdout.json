@@ -1,0 +1,120 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "sandbox": {
+              "default": false,
+              "description": "Capture from the HiBob sandbox environment (api.sandbox.hibob.com) instead of production.",
+              "title": "Sandbox",
+              "type": "boolean"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ServiceUser": {
+          "properties": {
+            "credentials_title": {
+              "const": "Service User",
+              "default": "Service User",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "description": "The ID of the HiBob service user.",
+              "order": 1,
+              "title": "Service User ID",
+              "type": "string"
+            },
+            "password": {
+              "description": "The token generated for the HiBob service user.",
+              "order": 2,
+              "secret": true,
+              "title": "Service User Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "ServiceUser",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "description": "A HiBob service user. Its permission group must grant View (and View history) on the People's data categories to capture, and its 'Access data for' scope must not be limited to employed people, or terminated employees are silently omitted.",
+          "discriminator": {
+            "mapping": {
+              "Service User": "#/$defs/ServiceUser"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ServiceUser"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-hibob",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

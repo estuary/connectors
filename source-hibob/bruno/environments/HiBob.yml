@@ -1,0 +1,5 @@
+variables:
+  - name: base_url
+    value: https://api.hibob.com/v1
+  - name: config_path
+    value: ../config.yaml

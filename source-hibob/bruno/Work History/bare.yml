@@ -1,0 +1,1251 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/bulk/people/work?limit=200"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/get_bulk-people-work
+
+    **WHY:** Shape of the `work` bulk table: the **department / site / title /
+    manager history**.
+
+    **VERIFIED (2026-11-02):** per-entry keys: id, effectiveDate,
+    endEffectiveDate, isCurrent, canBeDeleted, canEditOotbColumns, change,
+    creationDate, modificationDate, title, department, site, siteId, reportsTo,
+    activeEffectiveDate, workChangeType, customColumns. `department` and `title`
+    come back as **display values** ("Development", "Product", "Developer"), not
+    list ids. In this tenant the department named-list ids equal the names
+    (`Metadata / named lists`), so the two can't be told apart here. `reportsTo` is an
+    embedded object `{id, firstName, surname, email, displayName}` or null.
+    `workChangeType` was missing (no View) until permissions were widened; it
+    then appeared ("New Employee", "Other"). `site` is a display string; `siteId`
+    is an integer.
+
+    **VERIFIED (2026-11-02) — shared bulk-table envelope** (same for employment,
+    lifecycle and work; see `_bulk-table / *`):
+    - Shape is `{results: [{employeeId, values: [entry, ...]}], response_metadata: {next_cursor}, errors: {}}`
+      plus a **top-level** `restricted_columns` when columns are restricted.
+      **The docs are wrong here:** they nest `values: [{values: [entry], restricted_columns}]`.
+      Live, `results[].values` is the entry array itself, with no middle level.
+    - `errors` is an **object keyed by employeeId**
+      (`{"<id>": {error: "MISSING_PERMISSION", message}}`), not the documented
+      array. It is `{}` when no `employeeIds` are sent.
+    - `employeeId` exists only on the result; entries don't carry it.
+    - **Entry `id` is NOT unique across employees.** For every observed entry,
+      `id == int("10000" + effectiveDate.replace("-", ""))` (e.g. 2026-10-15 ->
+      1000020261015), so it is unique per (employee, effectiveDate) and identical
+      across tables. PK = (employeeId, id).
+    - History semantics (seeded 2026-11-02): adding an entry effective
+      2026-10-15 set the prior row `isCurrent=false`,
+      `endEffectiveDate=2026-10-14`; the current row has `endEffectiveDate=null`.
+    - Dates (`effectiveDate`, `endEffectiveDate`, `creationDate`,
+      `modificationDate`, `activeEffectiveDate`) are `YYYY-MM-DD` strings with no
+      time part. `creationDate` is null on employment and work, populated on
+      lifecycle. The docs' `CreationDate` (capital C) on employment is wrong:
+      live it is `creationDate`. No field is usable as an incremental cursor,
+      and there are no date filters (**LIMITATION**: full snapshot every sync).
+    - **LIMITATION (VERIFIED 2026-11-02):** terminated employees are dropped
+      from the default listing (45 -> 44 results) when the service user's
+      permission group's "Access data for" keeps the default
+      "Lifecycle status equals Employed" condition. Removing that condition
+      brings them back. See `_bulk-table / employeeIds terminated`.
+    - **LIMITATION (VERIFIED 2026-11-02):** with View but not View history on
+      a table, the response has top-level
+      `restricted_columns.no_view_history_permission` (+
+      `X-Has-Restricted-Columns: true`). Every row in that response was current
+      and its listed columns still had values, which fits the docs ("View" covers
+      the current row). **UNOBSERVABLE:** how restricted columns render on
+      *non-current* rows. View history was granted before a multi-entry history
+      existed under the restriction. The docs say they are filtered (null or
+      absent); the connector warns from `restricted_columns` either way.
+    - Without table permissions at all: 403 with an empty body. Never retry it
+      (WAF: >50 401/403 in 10 s => 5-minute IP block).
+
+    Examples redact `change.changedBy` (a person's display name); ids are kept.
+    `reportsTo` names and emails are HiBob's partner demo data (samplebob.com).
+  type: text/markdown
+
+examples:
+  - name: "403 - service user lacks table permission (empty body)"
+    request:
+      url: "{{base_url}}/bulk/people/work?limit=200"
+      method: GET
+    response:
+      status: 403
+      statusText: "Forbidden"
+      headers:
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "97"
+        - name: x-ratelimit-reset
+          value: "1793637900"
+      body:
+        type: json
+        data: |-
+          ""
+  - name: "200 - View but no View history: restricted_columns top-level (projection: 1 of 45 results)"
+    request:
+      url: "{{base_url}}/bulk/people/work?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-has-restricted-columns
+          value: "true"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "97"
+        - name: x-ratelimit-reset
+          value: "1793639460"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "workChangeType": null,
+                    "canBeDeleted": false,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "4021630335610520270"
+                    },
+                    "reportsTo": {
+                      "id": "4021630425922274001",
+                      "firstName": "Darren",
+                      "surname": "Lavery",
+                      "email": "darren.lavery_644219_2@samplebob.com",
+                      "displayName": "Darren Lavery"
+                    },
+                    "title": "Developer",
+                    "creationDate": null,
+                    "customColumns": {},
+                    "site": "London (Demo)",
+                    "isCurrent": true,
+                    "modificationDate": "2026-11-02",
+                    "canEditOotbColumns": true,
+                    "siteId": 2614100,
+                    "activeEffectiveDate": "2014-02-02",
+                    "endEffectiveDate": null,
+                    "id": 1000020140202,
+                    "department": "Development",
+                    "effectiveDate": "2014-02-02"
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {},
+            "restricted_columns": {
+              "no_view_permission": [
+                "workChangeType"
+              ],
+              "no_view_history_permission": [
+                "activeEffectiveDate",
+                "change.changedBy",
+                "change.changedById",
+                "change.reason",
+                "department",
+                "effectiveDate",
+                "endEffectiveDate",
+                "reportsTo",
+                "site",
+                "siteId",
+                "title"
+              ]
+            }
+          }
+  - name: "200 - terminated employee omitted, Access data for = Employed (44 results; projection: ids only)"
+    request:
+      url: "{{base_url}}/bulk/people/work?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "98"
+        - name: x-ratelimit-reset
+          value: "1793642940"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630335610520270",
+                "values": [
+                  {
+                    "id": 1000020261102,
+                    "effectiveDate": "2026-11-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630422130623184",
+                "values": [
+                  {
+                    "id": 1000020131101,
+                    "effectiveDate": "2013-11-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630425922274001",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "id": 1000020140202,
+                    "effectiveDate": "2014-02-02",
+                    "isCurrent": false
+                  },
+                  {
+                    "id": 1000020261015,
+                    "effectiveDate": "2026-10-15",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630446323368659",
+                "values": [
+                  {
+                    "id": 1000020140312,
+                    "effectiveDate": "2014-03-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630449754309332",
+                "values": [
+                  {
+                    "id": 1000020150128,
+                    "effectiveDate": "2015-01-28",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630456683299542",
+                "values": [
+                  {
+                    "id": 1000020150210,
+                    "effectiveDate": "2015-02-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630460424618711",
+                "values": [
+                  {
+                    "id": 1000020150205,
+                    "effectiveDate": "2015-02-05",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630463780061912",
+                "values": [
+                  {
+                    "id": 1000020150310,
+                    "effectiveDate": "2015-03-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630467101950681",
+                "values": [
+                  {
+                    "id": 1000020141210,
+                    "effectiveDate": "2014-12-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630470776160986",
+                "values": [
+                  {
+                    "id": 1000020141111,
+                    "effectiveDate": "2014-11-11",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630474366485211",
+                "values": [
+                  {
+                    "id": 1000020150216,
+                    "effectiveDate": "2015-02-16",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630477688373980",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630481756848861",
+                "values": [
+                  {
+                    "id": 1000020150501,
+                    "effectiveDate": "2015-05-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630485095514846",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630488702616287",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630492041282272",
+                "values": [
+                  {
+                    "id": 1000020141216,
+                    "effectiveDate": "2014-12-16",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630495430279905",
+                "values": [
+                  {
+                    "id": 1000020150302,
+                    "effectiveDate": "2015-03-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630498710225634",
+                "values": [
+                  {
+                    "id": 1000020150314,
+                    "effectiveDate": "2015-03-14",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630502443156195",
+                "values": [
+                  {
+                    "id": 1000020141201,
+                    "effectiveDate": "2014-12-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630506134143716",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630509615416037",
+                "values": [
+                  {
+                    "id": 1000020150303,
+                    "effectiveDate": "2015-03-03",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630512811475686",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630516066255591",
+                "values": [
+                  {
+                    "id": 1000020140212,
+                    "effectiveDate": "2014-02-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630535863370472",
+                "values": [
+                  {
+                    "id": 1000020150320,
+                    "effectiveDate": "2015-03-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630539629855465",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630543111127786",
+                "values": [
+                  {
+                    "id": 1000020150101,
+                    "effectiveDate": "2015-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630546617565931",
+                "values": [
+                  {
+                    "id": 1000020150101,
+                    "effectiveDate": "2015-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630549872345836",
+                "values": [
+                  {
+                    "id": 1000020141115,
+                    "effectiveDate": "2014-11-15",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630553135514350",
+                "values": [
+                  {
+                    "id": 1000020140212,
+                    "effectiveDate": "2014-02-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630556751004399",
+                "values": [
+                  {
+                    "id": 1000020160101,
+                    "effectiveDate": "2016-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630559930286832",
+                "values": [
+                  {
+                    "id": 1000020141210,
+                    "effectiveDate": "2014-12-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630563654828785",
+                "values": [
+                  {
+                    "id": 1000020150214,
+                    "effectiveDate": "2015-02-14",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630566842499826",
+                "values": [
+                  {
+                    "id": 1000020140511,
+                    "effectiveDate": "2014-05-11",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630570399269619",
+                "values": [
+                  {
+                    "id": 1000020140301,
+                    "effectiveDate": "2014-03-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630573872153332",
+                "values": [
+                  {
+                    "id": 1000020141113,
+                    "effectiveDate": "2014-11-13",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630578989204213",
+                "values": [
+                  {
+                    "id": 1000020150410,
+                    "effectiveDate": "2015-04-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630583141565174",
+                "values": [
+                  {
+                    "id": 1000020160801,
+                    "effectiveDate": "2016-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630599860060919",
+                "values": [
+                  {
+                    "id": 1000020160408,
+                    "effectiveDate": "2016-04-08",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630603584602872",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630607242035961",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630611084018426",
+                "values": [
+                  {
+                    "id": 1000020150202,
+                    "effectiveDate": "2015-02-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630614447850235",
+                "values": [
+                  {
+                    "id": 1000020150103,
+                    "effectiveDate": "2015-01-03",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630617878790908",
+                "values": [
+                  {
+                    "id": 1000020150306,
+                    "effectiveDate": "2015-03-06",
+                    "isCurrent": true
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {}
+          }
+  - name: "200 - full access incl. terminated; history for ...2130 and ...5573 (projection: 2 of 45 results, full entries)"
+    request:
+      url: "{{base_url}}/bulk/people/work?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "98"
+        - name: x-ratelimit-reset
+          value: "1793643300"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "id": 1000020140202,
+                    "effectiveDate": "2014-02-02",
+                    "endEffectiveDate": "2026-10-14",
+                    "isCurrent": false,
+                    "canBeDeleted": true,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "4021630335610520270"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "title": "Developer",
+                    "department": "Development",
+                    "site": "London (Demo)",
+                    "siteId": 2614100,
+                    "reportsTo": {
+                      "id": "4021630425922274001",
+                      "firstName": "Darren",
+                      "surname": "Lavery",
+                      "email": "darren.lavery_644219_2@samplebob.com",
+                      "displayName": "Darren Lavery"
+                    },
+                    "activeEffectiveDate": "2014-02-02",
+                    "workChangeType": "New Employee",
+                    "customColumns": {}
+                  },
+                  {
+                    "id": 1000020261015,
+                    "effectiveDate": "2026-10-15",
+                    "endEffectiveDate": null,
+                    "isCurrent": true,
+                    "canBeDeleted": true,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "SERVICE-46749"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "title": "Developer",
+                    "department": "Product",
+                    "site": "London (Demo)",
+                    "siteId": 2614100,
+                    "reportsTo": null,
+                    "activeEffectiveDate": "2026-10-15",
+                    "workChangeType": "Other",
+                    "customColumns": {}
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630453151695573",
+                "values": [
+                  {
+                    "id": 1000020150210,
+                    "effectiveDate": "2015-02-10",
+                    "endEffectiveDate": null,
+                    "isCurrent": true,
+                    "canBeDeleted": false,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "4021630335610520270"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "title": "Developer",
+                    "department": "Development",
+                    "site": "New York (Demo)",
+                    "siteId": 2614101,
+                    "reportsTo": {
+                      "id": "4021630446323368659",
+                      "firstName": "Sofia",
+                      "surname": "Hopkins",
+                      "email": "sofia.hopkins_644219_4@samplebob.com",
+                      "displayName": "Sofia Hopkins"
+                    },
+                    "activeEffectiveDate": "2015-02-10",
+                    "workChangeType": "New Employee",
+                    "customColumns": {}
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {}
+          }
+  - name: "200 - full access (45 results; projection: ids only)"
+    request:
+      url: "{{base_url}}/bulk/people/work?limit=200"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "98"
+        - name: x-ratelimit-reset
+          value: "1793643300"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630335610520270",
+                "values": [
+                  {
+                    "id": 1000020261102,
+                    "effectiveDate": "2026-11-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630422130623184",
+                "values": [
+                  {
+                    "id": 1000020131101,
+                    "effectiveDate": "2013-11-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630425922274001",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "id": 1000020140202,
+                    "effectiveDate": "2014-02-02",
+                    "isCurrent": false
+                  },
+                  {
+                    "id": 1000020261015,
+                    "effectiveDate": "2026-10-15",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630446323368659",
+                "values": [
+                  {
+                    "id": 1000020140312,
+                    "effectiveDate": "2014-03-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630449754309332",
+                "values": [
+                  {
+                    "id": 1000020150128,
+                    "effectiveDate": "2015-01-28",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630453151695573",
+                "values": [
+                  {
+                    "id": 1000020150210,
+                    "effectiveDate": "2015-02-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630456683299542",
+                "values": [
+                  {
+                    "id": 1000020150210,
+                    "effectiveDate": "2015-02-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630460424618711",
+                "values": [
+                  {
+                    "id": 1000020150205,
+                    "effectiveDate": "2015-02-05",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630463780061912",
+                "values": [
+                  {
+                    "id": 1000020150310,
+                    "effectiveDate": "2015-03-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630467101950681",
+                "values": [
+                  {
+                    "id": 1000020141210,
+                    "effectiveDate": "2014-12-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630470776160986",
+                "values": [
+                  {
+                    "id": 1000020141111,
+                    "effectiveDate": "2014-11-11",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630474366485211",
+                "values": [
+                  {
+                    "id": 1000020150216,
+                    "effectiveDate": "2015-02-16",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630477688373980",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630481756848861",
+                "values": [
+                  {
+                    "id": 1000020150501,
+                    "effectiveDate": "2015-05-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630485095514846",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630488702616287",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630492041282272",
+                "values": [
+                  {
+                    "id": 1000020141216,
+                    "effectiveDate": "2014-12-16",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630495430279905",
+                "values": [
+                  {
+                    "id": 1000020150302,
+                    "effectiveDate": "2015-03-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630498710225634",
+                "values": [
+                  {
+                    "id": 1000020150314,
+                    "effectiveDate": "2015-03-14",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630502443156195",
+                "values": [
+                  {
+                    "id": 1000020141201,
+                    "effectiveDate": "2014-12-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630506134143716",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630509615416037",
+                "values": [
+                  {
+                    "id": 1000020150303,
+                    "effectiveDate": "2015-03-03",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630512811475686",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630516066255591",
+                "values": [
+                  {
+                    "id": 1000020140212,
+                    "effectiveDate": "2014-02-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630535863370472",
+                "values": [
+                  {
+                    "id": 1000020150320,
+                    "effectiveDate": "2015-03-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630539629855465",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630543111127786",
+                "values": [
+                  {
+                    "id": 1000020150101,
+                    "effectiveDate": "2015-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630546617565931",
+                "values": [
+                  {
+                    "id": 1000020150101,
+                    "effectiveDate": "2015-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630549872345836",
+                "values": [
+                  {
+                    "id": 1000020141115,
+                    "effectiveDate": "2014-11-15",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630553135514350",
+                "values": [
+                  {
+                    "id": 1000020140212,
+                    "effectiveDate": "2014-02-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630556751004399",
+                "values": [
+                  {
+                    "id": 1000020160101,
+                    "effectiveDate": "2016-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630559930286832",
+                "values": [
+                  {
+                    "id": 1000020141210,
+                    "effectiveDate": "2014-12-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630563654828785",
+                "values": [
+                  {
+                    "id": 1000020150214,
+                    "effectiveDate": "2015-02-14",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630566842499826",
+                "values": [
+                  {
+                    "id": 1000020140511,
+                    "effectiveDate": "2014-05-11",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630570399269619",
+                "values": [
+                  {
+                    "id": 1000020140301,
+                    "effectiveDate": "2014-03-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630573872153332",
+                "values": [
+                  {
+                    "id": 1000020141113,
+                    "effectiveDate": "2014-11-13",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630578989204213",
+                "values": [
+                  {
+                    "id": 1000020150410,
+                    "effectiveDate": "2015-04-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630583141565174",
+                "values": [
+                  {
+                    "id": 1000020160801,
+                    "effectiveDate": "2016-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630599860060919",
+                "values": [
+                  {
+                    "id": 1000020160408,
+                    "effectiveDate": "2016-04-08",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630603584602872",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630607242035961",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630611084018426",
+                "values": [
+                  {
+                    "id": 1000020150202,
+                    "effectiveDate": "2015-02-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630614447850235",
+                "values": [
+                  {
+                    "id": 1000020150103,
+                    "effectiveDate": "2015-01-03",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630617878790908",
+                "values": [
+                  {
+                    "id": 1000020150306,
+                    "effectiveDate": "2015-03-06",
+                    "isCurrent": true
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {}
+          }
