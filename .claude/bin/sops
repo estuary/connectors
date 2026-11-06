@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""`sops` for Claude's shell: API-CONFIG-GATE on every decrypt. Bruno's
+pre-request script and flowctl (under pytest too) decrypt the connector's
+config.yaml with the `sops` on PATH; the SessionStart hook puts this file first
+on it.
+
+A decrypt runs only when the connector's config.yaml is tracked and clean. When
+the connector has a permissions file (a create-capture-connector run), also:
+- its `sops.mac` (which changes whenever a credential value does) matches the
+  one `permissions.py set --stamp` recorded, and
+- the caller is flowctl, or Node running Bruno. A session doesn't decrypt the
+  file itself (API-TOKEN-EPHEMERAL), so a hand-written curl gets no token.
+
+Every other sops command runs the real sops unchanged.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+# `edit` is left out: configure-auth runs `sops edit config.yaml` to reshape the
+# placeholder config while it is still uncommitted and unstamped, which the gate
+# would refuse.
+DECRYPT_ARGS = {"-d", "--decrypt", "decrypt", "exec-env", "exec-file"}
+MAC = re.compile(rb"""["']?mac["']?\s*:\s*["']?(ENC\[[^\]]*\])""")
+
+
+def real_sops_path() -> Path:
+    """The next sops on PATH. This directory leaves PATH too, so a shim (mise,
+    asdf) that looks sops up again doesn't find this file."""
+
+    here = Path(__file__).resolve().parent
+    path = [
+        d
+        for d in os.environ.get("PATH", "").split(os.pathsep)
+        if Path(d).resolve() != here
+    ]
+    os.environ["PATH"] = os.pathsep.join(path)
+    for d in path:
+        p = Path(d) / "sops"
+        if os.access(p, os.X_OK):
+            return p
+
+    sys.exit("sops wrapper: no real sops on PATH")
+
+
+def refuse(reason: str) -> None:
+    print(f"sops (permission gate): {reason}", file=sys.stderr)
+    sys.exit(1)
+
+
+def run(*args: str | Path) -> str:
+    out = subprocess.run(args, capture_output=True, text=True)
+    return out.stdout.strip() if out.returncode == 0 else ""
+
+
+def walk_to_connector_dir(start: Path) -> Path | None:
+    """The nearest directory holding config.yaml next to a pyproject.toml or go.mod."""
+
+    for p in (start.absolute(), *start.absolute().parents):
+        if (p / "config.yaml").is_file() and any(
+            (p / f).is_file() for f in ("pyproject.toml", "go.mod")
+        ):
+            return p
+
+    return None
+
+
+def parent_proc() -> tuple[str, list[str]]:
+    """The calling process's executable name and arguments. The executable, not the
+    process name: Node 24 names its main thread `MainThread`. /proc keeps arguments
+    with spaces whole; `ps -ww` (macOS) splits them, and plain `ps` cuts them at
+    $COLUMNS."""
+
+    ppid = str(os.getppid())
+    try:
+        exe = os.readlink(f"/proc/{ppid}/exe")
+        with open(f"/proc/{ppid}/cmdline", "rb") as fh:
+            args = [a.decode() for a in fh.read().split(b"\0") if a]
+    except OSError:
+        exe = run("ps", "-o", "comm=", "-p", ppid)  # the full path on macOS
+        args = run("ps", "-ww", "-o", "args=", "-p", ppid).split()
+
+    return Path(exe).name, args
+
+
+def is_trusted_caller(exe: str, args: list[str]) -> bool:
+    """flowctl, or Node running Bruno's `…/bin/bru.js`."""
+
+    if exe.startswith("flowctl"):
+        return True
+
+    return "node" in exe and any(a.endswith("/bin/bru.js") for a in args)
+
+
+def find_connector_in_call(files: list[Path], parent_args: list[str]) -> Path | None:
+    """Bruno names the file. flowctl pipes it on stdin, so try its cwd, then its paths
+    (`--source source-x/test.flow.yaml`, `--source=…`)."""
+
+    paths = [Path(a.split("=", 1)[-1]) for a in parent_args]
+    candidates = [f.absolute().parent for f in files]
+    candidates += [Path.cwd(), *(p for p in paths if p.exists())]
+
+    return next((c for c in map(walk_to_connector_dir, candidates) if c), None)
+
+
+def check(referenced_files: list[Path], stdin_data: bytes) -> None:
+    exe, parent_args = parent_proc()
+    connector_dir = find_connector_in_call(referenced_files, parent_args)
+    if connector_dir is None:
+        return
+
+    slug = connector_dir.name
+
+    # Every run, not only create-capture-connector ones: a swapped config.yaml may
+    # point at a different account.
+    if run(
+        "git", "-C", connector_dir, "status", "--porcelain", "--", "config.yaml"
+    ) or not run("git", "-C", connector_dir, "ls-files", "config.yaml"):
+        refuse(
+            (
+                f"{slug}/config.yaml is untracked or has uncommitted changes, so it may point at a "
+                "different account. The user commits it first; in a create-capture-connector run, "
+                "the orchestrator then re-stamps (API-CONFIG-GATE)."
+            )
+        )
+
+    common_git_dir = run(
+        "git",
+        "-C",
+        connector_dir,
+        "rev-parse",
+        "--path-format=absolute",
+        "--git-common-dir",
+    )
+
+    if not common_git_dir:
+        return
+    perms_file_path = Path(common_git_dir) / "claude-permissions" / f"{slug}.json"
+    if not perms_file_path.is_file():
+        return
+    consent = json.loads(perms_file_path.read_text())
+
+    if not is_trusted_caller(exe, parent_args):
+        refuse(
+            (
+                f"only Bruno and flowctl decrypt {slug}/config.yaml (API-TOKEN-EPHEMERAL). Send the call "
+                "from the connector's bruno/ collection (API-ROUTE-THROUGH-BRUNO)."
+            )
+        )
+
+    mac = MAC.search(stdin_data)
+    stamp = consent.get("config_mac")
+    if stamp and (mac is None or mac.group(1).decode() != stamp):
+        refuse(
+            (
+                f"{slug}/config.yaml holds different credentials from the ones the user gave "
+                f"permission for. The user re-confirms, then the orchestrator runs "
+                f"`permissions.py set {slug} … --stamp` (API-CONFIG-GATE)."
+            )
+        )
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    sops_path = real_sops_path()
+    if not DECRYPT_ARGS & set(args):
+        os.execv(sops_path, [sops_path, *args])
+
+    referenced_files = [
+        Path(a) for a in args if a != "/dev/stdin" and Path(a).is_file()
+    ]
+    is_stdin_in_args = "/dev/stdin" in args
+    stdin_data = sys.stdin.buffer.read() if is_stdin_in_args else b""
+
+    if referenced_files:
+        stdin_data = referenced_files[-1].read_bytes()
+    check(referenced_files, stdin_data)
+
+    if is_stdin_in_args:
+        sys.exit(subprocess.run([sops_path, *args], input=stdin_data).returncode)
+
+    os.execv(sops_path, [sops_path, *args])
+
+
+if __name__ == "__main__":
+    main()
