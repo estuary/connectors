@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,7 +31,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
@@ -183,10 +181,6 @@ type transactor struct {
 	cleanups              sync.WaitGroup
 	sweepOnce             sync.Once
 	profiler              *boilerplate.QueryProfiler
-	// twoPhaseLoads uses two queries to prune files: one that finds files
-	// where the rows matching the keys exist on, and another to read
-	// flow_document from those specific files.
-	twoPhaseLoads bool
 	// truncateAfterBackfill permits deleting the rows published before a
 	// completed backfill.
 	truncateAfterBackfill bool
@@ -347,7 +341,6 @@ func newTransactor(
 		templates:             renderTemplates(ep.Dialect),
 		materializationName:   materializationName,
 		stagingPrefix:         stagingPrefix(materializationName),
-		twoPhaseLoads:         featureFlags["two_phase_loads"],
 		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 	db, err := d.openDB()
@@ -500,11 +493,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	var loadTemplate = d.templates.loadQuery
-	if d.cfg.Advanced.NoFlowDocument {
-		loadTemplate = d.templates.loadQueryNoFlowDocument
-	}
-
 	var loads []bindingLoad
 	var toDelete []string
 	for idx, b := range d.bindings {
@@ -520,7 +508,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		profile.SetBounds(idx, bounds)
 		loads = append(loads, bindingLoad{
 			binding: idx,
-			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds},
+			data:    &tableWithFiles{Table: &b.target, Directories: []string{b.loadFile.remoteDir()}, Schema: b.loadSchema, Bounds: bounds, NoFlowDocument: d.cfg.Advanced.NoFlowDocument},
 		})
 		toDelete = append(toDelete, b.loadFile.remoteDir())
 	}
@@ -564,19 +552,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			})
 			defer finishEvaluating()
 
-			if d.twoPhaseLoads {
-				if matched, err := d.matchLoadFiles(groupCtx, db, profile, load); err != nil {
-					return err
-				} else if !matched {
-					return nil
-				}
-			}
-			query, err := renderTemplate(loadTemplate, load.data)
+			query, err := renderTemplate(d.templates.loadScript, load.data)
 			if err != nil {
-				return fmt.Errorf("loadQuery template: %w", err)
+				return fmt.Errorf("loadScript template: %w", err)
 			}
-
-			var queryCtx, trace = profile.Trace(groupCtx, load.binding, "load")
+			var queryCtx, trace = profile.Trace(groupCtx, load.binding, "loadScript")
 			defer func() { trace.Finish(err) }()
 
 			rows, err := db.QueryContext(queryCtx, query)
@@ -591,8 +571,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				var doc loadedDoc
 				if err := rows.Scan(&doc.binding, &doc.document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
-				} else if doc.binding < 0 {
-					continue
 				}
 				trace.AddDocument(len(doc.document))
 				select {
@@ -623,72 +601,11 @@ type bindingLoad struct {
 	data    *tableWithFiles
 }
 
-// maxMatchedFiles is the maximum number of files a two-phase load filters on.
-// A load that matches more, will omit the filter altogether, reading all the
-// files. With usually 256 MB to 1 GB per table file in Databricks, 10,000
-// files is about 2.5 to 10 TB of table. Each file path is about 280 bytes so
-// the longest list is about 2.9 MB that takes about 3s to compile.
+// maxMatchedFiles is the most files a load script restricts its read of
+// documents to. A load matching more reads every file within its key bounds.
+// With usually 256 MB to 1 GB per table file in Databricks, 10,000 files is
+// about 2.5 to 10 TB of table.
 const maxMatchedFiles = 10000
-
-// matchLoadFiles is the first phase of a two-phase load. It pins the load to
-// the table's current version, so that both phases read the same files, and
-// restricts it to the files holding rows that match its keys, found by reading
-// only the key columns. It reports whether any rows matched.
-func (d *transactor) matchLoadFiles(ctx context.Context, db *stdsql.DB, profile *boilerplate.QueryProfile, load bindingLoad) (bool, error) {
-	version, err := tableVersion(ctx, db, load.data.Table.Identifier)
-	if err != nil {
-		return false, err
-	}
-	load.data.Version = strconv.FormatInt(version, 10)
-	profile.Set(load.binding, "version", version)
-
-	query, err := renderTemplate(d.templates.loadMatchFiles, load.data)
-	if err != nil {
-		return false, fmt.Errorf("loadMatchFiles template: %w", err)
-	}
-	var queryCtx, trace = profile.Trace(ctx, load.binding, "loadMatch")
-	files, err := queryStrings(queryCtx, db, query)
-	profile.Set(load.binding, "matchedFiles", len(files))
-	trace.Finish(err)
-	if err != nil {
-		return false, fmt.Errorf("matching Load files: %w", err)
-	}
-
-	if len(files) <= maxMatchedFiles {
-		load.data.MatchedFiles = files
-	}
-	return len(files) > 0, nil
-}
-
-// tableVersion is the latest version of a Delta table.
-func tableVersion(ctx context.Context, db *stdsql.DB, identifier string) (int64, error) {
-	var latest struct {
-		Version int64 `db:"version"`
-	}
-	if err := sqlx.NewDb(db, "databricks").Unsafe().GetContext(ctx, &latest, "DESCRIBE HISTORY "+identifier+" LIMIT 1"); err != nil {
-		return 0, fmt.Errorf("describing history of %s: %w", identifier, err)
-	}
-	return latest.Version, nil
-}
-
-// queryStrings runs a query and returns the values of its first column.
-func queryStrings(ctx context.Context, db *stdsql.DB, query string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []string
-	for rows.Next() {
-		var value string
-		if err := rows.Scan(&value); err != nil {
-			return nil, err
-		}
-		out = append(out, value)
-	}
-	return out, rows.Err()
-}
 
 // loadedDoc is a document read by a binding's load query.
 type loadedDoc struct {

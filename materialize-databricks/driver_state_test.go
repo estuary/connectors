@@ -92,6 +92,9 @@ var recording struct {
 	// failMatching limits failWith to statements containing it when set.
 	failMatching string
 	attempts     int
+	// results are the rows of successive queries, after which queries return
+	// no rows.
+	results [][][]driver.Value
 }
 
 func (recordingDriver) Open(string) (driver.Conn, error) { return recordingConn{}, nil }
@@ -118,7 +121,26 @@ func (recordingConn) QueryContext(_ context.Context, query string, _ []driver.Na
 		return nil, recording.failWith
 	}
 	recording.executed = append(recording.executed, query)
+	if len(recording.results) > 0 {
+		var rows = &valueRows{rows: recording.results[0]}
+		recording.results = recording.results[1:]
+		return rows, nil
+	}
 	return noRows{}, nil
+}
+
+// valueRows is a recorded query's result of binding and document rows.
+type valueRows struct{ rows [][]driver.Value }
+
+func (*valueRows) Columns() []string { return []string{"binding", "document"} }
+func (*valueRows) Close() error      { return nil }
+func (r *valueRows) Next(dest []driver.Value) error {
+	if len(r.rows) == 0 {
+		return io.EOF
+	}
+	copy(dest, r.rows[0])
+	r.rows = r.rows[1:]
+	return nil
 }
 
 // noRows is the empty result of a recorded statement.
@@ -138,7 +160,7 @@ func recordingDB(t *testing.T, failWith error) *stdsql.DB {
 	t.Helper()
 	registerRecordingDriver()
 
-	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts = nil, failWith, 0, "", 0
+	recording.executed, recording.failWith, recording.failFirst, recording.failMatching, recording.attempts, recording.results = nil, failWith, 0, "", 0, nil
 	db, err := stdsql.Open("recording", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })

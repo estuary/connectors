@@ -27,6 +27,14 @@
   column, or in delta-updates mode, is unaffected.
 
 ### Changed
+- Every load runs as one SQL script, replacing the `two_phase_loads` feature
+  flag. The script first finds the files holding rows that match its keys,
+  reading only the key columns, then reads documents from those files alone.
+  Loads of large tables whose rows are updated get much faster: Databricks
+  otherwise reads every document of each file an update left a deletion
+  vector on. Both reads are of the table's version when the load starts, so
+  a write committed during the load, such as by `OPTIMIZE`, doesn't change
+  what it reads.
 - Changing the type of several columns of a table is faster: the temporary
   columns are added, and the original columns dropped, in one statement each
   instead of one statement per column.
