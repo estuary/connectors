@@ -47,6 +47,15 @@
               "nonsensitive": true,
               "title": "Max Concurrent Bulk Operations",
               "type": "integer"
+            },
+            "market_price_countries": {
+              "description": "Two-letter ISO country codes (ex: GB, DE, US) to capture product variant prices for. The product_variant_market_prices stream is only available once at least one country is listed.",
+              "items": {
+                "pattern": "^[A-Za-z]{2}$",
+                "type": "string"
+              },
+              "title": "Market Price Countries",
+              "type": "array"
             }
           },
           "title": "Advanced",

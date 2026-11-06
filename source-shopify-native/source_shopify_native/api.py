@@ -11,6 +11,9 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.http import HTTPMixin
 
 from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
+from source_shopify_native.graphql.products.variant_market_prices import (
+    ProductVariantMarketPrices,
+)
 from source_shopify_native.models import (
     BaseResponseData,
     ShopifyGraphQLResource,
@@ -57,6 +60,42 @@ async def bulk_fetch_incremental(
     async for record in model.process_result(log, lines()):
         resource = model.model_validate(record, context=ctx)
         yield resource
+
+    yield end
+
+
+async def bulk_fetch_product_variant_market_prices(
+    http: HTTPMixin,
+    window_size: timedelta,
+    bulk_job_manager: BulkJobManager,
+    countries: list[str],
+    store: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ProductVariantMarketPrices | LogCursor, None]:
+    """Like bulk_fetch_incremental, but runs one bulk query per batch of countries over the same window."""
+    assert isinstance(log_cursor, datetime)
+    max_end = log_cursor + window_size
+    end = min(max_end, datetime.now(tz=UTC))
+    model = ProductVariantMarketPrices
+    ctx = StoreValidationContext(store=store)
+
+    for i in range(0, len(countries), model.COUNTRIES_PER_QUERY):
+        batch = countries[i : i + model.COUNTRIES_PER_QUERY]
+        query = model.build_query(log_cursor, end, countries=batch)
+
+        url = await bulk_job_manager.execute(model, query)
+
+        if url is None:
+            # Every batch filters on the same products, so the remaining ones would find none too.
+            log.info(
+                f"[{store}] Bulk query job found no results between {log_cursor} and {end}."
+            )
+            break
+
+        _, lines = await http.request_lines(log, url)
+        async for record in model.process_result(log, lines()):
+            yield model.model_validate(record, context=ctx)
 
     yield end
 
