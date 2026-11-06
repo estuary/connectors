@@ -88,12 +88,13 @@ jobs:
   # Module zips are deleted before saving: builds read the extracted sources,
   # and the zips would add to what every build job downloads.
   #
-  # This job compiles every package and test. It saves only when no cache under
-  # the key is visible, and a PR sees main's, so a PR writes its own only when it
-  # changes go.mod or go.sum.
+  # This job compiles every package and test, and saves only when no cache
+  # under the key exists. It doesn't run on PRs: their caches are visible only
+  # to the same PR, and each one could evict main's. A PR that changes go.sum
+  # restores main's previous cache through restore-keys.
   warm_go_cache:
     needs: classify_changes
-    if: needs.classify_changes.outputs.run == 'true'
+    if: needs.classify_changes.outputs.run == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
