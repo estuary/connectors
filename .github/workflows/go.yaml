@@ -85,8 +85,8 @@ jobs:
   # Saves the Go cache the build jobs restore. A cache key is written once, so a
   # build job saving it would store only what its own connector compiled, and
   # every other connector would compile the rest cold until go.sum next changed.
-  # Module zips are left out: builds read the extracted sources, and the zips
-  # would roughly double what every build job downloads.
+  # Module zips are deleted before saving: builds read the extracted sources,
+  # and the zips would add to what every build job downloads.
   #
   # This job compiles every package and test. It saves only when no cache under
   # the key is visible, and a PR sees main's, so a PR writes its own only when it
@@ -109,9 +109,8 @@ jobs:
         with:
           path: |
             ~/go/pkg/mod
-            !~/go/pkg/mod/cache/download/**/*.zip
             ~/.cache/go-build
-          key: go-build-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
           lookup-only: true
 
       # A package that fails to compile here (source-db2 needs IBM's headers)
@@ -124,16 +123,16 @@ jobs:
         run: |
           go build ./... > /dev/null 2>&1 || true
           go test -count=1 -run '^$' ./... > /dev/null 2>&1 || true
-          du -sh ~/go/pkg/mod ~/go/pkg/mod/cache/download ~/.cache/go-build >> "$GITHUB_STEP_SUMMARY"
+          find ~/go/pkg/mod/cache/download -name '*.zip' -delete
+          du -sh ~/go/pkg/mod ~/.cache/go-build
 
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
             ~/go/pkg/mod
-            !~/go/pkg/mod/cache/download/**/*.zip
             ~/.cache/go-build
-          key: go-build-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
 
   build_connectors:
     runs-on: ubuntu-24.04
@@ -185,10 +184,9 @@ jobs:
         with:
           path: |
             ~/go/pkg/mod
-            !~/go/pkg/mod/cache/download/**/*.zip
             ~/.cache/go-build
-          key: go-build-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
-          restore-keys: go-build-${{ runner.os }}-
+          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: go-cache-${{ runner.os }}-
 
       # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
       # column types or keys drift from the spec.
