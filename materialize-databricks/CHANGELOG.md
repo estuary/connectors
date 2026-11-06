@@ -1,10 +1,13 @@
 # Changelog
 
-## 2026-11-05
+## 2026-11-06
 ### Changed
-- A MERGE of fewer than 100,000 rows of a binding reads them straight from
-  the staged files, instead of first copying them into a staging table. This
-  saves two queries per binding from each commit of small batches.
+- A binding's MERGE reads its staged files directly, instead of first copying
+  them into a staging table, unless the binding stores at least 1 GB of
+  uncompressed data and another binding is stored after it in the same
+  transaction. A copy is quicker only while later bindings are still
+  uploading. Commits of a single binding, or of small batches, now run two
+  fewer queries per binding.
 
 ## 2026-11-02
 ### Fixed
