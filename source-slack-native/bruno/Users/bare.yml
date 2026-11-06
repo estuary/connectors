@@ -1,0 +1,29 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/users.list?limit=200"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [users.list](https://docs.slack.dev/reference/methods/users.list)
+
+  **WHY:** shape of the `users` snapshot stream and of the `members[]` items key.
+  The docs say deactivated and invited users are included ("This includes both
+  invited users and deleted/deactivated users") — confirm a `deleted` field is
+  present, so no partition is silently excluded.
+
+  **PENDING:** run once credentials are in place.

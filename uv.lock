@@ -70,6 +70,7 @@ members = [
     "source-salesforce-native",
     "source-sentry",
     "source-shopify-native",
+    "source-slack-native",
     "source-smartsheet",
     "source-stripe-native",
     "source-tiktok-ads-native",
@@ -2697,6 +2698,21 @@ requires-dist = [
 name = "source-shopify-native"
 version = "0.1.0"
 source = { editable = "source-shopify-native" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-slack-native"
+version = "0.1.0"
+source = { editable = "source-slack-native" }
 dependencies = [
     { name = "estuary-cdk" },
     { name = "pydantic" },
