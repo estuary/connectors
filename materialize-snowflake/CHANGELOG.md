@@ -6,6 +6,17 @@
 - Updates that follow transactions of only new rows, such as the end of a
   backfill, may scan less of the destination table.
 
+## 2026-11-04
+
+### Added
+- Tasks can run on more than one shard with bindings that stage files. The
+  shard whose key range begins at zero applies every shard's staged files,
+  and combines the shards' MERGE INTO statements into one per table.
+
+### Changed
+- Tasks that run on more than one shard now fail at startup only if a
+  delta-updates binding writes through `snowpipe_streaming` or Snowpipe.
+
 ## 2026-11-03
 
 ### Added

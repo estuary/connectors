@@ -149,6 +149,13 @@ func TestIntegration(t *testing.T) {
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
 	})
 
+	t.Run("materialize-sharded", func(t *testing.T) {
+		// Every binding of the fixture stages files, which the primary shard
+		// applies on behalf of both shards.
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize-sharded.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityExact})
+	})
+
 	t.Run("materialize-no-flow-document", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone,

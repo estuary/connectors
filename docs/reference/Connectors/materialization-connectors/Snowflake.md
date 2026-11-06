@@ -411,6 +411,16 @@ incompatible destination asynchronously, so the connector surfaces it as a failu
 (`ERR_PIPE_IN_INVALID_STATE`) a few seconds after the rows are sent, rather than as an error on a specific document.
 :::
 
+### Running on more than one shard
+
+A task can run on more than one shard when each of its bindings stages files or uses
+[high-performance Snowpipe Streaming](#high-performance-snowpipe-streaming). Standard-updates bindings always stage
+files. Each shard stages its own files, and the shard whose key range begins at zero loads every shard's files. It
+combines the shards' `MERGE INTO` statements into one per table.
+
+A delta-updates binding that writes through Snowpipe Streaming or Snowpipe supports only one shard. A task with such a
+binding fails at startup if it runs on more than one shard.
+
 ## Timestamp Data Type Mapping
 
 The Snowflake materialization connector requires setting an expected timestamp type.

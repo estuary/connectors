@@ -79,11 +79,34 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		tf := boundedQueryInput{
 			Table:  tbl,
 			File:   "test-file",
+			Files:  []string{"test-file"},
 			Bounds: bounds,
 		}
 
 		snap.WriteString("--- Begin " + testcase + " ---")
 		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
+	{
+		tbl := tables[0]
+		var testcase = tbl.Identifier + " mergeInto over two files"
+		tf := boundedQueryInput{
+			Table: tbl,
+			Files: []string{"test-file-a", "test-file-b"},
+			Bounds: []sql.MergeBound{
+				{
+					Column:       tbl.Keys[0],
+					LiteralLower: "LEAST(10::INTEGER, 200::INTEGER)",
+					LiteralUpper: "GREATEST(100::INTEGER, 300::INTEGER)",
+				},
+				{Column: tbl.Keys[1]},
+				{Column: tbl.Keys[2]},
+			},
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, testTemplates.mergeInto.Execute(snap, &tf))
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 

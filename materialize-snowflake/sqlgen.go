@@ -387,11 +387,14 @@ COPY INTO {{ $.Table.Identifier }} (
 {{ define "mergeInto" }}
 MERGE INTO {{ $.Table.Identifier }} AS l
 USING (
+{{- range $fi, $file := $.Files }}{{ if $fi }}
+	UNION ALL{{ end }}
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}, $1[{{ len $.Table.Columns }}] AS _flow_delete
-	FROM {{ $.File }}
+	FROM {{ $file }}
+{{- end }}
 ) AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{ end -}}
@@ -513,16 +516,25 @@ func renderCopyHistoryTemplate(tableName string, files []string, tpl *template.T
 }
 
 type boundedQueryInput struct {
-	Table  sql.Table
-	File   string
+	Table sql.Table
+	// File is Files[0], for a template over a single staged path.
+	File string
+	// Files are staged paths, whose union a template reads.
+	Files  []string
 	Bounds []sql.MergeBound
 }
 
 func renderBoundedQueryTemplate(tpl *template.Template, table sql.Table, file string, bounds []sql.MergeBound) (string, error) {
+	return renderMergeQueryTemplate(tpl, table, []string{file}, bounds)
+}
+
+// renderMergeQueryTemplate renders a bounded query over the union of files.
+func renderMergeQueryTemplate(tpl *template.Template, table sql.Table, files []string, bounds []sql.MergeBound) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &boundedQueryInput{
 		Table:  table,
-		File:   file,
+		File:   files[0],
+		Files:  files,
 		Bounds: bounds,
 	}); err != nil {
 		return "", err
