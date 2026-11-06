@@ -1,0 +1,30 @@
+info:
+  name: List Ad Groups (filtering status campaign delete)
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"ADGROUP_STATUS_CAMPAIGN_DELETE"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** the ad group under the deleted seed campaign is neither in the
+  default listing nor under `ADGROUP_STATUS_DELETE`; this checks whether
+  `ADGROUP_STATUS_CAMPAIGN_DELETE` (parent campaign deleted) is where it sits.
+
+  **VERIFIED (2026-10-12, sandbox):** `total 1`: the ad group under the
+  deleted campaign. **A campaign deletion cascades as
+  `ADGROUP_STATUS_CAMPAIGN_DELETE`, not `ADGROUP_STATUS_DELETE`, and does not
+  update the ad group's `modify_time`** (still 23:08:09, its creation time; the
+  campaign was deleted at 23:08:18), so a modify-time cursor never sees the
+  cascade.

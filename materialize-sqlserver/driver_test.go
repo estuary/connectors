@@ -63,48 +63,44 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		var ctx = context.Background()
-		var cfg = testConfig()
-		connector, err := cfg.ToSQLConnector(ctx)
-		require.NoError(t, err)
-		var db = stdsql.OpenDB(connector)
-		defer db.Close()
-
-		_, err = db.ExecContext(ctx, `DROP TABLE IF EXISTS truncate_standard, truncate_delta, truncate_no_published_at;`)
-		require.NoError(t, err)
-		_, err = db.ExecContext(ctx, `IF OBJECT_ID('flow_checkpoints_v1') IS NOT NULL
-			DELETE FROM flow_checkpoints_v1 WHERE materialization = 'acmeCo/tests/materialize-sqlserver-truncate';`)
-		require.NoError(t, err)
-
-		testutil.RunFlowctl(t, "raw", "preview-next",
-			"--name", "acmeCo/tests/materialize-sqlserver-truncate",
-			"--source", "testdata/truncate.flow.yaml",
-			"--fixture", "testdata/truncate.fixture.json",
-			"--shards", "1",
-			"--timeout", "5m",
-			"--network", "flow-test",
-		)
-
-		// The fixture stores ids 1-3, then re-stores only id 1 during a
-		// backfill. Only the standard table with a flow_published_at column
-		// loses the rows published before the backfill.
-		for table, want := range map[string][]int64{
-			"truncate_standard":        {1},
-			"truncate_delta":           {1, 1, 2, 3},
-			"truncate_no_published_at": {1, 2, 3},
-		} {
-			var rows, err = db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+			connector, err := cfg.ToSQLConnector(ctx)
 			require.NoError(t, err)
-			var ids []int64
-			for rows.Next() {
-				var id int64
-				require.NoError(t, rows.Scan(&id))
-				ids = append(ids, id)
+			var db = stdsql.OpenDB(connector)
+			defer db.Close()
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var rows, err = db.QueryContext(ctx, "SELECT id FROM "+task.Resource(t, table)+" ORDER BY id;")
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
 			}
-			require.NoError(t, rows.Err())
-			require.NoError(t, rows.Close())
-			require.Equal(t, want, ids, table)
-		}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {

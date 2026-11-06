@@ -1,0 +1,113 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Ads/QueryByAdGroupId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AdGroupId": "{{ad_group_id}}", "AdTypes": ["Text", "Image", "Product", "AppInstall", "ExpandedText", "DynamicSearch", "ResponsiveAd", "ResponsiveSearch", "Hotel"]}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("ad_group_id")) throw new Error("run `Ad Groups / bare` first to set ad_group_id");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getadsbyadgroupid?view=bingads-13
+
+  **WHY:** the connector's `_ads` in `api.py` sends exactly this body,
+  every ad type in `ALL_AD_TYPES`. It checks that every listed type is
+  accepted and the ad shape. Run `Ad Groups / bare` first.
+
+  **VERIFIED (2026-11-03):** every `ALL_AD_TYPES` value is accepted: ad
+  groups `1194069955690481` and `1200667025830359` each return their one
+  `ResponsiveSearch` ad, with 200. There's no account, campaign or ad group
+  ID in an ad, so the connector's stamped parent IDs are needed. The sandbox
+  adds about 10 headlines of its own to each ad. The example keeps only the
+  first headline and description.
+
+  **VERIFIED (2026-11-03, P3):** a paused ad (`74629364458390`) comes back
+  with `Status: Paused`. A deleted ad wasn't tried; deleted campaigns, ad
+  groups and keywords don't come back.
+
+examples:
+  - name: 200 - one responsive search ad (asset lists trimmed to one each)
+    request:
+      url: "{{campaign_management_url}}/Ads/QueryByAdGroupId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "Ads": [
+              {
+                "Headlines": [
+                  {
+                    "Asset": {
+                      "Text": "Estuary Test Ad",
+                      "Id": "1197368240228836",
+                      "Name": null,
+                      "Type": "TextAsset"
+                    },
+                    "PinnedField": null,
+                    "AssetPerformanceLabel": "Unrated",
+                    "EditorialStatus": "Active"
+                  }
+                ],
+                "Descriptions": [
+                  {
+                    "Asset": {
+                      "Text": "No need for permissions—just dive into our documentation examples today!",
+                      "Id": "1202865795046761",
+                      "Name": null,
+                      "Type": "TextAsset"
+                    },
+                    "PinnedField": null,
+                    "AssetPerformanceLabel": "Unrated",
+                    "EditorialStatus": "Active"
+                  }
+                ],
+                "Domain": "example.com",
+                "Path1": "",
+                "Path2": "",
+                "Id": "74629364457283",
+                "Type": "ResponsiveSearch",
+                "Status": "Active",
+                "EditorialStatus": "Active",
+                "DevicePreference": "0",
+                "AdFormatPreference": "All",
+                "TrackingUrlTemplate": null,
+                "FinalUrlSuffix": null,
+                "UrlCustomParameters": null,
+                "FinalUrls": [
+                  "https://example.com"
+                ],
+                "FinalMobileUrls": null,
+                "FinalAppUrls": null,
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }

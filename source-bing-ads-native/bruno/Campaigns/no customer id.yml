@@ -1,0 +1,82 @@
+info:
+  name: no customer id
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+  headers:
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AccountId": "{{account_id}}", "CampaignType": "Search,Shopping,DynamicSearchAds,Audience,Hotel,PerformanceMax,App,ObjectiveBased"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13
+
+  **WHY:** the control for `wrong customer id`: whether the header is needed
+  at all for an account the user's own customer owns.
+
+  **VERIFIED (2026-11-02):** it isn't. Without `CustomerId`, the account's
+  campaigns come back as with the right value.
+
+examples:
+  - name: 200 - CustomerId not needed
+    request:
+      url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "Campaigns": [
+              {
+                "Id": "1150430564",
+                "Name": "PMax Example",
+                "Status": "Active",
+                "DailyBudget": 26.95,
+                "BudgetType": "DailyBudgetStandard",
+                "TimeZone": "PacificTimeUSCanadaTijuana",
+                "Settings": [
+                  {
+                    "FinalUrlExpansionOptOut": false,
+                    "Type": "PerformanceMaxSetting"
+                  }
+                ],
+                "CampaignType": "PerformanceMax",
+                "SubType": null,
+                "AudienceAdsBidAdjustment": 0,
+                "TrackingUrlTemplate": null,
+                "FinalUrlSuffix": null,
+                "UrlCustomParameters": null,
+                "BiddingScheme": {
+                  "Type": "MaxConversions",
+                  "MaxCpc": {
+                    "Amount": null
+                  }
+                },
+                "BudgetId": null,
+                "Languages": [
+                  "English"
+                ],
+                "ExperimentId": null,
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }

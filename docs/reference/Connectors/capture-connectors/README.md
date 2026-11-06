@@ -93,6 +93,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Klaviyo](./klaviyo-native.md)
 - [LinkedIn Pages](./linkedin-pages.md)
 - [Mailchimp](./mailchimp-native.md)
+- [TikTok Ads](./tiktok-ads-native.md)
 
 #### BI and analytics
 

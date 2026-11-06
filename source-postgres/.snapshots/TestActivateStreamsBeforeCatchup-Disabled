@@ -1,0 +1,143 @@
+sql> CREATE TABLE test.activatestreamsbeforecatchup_disabled_125209 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.activatestreamsbeforecatchup_disabled_125209 VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_disabled_125209"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_disabled_125209"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_disabled_125209"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_disabled_125209"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Factivatestreamsbeforecatchup_disabled_125209": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> UPDATE test.activatestreamsbeforecatchup_disabled_125209 SET data = 'one-updated' WHERE id = 1
+sql> UPDATE test.activatestreamsbeforecatchup_disabled_125209 SET data = 'three-updated' WHERE id = 3
+sql> INSERT INTO test.activatestreamsbeforecatchup_disabled_125209 VALUES (5, 'five'), (6, 'six')
+sql> DELETE FROM test.activatestreamsbeforecatchup_disabled_125209 WHERE id = 4
+=== Run: Filtered Re-Backfill ===
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_disabled_125209"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one-updated",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/activatestreamsbeforecatchup_disabled_125209",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "activatestreamsbeforecatchup_disabled_125209"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Factivatestreamsbeforecatchup_disabled_125209": {
+      "backfilled": 0,
+      "mode": "Ignore"
+    },
+    "test%2Factivatestreamsbeforecatchup_disabled_125209.v1": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

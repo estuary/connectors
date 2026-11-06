@@ -1,0 +1,63 @@
+info:
+  name: unreachable account
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "1"
+  body:
+    type: json
+    data: |-
+      {"AccountId": "1", "CampaignType": "Search"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13
+
+  **WHY:** which fault an account the user can't read returns. Discovery
+  treats only 105 and 106 as "try the next `CustomerId`", and any other fault
+  fails discovery.
+
+  **VERIFIED (2026-11-02):** `403` with fault 106 `UserIsNotAuthorized`, so
+  discovery moves on, then reports the account as unreadable. The status is
+  not 5xx, so it isn't retried.
+
+examples:
+  - name: 403 - 106 UserIsNotAuthorized
+    request:
+      url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+      method: POST
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "BatchErrors": [],
+            "OperationErrors": [
+              {
+                "Code": 106,
+                "ErrorCode": "UserIsNotAuthorized",
+                "Details": null,
+                "Message": "The user does not represent a authorized developer."
+              }
+            ],
+            "TrackingId": "9d4d744f-4aee-496a-b241-e0e8548b1d55",
+            "Type": "ApiFaultDetail"
+          }

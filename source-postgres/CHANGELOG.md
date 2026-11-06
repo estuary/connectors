@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-04
+
+### Added
+- The `activate_streams_before_catchup` feature flag activates new and
+  re-backfilled bindings for replication before the initial catch-up stream,
+  so changes since the checkpointed cursor are replicated for them.
+
 ## 2026-10-30
 
 ### Changed

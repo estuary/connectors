@@ -1,0 +1,23 @@
+info:
+  name: List Ad Groups (filtering auction and reservation rf)
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: '{{base_url}}/adgroup/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"buying_types":["AUCTION","RESERVATION_RF"]}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ad groups"
+  (`GET /open_api/v1.3/adgroup/get/`).
+
+  **WHY:** checks that the connector's first buying-type group is accepted for ad groups and returns the auction seed ad group.
+
+  **VERIFIED (2026-10-12, sandbox):** `total 1`: the auction seed ad group.

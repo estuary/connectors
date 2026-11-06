@@ -159,23 +159,18 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
 			dsn, err := cfg.toURI(true, taskName)
 			require.NoError(t, err)
 			db, err := stdsql.Open("snowflake", dsn)
 			require.NoError(t, err)
 			defer db.Close()
 
-			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
-			for _, table := range tables {
-				_, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+table+";")
-				require.NoError(t, err)
-			}
-
 			testutil.RunFlowctl(t, "raw", "preview-next",
-				"--name", taskName,
-				"--source", "testdata/truncate.flow.yaml",
+				"--name", task.Name,
+				"--source", task.SourcePath,
 				"--fixture", "testdata/truncate.fixture.json",
 				"--shards", "1",
 				"--timeout", "10m",
@@ -189,7 +184,7 @@ func TestIntegration(t *testing.T) {
 				"truncate_delta":           {1, 1, 2, 3},
 				"truncate_no_published_at": {1, 2, 3},
 			} {
-				rows, err := db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id;")
+				rows, err := db.QueryContext(ctx, "SELECT id FROM "+task.Resource(t, table)+" ORDER BY id;")
 				require.NoError(t, err)
 				var ids []int64
 				for rows.Next() {

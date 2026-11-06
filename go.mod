@@ -76,7 +76,7 @@ require (
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/slack-go/slack v0.23.1
-	github.com/snowflakedb/gosnowflake/v2 v2.2.0
+	github.com/snowflakedb/gosnowflake/v2 v2.4.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5

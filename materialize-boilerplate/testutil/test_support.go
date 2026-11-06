@@ -1275,6 +1275,8 @@ func logSweep(t *testing.T, kind string, outcomes []SweepOutcome) {
 // shouldCleanup reports whether a test resource or task should be removed, along
 // with the reason, which callers log.
 func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
+	// Destinations such as Snowflake fold unquoted names to upper case.
+	item, suffix = strings.ToLower(item), strings.ToLower(suffix)
 	if item == flowCheckpointsTableName {
 		// Never cleanup the meta checkpoints table: leaving it in place keeps
 		// it out of the next run's Apply action description (so snapshots stay

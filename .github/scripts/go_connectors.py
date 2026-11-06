@@ -45,8 +45,9 @@ ALL_PATHS = {
 }
 ALL_PREFIXES = ("base-image/",)
 
-# Other CI files build no Go connector.
-NONE_PREFIXES = (".github/workflows/", ".github/scripts/")
+# Other CI files build no Go connector, and neither do the catalog
+# sanitization scripts, which people run by hand and no image or test reads.
+NONE_PREFIXES = (".github/workflows/", ".github/scripts/", "scripts/obfuscation/")
 
 
 def read_graph(path: str) -> dict[str, set[str]]:

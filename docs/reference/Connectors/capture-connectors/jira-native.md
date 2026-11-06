@@ -88,6 +88,7 @@ See [connectors](../../../concepts/connectors.md#using-connectors) to learn more
 | **`/credentials/username`** | Email | The user email for your Jira account. | string | Required |
 | **`/credentials/password`** | API Token | The value of the API token generated. | string | Required |
 | `/advanced/projects` | Projects | Comma-separated list of project IDs from which to replicate issues. If left blank, issues from all projects wil be replicated. | string |  |
+| `/advanced/feature_flags` | Feature Flags | This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support. | string |  |
 
 #### Bindings
 

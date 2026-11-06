@@ -255,6 +255,11 @@ jobs:
             BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          # Layers come from the connector's build-cache tag and only main writes
+          # it back, so PR builds can't overwrite each other's cache. The GitHub
+          # Actions cache is too small for every connector's builder stage.
+          cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
 
       # Fetch the spec from the built image, to catch images which are entirely
       # broken. This is the only image-level coverage for connectors whose real

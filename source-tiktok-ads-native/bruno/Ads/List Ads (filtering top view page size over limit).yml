@@ -1,0 +1,28 @@
+info:
+  name: List Ads (filtering top view page size over limit)
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: '{{base_url}}/ad/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"buying_types":["RESERVATION_TOP_VIEW"]}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get ads"
+  (`GET /open_api/v1.3/ad/get/`).
+
+  **WHY:** checks whether `buying_types` is recognized for ads, and whether the 100-item top-view page ceiling applies, by asking for 1000.
+
+  **VERIFIED (2026-10-13, sandbox):** accepted, `code 0`, even with
+  `page_size=1000`, unlike ad groups, which hard-reject that.
+  **DOCUMENTED:** TikTok's SDK (`FilteringAdGet`) lists `buying_types` as an
+  `ad/get` filter, so the larger accepted page size is a per-endpoint limit
+  difference, not a sign the filter is ignored.
+  **PENDING:** an effect check of `buying_types` on real ads.

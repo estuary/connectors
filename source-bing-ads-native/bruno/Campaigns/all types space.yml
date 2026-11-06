@@ -1,0 +1,62 @@
+info:
+  name: all types space
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AccountId": "{{account_id}}", "CampaignType": "Search Shopping DynamicSearchAds Audience Hotel PerformanceMax App ObjectiveBased"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13
+
+  **WHY:** the space-delimited form the docs give for SOAP, as a control for
+  `Campaigns / all types comma`.
+
+  **LIMITATION (VERIFIED 2026-10-29):** REST rejects the space-delimited list
+  with `400` code 100 `NullRequest` ("Invalid JSON ... Path:
+  $.CampaignType"). Over REST, multiple types must be comma-joined.
+
+examples:
+  - name: 400 - space-delimited types rejected (100)
+    request:
+      url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "BatchErrors": [],
+            "OperationErrors": [
+              {
+                "Code": 100,
+                "ErrorCode": "NullRequest",
+                "Details": "Invalid JSON at line 0 position 126. Path: $.CampaignType",
+                "Message": "The request message is null."
+              }
+            ],
+            "TrackingId": "4c511f9a-d04f-4e37-b589-7540a3c45233",
+            "Type": "ApiFaultDetail"
+          }

@@ -119,6 +119,9 @@ type stagedFile struct {
 	buf    *fileBuffer
 	writer *writer.JsonWriter
 
+	// Bytes of rows written this transaction, before compression, by the files already closed.
+	uncompressed int
+
 	// Per-transaction coordination.
 	putFiles chan string
 	group    *errgroup.Group
@@ -162,6 +165,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 
 	// Reset values used per-transaction.
 	f.txnDir = f.prefix + "_" + uuid.Must(uuid.NewV7()).String()
+	f.uncompressed = 0
 	if err := f.files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: f.remoteDir()}); err != nil {
 		return fmt.Errorf("creating staging directory %q: %w", f.remoteDir(), err)
 	}
@@ -296,6 +300,7 @@ func (f *stagedFile) putFile() error {
 	if err := f.writer.Close(); err != nil {
 		return fmt.Errorf("closing writer: %w", err)
 	}
+	f.uncompressed += f.writer.WrittenUncompressed()
 	f.writer = nil
 
 	select {

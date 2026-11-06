@@ -1,4 +1,4 @@
-from datetime import datetime, UTC, timedelta
+from datetime import date, datetime, UTC, timedelta
 from enum import auto, StrEnum
 from typing import Any, ClassVar, Literal, Optional
 
@@ -13,6 +13,8 @@ from estuary_cdk.capture.common import (
     LogCursor,
     Logger,
 )
+from estuary_cdk.capture.backfill_signals import backfill_signal_flag_defaults
+from estuary_cdk.feature_flags import FeatureFlagsConfig, FlagDefault
 from pydantic import AwareDatetime, BaseModel, Field
 
 
@@ -71,7 +73,14 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"order": 3}
     )
 
-    class Advanced(BaseModel):
+    class Advanced(FeatureFlagsConfig):
+        FEATURE_FLAG_DEFAULTS: ClassVar[dict[str, FlagDefault]] = {
+            # emit_backfill_signals sends backfill signals, which make destinations delete
+            # the rows a backfill doesn't capture again. ignore_config_for_backfill_signals
+            # also sends them when start_date or projects limit the backfill.
+            **backfill_signal_flag_defaults(enabled_for_tasks_created_after=date(2026, 11, 16)),
+        }
+
         projects: str = Field(
             description="Comma-separated list of project IDs from which to replicate issues. If left blank, issues from all projects wil be replicated.",
             title="Projects",

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-06
+### Changed
+- A binding's MERGE reads its staged files directly, instead of first copying
+  them into a staging table, unless the binding stores at least 1 GB of
+  uncompressed data and another binding is stored after it in the same
+  transaction. A copy is quicker only while later bindings are still
+  uploading. Commits of a single binding, or of small batches, now run two
+  fewer queries per binding.
+
 ## 2026-11-02
 ### Fixed
 - A load of many bindings no longer runs out of memory, restarting the task,
@@ -10,7 +19,6 @@
 - With Exclude Flow Document enabled, documents now load correctly when a
   top-level field contains special or non-ASCII characters, or has a custom
   projection name.
-
 ### Added
 - A completed backfill now deletes a table's rows published before the
   backfill began, instead of leaving them in place until the next store
@@ -27,9 +35,6 @@
   vector on. Both reads are of the table's version when the load starts, so
   a write committed during the load, such as by `OPTIMIZE`, doesn't change
   what it reads.
-- A MERGE of fewer than 100,000 rows reads them straight from the staged
-  files, instead of first copying them into a staging table. This saves a
-  query of a few seconds from each commit of small batches.
 - Changing the type of several columns of a table is faster: the temporary
   columns are added, and the original columns dropped, in one statement each
   instead of one statement per column.

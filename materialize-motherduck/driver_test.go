@@ -93,30 +93,17 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				var ctx = context.Background()
+				var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeTestResource)
 				db, err := cfg.db(ctx)
 				require.NoError(t, err)
 				defer db.Close()
 
-				for _, table := range []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"} {
-					_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s.%s;", cfg.Schema, table))
-					require.NoError(t, err)
-				}
-				var checkpoints int
-				require.NoError(t, db.QueryRowContext(ctx,
-					"SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = ? AND table_schema = ? AND table_name = 'flow_checkpoints_v1'",
-					cfg.Database, cfg.Schema,
-				).Scan(&checkpoints))
-				if checkpoints > 0 {
-					_, err = db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s.flow_checkpoints_v1 WHERE materialization = ?;", cfg.Schema), taskName)
-					require.NoError(t, err)
-				}
-
 				testutil.RunFlowctl(t, "raw", "preview-next",
-					"--name", taskName,
-					"--source", "testdata/truncate.flow.yaml",
+					"--name", task.Name,
+					"--source", task.SourcePath,
 					"--fixture", "testdata/truncate.fixture.json",
 					"--shards", "1",
 					"--timeout", "5m",
@@ -131,7 +118,7 @@ func TestIntegration(t *testing.T) {
 					"truncate_delta":           {1, 1, 2, 3},
 					"truncate_no_published_at": {1, 2, 3},
 				} {
-					var rows, err = db.QueryContext(ctx, fmt.Sprintf("SELECT id FROM %s.%s ORDER BY id;", cfg.Schema, table))
+					var rows, err = db.QueryContext(ctx, fmt.Sprintf("SELECT id FROM %s.%s ORDER BY id;", cfg.Schema, task.Resource(t, table)))
 					require.NoError(t, err)
 					var ids []int64
 					for rows.Next() {

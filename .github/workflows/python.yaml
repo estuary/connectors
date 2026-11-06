@@ -192,6 +192,11 @@ jobs:
             CONNECTOR_TYPE=${{ matrix.connector.type }}
             USAGE_RATE=${{ matrix.connector.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          # Layers come from the connector's build-cache tag and only main writes
+          # it back, so PR builds can't overwrite each other's cache. The GitHub
+          # Actions cache is too small for every connector's builder stage.
+          cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
 
       # The tests run in the workspace venv, which also holds the dev group, so
       # an import that only a dev dependency satisfies still passes them.

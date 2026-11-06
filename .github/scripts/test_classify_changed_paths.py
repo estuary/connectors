@@ -342,6 +342,7 @@ class TestRustConnectors(unittest.TestCase):
             ".github/workflows/delayed-tag.yaml",
             ".github/scripts/delayed_tag.py",
             ".github/go-connectors.yaml",
+            "scripts/obfuscation/config_allowlist.txt",
         ]:
             with self.subTest(path=path):
                 self.assertEqual(rust(path), [])

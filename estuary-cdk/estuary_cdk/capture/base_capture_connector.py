@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from estuary_cdk.capture.connector_status import ConnectorStatus
 
 from .. import BaseConnector, Stopped
-from ..feature_flags import FeatureFlagsConfig
+from ..feature_flags import feature_flags_config
 from ..flow import (
     ConnectorSpec,
     EndpointConfig,
@@ -54,8 +54,8 @@ def _resolve_feature_flags(
 ) -> dict[str, bool] | None:
     """Resolve the feature flags of a connector whose `advanced` config is a
     FeatureFlagsConfig. Other connectors are left alone."""
-    advanced = getattr(config, "advanced", None)
-    if not isinstance(advanced, FeatureFlagsConfig):
+    advanced = feature_flags_config(config)
+    if advanced is None:
         return None
     return advanced.resolve_feature_flags(created_at)
 

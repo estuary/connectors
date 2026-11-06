@@ -1,5 +1,11 @@
 # materialize-snowflake
 
+## 2026-11-05
+
+### Changed
+- Updates that follow transactions of only new rows, such as the end of a
+  backfill, may scan less of the destination table.
+
 ## 2026-11-03
 
 ### Added

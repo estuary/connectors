@@ -1,0 +1,39 @@
+info:
+  name: List Campaigns (bare)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** the Campaigns stream's backing endpoint, with no filtering, to see
+  the default response shape and pagination block.
+
+  **VERIFIED (2026-10-08, sandbox, empty account):** `code 0`,
+  `data.list: []`, `page_info: {page: 1, page_size: 1000, total_page: 0,
+  total_number: 0}`. `page_size=1000` is accepted; with no data `total_page` is
+  0, so a `page >= total_page` stop condition ends after one request.
+
+  **VERIFIED (2026-10-08, sandbox, seeded):** `total_number 1`: only the live
+  campaign. **The default response hides deleted campaigns** (silent data loss
+  if the connector needs them). `create_time` / `modify_time` are
+  `"YYYY-MM-DD HH:MM:SS"` with no offset, in **UTC** (seeded at ~23:07 UTC; the
+  advertiser's time zone is America/Los_Angeles). Fields: advertiser_id, budget,
+  budget_mode, campaign_automation_type, campaign_id, campaign_name,
+  campaign_type, create_time, deep_bid_type, disable_skan_campaign,
+  is_advanced_dedicated_campaign, is_new_structure, is_search_campaign,
+  is_smart_performance_campaign, modify_time, objective, objective_type,
+  operation_status, roas_bid, rta_bid_enabled, rta_id,
+  rta_product_selection_enabled, sales_destination, virtual_objective_type.

@@ -50,6 +50,20 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	testutil.RunMaterializationTest(t, driver.NewMaterializer, source, makeResourceFn, actionDescSanitizers, runtime)
 }
 
+// PrepareTestTask renames a task and its resources for one test run. See the
+// testutil function of the same name.
+func PrepareTestTask[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	bundled []byte,
+	taskName string,
+	cfg EC,
+	makeResourceFn func(string, bool) RC,
+) testutil.TestTask {
+	t.Helper()
+	return testutil.PrepareTestTask(t, driver.NewMaterializer, bundled, taskName, cfg, makeResourceFn)
+}
+
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
 	driver *Driver[EC, RC],

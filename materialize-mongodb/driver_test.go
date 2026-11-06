@@ -69,8 +69,9 @@ func TestIntegration(t *testing.T) {
 		if boilerplate.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
+			var task = boilerplate.PrepareTestTask(t, NewMaterializer, bundled, taskName, cfg, makeResourceFn)
 			client, err := connect(ctx, cfg)
 			require.NoError(t, err)
 			defer client.Disconnect(ctx)
@@ -79,14 +80,13 @@ func TestIntegration(t *testing.T) {
 			// Each collection starts with a document stored by a connector
 			// version that predates the publication time field.
 			for _, name := range []string{"truncate_standard", "truncate_delta"} {
-				require.NoError(t, db.Collection(name).Drop(ctx))
-				_, err = db.Collection(name).InsertOne(ctx, bson.D{{Key: "id", Value: int64(99)}, {Key: "_meta", Value: bson.D{}}})
+				_, err = db.Collection(task.Resource(t, name)).InsertOne(ctx, bson.D{{Key: "id", Value: int64(99)}, {Key: "_meta", Value: bson.D{}}})
 				require.NoError(t, err)
 			}
 
 			boilerplate.RunFlowctl(t, "raw", "preview-next",
-				"--name", taskName,
-				"--source", "testdata/truncate.flow.yaml",
+				"--name", task.Name,
+				"--source", task.SourcePath,
 				"--fixture", "testdata/truncate.fixture.json",
 				"--shards", "1",
 				"--timeout", "5m",
@@ -100,7 +100,7 @@ func TestIntegration(t *testing.T) {
 				"truncate_standard": {1},
 				"truncate_delta":    {1, 1, 2, 3, 99},
 			} {
-				cur, err := db.Collection(name).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "id", Value: 1}}))
+				cur, err := db.Collection(task.Resource(t, name)).Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "id", Value: 1}}))
 				require.NoError(t, err)
 				var docs []struct {
 					ID int64 `bson:"id"`

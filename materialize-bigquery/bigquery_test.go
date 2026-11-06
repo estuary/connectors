@@ -14,7 +14,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -108,23 +107,20 @@ func TestIntegration(t *testing.T) {
 		if testutil.RuntimeV1() {
 			t.Skip("backfill signals require runtime-next")
 		}
-		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
-			var tables = []string{"truncate_standard", "truncate_delta", "truncate_no_published_at"}
-			var bq = bqTestClient(t, cfg, tables...)
-
-			flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
-			require.NoError(t, err)
-			materializer, err := NewMaterializer(ctx, taskName, cfg, flags)
-			require.NoError(t, err)
-			defer materializer.Close(ctx)
-			require.NoError(t, materializer.CleanupTestTask(ctx, taskName))
+			// Unlike makeResourceFn, keeps delta updates, which the delta binding's
+			// assertion depends on.
+			var task = sql.PrepareTestTask(t, NewDriver().sqlDriver, bundled, taskName, cfg, func(table string, delta bool) tableConfig {
+				return tableConfig{Table: table, Delta: delta}
+			})
+			var bq = bqTestClient(t, cfg)
 
 			// Two shards, so that the primary truncates after applying a peer's
 			// staged stores.
 			testutil.RunFlowctl(t, "raw", "preview-next",
-				"--name", taskName,
-				"--source", "testdata/truncate.flow.yaml",
+				"--name", task.Name,
+				"--source", task.SourcePath,
 				"--fixture", "testdata/truncate.fixture.json",
 				"--shards", "2",
 				"--timeout", "10m",
@@ -140,7 +136,7 @@ func TestIntegration(t *testing.T) {
 				"truncate_delta":           {1, 1, 2, 3},
 				"truncate_no_published_at": {1, 2, 3},
 			} {
-				var query = bq.Query(fmt.Sprintf("SELECT id FROM `%s.%s.%s` ORDER BY id;", cfg.ProjectID, cfg.Dataset, table))
+				var query = bq.Query(fmt.Sprintf("SELECT id FROM `%s.%s.%s` ORDER BY id;", cfg.ProjectID, cfg.Dataset, task.Resource(t, table)))
 				query.Location = cfg.Region
 				it, err := query.Read(ctx)
 				require.NoError(t, err)
