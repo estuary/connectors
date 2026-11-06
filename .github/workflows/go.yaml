@@ -85,11 +85,12 @@ jobs:
   # Saves the Go cache the build jobs restore. A cache key is written once, so a
   # build job saving it would store only what its own connector compiled, and
   # every other connector would compile the rest cold until go.sum next changed.
-  # This job compiles every package and test, and only main saves, so PRs share
-  # main's cache without each storing a copy.
+  # This job compiles every package and test. It saves only when no cache under
+  # the key is visible, and a PR sees main's, so a PR writes its own only when it
+  # changes go.mod or go.sum.
   warm_go_cache:
     needs: classify_changes
-    if: needs.classify_changes.outputs.run == 'true' && github.ref == 'refs/heads/main'
+    if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
