@@ -439,6 +439,9 @@ type binding struct {
 	}
 }
 
+// maxBoundRanges is the most ranges a string key's merge bound splits into.
+const maxBoundRanges = 8
+
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
 	var b = new(binding)
 	b.target = target
@@ -446,8 +449,10 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
 	}
 	b.nullFieldsToStrip = target.NullablePropertiesToStrip()
-	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
-	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+	// WithStringRanges orders string keys byte by byte, which is how Snowflake
+	// compares a column without a collation.
+	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal, sql.WithStringRanges(maxBoundRanges))
+	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal, sql.WithStringRanges(maxBoundRanges))
 	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
 	if d.cfg.isStreamsV2(b.target.DeltaUpdates, d.featureFlags) {
