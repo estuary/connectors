@@ -3,16 +3,17 @@ import base64
 import decimal
 import tempfile
 import traceback
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, BinaryIO, Callable, Generic
+from typing import Any, BinaryIO, Callable, Generic, cast
 
 import orjson
 import xxhash
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from estuary_cdk.capture.connector_status import ConnectorStatus
+from estuary_cdk.capture.document import AssociatedDocument, BaseDocument
 
 from ..flow import (
     ConnectorSpec,
@@ -21,12 +22,11 @@ from ..flow import (
     EndpointConfig,
     ResourceConfig,
 )
-from ..pydantic_polyfill import GenericModel
 from . import request, response
-from ._emit import emit_from_buffer
+from .transactor import Transactor
 
 
-class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Request(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     spec: request.Spec | None = None
     discover: request.Discover[EndpointConfig] | None = None
     validate_: request.Validate[EndpointConfig, ResourceConfig] | None = Field(
@@ -37,7 +37,7 @@ class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSta
     acknowledge: request.Acknowledge | None = None
 
 
-class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     spec: ConnectorSpec | None = None
     discovered: response.Discovered[ResourceConfig] | None = None
     validated: response.Validated | None = None
@@ -46,31 +46,143 @@ class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSt
     captured: response.Captured | None = None
     sourcedSchema: response.SourcedSchema | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
+    backfillBegin: response.BackfillBegin | None = None
+    backfillComplete: response.BackfillComplete | None = None
 
 
-def orjson_default(obj):
+def serialize_response(message: Response[Any, Any, Any]) -> bytes:
+    return message.model_dump_json(by_alias=True, exclude_unset=True).encode()
+
+
+# Bounds applied to SourcedSchema locations that don't declare their own. They
+# start deliberately tight because inference widens them to fit real data
+# (maxLength and maximum grow, minLength and minimum shrink).
+DEFAULT_STRING_BOUNDS = {"minLength": 1, "maxLength": 1}
+DEFAULT_NUMERIC_BOUNDS = {"minimum": 1, "maximum": 1}
+
+
+def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
+    """Fill in everything a SourcedSchema must state but a connector may have left out.
+
+    The runtime unions a SourcedSchema into the collection's inferred schema, and
+    that union only ever widens. A constraint the SourcedSchema doesn't assert is
+    dropped from the result rather than treated as unknown. SourcedSchemas
+    therefore have to be maximally restrictive. That's easy to get subtly wrong by
+    hand, so defaults are applied centrally:
+
+    - `_meta` and its subfields that are common across all capture connectors.
+    - `type: object` and `additionalProperties: False` on the root and wherever
+      properties are declared. The runtime rejects a SourcedSchema that isn't
+      closed, and a captured document is always an object.
+    - `required`, covering every declared property. Inference relaxes this for real
+      when a document turns up without the field.
+    - length and range bounds, which materializations size columns from.
+
+    Whatever the connector already declared wins, so one that knows better - a truer
+    bound, its own `_meta` - keeps it. The input is left unmodified.
+    """
+
+    def normalize(location: dict[str, Any]) -> dict[str, Any]:
+        out: dict[str, Any] = dict(location)
+
+        for keyword in ("properties", "patternProperties", "$defs", "definitions"):
+            if isinstance(subschemas := out.get(keyword), dict):
+                out[keyword] = {
+                    name: normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for name, s in cast(dict[str, Any], subschemas).items()
+                }
+
+        for keyword in ("oneOf", "anyOf", "allOf", "prefixItems"):
+            if isinstance(subschemas := out.get(keyword), list):
+                out[keyword] = [
+                    normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for s in cast(list[Any], subschemas)
+                ]
+
+        # `items` may be a single schema or a tuple of them, and
+        # `additionalProperties` is usually the boolean False.
+        for keyword in ("items", "additionalProperties"):
+            if isinstance(subschema := out.get(keyword), dict):
+                out[keyword] = normalize(cast(dict[str, Any], subschema))
+            elif isinstance(subschemas := out.get(keyword), list):
+                out[keyword] = [
+                    normalize(cast(dict[str, Any], s)) if isinstance(s, dict) else s
+                    for s in cast(list[Any], subschemas)
+                ]
+
+        # A location declaring properties is an object, and must be a closed one.
+        if out.get("properties") or out.get("patternProperties"):
+            out = {"type": "object", **out, "additionalProperties": False}
+
+        if properties := out.get("properties"):
+            required = out.get("required", [])
+            out["required"] = [
+                *required,
+                *(name for name in properties if name not in required),
+            ]
+
+        declared = out.get("type", [])
+        types = {declared} if isinstance(declared, str) else set(declared)
+
+        # Length bounds constrain only string values and range bounds only numeric
+        # ones, so a union of both types carries both sets.
+        if "string" in types:
+            out = {**DEFAULT_STRING_BOUNDS, **out}
+        if types & {"integer", "number"}:
+            out = {**DEFAULT_NUMERIC_BOUNDS, **out}
+
+        return out
+
+    # The root-only defaults are applied before the walk so that the `_meta` they add
+    # is treated like any other location. Captured documents are always objects, so
+    # the root's type is forced rather than defaulted.
+    root = dict(schema)
+    root["type"] = "object"
+
+    # `_meta` is a shared location. `uuid` is stamped onto every captured document by
+    # the runtime. `op` and `row_id` are added by the CDK, and a connector
+    # may carry its own fields alongside them. So the standard subfields are merged
+    # in one by one.
+    default_meta = BaseDocument.Meta.sourced_schema()
+    properties = root.get("properties", {})
+    declared_meta = properties.get("_meta", {})
+    root["properties"] = {
+        **properties,
+        "_meta": {
+            **default_meta,
+            **declared_meta,
+            "properties": {
+                **default_meta["properties"],
+                **declared_meta.get("properties", {}),
+            },
+        },
+    }
+
+    return normalize(root)
+
+
+def orjson_default(obj: Any) -> Any:
     # Pydantic automatically serializes Decimals as strings, but orjson doesn't
     # know about that. In order to handle this, we must provide this as
     # the default= kwarg to orjson.dumps
     if isinstance(obj, decimal.Decimal):
         return str(obj)
     if isinstance(obj, (bytes, bytearray)):
-        return base64.b64encode(obj).decode('utf-8')
+        return base64.b64encode(obj).decode("utf-8")
     raise TypeError
 
 
-@dataclass
-class Task:
+class _BaseTask:
     """
-    Task bundles a capture coroutine and its associated context.
+    Shared state and helpers for capture tasks.
 
     It facilitates the task in queuing any number of captured documents and
-    emitting them upon a checkpoint. Each instance of Task manages an independent
+    emitting them upon a checkpoint. Each instance manages an independent
     internal buffer (backed by memory or disk) which is only written to the
     connector's output upon a call to checkpoint(). This allows concurrent
-    Tasks to capture consistent checkpoints without trampling one another.
+    tasks to capture consistent checkpoints without trampling one another.
 
-    Task also facilitates logging and graceful stop of a capture coroutine.
+    _BaseTask also facilitates logging and graceful stop of a capture coroutine.
     """
 
     log: Logger
@@ -102,11 +214,26 @@ class Task:
 
     stopping: Stopping
 
-    _buffer: tempfile.SpooledTemporaryFile
+    transactor: Transactor
+    """Shared Transactor that coordinates stdout writes and Acknowledge pairing."""
+
+    requires_ack: bool
+    """When True, checkpoint() blocks until Flow ACKs the emitted checkpoint.
+    Inherited by children via spawn_child."""
+
+    _buffer: tempfile.SpooledTemporaryFile[bytes]
     _hasher: xxhash.xxh3_128
     _name: str
     _output: BinaryIO
     _tg: asyncio.TaskGroup
+
+    catalog_task_name: str
+    """The catalog task name of this capture (e.g. "acmeCo/my-capture"). Shared
+    by all Tasks of a capture and inherited by children via spawn_child. Used for
+    observability logging.
+
+    Distinct from the `_name` field, which is a connector-internal name for the
+    Python/asyncio task (e.g. "capture", "capture.webhook-server")."""
 
     MAX_BUFFER_MEM: int = 1_000_000
     """Maximum amount of memory to use for captured documents between checkpoints,
@@ -120,6 +247,9 @@ class Task:
         output: BinaryIO,
         stopping: Stopping,
         tg: asyncio.TaskGroup,
+        transactor: Transactor,
+        catalog_task_name: str,
+        requires_ack: bool = False,
     ):
         self._buffer = tempfile.SpooledTemporaryFile(max_size=self.MAX_BUFFER_MEM)
         self._hasher = xxhash.xxh3_128()
@@ -129,64 +259,175 @@ class Task:
         self.log = log
         self.connector_status = connector_status
         self.stopping = stopping
+        self.transactor = transactor
+        self.requires_ack = requires_ack
+        self.catalog_task_name = catalog_task_name
 
-    def captured(self, binding: int, document: Any):
-        """Enqueue the document to be captured under the given binding.
-        Documents are not actually captured until checkpoint() is called.
-        Or, reset() will discard any queued documents."""
+    def _write_response(self, message: Response[Any, Any, Any]):
+        self._buffer.write(serialize_response(message))
+        self._buffer.write(b"\n")
 
+    def _captured(self, binding: int, document: Any):
         if isinstance(document, dict):
-            b = orjson.dumps({
-                "captured": {
-                    "binding": binding,
-                    "doc": document,
-                }
-            }, default=orjson_default)
+            b = orjson.dumps(
+                {
+                    "captured": {
+                        "binding": binding,
+                        "doc": document,
+                    }
+                },
+                default=orjson_default,
+            )
         else:
-            b = Response(
-                captured=response.Captured(binding=binding, doc=document)
-            ).model_dump_json(by_alias=True, exclude_unset=True).encode()
+            b = serialize_response(
+                Response(captured=response.Captured(binding=binding, doc=document))
+            )
 
         self._buffer.write(b)
         self._buffer.write(b"\n")
         self._hasher.update(b)
 
-    def pending_digest(self) -> str:
-        """pending_digest returns the digest of captured() documents
-        since the last checkpoint() or reset()"""
-
+    def _pending_digest(self) -> str:
         return self._hasher.digest().hex()
 
-    def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
-        """Write a SourcedSchema message for the given binding to the buffer.
-        SourcedSchema messages won't be emitted until checkpoint() is called."""
-
-        b = Response(
-            sourcedSchema=response.SourcedSchema(binding=binding_index, schema_json=schema)
-        ).model_dump_json(by_alias=True, exclude_unset=True).encode()
-
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
-
-    async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
-        """Emit previously-queued, captured documents followed by a checkpoint."""
-        await self._emit(
-            Response[Any, Any, ConnectorState](
-                checkpoint=response.Checkpoint(
-                    state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
+    def _sourced_schema(self, binding_index: int, schema: dict[str, Any]):
+        self._write_response(
+            Response(
+                sourcedSchema=response.SourcedSchema(
+                    binding=binding_index, schema_json=with_sourced_schema_defaults(schema)
                 )
             )
         )
 
-    def reset(self):
-        """Discard any captured documents, resetting to an empty state."""
+    def _reset(self):
         self._buffer.truncate(0)
         self._buffer.seek(0)
         self._hasher.reset()
 
+    # ConnectorState parameterises the pydantic generic below, so it is
+    # load-bearing at runtime even though it appears once here: substituting
+    # its bound drops the state's fields from the serialised checkpoint
+    # (tests/test_snapshot_subtasks.py covers it).
+    async def _emit_checkpoint(
+        self,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+        merge_patch: bool = True,
+    ) -> asyncio.Future[None] | None:
+        checkpoint = Response[Any, Any, ConnectorState](
+            checkpoint=response.Checkpoint(
+                state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
+            )
+        )
+        self._write_response(checkpoint)
+
+        completion = await self.transactor.commit(
+            self._buffer, wait_for_ack=self.requires_ack
+        )
+        self._reset()
+
+        return completion
+
+
+class Task(_BaseTask):
+    """
+    Single-writer capture task.
+
+    Bundles a capture coroutine with its scoped logger, buffer, and the
+    shared connector context. Operations on this class are not safe to
+    invoke concurrently against the same instance — each Task is expected
+    to be driven by a single coroutine. Use `spawn_child` to fan out work
+    across multiple independent Tasks.
+    """
+
+    def captured(self, binding: int, document: Any):
+        """Enqueue the document to be captured under the given binding.
+        Documents are not actually captured until checkpoint() is called.
+        Or, reset() will discard any queued documents."""
+        self._captured(binding, document)
+
+    def pending_digest(self) -> str:
+        """pending_digest returns the digest of captured() documents
+        since the last checkpoint() or reset()"""
+        return self._pending_digest()
+
+    def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
+        """Write a SourcedSchema message for the given binding to the buffer.
+        SourcedSchema messages won't be emitted until checkpoint() is called."""
+        self._sourced_schema(binding_index, schema)
+
+    def reset(self):
+        """Discard any captured documents, resetting to an empty state."""
+        self._reset()
+
+    async def checkpoint(
+        self,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+        merge_patch: bool = True,
+    ):
+        """Emit previously-queued, captured documents followed by a checkpoint.
+
+        When this Task's `requires_ack` is True, the call blocks on Flow's
+        Acknowledge for the emitted checkpoint before returning.
+
+        Captures are at-least-once: once the buffer has been written to stdout
+        the documents may be durable, regardless of whether this coroutine
+        returns. Cancellation between the write and the ACK can therefore
+        produce a duplicate when the sender retries on the resulting failure."""
+
+        completion = await self._emit_checkpoint(state, merge_patch)
+
+        if completion is None:
+            return
+
+        try:
+            await completion
+        except asyncio.CancelledError:
+            self.log.warning(
+                (
+                    "checkpoint cancelled while awaiting ACK;"
+                    " documents may be durable but caller will see failure"
+                ),
+                {"task": self._name},
+            )
+            raise
+
+    async def _backfill_begin(
+        self,
+        binding: int,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ):
+        """Emit a BackfillBegin for the binding, then a checkpoint of `state`."""
+        # The runtime fails the session unless a backfill signal stands alone in
+        # its checkpoint, so nothing may be buffered ahead of it.
+        if self._buffer.tell() != 0:
+            raise RuntimeError(
+                "Implementation error: a BackfillBegin must stand alone in its checkpoint, but this task has buffered output"
+            )
+        self._write_response(
+            Response(backfillBegin=response.BackfillBegin(binding=binding))
+        )
+        await self.checkpoint(state)
+
+    async def _backfill_complete(
+        self,
+        binding: int,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ):
+        """Emit a BackfillComplete for the binding, then a checkpoint of `state`."""
+        # The runtime fails the session unless a backfill signal stands alone in
+        # its checkpoint, so nothing may be buffered ahead of it.
+        if self._buffer.tell() != 0:
+            raise RuntimeError(
+                "Implementation error: a BackfillComplete must stand alone in its checkpoint, but this task has buffered output"
+            )
+        self._write_response(
+            Response(backfillComplete=response.BackfillComplete(binding=binding))
+        )
+        await self.checkpoint(state)
+
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]
-    ) -> asyncio.Task:
+    ) -> asyncio.Task[None]:
         """
         Spawn a child Task of this Task, using the given name suffix and coroutine.
         The child coroutine will be invoked with a child Task and be polled concurrently.
@@ -205,6 +446,9 @@ class Task:
                         parent._output,
                         parent.stopping,
                         child_tg,
+                        parent.transactor,
+                        parent.catalog_task_name,
+                        parent.requires_ack,
                     )
                     await child(t)
                 except Exception as exc:
@@ -220,11 +464,81 @@ class Task:
         task.set_name(child_name)
         return task
 
-    async def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
-        self._buffer.write(
-            response.model_dump_json(by_alias=True, exclude_unset=True).encode()
+
+class MultipleWritersTask(_BaseTask):
+    """Task variant safe for multiple concurrent producers on a single instance.
+
+    emit() captures a batch of items and writes one checkpoint under an
+    internal lock, so overlapping calls cannot interleave partial
+    transactions — the transactor sees each batch as one atomic unit and
+    can track durable persistence per batch.
+
+    The per-step `captured`/`checkpoint` surface from `Task` is intentionally
+    not exposed: it cannot be called safely from multiple coroutines on the
+    same buffer.
+    """
+
+    _buffer_lock: asyncio.Lock
+
+    def __init__(
+        self,
+        log: Logger,
+        connector_status: ConnectorStatus,
+        name: str,
+        output: BinaryIO,
+        stopping: _BaseTask.Stopping,
+        tg: asyncio.TaskGroup,
+        transactor: Transactor,
+        catalog_task_name: str,
+        requires_ack: bool = False,
+    ):
+        super().__init__(
+            log=log,
+            connector_status=connector_status,
+            name=name,
+            output=output,
+            stopping=stopping,
+            tg=tg,
+            transactor=transactor,
+            requires_ack=requires_ack,
+            catalog_task_name=catalog_task_name,
         )
-        self._buffer.write(b"\n")
-        self._buffer.seek(0)
-        await emit_from_buffer(self._buffer, self._output)
-        self.reset()
+        self._buffer_lock = asyncio.Lock()
+
+    async def emit(
+        self,
+        items: Iterable[AssociatedDocument[Any]],
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ) -> None:
+        """Capture each item against its binding and write one checkpoint.
+
+        The buffer lock is held only while filling the buffer and flushing
+        it to stdout. The ACK wait, when `requires_ack` is True, happens
+        after the lock is released so concurrent emit() callers can pipeline
+        their writes instead of serializing on round-trip latency.
+        """
+
+        completion: asyncio.Future[None] | None = None
+        async with self._buffer_lock:
+            try:
+                for item in items:
+                    self._captured(item.binding, item.doc)
+                completion = await self._emit_checkpoint(state)
+            except BaseException as exc:
+                self.log.error(
+                    "MultipleWritersTask emit failed; discarding partial buffer",
+                    {"task": self._name, "error": str(exc)},
+                )
+                self._reset()
+                raise
+
+        if completion is None:
+            return
+        try:
+            await completion
+        except asyncio.CancelledError:
+            self.log.warning(
+                "MultipleWritersTask emit cancelled while awaiting ACK",
+                {"task": self._name},
+            )
+            raise

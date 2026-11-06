@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -789,6 +791,46 @@ func TestCaptureWithNullCursor(t *testing.T) {
 	})
 }
 
+// TestNullCursorNotPersisted verifies that a partial-progress checkpoint never
+// persists a NULL cursor value, which would make a resumed query match no rows.
+func TestNullCursorNotPersisted(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, sort_col INTEGER)")
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "sort_col")
+	setShutdownAfterQuery(t, true)
+
+	// Insert more NULL-cursor rows than documentsPerCheckpoint, then rows with
+	// non-NULL cursors. MySQL returns the NULL rows first, so a partial-progress
+	// checkpoint is due right where the cursor changes from NULL to non-NULL. Without
+	// the check, that checkpoint would save a NULL cursor.
+	var values []string
+	for i := 0; i < documentsPerCheckpoint+500; i++ {
+		values = append(values, fmt.Sprintf("(%d, NULL)", i))
+	}
+	for i := 0; i < 100; i++ {
+		values = append(values, fmt.Sprintf("(%d, %d)", documentsPerCheckpoint+500+i, i))
+	}
+	executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES %s", tableName, strings.Join(values, ", ")))
+
+	var cursorCheckpoints int
+	cs.Capture(ctx, t, func(data json.RawMessage) {
+		var state captureState
+		if err := json.Unmarshal(data, &state); err != nil || state.Streams == nil {
+			return // Not a checkpoint
+		}
+		var stream = state.Streams[boilerplate.StateKey(cs.Bindings[0].StateKey)]
+		if stream == nil || len(stream.CursorValues) == 0 {
+			return
+		}
+		require.NotContains(t, stream.CursorValues, nil, "persisted a NULL cursor value")
+		cursorCheckpoints++
+	})
+	require.Empty(t, cs.Errors)
+	require.Greater(t, cursorCheckpoints, 1, "expected a partial-progress checkpoint as well as the final one")
+}
+
 // TestQueryTemplateOverride exercises a capture configured with an explicit query template
 // in the resource spec rather than a blank template and specified table name/schema.
 //
@@ -1088,6 +1130,141 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 
 			cs.Capture(ctx, t, nil)
 			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}
+
+// TestBackfillMarkers exercises backfill signals with emit_backfill_signals set.
+// Each capture sends its sourced schemas right before its first BackfillBegin, and
+// the test harness fails the capture if a marker doesn't stand alone in its
+// checkpoint.
+func TestBackfillMarkers(t *testing.T) {
+	var ctx, control = context.Background(), testMySQLClient(t)
+
+	var backfillMarkersCaptureSpec = func(t *testing.T) *st.CaptureSpec {
+		var cs = testCaptureSpec(t)
+		cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "emit_backfill_signals"
+		cs.Validator = &st.OrderedCaptureValidator{IncludeBackfillMarkers: true, PrettyDocuments: true}
+		setShutdownAfterQuery(t, true)
+		return cs
+	}
+
+	// Every poll of a full-refresh binding is a complete restatement.
+	t.Run("FullRefresh", func(t *testing.T) {
+		var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+		createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+		var cs = backfillMarkersCaptureSpec(t)
+		cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+		for i := 0; i < 5; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		executeControlQuery(t, control, fmt.Sprintf("DELETE FROM %s WHERE id IN (1, 3)", tableName))
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+
+	// Only the first poll of an incremental binding is a complete restatement.
+	t.Run("Incremental", func(t *testing.T) {
+		var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+		createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+		var cs = backfillMarkersCaptureSpec(t)
+		cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+		setResourceCursor(t, cs.Bindings[0], "id")
+
+		for i := 0; i < 5; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		for i := 5; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+
+	// An incremental backfill resumed partway through must complete without
+	// beginning again. A second BackfillBegin would mark the rows captured before
+	// the resume as stale, and BackfillComplete would then delete them.
+	t.Run("IncrementalResume", func(t *testing.T) {
+		var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+		createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+		var cs = backfillMarkersCaptureSpec(t)
+		cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+		setResourceCursor(t, cs.Bindings[0], "id")
+
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Checkpoint = json.RawMessage(fmt.Sprintf(
+			`{"bindingStateV1":{%q:{"CursorNames":["id"],"CursorValues":[4],"DocumentCount":5,"IsAwaitingBackfillComplete":true}}}`,
+			cs.Bindings[0].StateKey,
+		))
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+
+	// A template override added partway through a backfill means the backfill may
+	// not capture the whole table, so it must never send BackfillComplete, even
+	// after the override is removed again.
+	t.Run("RuleFailsMidBackfill", func(t *testing.T) {
+		var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+		createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+		var cs = backfillMarkersCaptureSpec(t)
+		cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+		setResourceCursor(t, cs.Bindings[0], "id")
+
+		var setTemplate = func(tmpl string) {
+			var res Resource
+			require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+			res.Template = tmpl
+			var bs, err = json.Marshal(res)
+			require.NoError(t, err)
+			cs.Bindings[0].ResourceConfigJson = bs
+		}
+
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Checkpoint = json.RawMessage(fmt.Sprintf(
+			`{"bindingStateV1":{%q:{"CursorNames":["id"],"CursorValues":[4],"DocumentCount":5,"IsAwaitingBackfillComplete":true}}}`,
+			cs.Bindings[0].StateKey,
+		))
+		setTemplate(fmt.Sprintf(`SELECT * FROM %s WHERE id > @flow_cursor_value[0] AND id < 8 ORDER BY id`, tableName))
+		cs.Capture(ctx, t, nil)
+
+		setTemplate("")
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+func TestShouldEmitBackfillSignals(t *testing.T) {
+	// Creation dates on either side of the emit_backfill_signals cutoff.
+	const beforeCutoff, afterCutoff = "2026-01-01", "2099-01-01"
+	for _, tt := range []struct {
+		name      string
+		createdAt string
+		flags     string
+		template  string
+		want      bool
+	}{
+		{"default template", afterCutoff, "", "", true},
+		{"task created before the cutoff", beforeCutoff, "", "", false},
+		{"task created before the cutoff with emit_backfill_signals", beforeCutoff, "emit_backfill_signals", "", true},
+		{"template override", afterCutoff, "", "SELECT * FROM t WHERE x > 0", false},
+		{"template override with ignore_config_for_backfill_signals", afterCutoff, "ignore_config_for_backfill_signals", "SELECT * FROM t WHERE x > 0", true},
+		{"default template with no_emit_backfill_signals", afterCutoff, "no_emit_backfill_signals", "", false},
+		{"template override with both flags", afterCutoff, "no_emit_backfill_signals,ignore_config_for_backfill_signals", "SELECT * FROM t WHERE x > 0", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var createdAt, err = common.ParseCreatedAt(tt.createdAt)
+			require.NoError(t, err)
+			var cfg = &Config{Advanced: advancedConfig{FeatureFlags: tt.flags}}
+			cfg.resolveFeatureFlags(createdAt)
+			var res = &Resource{Name: "t", SchemaName: "s", TableName: "t", Template: tt.template}
+			require.Equal(t, tt.want, shouldEmitBackfillSignals(cfg, res))
 		})
 	}
 }

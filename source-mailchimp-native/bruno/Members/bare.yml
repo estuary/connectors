@@ -1,0 +1,553 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/members?count=10"
+  params:
+    - name: count
+      value: "10"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - populated, subscribed+unsubscribed, archived excluded
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/members?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "unique_email_id": "d7c26fdb43",
+                "contact_id": "47f004504f1869d6508905c179231fb7",
+                "full_name": "connector-dev+mailchimp@estuary.dev",
+                "web_id": 360308877,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "connector-dev+mailchimp@estuary.dev",
+                  "LNAME": "",
+                  "ADDRESS": {
+                    "addr1": "Estuary\n244 5th Ave Ste 1277\nNew York, NY 10001-7604\nUSA",
+                    "addr2": "",
+                    "city": "",
+                    "state": "",
+                    "zip": "",
+                    "country": "US"
+                  },
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "186.132.55.36",
+                "timestamp_opt": "2026-06-09T15:12:24+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-09T15:12:24+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "Admin Add",
+                "tags_count": 0,
+                "tags": [],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "unique_email_id": "277db7ffd1",
+                "contact_id": "6da1d215041fc8de79f7c1d596a9e90d",
+                "full_name": "Estuary Cursor Probe",
+                "web_id": 360308973,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "Estuary Cursor Probe",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:06+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T14:26:23+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "API - Generic",
+                "tags_count": 2,
+                "tags": [
+                  {
+                    "id": 2225593,
+                    "name": "estuary-test-segment (cursor probe)"
+                  },
+                  {
+                    "id": 2225591,
+                    "name": "estuary-test-tag"
+                  }
+                ],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "7bfb50d36252f5094fec17e378483cf1",
+                "email_address": "nicolas+estuary-test-3@estuary.dev",
+                "unique_email_id": "bf79c35454",
+                "contact_id": "0a2a92c7a707044b298b6e88a704f965",
+                "full_name": "",
+                "web_id": 360308986,
+                "email_type": "html",
+                "status": "unsubscribed",
+                "unsubscribe_reason": "N/A (Unsubscribed by admin)",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:32:34+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:32:42+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "API - Generic",
+                "tags_count": 1,
+                "tags": [
+                  {
+                    "id": 2225593,
+                    "name": "estuary-test-segment (cursor probe)"
+                  }
+                ],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 3,
+            "_links": "REDACTED"
+          }
+  - name: 200 - single original member pre-seeding
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/members?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "unique_email_id": "d7c26fdb43",
+                "contact_id": "47f004504f1869d6508905c179231fb7",
+                "full_name": "connector-dev+mailchimp@estuary.dev",
+                "web_id": 360308877,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "connector-dev+mailchimp@estuary.dev",
+                  "LNAME": "",
+                  "ADDRESS": {
+                    "addr1": "Estuary\n244 5th Ave Ste 1277\nNew York, NY 10001-7604\nUSA",
+                    "addr2": "",
+                    "city": "",
+                    "state": "",
+                    "zip": "",
+                    "country": "US"
+                  },
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "186.132.55.36",
+                "timestamp_opt": "2026-06-09T15:12:24+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-09T15:12:24+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "Admin Add",
+                "tags_count": 0,
+                "tags": [],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 1,
+            "_links": "REDACTED"
+          }
+  - name: 200 - after D4 unarchive, member rejoins with advanced last_changed
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/members?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "unique_email_id": "d7c26fdb43",
+                "contact_id": "47f004504f1869d6508905c179231fb7",
+                "full_name": "connector-dev+mailchimp@estuary.dev",
+                "web_id": 360308877,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "connector-dev+mailchimp@estuary.dev",
+                  "LNAME": "",
+                  "ADDRESS": {
+                    "addr1": "Estuary\n244 5th Ave Ste 1277\nNew York, NY 10001-7604\nUSA",
+                    "addr2": "",
+                    "city": "",
+                    "state": "",
+                    "zip": "",
+                    "country": "US"
+                  },
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "186.132.55.36",
+                "timestamp_opt": "2026-06-09T15:12:24+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-09T15:12:24+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "Admin Add",
+                "tags_count": 0,
+                "tags": [],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "unique_email_id": "277db7ffd1",
+                "contact_id": "6da1d215041fc8de79f7c1d596a9e90d",
+                "full_name": "Estuary Cursor Probe",
+                "web_id": 360308973,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "Estuary Cursor Probe",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:06+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T14:26:23+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "API - Generic",
+                "tags_count": 2,
+                "tags": [
+                  {
+                    "id": 2225593,
+                    "name": "estuary-test-segment (cursor probe)"
+                  },
+                  {
+                    "id": 2225591,
+                    "name": "estuary-test-tag"
+                  }
+                ],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "unique_email_id": "e8feaf0c3c",
+                "contact_id": "1bc3bc1c920d4a6cef2ee0d620f08bb0",
+                "full_name": "",
+                "web_id": 360308974,
+                "email_type": "html",
+                "status": "subscribed",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:38+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-07-02T18:19:54+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "API - Generic",
+                "tags_count": 3,
+                "tags": [
+                  {
+                    "id": 2225593,
+                    "name": "estuary-test-segment (cursor probe)"
+                  },
+                  {
+                    "id": 2225591,
+                    "name": "estuary-test-tag"
+                  },
+                  {
+                    "id": 2225592,
+                    "name": "estuary-other-tag"
+                  }
+                ],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "7bfb50d36252f5094fec17e378483cf1",
+                "email_address": "nicolas+estuary-test-3@estuary.dev",
+                "unique_email_id": "bf79c35454",
+                "contact_id": "0a2a92c7a707044b298b6e88a704f965",
+                "full_name": "",
+                "web_id": 360308986,
+                "email_type": "html",
+                "status": "unsubscribed",
+                "unsubscribe_reason": "N/A (Unsubscribed by admin)",
+                "consents_to_one_to_one_messaging": true,
+                "sms_phone_number": "",
+                "sms_subscription_status": "",
+                "sms_subscription_last_updated": "",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:32:34+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:32:42+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": "",
+                  "region": ""
+                },
+                "source": "API - Generic",
+                "tags_count": 1,
+                "tags": [
+                  {
+                    "id": 2225593,
+                    "name": "estuary-test-segment (cursor probe)"
+                  }
+                ],
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "list_id": "f34247943d",
+            "total_items": 4,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/list-members-info/)
+
+  **WHY:** bare list for the `list_members` stream. Teaches the envelope, that
+  each member carries its parent `list_id` in the body (so no parent-ID
+  injection is needed), and the identity/cursor fields the stream design leans
+  on. Each member's `id` is the MD5 subscriber hash that the D1/D2 mutation
+  seeds reference directly in their URLs.
+
+  **VERIFIED (2026-06-30):** envelope is `{members, list_id, total_items,
+  _links}`; each member carries `id` (MD5 of lowercase email), `last_changed`,
+  `status`, and `list_id` in the body.
+
+  **VERIFIED (2026-07-06):** unarchiving advances `last_changed` — after
+  `Seeding/D4 - Unarchive Member`, the member rejoins the bare list with its
+  `last_changed` advanced past the archive instant (see the "after D4
+  unarchive" example), so a since-filtered sweep picks the member back up and
+  its `status` heals downstream.

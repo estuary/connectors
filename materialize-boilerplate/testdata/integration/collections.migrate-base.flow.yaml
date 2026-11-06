@@ -211,6 +211,8 @@ collections:
         numStrUnionToMulti: { type: [number, string], format: number }
         objectToMulti: *object
         stringToMulti: *string
+        objectToString: *object
+        arrayToString: *array
         binaryToString: *binary
         stringToBinary: *string
         # Quoted-name fields exercise identifier escaping in dialects that
@@ -243,5 +245,8 @@ collections:
         uint064ToString: *uint064
         iriToString: *iri
         iriReferenceToString: *iriReference
+        stringToEnum: { type: string }
+        enumToString: { type: string, enum: [active, inactive] }
+        enumToExtendedEnum: { type: string, enum: [active, inactive] }
       required: [id]
     key: [/id]

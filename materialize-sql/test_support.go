@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -30,14 +29,39 @@ import (
 // that produce standard snapshots.
 var snapshotPath = "../materialize-sql/.snapshots"
 
+// RuntimeConfig configures how a materialization integration test drives the
+// runtime, notably its shard count. See the testutil type of the same name.
+type RuntimeConfig = testutil.RuntimeConfig
+
+// SanitizeCheckpointHashes returns a sanitizer for connector values derived by
+// hashing the runtime checkpoint. See the testutil function of the same name.
+func SanitizeCheckpointHashes(pattern, placeholder string) func(string) string {
+	return testutil.SanitizeCheckpointHashes(pattern, placeholder)
+}
+
 func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
 	driver *Driver[EC, RC],
 	source string,
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
+	runtime RuntimeConfig,
 ) {
-	testutil.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn, actionDescSanitizers)
+	testutil.RunMaterializationTest(t, driver.NewMaterializer, source, makeResourceFn, actionDescSanitizers, runtime)
+}
+
+// PrepareTestTask renames a task and its resources for one test run. See the
+// testutil function of the same name.
+func PrepareTestTask[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	bundled []byte,
+	taskName string,
+	cfg EC,
+	makeResourceFn func(string, bool) RC,
+) testutil.TestTask {
+	t.Helper()
+	return testutil.PrepareTestTask(t, driver.NewMaterializer, bundled, taskName, cfg, makeResourceFn)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -46,7 +70,86 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, 
 	sourcePath string,
 	makeResourceFn func(string, bool) RC,
 ) {
-	testutil.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
+	testutil.RunApplyTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn)
+}
+
+// RunApplyDrainTest verifies the two-iteration Apply drain of a post-commit
+// apply connector. See the testutil function of the same name.
+func RunApplyDrainTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	cfg EC,
+	res RC,
+	seedPending func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage,
+	verifyDrained func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any),
+) {
+	testutil.RunApplyDrainTest(t, driver, driver.NewMaterializer, cfg, res, seedPending, verifyDrained)
+}
+
+// DrainSeedInsertQuery builds an INSERT statement adding a single row to the
+// applied base specification's resource, covering every selected field. It
+// serves as the staged work of a committed-but-unacknowledged transaction
+// when seeding connector state for RunApplyDrainTest: post-commit apply SQL
+// connectors persist the queries of a staged transaction in their state and
+// execute them during Acknowledge. Identifiers are quoted and fields
+// translated by the connector's own dialect; jsonLiteral is the dialect's
+// expression for a JSON/object value.
+func DrainSeedInsertQuery[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	cfg EC,
+	appliedSpec *pf.MaterializationSpec,
+	jsonLiteral string,
+) string {
+	t.Helper()
+	ctx := context.Background()
+
+	flags, err := boilerplate.ResolveFlags(cfg, appliedSpec)
+	require.NoError(t, err)
+
+	m, err := driver.NewMaterializer(ctx, "apply-drain-seed", cfg, flags)
+	require.NoError(t, err)
+	defer m.Close(ctx)
+	s, ok := m.(*sqlMaterialization[EC, RC])
+	require.True(t, ok)
+	dialect := s.endpoint.Dialect
+
+	// Literals for the fields of the testutil drain fixture specs
+	// (validate_apply_test_cases base.flow.proto).
+	literals := map[string]string{
+		"key":                  "'k1'",
+		"flow_published_at":    "CURRENT_TIMESTAMP",
+		"_meta/flow_truncated": "false",
+		"optionalBoolean":      "true",
+		"requiredBoolean":      "true",
+		"optionalInteger":      "2",
+		"requiredInteger":      "1",
+		"optionalString":       "'opt'",
+		"requiredString":       "'req'",
+		"optionalObject":       jsonLiteral,
+		"requiredObject":       jsonLiteral,
+		"second_root":          jsonLiteral,
+		"flow_document":        jsonLiteral,
+	}
+
+	b := appliedSpec.Bindings[0]
+	fields := append(append([]string{}, b.FieldSelection.Keys...), b.FieldSelection.Values...)
+	if b.FieldSelection.Document != "" {
+		fields = append(fields, b.FieldSelection.Document)
+	}
+
+	var cols, vals []string
+	for _, f := range fields {
+		lit, ok := literals[f]
+		require.True(t, ok, "no seed literal for selected field %q", f)
+		cols = append(cols, dialect.Identifier(dialect.ColumnLocator(f)))
+		vals = append(vals, lit)
+	}
+
+	return fmt.Sprintf("INSERT INTO %s (%s) SELECT %s",
+		dialect.Identifier(b.ResourcePath...),
+		strings.Join(cols, ", "),
+		strings.Join(vals, ", "))
 }
 
 func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -56,7 +159,37 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	testutil.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
+	testutil.RunMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
+}
+
+// RunKeyChangeMigrationTest verifies that a KeyChangeInPlace endpoint keeps
+// its table and data through a group-by changing backfill.
+func RunKeyChangeMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+	actionDescSanitizers []func(string) string,
+) {
+	testutil.RunKeyChangeMigrationTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
+}
+
+// FeatureFlagMigrationPhase is one apply of a RunFeatureFlagMigrationTest.
+type FeatureFlagMigrationPhase = testutil.FeatureFlagMigrationPhase
+
+// RunFeatureFlagMigrationTest applies a binding repeatedly against the same
+// resource, changing the endpoint's feature flags between phases, to verify
+// migrations driven by a feature flag change (e.g. flow_document migrating
+// between JSON and text as objects_and_arrays_as_json is toggled).
+func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+	phases []FeatureFlagMigrationPhase,
+	actionDescSanitizers []func(string) string,
+) {
+	testutil.RunFeatureFlagMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, phases, actionDescSanitizers)
 }
 
 // RunFencingTest is a generalized form of test cases over fencing behavior,
@@ -69,28 +202,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 	createTableTpl *template.Template,
 	updateFence func(context.Context, Client, Fence) error,
 ) {
-	dumpTable := func(
-		ctx context.Context,
-		m boilerplate.Materializer[EC, FieldConfig, RC, MappedType],
-		path []string,
-	) (string, error) {
-		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
-		if err != nil {
-			return "", err
-		}
-
-		var out strings.Builder
-		enc := json.NewEncoder(&out)
-		for _, r := range rows {
-			doc := make(map[string]any, len(columnNames))
-			for i, col := range columnNames {
-				doc[col] = r[i]
-			}
-			require.NoError(t, enc.Encode(doc))
-		}
-
-		return out.String(), nil
-	}
+	testutil.SkipRuntimeV1(t)
 
 	// runTest takes zero or more key range fixtures, followed by a final pair
 	// which is the key range under test.
@@ -101,13 +213,15 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 
 		checkpointsTable := "temp_test_fencing_checkpoints" + rngSuffix
 
-		rawFlags, defaultFlags := cfg.FeatureFlags()
-		parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+		// The fencing harness has no runtime spec to take a creation date from,
+		// so date-gated flags resolve as they do for a brand-new task.
+		parsedFlags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+		require.NoError(t, err)
 
 		ep, err := driver.NewEndpoint(ctx, cfg, parsedFlags)
 		require.NoError(t, err)
 
-		m, err := driver.newMaterialization(ctx, taskName, cfg, parsedFlags)
+		m, err := driver.NewMaterializer(ctx, taskName, cfg, parsedFlags)
 		require.NoError(t, err)
 
 		dialect := ep.Dialect
@@ -158,7 +272,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		})
 		require.NoError(t, err)
 
-		dump1, err := dumpTable(ctx, m, checkpointsPath)
+		dump1, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		// Install the fence under test
@@ -172,14 +286,14 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		})
 		require.NoError(t, err)
 
-		dump2, err := dumpTable(ctx, m, checkpointsPath)
+		dump2, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		// Update it once.
 		fence.Checkpoint = append(fence.Checkpoint, []byte{0, 0, 0, 0, 0, 0, 0, 0}...)
 		require.NoError(t, updateFence(ctx, client, fence))
 
-		dump3, err := dumpTable(ctx, m, checkpointsPath)
+		dump3, err := testutil.SnapshotResource(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
@@ -542,8 +656,15 @@ func compareValues(a, b any) int {
 		}
 	}
 
-	sa := fmt.Sprintf("%v", a)
-	sb := fmt.Sprintf("%v", b)
+	// A json.RawMessage is compared by its byte slice formatting, which is how
+	// fmt printed it before Go 1.27 made it a fmt.Stringer. This keeps the row
+	// order of existing snapshots.
+	fmtValue := func(v any) string {
+		if raw, ok := v.(json.RawMessage); ok {
+			return fmt.Sprintf("%v", []byte(raw))
+		}
+		return fmt.Sprintf("%v", v)
+	}
 
-	return cmp.Compare(sa, sb)
+	return cmp.Compare(fmtValue(a), fmtValue(b))
 }

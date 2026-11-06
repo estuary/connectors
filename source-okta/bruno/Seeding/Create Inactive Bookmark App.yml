@@ -1,0 +1,75 @@
+info:
+  name: Create Inactive Bookmark App
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/apps?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "name": "bookmark",
+        "label": "Estuary Seed Bookmark (inactive)",
+        "signOnMode": "BOOKMARK",
+        "settings": {
+          "app": {
+            "url": "https://example.com/estuary-seed-bookmark.html"
+          }
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - created INACTIVE BOOKMARK app (projection)"
+    request:
+      url: "{{base_url}}/apps?activate=false"
+      method: POST
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          {
+            "id": "0oa18gus6s1DyA92Z698",
+            "name": "bookmark",
+            "status": "INACTIVE",
+            "signOnMode": "BOOKMARK",
+            "lastUpdated": "2026-10-07T14:36:53.000Z"
+          }
+
+docs: |-
+  **REFERENCE:** [Create an application](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/createApplication)
+
+  **WHY:** the org has only ACTIVE built-in OIDC apps, so the `includeNonDeleted`
+  default can't be observed. `activate=false` creates the app directly in `INACTIVE`
+  status in one request. Feeds `Applications / bare`, `Applications / includeNonDeleted`
+  and `Applications / status INACTIVE filter`: does an INACTIVE app appear without
+  `includeNonDeleted=true`? It also adds a second `signOnMode` (`BOOKMARK`) so the
+  snapshot covers the oneOf polymorphism.
+
+  **Prerequisites:** none beyond an admin token with app-management rights. Costs one
+  request against the `/apps` bucket.
+
+  **Cleanup (optional):** an INACTIVE app can be deleted directly with
+  `DELETE /api/v1/apps/{id}`. Leaving it in place is intended — the snapshot tests then
+  cover an INACTIVE, non-OIDC app.
+
+  Outcome: ran 2026-10-07 (assistant, `seeding: assistant`); created `0oa18gus6s1DyA92Z698` in `INACTIVE`. Finding VERIFIED in `Applications / includeNonDeleted`.

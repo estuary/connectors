@@ -1,307 +1,514 @@
 [
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
         "properties": {
           "_meta": {
             "properties": {
-              "row_id": {
-                "type": "integer"
+              "op": {
+                "const": "d"
               }
             },
             "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
+              "op"
+            ]
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
+          "_meta"
+        ]
       },
-      "key": [
-        "/id"
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
-      "recommendedName": "campaigns",
-      "resourceConfig": {
-        "cursorField": [
-          "updated_at"
-        ],
-        "stream": "campaigns",
-        "syncMode": "incremental"
-      }
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
-        "properties": {
-          "_meta": {
-            "properties": {
-              "row_id": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
-      },
-      "key": [
-        "/id"
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
       ],
-      "recommendedName": "events",
-      "resourceConfig": {
-        "cursorField": [
-          "datetime"
-        ],
-        "stream": "events",
-        "syncMode": "incremental"
-      }
+      "stream": "campaigns",
+      "syncMode": "incremental"
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
+    "resourcePath": [
+      "campaigns"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
         "properties": {
           "_meta": {
             "properties": {
-              "row_id": {
-                "type": "integer"
+              "op": {
+                "const": "d"
               }
             },
             "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
+              "op"
+            ]
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
+          "_meta"
+        ]
       },
-      "key": [
-        "/id"
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
-      "recommendedName": "global_exclusions",
-      "resourceConfig": {
-        "cursorField": [
-          "updated"
-        ],
-        "stream": "global_exclusions",
-        "syncMode": "incremental"
-      }
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
-        "properties": {
-          "_meta": {
-            "properties": {
-              "row_id": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
-      },
-      "key": [
-        "/id"
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "events",
+    "resourceConfig": {
+      "cursorField": [
+        "datetime"
       ],
-      "recommendedName": "lists",
-      "resourceConfig": {
-        "cursorField": [
-          "updated"
-        ],
-        "stream": "lists",
-        "syncMode": "incremental"
-      }
+      "stream": "events",
+      "syncMode": "incremental"
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
+    "resourcePath": [
+      "events"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
         "properties": {
           "_meta": {
             "properties": {
-              "row_id": {
-                "type": "integer"
+              "op": {
+                "const": "d"
               }
             },
             "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
+              "op"
+            ]
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
+          "_meta"
+        ]
       },
-      "key": [
-        "/id"
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
-      "recommendedName": "metrics",
-      "resourceConfig": {
-        "cursorField": [
-          "updated"
-        ],
-        "stream": "metrics",
-        "syncMode": "incremental"
-      }
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
-        "properties": {
-          "_meta": {
-            "properties": {
-              "row_id": {
-                "type": "integer"
-              }
-            },
-            "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
-      },
-      "key": [
-        "/id"
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "global_exclusions",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
       ],
-      "recommendedName": "flows",
-      "resourceConfig": {
-        "cursorField": [
-          "updated"
-        ],
-        "stream": "flows",
-        "syncMode": "incremental"
-      }
+      "stream": "global_exclusions",
+      "syncMode": "incremental"
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
+    "resourcePath": [
+      "global_exclusions"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
         "properties": {
           "_meta": {
             "properties": {
-              "row_id": {
-                "type": "integer"
+              "op": {
+                "const": "d"
               }
             },
             "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
+              "op"
+            ]
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
+          "_meta"
+        ]
       },
-      "key": [
-        "/id"
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
-      "recommendedName": "email_templates",
-      "resourceConfig": {
-        "cursorField": [
-          "updated"
-        ],
-        "stream": "email_templates",
-        "syncMode": "incremental"
-      }
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
     },
-    {
-      "documentSchema": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "additionalProperties": true,
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "lists",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "lists",
+      "syncMode": "incremental"
+    },
+    "resourcePath": [
+      "lists"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
         "properties": {
           "_meta": {
             "properties": {
-              "row_id": {
-                "type": "integer"
+              "op": {
+                "const": "d"
               }
             },
             "required": [
-              "row_id"
-            ],
-            "type": "object"
-          },
-          "id": {
-            "type": "string"
+              "op"
+            ]
           }
         },
         "required": [
-          "id"
-        ],
-        "type": "object",
-        "x-infer-schema": true
+          "_meta"
+        ]
       },
-      "key": [
-        "/id"
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
       ],
-      "recommendedName": "profiles",
-      "resourceConfig": {
-        "cursorField": [
-          "updated"
-        ],
-        "stream": "profiles",
-        "syncMode": "incremental"
-      }
-    }
-  ]
-  
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "metrics",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "metrics",
+      "syncMode": "incremental"
+    },
+    "resourcePath": [
+      "metrics"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "flows",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "flows",
+      "syncMode": "incremental"
+    },
+    "resourcePath": [
+      "flows"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "email_templates",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "email_templates",
+      "syncMode": "incremental"
+    },
+    "resourcePath": [
+      "email_templates"
+    ]
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "profiles",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "profiles",
+      "syncMode": "incremental"
+    },
+    "resourcePath": [
+      "profiles"
+    ]
+  }
+]

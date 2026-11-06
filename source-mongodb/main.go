@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -58,9 +59,9 @@ func (m captureMode) validate() error {
 type resource struct {
 	Database     string      `json:"database" jsonschema:"title=Database name" jsonschema_extras:"order=0"`
 	Collection   string      `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"order=1"`
-	Mode         captureMode `json:"captureMode,omitempty" jsonschema:"title=Capture Mode,enum=Change Stream Incremental,enum=Batch Snapshot,enum=Batch Incremental" jsonschema_extras:"order=2"`
+	Mode         captureMode `json:"captureMode,omitempty" jsonschema:"title=Capture Mode,enum=Change Stream Incremental,enum=Batch Snapshot,enum=Batch Incremental" jsonschema_extras:"order=2,nonsensitive=true"`
 	Cursor       string      `json:"cursorField,omitempty" jsonschema:"title=Cursor Field,description=The name of the field to use as a cursor for batch-mode bindings. For best performance this field should be indexed. When used with 'Batch Incremental' mode documents added to the collection are expected to always have the cursor field and for it to be strictly increasing." jsonschema_extras:"order=3"`
-	PollSchedule string      `json:"pollSchedule,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to poll batch collections (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=4"`
+	PollSchedule string      `json:"pollSchedule,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to poll batch collections (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=4,nonsensitive=true"`
 }
 
 func (r resource) Validate() error {
@@ -119,18 +120,52 @@ type config struct {
 	User                 string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password             string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database             string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the deployment." jsonschema_extras:"order=3"`
-	BatchAndChangeStream bool   `json:"batchAndChangeStream,omitempty" jsonschema:"title=Capture Batch Collections in Addition to Change Stream Collections,description=Discover collections that can only be batch captured if the deployment supports change streams. Check this box to capture views and time series collections as well as change streams. All collections will be captured in batch mode if the server does not support change streams regardless of this setting." jsonschema_extras:"order=4"`
-	PollSchedule         string `json:"pollSchedule,omitempty" jsonschema:"title=Default Batch Collection Polling Schedule,description=When and how often to poll batch collections. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=5"`
+	BatchAndChangeStream bool   `json:"batchAndChangeStream,omitempty" jsonschema:"title=Capture Batch Collections in Addition to Change Stream Collections,description=Discover collections that can only be batch captured if the deployment supports change streams. Check this box to capture views and time series collections as well as change streams. All collections will be captured in batch mode if the server does not support change streams regardless of this setting." jsonschema_extras:"order=4,nonsensitive=true"`
+	PollSchedule         string `json:"pollSchedule,omitempty" jsonschema:"title=Default Batch Collection Polling Schedule,description=When and how often to poll batch collections. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=5,nonsensitive=true"`
 
 	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network." jsonschema_extras:"order=6"`
 	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=7"`
 }
 
 type advancedConfig struct {
-	MaxAwaitTime              string `json:"maxAwaitTime,omitempty" jsonschema:"title=Max Await Time,description=Maximum time to wait for new change stream events before returning an empty batch. Defaults to 1 second. Accepts a Go duration string like '10s'."`
-	DisablePreImages          bool   `json:"disablePreImages,omitempty" jsonschema:"title=Disable Pre-Images,description=Disable requesting pre-images even if the MongoDB deployment supports them and they are enabled for collections."`
-	ExclusiveCollectionFilter bool   `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
+	MaxAwaitTime              string `json:"maxAwaitTime,omitempty" jsonschema:"title=Max Await Time,description=Maximum time to wait for new change stream events before returning an empty batch. Defaults to 1 second. Accepts a Go duration string like '10s'." jsonschema_extras:"nonsensitive=true"`
+	DisablePreImages          bool   `json:"disablePreImages,omitempty" jsonschema:"title=Disable Pre-Images,description=Disable requesting pre-images even if the MongoDB deployment supports them and they are enabled for collections." jsonschema_extras:"nonsensitive=true"`
+	ExclusiveCollectionFilter bool   `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled." jsonschema_extras:"nonsensitive=true"`
 	ExcludeCollections        string `json:"excludeCollections,omitempty" jsonschema:"title=Exclude Collections,description=Comma-separated list of collections to exclude from database change streams. Each one should be formatted as 'database_name:collection'. Cannot be set if exclusiveCollectionFilter is enabled."`
+	SkipBackfills             string `json:"skipBackfills,omitempty" jsonschema:"title=Skip Backfills,description=Comma-separated list of collections which should not be backfilled. Each one should be formatted as 'database_name:collection'. Use '*:*' to skip the backfill of every change stream collection."`
+}
+
+const skipAllBackfills = "*:*"
+
+func (c *config) skipsAllBackfills() bool {
+	return strings.TrimSpace(c.Advanced.SkipBackfills) == skipAllBackfills
+}
+
+func (c *config) skipBackfillsNamespaces() []string {
+	namespaces := strings.Split(c.Advanced.SkipBackfills, ",")
+	for idx, ns := range namespaces {
+		namespaces[idx] = strings.TrimSpace(ns)
+	}
+	return namespaces
+}
+
+func (c *config) shouldBackfill(database, collection string) bool {
+	if c.skipsAllBackfills() {
+		return false
+	}
+
+	var namespace = database + ":" + collection
+
+	// NOTE: MongoDB database and collection names are case-sensitive
+	//
+	// The whole namespace is compared as a single string, so a database or
+	// collection name which itself contains a ':' is matched correctly
+	// without needing to be parsed.
+	if slices.Contains(c.skipBackfillsNamespaces(), namespace) {
+		return false
+	}
+
+	return true
 }
 
 func parseExcludeCollections(excludeCollections string) (map[string][]string, error) {
@@ -193,7 +228,54 @@ func (c *config) Validate() error {
 		return err
 	}
 
+	if strings.TrimSpace(c.Advanced.SkipBackfills) != "" && !c.skipsAllBackfills() {
+		for _, ns := range c.skipBackfillsNamespaces() {
+			if !strings.Contains(ns, ":") {
+				return fmt.Errorf("invalid 'skipBackfills' configuration: collection %q must be formatted as \"database_name:collection\"", ns)
+			}
+		}
+	}
+
 	return nil
+}
+
+// UnmarshalJSON removes any login from the address as the config is parsed, so
+// it can't leak into messages.
+func (c *config) UnmarshalJSON(data []byte) error {
+	// A custom unmarshaler doesn't inherit the caller's DisallowUnknownFields,
+	// so decode strictly here.
+	type plain config
+	var d = json.NewDecoder(bytes.NewReader(data))
+	d.DisallowUnknownFields()
+	if err := d.Decode((*plain)(c)); err != nil {
+		return err
+	}
+	c.Address = withoutCredentials(c.Address)
+	return nil
+}
+
+// withoutCredentials removes any login from the address. The address shouldn't
+// contain one, but users sometimes paste a full connection string, and the
+// configured user and password replace it when connecting anyway.
+func withoutCredentials(address string) string {
+	uri, err := url.Parse(address)
+	if err == nil && uri.Scheme != "" && uri.Host != "" {
+		uri.User = nil
+		return uri.String()
+	}
+	// ToURI treats anything else as a bare host, so everything up to the last
+	// '@' can only be a login.
+	scheme, rest, ok := strings.Cut(address, "://")
+	if !ok {
+		scheme, rest = "", address
+	}
+	if i := strings.LastIndex(rest, "@"); i >= 0 {
+		rest = rest[i+1:]
+	}
+	if scheme == "" {
+		return rest
+	}
+	return scheme + "://" + rest
 }
 
 // ToURI converts the Config to a DSN string.
@@ -220,12 +302,25 @@ func (c *config) ToURI() *url.URL {
 	return uri
 }
 
+// redactedAddress masks any password in the address for use in messages. The
+// address shouldn't contain credentials, but users sometimes paste a full
+// connection string.
+func redactedAddress(address string) string {
+	uri, err := url.Parse(address)
+	if err != nil {
+		return "<unparseable address>"
+	}
+	return uri.Redacted()
+}
+
 type driver struct{}
 
 func isDocumentDB(address string) (bool, error) {
 	uri, err := url.Parse(address)
 	if err != nil {
-		return false, fmt.Errorf("parsing address: %w", err)
+		// A *url.Error repeats its input, which may contain a password, so unwrap it
+		// to get the actual error.
+		return false, fmt.Errorf("parsing address: %w", errors.Unwrap(err))
 	}
 
 	return strings.HasSuffix(uri.Hostname(), ".docdb.amazonaws.com"), nil
@@ -256,7 +351,9 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		uri, err := url.Parse(cfg.Address)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address for network tunnel: %w", err)
+			// A *url.Error repeats its input, which may contain a password, so unwrap it
+			// to get the actual error.
+			return nil, fmt.Errorf("parsing address for network tunnel: %w", errors.Unwrap(err))
 		}
 
 		var sshConfig = &networkTunnel.SshConfig{
@@ -272,7 +369,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 			return nil, err
 		}
 	} else if isDocDB {
-		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", cfg.Address)
+		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", redactedAddress(cfg.Address))
 	}
 
 	poolMonitor := &event.PoolMonitor{
@@ -338,12 +435,11 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 
 	// Ping the primary
 	if err := client.Ping(pingCtx, readpref.Primary()); err != nil {
-		var mongoErr mongoDriver.Error
 		client.Disconnect(ctx) // ignore error result
 
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address))
-		} else if errors.As(err, &mongoErr) {
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", redactedAddress(cfg.Address)))
+		} else if mongoErr, ok := errors.AsType[mongoDriver.Error](err); ok {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
 				// An auth error can occur for any of these reasons, and the mongo driver gives us no way to tell them apart:
@@ -500,6 +596,15 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the server does not support change streams", resourcePath, res.getMode())
 		} else if res.getMode() == captureModeChangeStream && !collectionType.canChangeStream() {
 			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the collection type '%s' does not support change streams", resourcePath, res.getMode(), collectionType)
+		}
+
+		if !cfg.skipsAllBackfills() &&
+			res.getMode() != captureModeChangeStream &&
+			!cfg.shouldBackfill(res.Database, res.Collection) {
+			return nil, fmt.Errorf(
+				"binding %q is named by the 'skipBackfills' advanced option, which only applies to bindings with mode '%s', and this binding has mode '%s': disable the binding instead of skipping its backfill",
+				resourcePath, captureModeChangeStream, res.getMode(),
+			)
 		}
 
 		bindings = append(bindings, &pc.Response_Validated_Binding{

@@ -15,6 +15,7 @@ from source_klaviyo.exceptions import KlaviyoBackoffError
 from source_klaviyo.streams import (
     ArchivedRecordsStream,
     Campaigns,
+    Events,
     GlobalExclusions,
     IncrementalKlaviyoStream,
     KlaviyoStream,
@@ -152,6 +153,43 @@ class TestKlaviyoStream:
             stream.backoff_time(response_mock)
         error_message = f"Stream some_stream has reached rate limit with 'Retry-After' of {float(retry_after)} seconds, exit from stream."
         assert str(e.value) == error_message
+
+    def test_map_record_normalizes_datetimes(self):
+        """Normalization hangs off the base map_record, so every stream gets it, not only the ones that override it."""
+
+        stream = SomeIncrementalStream(api_key=API_KEY, start_date=START_DATE.isoformat())
+        record = stream.map_record(
+            {
+                "type": "metric",
+                "id": "abc123",
+                "attributes": {
+                    "updated": "2026-06-23 00:15:23+00:00",
+                    "created": "2026-06-23 00:15:23.918411+00:00",
+                    # Klaviyo omits the UTC offset on some values.
+                    "last_seen": "2026-06-23 00:15:23",
+                    # Free-text values that merely contain spaces must be left alone.
+                    "favorite_month": "May 5, 2021",
+                    "status": "onboarding complete",
+                    # A trailing newline means it isn't a clean datetime; leave it untouched
+                    # rather than dropping the newline.
+                    "notes": "2026-06-23 00:15:23+00:00\n",
+                    "tags": ["2026-06-23 00:15:23+00:00", "plain tag"],
+                },
+            }
+        )
+        assert record["attributes"] == {
+            "updated": "2026-06-23T00:15:23+00:00",
+            "created": "2026-06-23T00:15:23.918411+00:00",
+            "last_seen": "2026-06-23T00:15:23",
+            "favorite_month": "May 5, 2021",
+            "status": "onboarding complete",
+            "notes": "2026-06-23 00:15:23+00:00\n",
+            "tags": ["2026-06-23T00:15:23+00:00", "plain tag"],
+        }
+        # The cursor is copied to the top level after normalization, so it carries the
+        # normalized value. SemiIncrementalKlaviyoStream compares cursors as strings
+        # against state written as isoformat(), and a space sorts below the "T".
+        assert record["updated"] == "2026-06-23T00:15:23+00:00"
 
 
 class TestIncrementalKlaviyoStream:
@@ -370,6 +408,72 @@ class TestProfilesStream:
             },
         ]
 
+    def test_parse_response_normalizes_datetimes(self, mocker):
+        stream = Profiles(api_key=API_KEY, start_date=START_DATE.isoformat())
+        json = {
+            "data": [
+                {
+                    "type": "profile",
+                    "id": "00AA0A0AA0AA000AAAAAAA0AA0",
+                    "attributes": {
+                        "email": "name@airbyte.io",
+                        "updated": "2023-03-10T20:36:36+00:00",
+                        "properties": {
+                            # Documented consent field, and an arbitrary custom property that also
+                            # happens to be a space-separated datetime: both should be normalized.
+                            "$consent_timestamp": "2026-06-23 00:15:23.918411+00:00",
+                            "custom_signup_date": "2026-06-23 00:15:23+00:00",
+                            # Free-text custom properties that merely contain spaces must be left alone.
+                            "favorite_month": "May 5, 2021",
+                            "status": "onboarding complete",
+                        },
+                        "subscriptions": {
+                            "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:23.918411+00:00"}},
+                            "sms": {
+                                "marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:24.000000+00:00"},
+                                "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23 00:15:25.000000+00:00"}},
+                        },
+                    },
+                },
+                {
+                    "type": "profile",
+                    "id": "AAAA1A1AA1AA111AAAAAAA1AA1",
+                    "attributes": {"email": "name2@airbyte.io", "updated": "2023-02-10T20:36:36+00:00"},
+                },
+            ],
+            "links": {"self": "https://a.klaviyo.com/api/profiles/", "next": None, "prev": None},
+        }
+        records = list(stream.parse_response(mocker.Mock(json=mocker.Mock(return_value=json))))
+        assert records == [
+            {
+                "type": "profile",
+                "id": "00AA0A0AA0AA000AAAAAAA0AA0",
+                "updated": "2023-03-10T20:36:36+00:00",
+                "attributes": {
+                    "email": "name@airbyte.io",
+                    "updated": "2023-03-10T20:36:36+00:00",
+                    "properties": {
+                        "$consent_timestamp": "2026-06-23T00:15:23.918411+00:00",
+                        "custom_signup_date": "2026-06-23T00:15:23+00:00",
+                        "favorite_month": "May 5, 2021",
+                        "status": "onboarding complete",
+                    },
+                    "subscriptions": {
+                        "email": {"marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:23.918411+00:00"}},
+                        "sms": {
+                            "marketing": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:24.000000+00:00"},
+                            "transactional": {"consent": "SUBSCRIBED", "consent_timestamp": "2026-06-23T00:15:25.000000+00:00"}},
+                    },
+                },
+            },
+            {
+                "type": "profile",
+                "id": "AAAA1A1AA1AA111AAAAAAA1AA1",
+                "updated": "2023-02-10T20:36:36+00:00",
+                "attributes": {"email": "name2@airbyte.io", "updated": "2023-02-10T20:36:36+00:00"},
+            },
+        ]
+
 
 class TestGlobalExclusionsStream:
     def test_parse_response(self, mocker):
@@ -414,6 +518,55 @@ class TestGlobalExclusionsStream:
                     },
                 },
                 "updated": "2023-03-10T20:36:36+00:00",
+            }
+        ]
+
+
+class TestEventsStream:
+    def test_parse_response_normalizes_datetimes(self, mocker):
+        stream = Events(api_key=API_KEY, start_date=START_DATE.isoformat())
+        # _prepare_campaign() calls the API; seed its cache so parse_response skips it.
+        stream.record_amount = 0
+        stream.campaign_data = {"CAMPAIGN_ID"}
+        json = {
+            "data": [
+                {
+                    "type": "event",
+                    "id": "3rdp5zEXAMPLE",
+                    "attributes": {
+                        "datetime": "2026-06-23 00:15:23+00:00",
+                        "timestamp": 1750637723,
+                        "event_properties": {
+                            "$message": "CAMPAIGN_ID",
+                            "$flow": "FLOW_ID",
+                            # Event properties are free-form, so datetimes surface under
+                            # arbitrary keys alongside plain free text.
+                            "Last Opened": "2026-06-23 00:15:23.918411+00:00",
+                            "Favorite Month": "May 5, 2021",
+                        },
+                    },
+                },
+            ],
+            "links": {"self": "https://a.klaviyo.com/api/events/", "next": None, "prev": None},
+        }
+        records = list(stream.parse_response(mocker.Mock(json=mocker.Mock(return_value=json))))
+        assert records == [
+            {
+                "type": "event",
+                "id": "3rdp5zEXAMPLE",
+                "attributes": {
+                    "datetime": "2026-06-23T00:15:23+00:00",
+                    "timestamp": 1750637723,
+                    "event_properties": {
+                        "$message": "CAMPAIGN_ID",
+                        "$flow": "FLOW_ID",
+                        "Last Opened": "2026-06-23T00:15:23.918411+00:00",
+                        "Favorite Month": "May 5, 2021",
+                    },
+                },
+                "datetime": "2026-06-23T00:15:23+00:00",
+                "campaign_id": "CAMPAIGN_ID",
+                "flow_id": "FLOW_ID",
             }
         ]
 

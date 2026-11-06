@@ -1,0 +1,41 @@
+info:
+  name: C1 - Create Contact Alpha
+  type: http
+  seq: 20
+
+http:
+  method: POST
+  url: "{{base_url}}/contacts"
+  body:
+    type: json
+    data: |-
+      {
+        "first_name": "Estuary",
+        "last_name": "Seed Alpha",
+        "information": "estuary connector test seed",
+        "phone_numbers": [{"label": "Work", "value": "+12025550101"}]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() < 300 && res.getBody()?.contact?.id) {
+          bru.setVar('seed_contact_a_id', String(res.getBody().contact.id));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **ONLY THE USER RUNS THIS — never the assistant.** (API-NEVER-MUTATE)
+
+    **WHY:** Oldest-created seed. C4 later updates it, so it becomes oldest-created but newest-updated: the discriminator for `Contacts / order_by updated_at desc` and `Contacts / from with order_by updated_at`. Captures `seed_contact_a_id`.
+
+    Outcome: ran 2026-09-28 by the user; created 518778628 (created_at 1790603975).
+  type: text/markdown

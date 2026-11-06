@@ -1,0 +1,73 @@
+$defs:
+  Meta:
+    additionalProperties: true
+    description: |-
+      `extra="allow"` lets context-stamped parent IDs ride in `_meta`;
+      `BaseDocument.Meta` otherwise drops unknown keys.
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: |-
+  Member (contact) of a list. `id` is the MD5 of the lowercase email
+  address, so it is unique only within its list — the stream key is the
+  (`list_id`, `id`) composite. The unfiltered listing silently excludes
+  archived members, so the stream walks each list twice: once bare, once
+  with `status=archived` (see the per-sweep subtasks in `resources.py`).
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  list_id:
+    title: List Id
+    type: string
+  email_address:
+    title: Email Address
+    type: string
+  last_changed:
+    format: date-time
+    title: Last Changed
+    type: string
+  status:
+    title: Status
+    type: string
+required:
+- id
+- list_id
+- email_address
+- last_changed
+- status
+title: ListMember
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

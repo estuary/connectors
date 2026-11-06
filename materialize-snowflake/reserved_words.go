@@ -1,4 +1,4 @@
-package main
+package connector
 
 // This list was obtained from this table [0]
 // [0]: https://docs.snowflake.com/en/sql-reference/reserved-keywords.html
@@ -29,6 +29,7 @@ var SF_RESERVED_WORDS = []string{
 	"delete",
 	"distinct",
 	"drop",
+	"dual", // https://en.wikipedia.org/wiki/DUAL_table
 	"else",
 	"exists",
 	"false",

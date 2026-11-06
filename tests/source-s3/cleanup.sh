@@ -2,4 +2,4 @@
 
 set -e
 
-docker stop "${LOCALSTACK_CONTAINER_NAME}"
+docker compose -f source-s3/docker-compose.yaml down -v

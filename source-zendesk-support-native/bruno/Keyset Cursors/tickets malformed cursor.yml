@@ -1,0 +1,56 @@
+info:
+  name: tickets malformed cursor
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?sort=updated_at&page[size]=100&page[after]={{bad_cursor}}"
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - garbage page[after]"
+    request:
+      url: "{{base_url}}/tickets?sort=updated_at&page[size]=100&page[after]=not-a-cursor"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "56"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99998; resets=56"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "page[after] is not valid"
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** Records how `/tickets` fails on a cursor it can't use: a garbage string,
+  or a cursor whose order doesn't match `sort`. The connector needs to know whether a
+  bad cursor is rejected loudly or silently ignored.
+
+  **VERIFIED (2026-10-07):** rejected loudly: `400 InvalidPaginationParameter`,
+  "page[after] is not valid".

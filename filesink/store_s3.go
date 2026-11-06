@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/blob"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
 )
@@ -73,6 +73,10 @@ func (c *CredentialsConfig) Validate() error {
 	return fmt.Errorf("unknown 'auth_type'")
 }
 
+type S3Resource struct {
+	Path string `json:"path" jsonschema:"title=Path,description=The path that objects will be materialized to. May contain date patterns." jsonschema_extras:"x-collection-name=true"`
+}
+
 type S3StoreConfig struct {
 	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store materialized objects." jsonschema_extras:"order=0"`
 	AWSAccessKeyID     string `json:"awsAccessKeyId,omitempty" jsonschema:"-"`
@@ -81,9 +85,9 @@ type S3StoreConfig struct {
 
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=4"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=1s,enum=1m,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=1s,enum=1m,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5,nonsensitive=true"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects. May contain date patterns." jsonschema_extras:"order=6"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7,nonsensitive=true"`
 
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=Custom S3 Endpoint,description=The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank." jsonschema_extras:"order=8"`
 	UsePathStyle bool   `json:"use_path_style,omitempty" jsonschema:"-"`
@@ -115,8 +119,8 @@ func (c S3StoreConfig) Validate() error {
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		if err := blob.ValidateBucketPath(c.Prefix); err != nil {
+			return fmt.Errorf("prefix %w", err)
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)

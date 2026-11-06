@@ -1,0 +1,6 @@
+# All 24 TPC-DS tables at scale 100 (~959M documents), from the source-tpc-ds
+# capture, committed every 4 GB of documents. Run it on a benchmark VM; see
+# gcp-vm.sh.
+tpcds:
+  scale: 100
+  transaction_size: 4GB

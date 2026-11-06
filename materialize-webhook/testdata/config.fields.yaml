@@ -1,0 +1,3 @@
+address: http://localhost:18321/
+advanced:
+  feature_flags: field_selection

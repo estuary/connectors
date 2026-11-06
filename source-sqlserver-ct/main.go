@@ -35,6 +35,7 @@ var sqlserverDriver = &sqlcapture.Driver{
 	ResourceSchema:   resourceSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-sqlserver-ct",
 	Connect:          connectSQLServer,
+	MaxStartupDelay:  maxStartupDelay,
 }
 
 const defaultPort = "1433"
@@ -51,21 +52,24 @@ type Config struct {
 	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4,nonsensitive=true"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
+	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	DiscoverNonEnabled bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."`
-	SkipBackfills      string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize  int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	PollingInterval    string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
-	SourceTag          string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DiscoverNonEnabled  bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered." jsonschema_extras:"nonsensitive=true"`
+	SkipBackfills       string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize   int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
+	PollingInterval     string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$,nonsensitive=true"`
+	SourceTag           string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
+	RediscoveryInterval string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	MaxStartupDelay     string `json:"max_startup_delay,omitempty" jsonschema:"title=Maximum Startup Delay,description=How long the connector waits at most before connecting to the database and replicating changes on startup. The actual wait is random between zero and this duration. This is useful when many captures against the same server start at once because it spreads out the load on the database. Accepts duration strings like '30s' or '10m30s' or '2h'. No delay when unspecified." jsonschema_extras:"pattern=^([0-9]+(ms|s|m|h))+$,nonsensitive=true"`
+	FeatureFlags        string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 type tunnelConfig struct {
@@ -106,6 +110,12 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid 'polling_interval' configuration %q: must not exceed %s", c.Advanced.PollingInterval, sqlcapture.StreamingFenceInterval)
 		}
 	}
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
+	}
+	if _, err := sqlcapture.ParseMaxStartupDelay(c.Advanced.MaxStartupDelay); err != nil {
+		return err
+	}
 
 	if c.Advanced.SkipBackfills != "" {
 		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
@@ -113,6 +123,9 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
 			}
 		}
+	}
+	if err := c.DiscoveryFilters.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -140,14 +153,11 @@ func (c *Config) SetDefaults() {
 }
 
 // ToURI converts the Config to a DSN string.
+//
+// The DSN host is always the real server address, even when tunneling. We dial localhost (the
+// tunnel) via tunnelDialer, but advertise the real server address as the LOGIN7 ServerName and
+// TLS SNI for SQL Server instances that rely on those being accurate.
 func (c *Config) ToURI() string {
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost
-	// to the target via the bastion server, so we use the tunnel's address.
-	var address = c.Address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		address = "localhost:" + defaultPort
-	}
-
 	var params = make(url.Values)
 	params.Add("app name", "Estuary Change Tracking Connector")
 	params.Add("encrypt", "true")
@@ -156,10 +166,33 @@ func (c *Config) ToURI() string {
 	var connectURL = &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(c.User, c.Password),
-		Host:     address,
+		Host:     c.Address,
 		RawQuery: params.Encode(),
 	}
 	return connectURL.String()
+}
+
+// tunnelDialer redirects connections to the local end of the SSH tunnel while the driver keeps
+// the original hostname for its TLS SNI and TDS LOGIN7 ServerName fields, so that SQL Server
+// instances which route on the server name they receive see the real host, not "localhost".
+type tunnelDialer struct {
+	localAddr string // address of the tunnel's local listener, to which all dials are redirected
+	address   string // the server address being tunneled to
+}
+
+func (d *tunnelDialer) DialContext(ctx context.Context, network, _ string) (net.Conn, error) {
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, d.localAddr)
+}
+
+// HostName marks this as a mssqldb.HostDialer so the driver dials the configured host through
+// this dialer instead of resolving it locally, which keeps the real hostname in the LOGIN7
+// ServerName and TLS SNI.
+func (d *tunnelDialer) HostName() string {
+	if host, _, err := net.SplitHostPort(d.address); err == nil {
+		return host
+	}
+	return d.address
 }
 
 func configSchema() json.RawMessage {
@@ -176,7 +209,9 @@ func configSchema() json.RawMessage {
 type CTResource struct {
 	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides.,readOnly=true"`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured.,readOnly=true"`
-	Priority  int    `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."`
+	Priority  int    `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others." jsonschema_extras:"nonsensitive=true"`
+
+	Advanced *sqlcapture.AdvancedResourceOptions `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 func resourceSchema() json.RawMessage {
@@ -186,6 +221,15 @@ func resourceSchema() json.RawMessage {
 		panic(err)
 	}
 	return json.RawMessage(resourceSchema)
+}
+
+// maxStartupDelay parses the config on its own because Pull needs the delay before connecting.
+func maxStartupDelay(cfg json.RawMessage) (time.Duration, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return 0, fmt.Errorf("error parsing config json: %w", err)
+	}
+	return sqlcapture.ParseMaxStartupDelay(config.Advanced.MaxStartupDelay)
 }
 
 func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
@@ -260,10 +304,15 @@ type sqlserverDatabase struct {
 	datatypesConfig *datatypes.Config // Configuration for datatype handling
 
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
+	loggedBackfill  map[sqlcapture.StreamID]struct{}                  // Tracks tables whose backfill query has been logged during this connector invocation
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
+}
+
+func (db *sqlserverDatabase) ActivateStreamsBeforeCatchup() bool {
+	return false
 }
 
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
@@ -272,13 +321,19 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		"user":    db.config.User,
 	}).Info("connecting to database")
 
-	var conn, err = sql.Open("sqlserver", db.config.ToURI())
+	connector, err := mssqldb.NewConnector(db.config.ToURI())
 	if err != nil {
-		return fmt.Errorf("unable to connect to database: %w", err)
+		return fmt.Errorf("error creating connector: %w", err)
 	}
+	// The tunnel itself is started in connectSQLServer. Here we just redirect the driver's TCP
+	// dial to its local listener while leaving the real hostname in the DSN.
+	if cfg := db.config.NetworkTunnel; cfg != nil && cfg.SSHForwarding != nil && cfg.SSHForwarding.SSHEndpoint != "" {
+		connector.Dialer = &tunnelDialer{localAddr: "localhost:" + defaultPort, address: db.config.Address}
+	}
+
+	var conn = sql.OpenDB(connector)
 	if err := conn.PingContext(ctx); err != nil {
-		var mssqlErr mssqldb.Error
-		if errors.As(err, &mssqlErr) {
+		if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok {
 			switch mssqlErr.Number {
 			case 18456:
 				return cerrors.NewUserError(err, "incorrect username or password")
@@ -334,3 +389,24 @@ func (db *sqlserverDatabase) FallbackCollectionKey() []string {
 }
 
 func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
+
+func (db *sqlserverDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
+}
+
+func (db *sqlserverDatabase) ReplicationPollingInterval() time.Duration {
+	// Reported for consistency with source-sqlserver rather than out of necessity. Unlike the
+	// CDC connector, whose cycle can only end once a polling pass reports a commit position at
+	// or past the fence, this connector's stream-to-fence loop is bounded by the fence duration
+	// itself and polls within it, so its cycles don't lengthen with the polling interval. That
+	// interval is also validated to be no greater than sqlcapture.StreamingFenceInterval, which
+	// keeps the resulting threshold close to the default in any case.
+	//
+	// Validation has already rejected unparseable values and SetDefaults fills in an empty one,
+	// so a failure here can only mean we have no better estimate than the default threshold.
+	var interval, err = time.ParseDuration(db.config.Advanced.PollingInterval)
+	if err != nil {
+		return 0
+	}
+	return interval
+}

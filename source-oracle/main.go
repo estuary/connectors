@@ -157,7 +157,7 @@ type Config struct {
 	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database    string `json:"database" jsonschema:"default=ORCL,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
@@ -167,14 +167,15 @@ type Config struct {
 type advancedConfig struct {
 	SkipBackfills        string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	WatermarksTable      string   `json:"watermarksTable,omitempty" jsonschema:"description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query. Only applies to tables with a primary key."`
-	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=10000,description=The number of rows which should be fetched from the database in a single incremental query."`
+	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query. Only applies to tables with a primary key." jsonschema_extras:"nonsensitive=true"`
+	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=10000,description=The number of rows which should be fetched from the database in a single incremental query." jsonschema_extras:"nonsensitive=true"`
 	IncrementalSCNRange  int      `json:"incremental_scn_range,omitempty" jsonschema:"-"`
-	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
-	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
-	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart"`
-	SourceTag            string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags         string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
+	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value." jsonschema_extras:"nonsensitive=true"`
+	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart" jsonschema_extras:"nonsensitive=true"`
+	SourceTag            string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
+	RediscoveryInterval  string   `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	FeatureFlags         string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -196,6 +197,10 @@ func (c *Config) Validate() error {
 
 	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart}, c.Advanced.DictionaryMode) {
 		return fmt.Errorf("dictionary mode must be one of %s or %s or %s", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart)
+	}
+
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
 	}
 
 	return nil
@@ -279,7 +284,7 @@ type oracleDatabase struct {
 	pdbName            string                           // name of the Pluggable Database we are in, if this is a container Oracle instance
 	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
-	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
+	tableObjectMapping map[string]tableObject           // A mapping from joinObjectID(objectID, dataObjectID) to the corresponding streamID + numeric IDs
 	featureFlags       map[string]bool                  // Parsed feature flag settings with defaults applied
 
 	backfillRowIDRanges map[sqlcapture.StreamID][]string // List of backfill chunk rowids
@@ -291,6 +296,10 @@ func (db *oracleDatabase) IsRDS() bool {
 
 func (db *oracleDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
+}
+
+func (db *oracleDatabase) ActivateStreamsBeforeCatchup() bool {
+	return false
 }
 
 // This function is a no-op if there is no PDB name configured
@@ -319,7 +328,7 @@ func (db *oracleDatabase) switchToPDB(ctx context.Context) error {
 	return nil
 }
 
-func (db *oracleDatabase) connect(_ context.Context) error {
+func (db *oracleDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":        db.config.Address,
 		"user":           db.config.User,
@@ -329,6 +338,11 @@ func (db *oracleDatabase) connect(_ context.Context) error {
 
 	var conn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.BackfillChunkSize+1))
 	if err != nil {
+		return fmt.Errorf("unable to connect to database: %w", err)
+	}
+	// sql.Open does not connect, so ping to report a connection failure as one.
+	if err := conn.PingContext(ctx); err != nil {
+		conn.Close()
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 	db.conn = conn
@@ -358,6 +372,16 @@ func (db *oracleDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Sch
 
 func (db *oracleDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/rs_id", "/_meta/source/ssn"}
+}
+
+func (db *oracleDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
+}
+
+func (db *oracleDatabase) ReplicationPollingInterval() time.Duration {
+	// Replication events are produced by polling the logs on a fixed interval, so a
+	// stream-to-fence cycle can't complete any faster than that.
+	return pollInterval
 }
 
 func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {

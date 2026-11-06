@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -27,10 +28,11 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type sshForwarding struct {
@@ -48,8 +50,8 @@ type config struct {
 	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4,nonsensitive=true"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5,nonsensitive=true"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -65,8 +67,8 @@ type advancedConfig struct {
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -109,7 +111,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -216,7 +218,7 @@ func (c config) ToURI() string {
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run after the table is created." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 }
 
 func (r tableConfig) Validate() error {
@@ -234,7 +236,7 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{translateFlowIdentifier(r.Table)}, r.Delta, nil
 }
 
-func newMysqlDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-mysql",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -332,7 +334,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(templates, product),
+				NewTransactor:       prepareNewTransactor(templates, product, tzLocation),
 				ConcurrentApply:     false,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
@@ -429,18 +431,61 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// tzLocation is the zone of the wall-clock times stored in DATETIME
+	// columns.
+	tzLocation *time.Location
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+// truncateBefore returns the DATETIME literal below which a stored
+// flow_published_at belongs to a document published before boundary. The
+// literal is floored to the column's precision, because the column may round
+// a stored value up to the next unit.
+func truncateBefore(boundary time.Time, loc *time.Location, precision time.Duration) string {
+	return boundary.Truncate(precision).In(loc).Format(datetimeLayout)
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func prepareNewTransactor(
 	templates templates,
 	product string,
+	tzLocation *time.Location,
 ) func(context.Context, string, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
@@ -453,8 +498,20 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
+		if err := boilerplate.RequireSingleShard(open); err != nil {
+			return nil, err
+		}
+
 		var cfg = ep.Config
-		var d = &transactor{dialect: ep.Dialect, templates: templates, cfg: cfg, be: be, product: product}
+		var d = &transactor{
+			dialect:               ep.Dialect,
+			templates:             templates,
+			cfg:                   cfg,
+			be:                    be,
+			product:               product,
+			tzLocation:            tzLocation,
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+		}
 		d.store.fence = fence
 
 		// Establish connections.
@@ -523,15 +580,28 @@ type binding struct {
 	loadDeleteSQL     string
 	deleteTruncateSQL string
 
+	// truncateSQL deletes the rows published before a boundary. It is empty
+	// when truncateReason states why the table cannot be truncated.
+	truncateSQL    string
+	truncateReason error
+	// truncatePrecision is the resolution of the flow_published_at column.
+	truncatePrecision time.Duration
+
 	mustMerge  bool
 	mustDelete bool
+
+	// Per-round counts for the transaction health report: rows LOAD DATA
+	// inserted straight into the target, and rows staged for REPLACE.
+	hasData      bool
+	insertRows   int64
+	updateStaged int64
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose the appropriate load query template based on configuration
@@ -596,6 +666,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 	b.varcharColumnMetas = columnMetas
 
+	if col, err := target.PublishedAtColumn(); err != nil {
+		b.truncateReason = err
+	} else {
+		b.truncateReason = addTruncation(b, col, is)
+	}
+
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
@@ -626,6 +702,31 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	return nil
 }
 
+// addTruncation prepares b to delete the rows whose col is earlier than a
+// boundary, at the fractional-seconds precision that col has in the table. It
+// returns why b cannot be truncated, as a clause suited for an operator.
+func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) error {
+	var res = is.GetResource(b.target.Path)
+	if res == nil {
+		return fmt.Errorf("table %s was not found in the database", b.target.Identifier)
+	}
+	var existing = res.GetField(col.Field)
+	if existing == nil {
+		return fmt.Errorf("column %s was not found in the table", col.Identifier)
+	}
+	meta, ok := existing.Meta.(datetimeFieldMeta)
+	if !ok {
+		return fmt.Errorf("column %s is not a DATETIME", col.Identifier)
+	}
+
+	b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", b.target.Identifier, col.Identifier)
+	b.truncatePrecision = time.Second
+	for range meta.precision {
+		b.truncatePrecision /= 10
+	}
+	return nil
+}
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
@@ -644,7 +745,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if lastBinding != it.Binding {
 			var b = d.bindings[lastBinding]
 			// Drain the prior binding as naturally-ordered key groupings are cycled through.
-			if err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
+			if _, err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
 				return fmt.Errorf("load infile drain on %q: %w", b.target.Identifier, err)
 			}
 			lastBinding = it.Binding
@@ -680,7 +781,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
-		if err := d.load.infile.write(ctx, converted, txn, b.loadLoadSQL); err != nil {
+		if _, err := d.load.infile.write(ctx, converted, txn, b.loadLoadSQL); err != nil {
 			return fmt.Errorf("load writing to infile: %w", err)
 		}
 	}
@@ -691,7 +792,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Drain the final binding if we processed any loads.
 	if lastBinding != -1 {
 		var b = d.bindings[lastBinding]
-		if err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
+		if _, err := d.load.infile.drain(ctx, txn, b.loadLoadSQL); err != nil {
 			return fmt.Errorf("load infile drain on %q: %w", b.target.Identifier, err)
 		}
 	}
@@ -755,15 +856,23 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer defuser.MaybeRollback()
 
 	drainBinding := func(b *binding) error {
-		if err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL); err != nil {
+		n, err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL)
+		if err != nil {
 			return fmt.Errorf("store writing to insert infile for %q: %w", b.target.Identifier, err)
-		} else if err := d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
+		}
+		b.insertRows += n
+		if n, err = d.store.updateInfile.drain(ctx, txn, b.storeUpdateSQL); err != nil {
 			return fmt.Errorf("store writing to update infile for %q: %w", b.target.Identifier, err)
-		} else if err := d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
+		}
+		b.updateStaged += n
+		if _, err = d.store.deleteInfile.drain(ctx, txn, b.loadDeleteSQL); err != nil {
 			return fmt.Errorf("store writing to delete infile for %q: %w", b.target.Identifier, err)
 		}
 		return nil
 	}
+
+	round := it.Round
+	var truncations = d.truncations
 
 	// The StoreIterator iterates over documents ordered by their binding, so we
 	// can keep track of the last binding that we have seen, and if we have moved
@@ -827,7 +936,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var inf *infile
 		var drainQuery string
+		var flushed *int64 // receives rows affected by a mid-store flush
 
+		b.hasData = true
 		if it.Delete && d.cfg.HardDelete {
 			b.mustDelete = true
 			inf = d.store.deleteInfile
@@ -836,13 +947,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			b.mustMerge = true
 			inf = d.store.updateInfile
 			drainQuery = b.storeUpdateSQL
+			flushed = &b.updateStaged
 		} else {
 			inf = d.store.insertInfile
 			drainQuery = b.storeInsertSQL
+			flushed = &b.insertRows
 		}
 
-		if err := inf.write(ctx, converted, txn, drainQuery); err != nil {
+		if n, err := inf.write(ctx, converted, txn, drainQuery); err != nil {
 			return nil, fmt.Errorf("store writing to infile for %q: %w", b.target.Identifier, err)
+		} else if flushed != nil {
+			*flushed += n
 		}
 	}
 
@@ -855,69 +970,100 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	defuser.Defuse()
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			defer txn.Rollback()
+		defer txn.Rollback()
 
-			for _, b := range d.bindings {
-				d.be.StartedResourceCommit(b.target.Path)
-				if b.mustDelete {
-					// Apply any deletions
-					if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
-						return fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err)
-					} else if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
-						return fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err)
-					}
-
-					b.mustDelete = false
+		for i, b := range d.bindings {
+			d.be.StartedResourceCommit(b.target.Path)
+			// Target rows affected this round. LOAD DATA and DELETE report
+			// one per row; REPLACE reports 2 per replaced row and 1 per row
+			// that did not exist, so subtracting the staged rows leaves the
+			// rows that were actually updated. None of these counts depend
+			// on CLIENT_FOUND_ROWS (which the DSN sets regardless).
+			affected := b.insertRows
+			if b.mustDelete {
+				// Apply any deletions
+				if res, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("running DELETE USING for %q: %w", b.target.Identifier, err))
+				} else if n, err := res.RowsAffected(); err == nil {
+					affected += n
+				}
+				if _, err := txn.ExecContext(ctx, b.deleteTruncateSQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating delete table for %q: %w", b.target.Identifier, err))
 				}
 
-				if b.mustMerge {
-					// Merge data from the temporary staging table into the target table, replacing keys
-					// that already exist.
-					if _, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
-						return fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err)
-					} else if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
-						return fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err)
-					}
+				b.mustDelete = false
+			}
 
-					// Reset for the next round.
-					b.mustMerge = false
+			if b.mustMerge {
+				// Merge data from the temporary staging table into the target table, replacing keys
+				// that already exist.
+				if res, err := txn.ExecContext(ctx, b.updateReplaceSQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("running REPLACE INTO for %q: %w", b.target.Identifier, err))
+				} else if n, err := res.RowsAffected(); err == nil {
+					affected += n - b.updateStaged
 				}
-				d.be.FinishedResourceCommit(b.target.Path)
+				if _, err := txn.ExecContext(ctx, b.updateTruncateSQL); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating update table for %q: %w", b.target.Identifier, err))
+				}
+
+				// Reset for the next round.
+				b.mustMerge = false
 			}
 
-			var err error
-			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+			// The truncation follows the binding's stores, so it removes only
+			// the rows they did not rewrite.
+			var stats = m.TotalRowStats(affected)
+			var boundary, truncate = truncations[i]
+			if truncate {
+				var before = truncateBefore(boundary, d.tzLocation, b.truncatePrecision)
+				var n int64
+				if res, err := txn.ExecContext(ctx, b.truncateSQL, before); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+				} else if n, err = res.RowsAffected(); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill (rows affected): %w", b.target.Identifier, err))
+				}
+				stats = stats.WithTruncated(n)
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"before":   before,
+					"deleted":  n,
+				}).Info("truncated rows published before the backfill")
 			}
-
-			var fenceUpdate strings.Builder
-			if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
+			if b.hasData || truncate {
+				d.be.ReportRowStats(round, b.target.Path, stats)
 			}
+			b.hasData, b.insertRows, b.updateStaged = false, 0, 0
+			d.be.FinishedResourceCommit(b.target.Path)
+		}
 
-			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
-			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
-			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
-			}
+		var err error
+		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
 
-			if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
-			}
+		var fenceUpdate strings.Builder
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+		}
 
-			return nil
-		})
+		if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
+		} else if rowsAffected, err := results.RowsAffected(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint (rows affected): %w", err))
+		} else if rowsAffected < 1 {
+			return nil, m.FinishedOperation(fmt.Errorf("This instance was fenced off by another"))
+		}
+
+		if err := txn.Commit(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("committing Store transaction: %w", err))
+		}
+
+		return nil, nil
 	}, nil
 }
 
 func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
-}
-
-func main() {
-	boilerplate.RunMain(newMysqlDriver())
 }

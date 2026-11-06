@@ -1,0 +1,41 @@
+info:
+  name: E3 - Recheck sheet after delete (deletion-gap probe)
+  type: http
+  seq: 113
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}?rowsModifiedSince={{PIN_TIMESTAMP_JUST_BEFORE_E2}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Get sheet](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/getsheet)
+
+  **WHY:** closes the deletion-gap probe from `E1 - Add a throwaway row`/
+  `E2 - Delete the throwaway row` — checks whether the deleted row leaves
+  any trace (tombstone, deleted flag, or a `totalRowCount` mismatch) via a
+  `rowsModifiedSince`-filtered fetch and a bare re-fetch of the seed sheet.
+
+  **VERIFIED (2026-07-21):** the deletion leaves ZERO trace. Run AFTER
+  `E2 - Delete the throwaway row`, injecting `--env-var
+  PIN_TIMESTAMP_JUST_BEFORE_E2=<RFC3339 from just before E2>` (this run:
+  T_E = `2026-07-21T13:57:39Z`, ~5s after E1 added row `6596458449602436`
+  as `rowNumber: 9`). Result of the `rowsModifiedSince=T_E` fetch, seconds
+  after E2's delete: `rows: []` (no tombstone, no `deleted`/`archived`
+  marker), `totalRowCount: 8` — decremented back from 9 with no
+  corresponding row object, and no deleted-row key anywhere in the response
+  (full top-level key set inspected). This confirms live the plan's
+  "deletions are an unrecoverable gap without full reconciliation"
+  conclusion, previously sourced only from community reports: a capture
+  that has already emitted a row gets no signal when that row is deleted,
+  so deletions can only be reconciled by a full re-read (backfill) diffing
+  against previously-captured row ids. The pre-edit baselines cited:
+  blank-row/`rowsModifiedSince` gap on `Get Sheet (rowsModifiedSince
+  narrows, blank-row gap)`, row-count baseline (`totalRowCount: 8`) on
+  `Get Sheet (bare)`.

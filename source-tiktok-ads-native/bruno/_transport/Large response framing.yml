@@ -1,0 +1,39 @@
+info:
+  name: Large response framing
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/tool/device_model/?advertiser_id={{advertiser_id}}"
+  headers:
+    - name: Accept-Encoding
+      value: gzip, deflate, zstd
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok Business API SDK, `js_sdk/docs/ToolApi.md`
+  (`GET /open_api/v1.3/tool/device_model/`), in
+  https://github.com/tiktok/tiktok-business-api-sdk.
+
+  **WHY:** the connector's status middleware must decide how to treat a large
+  HTTP 200 without buffering it, and whether it can tell a large body from its
+  headers alone depends on how TikTok frames one: with `Content-Length`, or
+  chunked. This read-only reference list is large in any account, so it shows
+  the framing a client sending the connector's `Accept-Encoding` (aiohttp
+  3.14's default) receives.
+
+  **UNOBSERVABLE (2026-10-23, sandbox):** the sandbox host answers HTTP 404,
+  `text/plain` `Not Found`, for `tool/device_model`, `tool/carrier`,
+  `tool/interest_category` and `tool/language`, and no sandbox listing or
+  report is large. A small sandbox response is gzip-compressed and carries
+  `Content-Length` (`Campaigns / List Campaigns (bare)`), which says nothing
+  about large ones. Run this against a production account (`--env TikTok`) to
+  observe it. Until then the connector must not assume large responses carry
+  `Content-Length`.

@@ -13,6 +13,7 @@ from estuary_cdk.http import HTTPSession
 from ..models import (
     MarketingEmail,
     PageResult,
+    TimestampedObject,
 )
 from .shared import (
     dt_to_str,
@@ -53,7 +54,7 @@ async def _fetch_marketing_emails_updated_between(
     http: HTTPSession,
     start: datetime,
     end: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+) -> AsyncGenerator[TimestampedObject[MarketingEmail], None]:
     if not end:
         end = datetime.now(tz=UTC)
 
@@ -85,7 +86,7 @@ async def _fetch_marketing_emails_updated_between(
             async for email in _paginate_through_marketing_emails(log, http, params):
                 if email.id not in seen_ids:
                     seen_ids.add(email.id)
-                    yield (email.updatedAt, email.id, email)
+                    yield TimestampedObject(email.updatedAt, email.id, email)
 
 
 async def fetch_marketing_emails_page(
@@ -115,7 +116,7 @@ def fetch_recent_marketing_emails(
     _: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+) -> AsyncGenerator[TimestampedObject[MarketingEmail], None]:
 
     return _fetch_marketing_emails_updated_between(log, http, since, until)
 
@@ -126,6 +127,6 @@ def fetch_delayed_marketing_emails(
     _: bool,
     since: datetime,
     until: datetime,
-) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+) -> AsyncGenerator[TimestampedObject[MarketingEmail], None]:
 
     return _fetch_marketing_emails_updated_between(log, http, since, until)

@@ -1,0 +1,56 @@
+info:
+  name: limit 501 probe
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{base_url}}/apps/{{app_id}}/users?limit=501"
+  params:
+    - name: limit
+      value: "501"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('app_id')) await bru.runRequest('Application users/parent apps');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/ApplicationUsers/#tag/ApplicationUsers/operation/listApplicationUsers
+
+  **WHY:** Enforcement mode of the documented `limit` maximum (500): rejected (4xx)
+  vs. silently accepted/clamped. Decides whether the connector must clamp.
+
+  **VERIFIED (2026-10-07):** silent clamp — 200, and the `rel="self"` link is
+  rewritten to `limit=500`. Clamp vs. truncation can't be told apart without >500
+  assignments on one app (out of seeding scope); safe regardless, because the
+  connector requests 500 and follows `rel="next"` to completion.
+
+examples:
+  - name: "200 \u2014 limit 501 silently clamped to 500 (self link)"
+    request:
+      url: "{{base_url}}/apps/0oa176zmw8iMaksJz698/users?limit=501"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/apps/0oa176zmw8iMaksJz698/users?limit=500>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          []

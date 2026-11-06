@@ -23,6 +23,14 @@ materializations:
         config: config.rest-deprecated.yaml
     bindings: []
 
+  acmeCo/tests/materialize-iceberg/dremio:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.dremio.yaml
+    bindings: []
+
   acmeCo/tests/materialize-iceberg/glue:
     endpoint:
       local:

@@ -8,6 +8,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 )
@@ -65,18 +66,28 @@ func listPublishedTables(ctx context.Context, conn *pgxpool.Pool, publicationNam
 	return publicationStatus, nil
 }
 
-// recreateReplicationSlot attempts to drop and then recreate a replication slot with the specified name.
-func recreateReplicationSlot(ctx context.Context, conn *pgxpool.Pool, slotName string) error {
+// recreateReplicationSlot attempts to drop and then recreate a replication slot with
+// the specified name.
+//
+// Slot manipulation is done via replication-protocol commands rather than SQL functions
+// because slot creation can block for a long time waiting for a consistent point, and
+// walsender commands hold no transaction snapshot during that wait.
+func recreateReplicationSlot(ctx context.Context, replConn *pgconn.PgConn, slotName string) error {
 	var logEntry = logrus.WithField("slot", slotName)
 	logEntry.Info("attempting to drop replication slot")
-	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_drop_replication_slot('%s');`, slotName)); err != nil {
+	if err := pglogrepl.DropReplicationSlot(ctx, replConn, slotName, pglogrepl.DropReplicationSlotOptions{}); err != nil {
 		// Not a fatal error because we don't want a failure to drop a nonexistent slot
 		// to prevent the subsequent attempt to create it.
 		logEntry.WithField("err", err).Debug("failed to drop replication slot")
 	}
+
 	logEntry.Info("attempting to create replication slot")
-	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
-		return fmt.Errorf("replication slot %q couldn't be created", slotName)
+	// NOEXPORT_SNAPSHOT (legacy syntax, accepted by all supported server versions) skips
+	// exporting a snapshot, which we have no use for.
+	if _, err := pglogrepl.CreateReplicationSlot(ctx, replConn, slotName, "pgoutput", pglogrepl.CreateReplicationSlotOptions{
+		SnapshotAction: "NOEXPORT_SNAPSHOT",
+	}); err != nil {
+		return fmt.Errorf("replication slot %q couldn't be created: %w", slotName, err)
 	}
 	logEntry.Info("created replication slot")
 	return nil

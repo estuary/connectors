@@ -1,0 +1,216 @@
+info:
+  name: Get Sheet (rowsModifiedSince equality probe)
+  type: http
+  seq: 21.5
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}?rowsModifiedSince=2026-07-21T13:59:43Z"
+  params:
+    - name: rowsModifiedSince
+      value: 2026-07-21T13:59:43Z
+      type: query
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - row stamped exactly at the bound is NOT returned (strict >)
+    request:
+      url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}?rowsModifiedSince=2026-07-21T13:59:43Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 4312824539121540,
+            "name": "Project Sheet",
+            "version": 4,
+            "totalRowCount": 8,
+            "accessLevel": "OWNER",
+            "effectiveAttachmentOptions": [
+              "EGNYTE",
+              "ONEDRIVE",
+              "LINK",
+              "DROPBOX",
+              "FILE",
+              "GOOGLE_DRIVE",
+              "BOX_COM",
+              "EVERNOTE"
+            ],
+            "ganttEnabled": true,
+            "dependenciesEnabled": false,
+            "resourceManagementEnabled": false,
+            "resourceManagementType": "NONE",
+            "cellImageUploadEnabled": true,
+            "userSettings": {
+              "criticalPathEnabled": false,
+              "displaySummaryTasks": true
+            },
+            "userPermissions": {
+              "summaryPermissions": "ADMIN"
+            },
+            "workspace": {
+              "id": 3258769762215811,
+              "name": "First Project"
+            },
+            "hasSummaryFields": false,
+            "permalink": "https://app.smartsheet.eu/sheets/M4wc8jH3r8C9wCRr7FMggMq9hCw6QmMVFRCf6RQ1",
+            "createdAt": "2026-07-07T13:40:44Z",
+            "modifiedAt": "2026-07-21T13:59:43Z",
+            "isMultiPicklistEnabled": true,
+            "columns": [
+              {
+                "id": 233555655526276,
+                "version": 0,
+                "index": 0,
+                "title": "At Risk",
+                "type": "CHECKBOX",
+                "symbol": "FLAG",
+                "validation": true,
+                "width": 72
+              },
+              {
+                "id": 4737155282896772,
+                "version": 0,
+                "index": 1,
+                "title": "Task",
+                "type": "TEXT_NUMBER",
+                "primary": true,
+                "validation": false,
+                "width": 337
+              },
+              {
+                "id": 2485355469211524,
+                "version": 0,
+                "index": 2,
+                "title": "Resource Allocation",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 318
+              },
+              {
+                "id": 6988955096582020,
+                "version": 0,
+                "index": 3,
+                "title": "Description",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 157
+              },
+              {
+                "id": 1359455562368900,
+                "version": 0,
+                "index": 4,
+                "title": "Assigned To",
+                "type": "CONTACT_LIST",
+                "contactOptions": [
+                  {
+                    "name": "Harley Sterling",
+                    "email": "harley@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Jamal King",
+                    "email": "jamal@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Guadalupe Garcia",
+                    "email": "guadalupe@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Aviv Perez",
+                    "email": "aviv@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Diana Kennedy",
+                    "email": "diana@demo.mbfcorp.com"
+                  }
+                ],
+                "validation": false,
+                "width": 150
+              },
+              {
+                "id": 5863055189739396,
+                "version": 0,
+                "index": 5,
+                "title": "Status",
+                "type": "PICKLIST",
+                "options": [
+                  "Not Started",
+                  "In Progress",
+                  "Blocked",
+                  "Complete"
+                ],
+                "validation": true,
+                "width": 135
+              },
+              {
+                "id": 3611255376054148,
+                "version": 0,
+                "index": 6,
+                "title": "Start Date",
+                "type": "DATE",
+                "tags": [
+                  "GANTT_START_DATE"
+                ],
+                "validation": true,
+                "width": 87
+              },
+              {
+                "id": 8114855003424644,
+                "version": 0,
+                "index": 7,
+                "title": "End Date",
+                "type": "DATE",
+                "tags": [
+                  "GANTT_END_DATE"
+                ],
+                "validation": true,
+                "width": 80
+              },
+              {
+                "id": 796505608947588,
+                "version": 0,
+                "index": 8,
+                "title": "Estimated Effort in Days",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 115
+              }
+            ],
+            "rows": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get sheet](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/getsheet)
+
+  **WHY:** pins `rowsModifiedSince`'s inclusivity at EXACT timestamp
+  equality, the counterpart of `List Sheets (modifiedSince equality probe)`
+  for the detail endpoint. The bound is row `3224513112835972`'s exact live
+  `modifiedAt` (`2026-07-21T13:59:43Z`, the `Seeding/D4` clear): that row's
+  membership ⇒ `>=`-inclusive; absence ⇒ strict `>`. The sheet's other rows
+  (`13:40:44Z`, `13:55:20Z`) sit strictly below the bound and must be
+  absent either way. Needed so the connector can put the incremental
+  window's lower boundary in the request itself
+  (`rowsModifiedSince = cursor + 1s`) instead of a client-side skip
+  (add-stream House rule 5).
+
+  **VERIFIED (2026-07-21):** 200 OK, `rows: []` — the row whose
+  `modifiedAt` equals the bound exactly is NOT returned (a bare fetch
+  seconds earlier confirmed it present with that exact stamp, and the
+  detail endpoint has no publishing lag, see `Seeding/D3`).
+  `rowsModifiedSince` is therefore strict `>` at exact equality:
+  `rowsModifiedSince = cursor` (not `cursor + 1s`) yields exactly the
+  ticks strictly after the cursor. NOTE the asymmetry: the list's
+  `modifiedSince` is `>=`-inclusive at equality (`List Sheets
+  (modifiedSince equality probe)`) — the two filters do NOT share
+  boundary semantics, so neither result may be extrapolated to the other.

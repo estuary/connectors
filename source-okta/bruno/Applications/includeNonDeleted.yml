@@ -1,0 +1,184 @@
+info:
+  name: includeNonDeleted
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: '{{base_url}}/apps?includeNonDeleted=true'
+  params:
+    - name: includeNonDeleted
+      value: 'true'
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - before seeding: same 7 ACTIVE apps as bare (projection)"
+    request:
+      url: "{{base_url}}/apps?includeNonDeleted=true"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/apps?limit=20>; rel=\"self\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zmw7qZJAJpl698",
+              "name": "saasure",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:26.000Z"
+            },
+            {
+              "id": "0oa176zmw8iMaksJz698",
+              "name": "okta_enduser",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:27.000Z"
+            },
+            {
+              "id": "0oa176zmwamcqJF5N698",
+              "name": "okta_browser_plugin",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:28.000Z"
+            },
+            {
+              "id": "0oa176zrvqhR5udPy698",
+              "name": "okta_oin_submission_tester_app",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:35.000Z"
+            },
+            {
+              "id": "0oa176zuoqmvHWXNq698",
+              "name": "okta_iga_reviewer",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:36.000Z"
+            },
+            {
+              "id": "0oa176zvegnWi4f8y698",
+              "name": "okta_flow_sso",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:37:35.000Z"
+            },
+            {
+              "id": "0oa176zvem7OQnQlX698",
+              "name": "flow",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:37:05.000Z"
+            }
+          ]
+  - name: "200 - after seeding: same 8 apps as bare incl. the INACTIVE one (projection)"
+    request:
+      url: "{{base_url}}/apps?includeNonDeleted=true"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/apps?limit=20>; rel=\"self\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zmw7qZJAJpl698",
+              "name": "saasure",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:26.000Z"
+            },
+            {
+              "id": "0oa176zmw8iMaksJz698",
+              "name": "okta_enduser",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:27.000Z"
+            },
+            {
+              "id": "0oa176zmwamcqJF5N698",
+              "name": "okta_browser_plugin",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:28.000Z"
+            },
+            {
+              "id": "0oa176zrvqhR5udPy698",
+              "name": "okta_oin_submission_tester_app",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:35.000Z"
+            },
+            {
+              "id": "0oa176zuoqmvHWXNq698",
+              "name": "okta_iga_reviewer",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:36:36.000Z"
+            },
+            {
+              "id": "0oa176zvegnWi4f8y698",
+              "name": "okta_flow_sso",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:37:35.000Z"
+            },
+            {
+              "id": "0oa176zvem7OQnQlX698",
+              "name": "flow",
+              "status": "ACTIVE",
+              "signOnMode": "OPENID_CONNECT",
+              "lastUpdated": "2026-09-03T19:37:05.000Z"
+            },
+            {
+              "id": "0oa18gus6s1DyA92Z698",
+              "name": "bookmark",
+              "status": "INACTIVE",
+              "signOnMode": "BOOKMARK",
+              "lastUpdated": "2026-10-07T14:36:53.000Z"
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all applications](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/listApplications)
+
+  **WHY:** silent-data-loss audit. `includeNonDeleted` (default `false`) is documented as
+  "include non-active, but not deleted apps" (OpenAPI spec v2026.09.2 (`management-oneOfInheritance.yaml`)). If INACTIVE apps only appeared with
+  it set, the connector would need it on every snapshot or deactivated apps would vanish
+  and be tombstoned. Compare with `Applications / bare` and
+  `Applications / status INACTIVE filter`.
+
+  **VERIFIED (2026-10-07):** no partition is hidden by the default. After
+  `Seeding / Create Inactive Bookmark App`, the INACTIVE app appears both with and without
+  `includeNonDeleted=true`; the two responses are identical (8 apps). The connector sends
+  `includeNonDeleted=true` anyway, because the spec documents the default as excluding
+  non-active apps even though the observed default lists them.
+
+  **DOCUMENTED (2026-10-07):** DELETED apps are never returned by the list endpoint
+  (OpenAPI spec v2026.09.2 (`management-oneOfInheritance.yaml`), `ApplicationLifecycleStatus` lists DELETED but list results exclude them).
+  A deleted app disappears from the snapshot, and the CDK's snapshot tombstone records the
+  deletion.

@@ -4,6 +4,7 @@
 
 import base64
 import logging
+import re
 from datetime import datetime
 from typing import Any, List, Mapping, Tuple
 
@@ -45,6 +46,20 @@ from .streams import (
 )
 
 logger = logging.getLogger("airbyte")
+
+# Valid subdomains are between 3-63 characters long, start with a lowercase letter,
+# and only contain lowercase letters, digits, or dashes.
+SUBDOMAIN_REGEX = re.compile(r"^[a-z][a-z0-9-]{2,62}$")
+
+
+def validate_subdomain(subdomain: str) -> None:
+    # fullmatch, not match: Python's `$` also matches just before a trailing newline.
+    if not SUBDOMAIN_REGEX.fullmatch(subdomain):
+        raise SourceZendeskException(
+            f"Invalid subdomain {subdomain!r}. Subdomains are 3-63 characters long, "
+            "start with a lowercase letter, and contain only lowercase letters, "
+            "digits, and dashes."
+        )
 
 
 class BasicApiTokenAuthenticator(TokenAuthenticator):
@@ -91,6 +106,7 @@ class SourceZendeskSupport(AbstractSource):
         auth = self.get_authenticator(config)
         settings = None
         try:
+            validate_subdomain(config["subdomain"])
             datetime.strptime(config["start_date"], DATETIME_FORMAT)
             settings = UserSettingsStream(config["subdomain"], authenticator=auth, start_date=None).get_settings()
         except Exception as e:
@@ -107,6 +123,7 @@ class SourceZendeskSupport(AbstractSource):
         """Convert input configs to parameters of the future streams
         This function is used by unit tests too
         """
+        validate_subdomain(config["subdomain"])
         return {
             "subdomain": config["subdomain"],
             "start_date": config["start_date"],

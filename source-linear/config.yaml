@@ -1,0 +1,18 @@
+credentials:
+    credentials_title: API Key
+    access_token_sops: ENC[AES256_GCM,data:oPX/4irgM4BQu0AeQYXgeE0Hp+mxzSrrCiO4s9tcfma9A65Y44A78x+X9zUXgWbY,iv:aiYZBig8VdDGLuIiTxctuw2NJ88Yt8MM5DmEmaSwAmI=,tag:8rGJBExEIKfhJ1UKyV8qbA==,type:str]
+start_date: "2024-01-01T00:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-07-30T21:43:50Z"
+          enc: CiUAdmEdwoyCXTMTwm8idKfGxPypBoJt3vBbFcFqPbXWN+QiiImwEkkApbezqqkw8rl08UHXAeDshDaKgdBjJZ7AXFIz49X2IZSUlN2IH9XjBEUda6G4WqBv8fIVRgrVubE+VUIKzPX2rS/OMSWadFn/
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2026-07-30T21:43:51Z"
+    mac: ENC[AES256_GCM,data:YrM+CVuNEzHpxP5pxStpXXbGs1+UrZHyjrUn6tWoICMbBXQqjJFKdhjYRJ4oa+C0A+l0Q/beNF4C2sMo1GQ8xdIbMV41FWZTyTGB/m3FNa5/8c5XAO5LgrWeIM9H96lxzf/MacRWWXVSERGydk8U434P7uxUNnFw2xSqjBw+gRU=,iv:dFAAsxBdbDUA2FTsI69yq8eTmMedmZd7evcNS3spMvY=,tag:5Je8Abyxljc2hdWZa4u4SA==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

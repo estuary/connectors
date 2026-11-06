@@ -1,15 +1,16 @@
-package main
+package connector
 
 import (
 	"testing"
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createDialect(featureFlagDefaults, false)
+var testDialect = createDialect(common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}), false)
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
@@ -32,7 +33,9 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tbl := range tables {
 		for _, tpl := range []*template.Template{
-			testTemplates.storeCopyIntoFromStagedQuery,
+			testTemplates.createStoreTable,
+			testTemplates.storeInsertQuery,
+			testTemplates.dropStoreTable,
 			testTemplates.storeCopyIntoDirectQuery,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
@@ -52,7 +55,7 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.loadQuery,
 		testTemplates.loadQueryNoFlowDocument,
 		testTemplates.dropLoadTable,
-		testTemplates.storeMergeQuery,
+		testTemplates.storeDeleteQuery,
 	} {
 		tbl := tables[0] // these queries are never run for delta updates mode
 		var testcase = tbl.Identifier + " " + tpl.Name()

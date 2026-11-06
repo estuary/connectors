@@ -1,0 +1,72 @@
+info:
+  name: Auth Sanity (GET users me)
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/users/me"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - account jonathan@estuary.dev (admin=True)
+    request:
+      url: "{{base_url}}/users/me"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 6763450190849923,
+            "email": "jonathan@estuary.dev",
+            "firstName": "Jonathan",
+            "lastName": "Wihl",
+            "locale": "en_US",
+            "timeZone": "US/Eastern",
+            "account": {
+              "name": "jonathan@estuary.dev",
+              "id": 8178447567611779
+            },
+            "admin": true,
+            "licensedSheetCreator": true,
+            "groupAdmin": true,
+            "resourceViewer": true,
+            "alternateEmails": [],
+            "sheetCount": -1,
+            "lastLogin": "2026-07-21T12:45:49Z",
+            "title": "",
+            "department": "",
+            "company": "",
+            "workPhone": "",
+            "mobilePhone": "",
+            "role": "",
+            "profileImage": {
+              "imageId": "g:https://lh3.googleusercontent.com/a/ACg8ocK2WBhiQnARqF0UOWMSy_SGj4yaB8Qif0LcCc-QmLfSHfYlRg=s96-c",
+              "height": 0,
+              "width": 0
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Get current user](https://developers.smartsheet.com/api/smartsheet/openapi/users/getcurrentuser)
+
+  **WHY:** confirms the decrypted token authenticates, and surfaces account
+  context (region, admin flags) for interpreting every other request's
+  responses.
+
+  **VERIFIED (2026-07-21):** 200 OK. Account jonathan@estuary.dev, id
+  6763450190849923, admin=true. No `x-ratelimit-*` response headers on this
+  endpoint (see `Get Sheet (bare)` for the one endpoint that does emit
+  them).

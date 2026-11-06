@@ -1,0 +1,262 @@
+info:
+  name: bare db fields
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Invoices($tenant: String!) {
+        tenant(name: $tenant) {
+          name
+          billing {
+            invoices(first: 100) {
+              pageInfo { hasNextPage endCursor }
+              edges { cursor node { dateStart dateEnd invoiceType subtotal lineItems extra } }
+            }
+          }
+        }
+      }
+    variables: |-
+      {
+        "tenant": "{{test_tenant}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/billing/invoices.rs
+
+  **WHY:** Invoice rows from the DB only — no Stripe round trips. Confirms shape,
+  newest-first order, cursor `dateEnd;dateStart;invoiceType`, and presence of
+  PREVIEW invoices (mutable until finalized).
+
+  **VERIFIED (2026-10-07):** 42 invoices for `Jonathan_Wihl/`, **newest-first**. The first is the current month's `PREVIEW` (mutable; `extra.daily_usage` grows daily); the rest are `FINAL`. Cursor = `<dateEnd>;<dateStart>;<invoicetype lowercase>`. `extra` duplicates `line_items`/`subtotal` and adds `billed_prefix`, `daily_usage`, `processed_data_gb`… — about 0.5 MB for 42 invoices, mostly `daily_usage`. Key = (tenant, dateStart, dateEnd, invoiceType); the tenant isn't on the node and must be stamped.
+
+examples:
+  - name: 200 - projection - 42 invoices newest-first, PREVIEW first
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "projection": "first edge full (extra.daily_usage truncated); remaining edges as cursors only",
+            "data": {
+              "tenant": {
+                "name": "Jonathan_Wihl/",
+                "billing": {
+                  "invoices": {
+                    "pageInfo": {
+                      "hasNextPage": false,
+                      "endCursor": "2023-01-31;2023-01-01;final"
+                    },
+                    "count": 42,
+                    "edges": [
+                      {
+                        "cursor": "2026-10-31;2026-10-01;preview",
+                        "node": {
+                          "dateStart": "2026-10-01",
+                          "dateEnd": "2026-10-31",
+                          "invoiceType": "PREVIEW",
+                          "subtotal": 0,
+                          "lineItems": [
+                            {
+                              "count": 96,
+                              "description": "Data processing (at $0.00/GB)",
+                              "rate": 0,
+                              "subtotal": 0
+                            },
+                            {
+                              "count": 0,
+                              "description": "Task usage (at $0.00/hour)",
+                              "rate": 0,
+                              "subtotal": 0
+                            }
+                          ],
+                          "extra": {
+                            "billed_month": "2026-10-01T00:00:00+00:00",
+                            "billed_prefix": "Jonathan_Wihl/",
+                            "daily_usage": [
+                              {
+                                "data_gb": 17.171468966,
+                                "data_subtotal": 0,
+                                "task_hours": 0,
+                                "task_subtotal": 0,
+                                "ts": "2026-10-01T00:00:00+00:00"
+                              },
+                              {
+                                "data_gb": 13.110510933,
+                                "data_subtotal": 0,
+                                "task_hours": 0,
+                                "task_subtotal": 0,
+                                "ts": "2026-10-02T00:00:00+00:00"
+                              },
+                              "... 7 entries total"
+                            ],
+                            "free_tier_credit": 0,
+                            "line_items": [
+                              {
+                                "count": 96,
+                                "description": "Data processing (at $0.00/GB)",
+                                "rate": 0,
+                                "subtotal": 0
+                              },
+                              {
+                                "count": 0,
+                                "description": "Task usage (at $0.00/hour)",
+                                "rate": 0,
+                                "subtotal": 0
+                              }
+                            ],
+                            "processed_data_gb": 95.567364887,
+                            "recurring_fee": 0,
+                            "subtotal": 0,
+                            "task_usage_hours": 0,
+                            "trial_credit": 0,
+                            "trial_start": "2026-04-22"
+                          }
+                        }
+                      },
+                      {
+                        "cursor": "2026-09-30;2026-09-01;final"
+                      },
+                      {
+                        "cursor": "2026-08-31;2026-08-01;final"
+                      },
+                      {
+                        "cursor": "2026-07-31;2026-07-01;final"
+                      },
+                      {
+                        "cursor": "2026-06-30;2026-06-01;final"
+                      },
+                      {
+                        "cursor": "2026-05-31;2026-05-01;final"
+                      },
+                      {
+                        "cursor": "2026-04-30;2026-04-01;final"
+                      },
+                      {
+                        "cursor": "2026-03-31;2026-03-01;final"
+                      },
+                      {
+                        "cursor": "2026-02-28;2026-02-01;final"
+                      },
+                      {
+                        "cursor": "2026-01-31;2026-01-01;final"
+                      },
+                      {
+                        "cursor": "2025-12-31;2025-12-01;final"
+                      },
+                      {
+                        "cursor": "2025-11-30;2025-11-01;final"
+                      },
+                      {
+                        "cursor": "2025-10-31;2025-10-01;final"
+                      },
+                      {
+                        "cursor": "2025-09-30;2025-09-01;final"
+                      },
+                      {
+                        "cursor": "2025-08-31;2025-08-01;final"
+                      },
+                      {
+                        "cursor": "2025-07-31;2025-07-01;final"
+                      },
+                      {
+                        "cursor": "2025-06-30;2025-06-01;final"
+                      },
+                      {
+                        "cursor": "2025-05-31;2025-05-01;final"
+                      },
+                      {
+                        "cursor": "2025-04-30;2025-04-01;final"
+                      },
+                      {
+                        "cursor": "2025-03-31;2025-03-01;final"
+                      },
+                      {
+                        "cursor": "2025-02-28;2025-02-01;final"
+                      },
+                      {
+                        "cursor": "2025-01-31;2025-01-01;final"
+                      },
+                      {
+                        "cursor": "2024-12-31;2024-12-01;final"
+                      },
+                      {
+                        "cursor": "2024-11-30;2024-11-01;final"
+                      },
+                      {
+                        "cursor": "2024-10-31;2024-10-01;final"
+                      },
+                      {
+                        "cursor": "2024-09-30;2024-09-01;final"
+                      },
+                      {
+                        "cursor": "2024-08-31;2024-08-01;final"
+                      },
+                      {
+                        "cursor": "2024-07-31;2024-07-01;final"
+                      },
+                      {
+                        "cursor": "2024-06-30;2024-06-01;final"
+                      },
+                      {
+                        "cursor": "2024-05-31;2024-05-01;final"
+                      },
+                      {
+                        "cursor": "2024-04-30;2024-04-01;final"
+                      },
+                      {
+                        "cursor": "2024-03-31;2024-03-01;final"
+                      },
+                      {
+                        "cursor": "2024-02-29;2024-02-01;final"
+                      },
+                      {
+                        "cursor": "2024-01-31;2024-01-01;final"
+                      },
+                      {
+                        "cursor": "2023-12-31;2023-12-01;final"
+                      },
+                      {
+                        "cursor": "2023-11-30;2023-11-01;final"
+                      },
+                      {
+                        "cursor": "2023-10-31;2023-10-01;final"
+                      },
+                      {
+                        "cursor": "2023-09-30;2023-09-01;final"
+                      },
+                      {
+                        "cursor": "2023-08-31;2023-08-01;final"
+                      },
+                      {
+                        "cursor": "2023-07-31;2023-07-01;final"
+                      },
+                      {
+                        "cursor": "2023-06-30;2023-06-01;final"
+                      },
+                      {
+                        "cursor": "2023-01-31;2023-01-01;final"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }

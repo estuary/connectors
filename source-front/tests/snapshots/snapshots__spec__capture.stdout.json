@@ -8,9 +8,6 @@
             "credentials_title": {
               "const": "Private App Credentials",
               "default": "Private App Credentials",
-              "enum": [
-                "Private App Credentials"
-              ],
               "title": "Credentials Title",
               "type": "string"
             },
@@ -52,6 +49,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -70,6 +68,7 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
+          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         }

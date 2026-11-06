@@ -5,7 +5,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
+from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar, cast
 
 import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
@@ -34,6 +34,9 @@ from .utils import format_error_message
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
+
+SERVER_ERROR_INITIAL_BACKOFF = 1.0
+SERVER_ERROR_MAX_BACKOFF = 30.0
 
 T = TypeVar("T")
 
@@ -74,12 +77,28 @@ class HTTPError(RuntimeError):
     """
     HTTPError is an custom error class that provides the HTTP status code
     as a distinct attribute.
+
+    `body` is the raw response body, when the error came from a response.
+    Read error details from it rather than parsing them out of `message`,
+    whose wording may change.
     """
 
-    def __init__(self, message: str, code: int):
+    def __init__(self, message: str, code: int, body: bytes | None = None):
         super().__init__(message)
         self.code = code
         self.message = message
+        self.body = body
+
+
+def format_error_body(body: bytes) -> str:
+    """
+    Decode a response body for an error message or log field.
+
+    Error bodies aren't guaranteed to be UTF-8, and raising here would destroy
+    the error being reported, so undecodable bytes are escaped rather than
+    dropped or replaced.
+    """
+    return body.decode("utf-8", errors="backslashreplace")
 
 
 class HTTPSession(abc.ABC):
@@ -313,8 +332,10 @@ class TokenSource:
         elif isinstance(self.credentials, GoogleServiceAccount):
             assert isinstance(self.google_spec, GoogleServiceAccountSpec)
             if self._access_token is None:
+                # google-auth ships py.typed but leaves from_service_account_info,
+                # refresh and token unannotated, so each arrives partially unknown.
                 self._access_token = (
-                    GoogleServiceAccountCredentials.from_service_account_info(
+                    GoogleServiceAccountCredentials.from_service_account_info(  # pyright: ignore[reportUnknownMemberType]
                         json.loads(self.credentials.service_account),
                         scopes=self.google_spec.scopes,
                     )
@@ -326,13 +347,16 @@ class TokenSource:
                 case GoogleTokenState.FRESH:
                     pass
                 case GoogleTokenState.STALE | GoogleTokenState.INVALID:
-                    self._access_token.refresh(GoogleAuthRequest())
+                    self._access_token.refresh(GoogleAuthRequest())  # pyright: ignore[reportUnknownMemberType]
                 case _:
                     raise RuntimeError(
                         f"Unknown GoogleTokenState: {self._access_token.token_state}"
                     )
 
-            return (self.authorization_token_type, self._access_token.token)
+            return (
+                self.authorization_token_type,
+                cast(str, self._access_token.token),  # pyright: ignore[reportUnknownMemberType]
+            )
 
         assert (
             isinstance(self.credentials, BaseOAuth2Credentials)
@@ -461,8 +485,9 @@ class RateLimiter:
 
     failed: int = 0
     total: int = 0
+    has_reached_max_delay: bool = False
 
-    def update(self, cur_delay: float, failed: bool):
+    def update(self, log: Logger, cur_delay: float, failed: bool) -> None:
         self.total += 1
         update: float
 
@@ -476,6 +501,17 @@ class RateLimiter:
 
         self.delay = (1 - self.gain) * self.delay + self.gain * update
         self.delay = min(self.delay, self.MAX_DELAY)
+
+        if self.delay >= self.MAX_DELAY and not self.has_reached_max_delay:
+            self.has_reached_max_delay = True
+            log.warning(
+                "rate limiter has reached its maximum delay",
+                {
+                    "delay": self.delay,
+                    "failed": self.failed,
+                    "total": self.total,
+                },
+            )
 
     @property
     def error_ratio(self) -> float:
@@ -590,6 +626,7 @@ class HTTPMixin(Mixin, HTTPSession):
         if headers is None:
             headers = {}
         attempt = 0
+        server_error_backoff = SERVER_ERROR_INITIAL_BACKOFF
 
         while True:
             cur_delay = self.rate_limiter.delay
@@ -614,8 +651,9 @@ class HTTPMixin(Mixin, HTTPSession):
             )
 
             should_release_response = True
+            sleep_for = 0.0
             try:
-                self.rate_limiter.update(cur_delay, resp.status == 429)
+                self.rate_limiter.update(log, cur_delay, resp.status == 429)
 
                 if resp.status == 429:
                     if self.rate_limiter.failed / self.rate_limiter.total > 0.05:
@@ -634,28 +672,38 @@ class HTTPMixin(Mixin, HTTPSession):
                     if should_retry is None or should_retry(
                         resp.status, resp.headers, body, attempt
                     ):
+                        sleep_for = server_error_backoff
+                        server_error_backoff = min(
+                            server_error_backoff * 2, SERVER_ERROR_MAX_BACKOFF
+                        )
                         log.warning(
                             "server internal error (will retry)",
                             {
                                 "status_code": resp.status,
-                                "body": body.decode("utf-8"),
+                                "content_type": resp.content_type,
+                                "body": format_error_body(body),
+                                "sleep_for": sleep_for,
                             },
                         )
                     else:
                         raise HTTPError(
-                            f"Encountered HTTP error status {resp.status}.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                            f"Encountered HTTP error status {resp.status}.\nURL: {resp.request_info.url}\nResponse:\n{format_error_body(body)}",
                             resp.status,
+                            body,
                         )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
-                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {resp.request_info.url}\nResponse:\n{format_error_body(body)}",
                         resp.status,
+                        body,
                     )
                 else:
                     resp.raise_for_status()
 
-                    async def body_generator() -> AsyncGenerator[bytes, None]:
+                    async def body_generator(
+                        resp: aiohttp.ClientResponse = resp,
+                    ) -> AsyncGenerator[bytes, None]:
                         try:
                             async for chunk in resp.content.iter_any():
                                 yield chunk
@@ -669,3 +717,6 @@ class HTTPMixin(Mixin, HTTPSession):
             finally:
                 if should_release_response:
                     await resp.release()
+
+            if sleep_for:
+                await asyncio.sleep(sleep_for)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -84,7 +85,7 @@ type Resource struct {
 	TableName  string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
 	Cursor     []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=3"`
 
-	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,nonsensitive=true"`
 	Template     string `json:"template,omitempty" jsonschema:"title=Query Template Override,description=Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples." jsonschema_extras:"multiline=true,order=5"`
 }
 
@@ -387,6 +388,14 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// With no enabled bindings there are no polling workers, so we'd fall through the
+	// empty worker group and exit silently. This connector normally runs forever, so
+	// report the reason.
+	if len(c.Bindings) == 0 {
+		log.Info("capture has no enabled bindings, shutting down")
+		return nil
+	}
+
 	// Always discover and output SourcedSchemas once at startup.
 	if err := c.emitSourcedSchemas(ctx); err != nil {
 		return err
@@ -436,6 +445,13 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 		} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
 			return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
 		}
+	}
+
+	// Checkpoint the sourced schemas now rather than leaving them for the next
+	// checkpoint, which might not come until the next poll. An empty merge patch
+	// commits them without changing any binding's state.
+	if err := c.Output.Checkpoint(json.RawMessage("{}"), true); err != nil {
+		return fmt.Errorf("error checkpointing sourced schemas: %w", err)
 	}
 	return nil
 }
@@ -625,10 +641,16 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 		return fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
+		// ScanType() returns a nil reflect.Type for column types the driver has
+		// no Go mapping for, so guard against it to avoid a nil dereference.
+		var scanTypeName string
+		if scanType := columnType.ScanType(); scanType != nil {
+			scanTypeName = scanType.Name()
+		}
 		log.WithFields(log.Fields{
 			"idx":          i,
 			"name":         columnType.DatabaseTypeName(),
-			"scanTypeName": columnType.ScanType().Name(),
+			"scanTypeName": scanTypeName,
 		}).Debug("column type")
 	}
 
@@ -655,6 +677,15 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 	var rowValues = make([]any, len(columnNames)+1)
 	var serializedDocument []byte
 
+	// Partial-progress checkpoint state. For incremental bindings we only checkpoint
+	// at boundaries between distinct cursor values, persisting the previous row's
+	// cursor: that guarantees every row sharing the persisted cursor has been emitted,
+	// so the next poll's `WHERE cursor > @persisted` resume query won't skip rows
+	// which happen to share a cursor value with the checkpoint. Full-refresh bindings
+	// don't have this constraint and just checkpoint every K rows.
+	var documentsSinceLastCheckpoint int
+	var prevCursorValues []any
+
 	var queryResultsCount int
 	for rows.Next() {
 		if err := rows.Scan(columnPointers...); err != nil {
@@ -669,6 +700,41 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 			}
 			rowValues[idx] = translatedVal
 		}
+
+		// Extract this row's cursor values into a fresh slice. Done before document
+		// emission so we can use the values for the partial-progress decision below.
+		var currentCursorValues []any
+		if !isFullRefresh {
+			currentCursorValues = make([]any, len(cursorIndices))
+			for i, j := range cursorIndices {
+				currentCursorValues[i] = rowValues[j]
+			}
+		}
+
+		// Emit a partial-progress checkpoint *before* this row when enough rows have
+		// accumulated since the last checkpoint, and (for incremental bindings) the
+		// cursor value is about to change. For full-refresh bindings the persisted
+		// cursor is empty and resume semantics don't apply, so the boundary check
+		// reduces to "every K rows".
+		if documentsSinceLastCheckpoint >= documentsPerCheckpoint {
+			var shouldEmit = false
+			if isFullRefresh {
+				shouldEmit = true
+			} else if prevCursorValues != nil && !cursorValuesEqual(prevCursorValues, currentCursorValues) {
+				// Update CursorValues and DocumentCount in lockstep
+				state.CursorValues = prevCursorValues
+				state.DocumentCount = nextRowID
+				shouldEmit = true
+			}
+
+			if shouldEmit {
+				if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+					return err
+				}
+				documentsSinceLastCheckpoint = 0
+			}
+		}
+
 		var metadata = &documentMetadata{
 			RowID:  nextRowID,
 			Polled: pollTime,
@@ -700,35 +766,11 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 			return fmt.Errorf("error emitting document: %w", err)
 		}
 
-		if len(cursorValues) != len(cursorNames) {
-			// Allocate a new values list if needed. This is done inside of the loop, so
-			// an empty result set will be a no-op even when the previous state is nil.
-			cursorValues = make([]any, len(cursorNames))
-		}
-		for i, j := range cursorIndices {
-			cursorValues[i] = rowValues[j]
-		}
-		state.CursorValues = cursorValues
-
+		prevCursorValues = currentCursorValues
 		queryResultsCount++
 		nextRowID++
+		documentsSinceLastCheckpoint++
 
-		if queryResultsCount%documentsPerCheckpoint == 0 {
-			// When a full-refresh binding outputs into a collection with key `/_meta/row_id`
-			// we rely on the persisted DocumentCount not being updated until after the whole
-			// update query completes successfully, so that we can infer deletions of any rows
-			// between the last rowID of the latest query and the persisted DocumentCount.
-			//
-			// But when emitting partial-progress updates on a _non_ full-refresh binding, we
-			// need to update the persisted DocumentCount on each partial progress checkpoint
-			// so that the rowID the next poll resumes from will match the persisted cursor.
-			if !isFullRefresh {
-				state.DocumentCount = nextRowID
-			}
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
-		}
 		if queryResultsCount%100000 == 1 {
 			log.WithFields(log.Fields{
 				"name":  res.Name,
@@ -775,10 +817,27 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 	}
 
 	state.DocumentCount = nextRowID // Always update persisted count on successful completion
+	if prevCursorValues != nil {
+		// Advance the persisted cursor to the final emitted row. Within the loop
+		// CursorValues is only updated at distinct-value boundaries to avoid losing
+		// rows on a mid-query restart, so the end-of-poll checkpoint is the one
+		// place where we accept the rest-of-batch-redo cost in exchange for the
+		// cursor advancing past the most recent row.
+		state.CursorValues = prevCursorValues
+	}
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
 	}
 	return nil
+}
+
+// cursorValuesEqual reports whether two cursor tuples are element-wise equal.
+// Uses reflect.DeepEqual so it handles whatever scan types the driver returns,
+// including []byte and time.Time.
+func cursorValuesEqual(a, b []any) bool {
+	return slices.EqualFunc(a, b, func(x, y any) bool {
+		return reflect.DeepEqual(x, y)
+	})
 }
 
 func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) error {
@@ -821,6 +880,8 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 	}
 
 	// Iterate over CTID range chunks until we reach the maximum possible CTID page for this table
+	var chunkCount int
+	var sweepResultCount int64
 	for int64(afterCTID.BlockNumber) < maximumPageID {
 		var untilCTID = pgtype.TID{BlockNumber: afterCTID.BlockNumber + pagesPerChunk, Valid: true}
 		var resultCount, err = c.pollIncrementalChunk(ctx, &incrementalChunkDescription{
@@ -843,10 +904,24 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		afterCTID = untilCTID
 		state.ScanTID = fmt.Sprintf("(%d,%d)", afterCTID.BlockNumber, afterCTID.OffsetNumber)
 		state.DocumentCount += resultCount
+		chunkCount++
+		sweepResultCount += resultCount
 		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 			return err
 		}
 	}
+
+	// Summarize the polling operation.
+	var summaryEntry = log.WithFields(log.Fields{
+		"name":   res.Name,
+		"chunks": chunkCount,
+		"count":  sweepResultCount,
+		"total":  state.DocumentCount,
+	})
+	if state.BaseXID != 0 {
+		summaryEntry = summaryEntry.WithField("txids", fmt.Sprintf("%d to %d", state.BaseXID, state.NextXID))
+	}
+	summaryEntry.Info("incremental polling complete")
 
 	// Reset scanning state for the next incremental table update
 	state.ScanTID = ""
@@ -899,7 +974,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 	if chunk.BaseXID != 0 {
 		logEntry = logEntry.WithField("txids", fmt.Sprintf("%d to %d", chunk.BaseXID, chunk.NextXID))
 	}
-	logEntry.Info("polling incremental chunk")
+	logEntry.Debug("polling incremental chunk")
 
 	// Set up a watchdog timeout which will terminate the capture task if no data is
 	// received after a long period of time. The deferred stop ensures that the timeout
@@ -927,10 +1002,16 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 		return 0, fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
+		// ScanType() returns a nil reflect.Type for column types the driver has
+		// no Go mapping for, so guard against it to avoid a nil dereference.
+		var scanTypeName string
+		if scanType := columnType.ScanType(); scanType != nil {
+			scanTypeName = scanType.Name()
+		}
 		log.WithFields(log.Fields{
 			"idx":          i,
 			"name":         columnType.DatabaseTypeName(),
-			"scanTypeName": columnType.ScanType().Name(),
+			"scanTypeName": scanTypeName,
 		}).Debug("column type")
 	}
 	var columnIndices = make(map[string]int)
@@ -1027,7 +1108,7 @@ func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalCh
 		"query": query,
 		"count": queryResultsCount,
 		"total": chunk.DocumentCount + queryResultsCount,
-	}).Info("chunk query complete")
+	}).Debug("chunk query complete")
 
 	return queryResultsCount, nil
 }

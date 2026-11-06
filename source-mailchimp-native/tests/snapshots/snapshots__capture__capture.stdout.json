@@ -1,0 +1,305 @@
+[
+  [
+    "acmeCo/lists",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "beamer_address": "us16-c18bf75d09-9a6ca81c73@inbound.mailchimp.com",
+      "campaign_defaults": {
+        "from_email": "connector-dev+mailchimp@estuary.dev",
+        "from_name": "Estuary",
+        "language": "en",
+        "subject": ""
+      },
+      "contact": {
+        "address1": "244 5th Ave Ste 1277",
+        "address2": "",
+        "city": "New York",
+        "company": "Estuary",
+        "country": "US",
+        "phone": "",
+        "state": "NY",
+        "zip": "10001-7604"
+      },
+      "date_created": "2026-06-09T15:12:23+00:00",
+      "double_optin": false,
+      "email_type_option": false,
+      "has_welcome": false,
+      "id": "f34247943d",
+      "list_rating": 0,
+      "marketing_permissions": false,
+      "modules": [],
+      "name": "Estuary",
+      "notify_on_subscribe": "",
+      "notify_on_unsubscribe": "",
+      "permission_reminder": "You are receiving this email because you opted in via our website.",
+      "stats": "REDACTED",
+      "subscribe_url_long": "https://dev.us16.list-manage.com/subscribe?u=05c093afb0e356009f1c0f3af&id=f34247943d",
+      "subscribe_url_short": "http://eepurl.com/MqKi2PfCnl",
+      "use_archive_bar": true,
+      "visibility": "prv",
+      "web_id": 615256
+    }
+  ],
+  [
+    "acmeCo/interests",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "category_id": "1d3affa9d2",
+      "display_order": 1,
+      "id": "6fbed1c079",
+      "list_id": "f34247943d",
+      "name": "Estuary Test Interest",
+      "subscriber_count": "0"
+    }
+  ],
+  [
+    "acmeCo/segment_members",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "segment_id": 2225591,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "email_address": "nicolas+estuary-test-1@estuary.dev",
+      "email_client": "Gmail",
+      "email_type": "html",
+      "full_name": "Estuary Cursor Probe",
+      "id": "6409961b1c262a7e6fb62624ce95ddf5",
+      "interests": {
+        "6fbed1c079": false
+      },
+      "ip_opt": "201.235.239.178",
+      "ip_signup": "",
+      "language": "",
+      "last_changed": "2026-06-12T14:26:23+00:00",
+      "list_id": "f34247943d",
+      "location": {
+        "country_code": "",
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "timezone": ""
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": "",
+        "BIRTHDAY": "",
+        "COMPANY": "",
+        "FNAME": "Estuary Cursor Probe",
+        "LNAME": "",
+        "PHONE": ""
+      },
+      "stats": "REDACTED",
+      "status": "subscribed",
+      "timestamp_opt": "2026-06-12T13:12:06+00:00",
+      "timestamp_signup": "",
+      "unique_email_id": "277db7ffd1",
+      "vip": false
+    }
+  ],
+  [
+    "acmeCo/interest_categories",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "display_order": 0,
+      "id": "1d3affa9d2",
+      "list_id": "f34247943d",
+      "title": "Estuary Test Category A",
+      "type": "checkboxes"
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "list_id": "f34247943d",
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": 2225592,
+      "name": "estuary-other-tag"
+    }
+  ],
+  [
+    "acmeCo/campaigns",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archive_url": "http://eepurl.com/JSUElAT-Ab",
+      "content_type": "html",
+      "create_time": "2026-07-13T13:15:41Z",
+      "delivery_status": {
+        "enabled": false
+      },
+      "emails_sent": 4,
+      "id": "3f69f3a595",
+      "long_archive_url": "https://us16.campaign-archive.com/?u=05c093afb0e356009f1c0f3af&id=3f69f3a595",
+      "needs_block_refresh": false,
+      "recipients": {
+        "list_id": "f34247943d",
+        "list_is_active": true,
+        "list_name": "Estuary",
+        "recipient_count": 4,
+        "segment_text": ""
+      },
+      "report_summary": {
+        "click_rate": 0,
+        "clicks": 0,
+        "ecommerce": {
+          "total_orders": 0,
+          "total_revenue": 0,
+          "total_spent": 0
+        },
+        "open_rate": "1.3333333333333333",
+        "opens": 10,
+        "subscriber_clicks": 0,
+        "unique_opens": 4
+      },
+      "resendable": false,
+      "send_time": "2026-07-13T13:15:57+00:00",
+      "settings": {
+        "authenticate": true,
+        "auto_footer": false,
+        "auto_tweet": false,
+        "drag_and_drop": false,
+        "fb_comments": true,
+        "folder_id": "",
+        "from_name": "Estuary Connector Test",
+        "inline_css": false,
+        "reply_to": "bounce-seed-nonexistent@estuary.dev",
+        "subject_line": "[estuary test] email-activity seed",
+        "template_id": 0,
+        "timewarp": false,
+        "title": "estuary-seed email-activity",
+        "to_name": "",
+        "use_conversation": false
+      },
+      "status": "sent",
+      "tracking": {
+        "clicktale": "",
+        "ecomm360": false,
+        "goal_tracking": false,
+        "google_analytics": "",
+        "html_clicks": true,
+        "opens": true,
+        "text_clicks": false
+      },
+      "type": "regular",
+      "web_id": 6785876
+    }
+  ],
+  [
+    "acmeCo/email_activity",
+    {
+      "_meta": {
+        "campaign_id": "3f69f3a595",
+        "email_address": "nicolas+estuary-test-2@estuary.dev",
+        "email_id": "3abd9d34d7d6953d8a91a79904b6631d",
+        "list_id": "f34247943d",
+        "list_is_active": true,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "action": "open",
+      "ip": "72.14.199.35",
+      "timestamp": "2026-07-13T13:16:07Z"
+    }
+  ],
+  [
+    "acmeCo/list_members",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "consents_to_one_to_one_messaging": true,
+      "contact_id": "1bc3bc1c920d4a6cef2ee0d620f08bb0",
+      "email_address": "nicolas+estuary-test-2@estuary.dev",
+      "email_client": "Gmail",
+      "email_type": "html",
+      "full_name": "",
+      "id": "3abd9d34d7d6953d8a91a79904b6631d",
+      "interests": {
+        "6fbed1c079": false
+      },
+      "ip_opt": "201.235.239.178",
+      "ip_signup": "",
+      "language": "",
+      "last_changed": "2026-07-02T18:19:54Z",
+      "list_id": "f34247943d",
+      "location": {
+        "country_code": "",
+        "dstoff": 0,
+        "gmtoff": 0,
+        "latitude": 0,
+        "longitude": 0,
+        "region": "",
+        "timezone": ""
+      },
+      "member_rating": 2,
+      "merge_fields": {
+        "ADDRESS": "",
+        "BIRTHDAY": "",
+        "COMPANY": "",
+        "FNAME": "",
+        "LNAME": "",
+        "PHONE": ""
+      },
+      "sms_phone_number": "",
+      "sms_subscription_last_updated": "",
+      "sms_subscription_status": "",
+      "source": "API - Generic",
+      "stats": "REDACTED",
+      "status": "subscribed",
+      "tags": [
+        {
+          "id": 2225593,
+          "name": "estuary-test-segment (cursor probe)"
+        },
+        {
+          "id": 2225591,
+          "name": "estuary-test-tag"
+        },
+        {
+          "id": 2225592,
+          "name": "estuary-other-tag"
+        }
+      ],
+      "tags_count": 3,
+      "timestamp_opt": "2026-06-12T13:12:38+00:00",
+      "timestamp_signup": "",
+      "unique_email_id": "e8feaf0c3c",
+      "vip": false,
+      "web_id": 360308974
+    }
+  ],
+  [
+    "acmeCo/segments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-06-12T13:12:06+00:00",
+      "id": 2225591,
+      "list_id": "f34247943d",
+      "member_count": 2,
+      "name": "estuary-test-tag",
+      "type": "static",
+      "updated_at": "2026-06-12T13:12:06Z"
+    }
+  ]
+]

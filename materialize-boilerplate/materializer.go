@@ -79,6 +79,10 @@ type MaterializeCfg struct {
 	// result in a resource deletion + re-creation.
 	NoTruncateResources bool
 
+	// KeyChangeInPlace indicates that a backfill with a changed collection key
+	// does not require re-creating the resource.
+	KeyChangeInPlace bool
+
 	// Serialization policy to use for all bindings of this materialization.
 	SerPolicy *pf.SerPolicy
 
@@ -191,7 +195,7 @@ type EndpointConfiger interface {
 
 	// FeatureFlags returns the raw string of comma-separated feature flags, and
 	// the default feature flag values that should be applied.
-	FeatureFlags() (raw string, defaults map[string]bool)
+	FeatureFlags() (raw string, defaults map[string]common.FlagDefault)
 }
 
 // Resourcer represents a parsed resource config.
@@ -356,7 +360,14 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		return nil, err
 	}
 
-	parsedFlags := ParseFlags(cfg)
+	// Validate carries no spec for the task being validated, only the last
+	// published one; a task with no last spec is brand new and has no creation
+	// date yet.
+	createdAt, err := specCreatedAt(req.LastMaterialization)
+	if err != nil {
+		return nil, err
+	}
+	parsedFlags := resolveFlags(cfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -402,7 +413,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		} else {
 			out = append(out, &pm.Response_Validated_Binding{
 				CaseInsensitiveFields: materializer.Config().CaseInsensitiveFields,
-				Constraints:           constraints,
+				ProjectionConstraints: ValidatedConstraints(constraints),
 				DeltaUpdates:          delta,
 				ResourcePath:          path,
 				SerPolicy:             mCfg.SerPolicy,
@@ -411,6 +422,31 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	}
 
 	return &pm.Response_Validated{Bindings: out}, nil
+}
+
+type openOptions struct {
+	featureFlagsPath []string
+}
+
+// OpenOption customizes the behavior of RunNewTransactor.
+type OpenOption func(*openOptions)
+
+// WithConfigUpdates enables recording the resolved value of cutoff-gated feature
+// flags into the task's persisted endpoint config, via a configUpdate event, so
+// that every task ends up carrying an explicit list of the flags its behavior
+// depends on instead of one implied by its creation date. featureFlagsPath
+// locates the feature flags property within the config document, e.g.
+// ["advanced", "feature_flags"].
+//
+// The value written is the same value the connector resolves from the task's
+// creation date, so this is a record rather than a decision: the configUpdate is
+// published asynchronously and is only eventually consistent, but the task
+// behaves identically before and after it lands. It is recomputed on each Open
+// and stops being emitted once the config contains it.
+func WithConfigUpdates(featureFlagsPath []string) OpenOption {
+	return func(o *openOptions) {
+		o.featureFlagsPath = featureFlagsPath
+	}
 }
 
 // RunApply produces an Applied response for an Apply request.
@@ -428,17 +464,16 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	parsedFlags := ParseFlags(endpointCfg)
+	createdAt, err := specCreatedAt(req.Materialization)
+	if err != nil {
+		return nil, err
+	}
+	parsedFlags := resolveFlags(endpointCfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
 	defer materializer.Close(ctx)
-
-	// TODO(whb): Some point soon we will have the last committed checkpoint
-	// available here in the Apply message, and should start calling Unmarshal
-	// State + Acknowledge somewhere around here to commit any previously staged
-	// transaction before applying the next spec's updates.
 
 	mCfg := materializer.Config()
 
@@ -516,12 +551,20 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		setupActionDescriptions = append(setupActionDescriptions, desc)
 	}
 
-	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	updates, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, bindingIdx := range common.newBindings {
+	// destructiveBindings are bindings whose existing resource is really being
+	// truncated or dropped & re-created by this Apply. drainBindings are
+	// bindings which retain their materialized data while their binding
+	// changes: any transaction previously staged for them must be committed
+	// before this Apply's actions run (see the drain below).
+	destructiveBindings := make(map[int]bool)
+	drainBindings := make(map[int]bool)
+
+	for _, bindingIdx := range updates.newBindings {
 		if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
 			return nil, err
 		} else if desc, action, err := materializer.CreateResource(ctx, *mapped); err != nil {
@@ -532,18 +575,28 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
-	for _, bindingIdx := range common.backfillBindings {
+	for _, bindingIdx := range updates.backfillBindings {
 		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
 		}
+
+		// Observable log for fleet-wide aggregation of backfill activity. Each
+		// binding in backfillBindings is having its backfill counter incremented,
+		// which triggers a backfill of that resource.
+		log.WithFields(log.Fields{
+			"observable":        true,
+			"catalog_task_name": req.Materialization.Name.String(),
+			"resource_path":     strings.Join(req.Materialization.Bindings[bindingIdx].ResourcePath, "."),
+			"backfill":          req.Materialization.Bindings[bindingIdx].Backfill,
+		}).Info("backfill triggered")
 
 		// If the existing resource is compatible with the proposed binding spec
 		// without incrementing the backfill counter, it only needs to be
 		// truncated rather than fully dropping and re-creating the table.
 		var doTruncate bool
 		thisBinding := req.Materialization.Bindings[bindingIdx]
-		lastBinding := findLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
+		lastBinding := FindLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
 		existing := is.GetResource(thisBinding.ResourcePath)
 		if _, err := validator.ValidateBinding(
 			thisBinding.ResourcePath,
@@ -562,10 +615,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				return false
 			})
 
-			// For simplicity, if the collection key has changed the resource
-			// will be re-created, although theoretically some systems could
-			// handle this change without fully dropping & re-creating.
-			if !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
+			// A changed collection key requires re-creating the resource,
+			// unless the endpoint doesn't enforce keys.
+			if !mCfg.KeyChangeInPlace && !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
 				doTruncate = false
 			}
 
@@ -580,12 +632,19 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 
 		if !mCfg.NoTruncateResources && !parsedFlags["always_drop_tables_on_backfill"] && doTruncate {
 			if parsedFlags["retain_existing_data_on_backfill"] {
-				// Only run TruncateTable if retain_existing_data_on_backfill is disabled
+				// Only run TruncateTable if retain_existing_data_on_backfill is disabled.
+				// Since the resource retains its data, a previously staged
+				// transaction remains applicable and must be committed: the
+				// backfill rotates the binding's state key, so pending work
+				// staged under the pre-backfill key would otherwise be
+				// orphaned, losing its staged-but-unacknowledged rows.
+				drainBindings[bindingIdx] = true
 			} else if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
 				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
 			} else {
 				truncationActionDescriptions = append(truncationActionDescriptions, desc)
 				truncationActions = append(truncationActions, action)
+				destructiveBindings[bindingIdx] = true
 			}
 
 			// A resource may be truncated, but require other updates as well.
@@ -593,7 +652,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			if err != nil {
 				return nil, err
 			}
-			common.updatedBindings[bindingIdx] = *upd
+			updates.updatedBindings[bindingIdx] = *upd
 		} else {
 			// Check if retain_existing_data_on_backfill is enabled, and if so, return an error
 			if parsedFlags["retain_existing_data_on_backfill"] {
@@ -605,6 +664,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
 				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
 			} else {
+				destructiveBindings[bindingIdx] = true
 				descs := make([]string, 2)
 				if deleteAction != nil {
 					descs = append(descs, deleteDesc)
@@ -630,7 +690,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
-	for bindingIdx, commonUpdates := range common.updatedBindings {
+	for bindingIdx, commonUpdates := range updates.updatedBindings {
 		mb, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
@@ -651,7 +711,16 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 
 		existingResource := is.GetResource(mb.ResourcePath)
-		for _, p := range mb.Values {
+		// The root document column is migratable in the same way value columns
+		// are (see mustRecreateTypeChange): e.g. disabling
+		// objects_and_arrays_as_json converts its JSON column to text in place.
+		// Keys are intentionally excluded, since a key type change requires a
+		// backfill rather than an in-place migration.
+		migratable := mb.Values
+		if mb.Document != nil {
+			migratable = append(slices.Clone(mb.Values), *mb.Document)
+		}
+		for _, p := range migratable {
 			if existingField := existingResource.GetField(p.Field); existingField == nil {
 				continue
 			} else if !p.Mapped.Compatible(*existingField) && p.Mapped.CanMigrate(*existingField) {
@@ -659,6 +728,15 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 					From: *existingField,
 					To:   p,
 				})
+				// Observable log for fleet-wide aggregation of column migrations by type.
+				log.WithFields(log.Fields{
+					"observable":        true,
+					"catalog_task_name": req.Materialization.Name.String(),
+					"resource_path":     strings.Join(mb.ResourcePath, "."),
+					"field":             p.Field,
+					"fromType":          existingField.Type,
+					"toType":            p.Mapped.String(),
+				}).Info("migrating column type")
 			} else if !p.Mapped.Compatible(*existingField) {
 				// This is mostly a sanity check that some other process (user
 				// modifications, perhaps) didn't change the type of a column in
@@ -684,6 +762,54 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			return nil, err
 		} else {
 			addResourceAction(desc, action)
+			if (action != nil || update.NewlyDeltaUpdates || selectedFieldsChanged(req, bindingIdx)) && !destructiveBindings[bindingIdx] {
+				// The binding's resource is being updated in-place, or its
+				// selected fields are changing, so any transaction previously
+				// staged against it must be committed before the update runs.
+				drainBindings[bindingIdx] = true
+			}
+		}
+	}
+
+	// Post-commit apply connectors persist staged transactions in their
+	// connector state and only commit them during Acknowledge. Work pending
+	// for a binding of drainBindings was staged against the last-applied
+	// specification's resource, so it must be committed before that resource
+	// is altered. This is done by invoking the connector's own Acknowledge
+	// restricted to the affected state keys, and returning its state update in
+	// the Applied response WITHOUT running any of the computed actions: the
+	// runtime durably persists the update and invokes Apply again, and only
+	// that next invocation - finding no remaining pending work - performs the
+	// actions. Running them in the same invocation as the drain would risk a
+	// crash after the staged DML commits but before the state update persists,
+	// re-running staged queries against an altered schema on the next attempt.
+	//
+	// Bindings of destructiveBindings are deliberately not drained: their
+	// backfill rotates the binding's state key, so the pending entries become
+	// inert, the truncated or re-created resource is re-materialized in full
+	// anyway, and a user backfilling to recover from wedged pending work is
+	// not blocked by a failing drain.
+	if len(req.StateJson) > 0 && len(drainBindings) > 0 {
+		var commitKeys []string
+		for bindingIdx := range drainBindings {
+			// Pending work was staged under the last-applied binding's state
+			// key, which differs from the current binding's key when the
+			// backfill counter is changing.
+			if lastBinding := FindLastBinding(req.Materialization.Bindings[bindingIdx].ResourcePath, req.LastMaterialization); lastBinding != nil {
+				commitKeys = append(commitKeys, lastBinding.StateKey)
+			}
+		}
+		slices.Sort(commitKeys)
+
+		if len(commitKeys) > 0 {
+			if patch, err := drainPendingState(ctx, materializer, req, endpointCfg, is, commitKeys); err != nil {
+				return nil, fmt.Errorf("committing pending transaction before applying schema updates: %w", err)
+			} else if patch != nil {
+				return &pm.Response_Applied{
+					ActionDescription: fmt.Sprintf("committed previously staged transaction for state keys: %s", strings.Join(commitKeys, ", ")),
+					State:             patch,
+				}, nil
+			}
 		}
 	}
 
@@ -706,6 +832,55 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	return &pm.Response_Applied{ActionDescription: strings.Join(allActions, "\n")}, nil
 }
 
+// selectedFieldsChanged reports whether the field selection of the given
+// binding differs, in content or order, from that of the last-applied binding
+// of the same resource.
+func selectedFieldsChanged(req *pm.Request_Apply, bindingIdx int) bool {
+	var next = req.Materialization.Bindings[bindingIdx]
+	var last = FindLastBinding(next.ResourcePath, req.LastMaterialization)
+	if last == nil {
+		return false
+	}
+
+	return !slices.Equal(last.FieldSelection.Keys, next.FieldSelection.Keys) ||
+		!slices.Equal(last.FieldSelection.Values, next.FieldSelection.Values) ||
+		last.FieldSelection.Document != next.FieldSelection.Document
+}
+
+// pinFeatureFlags records the resolved value of any cutoff-gated flag that the
+// endpoint config does not already mention, by emitting a configUpdate event
+// restating the config with those flags made explicit. Failures are logged and
+// otherwise ignored: the value is one the connector re-derives from the task's
+// creation date on every RPC, so the config is a record of behavior rather than
+// its source, and a task is unaffected by the write being late or lost.
+func pinFeatureFlags[EC EndpointConfiger](
+	endpointCfg EC,
+	sealedConfig json.RawMessage,
+	createdAt common.CreatedAt,
+	openOpts openOptions,
+) {
+	rawFlags, defaultFlags := endpointCfg.FeatureFlags()
+	toPin := common.PendingFlagPins(rawFlags, defaultFlags, createdAt)
+	if len(toPin) == 0 {
+		return
+	}
+
+	if len(sealedConfig) == 0 {
+		// The sealed config is what a restatement of an encrypted config is
+		// built from, and runtimes predating it send nothing.
+		log.Debug("not recording feature flag defaults: runtime did not provide the sealed endpoint config")
+		return
+	}
+
+	pinned, err := common.SetSealedConfigProperty(sealedConfig, openOpts.featureFlagsPath, common.PinnedFlagsString(rawFlags, toPin))
+	if err != nil {
+		log.WithError(err).Warn("failed to record feature flag defaults in endpoint config")
+		return
+	}
+
+	common.EmitConfigUpdate("Recording default values for newly introduced settings in the endpoint config.", pinned)
+}
+
 // RunNewTransactor builds a transactor and Opened response from an Open
 // request.
 func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -713,9 +888,15 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	req pm.Request_Open,
 	be *m.BindingEvents,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	opts ...OpenOption,
 ) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := req.Validate(); err != nil {
 		return nil, nil, nil, fmt.Errorf("validating request: %w", err)
+	}
+
+	var openOpts openOptions
+	for _, opt := range opts {
+		opt(&openOpts)
 	}
 
 	var epCfg EC
@@ -723,7 +904,11 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 
-	featureFlags := ParseFlags(epCfg)
+	createdAt, err := specCreatedAt(req.Materialization)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	featureFlags := resolveFlags(epCfg, createdAt)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
@@ -767,9 +952,20 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		}
 	}
 
+	if openOpts.featureFlagsPath != nil {
+		pinFeatureFlags(epCfg, req.SealedConfigJson, createdAt, openOpts)
+	}
+
 	return transactor, &pm.Response_Opened{
-		RuntimeCheckpoint:       cp,
-		DisableLoadOptimization: featureFlags["allow_existing_tables_for_new_bindings"],
+		RuntimeCheckpoint: cp,
+		// retain_existing_data_on_backfill skips truncating a table on
+		// backfill, but the runtime's per-binding load-key optimization is
+		// reset by a backfill and would skip loads, causing backfills to
+		// insert duplicate rows alongside the retained data instead of
+		// merging with it. Disabling the load optimization forces loads so
+		// that retained data is merged correctly.
+		DisableLoadOptimization: featureFlags["allow_existing_tables_for_new_bindings"] ||
+			featureFlags["retain_existing_data_on_backfill"],
 	}, &mCfg.MaterializeOptions, nil
 }
 
@@ -820,7 +1016,7 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 				}
 			}
 
-			mp := mapProjection(*p, fieldCfg)
+			mp := MapProjection(*p, fieldCfg)
 			mt, converter := materializer.MapType(mp, fieldCfg)
 			*dst = append(*dst, MappedProjection[MT]{
 				Projection: mp,
@@ -901,7 +1097,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 		}
 	}
 
-	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	mt, _ := c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
 	return mustRecreateTypeChange(p, mt, existing), nil
 }
 
@@ -910,11 +1106,12 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 // Generally this is true if there is a type change that can't be migrated.
 func mustRecreateTypeChange[MT MappedTyper](p *pf.Projection, mt MT, existing ExistingField) bool {
 	canMigrate := mt.CanMigrate(existing)
-	if p.IsRootDocumentProjection() || p.IsPrimaryKey {
-		// There are currently no known cases where migrating the root document
-		// column's type would be useful. Somewhat similarly, it would
-		// theoretically be possible for a few systems to migrate collection key
-		// columns, but for the most part this is not practical.
+	if p.IsPrimaryKey {
+		// It would theoretically be possible for a few systems to migrate
+		// collection key columns, but for the most part this is not practical, so
+		// a key type change still requires a backfill. The root document column,
+		// by contrast, is migratable: e.g. disabling objects_and_arrays_as_json
+		// converts its JSON column to text in place via the dialect's migration.
 		canMigrate = false
 	}
 
@@ -929,18 +1126,56 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 		}
 	}
 
-	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	mt, _ := c.m.MapType(MapProjection(*p, fieldCfg), fieldCfg)
 	return mt.String(), nil
 }
 
-func ParseFlags(cfg EndpointConfiger) map[string]bool {
+// ResolveFlags returns the feature flags of the task described by spec, for
+// connectors which implement the materialization RPCs themselves rather than
+// through RunValidate, RunApply and RunNewTransactor.
+//
+// The spec is required: a date-gated default can only be resolved against the
+// creation date the runtime stamped onto it, and resolving one without a spec
+// would silently hand the task whichever behavior a brand-new task gets. Take it
+// from `req.LastMaterialization` in Validate, and from `req.Materialization` in
+// Apply and Open. Anywhere further from the RPC boundary, thread down the flags
+// resolved there instead of re-resolving them.
+func ResolveFlags[EC EndpointConfiger](cfg EC, spec *pf.MaterializationSpec) (map[string]bool, error) {
+	createdAt, err := specCreatedAt(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveFlags(cfg, createdAt), nil
+}
+
+// resolveFlags resolves the feature flags of a task created on createdAt. Since
+// the creation date is carried by every task spec, all of Validate, Apply and
+// Open resolve the same flags for a given task without persisting anything.
+func resolveFlags(cfg EndpointConfiger, createdAt common.CreatedAt) map[string]bool {
 	rawFlags, defaultFlags := cfg.FeatureFlags()
-	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+	parsedFlags := common.ResolveFlags(rawFlags, defaultFlags, createdAt)
 	if rawFlags != "" {
 		log.WithField("flags", parsedFlags).Info("parsed feature flags")
 	}
 
 	return parsedFlags
+}
+
+// specCreatedAt returns the validated date on which a task was created. A spec
+// that is absent, or that predates the control plane stamping creation dates,
+// yields a brand-new CreatedAt. A date that cannot be parsed is an error rather
+// than something to resolve flags around: it would silently give the task the
+// behavior of the wrong era.
+func specCreatedAt(spec *pf.MaterializationSpec) (common.CreatedAt, error) {
+	if spec == nil {
+		return common.CreatedAt{}, nil
+	}
+	createdAt, err := common.ParseCreatedAt(spec.CreatedAt)
+	if err != nil {
+		return common.CreatedAt{}, fmt.Errorf("resolving feature flags: %w", err)
+	}
+	return createdAt, nil
 }
 
 func UnmarshalStrict[T pb.Validator](raw []byte, into *T) error {

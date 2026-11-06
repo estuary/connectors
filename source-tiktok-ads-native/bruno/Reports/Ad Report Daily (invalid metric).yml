@@ -1,0 +1,23 @@
+info:
+  name: Ad Report Daily (invalid metric)
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=BASIC&data_level=AUCTION_AD&dimensions=["ad_id","stat_time_day"]&metrics=["spend","not_a_real_metric"]&page=1&page_size=1000&start_date=2026-10-12&end_date=2026-10-12'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** what TikTok returns for an unknown metric name; the connector's validate-time check relies on it naming the field.
+
+  **VERIFIED (2026-10-13, sandbox):** rejected, `code 40002`: "Invalid metric fields: ['not_a_real_metric']". TikTok names the offending metric, so a validate-time test request can report typos precisely.

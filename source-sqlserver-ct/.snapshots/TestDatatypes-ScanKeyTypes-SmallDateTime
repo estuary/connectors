@@ -1,0 +1,67 @@
+sql> CREATE TABLE dbo.Datatypes_ScanKeyTypes_SmallDateTime_196778 (k SMALLDATETIME PRIMARY KEY, v TEXT)
+sql> INSERT INTO dbo.Datatypes_ScanKeyTypes_SmallDateTime_196778 VALUES ('1991-08-31T12:34:00', 'Data 0'), ('1991-08-31T12:35:00', 'Data 1'), ('2000-01-01T01:01:00', 'Data 2')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/datatypes_scankeytypes_smalldatetime_196778
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_smalldatetime_196778",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_SmallDateTime_196778"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:00Z",
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_smalldatetime_196778",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_SmallDateTime_196778"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:35:00Z",
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_smalldatetime_196778",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_SmallDateTime_196778"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "2000-01-01T01:01:00Z",
+    "v": "Data 2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_ScanKeyTypes_SmallDateTime_196778": {
+      "backfilled": 3,
+      "key_columns": [
+        "k"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

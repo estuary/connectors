@@ -39,6 +39,15 @@ def _ms_to_dt(ms: int) -> datetime:
 def base_url(host: PendoHost) -> str:
     return f"https://{host}/api/v1"
 
+def _escape_filter_string(value: str) -> str:
+    # Pendo's filter grammar is documented as "basic C expression syntax" but doesn't
+    # spell out string escape rules, so we only escape the two characters we know
+    # break the filter: "  and \. Order matters, so we escape backslashes
+    # first so the \" we insert isn't re-escaped into \\".
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def _generate_time_series(
         period: str,
         lower_bound: int,
@@ -89,7 +98,7 @@ def generate_events_body(
     #                    there are more events in Pendo with the same lastTime than we can retrieve in
     #                    a single API query.
     if last_seen_id:
-        filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+        filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)}"
     else:
         filter_condition = f"guideTimestamp >= {lower_bound}"
         if upper_bound:
@@ -161,7 +170,7 @@ def generate_event_aggregates_body(
     #              hour: The bottom of the hour for the aggregate. Ensures we don't get "in-progress"
     #                    aggregates for the current hour.
     if last_seen_id:
-        filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= \"{last_seen_id}\" && hour < {current_hour}"
+        filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)} && hour < {current_hour}"
     else:
         filter_condition = f"lastTime >= {lower_bound} && hour < {current_hour}"
         if upper_bound:
@@ -227,7 +236,7 @@ def generate_resources_body(
     #                    there are more resources in Pendo with the same updated_at_field than we can retrieve in
     #                    a single API query.
     if last_seen_id:
-        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)}"
     else:
         filter_condition = f"{updated_at_field} >= {lower_bound}"
         if upper_bound:
@@ -319,6 +328,11 @@ async def _fetch_events_between(
 
     body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -353,6 +367,11 @@ async def _fetch_events_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -435,13 +454,19 @@ async def backfill_events(
         model: type[Event],
         identifying_field: str,
         limit: int,
+        start_ms: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
 ) -> AsyncGenerator[Event | PageCursor, None]:
-    assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    last_dt = _ms_to_dt(page_cursor)
+    if page_cursor is None:
+        start = start_ms
+    else:
+        assert isinstance(page_cursor, int)
+        start = page_cursor
+
+    last_dt = _ms_to_dt(start)
     upper_bound_dt = last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS)
 
     # If we've reached or exceeded the cutoff date, stop backfilling.
@@ -467,7 +492,7 @@ async def backfill_events(
     if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS))
-    elif last_dt > _ms_to_dt(page_cursor):
+    elif last_dt > _ms_to_dt(start):
         # If there were documents and the last one has a later timestamp than our cursor,
         # then update the cursor to the later timestamp.
         yield _dt_to_ms(last_dt)
@@ -494,6 +519,11 @@ async def _fetch_aggregated_events_between(
     upper_bound_ts = _dt_to_ms(upper_bound)
 
     body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
+
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
 
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
@@ -529,6 +559,11 @@ async def _fetch_aggregated_events_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -611,13 +646,19 @@ async def backfill_aggregated_events(
         model: type[EventAggregate],
         identifying_field: str,
         limit: int,
+        start_ms: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
 ) -> AsyncGenerator[EventAggregate | PageCursor, None]:
-    assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    last_dt = _ms_to_dt(page_cursor)
+    if page_cursor is None:
+        start = start_ms
+    else:
+        assert isinstance(page_cursor, int)
+        start = page_cursor
+
+    last_dt = _ms_to_dt(start)
     upper_bound_dt = last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS)
 
     # If we've reached or exceeded the cutoff date, stop backfilling.
@@ -643,7 +684,7 @@ async def backfill_aggregated_events(
     if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS))
-    elif last_dt > _ms_to_dt(page_cursor):
+    elif last_dt > _ms_to_dt(start):
         # If there were documents and the last one has a later
         # timestamp than our cursor, update the cursor.
         yield _dt_to_ms(last_dt)
@@ -691,6 +732,11 @@ async def _fetch_resources_between(
 
     body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -725,6 +771,11 @@ async def _fetch_resources_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -805,13 +856,19 @@ async def backfill_resources(
         updated_at_field: str,
         identifying_field: str,
         limit: int,
+        start_ms: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
-    assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    last_dt = _ms_to_dt(page_cursor)
+    if page_cursor is None:
+        start = start_ms
+    else:
+        assert isinstance(page_cursor, int)
+        start = page_cursor
+
+    last_dt = _ms_to_dt(start)
     upper_bound_dt = last_dt + timedelta(days=RESOURCE_DATE_WINDOW_SIZE_IN_DAYS)
 
     # If we've reached or exceeded the cutoff date, stop backfilling.
@@ -838,7 +895,7 @@ async def backfill_resources(
     if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=RESOURCE_DATE_WINDOW_SIZE_IN_DAYS))
-    elif last_dt > _ms_to_dt(page_cursor):
+    elif last_dt > _ms_to_dt(start):
         # If there were documents and the last one has a later
         # timestamp than our cursor, update the cursor.
         yield _dt_to_ms(last_dt)

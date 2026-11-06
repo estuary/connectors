@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -115,13 +115,13 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"float":     {sql.NewMigrationSpec([]string{textType}, nocast)},
-			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast), sql.NewMigrationSpec([]string{"double precision"})},
-			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
-			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"float":     {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
+			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast()), sql.NewMigrationSpec([]string{"double precision"}, sql.WithDirectCast())},
+			"date":      {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
+			"time":      {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
 			"varchar": {
-				sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast),
+				sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast, sql.WithDirectCast()),
 				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
 			},
 			"nvarchar": {
@@ -130,8 +130,11 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"varbinary": {
 				sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(varbinaryToStringCast)),
 			},
-			"*": {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"*": {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
 		},
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s", table.Identifier, m.Identifier, m.BareDDL)
+		}),
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any
@@ -415,12 +418,14 @@ SELECT TOP 0 -1, NULL
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 (
-	SELECT
-		{{- range $i, $col := $.RootLevelColumns}}
+	{{- /* FOR JSON PATH would nest on a dot in a property; AUTO keeps it. */}}
+	SELECT * FROM (SELECT
+		{{- range $i, $col := $.RootPropertyColumns}}
 			{{- if $i}},{{end}}
-		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
-	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
+	) AS d
+	FOR JSON AUTO, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l

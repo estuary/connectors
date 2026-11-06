@@ -1,0 +1,13 @@
+bucket: ENC[AES256_GCM,data:bRRVTrLZNELyr9Q8hD82zHX/dHtJL4BCYTLPWfw=,iv:m3NPdMCV8G8ScELoMe/v/GnAhuFDzQRLNwIK5dbNSiQ=,tag:muMFMGO8YPkfe7Ssw+oVIg==,type:str]
+region: ENC[AES256_GCM,data:NSroQPl5HCiT,iv:c0FEljFwRKCfZI2oa84mFZsGma57LL8Gz3wsFYsMxAI=,tag:AUR0HjcmL1bprtepZrYaYw==,type:str]
+awsAccessKeyId: ENC[AES256_GCM,data:23TBILFGp4iLXwbmXEiHToXHw2c=,iv:hYiFheCKph8mkF4IdhLJu+1wsKOOz8qSsgIbgt+t6LA=,tag:fSGZgEEPAaBwN+G1LVLKSw==,type:str]
+awsSecretAccessKey: ENC[AES256_GCM,data:ZSDmp1FAknpaIz5K94YJjo0BouoJPhD0Sp/UtAeiJzo281ekOljz6g==,iv:rSkzva3YrWPbe66SdAJeivOTVn66f2mZ+3tfkWcr6ss=,tag:czK0/suSboei+P/cO09qXA==,type:str]
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-10-27T21:07:38Z"
+          enc: CiUAdmEdwq4ClQHynLHeJwE/H7magKWwvTX9zva+gQiNI+4h1SOWEkkAvE+nkw1mRm3vthmgeQRBF9KvDVdW1og4DOstCKz2V4+zMbvdWrpdaplKlJylzOiYpPCyN1dK0eS+k/PhTD0aonnBmaQdVjd4
+    lastmodified: "2026-10-27T21:07:39Z"
+    mac: ENC[AES256_GCM,data:sp3cV12jPEi1wUJ/6kLtuPpts+Y43dLHFUupDre2qftQ+71puemcCkdq8FjNXDi1Vb6BppmvKXi1DoYx+9IoM+SjyMqgzDn62/JzCKYIkg5Jr/q130I9h1XlpzTVUBQ6mAkab239pe466qw37W77Yq+h+0vnuPm2BGlX5//20Fw=,iv:sqeTvU7NpIKvHxKRuwDTiuP81dxcUY21e6eaaIPOLH4=,tag:f/IEBb8t7b6Ls9kf4O/5Cg==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.12.1

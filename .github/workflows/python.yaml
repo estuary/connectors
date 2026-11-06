@@ -1,391 +1,116 @@
 name: Python Connectors
 
+# No `paths-ignore`: the `Python connectors gate` check below has to report
+# on every PR to be usable as a required check. The classifier already skips
+# the builds for paths that build nothing.
 on:
   push:
     branches: [main]
-    paths:
-      - "estuary-cdk/**"
-      - "source-airtable/**"
-      - "source-asana/**"
-      - "source-facebook-marketing/**"
-      - "source-gladly/**"
-      - "source-google-ads/**"
-      - "source-google-sheets-native/**"
-      - "source-hubspot-native/**"
-      - "source-hubspot/**"
-      - "source-notion/**"
-      - "source-linkedin-pages/**"
-      - "source-linkedin-ads-v2/**"
-      - "source-klaviyo/**"
-      - "source-recharge/**"
-      - "source-stripe-native/**"
-      - "source-zendesk-support/**"
-      - "source-iterable/**"
-      - "source-pendo/**"
-      - "source-twilio/**"
-      - "source-jira-legacy/**"
-      - "source-mixpanel-native/**"
-      - "source-brevo/**"
-      - "source-impact-native/**"
-      - "source-front/**"
-      - "source-genesys/**"
-      - "source-braintree-native/**"
-      - "source-intercom-native/**"
-      - "source-shopify-native/**"
-      - "source-zendesk-support-native/**"
-      - "source-iterate/**"
-      - "source-google-analytics-data-api-native/**"
-      - "source-monday/**"
-      - "source-salesforce-native/**"
-      - "source-gainsight-nxt/**"
-      - "source-chargebee-native/**"
-      - "source-sage-intacct/**"
-      - "source-outreach/**"
-      - "source-jira-native/**"
-      - "source-looker/**"
-      - "source-qualtrics/**"
-      - "source-google-play/**"
-      - "source-apple-app-store/**"
-      - "source-datadog/**"
-      - "source-klaviyo-native/**"
-      - "source-sentry/**"
-      - "source-dynamics-365-finance-and-operations/**"
-      - "source-incident-io/**"
-      - "source-navan/**"
-      - "source-facebook-marketing-native/**"
-      - "source-quickbooks/**"
-      - "source-airtable-native/**"
-      - "source-ada/**"
-      - "source-zoho/**"
-      - "source-iterable-native/**"
-      - "source-ringcentral/**"
-      - "source-posthog/**"
-      - "source-ashby/**"
-      - "source-gong/**"
-      - "source-greenhouse-native/**"
-      - "source-calendly/**"
-      - "source-appsflyer/**"
 
   pull_request:
     branches: [main]
-    paths:
-      - "estuary-cdk/**"
-      - "source-airtable/**"
-      - "source-asana/**"
-      - "source-facebook-marketing/**"
-      - "source-gladly/**"
-      - "source-google-ads/**"
-      - "source-google-sheets-native/**"
-      - "source-hubspot-native/**"
-      - "source-hubspot/**"
-      - "source-notion/**"
-      - "source-linkedin-pages/**"
-      - "source-linkedin-ads-v2/**"
-      - "source-recharge/**"
-      - "source-klaviyo/**"
-      - "source-recharge/**"
-      - "source-stripe-native/**"
-      - "source-zendesk-support/**"
-      - "source-iterable/**"
-      - "source-pendo/**"
-      - "source-twilio/**"
-      - "source-jira-legacy/**"
-      - "source-mixpanel-native/**"
-      - "source-brevo/**"
-      - "source-impact-native/**"
-      - "source-front/**"
-      - "source-genesys/**"
-      - "source-braintree-native/**"
-      - "source-intercom-native/**"
-      - "source-shopify-native/**"
-      - "source-zendesk-support-native/**"
-      - "source-iterate/**"
-      - "source-google-analytics-data-api-native/**"
-      - "source-monday/**"
-      - "source-salesforce-native/**"
-      - "source-gainsight-nxt/**"
-      - "source-chargebee-native/**"
-      - "source-sage-intacct/**"
-      - "source-outreach/**"
-      - "source-jira-native/**"
-      - "source-looker/**"
-      - "source-qualtrics/**"
-      - "source-google-play/**"
-      - "source-apple-app-store/**"
-      - "source-datadog/**"
-      - "source-klaviyo-native/**"
-      - "source-sentry/**"
-      - "source-dynamics-365-finance-and-operations/**"
-      - "source-incident-io/**"
-      - "source-navan/**"
-      - "source-facebook-marketing-native/**"
-      - "source-quickbooks/**"
-      - "source-airtable-native/**"
-      - "source-ada/**"
-      - "source-zoho/**"
-      - "source-iterable-native/**"
-      - "source-ringcentral/**"
-      - "source-posthog/**"
-      - "source-ashby/**"
-      - "source-gong/**"
-      - "source-greenhouse-native/**"
-      - "source-calendly/**"
-      - "source-appsflyer/**"
+
+  # Push runs only build the connectors a change touches, so a deploy that
+  # failed, or a queued run a newer push replaced, stays missed until the
+  # connector changes again. The nightly run builds and deploys every Python
+  # connector, fixing those within a day and picking up base image updates.
+  # A manual run does the same; it only moves `dev` and version tags on main.
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      cdk_only:
+        description: >-
+          Check and publish estuary-cdk (without rebuilding any connector).
+        type: boolean
+        default: false
+
+  # Cutting a release publishes estuary-cdk from the tag; see
+  # estuary-cdk/README.md. No connector is rebuilt -- the classifier
+  # special-cases this event.
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Don't cancel in progress builds of main, since that can result in connector
+  # specs not being updated.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Which connectors did this change touch? This job classifies every changed
+  # path, and the build jobs below build only the connectors in its answer.
+  #
+  # It can't be a `paths` filter because dynamically telling a Python connector
+  # from a Go or Rust one means looking for a pyproject.toml, which needs the
+  # checked out tree & nothing is checked out when `paths` filters are evaluated.
+  classify_changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      # A `cdk_only` dispatch builds no connector, the shape the classifier
+      # already gives a release. `cdk` needs no override: the classifier
+      # reports it true for every manual run. The CDK's checks therefore run,
+      # and the publish job below still waits on them.
+      #
+      # `inputs.cdk_only` is a typed boolean, null on events that declare no
+      # inputs. `github.event.inputs.cdk_only` would be the string "false",
+      # which is truthy.
+      run: ${{ inputs.cdk_only && 'false' || steps.matrix.outputs.run }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      cdk: ${{ steps.classify.outputs.cdk }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Runs here rather than in the classifier's workflow so that it also
+      # runs on the change adding a connector.
+      - name: Check the connector lists
+        run: cd .github/scripts && python3 -m unittest test_connector_lists -v
+
+      - id: classify
+        uses: ./.github/actions/classify-changes
+
+      # The connector list lives in its own file so it can be read as data.
+      # The matrix is the connectors the classifier reported, or all of them.
+      - id: matrix
+        uses: ./.github/actions/select-connectors
+        with:
+          list: .github/python-connectors.yaml
+          connectors: ${{ steps.classify.outputs.python_connectors }}
+
+  fetch_flow:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # These tests only invoke flowctl, but flowctl shells out to sops to
+      # decrypt each test.flow.yaml's encrypted config, so both are uploaded.
+      - name: Fetch flowctl and sops
+        uses: ./.github/actions/fetch-flow-artifact
+        with:
+          paths: |
+            flow-bin/flowctl
+            flow-bin/sops
+
   py_connector:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    needs: [classify_changes, fetch_flow]
+    if: needs.classify_changes.outputs.run == 'true'
+    name: ${{ matrix.connector.name }}
     strategy:
       fail-fast: false
       matrix:
-        connector:
-          # Note that every entry here must specify usage_rate. We're unable to
-          # set a default and selectively override it with `0.0`, because GH actions
-          # considers zero values to be "unset" (which is bs and I'm salty about it).
-          - name: source-airtable
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-asana
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-facebook-marketing
-            type: capture
-            version: v4
-            usage_rate: "1.0"
-          - name: source-gladly
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-google-ads
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-google-sheets-native
-            type: capture
-            version: v1
-            usage_rate: "0.0"
-          - name: source-hubspot-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-hubspot
-            type: capture
-            version: v5
-            usage_rate: "1.0"
-          - name: source-notion
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-linkedin-pages
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-linkedin-ads-v2
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-klaviyo
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-recharge
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-stripe-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-zendesk-support
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-iterable
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-pendo
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-twilio
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-jira-legacy
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-mixpanel-native
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-brevo
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-impact-native
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-front
-            type: capture
-            version: v3
-            usage_rate: "1.0"
-          - name: source-genesys
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-braintree-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-intercom-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-shopify-native
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-zendesk-support-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-iterate
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-google-analytics-data-api-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-monday
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-salesforce-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-gainsight-nxt
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-chargebee-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-sage-intacct
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-outreach
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-jira-native
-            type: capture
-            version: v3
-            usage_rate: "1.0"
-          - name: source-looker
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-qualtrics
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-google-play
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-apple-app-store
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-datadog
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-klaviyo-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-sentry
-            type: capture
-            version: v2
-            usage_rate: "1.0"
-          - name: source-dynamics-365-finance-and-operations
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-incident-io
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-navan
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-facebook-marketing-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-quickbooks
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-airtable-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-ada
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-zoho
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-iterable-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-ringcentral
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-posthog
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-ashby
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-gong
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-greenhouse-native
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-calendly
-            type: capture
-            version: v1
-            usage_rate: "1.0"
-          - name: source-appsflyer
-            type: capture
-            version: v1
-            usage_rate: "1.0"
+        connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
+
+    # Without this, uv picks the runner's system Python. Test on the Python
+    # the images ship, and keep it in step with estuary-cdk/*.Dockerfile.
+    env:
+      UV_PYTHON: "3.14"
 
     steps:
       - uses: actions/checkout@v4
@@ -398,29 +123,54 @@ jobs:
           docker rm temp
           echo "${PWD}/network-tunnel" >> $GITHUB_PATH
 
+      - name: Restore Flow binaries
+        uses: ./.github/actions/restore-flow-binaries
+
       - name: Common Setup
         id: setup
         uses: ./.github/actions/setup
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          gcp_service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-      - name: Install Python
-        uses: actions/setup-python@v5
+      # uv provisions the interpreter itself, so there is no separate
+      # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          version: "0.13.3"
+          enable-cache: true
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      # Report-only: findings show up as PR annotations without failing the
+      # job. It runs before the tests so it still reports when they fail. The
+      # version must match `required-version` in ruff.toml.
+      - name: ${{ matrix.connector.name }} lint
+        run: |
+          uvx ruff@0.16.9 check --exit-zero --output-format=github ${{ matrix.connector.name }}
+          # GitHub renders only the first handful of annotations per step, and
+          # caps them per run as well, so with a matrix this wide the counts
+          # also go to the job summary, where none are dropped.
+          {
+            echo "### ruff: ${{ matrix.connector.name }}"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics ${{ matrix.connector.name }}
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: ${{ matrix.connector.name }} tests
         run: |
-          cd ${{ matrix.connector.name }}
-          poetry install
-          source $(poetry env info --path)/bin/activate
-          cd ..
-          pytest ${{ matrix.connector.name }}
+          uv sync --locked --package ${{ matrix.connector.name }} --all-extras --group dev --group lint
+          uv run --no-sync pytest ${{ matrix.connector.name }}
+
+      # Report-only, like the lint step above. The connectors carry a large
+      # pre-existing backlog, so this surfaces findings as annotations and a
+      # per-rule tally in the job summary rather than gating on them. It runs
+      # after the tests because it needs the synced environment, and the
+      # changed-connector matrix keeps each job's findings to one connector.
+      - name: ${{ matrix.connector.name }} type-check
+        run: |
+          uv run --no-sync pyright --outputjson ${{ matrix.connector.name }} \
+            | python3 .github/scripts/pyright_annotations.py ${{ matrix.connector.name }}
 
       - name: Find Dockerfile for ${{ matrix.connector.name }}
         id: dockerfile
@@ -442,15 +192,288 @@ jobs:
             CONNECTOR_TYPE=${{ matrix.connector.type }}
             USAGE_RATE=${{ matrix.connector.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          # Layers come from the connector's build-cache tag and only main writes
+          # it back, so PR builds can't overwrite each other's cache. The GitHub
+          # Actions cache is too small for every connector's builder stage.
+          cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
+
+      # The tests run in the workspace venv, which also holds the dev group, so
+      # an import that only a dev dependency satisfies still passes them.
+      # Asking the built image for its spec imports the connector from what
+      # the image actually installed.
+      - name: ${{ matrix.connector.name }} image smoke test
+        run: |
+          cat > "${RUNNER_TEMP}/smoke.flow.yaml" <<EOF
+          captures:
+            acmeCo/smoke-test:
+              endpoint:
+                connector:
+                  image: ghcr.io/estuary/${{ matrix.connector.name }}:local
+                  config: {}
+              bindings: []
+          EOF
+          flowctl raw spec --source "${RUNNER_TEMP}/smoke.flow.yaml" > /dev/null
 
       - name: Deployment
         uses: ./.github/actions/deploy
         with:
           connector: ${{ matrix.connector.name }}
-          pg_database: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
-          pg_host: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
-          pg_password: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
-          pg_user: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          rt_id: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
+          rt_secret: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
           tag_sha: ${{ steps.setup.outputs.tag_sha }}
           tag_version: ${{ matrix.connector.version }}
           variants: ${{ matrix.connector.variants }}
+
+  # estuary-cdk's own tests and checks. They live in this workflow, gated on
+  # the classifier rather than on a `paths` filter, so the required gate below
+  # covers them: a path-filtered workflow never reports on the PRs it skips,
+  # so it could not be a required check.
+  #
+  # `requires-python` intersects across workspace members, and every connector
+  # declares `>=3.14`, so the workspace lock resolves for 3.14 and refuses any
+  # other interpreter. This job is therefore not a matrix. The CDK's other
+  # supported releases are covered by estuary_cdk_supported_pythons below.
+  estuary_cdk:
+    name: estuary-cdk
+    needs: classify_changes
+    if: needs.classify_changes.outputs.cdk == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      # uv provisions the interpreter itself, so there is no separate
+      # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      # Blocking: estuary-cdk is clean. The connector jobs above stay
+      # report-only, since they still carry findings. The version must match
+      # `required-version` in ruff.toml.
+      - name: Lint
+        run: |
+          # The summary is written first: the gating check below exits non-zero
+          # on a finding, and with `bash -e` nothing after it would run.
+          {
+            echo "### ruff: estuary-cdk"
+            echo
+            echo '```'
+            uvx ruff@0.16.9 check --exit-zero --statistics estuary-cdk
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          uvx ruff@0.16.9 check --output-format=github estuary-cdk
+
+      - name: Install dependencies and run tests
+        run: |
+          # tests/test_airbyte_cdk.py imports the shim, which the `airbyte-shim`
+          # group supplies; see estuary-cdk/pyproject.toml.
+          uv sync --locked --package estuary_cdk --group airbyte-shim --group dev --group lint
+          cd estuary-cdk
+          uv run --no-sync python -m compileall -q estuary_cdk vendor
+          uv run --no-sync pytest
+
+      # Blocking, unlike the connector jobs' report-only step: estuary_cdk is
+      # at zero findings and stays there. The connectors are still reported
+      # rather than gated -- see [tool.pyright] in the root pyproject, which
+      # has them in scope for both.
+      - name: Type-check
+        run: uv run --no-sync pyright estuary-cdk/estuary_cdk
+
+  # estuary-cdk declares `>=3.11,<4.0` rather than the workspace's 3.14,
+  # because it is also consumed outside this repository -- source-netsuite is
+  # its own repo, pins the CDK, and runs on 3.11. What that floor promises has
+  # to be tested, and it cannot be tested inside the workspace, whose lock
+  # admits 3.14 alone. So this job installs the CDK into a venv of its own.
+  estuary_cdk_supported_pythons:
+    name: estuary-cdk on Python ${{ matrix.python-version }}
+    needs: classify_changes
+    if: needs.classify_changes.outputs.cdk == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      - name: Install dependencies and run tests
+        env:
+          VIRTUAL_ENV: /tmp/cdk-venv
+        run: |
+          uv venv --python ${{ matrix.python-version }} "$VIRTUAL_ENV"
+          # `--group pyproject.toml:dev` reads the root workspace's own dev
+          # group, so this job declares no test dependencies of its own and
+          # cannot drift from the versions every other job uses. The
+          # declaration is shared; the resolution is not, since an unlocked
+          # install can take a different patch than uv.lock pins. That is
+          # inherent in testing outside the lock, and better than a second copy
+          # of the list.
+          uv pip install -e estuary-cdk \
+            --group estuary-cdk/pyproject.toml:airbyte-shim --group pyproject.toml:dev
+          cd estuary-cdk
+          "$VIRTUAL_ENV/bin/python" -m compileall -q estuary_cdk vendor
+          "$VIRTUAL_ENV/bin/python" -m pytest
+
+      # Everything above installs the shim, because the test suite exercises
+      # it. Consumers install the published wheel and nothing else, so any
+      # module-scope import of something uv.lock supplies but the manifest
+      # does not declare would break them while leaving this workflow green.
+      # `compileall` only parses, and a workspace install always carries
+      # vendor/. So: build the wheel, install it alone, import what it ships.
+      #
+      # The floor alone, because the wheel is py3-none-any and an undeclared
+      # dependency is not interpreter-specific; 3.11 is where version-gated
+      # markers bite.
+      - name: Imports without the vendored Airbyte fork
+        if: matrix.python-version == '3.11'
+        run: |
+          uv build --package estuary_cdk --wheel --out-dir /tmp/cdk-pure-dist
+          uv venv --python ${{ matrix.python-version }} /tmp/cdk-pure-venv
+          VIRTUAL_ENV=/tmp/cdk-pure-venv uv pip install /tmp/cdk-pure-dist/*.whl
+          /tmp/cdk-pure-venv/bin/python - <<'PY'
+          import importlib, importlib.util, pkgutil, sys
+          import estuary_cdk
+
+          # walk_packages, not iter_modules: the latter stops at the top level
+          # and would never reach estuary_cdk.capture.webhook.
+          names = sorted(
+              m.name
+              for m in pkgutil.walk_packages(estuary_cdk.__path__, prefix="estuary_cdk.")
+          )
+
+          failed, swept = [], 0
+          for name in names:
+              # The one exemption: importing the shim without the shim
+              # installed is supposed to fail.
+              if name == "estuary_cdk.shim_airbyte_cdk":
+                  continue
+              swept += 1
+              try:
+                  importlib.import_module(name)
+              except Exception as exc:
+                  failed.append(f"{name}: {type(exc).__name__}: {exc}")
+
+          for found in ("airbyte_cdk", "airbyte_protocol"):
+              if importlib.util.find_spec(found) is not None:
+                  failed.append(f"{found} is importable; the wheel is not the pure CDK")
+
+          print(f"swept {swept} modules")
+          for line in failed:
+              print(f"::error::{line}")
+          sys.exit(1 if failed else 0)
+          PY
+
+  # One status check covering every job above, whichever connectors ran and
+  # whether or not estuary-cdk's checks did, so it can be made a required
+  # check. It must run with `always()`: GitHub counts a skipped job as passing
+  # a required check.
+  python_gate:
+    name: Python connectors gate # the required check's name; keep it fixed
+    needs: [classify_changes, fetch_flow, py_connector, estuary_cdk, estuary_cdk_supported_pythons]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the same `run` output the build jobs gate on.
+      - uses: ./.github/actions/connectors-gate
+        with:
+          results: ${{ join(needs.*.result, ' ') }}
+          run: ${{ needs.classify_changes.outputs.run }}
+          build_result: ${{ needs.py_connector.result }}
+
+      # Likewise for estuary-cdk, against the `cdk` output its jobs gate on.
+      - env:
+          CDK: ${{ needs.classify_changes.outputs.cdk }}
+          CDK_TESTS: ${{ needs.estuary_cdk.result }}
+          CDK_PYTHONS: ${{ needs.estuary_cdk_supported_pythons.result }}
+        run: |
+          if [ "$CDK" = true ] && { [ "$CDK_TESTS" != success ] || [ "$CDK_PYTHONS" != success ]; }; then
+            echo "::error::estuary-cdk was due to be checked but its jobs ended $CDK_TESTS and $CDK_PYTHONS"; exit 1
+          fi
+
+  # Publish estuary-cdk to PyPI: a `.devN` pre-release when the CDK changes, and
+  # the release itself from a tag. See estuary-cdk/README.md for the version
+  # scheme and the release steps.
+  #
+  # cdk-release-version.py counts to the last commit that changed the CDK, so
+  # a run derives the version of that commit's wheel rather than of its own.
+  # The nightly therefore rebuilds a file PyPI already holds, and
+  # `skip-existing` drops the upload.
+  #
+  # GitHub sometimes dispatches no runs at all for a push. The next nightly
+  # resolves the version that push should have published, finds PyPI lacks it,
+  # and uploads it. A `cdk_only` dispatch does the same on demand.
+  #
+  # Deliberately absent from python_gate's needs: it publishes rather than
+  # checks, and a required check must not wait on it.
+  estuary_cdk_publish:
+    name: estuary-cdk publish
+    needs: [estuary_cdk, estuary_cdk_supported_pythons]
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    # Restricted to main and v* in repo settings. That, not the `if:` above,
+    # is what keeps the trusted-publishing credential out of reach of a pull
+    # request ref -- this workflow runs on those too.
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # cdk-release-version.py needs tags and history.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.3"
+          enable-cache: true
+
+      - name: Build the wheel
+        run: |
+          # A tag publishes unconditionally; the tag is the intent.
+          if [ "${GITHUB_EVENT_NAME}" = release ]; then
+            VERSION=$(.github/scripts/cdk-release-version.py "${GITHUB_REF_NAME}")
+          else
+            VERSION=$(.github/scripts/cdk-release-version.py)
+          fi
+          echo "version: ${VERSION}"
+
+          # Stamping puts the manifest out of step with uv.lock, which
+          # `uv sync --locked` and `uv lock --check` both reject. `uv build`
+          # does not, and this job runs neither of the others.
+          python3 - "$VERSION" <<'PY'
+          import re, sys
+          path = "estuary-cdk/pyproject.toml"
+          text = open(path).read()
+          text, n = re.subn(
+              r'(?m)^version = "[^"]+"$', f'version = "{sys.argv[1]}"', text, count=1
+          )
+          assert n == 1, f"expected one version line in {path}, replaced {n}"
+          open(path, "w").write(text)
+          PY
+
+          # The version may count to an older commit. Nothing since has
+          # changed the CDK, so this tree builds that commit's wheel.
+          uv build --package estuary_cdk --wheel --out-dir dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # PyPI refuses to replace a file it holds; most runs rebuild one.
+          skip-existing: true

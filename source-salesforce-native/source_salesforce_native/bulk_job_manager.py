@@ -1,15 +1,12 @@
 import asyncio
-from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator
 
 from estuary_cdk.http import HTTPSession, HTTPError
 from estuary_cdk.incremental_csv_processor import CSVConfig, IncrementalCSVProcessor
-from .shared import build_query, should_retry, VERSION
+from .shared import should_retry, VERSION
 from .models import (
     BulkJobError,
-    FieldDetailsDict,
-    CursorFields,
     BulkJobStates,
     BulkJobSubmitResponse,
     BulkJobCheckStatusResponse,
@@ -49,14 +46,9 @@ class BulkJobManager:
 
     async def _submit(
             self,
-            object_name: str, 
-            field_names: list[str],
-            cursor_field: CursorFields | None = None,
-            start: datetime | None = None,
-            end: datetime | None = None,
+            object_name: str,
+            query: str,
         ) -> str:
-        query = build_query(object_name, field_names, cursor_field, start, end)
-
         body = {
             "operation": "queryAll",
             "query" : query,
@@ -65,8 +57,6 @@ class BulkJobManager:
         try:
             self.log.debug("Submitting bulk job.", {
                 "object_name": object_name,
-                "start": start,
-                "end": end,
                 "query": query,
             })
 
@@ -92,8 +82,6 @@ class BulkJobManager:
         self.log.debug("Submitted bulk job.", {
             "job_id": response.id,
             "object_name": object_name,
-            "start": start,
-            "end": end,
             "query": query,
         })
 
@@ -166,16 +154,14 @@ class BulkJobManager:
             params['locator'] = next_page
 
 
+    # execute runs a caller-provided SOQL query as a bulk query job and streams its results.
     async def execute(
         self,
-        object_name: str, 
-        fields: FieldDetailsDict,
+        object_name: str,
+        query: str,
         model_cls: type[SalesforceRecord],
-        cursor_field: CursorFields | None = None,
-        start: datetime | None = None,
-        end: datetime | None = None,
     ) -> AsyncGenerator[SalesforceRecord, None]:
-        job_id = await self._submit(object_name, list(fields.keys()), cursor_field, start, end)
+        job_id = await self._submit(object_name, query)
 
         delay = INITIAL_SLEEP
         attempt = 1
@@ -188,8 +174,7 @@ class BulkJobManager:
                         self.log.debug("Bulk job returned no results.", {
                             "job_id": job_id,
                             "object_name": object_name,
-                            "start": start,
-                            "end": end,
+                            "query": query,
                         })
                         return
                     break
@@ -198,7 +183,7 @@ class BulkJobManager:
                         self.log.info(f"Sleeping for {delay} seconds after attempt #{attempt} of waiting for job completion.", {
                             "job_details": job_details,
                         })
-                    await asyncio.sleep(delay)  
+                    await asyncio.sleep(delay)
                     delay = min(delay * 2, MAX_SLEEP)
                     attempt += 1
                 case BulkJobStates.ABORTED | BulkJobStates.FAILED:
@@ -219,8 +204,7 @@ class BulkJobManager:
             "job_id": job_id,
             "job_details": job_details,
             "object_name": object_name,
-            "start": start,
-            "end": end,
+            "query": query,
         })
 
         async for result in self._fetch_results(job_id, model_cls):
@@ -234,7 +218,6 @@ class BulkJobManager:
         self.log.debug("Finished fetching results for bulk job.", {
             "job_id": job_id,
             "object_name": object_name,
-            "start": start,
-            "end": end,
+            "query": query,
             "count": received,
         })

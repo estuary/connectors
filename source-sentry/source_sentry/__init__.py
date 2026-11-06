@@ -13,7 +13,7 @@ from estuary_cdk.capture import (
     response,
 )
 
-from .resources import all_resources, validate_credentials
+from .resources import all_resources, validate_credentials, validate_explore_queries
 from .models import (
     ConnectorState,
     EndpointConfig,
@@ -24,6 +24,8 @@ from .models import (
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
 ):
+    retain_projections = False
+
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
@@ -38,6 +40,7 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
+        await validate_explore_queries(self, discover.config, log)
         resources = await all_resources(log, self, discover.config)
         return common.discovered(resources)
 
@@ -47,6 +50,7 @@ class Connector(
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
         await validate_credentials(self, validate.config, log)
+        await validate_explore_queries(self, validate.config, log)
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -16,34 +18,49 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/invopop/jsonschema"
 	"github.com/segmentio/encoding/json"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// An alternate naming style for the Iceberg table data.  By default (when
 	// false), the naming is:
 	//   <base_location>/<namespace>_<table>_<hash>
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
-	"nested_dot_hash_location_style": false,
+	"nested_dot_hash_location_style": common.FlagDisabled,
+	// Materialize objects, arrays, multi-type fields, and the root document
+	// as Iceberg format v3 `variant` columns instead of JSON strings. Tables
+	// with a variant column are created as (or upgraded to) format v3, and
+	// the Spark job must run on Spark 4 (EMR release emr-spark-8.0.0 or
+	// later). Tasks created before the cutoff keep their JSON string columns
+	// unless opted in; toggling the flag on an existing table migrates the
+	// affected columns in place, preserving rows.
+	"variant_columns": common.FlagEnabledForTasksCreatedAfter("2026-09-23"),
 }
 
-// TODO(whb): It would be nice to have a configuration for making the table use
-// "Merge on Read" when performing DML, but that is broken in the latest version
-// of Spark. The default is "Copy on Write" which may be suboptimal for some
-// cases. See https://github.com/apache/iceberg/issues/11341 &
-// https://github.com/apache/iceberg/issues/11709
+var (
+	sparkJobPropertyRegex = regexp.MustCompile(`^[0-9A-Za-z]+$`)
+
+	validSparkJobPropertyKeys = []string{
+		"spark.dynamicAllocation.initialExecutors",
+		"spark.dynamicAllocation.maxExecutors",
+		"spark.executor.instances",
+	}
+)
+
 type config struct {
 	URL                   string                `json:"url" jsonschema:"title=URL,description=Base URL for the catalog. If you are using AWS Glue as a catalog this should look like 'https://glue.<region>.amazonaws.com/iceberg'. Otherwise it may look like 'https://yourserver.com/api/catalog'." jsonschema_extras:"order=0"`
 	Warehouse             string                `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to. For AWS Glue this is the account ID." jsonschema_extras:"order=1"`
 	Namespace             string                `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration).," jsonschema_extras:"order=2,pattern=^[^.]*$"`
 	BaseLocation          string                `json:"base_location,omitempty" jsonschema:"title=Base Location,description=Base location for the catalog tables. Required if using AWS Glue as a catalog. Example: 's3://your_bucket/your_prefix/'" jsonschema_extras:"order=3"`
-	HardDelete            bool                  `json:"hard_delete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete)." jsonschema_extras:"order=4"`
+	HardDelete            bool                  `json:"hard_delete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete)." jsonschema_extras:"order=4,nonsensitive=true"`
 	Credentials           *catalogAuthConfig    `json:"credentials" jsonschema_extras:"x-iam-auth=true,order=5"`
 	CatalogAuthentication *oldCatalogAuthConfig `json:"catalog_authentication,omitempty" jsonschema:"-"`
 	Compute               computeConfig         `json:"compute"`
@@ -60,21 +77,73 @@ type config struct {
 // is applied.
 type glueOptimizersConfig struct {
 	ExecutionRoleArn          string `json:"execution_role_arn,omitempty" jsonschema:"title=Execution Role ARN,description=IAM role ARN that Glue assumes to perform table optimization. The role must have permissions to read/write table data in S3 and access the Glue catalog." jsonschema_extras:"order=0"`
-	EnableCompaction          bool   `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance." jsonschema_extras:"order=1"`
-	EnableRetention           bool   `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs." jsonschema_extras:"order=2"`
-	SnapshotRetentionDays     int    `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset." jsonschema_extras:"order=3"`
-	NumberOfSnapshotsToRetain int    `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset." jsonschema_extras:"order=4"`
-	EnableOrphanFileDeletion  bool   `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot." jsonschema_extras:"order=5"`
-	OrphanFileRetentionDays   int    `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset." jsonschema_extras:"order=6"`
+	EnableCompaction          bool   `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance." jsonschema_extras:"order=1,nonsensitive=true"`
+	EnableRetention           bool   `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs." jsonschema_extras:"order=2,nonsensitive=true"`
+	SnapshotRetentionDays     int    `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset." jsonschema_extras:"order=3,nonsensitive=true"`
+	NumberOfSnapshotsToRetain int    `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset." jsonschema_extras:"order=4,nonsensitive=true"`
+	EnableOrphanFileDeletion  bool   `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot." jsonschema_extras:"order=5,nonsensitive=true"`
+	OrphanFileRetentionDays   int    `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset." jsonschema_extras:"order=6,nonsensitive=true"`
 }
 
 func (c glueOptimizersConfig) anyEnabled() bool {
 	return c.EnableCompaction || c.EnableRetention || c.EnableOrphanFileDeletion
 }
 
+// identifierCase is the set of casing behaviors that can be applied to
+// identifiers created by the materialization. The empty value means "whatever
+// specs published before this option existed did", which is not the same for
+// every option: table_identifier_case defaults to identifierCaseLowercase,
+// while field_name_case defaults to identifierCasePreserve.
+type identifierCase string
+
+const (
+	identifierCaseLowercase identifierCase = "lowercase"
+	identifierCaseUppercase identifierCase = "uppercase"
+	identifierCasePreserve  identifierCase = "preserve"
+)
+
+func (c identifierCase) valid() bool {
+	switch c {
+	case "", identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve:
+		return true
+	default:
+		return false
+	}
+}
+
+// fieldNameCase resolves field_name_case together with the deprecated
+// lowercase_column_names option it replaces.
+func (c advancedConfig) fieldNameCase() identifierCase {
+	if c.FieldNameCase != "" {
+		return c.FieldNameCase
+	} else if c.LowercaseColumnNames {
+		return identifierCaseLowercase
+	}
+
+	return identifierCasePreserve
+}
+
+// translateFieldName cases a Flow field name the way a column created for it is
+// named.
+func (c advancedConfig) translateFieldName(field string) string {
+	switch c.fieldNameCase() {
+	case identifierCaseLowercase:
+		return strings.ToLower(field)
+	case identifierCaseUppercase:
+		return strings.ToUpper(field)
+	default:
+		return field
+	}
+}
+
 type advancedConfig struct {
-	LowercaseColumnNames bool   `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."`
-	FeatureFlags         string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	// LowercaseColumnNames is superseded by FieldNameCase and hidden from the
+	// generated schema so that new materializations are not offered it, but it
+	// is still decoded and honored for specs that already set it.
+	LowercaseColumnNames bool           `json:"lowercase_column_names,omitempty" jsonschema:"-"`
+	TableIdentifierCase  identifierCase `json:"table_identifier_case,omitempty" jsonschema:"title=Table Identifier Case,enum=lowercase,enum=uppercase,enum=preserve,default=lowercase,description=Casing applied to the namespace and table name (together the Iceberg table identifier) of tables created by this materialization. 'lowercase' (the default) folds them to lower case so a binding for MyTable creates the table mytable; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's; 'preserve' uses them exactly as written in the binding. Tables that already exist are never renamed." jsonschema_extras:"nonsensitive=true"`
+	FieldNameCase        identifierCase `json:"field_name_case,omitempty" jsonschema:"title=Field Name Case,enum=lowercase,enum=uppercase,enum=preserve,default=preserve,description=Casing applied to the names of columns created by this materialization. 'preserve' (the default) names them exactly as the fields are named in the collection; 'lowercase' folds them to lower case which is necessary for some systems such as querying S3 Table Buckets with Athena; 'uppercase' folds them to upper case which is needed for catalogs where unquoted identifiers resolve upper-case such as Snowflake's. Columns that already exist are matched case-insensitively and are never renamed." jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags         string         `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -91,6 +160,18 @@ func (c config) Validate() error {
 
 	if strings.Contains(c.Namespace, ".") {
 		return fmt.Errorf("namespace %q must not contain dots", c.Namespace)
+	}
+
+	if !c.Advanced.TableIdentifierCase.valid() {
+		return fmt.Errorf("invalid table_identifier_case %q: must be one of %q, %q, or %q", c.Advanced.TableIdentifierCase, identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve)
+	}
+
+	if !c.Advanced.FieldNameCase.valid() {
+		return fmt.Errorf("invalid field_name_case %q: must be one of %q, %q, or %q", c.Advanced.FieldNameCase, identifierCaseLowercase, identifierCaseUppercase, identifierCasePreserve)
+	}
+
+	if c.Advanced.LowercaseColumnNames && c.Advanced.FieldNameCase != "" && c.Advanced.FieldNameCase != identifierCaseLowercase {
+		return fmt.Errorf("field_name_case %q conflicts with the deprecated lowercase_column_names option: unset lowercase_column_names to use field_name_case %q", c.Advanced.FieldNameCase, c.Advanced.FieldNameCase)
 	}
 
 	catalogAuth, err := c.CatalogAuthConfig()
@@ -140,10 +221,21 @@ func (c config) Validate() error {
 }
 
 func (c config) DefaultNamespace() string {
-	return c.Namespace
+	// This must apply the same transform to the namespace that
+	// resource.Parameters applies to its namespace element, or the boilerplate
+	// will create a second, differently-cased namespace alongside the one
+	// tables are created in.
+	switch c.Advanced.TableIdentifierCase {
+	case identifierCaseUppercase:
+		return strings.ToUpper(sanitize(c.Namespace))
+	case identifierCasePreserve:
+		return sanitize(c.Namespace)
+	default: // "" (unset) or lowercase.
+		return strings.ToLower(sanitize(c.Namespace))
+	}
 }
 
-func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
+func (c config) FeatureFlags() (raw string, defaults map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -278,7 +370,7 @@ func (catalogAuthConfig) JSONSchema() *jsonschema.Schema {
 }
 
 type catalogAuthClientCredentialConfig struct {
-	Oauth2ServerURI string `json:"oauth2_server_uri" jsonschema:"title=OAuth 2.0 Server URI,default=v1/oauth/tokens,description=OAuth 2.0 server URI for requesting access tokens when using OAuth client credentials. Usually this should be 'v1/oauth/tokens'." jsonschema_extras:"order=0"`
+	Oauth2ServerURI string `json:"oauth2_server_uri" jsonschema:"title=OAuth 2.0 Server URI,default=v1/oauth/tokens,description=OAuth 2.0 server URI for requesting access tokens when using OAuth client credentials. Either a path relative to the catalog URL (usually 'v1/oauth/tokens') or a full URL if the token endpoint is on a different host (for example 'https://login.dremio.cloud/oauth/token' for Dremio Cloud)." jsonschema_extras:"order=0"`
 	Credential      string `json:"credential" jsonschema:"title=Catalog Credential,description=Credential for connecting to the REST catalog. Must be in the format of '<client_id>:<client_secret>' for OAuth client credentials. For Bearer authentication use '<token>'." jsonschema_extras:"order=1,secret=true"`
 	Scope           string `json:"scope,omitempty" jsonschema:"title=Scope,description=Authorization scope for connecting to the catalog when using OAuth client credentials. Example: 'PRINCIPAL_ROLE:your_principal'" jsonschema_extras:"order=2"`
 }
@@ -292,6 +384,17 @@ func (c catalogAuthClientCredentialConfig) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	// An absolute oauth2_server_uri (as with Dremio's token host) is used
+	// as-is by catalog.New; a relative one is joined onto the catalog URL.
+	// Mirror that url.IsAbs check here so an absolute value is a usable
+	// http(s) endpoint rather than something that would be silently treated
+	// as a relative path.
+	if u, err := url.Parse(c.Oauth2ServerURI); err != nil {
+		return fmt.Errorf("parsing oauth2_server_uri: %w", err)
+	} else if u.IsAbs() && ((u.Scheme != "http" && u.Scheme != "https") || u.Host == "") {
+		return fmt.Errorf("oauth2_server_uri %q must be an http(s) URL or a path relative to the catalog URL", c.Oauth2ServerURI)
 	}
 
 	return nil
@@ -326,7 +429,7 @@ const (
 )
 
 type computeConfig struct {
-	ComputeType computeType `json:"compute_type"`
+	ComputeType computeType `json:"compute_type" jsonschema_extras:"nonsensitive=true"`
 
 	emrConfig
 	sparkConfig
@@ -384,8 +487,8 @@ func (c sparkConfig) Validate(emr emrConfig) error {
 	if emr.AWSSecretAccessKey == "" {
 		return errors.New("missing 'aws_secret_access_key'")
 	}
-	if emr.BucketPath != "" && strings.HasPrefix(emr.BucketPath, "/") {
-		return fmt.Errorf("bucket path %q cannot start with /", emr.BucketPath)
+	if err := blob.ValidateBucketPath(emr.BucketPath); err != nil {
+		return fmt.Errorf("bucket_path %w", err)
 	}
 	return nil
 }
@@ -442,16 +545,64 @@ func (emrCredentials) JSONSchema() *jsonschema.Schema {
 	)
 }
 
+type sparkJobProperty struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func (sparkJobProperty) JSONSchema() *jsonschema.Schema {
+	properties := make([]any, 0, len(validSparkJobPropertyKeys))
+	for _, key := range validSparkJobPropertyKeys {
+		properties = append(properties, key)
+	}
+	return &jsonschema.Schema{
+		Type: "object",
+		Properties: orderedmap.New[string, *jsonschema.Schema](orderedmap.WithInitialData[string, *jsonschema.Schema](
+			orderedmap.Pair[string, *jsonschema.Schema]{
+				Key: "key",
+				Value: &jsonschema.Schema{
+					Type:        "string",
+					Title:       "Key",
+					Description: "Spark Job Property Key.",
+					Enum:        properties,
+					Extras: map[string]any{
+						"order":        1,
+						"nonsensitive": true,
+					},
+				},
+			},
+			orderedmap.Pair[string, *jsonschema.Schema]{
+				Key: "value",
+				Value: &jsonschema.Schema{
+					Type:        "string",
+					Title:       "Value",
+					Description: "Spark Job Property Value.",
+					Pattern:     "^[0-9A-Za-z]+$",
+					Extras: map[string]any{
+						"order":        2,
+						"nonsensitive": true,
+					},
+				},
+			},
+		)),
+		Required: []string{
+			"key",
+			"value",
+		},
+	}
+}
+
 type emrConfig struct {
-	AWSAccessKeyID       string          `json:"aws_access_key_id" jsonschema:"-"`
-	AWSSecretAccessKey   string          `json:"aws_secret_access_key" jsonschema:"-" jsonschema_extras:"secret=true"`
-	Region               string          `json:"region" jsonschema:"title=Region,description=Region of the EMR application and staging bucket." jsonschema_extras:"order=3"`
-	ApplicationId        string          `json:"application_id" jsonschema:"title=Application ID,description=ID of the EMR serverless application." jsonschema_extras:"order=4"`
-	ExecutionRoleArn     string          `json:"execution_role_arn" jsonschema:"title=Execution Role ARN,description=ARN of the EMR serverless execution role used to run jobs." jsonschema_extras:"order=5"`
-	Bucket               string          `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store staged data files." jsonschema_extras:"order=6"`
-	BucketPath           string          `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=Optional prefix that will be used to store staged data files." jsonschema_extras:"order=7"`
-	SystemsManagerPrefix string          `json:"systems_manager_prefix,omitempty" jsonschema:"title=System Manager Prefix,description=Prefix for parameters in Systems Manager as an absolute directory path (must start and end with /). This is required when using Client Credentials for catalog authentication." jsonschema_extras:"pattern=^/.+/$,order=8"`
-	Credentials          *emrCredentials `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=9"`
+	AWSAccessKeyID       string             `json:"aws_access_key_id" jsonschema:"-"`
+	AWSSecretAccessKey   string             `json:"aws_secret_access_key" jsonschema:"-" jsonschema_extras:"secret=true"`
+	Region               string             `json:"region" jsonschema:"title=Region,description=Region of the EMR application and staging bucket." jsonschema_extras:"order=3"`
+	ApplicationId        string             `json:"application_id" jsonschema:"title=Application ID,description=ID of the EMR serverless application." jsonschema_extras:"order=4"`
+	ExecutionRoleArn     string             `json:"execution_role_arn" jsonschema:"title=Execution Role ARN,description=ARN of the EMR serverless execution role used to run jobs." jsonschema_extras:"order=5"`
+	Bucket               string             `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store staged data files." jsonschema_extras:"order=6"`
+	BucketPath           string             `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=Optional prefix that will be used to store staged data files." jsonschema_extras:"order=7"`
+	SystemsManagerPrefix string             `json:"systems_manager_prefix,omitempty" jsonschema:"title=System Manager Prefix,description=Prefix for parameters in Systems Manager as an absolute directory path (must start and end with /). This is required when using Client Credentials for catalog authentication." jsonschema_extras:"pattern=^/.+/$,order=8"`
+	Credentials          *emrCredentials    `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=9"`
+	SparkJobProperties   []sparkJobProperty `json:"spark_job_properties,omitempty" jsonschema:"title=Spark Job Properties,description=Override Spark Job Properties" jsonschema_extras:"order=10,nonsensitive=true"`
 }
 
 func (c emrConfig) Validate() error {
@@ -480,15 +631,22 @@ func (c emrConfig) Validate() error {
 		}
 	}
 
-	if c.BucketPath != "" {
-		if strings.HasPrefix(c.BucketPath, "/") {
-			return fmt.Errorf("bucket path %q cannot start with /", c.BucketPath)
-		}
+	if err := blob.ValidateBucketPath(c.BucketPath); err != nil {
+		return fmt.Errorf("bucket_path %w", err)
 	}
 
 	if c.SystemsManagerPrefix != "" {
 		if !strings.HasPrefix(c.SystemsManagerPrefix, "/") || !strings.HasSuffix(c.SystemsManagerPrefix, "/") {
 			return fmt.Errorf("systems manager prefix %q must start and end with /", c.SystemsManagerPrefix)
+		}
+	}
+
+	for _, property := range c.SparkJobProperties {
+		if !slices.Contains(validSparkJobPropertyKeys, property.Key) {
+			return fmt.Errorf("spark job property key %q is not supported", property.Key)
+		}
+		if !sparkJobPropertyRegex.MatchString(property.Value) {
+			return fmt.Errorf("spark job property value %q is invalid", property.Value)
 		}
 	}
 
@@ -641,7 +799,7 @@ func (c config) toGlueClient(ctx context.Context) (*glue.Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		region = catalogAuth.AWSRegion
+		region = catalogAuth.IAMConfig.AWSRegion
 	default:
 		return nil, fmt.Errorf("Glue optimizers require AWS credentials (SigV4 or IAM), not %q", catalogAuth.AuthType)
 	}
@@ -661,6 +819,10 @@ type resource struct {
 	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
 	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
+
+	// tableIdentifierCase is populated from the endpoint config in WithDefaults
+	// so that Parameters can case the elements of the resource path.
+	tableIdentifierCase identifierCase
 }
 
 func (r resource) Validate() error {
@@ -680,10 +842,19 @@ func (r resource) WithDefaults(cfg config) resource {
 	if r.Namespace == "" {
 		r.Namespace = cfg.Namespace
 	}
+	r.tableIdentifierCase = cfg.Advanced.TableIdentifierCase
 
 	return r
 }
 
 func (r resource) Parameters() (path []string, deltaUpdates bool, err error) {
-	return sanitizePath(r.Namespace, r.Table), false, nil
+	switch r.tableIdentifierCase {
+	case identifierCaseUppercase:
+		path = []string{strings.ToUpper(sanitize(r.Namespace)), strings.ToUpper(sanitize(r.Table))}
+	case identifierCasePreserve:
+		path = []string{sanitize(r.Namespace), sanitize(r.Table)}
+	default: // "" (unset) or lowercase: historical behavior.
+		path = sanitizePath(r.Namespace, r.Table)
+	}
+	return path, false, nil
 }

@@ -1,0 +1,484 @@
+---
+sidebar_position: 5
+description: Set up Estuary's MySQL capture connector with CDC, binlog configuration, IAM authentication, and time zone settings using self-hosted and cloud platform guides.
+---
+
+# MySQL
+
+This is a change data capture (CDC) connector that captures change events from a MySQL database via the [Binary Log](https://dev.mysql.com/doc/refman/8.0/en/binary-log.html).
+
+## Supported platforms
+
+This connector supports MySQL on major cloud providers, as well as self-hosted instances.
+
+Setup instructions are provided for the following platforms:
+
+- [Self-hosted MySQL](#self-hosted-mysql)
+- [Amazon RDS](./amazon-rds-mysql/)
+- [Amazon Aurora](#amazon-aurora)
+- [Google Cloud SQL](./google-cloud-sql-mysql/)
+- [Azure Database for MySQL](#azure-database-for-mysql)
+
+## Prerequisites
+
+To use this connector, you'll need a MySQL database setup with the following.
+
+- The [`binlog_format`](https://dev.mysql.com/doc/refman/8.4/en/replication-options-binary-log.html#sysvar_binlog_format)
+  system variable must be set to `ROW` (the default value).
+- The [binary log expiration period](https://dev.mysql.com/doc/refman/8.4/en/replication-options-binary-log.html#sysvar_binlog_expire_logs_seconds) should be at least 7 days.
+  - This value may be set lower if necessary, but we [discourage](#insufficient-binlog-retention) doing so as this may increase the likelihood of unrecoverable failures.
+- A database user with appropriate permissions:
+  - `REPLICATION CLIENT` and `REPLICATION SLAVE` privileges.
+  - Permission to read the tables being captured.
+  - Permission to read from `information_schema` tables, if automatic discovery is used.
+- If the table(s) to be captured include columns of type `DATETIME`, the `time_zone` system variable
+  must be set to an IANA zone name or numerical offset or the capture configured with a `timezone` to use by default.
+
+:::tip Configuration Tip
+To capture data from databases hosted on your internal network, you may need to
+use [SSH tunneling](/guides/connect-network/). If you have a
+[private deployment](/getting-started/deployment-options/#private-deployment),
+you can also use private cloud networking features to reach your database.
+:::
+
+## Setup
+
+To meet these requirements, follow the steps for your hosting type.
+
+- [Self-hosted MySQL](#self-hosted-mysql)
+- [Amazon RDS](./amazon-rds-mysql/)
+- [Amazon Aurora](#amazon-aurora)
+- [Google Cloud SQL](./google-cloud-sql-mysql/)
+- [Azure Database for MySQL](#azure-database-for-mysql)
+
+### Self-hosted MySQL
+
+1. Create the `flow_capture` user with replication permission, and the ability to read all tables.
+
+Grant `SELECT` on all tables or restrict it to the tables to be captured. `SELECT`
+permissions must be at the table level, not the column level. Automatic discovery also
+requires `information_schema` access. To keep specific columns, such as sensitive fields,
+out of the capture, use [redaction](/features/redaction) rather than column-level grants.
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED BY 'secret'
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+2. We recommend that you set your binary log to retain data for at least 7 days.  It is possible to use a shorter binlog retention period by selecting "Skip Binlog Retention Sanity Check" under "Endpoint Config" -> "Advanced Options".
+
+```sql
+SET PERSIST binlog_expire_logs_seconds = 2592000;
+```
+
+3. Configure the database's time zone. See [below](#setting-the-mysql-time-zone) for more information.
+
+```sql
+SET PERSIST time_zone = '-05:00'
+```
+
+### Amazon Aurora
+
+You must apply some of the settings to the entire Aurora DB cluster, and others to a database instance within the cluster.
+For each step, take note of which entity you're working with.
+
+1. Allow connections between the database and Estuary. There are two ways to do this: by granting direct access to Estuary's IP or by creating an SSH tunnel.
+
+   1. To allow direct access:
+
+      - [Modify the instance](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Modifying.html#Aurora.Modifying.Instance), choosing **Publicly accessible** in the **Connectivity** settings.
+      - Edit the VPC security group associated with your instance, or create a new VPC security group and associate it with the instance as described in [the Amazon documentation](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html#Overview.RDSSecurityGroups.Create). Create a new inbound rule and a new outbound rule that allow all traffic from the [Estuary IP addresses](/reference/allow-ip-addresses).
+
+   2. To allow secure connections via SSH tunneling:
+      - Follow the guide to [configure an SSH server for tunneling](/guides/connect-network/)
+      - When you configure your connector as described in the [configuration](#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](/concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
+
+2. Create a RDS parameter group to enable replication on your Aurora DB cluster.
+
+   1. [Create a parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.CreatingCluster).
+      Create a unique name and description and set the following properties:
+
+      - **Family**: aurora-mysql8.0
+      - **Type**: DB ClusterParameter group
+
+   2. [Modify the new parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.ModifyingCluster) and update the following parameters:
+
+      - binlog_format: ROW
+      - binlog_row_metadata: FULL
+      - read_only: 0
+
+   3. [Associate the parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.AssociatingCluster)
+      with the DB cluster.
+      While you're modifying the cluster, also set [Backup Retention Period](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Managing.Backups.html) to 7 days.
+
+   4. Reboot the cluster to allow the changes to take effect.
+
+3. Switch to your MySQL client. Run the following commands to create a new user for the capture with appropriate permissions:
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED BY 'secret'
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+5. Run the following command to set the binary log retention to 7 days, the maximum value Aurora permits:
+
+```sql
+CALL mysql.rds_set_configuration('binlog retention hours', 168);
+```
+
+6. In the [RDS console](https://console.aws.amazon.com/rds/), note the instance's Endpoint and Port. You'll need these for the `address` property when you configure the connector.
+
+### Azure Database for MySQL
+
+1. Allow connections between the database and Estuary. There are two ways to do this: by granting direct access to Estuary's IP or by creating an SSH tunnel.
+
+   1. To allow direct access:
+
+      - Create a new [firewall rule](https://docs.microsoft.com/en-us/azure/mysql/flexible-server/how-to-manage-firewall-portal#create-a-firewall-rule-after-server-is-created) that grants access to the [Estuary IP addresses](/reference/allow-ip-addresses).
+
+   2. To allow secure connections via SSH tunneling:
+      - Follow the guide to [configure an SSH server for tunneling](/guides/connect-network/)
+      - When you configure your connector as described in the [configuration](#configuration) section above, including the additional `networkTunnel` configuration to enable the SSH tunnel. See [Connecting to endpoints on secure networks](/concepts/connectors.md#connecting-to-endpoints-on-secure-networks) for additional details and a sample.
+
+2. Set the `binlog_expire_logs_seconds` [server perameter](https://docs.microsoft.com/en-us/azure/mysql/single-server/concepts-server-parameters#configurable-server-parameters)
+   to `2592000`.
+
+3. Using [MySQL workbench](https://docs.microsoft.com/en-us/azure/mysql/single-server/connect-workbench) or your preferred client,
+   create the `flow_capture` user with replication permission, and the ability to read all tables.
+
+Grant `SELECT` on all tables or restrict it to the tables to be captured. `SELECT`
+permissions must be at the table level, not the column level. Automatic discovery also
+requires `information_schema` access. To keep specific columns, such as sensitive fields,
+out of the capture, use [redaction](/features/redaction) rather than column-level grants.
+
+:::tip
+Your username must be specified in the format `username@servername`.
+:::
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED BY 'secret'
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+4. Note the instance's host under Server name, and the port under Connection Strings (usually `3306`).
+   Together, you'll use the host:port as the `address` property when you configure the connector.
+
+### IAM Authentication
+
+On Amazon Aurora, Google Cloud SQL, and Azure Database for MySQL you can authenticate with a cloud IAM identity instead of a password. IAM authentication always connects over TLS and never falls back to an unencrypted connection.
+
+#### AWS IAM
+
+For Amazon Aurora MySQL clusters, you can authenticate with an AWS IAM role instead of a password.
+
+Follow the steps in the [AWS IAM guide][aws-iam] to create a role for Estuary to assume, and make note of its ARN and your cluster's region to use when configuring the connector's authentication options.
+
+[Enable IAM database authentication](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.Enabling.html) on the cluster, then run the following commands to create a database user which authenticates through the RDS plugin, granting it the same permissions as the `flow_capture` user in the [Amazon Aurora](#amazon-aurora) setup instructions above:
+
+```sql
+CREATE USER IF NOT EXISTS flow_capture
+  IDENTIFIED WITH AWSAuthenticationPlugin AS 'RDS'
+  REQUIRE SSL
+  COMMENT 'User account for Estuary MySQL data capture';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Finally, [attach a policy](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.IAMPolicy.html) to the role granting it `rds-db:connect` on that user, substituting your own region, account ID, and the cluster's resource ID:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["rds-db:connect"],
+      "Resource": ["arn:aws:rds-db:us-east-1:123456789012:dbuser:cluster-ABCDEFGHIJKL01234/flow_capture"]
+    }
+  ]
+}
+```
+
+#### Google Cloud IAM
+
+For Google Cloud SQL for MySQL instances, you can authenticate with a Google Cloud service account instead of a password.
+
+Follow the steps in the [GCP IAM guide][gcp-iam] to set up a workload identity pool for Estuary, and make note of the pool audience and the service account email to use when configuring the connector's authentication options.
+
+Set the instance's `cloudsql_iam_authentication` flag to `on`, then [add the service account as an IAM database user](https://cloud.google.com/sql/docs/mysql/add-manage-iam-users#creating-database-user) and grant it the `roles/cloudsql.instanceUser` role. Cloud SQL logs the service account in under its email address with the `@PROJECT_ID.iam.gserviceaccount.com` suffix removed, and MySQL usernames are limited to 32 characters, so pick a service account name that fits. Grant that user the same permissions as the `flow_capture` user in the [Google Cloud SQL](./google-cloud-sql-mysql/) setup instructions:
+
+```sql
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow-capture';
+GRANT SELECT ON *.* TO 'flow-capture';
+```
+
+Use the same truncated name as the connector's `user` property.
+
+#### Azure IAM
+
+For Azure Database for MySQL flexible servers, you can authenticate with an Azure App Registration instead of a password.
+
+Follow the steps in the [Azure IAM guide][azure-iam] to create an App Registration and make note of the Application ID and Tenant ID to use when configuring the connector's authentication options.
+
+Ensure that the flexible server has [Microsoft Entra authentication](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/how-to-azure-ad) enabled and connect to it as the Entra admin. Run the following commands to create a database user for the App Registration, granting it the same permissions as the `flow_capture` user in the [Azure Database for MySQL](#azure-database-for-mysql) setup instructions above:
+
+```sql
+SET aad_auth_validate_oids_in_tenant = OFF;
+CREATE AADUSER 'flow_capture' IDENTIFIED BY 'application-id-of-app-registration';
+GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO 'flow_capture';
+GRANT SELECT ON *.* TO 'flow_capture';
+```
+
+Use the name given in the `CREATE AADUSER` statement as the connector's `user` property.
+
+[aws-iam]: /guides/iam-auth/aws/
+[gcp-iam]: /guides/iam-auth/gcp/
+[azure-iam]: /guides/iam-auth/azure/
+
+## Capturing from Read Replicas
+
+This connector supports capturing from a read replica of your database, provided that
+binary logging is enabled on the replica and all other requirements are met.
+
+## Setting the MySQL time zone
+
+MySQL's [`time_zone` server system variable](https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_time_zone) is set to `SYSTEM` by default.
+
+If you intend to capture tables including columns of the type `DATETIME`,
+and `time_zone` is set to `SYSTEM`,
+Estuary won't be able to detect the time zone and convert the column to [RFC3339 format](https://www.rfc-editor.org/rfc/rfc3339).
+To avoid this, you must explicitly set the time zone for your database.
+
+You can:
+
+- Specify a numerical offset from UTC.
+
+  - For MySQL version 8.0.19 or higher, values from `-13:59` to `+14:00`, inclusive, are permitted.
+  - Prior to MySQL 8.0.19, values from `-12:59` to `+13:00`, inclusive, are permitted
+
+- Specify a named timezone in [IANA timezone format](https://www.iana.org/time-zones).
+
+- If you're using Amazon Aurora, create or modify the [DB cluster parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html)
+  associated with your MySQL database.
+  [Set](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_WorkingWithDBClusterParamGroups.html#USER_WorkingWithParamGroups.ModifyingCluster) the `time_zone` parameter to the correct value.
+
+For example, if you're located in New Jersey, USA, you could set `time_zone` to `-05:00` or `-04:00`, depending on the time of year.
+Because this region observes daylight savings time, you'd be responsible for changing the offset.
+Alternatively, you could set `time_zone` to `America/New_York`, and time changes would occur automatically.
+
+If using IANA time zones, your database must include time zone tables. [Learn more in the MySQL docs](https://dev.mysql.com/doc/refman/8.0/en/time-zone-support.html).
+
+:::tip Capture Timezone Configuration
+If you are unable to set the `time_zone` in the database and need to capture tables with `DATETIME` columns, the capture can be configured to assume a time zone using the `timezone` configuration property (see below). The `timezone` configuration property can be set as a numerical offset or IANA timezone format.
+:::
+
+## Backfills and performance considerations
+
+When the MySQL capture is initiated, by default, the connector first _backfills_, or captures the targeted tables in their current state. It then transitions to capturing change events on an ongoing basis.
+
+This is desirable in most cases, as it ensures that a complete view of your tables is captured into Estuary.
+However, you may find it appropriate to skip the backfill, especially for extremely large tables.
+
+In this case, you may turn off backfilling on a per-table basis. See [properties](#properties) for details.
+
+## Configuration
+
+You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
+
+See [connectors](/concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the MySQL source connector.
+
+### Properties
+
+#### Endpoint
+
+| Property                                | Title                              | Description                                                                                                                                                                                                                                                                                                                                                                             | Type    | Required/Default           |
+| --------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------------------- |
+| **`/address`**                          | Server Address                     | The host or host:port at which the database can be reached.                                                                                                                                                                                                                                                                                                                             | string  | Required                   |
+| **`/user`**                             | Login User                         | The database user to authenticate as.                                                                                                                                                                                                                                                                                                                                                   | string  | Required, `"flow_capture"` |
+| `/timezone`                             | Timezone                           | Timezone to use when capturing datetime columns. Should normally be left blank to use the database's `'time_zone'` system variable. Only required if the `'time_zone'` system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the `'time_zone'` system variable if both are set. | string  |                            |
+| `/historyMode` | History Mode | Capture each change event, without merging. | boolean | `false` |
+| `/advanced/dbname`                      | Database Name                      | The name of the database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access.                                                                                                                                                                                                                    | string  | `"mysql"`                  |
+| `/advanced/node_id`                     | Node ID                            | Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value.                                                                                                                                                                             | integer |                            |
+| `/advanced/skip_backfills`              | Skip Backfills                     | A comma-separated list of fully-qualified table names which should not be backfilled.                                                                                                                                                                                                                                                                                                   | string  |                            |
+| `/advanced/backfill_chunk_size`         | Backfill Chunk Size                | The number of rows which should be fetched from the database in a single backfill query.                                                                                                                                                                                                                                                                                                | integer | `50000`                    |
+| `/advanced/discover_schemas`            | Discovery Schema Selection         | If specified, only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas.                                                                                                                                                                                                                                             | array of strings | |
+| `/advanced/skip_binlog_retention_check` | Skip Binlog Retention Sanity Check | Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need.                                                                                                                                                                                                                                | boolean |                            |
+| `/advanced/source_tag` | Source Tag | This value is added as the property 'tag' in the source metadata of each document. | string |  |
+| `/advanced/statement_timeout` | Statement Timeout | Overrides the default statement timeout used by the connector. Allowed values: `30s`, `1m`, `5m`, `30m`, or empty to disable. | string |  |
+| `/advanced/rediscovery_interval` | Rediscovery Interval | How often the connector re-runs discovery while a capture is running, in order to notice schema changes and newly added tables. Accepts duration strings like `15m` or `1h`, from `1m` up to `8760h`. | string | `"15m"` |
+| `/advanced/sslmode` | SSL Mode | Controls whether connections use TLS and whether the server's certificate is verified. One of `disabled`, `preferred`, `required`, `verify_ca`, or `verify_identity`. See [TLS and certificate verification](#tls-and-certificate-verification). | string | `"required"` |
+| `/advanced/ssl_server_ca` | SSL Server CA | PEM-encoded certificate authority the server certificate must chain to. Required for `verify_ca`. Optional for `verify_identity`, which otherwise trusts public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA). | string |  |
+| `/advanced/ssl_client_cert` | SSL Client Certificate | Optional PEM-encoded client certificate to present to the server for mutual TLS. | string |  |
+| `/advanced/ssl_client_key` | SSL Client Key | PEM-encoded private key for the SSL Client Certificate. | string |  |
+
+##### Authentication
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| **`/credentials`** | Authentication | Authentication method and credentials that provide access to the database. | object | Required |
+| `/credentials/auth_type` | Auth Type | The authentication method to use. One of `UserPassword`, `AWSIAM`, `GCPIAM`, or `AzureIAM`. | string |  |
+| `/credentials/password` | Password | Password for the specified database user. | string | Required for `UserPassword` auth |
+| `/credentials/aws_region` | AWS Region | AWS region of your resource. | string | Required for `AWSIAM` auth |
+| `/credentials/aws_role_arn` | AWS Role ARN | AWS role for Estuary to use that has access to the resource. | string | Required for `AWSIAM` auth |
+| `/credentials/gcp_service_account_to_impersonate` | Service Account | GCP service account email for Cloud SQL IAM authentication. | string | Required for `GCPIAM` auth |
+| `/credentials/gcp_workload_identity_pool_audience` | Workload Identity Pool Audience | GCP workload identity pool audience. The format should be similar to: `//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider`. | string | Required for `GCPIAM` auth |
+| `/credentials/azure_client_id` | Azure Client ID | Application (client) ID of the App Registration. | string | Required for `AzureIAM` auth |
+| `/credentials/azure_tenant_id` | Azure Tenant ID | Directory (tenant) ID of the App Registration. | string | Required for `AzureIAM` auth |
+
+##### Discovery Filters
+
+Options that restrict which tables are surfaced by discovery. These take effect
+when discovery runs. If your capture has automatic discovery enabled, a table
+these filters exclude will be deactivated the next time discovery runs.
+
+| Property | Title | Description | Type | Required/Default |
+| --- | --- | --- | --- | --- |
+| `/discoveryFilters` | Discovery Filters | Options that restrict which tables are visible to discovery. | object | |
+| `/discoveryFilters/include_schemas` | Include Schemas | If specified, only tables in the listed schemas are discovered. Combined as a union with the `Discovery Schema Selection` setting under Advanced Options. | string array | |
+| `/discoveryFilters/exclude_schemas` | Exclude Schemas | Tables in the listed schemas are excluded from discovery. | string array | |
+| `/discoveryFilters/table_patterns` | Table Patterns | If specified, only tables matching at least one of these glob patterns are discovered. A pattern containing a `.` matches against the qualified `schema.table` name. A pattern without a `.` matches the unqualified table name in any schema. Use `*` or `?` as wildcards. | string array | |
+
+#### Bindings
+
+| Property         | Title     | Description                                                                                                    | Type   | Required/Default |
+| ---------------- | --------- | -------------------------------------------------------------------------------------------------------------- | ------ | ---------------- |
+| **`/namespace`** | Namespace | The [database/schema](https://dev.mysql.com/doc/refman/8.0/en/show-databases.html) in which the table resides. | string | Required         |
+| **`/stream`**    | Stream    | Name of the table to be captured from the database.                                                            | string | Required         |
+| `/mode` | [Backfill Mode](/reference/backfilling-data/#resource-configuration-backfill-modes) | How the preexisting contents of the table should be backfilled. This should generally not be changed. | string | `""` |
+| `/priority` | Backfill Priority | Optional priority for this binding. The highest priority binding(s) will be backfilled completely before any others. Negative priorities are allowed and will cause a binding to be backfilled after others. | integer | `0` |
+| `/advanced/additional_backfill_filter` | Additional Backfill Filter | Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option. | string | |
+
+:::info
+When you configure this connector in the web application, the automatic **discovery** process sets up a binding for _most_ tables it finds in your database, but there are exceptions.
+
+Tables in the MySQL system schemas `information_schema`, `mysql`, `performance_schema`, and `sys` will not be discovered.
+You can add bindings for such tables manually.
+:::
+
+### Sample
+
+A minimal capture definition will look like the following:
+
+```yaml
+captures:
+  ${PREFIX}/${CAPTURE_NAME}:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/source-mysql:v3
+        config:
+          address: "127.0.0.1:3306"
+          user: "flow_capture"
+          credentials:
+            auth_type: UserPassword
+            password: "secret"
+    bindings:
+      - resource:
+          namespace: ${TABLE_NAMESPACE}
+          stream: ${TABLE_NAME}
+        target: ${PREFIX}/${COLLECTION_NAME}
+```
+
+To authenticate to an Amazon Aurora MySQL cluster with [AWS IAM](#aws-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AWSIAM
+            aws_region: "us-east-1"
+            aws_role_arn: "arn:aws:iam::123456789012:role/flow-capture"
+```
+
+To authenticate to a Google Cloud SQL for MySQL instance with [Google Cloud IAM](#google-cloud-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: GCPIAM
+            gcp_service_account_to_impersonate: "flow-capture@example-project.iam.gserviceaccount.com"
+            gcp_workload_identity_pool_audience: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+```
+
+To authenticate to an Azure Database for MySQL flexible server with [Azure IAM](#azure-iam) instead, replace the credentials block:
+
+```yaml
+          credentials:
+            auth_type: AzureIAM
+            azure_client_id: "11111111-2222-3333-4444-555555555555"
+            azure_tenant_id: "66666666-7777-8888-9999-000000000000"
+```
+
+Your capture definition will likely be more complex, with additional bindings for each table in the source database.
+
+[Learn more about capture definitions.](/concepts/captures.md)
+
+## TLS and certificate verification
+
+By default the connector uses `required`: it requires a TLS-encrypted connection but doesn't verify the server's certificate, so it doesn't protect against an attacker impersonating your database server. To verify the server, set the `sslmode` advanced option to one of:
+
+- `verify_identity` checks that the server's certificate is valid for the configured server hostname. When `ssl_server_ca` is empty, the connector trusts public certificate authorities, which include the ones Azure Database for MySQL uses, and the CAs of Amazon RDS and Aurora and Google Cloud SQL's shared CA. When `ssl_server_ca` is set, the connector trusts only that CA.
+- `verify_ca` checks that the server certificate is signed by the CA you paste into `ssl_server_ca`, without checking the hostname. Use this when connecting by IP address, or when the certificate doesn't name the address you connect to.
+
+A self-managed server's auto-generated or self-signed certificate usually comes from a private CA and names no host, so `verify_identity` rejects it. Paste the server's auto-generated CA into `ssl_server_ca` and use `verify_ca`.
+
+If the server's certificate can't be verified, the connection fails with an error explaining why.
+
+`preferred` falls back to an unencrypted connection when TLS fails, and `disabled` never uses TLS. If your server doesn't accept TLS connections, the default `required` can't connect: enable TLS on the server, or set `sslmode` to `preferred` or `disabled`. IAM authentication presents a bearer token as the password, which must never be sent unencrypted, so `disabled` and `preferred` are both rejected in that case.
+
+## Troubleshooting Capture Errors
+
+The `source-mysql` connector is designed to halt immediately if something wrong or unexpected happens, instead of continuing on and potentially outputting incorrect data. What follows is a non-exhaustive list of some potential failure modes, and what action should be taken to fix these situations:
+
+### Handling Source Schema Changes
+
+The connector handles most DDL on actively-captured tables automatically:
+
+- `ALTER TABLE` to add, drop, rename, or change the type of a column is handled automatically as the change appears in the binlog. No action is required.
+- `DROP TABLE`, `RENAME TABLE`, and `DROP DATABASE` deactivate the affected binding. If the table is later recreated, the connector automatically re-backfills it and resumes capturing.
+- `TRUNCATE TABLE` on an active table is ignored — truncated rows are not propagated to the destination as deletes. If you need the destination to reflect the truncate, trigger a backfill of the binding.
+
+If a column type change results in captured documents that don't match the existing collection schema, autodiscovery will update the schema on its next run. To apply the new schema immediately, edit the capture, click **Refresh**, and republish.
+
+### Data Manipulation Queries
+
+If your capture is failing with an `"unsupported DML query"` error, this means that an `INSERT`, `UPDATE`, `DELETE` or other data manipulation query is present in the MySQL binlog. This should generally not happen if `binlog_format = 'ROW'` as described in the [Prerequisites](#prerequisites) section.
+
+Resolving this error requires fixing the `binlog_format` system variable, and then either tearing down and recreating the entire capture so that it restarts at a later point in the binlog, or in the case of an `INSERT`/`DELETE` query it may suffice to remove the capture binding for the offending table and then re-add it.
+
+### Unhandled Queries
+
+If your capture is failing with an `"unhandled query"` error, some SQL query is present in the binlog which the connector does not (currently) understand.
+
+If you encounter this error, [contact Estuary support](mailto:support@estuary.dev) so we can help get your capture unstuck.
+
+### Inconsistent Metadata
+
+If your capture logs contain the warning message `"detected inconsistent metadata for stream, will backfill"`, this indicates that the connector's internal tracking of table metadata (column names and types) does not match the changes observed via replication. The connector will attempt to recover automatically by triggering a fresh backfill of the affected table and reinitializing its metadata tracking.
+
+This generally happens when the binlog does not include column metadata (`binlog_row_metadata=MINIMAL`), which forces the connector to rely on its own metadata tracking and use DDL query parsing to remain in sync. Unfortunately, it is possible to perform DDL updates which are not written to the binlog, and the connector cannot tell when this happens.
+
+If the same table repeatedly experiences metadata errors, the recommended solution is to set `binlog_row_metadata=FULL` in your MySQL configuration. This causes the binlog to include complete column metadata with each row event, allowing the connector to always use authoritative information from the database rather than relying on its own tracking.
+
+### Insufficient Binlog Retention
+
+If your capture fails with a `"binlog retention period is too short"` error, it is informing you that the MySQL binlog retention period is set to a dangerously low value.
+
+The concern is that if a capture is disabled or the server becomes unreachable for longer than the binlog retention period, the database might delete a binlog segment which the capture isn't yet done with. If this happens then change events have been permanently lost, and the only way to get the capture running again is to skip ahead to a portion of the binlog which still exists. For correctness this requires backfilling the current contents of all tables from the source, and so we prefer to avoid it as much as possible. It's much easier to just set up your binlog retention with enough wiggle room to recover from temporary failures.
+
+The `"binlog retention period is too short"` error should normally be fixed by setting a longer retention period as described in these setup instructions. However, advanced users who understand the risks can use the `skip_binlog_retention_check` configuration option to disable this safety.
+
+### Failover and Host Changes
+
+MySQL binlog coordinates are specific to each server, so they do not carry over when you fail over to a new writer, for example by promoting a standby. After a failover, the capture's stored position is invalid on the new writer and replication fails with `ERROR 1236`. Always capture from the **writer** endpoint; reader endpoints report `log_bin = OFF` and fail the prerequisite check.
+
+If the failover is planned and you can pause writes, you can re-establish the capture on the new writer without a full backfill. See [Preventing backfills during database upgrades and failovers](/reference/backfilling-data/#preventing-backfills-during-database-upgrades-and-failovers).
+
+### Empty Collection Key
+
+Every Estuary collection must declare a [key](/concepts/collections.md#keys) which is used to group its documents. When testing your capture, if you encounter an error indicating collection key cannot be empty, you will need to either add a key to the table in your source, or manually edit the generated specification and specify keys for the collection before publishing to the catalog as documented [here](/concepts/collections.md#empty-keys).

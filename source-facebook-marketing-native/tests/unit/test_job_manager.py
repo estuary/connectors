@@ -13,7 +13,20 @@ from estuary_cdk.http import HTTPError
 
 from source_facebook_marketing_native.client import FacebookAPIError
 from source_facebook_marketing_native.insights import FacebookInsightsJobManager
+from source_facebook_marketing_native.insights.errors import CannotSplitFurtherError
+from source_facebook_marketing_native.models import (
+    AdsInsights,
+    AdsInsightsActionType,
+    AdsInsightsAgeAndGender,
+    AdsInsightsComscoreMarket,
+    AdsInsightsCountry,
+    AdsInsightsPlatformAndDevice,
+    AdsInsightsRegion,
+    InsightsConfig,
+    build_custom_ads_insights_model,
+)
 from source_facebook_marketing_native.insights.types import (
+    FieldSplitPart,
     JobScope,
     InsightsJob,
 )
@@ -115,6 +128,298 @@ class TestBinarySplit:
         # Verify depth tracking on large splits
         assert result[0].depth == 3
         assert result[1].depth == 3
+
+
+class TestFieldSplitJoinKey:
+    """Tests for the two key lists field splitting needs to keep distinct."""
+
+    @pytest.fixture
+    def job_manager(self) -> FacebookInsightsJobManager:
+        return FacebookInsightsJobManager(
+            http=None,  # type: ignore
+            base_url="https://graph.facebook.com/v21.0",
+            log=logging.getLogger("test"),
+            account_id="test_account",
+        )
+
+    def test_plain_stream_requests_all_its_keys(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Every primary key of ads_insights is a requestable field."""
+        assert job_manager._requested_key_fields(AdsInsights) == [
+            "account_id",
+            "ad_id",
+            "date_start",
+        ]
+        assert job_manager._join_key(AdsInsights) == [
+            "account_id",
+            "ad_id",
+            "date_start",
+        ]
+
+    def test_breakdown_columns_are_keys_but_not_requested(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Breakdown columns key the row but must not be added to `fields`.
+
+        Facebook returns them because the `breakdowns` parameter is unchanged
+        across parts; asking for them as fields would be rejected. They must
+        still join the parts back together, or every demographic row of an
+        ad-day collapses into one record.
+        """
+        requested = job_manager._requested_key_fields(AdsInsightsAgeAndGender)
+        assert requested == ["account_id", "ad_id", "date_start"]
+
+        assert job_manager._join_key(AdsInsightsAgeAndGender) == [
+            "account_id",
+            "ad_id",
+            "age",
+            "date_start",
+            "gender",
+        ]
+
+    def test_every_breakdown_stream_joins_on_its_whole_key(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """No breakdown stream may lose part of its key to the requestable filter."""
+        for model in [
+            AdsInsights,
+            AdsInsightsActionType,
+            AdsInsightsAgeAndGender,
+            AdsInsightsComscoreMarket,
+            AdsInsightsCountry,
+            AdsInsightsPlatformAndDevice,
+            AdsInsightsRegion,
+        ]:
+            pointers = [key.lstrip("/") for key in model.primary_keys]
+            assert job_manager._join_key(model) == pointers, model.name
+
+    def test_custom_model_keys_on_date_start_it_never_requests(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Custom insights models key on `/date_start` without listing it.
+
+        `level_specific_fields()` contributes only the account/campaign/adset/ad
+        id and name columns, so `date_start` is in neither `fields` nor
+        `breakdowns`. Facebook returns it regardless, because `time_increment=1`
+        is always sent - which is why obtainability cannot be decided from the
+        model alone.
+        """
+        model = build_custom_ads_insights_model(
+            InsightsConfig(
+                name="my_custom",
+                level="ad",
+                fields="impressions,clicks",
+                breakdowns="age,gender",
+            )
+        )
+        assert "date_start" not in model.fields
+        assert "date_start" not in model.breakdowns
+
+        assert job_manager._join_key(model) == [
+            "account_id",
+            "ad_id",
+            "age",
+            "date_start",
+            "gender",
+        ]
+
+
+class TestVerifyJoinKey:
+    """Tests for _verify_join_key - the chunk-level guard before merging."""
+
+    @pytest.fixture
+    def job_manager(self) -> FacebookInsightsJobManager:
+        return FacebookInsightsJobManager(
+            http=None,  # type: ignore
+            base_url="https://graph.facebook.com/v21.0",
+            log=logging.getLogger("test"),
+            account_id="test_account",
+        )
+
+    def test_rows_carrying_the_whole_key_pass(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        records = [
+            {"ad_id": "a1", "date_start": "2024-01-01", "age": "25-34", "clicks": 1},
+            {"ad_id": "a1", "date_start": "2024-01-01", "age": "35-44", "clicks": 2},
+        ]
+        job_manager._verify_join_key(
+            records, ["ad_id", "age", "date_start"], ["clicks"], "job"
+        )
+
+    def test_missing_key_column_is_refused(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """A row without a key column cannot be told apart from its siblings."""
+        records = [
+            {"ad_id": "a1", "date_start": "2024-01-01", "clicks": 1},
+            {"ad_id": "a1", "date_start": "2024-01-01", "clicks": 2},
+        ]
+
+        with pytest.raises(CannotSplitFurtherError, match=r"\['age'\]"):
+            job_manager._verify_join_key(
+                records, ["ad_id", "age", "date_start"], ["clicks"], "job"
+            )
+
+    def test_every_missing_column_is_named(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """The error names all of them, not just the first row's."""
+        records = [
+            {"ad_id": "a1", "date_start": "2024-01-01", "age": "25-34"},
+            {"ad_id": "a1", "date_start": "2024-01-01", "gender": "male"},
+        ]
+
+        with pytest.raises(CannotSplitFurtherError, match=r"\['age', 'gender'\]"):
+            job_manager._verify_join_key(
+                records, ["ad_id", "age", "date_start", "gender"], ["clicks"], "job"
+            )
+
+    def test_a_chunk_with_no_rows_has_nothing_to_verify(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Emptiness is not a key violation; it is handled as degradation."""
+        job_manager._verify_join_key([], ["ad_id", "age"], ["clicks"], "job")
+
+
+class TestMergeByPrimaryKey:
+    """Tests for _merge_by_primary_key - re-joining field-split parts."""
+
+    @pytest.fixture
+    def job_manager(self) -> FacebookInsightsJobManager:
+        return FacebookInsightsJobManager(
+            http=None,  # type: ignore
+            base_url="https://graph.facebook.com/v21.0",
+            log=logging.getLogger("test"),
+            account_id="test_account",
+        )
+
+    def test_disjoint_columns_merge_into_one_record(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Parts hold different columns for the same row."""
+        parts = [
+            FieldSplitPart(
+                fields=["impressions"],
+                records=[{"ad_id": "a1", "date_start": "2024-01-01", "impressions": 100}],
+            ),
+            FieldSplitPart(
+                fields=["clicks"],
+                records=[{"ad_id": "a1", "date_start": "2024-01-01", "clicks": 5}],
+            ),
+        ]
+        merged = job_manager._merge_by_primary_key(parts, ["ad_id", "date_start"])
+
+        assert merged == [
+            {
+                "ad_id": "a1",
+                "date_start": "2024-01-01",
+                "impressions": 100,
+                "clicks": 5,
+            }
+        ]
+
+    def test_distinct_rows_stay_distinct(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Different primary keys must not collapse together."""
+        parts = [
+            FieldSplitPart(
+                fields=["impressions"],
+                records=[
+                    {"ad_id": "a1", "date_start": "2024-01-01", "impressions": 1},
+                    {"ad_id": "a2", "date_start": "2024-01-01", "impressions": 2},
+                ],
+            ),
+            FieldSplitPart(
+                fields=["clicks"],
+                records=[
+                    {"ad_id": "a1", "date_start": "2024-01-01", "clicks": 10},
+                    {"ad_id": "a2", "date_start": "2024-01-01", "clicks": 20},
+                ],
+            ),
+        ]
+        merged = job_manager._merge_by_primary_key(parts, ["ad_id", "date_start"])
+
+        assert len(merged) == 2
+        by_ad = {record["ad_id"]: record for record in merged}
+        assert by_ad["a1"]["impressions"] == 1 and by_ad["a1"]["clicks"] == 10
+        assert by_ad["a2"]["impressions"] == 2 and by_ad["a2"]["clicks"] == 20
+
+    def test_row_missing_from_a_part_still_yields_a_record(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Merging over the union, not the intersection.
+
+        Facebook returns primary-key-only rows rather than omitting rows whose
+        metrics are all null, so parts normally align. If one ever doesn't, the
+        row should still surface with whatever was obtained instead of vanishing.
+        """
+        parts = [
+            FieldSplitPart(
+                fields=["impressions"],
+                records=[
+                    {"ad_id": "a1", "date_start": "2024-01-01", "impressions": 1},
+                    {"ad_id": "a2", "date_start": "2024-01-01", "impressions": 2},
+                ],
+            ),
+            FieldSplitPart(
+                fields=["clicks"],
+                records=[{"ad_id": "a1", "date_start": "2024-01-01", "clicks": 10}],
+            ),
+        ]
+        merged = job_manager._merge_by_primary_key(parts, ["ad_id", "date_start"])
+
+        assert len(merged) == 2
+        by_ad = {record["ad_id"]: record for record in merged}
+        assert by_ad["a2"]["impressions"] == 2
+        assert "clicks" not in by_ad["a2"]
+
+    def test_breakdown_rows_of_one_entity_day_stay_distinct(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """The case field splitting exists for: one ad, one day, many segments.
+
+        A single ad-day yields one row per age x gender combination, so joining
+        on only the requestable keys would collapse them all into one record
+        carrying an arbitrary segment's metrics.
+        """
+        segments = [("25-34", "male"), ("25-34", "female"), ("35-44", "male")]
+
+        def part(metric: str, multiplier: int) -> list[dict]:
+            return [
+                {
+                    "account_id": "acct1",
+                    "ad_id": "ad1",
+                    "date_start": "2024-01-01",
+                    "age": age,
+                    "gender": gender,
+                    metric: (index + 1) * multiplier,
+                }
+                for index, (age, gender) in enumerate(segments)
+            ]
+
+        merged = job_manager._merge_by_primary_key(
+            [
+                FieldSplitPart(fields=["impressions"], records=part("impressions", 1)),
+                FieldSplitPart(fields=["clicks"], records=part("clicks", 10)),
+            ],
+            job_manager._join_key(AdsInsightsAgeAndGender),
+        )
+
+        assert len(merged) == len(segments)
+        by_segment = {(r["age"], r["gender"]): r for r in merged}
+        for index, segment in enumerate(segments):
+            record = by_segment[segment]
+            assert record["impressions"] == index + 1
+            assert record["clicks"] == (index + 1) * 10
+
+    def test_no_parts_yields_no_records(
+        self, job_manager: FacebookInsightsJobManager
+    ):
+        """Every field unfetchable means there is nothing to emit."""
+        assert job_manager._merge_by_primary_key([], ["ad_id"]) == []
 
 
 class TestTryParseFacebookApiError:

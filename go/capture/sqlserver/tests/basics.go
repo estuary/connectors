@@ -22,6 +22,7 @@ func TestBasics(t *testing.T, setup testSetupFunc) {
 
 // TestSimpleDiscovery exercises discovery of a single, simple table.
 func testSimpleDiscovery(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(a INTEGER PRIMARY KEY, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
 	tc.DiscoverFull("Discover Tables")
@@ -30,6 +31,7 @@ func testSimpleDiscovery(t *testing.T, setup testSetupFunc) {
 
 // TestSimpleCapture exercises the simplest possible backfill of a small table.
 func testSimpleCapture(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
@@ -42,6 +44,7 @@ func testSimpleCapture(t *testing.T, setup testSetupFunc) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts performed after the first capture.
 func testReplicationInserts(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
@@ -56,6 +59,7 @@ func testReplicationInserts(t *testing.T, setup testSetupFunc) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and row updates performed after the first capture.
 func testReplicationUpdates(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
@@ -72,6 +76,7 @@ func testReplicationUpdates(t *testing.T, setup testSetupFunc) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and deletions performed after the first capture.
 func testReplicationDeletes(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
@@ -87,6 +92,7 @@ func testReplicationDeletes(t *testing.T, setup testSetupFunc) {
 // TestEmptyTable leaves the table empty during the initial table backfill
 // and only adds data after replication has begun.
 func testEmptyTable(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	tc.Discover("Discover Tables")
@@ -99,6 +105,7 @@ func testEmptyTable(t *testing.T, setup testSetupFunc) {
 // TestIgnoredStreams checks that replicated changes are only reported
 // for tables which are configured in the catalog.
 func testIgnoredStreams(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -116,6 +123,7 @@ func testIgnoredStreams(t *testing.T, setup testSetupFunc) {
 // TestMultipleStreams exercises captures with multiple stream configured, as
 // well as adding/removing/re-adding a stream.
 func testMultipleStreams(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -146,6 +154,7 @@ func testMultipleStreams(t *testing.T, setup testSetupFunc) {
 // TestMissingTable verifies that things fail cleanly if a capture
 // binding doesn't actually exist.
 func testMissingTable(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -158,6 +167,7 @@ func testMissingTable(t *testing.T, setup testSetupFunc) {
 // TestPrimaryKeyOverride sets up a table with a primary key, but
 // then overrides that via the catalog configuration.
 func testPrimaryKeyOverride(t *testing.T, setup testSetupFunc) {
+	t.Parallel()
 	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, name VARCHAR(32), value INTEGER)`)
 	// Names out of id order: charlie(1), alice(2), bob(3), dave(4)

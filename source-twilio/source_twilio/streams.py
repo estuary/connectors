@@ -38,6 +38,24 @@ class TwilioStream(HttpStream, ABC):
     page_size = 1000
     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization | TransformConfig.CustomSchemaNormalization)
 
+    def __init__(
+        self,
+        authenticator: Union[AuthBase, HttpAuthenticator],
+        sync_subaccounts: bool = True,
+        config_account_sid: Optional[str] = None,
+    ):
+        super().__init__(authenticator=authenticator)
+        # When False, the Accounts stream (which acts as the parent for most other
+        # streams) only emits the main account and/or the account whose SID is
+        # provided in the config. This prevents fanning out to subaccount resources,
+        # which Twilio denies when authenticating with an API Key instead of an
+        # account's Auth Token (error 20003).
+        self.sync_subaccounts = sync_subaccounts
+        # The Account SID field from the endpoint config. Note: when the user
+        # authenticates with an API Key, this holds an "SK..." key SID rather than
+        # an "AC..." account SID, so it cannot be assumed to identify an account.
+        self.config_account_sid = config_account_sid
+
     @property
     def data_field(self):
         return self.name
@@ -130,8 +148,10 @@ class IncrementalTwilioStream(TwilioStream, IncrementalMixin):
         start_date: str = None,
         lookback_window: int = 0,
         slice_step_map: Mapping[str, int] = None,
+        sync_subaccounts: bool = True,
+        config_account_sid: Optional[str] = None,
     ):
-        super().__init__(authenticator)
+        super().__init__(authenticator, sync_subaccounts=sync_subaccounts, config_account_sid=config_account_sid)
         slice_step = (slice_step_map or {}).get(self.name)
         self._slice_step = slice_step and pendulum.duration(days=slice_step)
         self._start_date = start_date if start_date is not None else "1970-01-01T00:00:00Z"
@@ -299,7 +319,11 @@ class TwilioNestedStream(TwilioStream):
 
     @cached_property
     def parent_stream_instance(self):
-        return self.parent_stream(authenticator=self.authenticator)
+        return self.parent_stream(
+            authenticator=self.authenticator,
+            sync_subaccounts=self.sync_subaccounts,
+            config_account_sid=self.config_account_sid,
+        )
 
     def parent_record_to_stream_slice(self, record: Mapping[str, Any]) -> Mapping[str, Any]:
         return {"subresource_uri": record["subresource_uris"][self.subresource_uri_key]}
@@ -327,6 +351,16 @@ class Accounts(TwilioStream):
     """https://www.twilio.com/docs/usage/api/account#read-multiple-account-resources"""
 
     url_base = TWILIO_API_URL_BASE_VERSIONED
+
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        for record in super().parse_response(response, **kwargs):
+            if self.sync_subaccounts:
+                yield record
+            # The main account is the account that owns itself. Also retain a record
+            # matching the configured Account SID so that captures authenticated with
+            # a subaccount's own credentials keep working when this option is disabled.
+            elif record.get("sid") == record.get("owner_account_sid") or record.get("sid") == self.config_account_sid:
+                yield record
 
 
 class Addresses(TwilioNestedStream):
@@ -582,24 +616,43 @@ class Messages(IncrementalTwilioStreamWithLookbackWindow, TwilioNestedStream):
         stream_slice: Mapping[str, Any] = None,
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
-        unsorted_records = []
-        initial_cursor = self.state.get(self.cursor_field, self._start_date)
-
-        # Skip the IncrementalTwilioStream's read_records method since it filters only based on date_sent instead of 
-        # both date_sent and date_updated.
+        # Skip the IncrementalTwilioStream's read_records method since it filters records based on the
+        # cursor before yielding them.
+        #
+        # Every record returned within the requested DateSent window is yielded unconditionally. The
+        # Twilio API cannot filter on date_updated, so the lookback window re-reads a trailing DateSent
+        # range to pick up in-place updates (e.g. price being populated shortly after a message is sent).
+        # Records must NOT be filtered against the cursor here: a re-fetched record typically has both
+        # date_sent and date_updated older than the max date_sent observed in the previous sweep, and
+        # filtering on the cursor silently discards exactly the updates the lookback window exists to
+        # capture. Re-emitting previously seen documents is safe since collections reduce on the key.
+        #
+        # The API returns messages in reverse chronological order, and IncrementalTwilioStream
+        # checkpoints intra-slice every `state_checkpoint_interval` records. The cursor therefore
+        # must not advance while records are still streaming: the first record seen carries the
+        # newest date_sent in the slice, and an intra-slice checkpoint taken after it would persist
+        # a cursor beyond the older records still being processed, permanently skipping them if the
+        # connector crashes or restarts mid-slice. Instead, track the max date_sent locally and only
+        # advance the cursor once the slice has been read to completion. Checkpoints taken mid-slice
+        # carry the prior cursor, so a restart re-reads the slice from the beginning, which is safe
+        # (at-least-once) since collections reduce on the key.
+        max_cursor_value = None
         for record in super(IncrementalTwilioStream, self).read_records(sync_mode, cursor_field, stream_slice, stream_state):
-            record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
-            record["date_updated"] = pendulum.parse(record["date_updated"], strict=False).to_iso8601_string()
-            unsorted_records.append(record)
-        sorted_records = sorted(unsorted_records, key=lambda x: x[self.cursor_field])
-        for record in sorted_records:
-            # If this is a new record, yield it and update the cursor.
-            if record[self.cursor_field] >= initial_cursor:
-                self._cursor_value = record[self.cursor_field]
-                yield record
-            # Otherwise if it's an update to a record we've seen before, yield it.
-            elif record["date_updated"] >= initial_cursor:
-                yield record
+            # A message that has not been sent yet (or failed to send) can have a null date_sent.
+            # Normalize timestamps when present, yield the record regardless, and only consider
+            # non-null date_sent values for cursor advancement so a single anomalous record can't
+            # fail the entire sweep.
+            if record.get(self.cursor_field):
+                record[self.cursor_field] = pendulum.parse(record[self.cursor_field], strict=False).to_iso8601_string()
+                if max_cursor_value is None or record[self.cursor_field] > max_cursor_value:
+                    max_cursor_value = record[self.cursor_field]
+            if record.get("date_updated"):
+                record["date_updated"] = pendulum.parse(record["date_updated"], strict=False).to_iso8601_string()
+            yield record
+
+        # The slice was read to completion; it is now safe to advance the cursor.
+        if max_cursor_value is not None and (self._cursor_value is None or max_cursor_value > self._cursor_value):
+            self._cursor_value = max_cursor_value
 
 
 class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
@@ -621,7 +674,12 @@ class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
     @cached_property
     def parent_stream_instance(self):
         most_recent_cursor = self.state.get(self.cursor_field, self._start_date)
-        return self.parent_stream(authenticator=self.authenticator, start_date=most_recent_cursor)
+        return self.parent_stream(
+            authenticator=self.authenticator,
+            start_date=most_recent_cursor,
+            sync_subaccounts=self.sync_subaccounts,
+            config_account_sid=self.config_account_sid,
+        )
 
 
 class UsageNestedStream(TwilioNestedStream):

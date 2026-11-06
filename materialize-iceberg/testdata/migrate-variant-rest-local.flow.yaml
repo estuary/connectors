@@ -1,0 +1,33 @@
+# Fixture for the variant_columns feature flag migration test, run against
+# the Spark 4 set. A collection with an object field and the root document,
+# so toggling the flag migrates both the `obj` column and flow_document
+# between a JSON string and variant in place, and a table created as format
+# v2 is upgraded to v3 when its first variant column arrives.
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        obj:
+          type: object
+          properties:
+            nested: { type: string }
+      required: [id]
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-iceberg/rest-local-spark4:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: .local/config.rest-local-spark4.yaml
+    bindings:
+    - resource:
+        table: variant_migrate
+      source: key/value
+      fields:
+        recommended: true
+        include:
+          obj: {}

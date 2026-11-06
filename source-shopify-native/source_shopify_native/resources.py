@@ -9,7 +9,9 @@ from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
     Resource,
     ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
+    SnapshotResource,
     open_binding,
 )
 from estuary_cdk.flow import (
@@ -19,6 +21,7 @@ from estuary_cdk.flow import (
     ValidationError,
 )
 from estuary_cdk.http import HTTPError, HTTPMixin, RateLimiter, TokenSource
+from estuary_cdk.logger import OBSERVABLE_FIELD
 from pydantic import AwareDatetime
 
 import source_shopify_native.graphql as gql
@@ -26,11 +29,13 @@ from .graphql.bulk_job_manager import BulkJobManager
 
 from .api import (
     backfill_incremental,
+    backfill_incremental_unsorted,
     bulk_fetch_incremental,
+    bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_snapshot,
 )
-from .utils import dt_to_str
 from .models import (
     AccessScopes,
     ConnectorState,
@@ -38,20 +43,16 @@ from .models import (
     PlanName,
     ShopDetails,
     ShopifyClientCredentials,
+    ShopifyDocument,
     ShopifyGraphQLResource,
+    StoreCapabilities,
     StoreConfig,
     create_response_data_model,
 )
 
 
 class StoreInitError(Exception):
-    """Raised when one or more stores fail to initialize.
-
-    Current behavior is fail-fast: any single store failure blocks the entire capture.
-    This surfaces configuration errors clearly rather than silently skipping a store.
-    TODO: Consider graceful degradation — continue with healthy stores and surface
-    errors for failed ones without blocking the entire capture.
-    """
+    """Raised when store initialization can't proceed."""
 
     def __init__(
         self, failed_stores: dict[str, BaseException], initialized_stores: list[str]
@@ -64,6 +65,20 @@ class StoreInitError(Exception):
         super().__init__(
             f"Failed to initialize {len(failed_stores)} store(s):\n{store_errors}"
         )
+
+
+# Statuses Shopify returns for a shop that exists but can't serve Admin API requests right
+# now: 402 = frozen (unpaid), 423 = locked. A misspelled store name can't produce these, so
+# validation tolerates them too.
+FROZEN_OR_LOCKED_STORE_STATUS_CODES: frozenset[int] = frozenset({402, 423})
+# 404 = closed or deleted, but also a misspelled store name. Skipped when initializing stores
+# so a closed store doesn't stop the capture, but rejected by validation so a typo fails
+# loudly; a closed store must be removed from the config before the next publish.
+UNAVAILABLE_STORE_STATUS_CODES: frozenset[int] = FROZEN_OR_LOCKED_STORE_STATUS_CODES | {404}
+
+
+def _is_store_unavailable(error: BaseException) -> bool:
+    return isinstance(error, HTTPError) and error.code in UNAVAILABLE_STORE_STATUS_CODES
 
 
 class StoreHTTP(HTTPMixin):
@@ -94,7 +109,7 @@ class StoreContext:
     http: StoreHTTP
     client: gql.ShopifyGraphQLClient
     bulk_job_manager: BulkJobManager
-    scopes: set[str]
+    capabilities: StoreCapabilities
     available_resources: set[type[ShopifyGraphQLResource]]
 
 
@@ -145,6 +160,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.OrderMetafields,
     gql.OrderTransactions,
     gql.OrderRefunds,
+    gql.OrderReturns,
     gql.OrderRisks,
     gql.InventoryItems,
     gql.InventoryLevels,
@@ -155,6 +171,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.Locations,
     gql.LocationMetafields,
     gql.SubscriptionContracts,
+    gql.Disputes,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
@@ -163,23 +180,31 @@ PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
     gql.FulfillmentOrders,
 }
 
+FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
+    gql.StaffMembers,
+    gql.Markets,
+]
+
 
 async def _create_store_context(
     log: Logger,
     http: HTTPMixin,
     store_config: StoreConfig,
     should_cancel_ongoing_job: bool,
+    max_concurrent_bulk_ops: int,
 ) -> StoreContext:
     """Create context for a single store."""
     token_source = _build_token_source(store_config)
     store_http = StoreHTTP(http, token_source)
     client = gql.ShopifyGraphQLClient(store_http, store_config.store)
-    bulk_job_manager = BulkJobManager(client, log)
+    bulk_job_manager = BulkJobManager(client, log, max_concurrent_bulk_ops)
 
     if should_cancel_ongoing_job:
         await bulk_job_manager.cancel_current()
 
-    granted_scopes = await _get_granted_scopes(store_http, client.url, log)
+    granted_scopes = await _get_granted_scopes(
+        store_http, client.url, log, store_config.store
+    )
 
     # Both AccessToken and ShopifyClientCredentials are custom app tokens
     # subject to plan restrictions on PII access.
@@ -187,18 +212,26 @@ async def _create_store_context(
         store_config.credentials, (AccessToken, ShopifyClientCredentials)
     )
     can_access_pii = True
+    is_plus_or_advanced = False
     if uses_custom_app_token:
-        can_access_pii = await _check_plan_allows_pii(store_http, client.url, log)
+        plan = await _get_shop_plan(store_http, client.url, log)
+        can_access_pii = _plan_allows_pii(plan, log)
+        is_plus_or_advanced = _plan_is_plus_or_advanced(plan)
 
     available_resources = _get_available_resources(
-        granted_scopes, uses_custom_app_token, can_access_pii
+        granted_scopes, uses_custom_app_token, can_access_pii, is_plus_or_advanced
+    )
+
+    capabilities = StoreCapabilities(
+        scopes=frozenset(granted_scopes),
+        is_plus_or_advanced=is_plus_or_advanced,
     )
 
     store_context = StoreContext(
         http=store_http,
         client=client,
         bulk_job_manager=bulk_job_manager,
-        scopes=granted_scopes,
+        capabilities=capabilities,
         available_resources=available_resources,
     )
 
@@ -209,20 +242,37 @@ def _get_available_resources(
     granted_scopes: set[str],
     uses_custom_app_token: bool,
     can_access_pii: bool,
+    is_plus_or_advanced: bool,
 ) -> set[type[ShopifyGraphQLResource]]:
     """Determine which resources are available based on scopes and plan."""
     available: set[type[ShopifyGraphQLResource]] = set()
 
-    for resource in INCREMENTAL_RESOURCES:
+    for resource in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
         # Skip if none of the qualifying scopes are granted
         if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
             continue
         # Skip PII resources for custom app tokens when plan doesn't allow PII
         if uses_custom_app_token and resource in PII_RESOURCES and not can_access_pii:
             continue
+        # Skip resources only queryable on Plus/Advanced plans when the store
+        # isn't on one.
+        if resource.REQUIRES_PLUS_OR_ADVANCED_PLAN and not is_plus_or_advanced:
+            continue
         available.add(resource)
 
     return available
+
+
+def _stores_with_access_to(
+    model: type[ShopifyGraphQLResource],
+    store_contexts: dict[str, StoreContext],
+) -> list[str]:
+    """IDs of the stores that can serve `model`: their granted scopes and plan tier allow it."""
+    return [
+        store_id
+        for store_id, ctx in store_contexts.items()
+        if model in ctx.available_resources
+    ]
 
 
 def _create_initial_state(
@@ -240,7 +290,7 @@ def _create_initial_state(
     Args:
         store_ids: List of store IDs to create state for.
         start_date: The start date for data replication.
-        use_backfill: Whether to create backfill state (for non-bulk queries with SORT_KEY).
+        use_backfill: Whether to create backfill state (for non-bulk queries).
     """
     cutoff = datetime.now(tz=UTC)
 
@@ -248,9 +298,7 @@ def _create_initial_state(
         return ResourceState(
             inc={sid: ResourceState.Incremental(cursor=cutoff) for sid in store_ids},
             backfill={
-                sid: ResourceState.Backfill(
-                    next_page=dt_to_str(start_date), cutoff=cutoff
-                )
+                sid: ResourceState.Backfill(next_page=None, cutoff=cutoff)
                 for sid in store_ids
             },
         )
@@ -351,13 +399,18 @@ async def _reconcile_connector_state(
         await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
 
-async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool:
-    """Check if the Shopify plan allows access to PII data."""
+async def _get_shop_plan(
+    http: HTTPMixin, url: str, log: Logger
+) -> ShopDetails.Data.Shop.Plan:
+    """Fetch the store's Shopify plan details."""
     response = ShopDetails.model_validate_json(
         await http.request(log, url, method="POST", json={"query": ShopDetails.query()})
     )
-    plan = response.data.shop.plan
+    return response.data.shop.plan
 
+
+def _plan_allows_pii(plan: ShopDetails.Data.Shop.Plan, log: Logger) -> bool:
+    """Check if the Shopify plan allows access to PII data."""
     if plan.partnerDevelopment or plan.shopifyPlus:
         return True
 
@@ -374,7 +427,21 @@ async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool
     return True
 
 
-async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str]:
+def _plan_is_plus_or_advanced(plan: ShopDetails.Data.Shop.Plan) -> bool:
+    """Whether the plan can query fields restricted to Plus/Advanced tiers.
+
+    Partner development stores have the same access as Plus for testing purposes.
+    """
+    return (
+        plan.shopifyPlus
+        or plan.partnerDevelopment
+        or plan.displayName == PlanName.ADVANCED
+    )
+
+
+async def _get_granted_scopes(
+    http: HTTPMixin, url: str, log: Logger, store: str
+) -> set[str]:
     """Query the currentAppInstallation to determine which scopes are granted."""
     response = AccessScopes.model_validate_json(
         await http.request(
@@ -383,6 +450,16 @@ async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str
     )
     scopes = response.get_scope_handles()
     log.info(f"Access token has scopes: {scopes}")
+    # Observable so we can find captures authenticating with a public app's
+    # token, which will stop working once Shopify makes those expire hourly.
+    log.info(
+        "Shopify app public category",
+        extra={
+            OBSERVABLE_FIELD: True,
+            "store": store,
+            "public_category": response.data.currentAppInstallation.app.publicCategory,
+        },
+    )
     return scopes
 
 
@@ -400,10 +477,23 @@ async def _validate_store(
     try:
         await bulk_job_manager.check_connectivity()
     except HTTPError as err:
+        if err.code in FROZEN_OR_LOCKED_STORE_STATUS_CODES:
+            log.warning(
+                f"Store '{store_config.store}' is unavailable (HTTP {err.code}) and will be skipped until it is reachable again.",
+                {"error": err.message},
+            )
+            return None
         if err.code == 401:
             return (
                 f"Store '{store_config.store}': Invalid credentials. "
                 f"Please confirm the provided credentials are correct.\n\n{err.message}"
+            )
+        if err.code == 404:
+            return (
+                f"Store '{store_config.store}': Store not found. "
+                f"Please confirm the store name is the prefix of your admin URL "
+                f"(e.g., 'mystore' for mystore.myshopify.com), or remove the store "
+                f"if it has been closed.\n\n{err.message}"
             )
         return f"Store '{store_config.store}': Encountered error validating access token.\n\n{err.message}"
 
@@ -428,13 +518,13 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError(errors)
 
 
-async def all_resources(
-    log: Logger,
-    http: HTTPMixin,
+def _build_incremental_resource(
+    model: type[ShopifyGraphQLResource],
+    stores_with_access: list[str],
+    store_contexts: dict[str, StoreContext],
     config: EndpointConfig,
-    should_cancel_ongoing_job: bool = False,
-) -> list[Resource]:
-    """Discover all available resources across all configured stores.
+) -> Resource:
+    """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`.
 
     State format is always dictionary-based: {"inc": {"store_id": {...}}}
 
@@ -442,26 +532,252 @@ async def all_resources(
     - True: ["/_meta/store", "/id"]
     - False: ["/id"]
     """
+    key = (
+        ["/_meta/store", "/id"]
+        if config.advanced.should_use_composite_key
+        else ["/id"]
+    )
+    use_backfill = not model.SHOULD_USE_BULK_QUERIES
+    initial_state = _create_initial_state(
+        stores_with_access, config.start_date, use_backfill
+    )
+    legacy_store_id = config._legacy_store or config.stores[0].store
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        await _reconcile_connector_state(
+            stores_with_access,
+            binding,
+            state,
+            initial_state,
+            task,
+            legacy_store_id=legacy_store_id,
+        )
+
+        # Warn if FulfillmentOrders has partial scope coverage
+        if model == gql.FulfillmentOrders:
+            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
+            for store_id in stores_with_access:
+                granted = store_contexts[store_id].capabilities.scopes
+                if fo_scopes & granted and not fo_scopes <= granted:
+                    missing = fo_scopes - granted
+                    task.log.warning(
+                        f"Store '{store_id}': FulfillmentOrders has partial scopes. "
+                        f"Missing: {missing}. Only matching fulfillment orders will be captured."
+                    )
+
+        if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
+            raise RuntimeError(
+                "Non-bulk queries cannot contain nested connections."
+            )
+
+        data_model = create_response_data_model(model)
+
+        # Subtask creation is driven by fetch_changes/fetch_page dict keys
+        # (from stores_with_access), NOT by state keys. Orphaned state for
+        # removed stores is inert and intentionally preserved.
+        fetch_changes: dict[str, functools.partial] = {}
+        fetch_page: dict[str, functools.partial] = {}
+
+        for store_id in stores_with_access:
+            ctx = store_contexts[store_id]
+
+            if model.SHOULD_USE_BULK_QUERIES:
+                fetch_changes[store_id] = functools.partial(
+                    bulk_fetch_incremental,
+                    ctx.http,
+                    config.advanced.window_size,
+                    ctx.bulk_job_manager,
+                    model,
+                    store_id,
+                    ctx.capabilities,
+                )
+            elif model.SORT_KEY is None:
+                fetch_changes[store_id] = functools.partial(
+                    fetch_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                )
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                    config.start_date,
+                )
+            else:
+                fetch_changes[store_id] = functools.partial(
+                    fetch_incremental,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                )
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                    config.start_date,
+                )
+
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=fetch_changes,
+            fetch_page=fetch_page if fetch_page else None,
+        )
+
+
+    return Resource(
+        name=model.NAME,
+        key=key,
+        model=ShopifyGraphQLResource,
+        open=open,
+        initial_state=initial_state,
+        schema_inference=True,
+        initial_config=ResourceConfigWithSchedule(
+            name=model.NAME,
+            interval=timedelta(minutes=5),
+            schedule=model.BACKFILL_SCHEDULE,
+        ),
+    )
+
+
+def _build_snapshot_resource(
+    model: type[ShopifyGraphQLResource],
+    stores_with_access: list[str],
+    store_contexts: dict[str, StoreContext],
+) -> SnapshotResource:
+    """Build the snapshot resource for `model`, with one subtask per store in `stores_with_access`.
+
+    Each is a single binding keyed on [/_meta/store, /_meta/row_id] whose snapshot
+    fans out into one per-store subtask.
+    """
+    snapshot_key = ["/_meta/store", "/_meta/row_id"]
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        data_model = create_response_data_model(model)
+
+        fetch_snapshot_fns: dict[str, functools.partial] = {}
+        tombstones: dict[str, ShopifyDocument] = {}
+        for store_id in stores_with_access:
+            ctx = store_contexts[store_id]
+            if model.SHOULD_USE_BULK_QUERIES:
+                fetch_snapshot_fns[store_id] = functools.partial(
+                    bulk_fetch_snapshot,
+                    ctx.http,
+                    ctx.bulk_job_manager,
+                    model,
+                    store_id,
+                    ctx.capabilities,
+                )
+            else:
+                fetch_snapshot_fns[store_id] = functools.partial(
+                    fetch_snapshot,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                )
+            # The tombstone must carry the /_meta/store discriminator so
+            # deletes target the correct [store, row_id] key. The CDK only
+            # fills in op/row_id.
+            tombstones[store_id] = ShopifyDocument(
+                _meta=ShopifyDocument.Meta(op="d", store=store_id),
+            )
+
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=fetch_snapshot_fns,
+            tombstone=tombstones,
+        )
+
+
+    return SnapshotResource(
+        name=model.NAME,
+        key=snapshot_key,
+        # ShopifyDocument's discovered schema include /_meta/store, which is
+        # a necessary key component that the CDK's BaseDocument couldn't know about.
+        model=ShopifyDocument,
+        open=open,
+        initial_config=ResourceConfigWithSchedule(
+            name=model.NAME,
+            interval=timedelta(minutes=15)
+        ),
+    )
+
+
+async def _initialize_store_contexts(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    should_cancel_ongoing_job: bool,
+) -> dict[str, StoreContext]:
+    """Initialize every configured store in parallel, keyed by store name.
+
+    Unavailable stores (see UNAVAILABLE_STORE_STATUS_CODES) are skipped with a warning.
+    Raises StoreInitError if a store fails for any other reason, or if every store is
+    unavailable.
+    """
     store_contexts: dict[str, StoreContext] = {}
 
     # Initialize all store contexts in parallel
     results = await asyncio.gather(
         *[
-            _create_store_context(log, http, store_config, should_cancel_ongoing_job)
+            _create_store_context(
+                log,
+                http,
+                store_config,
+                should_cancel_ongoing_job,
+                config.advanced.max_concurrent_bulk_ops,
+            )
             for store_config in config.stores
         ],
         return_exceptions=True,
     )
 
     failed_stores: dict[str, BaseException] = {}
+    unavailable_stores: dict[str, BaseException] = {}
     for store_config, result in zip(config.stores, results):
-        if isinstance(result, BaseException):
+        if isinstance(result, BaseException) and _is_store_unavailable(result):
+            log.warning(
+                f"Store '{store_config.store}' is unavailable and will be skipped until it is reachable again.",
+                {"error": str(result)},
+            )
+            unavailable_stores[store_config.store] = result
+        elif isinstance(result, BaseException):
             log.error(f"Failed to initialize store '{store_config.store}': {result}")
             failed_stores[store_config.store] = result
         else:
             excluded = [
                 m.NAME
-                for m in INCREMENTAL_RESOURCES
+                for m in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES
                 if m not in result.available_resources
             ]
             if excluded:
@@ -470,153 +786,80 @@ async def all_resources(
                 )
             store_contexts[store_config.store] = result
 
-    if not store_contexts:
-        raise StoreInitError(failed_stores, [])
-
     if failed_stores:
         raise StoreInitError(failed_stores, list(store_contexts.keys()))
 
-    # Determine which resources are available across all stores (union)
-    all_available: set[type[ShopifyGraphQLResource]] = set()
-    for ctx in store_contexts.values():
-        all_available.update(ctx.available_resources)
+    if not store_contexts:
+        raise StoreInitError(unavailable_stores, [])
+
+    return store_contexts
+
+
+def _build_resource(
+    model: type[ShopifyGraphQLResource],
+    stores_with_access: list[str],
+    store_contexts: dict[str, StoreContext],
+    config: EndpointConfig,
+) -> Resource:
+    if model in FULL_REFRESH_RESOURCES:
+        return _build_snapshot_resource(model, stores_with_access, store_contexts)
+    elif model in INCREMENTAL_RESOURCES:
+        return _build_incremental_resource(model, stores_with_access, store_contexts, config)
+    raise RuntimeError(
+        f"Implementation error: {model.__name__} is in neither INCREMENTAL_RESOURCES nor FULL_REFRESH_RESOURCES."
+    )
+
+
+async def discovered_resources(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+) -> list[Resource]:
+    store_contexts = await _initialize_store_contexts(
+        log, http, config, should_cancel_ongoing_job=False
+    )
+
+    resources: list[Resource] = []
+    for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
+        stores_with_access = _stores_with_access_to(model, store_contexts)
+        if stores_with_access:
+            resources.append(
+                _build_resource(model, stores_with_access, store_contexts, config)
+            )
 
     log.info(
-        f"Discovered {len(all_available)} stream(s) across {len(store_contexts)} store(s)"
+        f"Discovered {len(resources)} stream(s) across {len(store_contexts)} store(s)"
     )
 
-    # Build resources
+    return resources
+
+
+async def bound_resources(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    bound_stream_names: set[str],
+    should_cancel_ongoing_job: bool = False,
+) -> list[Resource]:
+    store_contexts = await _initialize_store_contexts(
+        log, http, config, should_cancel_ongoing_job
+    )
+
     resources: list[Resource] = []
-    key = (
-        ["/_meta/store", "/id"]
-        if config.advanced.should_use_composite_key
-        else ["/id"]
-    )
-
-    for model in INCREMENTAL_RESOURCES:
-        stores_with_access = [
-            store_id
-            for store_id, ctx in store_contexts.items()
-            if model in ctx.available_resources
-        ]
-
-        if not stores_with_access:
+    for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
+        if model.NAME not in bound_stream_names:
             continue
 
-        use_backfill = not model.SHOULD_USE_BULK_QUERIES and model.SORT_KEY is not None
-        initial_state = _create_initial_state(
-            stores_with_access, config.start_date, use_backfill
-        )
-        legacy_store_id = config._legacy_store or config.stores[0].store
-
-        def create_open_fn(
-            model: type[ShopifyGraphQLResource],
-            stores_with_access: list[str],
-            initial_state: ResourceState,
-            legacy_store_id: str,
-        ):
-            async def open(
-                binding: CaptureBinding[ResourceConfig],
-                binding_index: int,
-                state: ResourceState,
-                task: Task,
-                _all_bindings,
-            ):
-                await _reconcile_connector_state(
-                    stores_with_access,
-                    binding,
-                    state,
-                    initial_state,
-                    task,
-                    legacy_store_id=legacy_store_id,
-                )
-
-                # Warn if FulfillmentOrders has partial scope coverage
-                if model == gql.FulfillmentOrders:
-                    fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
-                    for store_id in stores_with_access:
-                        granted = store_contexts[store_id].scopes
-                        if fo_scopes & granted and not fo_scopes <= granted:
-                            missing = fo_scopes - granted
-                            task.log.warning(
-                                f"Store '{store_id}': FulfillmentOrders has partial scopes. "
-                                f"Missing: {missing}. Only matching fulfillment orders will be captured."
-                            )
-
-                if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
-                    raise RuntimeError(
-                        "Non-bulk queries cannot contain nested connections."
-                    )
-
-                data_model = create_response_data_model(model)
-
-                # Subtask creation is driven by fetch_changes/fetch_page dict keys
-                # (from stores_with_access), NOT by state keys. Orphaned state for
-                # removed stores is inert and intentionally preserved.
-                fetch_changes: dict[str, functools.partial] = {}
-                fetch_page: dict[str, functools.partial] = {}
-
-                for store_id in stores_with_access:
-                    ctx = store_contexts[store_id]
-
-                    if model.SHOULD_USE_BULK_QUERIES:
-                        fetch_changes[store_id] = functools.partial(
-                            bulk_fetch_incremental,
-                            ctx.http,
-                            config.advanced.window_size,
-                            ctx.bulk_job_manager,
-                            model,
-                            store_id,
-                        )
-                    elif model.SORT_KEY is None:
-                        fetch_changes[store_id] = functools.partial(
-                            fetch_incremental_unsorted,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                        )
-                    else:
-                        fetch_changes[store_id] = functools.partial(
-                            fetch_incremental,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                        )
-                        fetch_page[store_id] = functools.partial(
-                            backfill_incremental,
-                            ctx.client,
-                            model,
-                            data_model,
-                            store_id,
-                        )
-
-                open_binding(
-                    binding,
-                    binding_index,
-                    state,
-                    task,
-                    fetch_changes=fetch_changes,
-                    fetch_page=fetch_page if fetch_page else None,
-                )
-
-            return open
+        stores_with_access = _stores_with_access_to(model, store_contexts)
+        if not stores_with_access:
+            # Build the resource anyway so the binding resolves and opens idle instead of
+            # failing validation and the whole capture.
+            log.warning(
+                f"No initialized store can serve bound stream '{model.NAME}'. Its binding will be idle."
+            )
 
         resources.append(
-            Resource(
-                name=model.NAME,
-                key=key,
-                model=ShopifyGraphQLResource,
-                open=create_open_fn(
-                    model, stores_with_access, initial_state, legacy_store_id
-                ),
-                initial_state=initial_state,
-                schema_inference=True,
-                initial_config=ResourceConfig(
-                    name=model.NAME, interval=timedelta(minutes=5)
-                ),
-            )
+            _build_resource(model, stores_with_access, store_contexts, config)
         )
 
     return resources

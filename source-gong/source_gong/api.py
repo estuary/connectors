@@ -13,8 +13,8 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.http import HTTPError, HTTPSession
 
 from source_gong.models import (
-    Call,
     DateFormat,
+    FilteredGongResource,
     GongResource,
     GongResponseEnvelope,
     HttpMethod,
@@ -97,7 +97,7 @@ class GongRateLimiter:
 
 
 async def _make_request(
-    cls: type[IncrementalGongResource],
+    cls: type[FilteredGongResource],
     http: HTTPSession,
     rate_limiter: GongRateLimiter,
     base_url: str,
@@ -124,6 +124,7 @@ async def _make_request(
             body: dict[str, object] = {cls.FROM_PARAM: from_val, cls.TO_PARAM: to_val}
             if cls.FILTER_WRAPPER:
                 body = {"filter": body}
+            body = {**body, **cls.BODY_EXTRA}
             if cursor:
                 body["cursor"] = cursor
             await rate_limiter.acquire()
@@ -133,7 +134,7 @@ async def _make_request(
             assert_never(unreachable)
 
 
-async def _request_items[T: IncrementalGongResource](
+async def _request_items[T: FilteredGongResource](
     cls: type[T],
     http: HTTPSession,
     rate_limiter: GongRateLimiter,
@@ -189,7 +190,7 @@ async def snapshot_resource(
 
 
 async def fetch_page(
-    cls: type[IncrementalGongResource],
+    cls: type[FilteredGongResource],
     http: HTTPSession,
     rate_limiter: GongRateLimiter,
     base_url: str,
@@ -197,7 +198,7 @@ async def fetch_page(
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
-) -> AsyncGenerator[IncrementalGongResource | PageCursor, None]:
+) -> AsyncGenerator[FilteredGongResource | PageCursor, None]:
     assert isinstance(cutoff, datetime)
     assert isinstance(page, str | None)
 
@@ -215,21 +216,22 @@ async def fetch_page(
         yield next_cursor
 
 
-async def fetch_calls_changes(
+async def fetch_changes_with_lookback(
+    cls: type[FilteredGongResource],
     http: HTTPSession,
     rate_limiter: GongRateLimiter,
     base_url: str,
     lookback_window: int,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[Call | LogCursor, None]:
+) -> AsyncGenerator[FilteredGongResource | LogCursor, None]:
     """
     Fetch call changes with a lookback window to capture post-call enrichment.
 
     On the first run of each day, queries from cursor - lookback_window to now,
-    re-emitting calls that may have been enriched since last seen. Deduplication
-    happens via the primary key at the Flow runtime level. On subsequent same-day
-    runs, only fetches new calls from the cursor forward.
+    re-emitting documents that may have been enriched since last seen.
+    Deduplication happens via the primary key at the Flow runtime level. On
+    subsequent same-day runs, only fetches from the cursor forward.
     """
     assert isinstance(log_cursor, int)
 
@@ -253,11 +255,11 @@ async def fetch_calls_changes(
     page_cursor: str | None = None
 
     while True:
-        from_val = _format_date(start_date, Call.DATE_FORMAT)
-        to_val = _format_date(end_date, Call.DATE_FORMAT)
+        from_val = _format_date(start_date, cls.DATE_FORMAT)
+        to_val = _format_date(end_date, cls.DATE_FORMAT)
 
         items, page_cursor = await _request_items(
-            Call, http, rate_limiter, base_url, from_val, to_val, log, page_cursor
+            cls, http, rate_limiter, base_url, from_val, to_val, log, page_cursor
         )
 
         if not items:

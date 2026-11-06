@@ -1,0 +1,45 @@
+info:
+  name: Create Doomed Group
+  type: http
+  seq: 35
+
+http:
+  method: POST
+  url: "{{base_url}}/groups"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "name": "estuary-members-doomed-group",
+          "description": "Estuary connector test fixture (members cluster); deleted by Seeding / Delete Doomed Group"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('members_doomed_group_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/addGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** a group that is deleted while it still has a member, so
+  `Group members / membership events group delete` can show whether a group delete logs a
+  `group.user_membership.remove` per member — i.e. whether an event-driven Group_members can
+  tombstone a deleted group's memberships.
+
+  **Cleanup:** none — `Seeding / Delete Doomed Group` deletes it.
+
+  Outcome: ran 2026-10-09 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / membership events cascade` and `Group members / membership events group delete`.

@@ -19,6 +19,8 @@ type Dialect struct {
 
 	// MaxFieldCharLength is provided as the "maxFieldLength" parameter to boilerplate.NewValidator.
 	MaxColumnCharLength int
+	// MaxColumns is the most columns a table may have. If 0, there is no limit.
+	MaxColumns int
 	// CaseInsensitiveColumns is provided as the "caseInsensitiveFields" parameter to boilerplate.NewValidator.
 	CaseInsensitiveColumns bool
 	// CaseInsensitiveResources indicates if resources (tables/schemas) are case-insensitive.
@@ -29,6 +31,27 @@ type Dialect struct {
 	// which the key type can be migrated to.
 	// For example, "decimal": {"string"} means decimal columns can be migrated to string type
 	MigratableTypes MigrationSpecs
+
+	// DirectCastSQL renders the in-place column type changes for all of a table's
+	// migrations whose specs are marked DirectCast (see WithDirectCast). Dialects
+	// whose engine rewrites the table for each statement should change every column
+	// in one statement. It is required for any dialect that enables a DirectCast
+	// spec — there is no implicit default, and StdColumnTypeMigrations errors if it
+	// encounters a DirectCast migration while this is nil. The Postgres/DuckDB form
+	// is "ALTER TABLE t ALTER COLUMN c TYPE t USING <expr>"; BigQuery uses "SET DATA TYPE".
+	DirectCastSQL func(table Table, migrations []ColumnTypeMigration) []string
+}
+
+// DirectCastPerColumn builds a DirectCastSQL which issues one statement per
+// column, for dialects that cannot change several columns' types in one.
+func DirectCastPerColumn(render func(table Table, migration ColumnTypeMigration) string) func(Table, []ColumnTypeMigration) []string {
+	return func(table Table, migrations []ColumnTypeMigration) []string {
+		stmts := make([]string, len(migrations))
+		for i, m := range migrations {
+			stmts[i] = render(table, m)
+		}
+		return stmts
+	}
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.

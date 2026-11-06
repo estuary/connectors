@@ -1,0 +1,287 @@
+info:
+  name: include flags
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1000&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+  params:
+    - name: count
+      value: "1000"
+      type: query
+    - name: include_cleaned
+      value: "true"
+      type: query
+    - name: include_transactional
+      value: "true"
+      type: query
+    - name: include_unsubscribed
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - 3 members but total_items still 2
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1000&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "277db7ffd1",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:06+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:06+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "e8feaf0c3c",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:38+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:38+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "7bfb50d36252f5094fec17e378483cf1",
+                "email_address": "nicolas+estuary-test-3@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "bf79c35454",
+                "email_type": "html",
+                "status": "unsubscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:32:34+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:32:42+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+  - name: 200 - include_x flags accepted
+    request:
+      url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members?count=1000&include_cleaned=true&include_transactional=true&include_unsubscribed=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "members": [
+              {
+                "id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "277db7ffd1",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:06+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:06+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              },
+              {
+                "id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "full_name": "",
+                "unique_email_id": "e8feaf0c3c",
+                "email_type": "html",
+                "status": "subscribed",
+                "merge_fields": {
+                  "FNAME": "",
+                  "LNAME": "",
+                  "ADDRESS": "",
+                  "PHONE": "",
+                  "BIRTHDAY": "",
+                  "COMPANY": ""
+                },
+                "interests": {
+                  "6fbed1c079": false
+                },
+                "stats": "REDACTED",
+                "ip_signup": "",
+                "timestamp_signup": "",
+                "ip_opt": "201.235.239.178",
+                "timestamp_opt": "2026-06-12T13:12:38+00:00",
+                "member_rating": 2,
+                "last_changed": "2026-06-12T13:12:38+00:00",
+                "language": "",
+                "vip": false,
+                "email_client": "",
+                "location": {
+                  "latitude": 0,
+                  "longitude": 0,
+                  "gmtoff": 0,
+                  "dstoff": 0,
+                  "country_code": "",
+                  "timezone": ""
+                },
+                "list_id": "f34247943d",
+                "_links": "REDACTED"
+              }
+            ],
+            "total_items": 2,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segment-members/list-members-in-segment/)
+
+  **WHY:** silent-data-loss audit — the provider schema
+  (Parameters/SegmentInclude_*.json) describes include_cleaned /
+  include_transactional / include_unsubscribed as "Include <state> members in
+  response", i.e. those partitions are EXCLUDED by default. Teaches that the
+  three flags are accepted and what they do to the item set; the connector must
+  decide explicitly whether to pass them (it does — all three).
+
+  **VERIFIED (2026-06-30):** the three flags are accepted (200, not 400), and
+  with them on the unsubscribed member 3 joins the item set (3 members vs. the
+  bare run's 2 — see the examples). An earlier note here claimed the item set
+  matched the bare run; that predated the B5–B7 unsubscribe seeds and is
+  superseded by the saved examples.
+
+  **LIMITATION (VERIFIED 2026-06-30):** the connector passes all three
+  include_* flags so full membership is captured, but under those flags
+  `total_items` *undercounts* the returned rows (see the "200 - 3 members but
+  total_items still 2" example: 3 members returned, `total_items` reported as
+  2). Offset pagination therefore can't trust `total_items` as the stop
+  condition — it completes on a short page (a page smaller than the requested
+  `count`) instead.

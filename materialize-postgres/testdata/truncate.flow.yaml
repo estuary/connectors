@@ -1,0 +1,35 @@
+collections:
+  tests/truncate:
+    schema:
+      properties:
+        id: {type: integer}
+        _meta: {type: object}
+      required: [id, _meta]
+      type: object
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-postgres-truncate:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_delta
+        delta_updates: true
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]

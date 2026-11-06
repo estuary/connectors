@@ -1,0 +1,8 @@
+captures:
+  acmeCo/test_capture/source-ga4-bigquery:
+    endpoint:
+      local:
+        command: ["go", "run", "./source-ga4-bigquery"]
+        config: {}
+        protobuf: true
+    bindings: []

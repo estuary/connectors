@@ -11,7 +11,34 @@ import (
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
+	"github.com/stretchr/testify/require"
 )
+
+func TestTemporalKeyEncoding(t *testing.T) {
+	for _, tc := range []struct {
+		columnType string
+		value      string
+	}{
+		{columnType: "date", value: "2026-09-04"},
+		{columnType: "datetime", value: "2026-09-04 12:34:56.123456"},
+		{columnType: "time", value: "12:34:56.123456"},
+		{columnType: "timestamp", value: "2026-09-04 12:34:56.123456"},
+	} {
+		t.Run(tc.columnType, func(t *testing.T) {
+			var db mysqlDatabase
+			var backfillTranscoder, backfillTranscoderErr = db.constructFDBTranscoder(true, tc.columnType)
+			require.NoError(t, backfillTranscoderErr)
+			var replicationTranscoder, replicationTranscoderErr = db.constructFDBTranscoder(false, tc.columnType)
+			require.NoError(t, replicationTranscoderErr)
+
+			var backfillKey, backfillErr = backfillTranscoder.TranscodeFDB(nil, []byte(tc.value))
+			var replicationKey, replicationErr = replicationTranscoder.TranscodeFDB(nil, tc.value)
+			require.NoError(t, backfillErr)
+			require.NoError(t, replicationErr)
+			require.Equal(t, backfillKey, replicationKey)
+		})
+	}
+}
 
 // TestDatatypes runs the discovery test on various datatypes.
 func TestDatatypes(t *testing.T) {
@@ -300,4 +327,41 @@ func TestMariaDBTypeUUID(t *testing.T) {
 		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
 	})
+}
+
+// TestMariaDBAddJSONColumn captures a JSON column added to a table via live DDL.
+//
+// In MariaDB the JSON type is an alias for LONGTEXT, so discovery (which reads
+// information_schema) reports such a column as a string. The replication DDL parser,
+// however, keys off the literal `JSON` keyword in the ALTER statement and so records the
+// column as a JSON type, causing its values to be emitted as bare JSON rather than as
+// strings. The result is a metadata inconsistency: the discovered collection schema says
+// the column is a string, but the captured documents contain bare JSON objects and arrays.
+func TestMariaDBAddJSONColumn(t *testing.T) {
+	if os.Getenv("TEST_MARIADB") != "yes" {
+		t.Skip("Skipping MariaDB specific test, set TEST_MARIADB=yes to enable")
+	}
+
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "31415926"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Initial backfill of the table before the JSON column exists.
+	tb.Insert(ctx, t, tableName, [][]any{{1, "before"}})
+	cs.Capture(ctx, t, nil)
+
+	// Add the JSON column via live DDL and insert object and array-of-objects values.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN j JSON;", tableName))
+	tb.Insert(ctx, t, tableName, [][]any{
+		{2, "obj", `{"bucket_id": 1, "id": 1}`},
+		{3, "arr", `[{"bucket_id": 1, "id": 1}]`},
+	})
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
 }

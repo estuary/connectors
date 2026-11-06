@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/mysql/jsonpath"
 	"github.com/estuary/connectors/sqlcapture"
@@ -106,15 +105,44 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		logrus.WithField("pos", pos).Debug("initialized binlog position")
 	}
 
+	// MySQL and MariaDB frame GTIDs and related metadata using different binlog
+	// event types, so the syncer must know which flavor it's talking to in order
+	// to request and parse the correct events. Connecting to MariaDB with the
+	// "mysql" flavor makes the server rewrite its native GTID events into
+	// backwards-compatible dummy events. That rewrite is lossy (we never observe
+	// the GTID or its commit timestamp) and occasionally fatal: a server-side
+	// failure to rewrite an event aborts replication with error 1236 ("Failed to
+	// replace GTID event with backwards-compatible event").
+	var flavor = mysql.MySQLFlavor
+	if db.versionProduct == "MariaDB" {
+		flavor = mysql.MariaDBFlavor
+	}
+
+	// The syncer keeps this password for its entire lifetime, so under AWS IAM auth an
+	// internal reconnect attempted more than fifteen minutes from now will be denied.
+	// That failure terminates the capture and the restarted connector mints a fresh token.
+	password, err := db.config.EffectivePassword(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var sslSettings = db.config.sslSettings()
+	tlsConfig, err := sslSettings.Config(db.config.serverHost())
+	if err != nil {
+		return nil, err
+	}
+
 	var syncConfig = replication.BinlogSyncerConfig{
 		ServerID: uint32(db.config.Advanced.NodeID),
-		Flavor:   "mysql", // TODO(wgd): See what happens if we change this and run against MariaDB?
+		Flavor:   flavor,
 		Host:     host,
 		Port:     uint16(port),
 		User:     db.config.User,
-		Password: db.config.Password,
-		// TODO(wgd): Maybe add 'serverName' checking as described over in Connect()
-		TLSConfig: &tls.Config{InsecureSkipVerify: true},
+		Password: password,
+		// Nil only when 'sslmode' is disabled. When the Password above is a bearer
+		// token rather than a user-chosen secret, Config.Validate rejects every mode
+		// that would leave it unencrypted, so neither this nor the plaintext retry
+		// below is reachable for those auth types.
+		TLSConfig: tlsConfig,
 		// Request that timestamp values coming via replication be interpreted as UTC.
 		TimestampStringLocation: time.UTC,
 
@@ -143,19 +171,37 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
 	var streamer *replication.BinlogStreamer
 	var syncer = replication.NewBinlogSyncer(syncConfig)
-	if streamer, err = syncer.StartSync(pos); err == nil {
-		logrus.Debug("replication connected with TLS")
+	var errWithTLS error
+	if streamer, errWithTLS = syncer.StartSync(pos); errWithTLS == nil {
+		if tlsConfig != nil {
+			logrus.WithField("sslmode", sslSettings.EffectiveMode()).Debug("replication connected with TLS")
+		} else {
+			logrus.Debug("replication connected without TLS")
+		}
+	} else if tlsConfig == nil || !sslSettings.AllowsPlaintextFallback() {
+		syncer.Close()
+		if userErr := wrapMySQLReplicationError(errWithTLS); userErr != nil {
+			return nil, userErr
+		}
+		// The main connection has already succeeded with these settings, so a
+		// failure here is rarely down to TLS: StartSync also registers as a
+		// replica, which fails without the REPLICATION SLAVE privilege. When
+		// 'sslmode' is disabled, sslFailureMessage never blames TLS.
+		if msg := db.config.sslFailureMessage(sslSettings, errWithTLS); msg != "" {
+			return nil, cerrors.NewUserError(errWithTLS, "could not start binlog replication over TLS: "+msg)
+		}
+		return nil, fmt.Errorf("error starting binlog sync (sslmode %q): %w", sslSettings.EffectiveMode(), errWithTLS)
 	} else {
 		syncer.Close()
 		syncConfig.TLSConfig = nil
 		syncer = replication.NewBinlogSyncer(syncConfig)
 		if streamer, err = syncer.StartSync(pos); err == nil {
-			logrus.Info("replication connected without TLS")
+			logrus.WithField("errWithTLS", errWithTLS).Warn("replication connected without TLS")
 		} else {
 			if userErr := wrapMySQLReplicationError(err); userErr != nil {
 				return nil, userErr
 			}
-			return nil, fmt.Errorf("error starting binlog sync: %w", err)
+			return nil, fmt.Errorf("error starting binlog sync: failed both with TLS (%w) and without TLS (%w)", errWithTLS, err)
 		}
 	}
 
@@ -170,7 +216,6 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	stream.tables.discovery = make(map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo)
 	stream.tables.metadata = make(map[sqlcapture.StreamID]*mysqlTableMetadata)
 	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
-	stream.tables.nonTransactional = make(map[sqlcapture.StreamID]bool)
 	return stream, nil
 }
 
@@ -192,8 +237,8 @@ func parseCursor(cursor string) (mysql.Position, error) {
 // wrapMySQLReplicationError checks if an error is a known MySQL replication error and returns
 // a user-friendly error message if so. Returns nil if the error is not a known replication error.
 func wrapMySQLReplicationError(err error) error {
-	var mysqlErr *mysql.MyError
-	if !errors.As(err, &mysqlErr) {
+	var mysqlErr, ok = errors.AsType[*mysql.MyError](err)
+	if !ok {
 		return nil
 	}
 	if mysqlErr.Code == 1236 {
@@ -249,20 +294,23 @@ type mysqlReplicationStream struct {
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 	gtidString    string    // The GTID value of the last GTID event, formatted as a "<uuid>:<counter>" string.
 
-	uncommittedChanges      bool // True when there have been row changes since the last commit was processed.
-	nonTransactionalChanges bool // True when there have been row changes *on non-transactional tables* since the last commit was processed.
+	// withinTransaction is true from a transaction's BEGIN query event or first
+	// table map event until its XID or COMMIT event. Implicit flushes are
+	// suppressed while it is set. A cursor inside a transaction is not a valid
+	// resume point, because the row events after it reference table map events
+	// which a new binlog connection never receives.
+	withinTransaction bool
 
 	// The active tables set and associated metadata, guarded by a
 	// mutex so it can be modified from the main goroutine while it's
 	// read from the replication goroutine.
 	tables struct {
 		sync.RWMutex
-		active           map[sqlcapture.StreamID]struct{}
-		discovery        map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo
-		metadata         map[sqlcapture.StreamID]*mysqlTableMetadata
-		keyColumns       map[sqlcapture.StreamID][]string
-		nonTransactional map[sqlcapture.StreamID]bool
-		dirtyMetadata    []sqlcapture.StreamID
+		active        map[sqlcapture.StreamID]struct{}
+		discovery     map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo
+		metadata      map[sqlcapture.StreamID]*mysqlTableMetadata
+		keyColumns    map[sqlcapture.StreamID][]string
+		dirtyMetadata []sqlcapture.StreamID
 	}
 }
 
@@ -274,6 +322,26 @@ type mysqlTableMetadata struct {
 type mysqlTableSchema struct {
 	Columns     []string               `json:"columns"`
 	ColumnTypes map[string]interface{} `json:"types"`
+
+	// ImplicitSystemVersioning is set for MariaDB tables declared `WITH SYSTEM
+	// VERSIONING` without an explicit `PERIOD FOR SYSTEM_TIME` clause. Such tables
+	// have hidden row_start and row_end columns which always follow the visible
+	// columns in binlog row images, and which MariaDB keeps at the end even when
+	// columns are added later. They are deliberately left out of Columns, so that
+	// DDL handling only ever manipulates visible columns, and this flag is the
+	// sole source of their presence when decoding row images.
+	ImplicitSystemVersioning bool `json:"implicit_system_versioning,omitempty"`
+}
+
+// rowImageColumns returns the names of every column present in binlog row images
+// for the table, in row image order.
+func (s *mysqlTableSchema) rowImageColumns() []string {
+	if !s.ImplicitSystemVersioning {
+		return s.Columns
+	}
+	var names = make([]string, 0, len(s.Columns)+2)
+	names = append(names, s.Columns...)
+	return append(names, implicitSystemVersioningStartColumn, implicitSystemVersioningEndColumn)
 }
 
 func (rs *mysqlReplicationStream) StartReplication(ctx context.Context, _ map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
@@ -388,8 +456,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				BinlogOffset: binlogEstimatedOffset,
 			}
 			if err := rs.handleRowsEvent(ctx, event, eventCursor); err != nil {
-				var metadataErr = &InconsistentMetadataError{}
-				if errors.As(err, &metadataErr) {
+				if metadataErr, ok := errors.AsType[*InconsistentMetadataError](err); ok {
 					logrus.WithField("stream", metadataErr.StreamID).Warn("detected inconsistent metadata for stream, will backfill")
 					if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
 						StreamID: metadataErr.StreamID,
@@ -427,11 +494,11 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 					return err
 				}
-				rs.uncommittedChanges = false      // Reset uncommitted changes
-				rs.nonTransactionalChanges = false // Reset uncommitted non-transactional changes
 			}
+			rs.withinTransaction = false
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")
+			rs.withinTransaction = true
 		case *replication.GTIDEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("data", data).Trace("GTID Event")
@@ -450,20 +517,22 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			if string(data.Query) == "COMMIT" && rs.nonTransactionalChanges {
-				// If there are uncommitted non-transactional changes, we should treat a
-				// "COMMIT" query event as a transaction commit. This logic should match
-				// the XIDEvent handling.
-				if !binlogOffsetOverflow {
-					if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
-						return err
-					}
-					rs.uncommittedChanges = false      // Reset all uncommitted changes
-					rs.nonTransactionalChanges = false // Reset uncommitted non-transactional changes
-				}
-			} else {
+			switch query := string(data.Query); query {
+			case "BEGIN":
+				// A BEGIN query event opens a transaction. On MariaDB with GTIDs
+				// enabled there is no BEGIN event, and the transaction is opened by
+				// its first table map event.
+				rs.withinTransaction = true
+			case "COMMIT", "ROLLBACK":
+				// A transaction on non-transactional tables such as MyISAM ends with a
+				// COMMIT query event in place of an XID event, or with a ROLLBACK query
+				// event when it is rolled back after writing to such a table. The
+				// implicit flush below reports the commit.
 				implicitFlush = true // Implicit FlushEvent conversion permitted
-				if err := rs.handleQuery(ctx, parser, string(data.Schema), string(data.Query)); err != nil {
+				rs.withinTransaction = false
+			default:
+				implicitFlush = true // Implicit FlushEvent conversion permitted
+				if err := rs.handleQuery(ctx, parser, string(data.Schema), query); err != nil {
 					return fmt.Errorf("error processing query event: %w", err)
 				}
 			}
@@ -473,6 +542,14 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			cursor.Pos = uint32(data.Position)
 			binlogOffsetOverflow = false
 			binlogEstimatedOffset = uint64(data.Position)
+			// A transaction never spans binlog files, so a genuine rotate ends any
+			// open one. The artificial rotate event at the start of every binlog
+			// dump (including the re-sync which go-mysql performs after a dropped
+			// connection) only restates the position the dump begins at, which may
+			// be inside a transaction.
+			if event.Header.Flags&replication.LOG_EVENT_ARTIFICIAL_F == 0 {
+				rs.withinTransaction = false
+			}
 			logrus.WithFields(logrus.Fields{
 				"name": cursor.Name,
 				"pos":  cursor.Pos,
@@ -502,15 +579,31 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		case *replication.IntVarEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("type", data.Type).WithField("value", data.Value).Debug("ignoring IntVar Event")
+		case *replication.MariadbGTIDEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("data", data).Trace("MariaDB GTID Event")
+			// MariaDB GTID events carry no dedicated commit timestamp the way MySQL
+			// GTID events do, so we fall back to the event header timestamp which
+			// holds the transaction's commit time (at second granularity).
+			rs.gtidTimestamp = time.Unix(int64(event.Header.Timestamp), 0)
+			rs.gtidString = data.GTID.String()
+		case *replication.MariadbGTIDListEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("gtids", data.GTIDs).Trace("MariaDB GTID List Event")
+		case *replication.MariadbBinlogCheckPointEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("info", string(data.Info)).Trace("MariaDB Binlog Checkpoint Event")
+		case *replication.MariadbAnnotateRowsEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("query", string(data.Query)).Trace("ignoring MariaDB Annotate Rows Event")
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
 
-		// If the binlog event is eligible for implicit FlushEvent reporting and there
-		// are no uncommitted changes currently pending (for which we would want to wait
-		// until a real commit event to flush the output) then report a new FlushEvent
-		// with the latest position.
-		if implicitFlush && !rs.uncommittedChanges && !binlogOffsetOverflow {
+		// If the binlog event is eligible for implicit FlushEvent reporting and we
+		// are not inside a transaction then report a new FlushEvent with the
+		// latest position.
+		if implicitFlush && !rs.withinTransaction && !binlogOffsetOverflow {
 			if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 				return err
 			}
@@ -534,8 +627,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		return rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{})
 	}
 
-	var nonTransactionalTable = rs.isNonTransactional(streamID)
-
 	// Get column names and types from persistent metadata. If available, allow
 	// override the persistent column name tracking using binlog row metadata.
 	metadata, ok := rs.tableMetadata(streamID)
@@ -545,7 +636,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	var columnTypes = metadata.Schema.ColumnTypes
 	var columnNames = data.Table.ColumnNameString()
 	if len(columnNames) == 0 {
-		columnNames = metadata.Schema.Columns
+		columnNames = metadata.Schema.rowImageColumns()
 	}
 
 	keyColumns, ok := rs.keyColumns(streamID)
@@ -735,12 +826,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			return err
 		}
 	}
-	if len(events) > 0 {
-		rs.uncommittedChanges = true // Set uncommitted changes flag
-		if nonTransactionalTable {
-			rs.nonTransactionalChanges = true // Set uncommitted non-transactional changes flag
-		}
-	}
 	return nil
 }
 
@@ -923,6 +1008,10 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 	case *sqlparser.CreateView, *sqlparser.AlterView, *sqlparser.DropView:
 		// All view creation/deletion/alterations should be fine to ignore since we don't capture from views.
 		logrus.WithField("query", query).Debug("ignoring benign query")
+	case *sqlparser.CreateProcedure, *sqlparser.DropProcedure:
+		// Stored procedures don't change the schema of any table, so they're safe to ignore.
+		// Most reach this point only when a leading comment defeats ignoreQueriesRe.
+		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.DropDatabase:
 		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
 		if streamIDs := rs.tablesInSchema(stmt.GetDatabaseName()); len(streamIDs) > 0 {
@@ -946,6 +1035,29 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 		}
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+			// The Vitess SQL parser does not error on DDL it can't fully understand. Instead it
+			// silently degrades the result into a partially parsed statement with FullyParsed set
+			// to false, typically with empty or incomplete AlterOptions.
+			//
+			// If this happens we can't reliably apply the alteration to our cached table metadata,
+			// so rather than silently capturing against incorrect metadata we mark the table as
+			// dropped and rely on a subsequent backfill to reinitialize with correct metadata.
+			if !stmt.FullyParsed {
+				logrus.WithFields(logrus.Fields{
+					"query":  query,
+					"stream": streamID,
+				}).Warn("unable to fully parse ALTER TABLE on active table, will backfill")
+				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+					StreamID: streamID,
+					Cause:    fmt.Sprintf("unable to fully parse alteration of table %q by query %q", streamID, query),
+				}); err != nil {
+					return err
+				} else if err := rs.deactivateTable(streamID); err != nil {
+					return fmt.Errorf("error deactivating table %q after incomplete ALTER TABLE parse: %w", streamID, err)
+				}
+				return nil
+			}
+
 			logrus.WithFields(logrus.Fields{
 				"query":         query,
 				"partitionSpec": stmt.PartitionSpec,
@@ -1082,7 +1194,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newName = alter.NewColDefinition.Name.String()
-			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1107,7 +1219,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1138,7 +1250,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var newCols []string
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
-				var dataType = translateDataType(meta, col.Type, rs.db.featureFlags)
+				var dataType = translateDataType(meta, col.Type, rs.db.featureFlags, rs.db.versionProduct == "MariaDB")
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
@@ -1187,7 +1299,7 @@ func findColumnIndex(columns []string, name string) int {
 	return -1
 }
 
-func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featureFlags map[string]bool) any {
+func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featureFlags map[string]bool, isMariaDB bool) any {
 	switch typeName := strings.ToLower(t.Type); typeName {
 	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
@@ -1204,17 +1316,17 @@ func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featur
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		var charset string
-		if t.Charset.Name != "" {
-			charset = t.Charset.Name // If explicitly specified, the declared charset wins
-		} else if t.Options.Collate != "" {
-			charset = charsetFromCollation(t.Options.Collate) // If only a collation is declared, figure out what charset that implies
-		} else if meta.DefaultCharset != "" {
-			charset = meta.DefaultCharset // In the absence of a column-specific declaration, use the default table charset
-		} else {
-			charset = mysqlDefaultCharset // Finally fall back to UTF-8 if nothing else supersedes that
+		return &mysqlColumnType{Type: typeName, Charset: columnCharset(meta, t)}
+	case "json":
+		// MySQL has a real JSON type, but in MariaDB the JSON type is an alias for
+		// `LONGTEXT COLLATE utf8mb4_bin`, and discovery (which reads information_schema)
+		// reports it as a longtext with charset utf8mb4. Thus we have to mirror that here
+		// so a JSON column added via live DDL is captured as a string, consistent with the
+		// discovered schema.
+		if isMariaDB {
+			return &mysqlColumnType{Type: "longtext", Charset: "utf8mb4"}
 		}
-		return &mysqlColumnType{Type: typeName, Charset: charset}
+		return typeName
 	case "binary":
 		var columnLength int
 		if t.Length == nil {
@@ -1226,6 +1338,20 @@ func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featur
 	default:
 		return typeName
 	}
+}
+
+// columnCharset resolves the character set of a text column declared in a DDL statement,
+// preferring an explicit column charset, then the charset implied by an explicit collation,
+// then the table default, and finally falling back to UTF-8.
+func columnCharset(meta *mysqlTableMetadata, t *sqlparser.ColumnType) string {
+	if t.Charset.Name != "" {
+		return t.Charset.Name
+	} else if t.Options.Collate != "" {
+		return charsetFromCollation(t.Options.Collate)
+	} else if meta.DefaultCharset != "" {
+		return meta.DefaultCharset
+	}
+	return mysqlDefaultCharset
 }
 
 func resolveTableName(defaultSchema string, name sqlparser.TableName) sqlcapture.StreamID {
@@ -1263,16 +1389,6 @@ func (rs *mysqlReplicationStream) tablesInSchema(schema string) []sqlcapture.Str
 	return tables
 }
 
-// isNonTransactional returns true if the stream ID refers to a table which
-// uses a storage engine such as MyISAM which doesn't support transactions.
-// Changes to non-transactional tables are never followed by a commit event,
-// so we have to take care of that for ourselves.
-func (rs *mysqlReplicationStream) isNonTransactional(streamID sqlcapture.StreamID) bool {
-	rs.tables.RLock()
-	defer rs.tables.RUnlock()
-	return rs.tables.nonTransactional[streamID]
-}
-
 func (rs *mysqlReplicationStream) keyColumns(streamID sqlcapture.StreamID) ([]string, bool) {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
@@ -1287,14 +1403,6 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 	// Do nothing if the table is already active.
 	if _, ok := rs.tables.active[streamID]; ok {
 		return nil
-	}
-
-	// Extract some details from the provided discovery info, if present.
-	var nonTransactional bool
-	if discovery != nil {
-		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
-			nonTransactional = extraDetails.StorageEngine == "MyISAM"
-		}
 	}
 
 	// If metadata JSON is present then parse it into a usable object. Otherwise
@@ -1357,6 +1465,15 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 		metadata.Schema.ColumnTypes = colTypes
 		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
 			metadata.DefaultCharset = extraDetails.DefaultCharset
+			if extraDetails.ImplicitSystemVersioning {
+				// Discovery synthesizes the hidden row_start and row_end columns so that
+				// they appear in the generated schema and key, but the tracked column
+				// list should only hold visible columns so DDL tracking works properly.
+				metadata.Schema.ImplicitSystemVersioning = true
+				metadata.Schema.Columns = slices.DeleteFunc(slices.Clone(discovery.ColumnNames), func(name string) bool {
+					return name == implicitSystemVersioningStartColumn || name == implicitSystemVersioningEndColumn
+				})
+			}
 		}
 
 		logrus.WithFields(logrus.Fields{
@@ -1371,7 +1488,6 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 	rs.tables.active[streamID] = struct{}{}
 	rs.tables.keyColumns[streamID] = keyColumns
 	rs.tables.metadata[streamID] = metadata
-	rs.tables.nonTransactional[streamID] = nonTransactional
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
 	return nil
 }
@@ -1383,7 +1499,6 @@ func (rs *mysqlReplicationStream) deactivateTable(streamID sqlcapture.StreamID) 
 	delete(rs.tables.active, streamID)
 	delete(rs.tables.keyColumns, streamID)
 	delete(rs.tables.metadata, streamID) // No need to mark metadata as dirty, just forget it
-	delete(rs.tables.nonTransactional, streamID)
 	return nil
 }
 

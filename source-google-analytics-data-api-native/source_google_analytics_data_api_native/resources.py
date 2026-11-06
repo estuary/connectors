@@ -28,10 +28,6 @@ from .models import (
     Report,
     ReportDocument,
 )
-from .utils import (
-    dt_to_str,
-)
-
 from .default_reports import DEFAULT_REPORTS
 
 
@@ -183,6 +179,7 @@ def reports(
                 config.property_id,
                 model,
                 report,
+                start,
             )
         )
 
@@ -206,7 +203,7 @@ def reports(
             open=functools.partial(open, model, report),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=report.name, interval=timedelta(hours=12)

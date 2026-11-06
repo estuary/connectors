@@ -1,0 +1,52 @@
+info:
+  name: unknown app 404 probe
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/apps/0oa00000000000000000/users?limit=500"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/ApplicationUsers/#tag/ApplicationUsers/operation/listApplicationUsers
+
+  **WHY:** The snapshot drains parent ids first, then lists each parent's children.
+  An app deleted between the two steps yields a child request for a vanished parent;
+  this records what Okta returns (status + errorCode) so the fetch can skip exactly
+  that case and nothing broader.
+
+  **VERIFIED (2026-10-07):** 404 with `errorCode: "E0000007"` ("Resource not found …
+  (AppInstance)").
+
+examples:
+  - name: "404 \u2014 E0000007 Resource not found (AppInstance)"
+    request:
+      url: "{{base_url}}/apps/0oa00000000000000000/users?limit=500"
+      method: GET
+    response:
+      status: 404
+      statusText: "Not Found"
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "errorCode": "E0000007",
+            "errorSummary": "Not found: Resource not found: 0oa00000000000000000 (AppInstance)",
+            "errorLink": "E0000007",
+            "errorId": "oae9R-lP2UKSJW9LDUzA0gZvw",
+            "errorCauses": []
+          }

@@ -1,0 +1,57 @@
+info:
+  name: Get Sheet (404 bad id)
+  type: http
+  seq: 28
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets/1"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 404 - errorCode 1006 Not Found
+    request:
+      url: "{{base_url}}/sheets/1"
+      method: GET
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: content-type
+          value: application/json
+        - name: x-ratelimit-limit
+          value: 80000
+        - name: x-ratelimit-remaining
+          value: 79600
+        - name: x-ratelimit-reset
+          value: 1784638460
+      body:
+        type: json
+        data: |-
+          {
+            "refId": "2b60345c-2dc6-4d38-8545-75adbfc4a55e",
+            "errorCode": 1006,
+            "message": "Not Found"
+          }
+
+docs: |-
+  **REFERENCE:** [Get sheet](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/getsheet)
+
+  **WHY:** error-shape probe using an id that can't exist (Smartsheet ids
+  are large 64-bit-range numbers; `1` is never allocated) — confirms the
+  connector's error handling matches the actual envelope.
+
+  **VERIFIED (2026-07-21):** 404,
+  `{"refId":"2b60345c-2dc6-4d38-8545-75adbfc4a55e","errorCode":1006,
+  "message":"Not Found"}` — the same `{errorCode, message, refId}` envelope
+  documented for 429s, confirming this is Smartsheet's general error
+  envelope, not something rate-limit-specific. `x-ratelimit-*` headers
+  (limit=80000) ARE present on this 404 response too, consistent with
+  `Get Sheet (bare)`'s finding that they're scoped to `/sheets/{id}`
+  (including its error responses), not account-wide.

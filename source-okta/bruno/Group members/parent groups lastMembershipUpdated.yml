@@ -1,0 +1,68 @@
+info:
+  name: parent groups lastMembershipUpdated
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?limit=200&filter=lastMembershipUpdated gt \"2026-10-01T00:00:00.000Z\""
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: filter
+      value: lastMembershipUpdated gt "2026-10-01T00:00:00.000Z"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroups
+
+  **WHY:** Candidate change-detection gate: does `filter=lastMembershipUpdated gt …`
+  narrow the parent list to groups whose membership changed? Only usable by a
+  design that re-fetches a subset of groups per sweep.
+
+  **VERIFIED (2026-10-07):** honored — 3 groups narrowed to the 2 whose membership
+  changed after 2026-10-01 (the seeded group, and Everyone, which every new user
+  joins). Not used by the plan: a whole-collection snapshot must re-list every
+  parent to infer deletions, so a changed-groups gate would tombstone the unchanged
+  groups' members.
+
+examples:
+  - name: "200 \u2014 filter narrowed 3 groups to the 2 changed since 2026-10-01 (projection: id/type/name/lastMembershipUpdated)"
+    request:
+      url: "{{base_url}}/groups?limit=200&filter=lastMembershipUpdated%20gt%20%222026-10-01T00%3A00%3A00.000Z%22"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups?limit=200&filter=lastMembershipUpdated+gt+%222026-10-01T00%3A00%3A00.000Z%22>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00g18gur2rc3zz7MS698",
+              "type": "OKTA_GROUP",
+              "profile.name": "estuary-members-group",
+              "lastMembershipUpdated": "2026-10-07T14:37:12.000Z"
+            },
+            {
+              "id": "00g176zmw9j1Wyxqf698",
+              "type": "BUILT_IN",
+              "profile.name": "Everyone",
+              "lastMembershipUpdated": "2026-10-07T14:36:39.000Z"
+            }
+          ]

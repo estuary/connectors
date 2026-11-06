@@ -76,7 +76,7 @@ json_object(
        'array', l."array",                                                                                                                                         
        'binary', TO_BASE64(l."binary"),                                                                                                                                         
        'boolean', l."boolean",                                                                                                                                         
-       'field_with_projection', l.field_with_projection,                                                                                                                                         
+       'fieldWithProjection', l.field_with_projection,                                                                                                                                         
        'integer', l."integer",                                                                                                                                         
        'integerGt128Bit', l."integerGt128Bit",                                                                                                                                         
        'integerGt256Bit', l."integerGt256Bit",                                                                                                                                         

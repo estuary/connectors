@@ -1,0 +1,28 @@
+version: "3.7"
+
+services:
+  db:
+    # Pinned to v3 because LocalStack 4.x requires LOCALSTACK_AUTH_TOKEN even for
+    # community services and exits with code 55 on startup otherwise. v3 (last 3.8.1)
+    # is the final auth-free release.
+    image: 'localstack/localstack:3'
+    environment:
+      - SERVICES=sqs
+      # Legacy path-style queue URLs (http://localhost:4566/<account>/<name>) keep
+      # discovery snapshots deterministic and independent of LocalStack's DNS-based
+      # endpoint strategy.
+      - SQS_ENDPOINT_STRATEGY=off
+    healthcheck:
+      test: "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 aws --endpoint-url=http://localhost:4566 sqs list-queues"
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    ports:
+      - 4566:4566
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

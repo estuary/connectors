@@ -22,10 +22,11 @@ table {
 	7: decimalToFloat: required decimal(38, 0)
 	8: timestampToStr: required timestamptz
 	13: new: optional string
-	14: dateToStr_flow_tmp: optional string
-	15: intToDecimal_flow_tmp: optional decimal(38, 0)
-	16: decimalToFloat_flow_tmp: required double
-	17: timestampToStr_flow_tmp: optional string
+	14: newRequired: optional string
+	15: dateToStr_flow_tmp: optional string
+	16: intToDecimal_flow_tmp: optional decimal(38, 0)
+	17: decimalToFloat_flow_tmp: optional double
+	18: timestampToStr_flow_tmp: optional string
 }
 
 --- After Migrate Schema ---
@@ -35,8 +36,9 @@ table {
 	3: val1: required string
 	4: val2: optional boolean
 	13: new: optional string
-	14: dateToStr: optional string
-	15: intToDecimal: optional decimal(38, 0)
-	16: decimalToFloat: required double
-	17: timestampToStr: optional string
+	14: newRequired: optional string
+	15: dateToStr: optional string
+	16: intToDecimal: optional decimal(38, 0)
+	17: decimalToFloat: optional double
+	18: timestampToStr: optional string
 }

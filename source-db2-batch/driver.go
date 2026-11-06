@@ -84,7 +84,7 @@ type Resource struct {
 	TableName  string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
 	Cursor     []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=3"`
 
-	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,nonsensitive=true"`
 	Template     string `json:"template,omitempty" jsonschema:"title=Query Template Override,description=Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples." jsonschema_extras:"multiline=true,order=5"`
 }
 
@@ -377,6 +377,14 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// With no enabled bindings there are no polling workers, so we'd fall through the
+	// empty worker group and exit silently. This connector normally runs forever, so
+	// report the reason.
+	if len(c.Bindings) == 0 {
+		log.Info("capture has no enabled bindings, shutting down")
+		return nil
+	}
+
 	// Always discover and output SourcedSchemas once at startup.
 	if err := c.emitSourcedSchemas(ctx); err != nil {
 		return err
@@ -422,6 +430,13 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 		} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
 			return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
 		}
+	}
+
+	// Checkpoint the sourced schemas now rather than leaving them for the next
+	// checkpoint, which might not come until the next poll. An empty merge patch
+	// commits them without changing any binding's state.
+	if err := c.Output.Checkpoint(json.RawMessage("{}"), true); err != nil {
+		return fmt.Errorf("error checkpointing sourced schemas: %w", err)
 	}
 	return nil
 }
@@ -572,10 +587,16 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		return fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
+		// ScanType() returns a nil reflect.Type for column types the driver has
+		// no Go mapping for, so guard against it to avoid a nil dereference.
+		var scanTypeName string
+		if scanType := columnType.ScanType(); scanType != nil {
+			scanTypeName = scanType.Name()
+		}
 		log.WithFields(log.Fields{
 			"idx":          i,
 			"name":         columnType.DatabaseTypeName(),
-			"scanTypeName": columnType.ScanType().Name(),
+			"scanTypeName": scanTypeName,
 		}).Debug("column type")
 	}
 

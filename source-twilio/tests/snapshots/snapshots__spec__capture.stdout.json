@@ -40,6 +40,13 @@
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
           "title": "Replication Start Date",
           "type": "string"
+        },
+        "sync_subaccounts": {
+          "default": true,
+          "description": "Whether to capture data belonging to subaccounts in addition to the authenticated account. Disable this if you authenticate with an API Key (SID and Secret) instead of an Auth Token, since Twilio denies API Key access to subaccount resources. Requires a Main API Key or an Auth Token; Standard API Keys cannot list accounts.",
+          "order": 5,
+          "title": "Capture Subaccount Data",
+          "type": "boolean"
         }
       },
       "required": [
@@ -57,8 +64,17 @@
       "description": "ResourceConfig encodes a configured resource stream",
       "properties": {
         "_meta": {
-          "title": "Meta",
-          "type": "object"
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
         },
         "cursorField": {
           "items": {

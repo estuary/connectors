@@ -14,13 +14,27 @@ func OneOfSchema(title, description, discriminator, default_ string, inputs ...O
 
 	for _, input := range inputs {
 		config := GenerateSchema(input.title, input.configObj)
+
+		extras := map[string]any{"order": 0}
+		if discriminator != "auth_type" {
+			extras["nonsensitive"] = true
+		}
+
 		config.Properties.Set(discriminator, &jsonschema.Schema{
 			Type:    "string",
 			Default: input.default_,
 			Const:   input.default_,
-			Extras:  map[string]any{"order": 0},
+			Extras:  extras,
 		})
 		config.Properties.MoveToFront(discriminator)
+
+		if input.oauth2Provider != nil {
+			if config.Extras == nil {
+				config.Extras = make(map[string]any, 1)
+			}
+			config.Extras["x-oauth2-provider"] = *input.oauth2Provider
+		}
+
 		oneOfs = append(oneOfs, config)
 	}
 
@@ -42,7 +56,13 @@ func OneOfSubSchema(title string, configObj any, default_ string) OneOfSubSchema
 }
 
 type OneOfSubSchemaT struct {
-	title     string
-	configObj any
-	default_  string
+	title          string
+	configObj      any
+	default_       string
+	oauth2Provider *string
+}
+
+func (s OneOfSubSchemaT) WithOAuth2Provider(provider string) OneOfSubSchemaT {
+	s.oauth2Provider = &provider
+	return s
 }

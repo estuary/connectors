@@ -1,0 +1,66 @@
+info:
+  name: F1 - Submit batch operation
+  type: http
+  seq: 20
+
+http:
+  method: POST
+  url: "{{base_url}}/batches"
+  body:
+    type: json
+    data: |-
+      {
+        "operations": [
+          {
+            "method": "GET",
+            "path": "/reports/5dfc22e163/email-activity",
+            "operation_id": "ea-5dfc22e163",
+            "params": { "count": "1000" }
+          },
+          {
+            "method": "GET",
+            "path": "/reports/3f69f3a595/email-activity",
+            "operation_id": "ea-3f69f3a595",
+            "params": { "count": "1000" }
+          },
+          {
+            "method": "GET",
+            "path": "/reports",
+            "operation_id": "reports-list",
+            "params": { "count": "100" }
+          }
+        ]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Surface the created batch id so it's easy to hand back to the assistant.
+        // Runtime var only; the assistant will also rediscover it via GET /batches.
+        const id = res.getBody()?.id;
+        if (res.getStatus() < 300 && id) {
+          bru.setVar('batch_id', id);
+          console.log('BATCH SUBMITTED id=' + id + ' status=' + res.getBody()?.status);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Start batch operation](https://mailchimp.com/developer/marketing/api/batch-operations/start-batch-operation/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. State-mutating.
+
+  **WHY:** creates a batch job (the async bulk mechanism that this connector
+  REJECTED — see `Batches / list`), so the Batches read probes can observe a
+  real batch object. The three sub-operations are all read-only GETs
+  (email-activity for the two seeded campaigns + a reports list), so nothing
+  but the batch job itself is created; results expire after 7 days.
+
+  Outcome: ran 2026-07-13 (batch `rh0kvyhbd6`); object shape and ~2 s
+  turnaround VERIFIED in `Batches / get by id`.

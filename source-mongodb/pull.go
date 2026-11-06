@@ -19,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -73,6 +74,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	if err != nil {
 		return fmt.Errorf("connecting to database: %w", err)
 	}
+	log.Info("connected to database")
 
 	defer func() {
 		if err = client.Disconnect(ctx); err != nil {
@@ -98,7 +100,8 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		for _, coll := range collections {
-			if collectionType := mongoCollectionType(coll.Type); err != nil {
+			var collectionType = mongoCollectionType(coll.Type)
+			if err := collectionType.validate(); err != nil {
 				return fmt.Errorf("unsupported collection type: %w", err)
 			} else if collectionType == mongoCollectionTypeTimeseries {
 				timeseriesCollections[resourceId(db, coll.Name)] = true
@@ -165,6 +168,23 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("updating resource states: %w", err)
 	}
 
+	skipConfiguredBackfills(&prevState, changeStreamBindings, &cfg)
+	for _, binding := range allBindings {
+		state := prevState.Resources[binding.stateKey].Backfill
+		var resumeAfter any
+		if state.LastCursorValue != nil {
+			resumeAfter = state.LastCursorValue.String()
+		}
+		log.WithFields(log.Fields{
+			"database":       binding.resource.Database,
+			"collection":     binding.resource.Collection,
+			"mode":           binding.resource.getMode(),
+			"backfillDone":   state.done(),
+			"backfilledDocs": state.BackfilledDocs,
+			"resumeAfter":    resumeAfter,
+		}).Info("loaded binding state")
+	}
+
 	var c = capture{
 		client:                      client,
 		output:                      stream,
@@ -197,8 +217,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
+	// Nothing to stream or poll, so exit rather than idle forever. This connector
+	// normally runs indefinitely, so report the reason for an otherwise silent exit.
 	if len(allBindings) == 0 {
-		// No bindings to capture.
+		log.Info("capture has no enabled bindings, shutting down")
 		return nil
 	}
 
@@ -211,7 +233,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		"supportsChangeStreams": serverInfo.supportsChangeStreams,
 		"supportsPreImages":     serverInfo.supportsPreImages,
 		"supportsStartAfter":    serverInfo.supportsStartAfter,
-	}).Info("connected to database")
+	}).Info("checked database capabilities")
 
 	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
 		return getClusterOpTime(ctx, client)
@@ -297,6 +319,8 @@ type capture struct {
 	// mu provides synchronization for values that are accessed by concurrent backfill and change
 	// stream goroutines.
 	mu                    sync.Mutex
+	backfillAttempt       uint64
+	explainedBackfills    map[backfillExplainKey]struct{}
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int
@@ -391,6 +415,44 @@ func updateResourceStates(prevState captureState, allBindings []bindingInfo) (ca
 	return newState, nil
 }
 
+func skipConfiguredBackfills(state *captureState, changeStreamBindings []bindingInfo, cfg *config) {
+	if cfg.Advanced.SkipBackfills == "" {
+		return
+	}
+
+	// Batch mode bindings are deliberately left alone: their backfill is the only
+	// way they capture anything, so marking one complete would capture nothing at
+	// all, and it would also leave `LastPollStart` unset for the polling loop.
+	// driver.Validate rejects a config which names a batch binding explicitly.
+	for _, b := range changeStreamBindings {
+		if cfg.shouldBackfill(b.resource.Database, b.resource.Collection) {
+			continue
+		}
+
+		resState := state.Resources[b.stateKey]
+		if resState.Backfill.done() {
+			continue
+		}
+
+		fields := log.Fields{
+			"database":       b.resource.Database,
+			"collection":     b.resource.Collection,
+			"backfilledDocs": resState.Backfill.BackfilledDocs,
+		}
+		if resState.Backfill.LastCursorValue != nil {
+			log.WithFields(fields).WithField(
+				"lastCursorValue", resState.Backfill.LastCursorValue,
+			).Warn("abandoning in-progress backfill for collection: documents after the last cursor position will not be captured")
+		} else {
+			log.WithFields(fields).Info("skipping backfill for collection")
+		}
+
+		resState.Backfill.Done = makePtr(true)
+		resState.Backfill.LastCursorValue = nil
+		state.Resources[b.stateKey] = resState
+	}
+}
+
 func (s *captureState) isChangeStreamBackfillComplete(changeStreamBindings []bindingInfo) bool {
 	for _, b := range changeStreamBindings {
 		if !s.Resources[b.stateKey].Backfill.done() {
@@ -471,17 +533,25 @@ func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, databa
 	}
 
 	var preImages bool
-	if changeStreams {
-		if preImages, err = supportsPreImages(ctx, client, database, buildInfo); err != nil {
-			return nil, fmt.Errorf("checking change stream pre-image support: %w", err)
-		}
-	}
-
 	var startAfter bool
-	if len(buildInfo.VersionArray) >= 3 && (buildInfo.VersionArray[0] > 4 || buildInfo.VersionArray[0] == 4 && buildInfo.VersionArray[1] >= 2) {
-		// The startAfter parameter is supported by MongoDB versions 4.2 and
-		// later.
-		startAfter = true
+	if changeStreams {
+		support, err := probeChangeStreamSupport(ctx, client, database)
+		if err != nil {
+			return nil, fmt.Errorf("probing change stream support: %w", err)
+		}
+
+		if !support.producesResumeToken {
+			// Without a post-batch resume token the connector cannot advance its
+			// resume token while idle, so it can't checkpoint reliably.
+			// Capture in batch mode instead.
+			log.Info("server supports opening change streams but does not produce resume tokens; collections will be captured in batch mode")
+			changeStreams = false
+		} else {
+			startAfter = support.supportsStartAfter
+			if preImages, err = supportsPreImages(ctx, client, database, buildInfo); err != nil {
+				return nil, fmt.Errorf("checking change stream pre-image support: %w", err)
+			}
+		}
 	}
 
 	return &serverInfo{
@@ -501,6 +571,64 @@ func supportsChangeStreams(ctx context.Context, client *mongo.Client, database s
 	}
 
 	return true, nil
+}
+
+// changeStreamSupport describes change-stream capabilities that can't be
+// reliably inferred from the reported server version and so must be probed
+// directly.
+type changeStreamSupport struct {
+	// producesResumeToken indicates the server emits a post-batch resume token.
+	// The connector relies on PBRTs to advance its resume token even when
+	// no events are arriving, so a server that never produces one cannot be
+	// captured via change streams and must use batch mode instead.
+	producesResumeToken bool
+	// supportsStartAfter indicates the server accepts the change stream
+	// `startAfter` resume option, which is preferred over `resumeAfter`. Some
+	// MongoDB-compatible servers - notably Amazon DocumentDB, which reports a
+	// version (e.g. 5.0.0) that would otherwise imply support - handle change
+	// streams and `resumeAfter` but reject `startAfter` as an unknown field.
+	supportsStartAfter bool
+}
+
+// probeChangeStreamSupport determines change-stream capabilities by attempting
+// them rather than trusting the reported server version. It must only be called
+// once the server is known to support opening change streams.
+func probeChangeStreamSupport(ctx context.Context, client *mongo.Client, database string) (changeStreamSupport, error) {
+	var out changeStreamSupport
+
+	// Open a change stream to obtain a post-batch resume token. MongoDB returns
+	// one in the initial aggregate response, so it is available without
+	// iterating.
+	probe, err := client.Database(database).Watch(ctx, mongo.Pipeline{})
+	if err != nil {
+		return out, fmt.Errorf("opening change stream: %w", err)
+	}
+	token := probe.ResumeToken()
+	if err := probe.Close(ctx); err != nil {
+		return out, fmt.Errorf("closing change stream: %w", err)
+	}
+	if token == nil {
+		// No PBRT. Change streams are unusable for consistent capture, and there
+		// is no token with which to test startAfter.
+		return out, nil
+	}
+	out.producesResumeToken = true
+
+	// startAfter requires a resume token, so test it with the one just obtained.
+	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{}, options.ChangeStream().SetStartAfter(token))
+	if err != nil {
+		if cmdErr, ok := errors.AsType[mongo.CommandError](err); ok && strings.Contains(cmdErr.Message, "startAfter") {
+			log.WithField("error", err).Debug("server does not support the change stream 'startAfter' option. 'resumeAfter' will be used instead")
+			return out, nil
+		}
+		return out, fmt.Errorf("opening change stream with startAfter: %w", err)
+	}
+	if err := cs.Close(ctx); err != nil {
+		return out, fmt.Errorf("closing change stream: %w", err)
+	}
+	out.supportsStartAfter = true
+
+	return out, nil
 }
 
 // supportsPreImages returns true if the server supports pre-images. To support
@@ -538,12 +666,12 @@ func supportsPreImages(ctx context.Context, client *mongo.Client, database strin
 	// pipeline stage.
 	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}})
 	if err != nil {
-		var commandError mongo.CommandError
-		if errors.As(err, &commandError) {
-			if commandError.Name == "AtlasError" && strings.HasPrefix(commandError.Message, "$changeStreamSplitLargeEvent is not allowed") {
-				ll.WithField("atlasError", err).Info("not requesting pre-images because this MongoDB Atlas instance does not support the $changeStreamSplitLargeEvent stage")
-				return false, nil
-			}
+		// Servers reject the stage with varying wording. Treat any command
+		// error naming the stage as meaning the server won't run it, and
+		// capture without pre-images.
+		if commandError, ok := errors.AsType[mongo.CommandError](err); ok && strings.Contains(commandError.Message, "$changeStreamSplitLargeEvent") {
+			ll.WithField("error", err).Info("not requesting pre-images because this server does not support the $changeStreamSplitLargeEvent stage")
+			return false, nil
 		}
 		return false, fmt.Errorf("opening change stream to test for $changeStreamSplitLargeEvent support: %w", err)
 	}

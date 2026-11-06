@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -15,6 +15,8 @@ import (
 )
 
 func TestStreamManager(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -494,6 +496,8 @@ func TestStreamManager(t *testing.T) {
 }
 
 func TestStreamDatatypes(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
@@ -624,4 +628,3 @@ func TestStreamDatatypes(t *testing.T) {
 		})
 	}
 }
-

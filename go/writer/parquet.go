@@ -14,12 +14,14 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/apache/arrow-go/v18/arrow"
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
+	"github.com/apache/arrow-go/v18/parquet/variant"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
@@ -27,13 +29,15 @@ import (
 )
 
 const (
-	// Sets an approximate limit on the number of document "rows" to buffer in memory before writing
-	// them out as a row group to the scratch file. A larger buffer will use more connector memory,
-	// and perhaps afford slightly less overhead when seeking through the scratch file to read
-	// columns from its individual row groups. A smaller buffer here means more row groups written
-	// to the scratch file, and this interacts with the maxScratchColumnChunkCount value as well in
-	// terms of how much metadata is written to the scratch file.
-	maxBufferSize = 25 * 1024 * 1024
+	// The default approximate limit on the number of document "rows" to buffer in memory before
+	// writing them out as a row group to the scratch file. A larger buffer will use more connector
+	// memory, and perhaps afford slightly less overhead when seeking through the scratch file to
+	// read columns from its individual row groups. A smaller buffer here means more row groups
+	// written to the scratch file, and this interacts with the maxScratchColumnChunkCount value as
+	// well in terms of how much metadata is written to the scratch file. Configurable via
+	// WithParquetBufferSize, which is useful to lower for schemas with very large individual values,
+	// since this is the only buffering stage sized in bytes rather than rows.
+	defaultBufferSize = 25 * 1024 * 1024
 
 	// Each row group that is written to the scratch file has a column chunk for each column it
 	// contains. In extreme cases of very large numbers of columns (1000+) where the values in the
@@ -80,10 +84,10 @@ func newRowSizing(sch ParquetSchema) rowSize {
 			rs.fixed += 8
 		case PrimitiveTypeBoolean:
 			rs.fixed += 1
-		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal:
+		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal, LogicalTypeVariant:
 			rs.fixed += 24 // slice header
 			rs.calcLen = append(rs.calcLen, idx)
-		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeInterval:
+		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos, LogicalTypeInterval:
 			rs.fixed += 16 // string header
 			rs.calcLen = append(rs.calcLen, idx)
 		default:
@@ -130,6 +134,7 @@ const (
 type parquetConfig struct {
 	compression               ParquetCompression
 	disableDictionaryEncoding bool
+	bufferSize                int
 	rowGroupRowLimit          int
 	rowGroupByteLimit         int
 	metadata                  map[string]string
@@ -138,12 +143,13 @@ type parquetConfig struct {
 type ParquetWriter struct {
 	cfg parquetConfig
 
-	schema        ParquetSchema
-	schemaRoot    *schema.GroupNode
-	sinkWriter    *file.Writer
-	cwc           *countingWriteCloser
-	rs            rowSize
-	rowGroupCount int
+	schema         ParquetSchema
+	schemaRoot     *schema.GroupNode
+	sinkWriter     *file.Writer
+	cwc            *countingWriteCloser
+	rs             rowSize
+	rowGroupCount  int
+	numLeafColumns int
 
 	// Scratch values are re-initialized as scratch files are transposed into the output stream.
 	scratch struct {
@@ -174,6 +180,12 @@ func WithDisableDictionaryEncoding() ParquetOption {
 	}
 }
 
+func WithParquetBufferSize(n int) ParquetOption {
+	return func(cfg *parquetConfig) {
+		cfg.bufferSize = n
+	}
+}
+
 func WithParquetRowGroupRowLimit(n int) ParquetOption {
 	return func(cfg *parquetConfig) {
 		cfg.rowGroupRowLimit = n
@@ -192,9 +204,10 @@ func WithParquetMetadata(meta map[string]string) ParquetOption {
 	}
 }
 
-func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetWriter {
+func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) (*ParquetWriter, error) {
 	cfg := parquetConfig{
 		compression:       Uncompressed,
+		bufferSize:        defaultBufferSize,
 		rowGroupRowLimit:  defaultRowGroupRowLimit,
 		rowGroupByteLimit: defaultRowGroupByteLimit,
 	}
@@ -211,17 +224,27 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 
 	cwc := &countingWriteCloser{w: w}
 
-	return &ParquetWriter{
-		cfg:        cfg,
-		schema:     sch,
-		schemaRoot: schemaRoot,
-		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
-		cwc:        cwc,
-		rs:         newRowSizing(sch),
+	// Use the non-panicking constructor: the sink here is typically one end of an io.Pipe
+	// streaming to a cloud-storage upload, and its very first write (the parquet magic header)
+	// can fail transiently (e.g. a broken pipe). The legacy file.NewParquetWriter panics in that
+	// case; returning the error instead lets the caller surface it as a normal, retryable failure.
+	sinkWriter, err := file.NewParquetWriterWithError(cwc, schemaRoot, writerOpts(cfg, sch)...)
+	if err != nil {
+		return nil, fmt.Errorf("initializing parquet sink writer: %w", err)
 	}
+
+	return &ParquetWriter{
+		cfg:            cfg,
+		schema:         sch,
+		schemaRoot:     schemaRoot,
+		sinkWriter:     sinkWriter,
+		cwc:            cwc,
+		rs:             newRowSizing(sch),
+		numLeafColumns: schema.NewSchema(schemaRoot).NumColumns(),
+	}, nil
 }
 
-func writerOpts(cfg parquetConfig) []file.WriteOption {
+func writerOpts(cfg parquetConfig, sch ParquetSchema) []file.WriteOption {
 	propOpts := []parquet.WriterProperty{}
 
 	switch cfg.compression {
@@ -237,6 +260,18 @@ func writerOpts(cfg parquetConfig) []file.WriteOption {
 
 	if cfg.disableDictionaryEncoding {
 		propOpts = append(propOpts, parquet.WithDictionaryDefault(false))
+	}
+
+	// Byte-wise min/max values of the variant binary encoding are meaningless
+	// for readers and potentially very large, so statistics are disabled for
+	// the leaf columns of variant groups.
+	for _, e := range sch {
+		if e.DataType == LogicalTypeVariant {
+			propOpts = append(propOpts,
+				parquet.WithStatsPath(parquet.ColumnPath{e.Name, "metadata"}, false),
+				parquet.WithStatsPath(parquet.ColumnPath{e.Name, "value"}, false),
+			)
+		}
 	}
 
 	out := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
@@ -257,43 +292,24 @@ func writerOpts(cfg parquetConfig) []file.WriteOption {
 // exceed writing the buffer as a row group to the scratch file, and potentially flushing the row
 // groups from the scratch file collectively as a single row group to the output.
 func (w *ParquetWriter) Write(row []any) error {
-	var err error
-
 	if len(row) != len(w.schema) {
 		return fmt.Errorf("write: row length (%d) does not match schema length (%d)", len(row), len(w.schema))
-	}
-
-	if w.scratch.writer == nil {
-		// Either the very first row, or the first one after flushing the scratch file.
-		if w.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
-			return fmt.Errorf("write creating scratch file: %w", err)
-		}
-
-		scratchOpts := []parquet.WriterProperty{
-			// Don't use dictionary encoding for the scratch file, since it is
-			// much slower to write than plain encoding with the small row
-			// groups of the scratch file.
-			parquet.WithDictionaryDefault(false),
-			// Turning off stats calculations helps too, but just a tiny bit.
-			parquet.WithStats(false),
-		}
-		w.scratch.writer = file.NewParquetWriter(w.scratch.file, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
 	w.buffer = append(w.buffer, row)
 	w.bufferSizeBytes += w.rs.estSize(row)
 	w.scratch.rowCount += 1
 
-	if w.bufferSizeBytes >= maxBufferSize {
-		// Write out the buffer as a single row group to the scratch file.
+	if w.bufferSizeBytes >= w.cfg.bufferSize {
+		// Write out the buffer as a single row group to the scratch file (see flushBuffer).
 		if err := w.flushBuffer(); err != nil {
 			return fmt.Errorf("write flushing buffer based on buffer size: %w", err)
 		}
 	}
 
-	if w.scratch.sizeBytes >= w.cfg.rowGroupByteLimit ||
+	if w.scratch.writer != nil && (w.scratch.sizeBytes >= w.cfg.rowGroupByteLimit ||
 		w.scratch.rowCount >= w.cfg.rowGroupRowLimit ||
-		w.scratch.columnChunkCount >= maxScratchColumnChunkCount {
+		w.scratch.columnChunkCount >= maxScratchColumnChunkCount) {
 		if w.scratch.columnChunkCount >= maxScratchColumnChunkCount {
 			log.WithFields(log.Fields{
 				"scratchSizeBytes":        w.scratch.sizeBytes,
@@ -317,7 +333,7 @@ func (w *ParquetWriter) Write(row []any) error {
 // row groups from the scratch file are flushed to the output, which happens whenever there is
 // enough data (either by rows or bytes) in the scratch file to fill a complete row group.
 func (w *ParquetWriter) Written() int {
-	return w.cwc.written
+	return int(w.cwc.written.Load())
 }
 
 // Close flushes the buffered rows and scratch file, and closes the output writer.
@@ -354,13 +370,29 @@ func (w *ParquetWriter) flushScratchFile() error {
 
 	if err := w.scratch.writer.Close(); err != nil { // also closes the underlying io.WriteCloser
 		return fmt.Errorf("closing scratch writer: %w", err)
-	} else if sr, err := os.Open(w.scratch.file.Name()); err != nil {
+	}
+
+	sr, err := os.Open(w.scratch.file.Name())
+	if err != nil {
 		return fmt.Errorf("opening scratch file to transfer values: %w", err)
-	} else if scratchReader, err := file.NewParquetReader(sr); err != nil {
+	}
+
+	scratchReader, err := file.NewParquetReader(sr)
+	if err != nil {
 		return fmt.Errorf("creating scratch reader: %w", err)
-	} else if err := transferColumnValues(scratchReader, w.sinkWriter); err != nil {
+	}
+
+	if err := transferColumnValues(scratchReader, w.sinkWriter, sr); err != nil {
 		return fmt.Errorf("transferring column values: %w", err)
-	} else if err := sr.Close(); err != nil {
+	}
+
+	// The scratch file's page cache is charged against the process's cgroup memory limit like
+	// heap memory is, and the kernel won't necessarily reclaim it before it's needed elsewhere.
+	// Drop it explicitly now that its contents have been transferred to the sink writer and the
+	// file is about to be removed.
+	dropPageCache(sr)
+
+	if err := sr.Close(); err != nil {
 		return fmt.Errorf("closing scratch file after reading: %w", err)
 	} else if err := os.Remove(w.scratch.file.Name()); err != nil {
 		return fmt.Errorf("removing scratch file: %w", err)
@@ -382,10 +414,43 @@ func (w *ParquetWriter) flushBuffer() error {
 		return nil
 	}
 
+	if w.scratch.writer == nil {
+		// Either the very first buffered row group, or the first one after flushing the scratch
+		// file.
+		scratchFile, err := os.CreateTemp("", "parquet-scratch-*")
+		if err != nil {
+			return fmt.Errorf("flushing buffer creating scratch file: %w", err)
+		}
+
+		scratchOpts := []parquet.WriterProperty{
+			// Don't use dictionary encoding for the scratch file, since it is
+			// much slower to write than plain encoding with the small row
+			// groups of the scratch file.
+			parquet.WithDictionaryDefault(false),
+			// Turning off stats calculations helps too, but just a tiny bit.
+			parquet.WithStats(false),
+		}
+		scratchWriter, err := file.NewParquetWriterWithError(scratchFile, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
+		if err != nil {
+			return fmt.Errorf("flushing buffer creating scratch writer: %w", err)
+		}
+		w.scratch.file = scratchFile
+		w.scratch.writer = scratchWriter
+	}
+
 	rgWriter := w.scratch.writer.AppendRowGroup()
 
 	// Transpose the buffered rows into the scratch file row group by writing them column-by-column.
 	for colIdx, f := range w.schema {
+		// A variant element is a group of two leaf columns and so consumes two
+		// of the row group's columns, unlike every other element.
+		if f.DataType == LogicalTypeVariant {
+			if err := writeVariantColumn(f, colIdx, w.buffer, rgWriter); err != nil {
+				return fmt.Errorf("writing variant column '%s': %w", f.Name, err)
+			}
+			continue
+		}
+
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
@@ -432,6 +497,10 @@ func (w *ParquetWriter) flushBuffer() error {
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
+		case LogicalTypeTimestampNanos:
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampNanosVal); err != nil {
+				return fmt.Errorf("writing timestamp (nanos) column '%s': %w", f.Name, err)
+			}
 		case LogicalTypeDecimal:
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
 				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
@@ -454,9 +523,15 @@ func (w *ParquetWriter) flushBuffer() error {
 	}
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
-	w.scratch.columnChunkCount += len(w.schema)
+	w.scratch.columnChunkCount += w.numLeafColumns
 	w.buffer = w.buffer[:0]
 	w.bufferSizeBytes = 0
+
+	// Sync and drop the scratch file's page cache after each row group, so its resident (and
+	// cgroup-charged) page cache stays near one buffer's worth instead of growing to the full
+	// scratch file size. Nothing reads the scratch file until flushScratchFile, so dropping the
+	// whole file is safe.
+	flushAndDropPageCache(w.scratch.file)
 
 	return nil
 }
@@ -527,11 +602,138 @@ func writeColumn[T parquetValue](
 	return nil
 }
 
+// encodeVariant encodes a value into the unshredded Variant V1 binary form.
+//
+// Scalars are appended to a variant builder directly rather than being marshaled to JSON that the
+// parse below would immediately undo — that round trip is what a multi-type field's scalar values
+// would otherwise pay for. Everything else is encoded from its JSON serialization, which is free
+// for the objects, arrays, and root documents that arrive as json.RawMessage, and is also the only
+// path that can represent a uint64 too large for the variant integer types.
+func encodeVariant(val any, stringType ParquetDataType) (variant.Value, error) {
+	var b variant.Builder
+	var err error
+	var scalar = true
+
+	switch v := val.(type) {
+	case string:
+		err = appendVariantString(&b, v, stringType)
+	case bool:
+		err = b.AppendBool(v)
+	case int64:
+		err = b.AppendInt(v)
+	case float64:
+		err = b.AppendFloat64(v)
+	case uint64:
+		if v <= math.MaxInt64 {
+			err = b.AppendInt(int64(v))
+		} else {
+			scalar = false
+		}
+	default:
+		scalar = false
+	}
+	if err != nil {
+		return variant.Value{}, err
+	} else if scalar {
+		return b.Build()
+	}
+
+	jsonVal, err := getJsonVal(val)
+	if err != nil {
+		return variant.Value{}, fmt.Errorf("getting JSON value: %w", err)
+	}
+
+	return variant.ParseJSONBytes(jsonVal, false)
+}
+
+// appendVariantString appends v as the variant type implied by its format
+// annotation, so that a formatted string is stored the same way it would be as
+// a column of its own.
+//
+// A string that does not parse is appended as a variant string. A variant holds
+// values of any type, so keeping the value costs nothing here, unlike the typed
+// columns whose converters have nowhere but an error to put it.
+func appendVariantString(b *variant.Builder, v string, stringType ParquetDataType) error {
+	switch stringType {
+	case LogicalTypeDate:
+		if d, err := getDateVal(v); err == nil {
+			return b.AppendDate(arrow.Date32(d))
+		}
+	case LogicalTypeTimestamp:
+		if ts, err := getTimestampVal(v); err == nil {
+			return b.AppendTimestamp(arrow.Timestamp(ts), true, true)
+		}
+	case LogicalTypeTimestampNanos:
+		if ts, err := getTimestampNanosVal(v); err == nil {
+			return b.AppendTimestamp(arrow.Timestamp(ts), false, true)
+		}
+	case LogicalTypeTime:
+		if t, err := getTimeVal(v); err == nil {
+			return b.AppendTimeMicro(arrow.Time64(t))
+		}
+	case LogicalTypeUuid:
+		if u, err := uuid.Parse(v); err == nil {
+			return b.AppendUUID(u)
+		}
+	case PrimitiveTypeBinary:
+		if bs, err := getBinaryVal(v); err == nil {
+			return b.AppendBinary(bs)
+		}
+	}
+
+	return b.AppendString(v)
+}
+
+// writeVariantColumn writes a variant schema element as its two leaf columns: each non-null value
+// is encoded from its JSON serialization to the unshredded Variant V1 binary form, and the
+// resulting metadata and value byte arrays are written as consecutive columns of the row group,
+// sharing the definition levels of the enclosing variant group.
+func writeVariantColumn(e ParquetSchemaElement, colIdx int, buf [][]any, rgWriter file.SerialRowGroupWriter) error {
+	var metaVals = make([]parquet.ByteArray, 0, len(buf))
+	var valueVals = make([]parquet.ByteArray, 0, len(buf))
+	var defLevels = make([]int16, 0, len(buf))
+
+	for _, row := range buf {
+		if row[colIdx] == nil {
+			defLevels = append(defLevels, 0)
+			continue
+		}
+
+		encoded, err := encodeVariant(row[colIdx], e.VariantStringType)
+		if err != nil {
+			return fmt.Errorf("encoding value as variant: %w (type %T)", err, row[colIdx])
+		}
+
+		metaVals = append(metaVals, parquet.ByteArray(encoded.Metadata().Bytes()))
+		valueVals = append(valueVals, parquet.ByteArray(encoded.Bytes()))
+		defLevels = append(defLevels, 1)
+	}
+
+	for _, vals := range [][]parquet.ByteArray{metaVals, valueVals} {
+		cw, err := rgWriter.NextColumn()
+		if err != nil {
+			return fmt.Errorf("getting next column: %w", err)
+		}
+
+		if valuesWritten, err := cw.(*file.ByteArrayColumnChunkWriter).WriteBatch(vals, defLevels, nil); err != nil {
+			return fmt.Errorf("writing batch of values: %w", err)
+		} else if int(valuesWritten) != len(vals) {
+			return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(vals))
+		}
+
+		if err := cw.Close(); err != nil {
+			return fmt.Errorf("closing column writer: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // transferColumnValues reads columns from the scratch file r and writes the values to w. The
 // scratch file may contain many row groups, and the corresponding column from each row group is
 // read and written in order to combine all of the row groups from the scratch file into a single
 // row group written to w.
-func transferColumnValues(r *file.Reader, w *file.Writer) error {
+func transferColumnValues(r *file.Reader, w *file.Writer, scratchFile *os.File) error {
 	sch := r.MetaData().Schema
 	rgWriter := w.AppendRowGroup()
 
@@ -577,6 +779,20 @@ func transferColumnValues(r *file.Reader, w *file.Writer) error {
 				}
 			default:
 				return fmt.Errorf("unhandled physical type %q (writer type %T)", sch.Column(c).PhysicalType(), cw)
+			}
+
+			// This chunk's byte range is never read again, and its pages are clean (the scratch
+			// file was synced as it was written), so drop it from the page cache immediately
+			// rather than letting the read-back re-accumulate the full scratch file size in
+			// cgroup-charged memory.
+			if scratchFile != nil {
+				if ccMeta, err := r.MetaData().RowGroup(rgIdx).ColumnChunk(c); err == nil {
+					off := ccMeta.DataPageOffset()
+					if dictOff := ccMeta.DictionaryPageOffset(); dictOff > 0 && dictOff < off {
+						off = dictOff
+					}
+					dropPageCacheRange(scratchFile, off, ccMeta.TotalCompressedSize())
+				}
 			}
 		}
 	}
@@ -662,6 +878,13 @@ func getNumberVal(val any) (got float64, err error) {
 		got = float64(v)
 	case int64:
 		got = float64(v)
+	case uint64:
+		got = float64(v)
+	case *big.Int:
+		got, _ = v.Float64()
+		if math.IsInf(got, 0) {
+			err = fmt.Errorf("big.Int value %q outside of float64 range", v.String())
+		}
 	case string:
 		if p, parseErr := strconv.ParseFloat(v, 64); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as float64: %w", v, parseErr)
@@ -824,6 +1047,22 @@ func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
 		}
 	default:
 		err = fmt.Errorf("getIntervalVal unhandled type: %T", v)
+	}
+
+	return
+}
+
+func getTimestampNanosVal(val any) (got int64, err error) {
+	switch v := val.(type) {
+	case string:
+		v = strings.Replace(v, "z", "Z", 1)
+		if d, parseErr := time.Parse(time.RFC3339Nano, v); parseErr != nil {
+			err = fmt.Errorf("unable to parse string %q as timestamp: %w", v, parseErr)
+		} else {
+			got = d.UnixNano()
+		}
+	default:
+		err = fmt.Errorf("getTimestampNanosVal unhandled type: %T", v)
 	}
 
 	return

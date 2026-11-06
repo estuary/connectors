@@ -1,0 +1,229 @@
+meta {
+  name: 30 - Initiatives Bare
+  type: graphql
+  seq: 30
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query InitiativesBare {
+    initiatives(first: 2, includeArchived: true, sort: [{updatedAt: {order: Ascending}}]) {
+      nodes {
+        id
+        createdAt
+        updatedAt
+        archivedAt
+        name
+        description
+        slugId
+        icon
+        color
+        status
+        priority
+        sortOrder
+        prioritySortOrder
+        targetDate
+        startedAt
+        completedAt
+        canceledAt
+        healthUpdatedAt
+        trashed
+        url
+        content
+        creator { id }
+        owner { id }
+        leadTeam { id }
+        parentInitiative { id }
+        organization { id }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  The canonical Initiatives selection set — verbatim what the connector will send. Same
+  construction rules as `10 - Issues Bare`. Nested connections (`projects`,
+  `subInitiatives`, `initiativeUpdates`, `links`, `documents`, `history`, `labels`) are
+  omitted; note `parentInitiative { id }` IS included, since initiative hierarchy is a
+  scalar-cost relation and is the field a downstream consumer needs to rebuild the tree.
+
+  Static cost under the documented formula (22 scalars, 5 relation objects): per node =
+  1 + 22 x 0.1 + 5 x 1.1 = ~8.7 points; at `first: 250` that is ~2,175 points — the
+  cheapest of the four streams.
+
+  `initiatives` accepts the `sort` argument (verified by introspection), so this stream
+  uses the ascending `updatedAt` sweep and may checkpoint per page.
+
+  Note `Initiative.status` is an ENUM here (`InitiativeStatus`), NOT an object — unlike
+  `Project.status`, which is a `ProjectStatus` OBJECT and must be selected as
+  `status { id }`. The two streams look symmetrical but their `status` fields are not; a
+  shared selection-set template that treated them identically would fail validation on one
+  of them. This is exactly the kind of near-miss the per-stream explicit selection sets
+  exist to keep honest.
+
+  **Limitation / observed finding — `identifier` is ENTITLEMENT-GATED and has been REMOVED
+  from this selection set.** With the stream empty (2026-07-30) the field resolved without
+  complaint. Once `Seeding/A1`/`A2` created a real record (2026-08-04), requesting it
+  returned:
+
+      HTTP 200
+      "errors": [{ "extensions": { "code": "INPUT_ERROR" },
+                   "message": "Feature 'Initiative IDs' is not enabled",
+                   "path": ["initiatives","nodes",0,"identifier"] }]
+
+  **and `data` was still populated** — the row came back intact, with the errors array
+  alongside it. This is the third and nastiest variant of the "HTTP 200 does not mean
+  success" rule in this collection: not a total failure (`06`, `data: null`) and not a
+  clean rejection (`42`, HTTP 400), but a PARTIAL SUCCESS carrying both real data and a
+  real error.
+
+  Two lessons carried into the plan:
+
+  1. **Entitlement-gated fields are a portability hazard unique to GraphQL selection sets.**
+     REST returns whatever the plan allows; GraphQL returns only what you ask for, so asking
+     for a field the workspace is not entitled to poisons every response — on every page,
+     forever. `identifier` is a paid add-on ('Initiative IDs') and is not worth that: `id`, `slugId`
+     and `url` already identify the record. Removed.
+  2. **The connector's error handling must distinguish partial success from total failure.**
+     Treating any non-empty `errors` array as fatal would break the sync outright on every
+     workspace lacking this feature; ignoring `errors` would hide genuine failures. Branch
+     on whether `data` is present.
+
+  Only discoverable with data in the stream — the empty-endpoint run gave a false all-clear.
+
+  **Limitation / observed finding — POPULATED as of 2026-08-04.** `Seeding/A2` created one
+  initiative, and it succeeded — which also settles the entitlement question below:
+  **Initiatives ARE enabled on this workspace**, so no graceful-degradation path is needed.
+  The saved example confirms `status` resolves as a PLAIN STRING (`"Active"`), in contrast to
+  `Project.status`'s object — exactly the asymmetry flagged above, now evidenced.
+  `identifier` was stripped for the entitlement reason above.
+
+  <!-- Historical, pre-seed (2026-07-30): -->
+  **Superseded — this endpoint WAS empty.** The Estuary workspace contained ZERO
+  initiatives, with or without `includeArchived: true` (confirmed 2026-07-30). Initiatives
+  are additionally a paid-plan feature, so an empty result may reflect plan entitlement
+  rather than merely unpopulated data — worth confirming before treating the emptiness as
+  benign. The query IS accepted and all fields resolve, proving the selection set is valid
+  against the live schema, but no response body has ever been observed.
+
+  Closing this gap requires `Seeding/A2 - Create Initiative`, which the user must run.
+}
+
+example {
+  name: 200 — populated Initiative (status is a STRING, not an object)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query InitiativesBare {
+        initiatives(first: 2, includeArchived: true, sort: [{updatedAt: {order: Ascending}}]) {
+          nodes {
+            id
+            createdAt
+            updatedAt
+            archivedAt
+            name
+            description
+            slugId
+            icon
+            color
+            status
+            priority
+            sortOrder
+            prioritySortOrder
+            targetDate
+            startedAt
+            completedAt
+            canceledAt
+            healthUpdatedAt
+            trashed
+            url
+            content
+            creator { id }
+            owner { id }
+            leadTeam { id }
+            parentInitiative { id }
+            organization { id }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 15
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2483
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999985
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "initiatives": {
+              "nodes": [
+                {
+                  "id": "44f4e104-762d-43b3-a154-78fa72567bdb",
+                  "createdAt": "2026-08-04T18:35:04.260Z",
+                  "updatedAt": "2026-08-04T18:35:04.260Z",
+                  "archivedAt": null,
+                  "name": "estuary-connector-verification",
+                  "description": "Temporary record created to verify source-linear Initiatives stream. Safe to delete.",
+                  "slugId": "ba21ab221cce",
+                  "icon": null,
+                  "color": "#95a2b3",
+                  "status": "Active",
+                  "priority": 0,
+                  "sortOrder": 0,
+                  "prioritySortOrder": 0,
+                  "targetDate": null,
+                  "startedAt": null,
+                  "completedAt": null,
+                  "canceledAt": null,
+                  "healthUpdatedAt": null,
+                  "trashed": null,
+                  "url": "https://linear.app/estuary-test/initiative/estuary-connector-verification-ba21ab221cce",
+                  "content": null,
+                  "creator": {
+                    "id": "8ef0e033-440f-4809-b0ff-6a68821fc413"
+                  },
+                  "owner": null,
+                  "leadTeam": null,
+                  "parentInitiative": null,
+                  "organization": {
+                    "id": "14d2f26b-c26d-45e5-ada9-96636caa48be"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "eyJrZXkiOiI0NGY0ZTEwNC03NjJkLTQzYjMtYTE1NC03OGZhNzI1NjdiZGIiLCJncm91cHMiOlsiIiwiIl19"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

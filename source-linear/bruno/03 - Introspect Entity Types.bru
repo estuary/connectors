@@ -1,0 +1,227 @@
+meta {
+  name: 03 - Introspect Entity Types
+  type: graphql
+  seq: 3
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IntrospectEntityTypes {
+    Issue: __type(name: "Issue") { ...F }
+    Project: __type(name: "Project") { ...F }
+    Initiative: __type(name: "Initiative") { ...F }
+    IssueLabel: __type(name: "IssueLabel") { ...F }
+  }
+
+  fragment F on __Type {
+    name
+    fields(includeDeprecated: false) {
+      name
+      type {
+        kind
+        name
+        ofType { kind name ofType { kind name } }
+      }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  Enumerates the scalar/relation surface of the four entity types so the per-stream
+  GraphQL selection sets can be written explicitly (GraphQL returns nothing you do not
+  ask for) while staying narrow enough to respect the 10,000-point per-query cap.
+
+  Specifically resolves:
+  - Whether `archivedAt` is exposed on each of the four types. If it is, archived rows
+    captured via `includeArchived: true` are self-identifying downstream and no separate
+    tombstone mechanism is needed.
+  - Whether `updatedAt` is non-null on all four (required for it to be a safe cursor).
+  - Whether `IssueLabel` exposes a `team` relation — a null `team` means the label is
+    workspace-level, a populated one means it is scoped to a single team.
+}
+
+example {
+  name: 200 — projection: cursor/archival fields per entity type
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IntrospectEntityTypes {
+        Issue: __type(name: "Issue") { ...F }
+        Project: __type(name: "Project") { ...F }
+        Initiative: __type(name: "Initiative") { ...F }
+        IssueLabel: __type(name: "IssueLabel") { ...F }
+      }
+      
+      fragment F on __Type {
+        name
+        fields(includeDeprecated: false) {
+          name
+          type {
+            kind
+            name
+            ofType { kind name ofType { kind name } }
+          }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 34
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2497
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999966
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "Issue": [
+              {
+                "name": "id",
+                "kind": "NON_NULL",
+                "type": "ID"
+              },
+              {
+                "name": "createdAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "updatedAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "archivedAt",
+                "kind": "SCALAR",
+                "type": "DateTime"
+              },
+              {
+                "name": "team",
+                "kind": "NON_NULL",
+                "type": "Team"
+              },
+              {
+                "name": "parent",
+                "kind": "OBJECT",
+                "type": "Issue"
+              }
+            ],
+            "Project": [
+              {
+                "name": "id",
+                "kind": "NON_NULL",
+                "type": "ID"
+              },
+              {
+                "name": "createdAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "updatedAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "archivedAt",
+                "kind": "SCALAR",
+                "type": "DateTime"
+              },
+              {
+                "name": "status",
+                "kind": "NON_NULL",
+                "type": "ProjectStatus"
+              }
+            ],
+            "Initiative": [
+              {
+                "name": "id",
+                "kind": "NON_NULL",
+                "type": "ID"
+              },
+              {
+                "name": "createdAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "updatedAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "archivedAt",
+                "kind": "SCALAR",
+                "type": "DateTime"
+              },
+              {
+                "name": "status",
+                "kind": "NON_NULL",
+                "type": "InitiativeStatus"
+              }
+            ],
+            "IssueLabel": [
+              {
+                "name": "id",
+                "kind": "NON_NULL",
+                "type": "ID"
+              },
+              {
+                "name": "createdAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "updatedAt",
+                "kind": "NON_NULL",
+                "type": "DateTime"
+              },
+              {
+                "name": "archivedAt",
+                "kind": "SCALAR",
+                "type": "DateTime"
+              },
+              {
+                "name": "isGroup",
+                "kind": "NON_NULL",
+                "type": "Boolean"
+              },
+              {
+                "name": "team",
+                "kind": "OBJECT",
+                "type": "Team"
+              },
+              {
+                "name": "parent",
+                "kind": "OBJECT",
+                "type": "IssueLabel"
+              }
+            ]
+          }
+        }
+      '''
+    }
+  }
+}

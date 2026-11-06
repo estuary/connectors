@@ -1,0 +1,4 @@
+# The Rust connectors that rust.yaml builds, tests and deploys.
+- name: materialize-kafka
+- name: source-http-ingest
+- name: source-kafka

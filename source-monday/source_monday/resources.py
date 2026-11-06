@@ -90,14 +90,11 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, name, query, snapshot_fn),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(name=name, interval=timedelta(hours=2)),
-            schema_inference=True,
         )
         for name, query, snapshot_fn in FULL_REFRESH_RESOURCES
     ]

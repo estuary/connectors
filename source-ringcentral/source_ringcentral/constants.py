@@ -23,7 +23,6 @@ RATE_LIMITS: dict[RateGroup, int] = {
 
 
 class CursorField(StrEnum):
-    LAST_MODIFIED_TIME = "lastModifiedTime"
     CREATION_TIME = "creationTime"
     START_TIME = "startTime"
 

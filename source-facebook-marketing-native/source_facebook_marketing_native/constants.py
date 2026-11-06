@@ -1,6 +1,4 @@
-from typing import Any
-
-API_VERSION = "v23.0"
+API_VERSION = "v25.0"
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
 
 
@@ -35,7 +33,6 @@ AD_ACCOUNT_SOURCED_SCHEMA = {
         "timezone_id": {"type": "number"},
         "timezone_offset_hours_utc": {"type": "number"},
     },
-    "required": ["id"],
 }
 
 
@@ -127,5 +124,4 @@ AD_CREATIVE_SOURCED_SCHEMA = {
         },
         "video_id": {"type": "string"},
     },
-    "required": ["id"],
 }

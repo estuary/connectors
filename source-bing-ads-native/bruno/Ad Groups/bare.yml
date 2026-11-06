@@ -1,0 +1,119 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"CampaignId": "{{search_campaign_id}}"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("search_campaign_id")) throw new Error("run `Campaigns / all types comma` first to set search_campaign_id");
+    - type: after-response
+      code: |-
+        // Chain the first ad group into `Ads / bare`.
+        const id = res.getBody()?.AdGroups?.[0]?.Id;
+        if (id) bru.setVar("ad_group_id", String(id));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getadgroupsbycampaignid?view=bingads-13
+
+  **WHY:** the connector's `_ad_groups` in `api.py` sends exactly this body.
+  It checks the ad group shape and that each needs no `AccountId` field (the
+  connector stamps the parent IDs). Run `Campaigns / all types comma` first.
+
+  **VERIFIED (2026-10-29):** a PerformanceMax campaign returns
+  `{"AdGroups": []}`. Performance Max campaigns are built from asset groups,
+  not ad groups, so the `asset_groups` stream covers them instead (see
+  `Asset Groups / bare`).
+
+  **VERIFIED (2026-11-03):** a Search campaign (`1150435732`) returns its
+  one ad group, `1194069955690481`. There's no account or campaign ID in it,
+  so the connector's stamped parent IDs are needed. This request now reads
+  the first Search campaign (`search_campaign_id`).
+
+  **VERIFIED (2026-11-03, P3):** a paused ad group (`1200667025834839`) comes
+  back with `Status: Paused`. An ad group created and then deleted doesn't
+  come back. Ad groups in a paused campaign keep their own `Active` status.
+
+examples:
+  - name: 200 - Search campaign, one ad group
+    request:
+      url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "AdGroups": [
+              {
+                "Id": "1194069955690481",
+                "Name": "Ad Group 1",
+                "StartDate": {
+                  "Year": 2026,
+                  "Month": 11,
+                  "Day": 3
+                },
+                "EndDate": null,
+                "Language": null,
+                "Status": "Active",
+                "PrivacyStatus": null,
+                "CpcBid": {
+                  "Amount": 0.05
+                },
+                "Network": "OwnedAndOperatedAndSyndicatedSearch",
+                "AdRotation": null,
+                "AudienceAdsBidAdjustment": null,
+                "TrackingUrlTemplate": null,
+                "FinalUrlSuffix": null,
+                "UrlCustomParameters": null,
+                "BiddingScheme": {
+                  "Type": "InheritFromParent",
+                  "InheritedBidStrategyType": "EnhancedCpc"
+                },
+                "Settings": null,
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }
+  - name: 200 - PerformanceMax campaign has no ad groups
+    request:
+      url: "{{campaign_management_url}}/AdGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "AdGroups": []
+          }

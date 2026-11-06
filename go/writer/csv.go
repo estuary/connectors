@@ -87,7 +87,7 @@ func (w *CsvWriter) Write(row []any) error {
 }
 
 func (w *CsvWriter) Written() int {
-	return w.cwc.written
+	return int(w.cwc.written.Load())
 }
 
 func (w *CsvWriter) Close() error {

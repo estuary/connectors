@@ -1,0 +1,143 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/AssetGroups/QueryByCampaignId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"CampaignId": "{{campaign_id}}"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("campaign_id")) throw new Error("run `Campaigns / all types comma` first to set campaign_id");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getassetgroupsbycampaignid?view=bingads-13
+
+  **WHY:** Performance Max campaigns have no ad groups, so the connector
+  reads their asset groups instead. `_asset_groups` in `api.py` sends exactly
+  this body. Run `Campaigns / all types comma` first; in the sandbox its first
+  campaign is the Performance Max one.
+
+  **VERIFIED (2026-10-29):** the sandbox's Performance Max campaign returns
+  one asset group. Like ads, each asset link carries an
+  `AssetPerformanceLabel` that Microsoft recomputes on its own, and the
+  response has no account or campaign ID. There's no paging. The docs'
+  response table says "a maximum of 100 asset groups", which reads like text
+  copied from the update operation, so a campaign with more is UNOBSERVABLE
+  here. The example keeps only the first asset of each list.
+
+examples:
+  - name: 200 - one asset group (asset lists trimmed to one each)
+    request:
+      url: "{{campaign_management_url}}/AssetGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "PartialErrors": [],
+            "AssetGroups": [
+              {
+                "Name": "Example_102926_162253",
+                "Status": "Active",
+                "StartDate": {
+                  "Year": 2026,
+                  "Month": 10,
+                  "Day": 29
+                },
+                "EndDate": null,
+                "Path1": null,
+                "Path2": null,
+                "BusinessName": "Example",
+                "Headlines": [
+                  {
+                    "Asset": {
+                      "Text": "Example Official Site",
+                      "Id": "1194069716953409",
+                      "Name": null,
+                      "Type": "TextAsset"
+                    },
+                    "PinnedField": null,
+                    "AssetPerformanceLabel": "Unrated",
+                    "EditorialStatus": "Active"
+                  }
+                ],
+                "LongHeadlines": [
+                  {
+                    "Asset": {
+                      "Text": "Example Domain Provides Clear Information on Its Purpose",
+                      "Id": "1200666765797879",
+                      "Name": null,
+                      "Type": "TextAsset"
+                    },
+                    "PinnedField": null,
+                    "AssetPerformanceLabel": "Unrated",
+                    "EditorialStatus": "Active"
+                  }
+                ],
+                "Descriptions": [
+                  {
+                    "Asset": {
+                      "Text": "Visit the Example domain to understand its intended use online.",
+                      "Id": "1209462859154015",
+                      "Name": null,
+                      "Type": "TextAsset"
+                    },
+                    "PinnedField": null,
+                    "AssetPerformanceLabel": "Unrated",
+                    "EditorialStatus": "Active"
+                  }
+                ],
+                "Images": [
+                  {
+                    "Asset": {
+                      "SubType": "LandscapeImageMedia",
+                      "CropX": 0,
+                      "CropY": 0,
+                      "CropWidth": 1000,
+                      "CropHeight": 522,
+                      "Id": "1195169208744418",
+                      "Name": null,
+                      "Type": "ImageAsset"
+                    },
+                    "PinnedField": null,
+                    "AssetPerformanceLabel": "Unrated",
+                    "EditorialStatus": "Inactive"
+                  }
+                ],
+                "CallToAction": "Automated",
+                "FinalUrls": [
+                  "https://example.com"
+                ],
+                "FinalMobileUrls": null,
+                "EditorialStatus": "Active",
+                "Id": "1192970443031472",
+                "ForwardCompatibilityMap": []
+              }
+            ]
+          }

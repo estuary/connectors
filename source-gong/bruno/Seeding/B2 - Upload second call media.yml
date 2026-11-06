@@ -1,0 +1,38 @@
+info:
+  name: B2 - Upload second call media
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: "{{base_url}}/v2/calls/{{seed_call_id}}/media"
+  body:
+    type: multipart-form
+    data:
+      - name: mediaFile
+        type: file
+        value:
+          - ./seed-media/seed-call-b.mp3
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#put-/v2/calls/-id-/media
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** attaches audio to the call created by `B1`. Consumes
+  `{{seed_call_id}}`, which `B1`'s post-response script overwrites — so this
+  must run in the same `bru run` invocation as B1, and after it. The
+  folder-level run handles the ordering:
+
+      bru run Seeding --env Gong --sandbox developer
+
+  **LIMITATION — distinct file from `A2` on purpose.** Gong requires unique
+  media content per call, so this uploads `seed-call-b.mp3` — a different
+  public-domain reading from the one A2 sends.

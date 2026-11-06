@@ -206,6 +206,14 @@ func (c *capture) Run(ctx context.Context) error {
 			}
 		}
 	}
+
+	// This connector always exits after polling each binding once and is then
+	// restarted, but it's helpful to distinguish "no bindings" from "all done".
+	if len(activeKeys) == 0 {
+		log.Info("no bindings to poll, shutting down")
+	} else {
+		log.WithField("bindings", len(activeKeys)).Info("polled all bindings, shutting down")
+	}
 	return nil
 }
 

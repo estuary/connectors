@@ -42,7 +42,7 @@ There are some things to consider and some tips here for developing a new connec
 
 ### Materialization Fixtures
 
-You can use `flowctl preview` to run a connector with a fixture, which allows
+You can use `flowctl raw preview-next` to run a connector with a fixture, which allows
 you to process custom collection data through the materialization connector.
 Here is an example of the process using the Motherduck materialization.
 
@@ -118,9 +118,9 @@ a newline-delimited JSON file containing the data for each transaction:
 
 Install [flowctl][], or use the `flowctl` binary downloaded previously in `flow-bin`.
 
-Use `flowctl preview` to run the fixture:
+Use `flowctl raw preview-next` to run the fixture:
 ```
-RUST_LOG=DEBUG flowctl preview --source ./my-spec.yaml --fixture ./my-fixture.json --output-state --output-apply
+RUST_LOG=DEBUG flowctl raw preview-next --source ./my-spec.yaml --fixture ./my-fixture.json --output-state --output-apply
 ```
 
 [flowctl]: https://docs.estuary.dev/guides/get-started-with-flowctl/

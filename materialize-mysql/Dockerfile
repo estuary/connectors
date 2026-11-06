@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
+FROM --platform=linux/amd64 golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
@@ -18,12 +18,11 @@ COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-mysql       ./materialize-mysql
 COPY materialize-sql         ./materialize-sql
-COPY testsupport             ./testsupport
 
 # Test and build the connector.
 RUN go test -tags nozstd -v      ./materialize-sql/...
 RUN go test -tags nozstd -short -v ./materialize-mysql/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-mysql/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-mysql/cmd/connector
 
 # Runtime Stage
 ################################################################################
@@ -37,6 +36,9 @@ COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flo
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

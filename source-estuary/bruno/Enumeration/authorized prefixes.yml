@@ -1,0 +1,134 @@
+info:
+  name: authorized prefixes
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { prefixes(by: {minCapability: read}) { edges { node { prefix } } } }"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/prefixes.rs` (no public per-query docs page; SDL at `source-estuary/.schema-reference.graphql`)
+  
+  **WHY:** the set of prefixes an empty `prefixes` config expands to. Shows
+  that authorized prefixes nest (`Artificial-Industries/` and
+  `Artificial-Industries/databricks/`), which the connector must collapse to
+  the outermost before enumerating names or requesting rollups.
+
+  **VERIFIED (2026-10-07):** 200 with 15 prefixes, including nested
+  `Artificial-Industries/`, `Artificial-Industries/databricks/` and
+  `Artificial-Industries/postgres-shipments/`, plus default read grants on
+  `estuary/public/`, `ops/dp/public/`, `ops/tasks/private/*`, `ops.us-central1.v1/`.
+  An earlier run with an expired JWT access token returned
+  `401 failed to verify token: ExpiredSignature`: the server only exchanges
+  bearers containing no `.` (refresh-token keys); a dotted bearer is verified
+  as a JWT directly.
+
+examples:
+  - name: "200 — 15 authorized prefixes (nested Artificial-Industries/*)"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "prefixes": {
+                "edges": [
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/databricks/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/postgres-shipments/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Dani/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Dave/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Jonathan_Wihl/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "dani-demo/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "demo/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "estuary/public/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops.us-central1.v1/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/private/estuary/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/private/solutions/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/public/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/tasks/private/estuary/"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/tasks/private/solutions/"
+                    }
+                  }
+                ]
+              }
+            }
+          }

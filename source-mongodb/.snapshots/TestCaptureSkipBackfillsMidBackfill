@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test/largeCollection": 5 Documents
+# ================================
+{"_id":"pk val 10","_meta":{"op":"c","source":{"collection":"largeCollection","db":"testDb"}},"onlyColumn":{"array":["a","b","c"],"date-max":"9999-12-31T23:59:59.999Z","date-min":"0000-01-01T00:00:00.000Z","date-normal":"2023-11-07T16:57:00.000Z","float":1.23,"int":1,"str":"onlyColumn val 10"}}
+{"_id":"pk val 11","_meta":{"op":"c","source":{"collection":"largeCollection","db":"testDb"}},"onlyColumn":{"array":["a","b","c"],"date-max":"9999-12-31T23:59:59.999Z","date-min":"0000-01-01T00:00:00.000Z","date-normal":"2023-11-07T16:57:00.000Z","float":1.23,"int":1,"str":"onlyColumn val 11"}}
+{"_id":"pk val 12","_meta":{"op":"c","source":{"collection":"largeCollection","db":"testDb"}},"onlyColumn":{"array":["a","b","c"],"date-max":"9999-12-31T23:59:59.999Z","date-min":"0000-01-01T00:00:00.000Z","date-normal":"2023-11-07T16:57:00.000Z","float":1.23,"int":1,"str":"onlyColumn val 12"}}
+{"_id":"pk val 13","_meta":{"op":"c","source":{"collection":"largeCollection","db":"testDb"}},"onlyColumn":{"array":["a","b","c"],"date-max":"9999-12-31T23:59:59.999Z","date-min":"0000-01-01T00:00:00.000Z","date-normal":"2023-11-07T16:57:00.000Z","float":1.23,"int":1,"str":"onlyColumn val 13"}}
+{"_id":"pk val 14","_meta":{"op":"c","source":{"collection":"largeCollection","db":"testDb"}},"onlyColumn":{"array":["a","b","c"],"date-max":"9999-12-31T23:59:59.999Z","date-min":"0000-01-01T00:00:00.000Z","date-normal":"2023-11-07T16:57:00.000Z","float":1.23,"int":1,"str":"onlyColumn val 14"}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"testDb%2FlargeCollection":{"backfill":{"backfilled_docs":5,"done":true}}},"databaseResumeTokens":{"testDb":"<TOKEN>"}}
+

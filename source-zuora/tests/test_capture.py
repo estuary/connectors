@@ -1,0 +1,528 @@
+"""Unit tests for the capture logic in source_zuora.api.
+
+These exercise cursor advancement, intermediate checkpointing, the LAG settle
+delay, Id-paged backfills (including LIMIT-halving on too-large exports), the
+incremental engine's window-shrinking bisect on too-large exports, and query
+construction — none of which the spec/discover snapshot tests touch. A
+FakeManager stands in for ExportManager so tests run without a live Zuora
+tenant.
+"""
+
+import logging
+import re
+from datetime import UTC, datetime, timedelta, timezone
+
+import pytest
+
+from estuary_cdk.incremental_csv_processor import BaseCSVRow
+
+from source_zuora import api
+from source_zuora.export_manager import ExportTooLargeError
+from source_zuora.models import (
+    TransactionDateDocument,
+    UpdatedDateDocument,
+    ZuoraDocument,
+)
+
+_FMT = "%Y-%m-%dT%H:%M:%SZ"
+_LOG = logging.getLogger(__name__)
+
+
+def _fmt(dt: datetime) -> str:
+    return dt.astimezone(UTC).strftime(_FMT)
+
+
+def _parse(s: str) -> datetime:
+    return datetime.strptime(s, _FMT).replace(tzinfo=UTC)
+
+
+class FakeManager:
+    """Mimics ExportManager.export_rows: parses the query's cursor window (keyed
+    on cursor_field, default UpdatedDate), an optional `Id > 'x'` bound, and an
+    optional `LIMIT n`; yields matching records sorted as the query's ORDER BY
+    would. Raises ExportTooLargeError for date windows wider than
+    too_large_over, or when the rows an Id page would export exceed
+    too_large_over_rows (simulating the file size cap).
+    """
+
+    def __init__(
+        self,
+        records: list[tuple[str, datetime]] | None = None,
+        too_large_over: timedelta | None = None,
+        emit_millis: bool = False,
+        cursor_field: str = "UpdatedDate",
+        too_large_over_rows: int | None = None,
+    ):
+        self.records = sorted(records or [], key=lambda r: r[1])
+        self.too_large_over = too_large_over
+        # When set, output cursor values carry milliseconds, as Zuora's export
+        # does. The query filter is still parsed at whole-second precision (as
+        # Export ZOQL only accepts second literals), so a sub-second record sits
+        # above a second-granular >= bound — the realistic mismatch the
+        # second-aligned checkpoint logic has to handle.
+        self.emit_millis = emit_millis
+        self.cursor_field = cursor_field
+        self.too_large_over_rows = too_large_over_rows
+        self.queries: list[str] = []
+
+    async def export_rows(self, query: str, model, context):
+        self.queries.append(query)
+        lo = re.search(rf"{self.cursor_field} >= '([^']+)'", query)
+        hi = re.search(rf"{self.cursor_field} < '([^']+)'", query)
+        start = _parse(lo.group(1)) if lo else None
+        end = _parse(hi.group(1)) if hi else None
+        id_after_m = re.search(r"Id > '([^']+)'", query)
+        id_after = id_after_m.group(1) if id_after_m else None
+        limit_m = re.search(r"LIMIT (\d+)", query)
+        limit = int(limit_m.group(1)) if limit_m else None
+
+        if (
+            self.too_large_over is not None
+            and start is not None
+            and end is not None
+            and (end - start) > self.too_large_over
+        ):
+            raise ExportTooLargeError("too large")
+
+        matching = [
+            (rid, dt)
+            for rid, dt in self.records
+            if (start is None or dt >= start)
+            and (end is None or dt < end)
+            and (id_after is None or rid > id_after)
+        ]
+        if "ORDER BY Id" in query:
+            matching.sort(key=lambda r: r[0])
+        # The rows this export's file would hold, for the file-size-cap analog.
+        would_export = min(limit, len(matching)) if limit is not None else len(matching)
+        if self.too_large_over_rows is not None and would_export > self.too_large_over_rows:
+            raise ExportTooLargeError("too large")
+        if limit is not None:
+            matching = matching[:limit]
+
+        out_fmt = "%Y-%m-%dT%H:%M:%S.%fZ" if self.emit_millis else _FMT
+        for rid, dt in matching:
+            # Like the real manager, hand the row to the model with the caller's context.
+            yield model.model_validate(
+                {"Id": rid, self.cursor_field: dt.astimezone(UTC).strftime(out_fmt)},
+                context=context,
+            )
+
+
+async def _collect(agen) -> list:
+    return [item async for item in agen]
+
+
+def _docs(items: list) -> list:
+    return [i for i in items if isinstance(i, (ZuoraDocument, BaseCSVRow))]
+
+
+def _cursors(items: list) -> list:
+    return [i for i in items if not isinstance(i, (ZuoraDocument, BaseCSVRow))]
+
+
+# --- build_query ---------------------------------------------------------------
+
+
+def test_build_query_no_bounds_is_unordered_full_table():
+    q = api.build_query("Product", ["Id", "Name"])
+    assert q == "SELECT Id, Name FROM Product"
+
+
+def test_build_query_bounds_add_where_and_order_by():
+    q = api.build_query(
+        "Account",
+        ["Id"],
+        after=datetime(2020, 1, 1, tzinfo=UTC),
+        before=datetime(2020, 2, 1, tzinfo=UTC),
+    )
+    assert q == (
+        "SELECT Id FROM Account WHERE UpdatedDate >= '2020-01-01T00:00:00Z' "
+        "AND UpdatedDate < '2020-02-01T00:00:00Z' ORDER BY UpdatedDate"
+    )
+
+
+def test_build_query_uses_named_cursor_field():
+    q = api.build_query(
+        "PaymentTransactionLog",
+        ["Id"],
+        "TransactionDate",
+        after=datetime(2020, 1, 1, tzinfo=UTC),
+        before=datetime(2020, 2, 1, tzinfo=UTC),
+    )
+    assert q == (
+        "SELECT Id FROM PaymentTransactionLog "
+        "WHERE TransactionDate >= '2020-01-01T00:00:00Z' "
+        "AND TransactionDate < '2020-02-01T00:00:00Z' ORDER BY TransactionDate"
+    )
+
+
+def test_build_query_normalizes_non_utc_bounds_to_utc():
+    plus_ten = timezone(timedelta(hours=10))
+    q = api.build_query(
+        "Account", ["Id"], after=datetime(2020, 1, 1, tzinfo=plus_ten)
+    )
+    assert "UpdatedDate >= '2019-12-31T14:00:00Z'" in q
+
+
+def test_build_id_page_query_first_page_has_no_id_bound():
+    q = api.build_id_page_query(
+        "Account",
+        ["Id", "UpdatedDate"],
+        "UpdatedDate",
+        start=datetime(2020, 1, 1, tzinfo=UTC),
+        cutoff=datetime(2020, 2, 1, tzinfo=UTC),
+        after_id=None,
+        limit=250000,
+    )
+    assert q == (
+        "SELECT Id, UpdatedDate FROM Account "
+        "WHERE UpdatedDate >= '2020-01-01T00:00:00Z' "
+        "AND UpdatedDate < '2020-02-01T00:00:00Z' "
+        "ORDER BY Id LIMIT 250000"
+    )
+
+
+def test_build_id_page_query_resume_adds_strict_id_bound():
+    q = api.build_id_page_query(
+        "PaymentTransactionLog",
+        ["Id"],
+        "TransactionDate",
+        start=datetime(2020, 1, 1, tzinfo=UTC),
+        cutoff=datetime(2020, 2, 1, tzinfo=UTC),
+        after_id="aa02",
+        limit=100,
+    )
+    assert "TransactionDate >= '2020-01-01T00:00:00Z'" in q
+    assert "AND Id > 'aa02' ORDER BY Id LIMIT 100" in q
+
+
+# --- fetch_changes -------------------------------------------------------------
+
+
+async def _run_changes(
+    manager, cursor, model=UpdatedDateDocument, object_name="Account", field_types=None
+):
+    return await _collect(
+        api.fetch_changes(
+            object_name,
+            ["Id", model.CURSOR_FIELD],
+            field_types or {},
+            model,
+            manager,
+            _LOG,
+            cursor,
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_cursor_is_max_updated_plus_one_second():
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
+    records = [("1", base), ("2", base + timedelta(seconds=30))]
+    out = await _run_changes(FakeManager(records), base - timedelta(seconds=5))
+
+    assert [d.Id for d in _docs(out)] == ["1", "2"]
+    cursors = _cursors(out)
+    assert cursors[-1] == base + timedelta(seconds=31)  # max UpdatedDate + 1s
+    assert cursors[-1] > base - timedelta(seconds=5)  # strictly increasing
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_emits_intermediate_checkpoints(monkeypatch):
+    monkeypatch.setattr(api, "CHECKPOINT_INTERVAL", 2)
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
+    # seconds 0,0,10,20 — checkpoints land only at second boundaries
+    records = [(str(i), base + timedelta(seconds=s)) for i, s in enumerate([0, 0, 10, 20])]
+    out = await _run_changes(FakeManager(records), base - timedelta(seconds=5))
+
+    cursors = _cursors(out)
+    assert len(cursors) >= 2  # at least one intermediate + the final
+    assert cursors == sorted(cursors) and len(set(cursors)) == len(cursors)
+    # every checkpoint is a whole-second boundary (a record second + 1s)
+    for c in cursors:
+        assert (c - base).total_seconds() in {1, 11, 21}
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_no_checkpoint_splits_a_single_second(monkeypatch):
+    # Four distinct sub-second values all within second 5. Even though the count
+    # exceeds CHECKPOINT_INTERVAL, no intermediate checkpoint may split the second
+    # (the whole-second-only filter couldn't resume inside it), so only the final
+    # cursor is emitted — and it floors the ms max (5.900) to its second + 1s.
+    monkeypatch.setattr(api, "CHECKPOINT_INTERVAL", 2)
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
+    records = [
+        ("a", base + timedelta(seconds=5, milliseconds=100)),
+        ("b", base + timedelta(seconds=5, milliseconds=400)),
+        ("c", base + timedelta(seconds=5, milliseconds=700)),
+        ("d", base + timedelta(seconds=5, milliseconds=900)),
+    ]
+    out = await _run_changes(FakeManager(records, emit_millis=True), base)
+
+    assert [d.Id for d in _docs(out)] == ["a", "b", "c", "d"]
+    cursors = _cursors(out)
+    assert cursors == [base + timedelta(seconds=6)]
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_checkpoints_are_second_aligned_on_ms_data(monkeypatch):
+    # Sub-second values in second 5 then a jump to second 9. Crossing the second
+    # boundary (with the interval reached) emits an intermediate cursor floored to
+    # floor(5.800)+1s = second 6; the final floors the ms max (9.600) to second 10.
+    monkeypatch.setattr(api, "CHECKPOINT_INTERVAL", 2)
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
+    records = [
+        ("a", base + timedelta(seconds=5, milliseconds=200)),
+        ("b", base + timedelta(seconds=5, milliseconds=800)),
+        ("c", base + timedelta(seconds=9, milliseconds=100)),
+        ("d", base + timedelta(seconds=9, milliseconds=600)),
+    ]
+    out = await _run_changes(FakeManager(records, emit_millis=True), base)
+
+    cursors = _cursors(out)
+    # Every emitted cursor is on a whole-second boundary so it round-trips the
+    # second-granular filter exactly (the property that makes resume dupe-free).
+    assert all(c.microsecond == 0 for c in cursors)
+    assert base + timedelta(seconds=6) in cursors  # intermediate
+    assert cursors[-1] == base + timedelta(seconds=10)  # final
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_empty_full_window_advances():
+    # log_cursor > MAX_EXPORT_WINDOW behind now-LAG -> full window, empty -> advance
+    cursor = datetime.now(UTC).replace(microsecond=0) - timedelta(days=60)
+    out = await _run_changes(FakeManager([]), cursor)
+    assert out == [cursor + api.MAX_EXPORT_WINDOW]
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_empty_trailing_window_does_not_advance():
+    # within MAX_EXPORT_WINDOW of now-LAG -> window_end == now-LAG -> no cursor
+    cursor = datetime.now(UTC).replace(microsecond=0) - timedelta(days=2)
+    out = await _run_changes(FakeManager([]), cursor)
+    assert out == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_holds_back_within_lag():
+    # cursor inside the LAG window -> nothing settled to read yet
+    cursor = datetime.now(UTC).replace(microsecond=0) - (api.LAG // 2)
+    manager = FakeManager([])
+    out = await _run_changes(manager, cursor)
+    assert out == []
+    assert manager.queries == []  # no export attempted
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_transaction_date_cursor():
+    # An append-only log cursors on TransactionDate: the query must filter and
+    # order by TransactionDate, docs validate as TransactionDateDocument, and the
+    # cursor advances off get_cursor() just as the UpdatedDate path does.
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=10)
+    records = [("1", base), ("2", base + timedelta(seconds=30))]
+    manager = FakeManager(records, cursor_field="TransactionDate")
+    out = await _run_changes(
+        manager, base - timedelta(seconds=5),
+        model=TransactionDateDocument, object_name="PaymentTransactionLog",
+    )
+
+    assert [d.Id for d in _docs(out)] == ["1", "2"]
+    assert all(isinstance(d, TransactionDateDocument) for d in _docs(out))
+    assert "TransactionDate >= " in manager.queries[0]
+    assert "ORDER BY TransactionDate" in manager.queries[0]
+    assert _cursors(out)[-1] == base + timedelta(seconds=31)  # max cursor + 1s
+
+
+# --- fetch_page ----------------------------------------------------------------
+
+
+async def _run_page(
+    manager, start_date, page, cutoff, model=UpdatedDateDocument, field_types=None
+):
+    return await _collect(
+        api.fetch_page(
+            "Account",
+            ["Id", model.CURSOR_FIELD],
+            field_types or {},
+            model,
+            manager,
+            start_date,
+            _LOG,
+            page,
+            cutoff,
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_fresh_backfill_queries_by_id_within_cursor_bounds():
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    manager = FakeManager([("aa01", start + timedelta(days=1))])
+    out = await _run_page(manager, start, None, cutoff)
+    (query,) = manager.queries
+    assert f"UpdatedDate >= '{_fmt(start)}'" in query
+    assert f"UpdatedDate < '{_fmt(cutoff)}'" in query
+    assert f"ORDER BY Id LIMIT {api.BACKFILL_PAGE_SIZE}" in query
+    assert "Id > " not in query  # fresh backfill has no Id lower bound
+    assert [d.Id for d in _docs(out)] == ["aa01"]
+    assert isinstance(out[-1], ZuoraDocument)  # short page -> backfill complete
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_full_page_ends_with_id_cursor(monkeypatch):
+    monkeypatch.setattr(api, "BACKFILL_PAGE_SIZE", 2)
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    records = [(f"aa0{i}", start + timedelta(hours=i)) for i in range(1, 4)]
+    out = await _run_page(FakeManager(records), start, None, cutoff)
+    assert [d.Id for d in _docs(out)] == ["aa01", "aa02"]
+    assert out[-1] == "aa02"  # full page -> trailing Id PageCursor to resume from
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_resumes_from_id_cursor():
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    records = [(f"aa0{i}", start + timedelta(hours=i)) for i in range(1, 4)]
+    manager = FakeManager(records)
+    out = await _run_page(manager, start, "aa01", cutoff)
+    assert "Id > 'aa01'" in manager.queries[0]
+    assert [d.Id for d in _docs(out)] == ["aa02", "aa03"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_id_engine_emits_intermediate_id_checkpoints(monkeypatch):
+    monkeypatch.setattr(api, "CHECKPOINT_INTERVAL", 2)
+    monkeypatch.setattr(api, "BACKFILL_PAGE_SIZE", 10)
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    records = [(f"aa0{i}", start + timedelta(hours=i)) for i in range(1, 6)]
+    out = await _run_page(FakeManager(records), start, None, cutoff)
+    # A checkpoint lands before the doc that crosses the interval, naming the
+    # last durable Id, so the stream still ends on documents.
+    assert _cursors(out) == ["aa02", "aa04"]
+    assert isinstance(out[-1], ZuoraDocument)
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_id_engine_halves_limit_when_too_large(monkeypatch):
+    monkeypatch.setattr(api, "BACKFILL_PAGE_SIZE", 8)
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    records = [(f"aa0{i}", start + timedelta(hours=i)) for i in range(1, 6)]
+    manager = FakeManager(records, too_large_over_rows=3)
+    out = await _run_page(manager, start, None, cutoff)
+    # 8-row page too large, 4-row page too large, 2-row page fits.
+    assert [q.rsplit("LIMIT ", 1)[1] for q in manager.queries] == ["8", "4", "2"]
+    assert [d.Id for d in _docs(out)] == ["aa01", "aa02"]
+    assert out[-1] == "aa02"  # the shrunken page is full -> continue from its end
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_id_engine_single_record_too_large_raises(monkeypatch):
+    # Even one record per page exceeds the cap -> fail loudly, naming the object.
+    monkeypatch.setattr(api, "BACKFILL_PAGE_SIZE", 4)
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    manager = FakeManager([("aa01", start + timedelta(hours=1))], too_large_over_rows=0)
+    with pytest.raises(ExportTooLargeError) as exc:
+        await _run_page(manager, start, None, cutoff)
+    assert "Account" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_id_engine_ordering_violation_raises():
+    # `Id >` resume is only dupe-free if ORDER BY Id is a stable total order;
+    # out-of-order rows must kill the backfill rather than risk skipped records.
+    class UnorderedManager:
+        async def export_rows(self, query, model, context):
+            for row in (
+                {"Id": "aa02", "UpdatedDate": "2020-01-02T00:00:00Z"},
+                {"Id": "aa01", "UpdatedDate": "2020-01-01T00:00:00Z"},
+            ):
+                yield model.model_validate(row, context=context)
+
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    with pytest.raises(RuntimeError, match="ordering violation"):
+        await _run_page(UnorderedManager(), start, None, start + timedelta(days=5))
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_empty_backfill_completes():
+    # No rows in [start_date, cutoff) -> no docs, no PageCursor -> complete.
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    cutoff = start + timedelta(days=5)
+    out = await _run_page(FakeManager([]), start, None, cutoff)
+    assert out == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_start_date_at_cutoff_returns_nothing():
+    start = datetime(2020, 1, 1, tzinfo=UTC)
+    records = [("aa01", start - timedelta(days=1))]
+    out = await _run_page(FakeManager(records), start, None, start)  # cutoff == start
+    assert out == []
+
+
+# --- bisect on ExportTooLargeError (incremental engine) -------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_empty_after_shrink_still_advances():
+    # The 30d window 403s and bisects to ~7.5d, which holds no data (it lives at
+    # day 20); the cursor must still advance so a later sweep reaches the data.
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=60)
+    manager = FakeManager(
+        [("1", base + timedelta(days=20))], too_large_over=timedelta(days=8)
+    )
+    out = await _run_changes(manager, base)
+    assert not _docs(out)
+    assert base < _cursors(out)[-1] < base + timedelta(days=15)
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_too_large_single_second_raises():
+    # An unsplittable one-second window that stays too large must fail loudly,
+    # naming the object rather than an opaque Zuora file id.
+    cursor = datetime.now(UTC).replace(microsecond=0) - api.LAG - timedelta(seconds=1)
+    manager = FakeManager([], too_large_over=timedelta(0))
+    with pytest.raises(ExportTooLargeError) as exc:
+        await _run_changes(manager, cursor)
+    assert "Account" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_fetch_changes_bisects_too_large_window():
+    base = datetime.now(UTC).replace(microsecond=0) - timedelta(days=40)  # full 30d window
+    manager = FakeManager(
+        [("1", base + timedelta(days=1))], too_large_over=timedelta(days=8)
+    )
+    out = await _run_changes(manager, base)
+    assert [d.Id for d in _docs(out)] == ["1"]
+    assert _cursors(out)[-1] > base
+
+
+# --- fetch_snapshot ------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_fetch_snapshot_full_table_no_bounds():
+    manager = FakeManager([("1", datetime(2020, 1, 1, tzinfo=UTC))])
+    out = await _collect(api.fetch_snapshot("Product", ["Id", "Name"], {}, manager, _LOG))  # type: ignore[arg-type]
+    assert all(isinstance(d, BaseCSVRow) for d in out)
+    assert "WHERE" not in manager.queries[0]  # full table, unbounded
+
+
+@pytest.mark.asyncio
+async def test_fetch_snapshot_too_large_propagates():
+    # A snapshot has no time cursor, so it can't be bisected — a too-large export
+    # surfaces loudly rather than being silently truncated.
+    class TooBig:
+        async def export_rows(self, query, model, context):
+            raise ExportTooLargeError("too big")
+            yield  # unreachable; makes this an async generator
+
+    with pytest.raises(ExportTooLargeError):
+        await _collect(api.fetch_snapshot("Product", ["Id"], {}, TooBig(), _LOG))  # type: ignore[arg-type]

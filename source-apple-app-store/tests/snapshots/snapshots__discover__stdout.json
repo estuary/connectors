@@ -60,11 +60,37 @@
       ],
       "title": "AppCrashesReportRow",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_crashes"
     ]
   },
   {
@@ -128,11 +154,37 @@
       ],
       "title": "AppDownloadsDetailedReportRow",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_downloads_detailed"
     ]
   },
   {
@@ -207,11 +259,37 @@
       ],
       "title": "AppReview",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/app_id",
       "/id"
+    ],
+    "resourcePath": [
+      "app_reviews"
     ]
   },
   {
@@ -275,11 +353,37 @@
       ],
       "title": "AppSessionsDetailedReportRow",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_sessions_detailed"
     ]
   },
   {
@@ -343,11 +447,37 @@
       ],
       "title": "AppStoreDiscoveryAndEngagementDetailedReportRow",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_store_discovery_and_engagement_detailed"
     ]
   },
   {
@@ -411,11 +541,37 @@
       ],
       "title": "AppStoreInstallsDetailedReportRow",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/filename",
       "/row_number"
+    ],
+    "resourcePath": [
+      "app_store_installs_and_deletions_detailed"
     ]
   }
 ]

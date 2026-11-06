@@ -136,7 +136,7 @@ SELECT 0,
 		'array', r."array",
 		'binary', translate(encode(r."binary", 'base64'), E'\n', ''),
 		'boolean', r."boolean",
-		'field_with_projection', r.field_with_projection,
+		'fieldWithProjection', r.field_with_projection,
 		'integer', r."integer",
 		'integerGt128Bit', r."integerGt128Bit",
 		'integerGt256Bit', r."integerGt256Bit",
@@ -329,19 +329,28 @@ limit 1
 --- End Fence Install ---
 
 --- Begin Fence Update ---
-DO $$
-BEGIN
-	UPDATE path."to".checkpoints
-		SET   checkpoint = 'AAECAwQFBgcICQ=='
-		WHERE materialization = 'some/Materialization'
-		AND   key_begin = 1122867
-		AND   key_end   = 4293844428
-		AND   fence     = 123;
-
-	IF NOT FOUND THEN
-		RAISE 'This instance was fenced off by another';
-	END IF;
-END $$;
+UPDATE path."to".checkpoints
+	SET   checkpoint = $1
+	WHERE materialization = $2
+	AND   key_begin = $3
+	AND   key_end   = $4
+	AND   fence     = $5;
 --- End Fence Update ---
+
+--- Begin createTargetTable [jsonb contentMediaType] ---
+
+CREATE TABLE IF NOT EXISTS "public".jsonb_round_trip (
+		id BIGINT NOT NULL,
+		plain_json JSON,
+		jsonb_col JSONB,
+
+		PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE "public".jsonb_round_trip IS 'Generated for materialize-postgres jsonb round-trip test';
+COMMENT ON COLUMN "public".jsonb_round_trip.id IS '';
+COMMENT ON COLUMN "public".jsonb_round_trip.plain_json IS '';
+COMMENT ON COLUMN "public".jsonb_round_trip.jsonb_col IS '';
+--- End createTargetTable [jsonb contentMediaType] ---
 
 

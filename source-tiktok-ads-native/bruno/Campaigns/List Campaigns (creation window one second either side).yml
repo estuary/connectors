@@ -1,0 +1,26 @@
+info:
+  name: List Campaigns (creation window one second either side)
+  type: http
+  seq: 14
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"creation_filter_start_time":"2026-10-08 23:07:55","creation_filter_end_time":"2026-10-08 23:07:57"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** control for the creation bound probes: a window one second either side of the live seed campaign's `create_time` (2026-10-08 23:07:56).
+
+  **VERIFIED (2026-10-12, sandbox):** `total_number 1`: the campaign is
+  matched by `(23:07:55, 23:07:57)`, so the bounds are compared in **UTC** at
+  one-second resolution, and the two zero-result bound probes are explained by
+  exclusivity, not by a time-zone shift.

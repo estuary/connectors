@@ -1,0 +1,69 @@
+info:
+  name: List Reports (modifiedSince source-data-edit probe)
+  type: http
+  seq: 11.7
+
+http:
+  method: GET
+  url: "{{base_url}}/reports?modifiedSince=2026-07-21T13:55:14Z"
+  params:
+    - name: modifiedSince
+      value: 2026-07-21T13:55:14Z
+      type: query
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - totalCount=0 (data-only edits do not bump report modifiedAt)
+    request:
+      url: "{{base_url}}/reports?modifiedSince=2026-07-21T13:55:14Z"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "pageNumber": 0,
+            "pageSize": 100,
+            "totalPages": 0,
+            "totalCount": 0,
+            "data": []
+          }
+
+docs: |-
+  **REFERENCE:** [List reports](https://developers.smartsheet.com/api/smartsheet/openapi/reports/listreports)
+
+  **WHY:** closes the open question on `List Reports (modifiedSince)` —
+  whether a report's `modifiedAt`/`modifiedSince` reflects underlying
+  source-sheet *data* changes or only report-definition edits. The pinned
+  report `PIN_REPORT_ID` (7840186690045828, "Report 1") sources
+  `PIN_SHEET_ID` (4312824539121540, see `Get Source Sheet (cross-check row
+  count)`), its definition was last modified `2026-07-07T19:50:15Z` (`Get
+  Report (bare)`), and the seeding D/E chains mutated ONLY that sheet's
+  row data on 2026-07-21 (cell edit at `13:55:20Z` by `Seeding/D1`, clear
+  by `Seeding/D4`, row add/delete by `Seeding/E1`/`E2`) with no
+  report-definition edit. So `modifiedSince=2026-07-21T13:55:14Z` (T_D,
+  seconds before the first data edit, hours before this probe — far past
+  the (5s, 65s] list-index lag seen on sheets, see `Seeding/D2`) is a
+  clean discriminator: pinned report PRESENT ⇒ source-data edits bump
+  report `modifiedAt`; ABSENT ⇒ definition-only semantics.
+
+  **VERIFIED (2026-07-21):** 200 OK, `totalCount: 0`, `data: []` — the
+  pinned report is ABSENT despite four post-T_D data mutations to its
+  source sheet. Report `modifiedAt`/`modifiedSince` therefore reflects
+  **report-definition edits only**, not underlying source-sheet data
+  changes. Consequence: the Reports stream cannot use `modifiedSince` to
+  detect row-data changes flowing through a report — the docs' steer away
+  from it for change-tracking is confirmed, and the snapshot/backfill
+  classification on `List Reports (modifiedSince)` stands on evidence, not
+  just docs. (The seed report is also absent: it was created before T_D
+  and its definition never edited after — consistent.)

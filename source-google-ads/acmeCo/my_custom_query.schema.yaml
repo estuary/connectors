@@ -54,11 +54,10 @@ properties:
     type:
     - number
     - 'null'
-  campaign.start_date:
+  campaign.start_date_time:
     type:
     - string
     - 'null'
-    format: date
   segments.date:
     type: string
     format: date
@@ -70,4 +69,21 @@ properties:
     required:
     - row_id
 additionalProperties: true
+required:
+- customer.id
+- segments.date
 x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

@@ -28,11 +28,14 @@ import (
 )
 
 const (
-	// streamToFenceWatchdogInterval is the length of time to wait between checking whether
-	// we're still processing change events. This should never be hit in normal operation,
-	// and exists only so that certain rare failure modes produce an error rather than
-	// blocking forever.
-	streamToFenceWatchdogInterval = 6 * time.Hour
+	// replicationStreamReceiveTimeout bounds how long we will wait for any message from the
+	// server during replication streaming before assuming the connection is dead. We send
+	// Standby Status Updates with reply-requested every 10s, and the server is expected to
+	// send Primary Keepalive Messages at least every wal_sender_timeout/2 (default 30s),
+	// so a long quiet period is a strong signal of a silent disconnect. The threshold is
+	// generous enough to tolerate the worst realistic case of a slow output-plugin commit
+	// callback for a very large transaction without yielding back to the walsender loop.
+	replicationStreamReceiveTimeout = 15 * time.Minute
 
 	// replicationStreamReadTimeout is the maximum amount of time any single read operation may
 	// block for. But all we do when it's hit is check the context for cancellation and retry,
@@ -52,6 +55,11 @@ const (
 )
 
 var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
+
+// errReceiveTimeout is returned by relayChanges (and used as the cancellation cause on its
+// derived context) when the replication stream goes silent for longer than the configured
+// liveness timeout, indicating a likely silently disconnected connection.
+var errReceiveTimeout = fmt.Errorf("no replication messages received from server within %s", replicationStreamReceiveTimeout)
 
 const standbyStatusInterval = 10 * time.Second
 
@@ -213,7 +221,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 			// care about any prior state in the replication slot, and if we're able to drop
 			// it then we also have the necessary permissions to recreate it. Any errors here
 			// aren't fatal, just to be on the safe side.
-			if err := recreateReplicationSlot(ctx, db.conn, slot); err != nil {
+			if err := recreateReplicationSlot(ctx, conn, slot); err != nil {
 				logrus.WithField("err", err).Debug("error recreating replication slot")
 			}
 		}
@@ -357,34 +365,13 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		}
 	}
 
-	// Stream replication events until the fence is reached or the watchdog timeout hits.
+	// Stream replication events until the fence is reached. Liveness is enforced inside
+	// relayChanges via replicationStreamReceiveTimeout.
 	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
 	var fenceReached = errors.New("fenced reached")
 	defer cancelRelayCtx(nil)
 
-	// Given that the early-exit fast path was not taken, there must be further data for
-	// us to read. Thus if we sit idle for too long without reaching our fence position,
-	// something is wrong and we should error out instead of blocking forever.
-	var eventCount atomic.Int64
-	var previousCount int64
-	var watchdog *time.Timer
-	watchdog = time.AfterFunc(streamToFenceWatchdogInterval, func() {
-		if count := eventCount.Load(); count > previousCount {
-			previousCount = count
-			watchdog.Reset(streamToFenceWatchdogInterval)
-			return
-		}
-
-		var err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
-		if s.db.config.Advanced.ReadOnlyCapture {
-			err = fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
-		}
-		cancelRelayCtx(err)
-	})
-	defer watchdog.Stop()
-
 	if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
-		eventCount.Add(1)
 		if err := callback(event); err != nil {
 			return err
 		}
@@ -484,12 +471,26 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 }
 
 func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
-	for ctx.Err() == nil {
-		// Try to receive another message from the database.
-		var msg, err = s.receiveMessage(ctx)
+	// Bound the time we will wait for any message from the server so that a silently dead
+	// connection (e.g. a NAT or middlebox dropping the TCP session without sending RST) is
+	// detected instead of blocking forever. We expect Primary Keepalive Messages from the
+	// server well within this interval even when no decodable changes are being produced.
+	var relayCtx, cancelRelay = context.WithCancelCause(ctx)
+	defer cancelRelay(nil)
+	var receiveTimer = time.AfterFunc(replicationStreamReceiveTimeout, func() {
+		cancelRelay(errReceiveTimeout)
+	})
+	defer receiveTimer.Stop()
+
+	for relayCtx.Err() == nil {
+		var msg, err = s.receiveMessage(relayCtx)
 		if err != nil {
+			if errors.Is(context.Cause(relayCtx), errReceiveTimeout) {
+				return errReceiveTimeout
+			}
 			return err
 		}
+		receiveTimer.Reset(replicationStreamReceiveTimeout)
 
 		// Handle messages that aren't CopyData
 		var data []byte
@@ -552,10 +553,14 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 	return ctx.Err()
 }
 
-// receiveMessage reads and returns the next complete message from the database. It will
-// return os.DeadlineExceeded if no message is immediately available. It returns the
-// complete message including initial message type byte and length header. The bytes
-// are valid only until the next call to receiveMessage.
+// receiveMessage reads and returns the next complete message from the database, blocking
+// until one is available. It returns the complete message including initial message type
+// byte and length header. The bytes are valid only until the next call to receiveMessage.
+//
+// Internally a short read deadline is used so that the loop periodically checks the
+// context for cancellation, but deadline expirations are not surfaced to the caller.
+// The function only returns when a complete message has been read, the context is
+// canceled, or a non-timeout I/O or framing error occurs.
 func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) {
 	for ctx.Err() == nil {
 		// 1. Check if a complete message exists in the buffer at rxoff. If so, slice and return it.
@@ -866,6 +871,29 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 		}
 		return nil, nil
 
+	// Streaming: Stream Abort
+	case pglogrepl.MessageTypeStreamAbort:
+		// Stream Abort
+		//   Byte1('A')    Identifies the message as a stream abort message.
+		//   Int32 (XID)   XID of the top-level transaction.
+		//   Int32 (XID)   XID of the aborted subtransaction (same as above for a top-level abort).
+		//
+		// We never request streaming of in-progress transactions (we use protocol version 1),
+		// so we should never receive any streaming messages. However PostgreSQL 18 introduced
+		// a regression in which the server may send a Stream Abort for a subtransaction of a
+		// large, already rolled back transaction, even when streaming is disabled. Since we
+		// were never sent any changes for that transaction there is nothing to undo, so we
+		// just log the event and ignore it.
+		if len(data) < 9 {
+			return nil, fmt.Errorf("STREAM ABORT message too short: %d bytes", len(data))
+		}
+		logrus.WithFields(logrus.Fields{
+			"xid":    binary.BigEndian.Uint32(data[1:5]),
+			"subxid": binary.BigEndian.Uint32(data[5:9]),
+			"inTxn":  s.nextTxnFinalLSN != 0,
+		}).Warn("ignoring STREAM ABORT message for a transaction which was never streamed")
+		return nil, nil
+
 	default:
 		// There shouldn't be any other message types in the replication stream,
 		// but we might as well handle them gracefully if they show up.
@@ -893,6 +921,17 @@ func (s *replicationStream) decodeChangeEvent(
 	}
 	// If this change event is on a table we're not capturing, skip doing any further processing on it.
 	if !active {
+		// Tally the discard so that ReplicationDiagnostics can later surface tables that
+		// we're receiving (and throwing away) significant volumes of replication events on.
+		if streamID, ok := s.streamIDFromRelationID(relID); ok {
+			s.db.discardCounts.Lock()
+			if s.db.discardCounts.byStream == nil {
+				s.db.discardCounts.byStream = make(map[sqlcapture.StreamID]int64)
+			}
+			s.db.discardCounts.byStream[streamID]++
+			s.db.discardCounts.Unlock()
+		}
+
 		// Return a KeepaliveEvent to indicate that we're actively receiving and discarding
 		// change data. This avoids situations where a sufficiently large transaction full
 		// of changes on a not-currently-active table causes the fenced streaming watchdog

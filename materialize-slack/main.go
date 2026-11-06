@@ -85,17 +85,20 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		var constraints = make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
+		var sawText, sawTs bool
 		for _, projection := range binding.Collection.Projections {
 			var constraint pm.Response_Validated_Constraint
 
 			switch {
 			case projection.Field == "ts":
+				sawTs = true
 				constraint = pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "The Slack materialization requires a message timestamp",
 				}
 			case projection.Field == "text":
+				sawText = true
 				constraint = pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "The Slack materialization requires 'text'",
@@ -116,19 +119,22 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 					Reason: "All fields other than 'ts', 'text', and 'blocks' will be ignored",
 				}
 			}
-			constraints[projection.Field] = &constraint
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      projection.Field,
+				Constraint: &constraint,
+			})
 		}
 
-		if constraints["text"] == nil {
+		if !sawText {
 			return nil, fmt.Errorf("'text' field required")
 		}
-		if constraints["ts"] == nil {
+		if !sawTs {
 			return nil, fmt.Errorf("'ts' field required")
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: false,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          []string{res.Channel},
 		})
@@ -170,6 +176,10 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 
 // Transactions implements the DriverServer interface.
 func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
@@ -302,7 +312,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (transactor) Destroy() {
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }
 

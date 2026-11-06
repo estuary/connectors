@@ -121,5 +121,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"featureflagemitsourcedschemas_960966":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":2}}}
+{"bindingStateV1":{"featureflagemitsourcedschemas_960966":{"DocumentCount":2,"LastPolled":"<TIMESTAMP>"}}}
 

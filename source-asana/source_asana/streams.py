@@ -47,7 +47,7 @@ class AsanaStream(HttpStream, ABC):
             self.logger.error(
                 f"Skipping stream {self.name}. {ASANA_ERRORS_MAPPING.get(response.status_code)}. Full error message: {response.text}"
             )
-            setattr(self, "raise_on_http_errors", False)
+            self.raise_on_http_errors = False
             return False
         return super().should_retry(response)
 
@@ -124,10 +124,18 @@ class AsanaStream(HttpStream, ABC):
         stream_slices = stream.stream_slices(sync_mode=SyncMode.full_refresh)
 
         for stream_slice in stream_slices:
-            for record in stream.read_records(
-                sync_mode=SyncMode.full_refresh, stream_slice=stream_slice
-            ):
-                yield {slice_field: record["gid"]}
+            # Asana pagination tokens expire after 15 minutes. The child stream
+            # reads its records for each gid before asking for the next one, so
+            # reading lazily could wait longer than that between pages. Fetch
+            # every page up front.
+            gids = [
+                record["gid"]
+                for record in stream.read_records(
+                    sync_mode=SyncMode.full_refresh, stream_slice=stream_slice
+                )
+            ]
+            for gid in gids:
+                yield {slice_field: gid}
 
     @cache  # Caching this method, so we only make this request once
     def get_current_user_data(self) -> dict:
@@ -151,11 +159,9 @@ class WorkspaceRelatedStream(AsanaStream, ABC):
     """
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        workspaces_stream = Workspaces(authenticator=self.authenticator)
-        for workspace in workspaces_stream.read_records(
-            sync_mode=SyncMode.full_refresh
-        ):
-            yield {"workspace_gid": workspace["gid"]}
+        yield from self.read_slices_from_records(
+            stream_class=Workspaces, slice_field="workspace_gid"
+        )
 
 
 class WorkspaceRequestParamsRelatedStream(WorkspaceRelatedStream, ABC):
@@ -382,7 +388,7 @@ class PortfoliosMemberships(AsanaStream):
         self, stream_slice: Mapping[str, Any] = None, **kwargs
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_slice=stream_slice, **kwargs)
-        params["portfolio"] = stream_slice["porfolio_gid"]
+        params["portfolio"] = stream_slice["portfolio_gid"]
         return params
 
     def parse_response(

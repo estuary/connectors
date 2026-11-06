@@ -64,6 +64,14 @@ type Client interface {
 	Close()
 }
 
+// TablePreparer is an optional interface for sql.Client implementations that
+// need to resolve type information on a Table before its DDL is rendered.
+// CreateResource calls PrepareTable before rendering the CREATE TABLE statement
+// that becomes the action description, ensuring the description is accurate.
+type TablePreparer interface {
+	PrepareTable(table *Table) error
+}
+
 // SchemaManager is an optional interface that destinations can implement if they support schemas
 // and their automatic creation.
 type SchemaManager interface {
@@ -152,6 +160,9 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	ConcurrentApply bool
 	// NoFlowDocument indicates whether flow_document projection should be optional (true) or mandatory (false)
 	NoFlowDocument bool
+	// KeyChangeInPlace indicates that a backfill with a changed collection key
+	// does not require re-creating the resource.
+	KeyChangeInPlace bool
 	// Options are general materialization options that apply to this task.
 	Options m.MaterializeOptions
 }

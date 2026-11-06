@@ -1,0 +1,152 @@
+info:
+  name: liveSpecs bare
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { liveSpecs(by: {prefix: \"Jonathan_Wihl/\"}, first: 500) { pageInfo { hasNextPage endCursor } edges { node { catalogName liveSpec { catalogType } } } } }"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain up to 5 capture/materialization names into `CatalogStats / task names hourly`.
+        const edges = res.getBody()?.data?.liveSpecs?.edges ?? [];
+        const names = edges
+          .filter((e) => ["capture", "materialization"].includes(e.node.liveSpec?.catalogType))
+          .slice(0, 5).map((e) => e.node.catalogName);
+        if (names.length) bru.setVar("task_names_json", JSON.stringify(names));
+        // Chain every live name (tasks + collections, incl. derivations) into
+        // `CatalogStats / all live names hourly`.
+        bru.setVar("live_names_json", JSON.stringify(edges.map((e) => e.node.catalogName)));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs` (`LiveSpecsQuery::live_specs`, `DEFAULT_PAGE_SIZE = 50`)
+  
+  **WHY:** the name source for per-task `catalogStats` rows. Proves the
+  envelope, that `first: 500` is honored (no max), and what `catalogType`
+  values come back (tests must be dropped — they have no stats).
+
+  **VERIFIED (2026-10-07):** 55 specs under `Jonathan_Wihl/` in one page with
+  `first: 500` (default page size is 50, so `first` above it is honored):
+  51 `collection`, 3 `materialization`, 1 `capture`. The task-name chain picks
+  up only those 4, which turn out to be idle — see `CatalogStats / task names hourly`.
+
+examples:
+  - name: "200 — 55 specs, first:500, hasNextPage false (projection: first 6 edges + non-collection specs)"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "Jonathan_Wihl/wikipedia/user-summary-limit"
+                },
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                      "liveSpec": {
+                        "catalogType": "collection"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "liveSpec": {
+                        "catalogType": "collection"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "liveSpec": {
+                        "catalogType": "materialization"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/my_first_capture/assignees",
+                      "liveSpec": {
+                        "catalogType": "collection"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/my_first_capture/branches",
+                      "liveSpec": {
+                        "catalogType": "collection"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/my_first_capture/collaborators",
+                      "liveSpec": {
+                        "catalogType": "collection"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "liveSpec": {
+                        "catalogType": "materialization"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/notion-to-pinecone-demo/materialize-pinecone",
+                      "liveSpec": {
+                        "catalogType": "materialization"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/pinecone_notion/materialize-pinecone",
+                      "liveSpec": {
+                        "catalogType": "materialization"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/snowflake-gpt/source-snowflake",
+                      "liveSpec": {
+                        "catalogType": "capture"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }

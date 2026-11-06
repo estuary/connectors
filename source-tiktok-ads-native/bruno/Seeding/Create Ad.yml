@@ -1,0 +1,64 @@
+info:
+  name: Create Ad
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/ad/create/"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "advertiser_id": "{{advertiser_id}}",
+        "adgroup_id": "{{seed_adgroup_id}}",
+        "creatives": [
+          {
+            "ad_name": "Estuary Seed Ad",
+            "ad_format": "SINGLE_VIDEO",
+            "video_id": "{{seed_video_id}}",
+            "image_ids": [
+              "{{seed_cover_image_id}}"
+            ],
+            "identity_id": "{{seed_identity_id}}",
+            "identity_type": "CUSTOMIZED_USER",
+            "ad_text": "Estuary connector test ad",
+            "call_to_action": "LEARN_MORE",
+            "landing_page_url": "https://estuary.dev",
+            "operation_status": "DISABLE"
+          }
+        ]
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_adgroup_id') && !bru.getEnvVar('seed_adgroup_id')) await bru.runRequest('Seeding/Create Ad Group');
+        if (!bru.getVar('seed_video_id') && !bru.getEnvVar('seed_video_id')) await bru.runRequest('Seeding/Upload Video');
+        // The cover is optional here: the sandbox cannot upload images (see
+        // `Upload Cover Image`), so without one the ad is created without `image_ids`.
+        if (!bru.getVar('seed_cover_image_id') && !bru.getEnvVar('seed_cover_image_id')) {
+          const body = req.getBody();
+          delete body.creatives[0].image_ids;
+          req.setBody(body);
+        }
+        if (!bru.getVar('seed_identity_id') && !bru.getEnvVar('seed_identity_id')) await bru.runRequest('Seeding/Create Identity');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Create an ad" (`POST /open_api/v1.3/ad/create/`).
+
+  **WHY:** the live ad the Ads snapshot captures.
+
+  **UNOBSERVABLE (2026-10-12, sandbox):** run against the existing ad group,
+  video and identity (passed with `--env-var`), it fails with `code 51004`, an
+  internal sandbox authorization error on `CheckMaterialBinding`
+  (`AUTHORIZATION_DENY`). **Ads cannot be seeded in the TikTok sandbox**; the
+  Ads stream needs a production ad account to verify.

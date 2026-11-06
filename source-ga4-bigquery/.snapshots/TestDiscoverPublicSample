@@ -1,0 +1,102 @@
+=== Discover: Discover Public Sample ===
+{
+  "recommendedName": "ga4_obfuscated_sample_ecommerce/events",
+  "resourceConfig": {
+    "dataset": "ga4_obfuscated_sample_ecommerce",
+    "stream_type": "events"
+  },
+  "documentSchema": {
+    "type": "object",
+    "required": [
+      "_meta",
+      "event_name",
+      "event_timestamp"
+    ],
+    "properties": {
+      "_meta": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "polled": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Polled Timestamp",
+            "description": "The time at which the readout that produced this document began."
+          },
+          "index": {
+            "type": "integer",
+            "title": "Result Index",
+            "description": "The index of this document within the readout that produced it."
+          },
+          "source": {
+            "properties": {
+              "dataset": {
+                "type": "string",
+                "description": "BigQuery dataset from which the document was read."
+              },
+              "stream_type": {
+                "type": "string",
+                "description": "GA4 logical stream that produced the document."
+              },
+              "table_date": {
+                "type": "string",
+                "description": "YYYYMMDD suffix of the source table from which the document was read."
+              },
+              "tag": {
+                "type": "string",
+                "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+              }
+            },
+            "type": "object",
+            "required": [
+              "dataset",
+              "stream_type",
+              "table_date"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "polled",
+          "index",
+          "source"
+        ]
+      },
+      "batch_event_index": {
+        "default": -1,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "event_bundle_sequence_id": {
+        "default": -1,
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "event_name": {
+        "type": "string"
+      },
+      "event_timestamp": {
+        "type": "integer"
+      },
+      "user_pseudo_id": {
+        "default": "unknown",
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "x-infer-schema": true
+  },
+  "key": [
+    "/event_timestamp",
+    "/event_name",
+    "/user_pseudo_id",
+    "/event_bundle_sequence_id",
+    "/batch_event_index"
+  ]
+}
+

@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -21,6 +21,15 @@ var simpleIdentifierRegexp = regexp.MustCompile(`^[_A-Za-z]+[_0-9A-Za-z]*$`)
 
 func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
+}
+
+// unquotedIdentifier removes SQL identifier quotes, yielding the exact name that
+// Snowflake stores.
+func unquotedIdentifier(ident string) string {
+	if strings.HasPrefix(ident, `"`) && strings.HasSuffix(ident, `"`) && len(ident) >= 2 {
+		return strings.ReplaceAll(ident[1:len(ident)-1], `""`, `"`)
+	}
+	return ident
 }
 
 // See https://docs.snowflake.com/en/sql-reference/data-types-datetime#timestamp
@@ -138,6 +147,7 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 			"timestamp_ltz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"binary":        {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(binaryToStringCast))},
 			"text":          {sql.NewMigrationSpec([]string{"binary"}, sql.WithCastSQL(stringToBinaryCast))},
+			"variant":       {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(variantToStringCast))},
 			"*":             {sql.NewMigrationSpec([]string{"variant"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -184,6 +194,14 @@ func datetimeNoTzToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_VARIANT(%s)`, migration.Identifier)
+}
+
+// variantToStringCast serializes a VARIANT column to its JSON text
+// representation. Used when reverting object/array fields from VARIANT storage
+// back to text, e.g. when a collection field that was an object/array becomes a
+// plain string.
+func variantToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
 }
 
 func binaryToStringCast(migration sql.ColumnTypeMigration) string {
@@ -272,7 +290,7 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }})
+SELECT {{ $.Table.Binding }}, {{ if eq $.Table.Document.BareDDL "VARIANT" }}TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}){{ else }}{{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}{{ end }}
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
@@ -313,9 +331,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Table.Binding }},
 OBJECT_CONSTRUCT_KEEP_NULL(
-{{- range $i, $col := $.Table.RootLevelColumns}}
+{{- range $i, $col := $.Table.RootPropertyColumns}}
 	{{- if $i}},{{end}}
-	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
+	{{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
 {{- end}}
 ) as flow_document
 FROM {{ $.Table.Identifier }}
@@ -407,7 +425,7 @@ WHEN NOT MATCHED AND r._flow_delete=false THEN
 
 
 {{ define "copyHistory" }}
-SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
+SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE, ROW_COUNT FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
   TABLE_NAME=>'{{ $.TableName }}',
   START_TIME=>DATEADD(DAY, -14, CURRENT_TIMESTAMP())
 )) WHERE

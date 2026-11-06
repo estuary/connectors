@@ -15,6 +15,46 @@ The CDK is designed for modern Python, which means:
 The rough architecture of the CDK is a framework, which calls a user-developed connector, which optionally calls "common" components that solve problems common to many connectors.
 The "framework" portion of the CDK tries to be as un-opinionated as possible, allowing any kind of connector use case, while common components are opinionated to reduce boilerplate and repetition across connectors.
 
+## Depending on the CDK from another repository
+
+Connectors here get the CDK as a uv workspace member. Projects outside this repository
+install it from PyPI:
+
+```toml
+dependencies = ["estuary-cdk>=0.3.0"]
+```
+
+Changing the CDK on `main` also publishes a pre-release, versioned `X.Y.Z.devN` — `X.Y.Z`
+names the next cut, and `N` counts commits from the *last* cut to the CDK's last change.
+Two commits that build the same wheel share a version.
+
+Pre-releases are excluded from resolution unless a specifier asks for them:
+
+```toml
+dependencies = ["estuary-cdk>=0.4.0.dev0"]
+```
+
+`estuary_cdk.shim_airbyte_cdk` is the one module that will not work out there: it needs the
+vendored Airbyte fork under `vendor/`, a separate distribution that is not published.
+Everything else imports from the wheel alone, which CI checks on every change.
+
+## Cutting a release
+
+`vX.Y.Z` is a shared, repo-wide tag namespace — the same tag is this repository's Go module
+version. (At `v2` Go would require the module path to carry a `/v2` suffix, so it stops
+tracking these tags and `go get` pins to the last `v1`.)
+
+1. Tag the commit, and push branch and tag together: `git push --follow-tags`.
+2. Publish a GitHub release for the tag. That is what publishes `X.Y.Z` to PyPI.
+3. Raise `version` in this directory's `pyproject.toml` to the next release, and relock.
+
+Until step 3 lands, every run that would publish — the nightly, or a push that
+changes the CDK — fails in `.github/scripts/cdk-release-version.py`
+rather than publishing a `.devN` that sorts below the release just cut.
+
+The release path runs only on a real cut, so it is cold when you first need it. Before the
+first one, point it at TestPyPI with a throwaway tag.
+
 ## Canonical Layout of a Connector
 
 A canonical connector consists of:
@@ -48,8 +88,17 @@ The CDK's `common` module implements common strategies for capturing data, inclu
 - **incremental_csv_processor** — Streaming CSV parser
 - **gunzip_stream** / **unzip_stream** — Compressed data handling
 
+### Protocol Models (`flow.py`, `capture/`, `derive/`)
+- **flow** — Specifications shared across protocols (`CollectionSpec`, `CaptureSpec`, `DerivedCollectionSpec`), generic over a connector's endpoint and resource configuration types
+- **capture.request** / **capture.response** — Messages of the capture protocol
+- **derive.request** / **derive.response** — Messages of the derive protocol, generic over a derivation's documents, used by Python derivations (they require Pydantic v2)
+- **Linked collections** — A message whose bindings name collections through `linkedCollections` (the indirect form) links each binding to its entry as it's parsed. `binding.collection` is set in either form, and bindings of one collection share one parsed `CollectionSpec`
+
 ### Third-Party Connector Support
 - **CaptureShim** (`shim_airbyte_cdk.py`) — Wraps Airbyte CDK connectors to run within the Estuary framework
+- **`vendor/`** — The forked Airbyte CDK the shim runs against, pruned to the surface the
+  remaining shim connectors use. Enabled via the `airbyte-shim` extra. See
+  [vendor/README.md](vendor/README.md) before changing anything under it.
 
 ## Runtime Behavior
 
@@ -62,6 +111,13 @@ The CDK implements a graceful shutdown: when the connector receives a stop signa
 Snapshot bindings store a digest of the previous snapshot in their state and compare it against the current snapshot to detect changes. To avoid emitting duplicate data, `FetchSnapshotFn` implementations should yield documents in a consistent order.
 
 When a snapshot captures fewer documents than the previous run, the CDK emits minimal documents with `_meta/op: "d"` for the missing keys. This deletion inference mechanism enables standard-updates materializations to maintain a complete view of what exists in the source system.
+
+### Backfill Signals
+The backfill signals are the `BackfillBegin` and `BackfillComplete` messages. A backfill sent with them restates its binding, and destinations delete the rows it didn't capture again. A resource declares its backfills' coverage by setting `Resource.backfill_coverage` to a `BackfillCoverage`, or to a function that answers for each backfill, and the CDK sends a backfill as a restatement only when its coverage allows it. The connector also declares two feature flags with `backfill_signal_flag_defaults`. `emit_backfill_signals` turns the signals on, and `ignore_config_for_backfill_signals` also sends them for backfills the configuration bounds.
+
+The CDK sends the signals and keeps them exactly-once across restarts. It never decides a backfill's coverage, and a wrong answer deletes data. Read `capture/backfill_signals.py` before answering anything but `PARTIAL`. `BackfillCoverage` holds the checklist.
+
+`flowctl preview` counts its task as newly created, so `emit_backfill_signals` defaults on there, and a `BackfillBegin` ends a `--sessions 1` preview before it captures any document. A capture test sets the flags it tests in its config's `advanced.feature_flags`, and `no_emit_backfill_signals` otherwise.
 
 ## Why Another Connector Kit?
 

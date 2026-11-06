@@ -109,7 +109,7 @@
               "query": {
                 "type": "string",
                 "title": "Custom Query",
-                "description": "A custom defined GAQL query for building the report. Should not contain segments.date expression because it is used by incremental streams. For more information, see Google's query builder at https://developers.google.com/google-ads/api/fields/v11/overview_query_builder.",
+                "description": "A custom defined GAQL query for building the report. Should not contain segments.date expression because it is used by incremental streams. For more information, see Google's query builder at https://developers.google.com/google-ads/api/fields/v25/overview_query_builder.",
                 "examples": [
                   "SELECT segments.ad_destination_type, campaign.advertising_channel_sub_type FROM campaign WHERE campaign.status = 'PAUSED'"
                 ]
@@ -152,26 +152,34 @@
       }
     },
     "resourceConfigSchema": {
-      "title": "ResourceConfig",
+      "additionalProperties": false,
       "description": "ResourceConfig encodes a configured resource stream",
-      "type": "object",
       "properties": {
         "_meta": {
-          "title": "Meta",
-          "type": "object"
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
         },
         "stream": {
-          "title": "Stream",
           "description": "Name of this stream",
+          "title": "Stream",
           "type": "string"
         },
         "syncMode": {
-          "title": "Sync Mode",
           "description": "Sync this resource incrementally, or fully refresh it every run",
           "enum": [
             "full_refresh",
             "incremental"
           ],
+          "title": "Sync Mode",
           "type": "string"
         },
         "namespace": {
@@ -191,7 +199,8 @@
         "stream",
         "syncMode"
       ],
-      "additionalProperties": false
+      "title": "ResourceConfig",
+      "type": "object"
     },
     "documentationUrl": "https://go.estuary.dev/source-google-ads",
     "oauth2": {

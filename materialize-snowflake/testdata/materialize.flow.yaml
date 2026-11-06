@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-snowflake:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.yaml
     bindings:
@@ -34,3 +34,13 @@ materializations:
       source: tests/data-types
       fields:
         recommended: true
+    - resource:
+        table: merge_renamed
+        schema: PUBLIC
+      source: tests/merge-renamed
+      fields:
+        recommended: true
+        exclude: [renamedString, renamedTotal]
+        include:
+          renamed_string: {}
+          renamed_total: {}

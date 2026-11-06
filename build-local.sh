@@ -48,6 +48,7 @@ docker buildx build \
     --platform linux/amd64 \
     --build-arg CONNECTOR_NAME="$name" \
     --build-arg CONNECTOR_TYPE="$type" \
+    --build-arg CONNECTOR_VERSION="local-$(git rev-parse --short HEAD)" \
     --build-arg="USAGE_RATE=1.0" \
     --load \
     -t "ghcr.io/estuary/${name}:local" \

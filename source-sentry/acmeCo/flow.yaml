@@ -19,3 +19,8 @@ collections:
     schema: Teams.schema.yaml
     key:
     - /_meta/row_id
+  acmeCo/custom_explore_my_spans:
+    schema: custom_explore_my_spans.schema.yaml
+    key:
+    - /trace
+    - /id

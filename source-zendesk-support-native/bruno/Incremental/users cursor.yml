@@ -1,0 +1,69 @@
+info:
+  name: users cursor
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/incremental/users/cursor?start_time=0"
+  params:
+    - name: "start_time"
+      value: "0"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - after A1/A2, deleted user present (projection, probe user only)"
+    request:
+      url: "{{base_url}}/incremental/users/cursor?start_time=0"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "694"
+        - name: "ratelimit-remaining"
+          value: "694"
+        - name: "ratelimit-reset"
+          value: "6"
+        - name: "zendesk-ratelimit-incremental-exports-cursor"
+          value: "total=20; remaining=19; resets=6"
+      body:
+        type: json
+        data: |-
+          {
+            "users": [
+              {
+                "id": 54337475674900,
+                "name": "Bruno probe V7 deleted user",
+                "updated_at": "2026-10-07T15:52:05Z",
+                "active": false,
+                "email": null
+              }
+            ],
+            "after_cursor": "MTc5MTM4ODMyNS4wfHw1NDMzNzQ3NTY3NDkwMHw=",
+            "end_of_stream": true
+          }
+
+docs: |-
+  **REFERENCE:** [Incremental User Export, Cursor Based](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export-cursor-based)
+
+  **WHY:** V7. Shows how the export represents deleted users today, to compare
+  with what `/users` and `/deleted_users` return.
+
+  **VERIFIED (2026-10-07):** a user deleted by `Seeding / A2 - Delete user` stays in the export
+  with `active: false` and `email: null` (after the roughly 60-second hold-back). Bucket
+  header: `zendesk-ratelimit-incremental-exports-cursor: total=20`.

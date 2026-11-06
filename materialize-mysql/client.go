@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -39,7 +40,7 @@ func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, _ str
 	}
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := stdsql.Open("mysql", cfg.ToURI())
@@ -56,11 +57,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var mysqlErr *mysql.MySQLError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &mysqlErr) {
+		if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok {
 			// See MySQL error reference: https://dev.mysql.com/doc/mysql-errors/5.7/en/error-reference-introduction.html
 			switch mysqlErr.Number {
 			case 1045:
@@ -70,11 +67,11 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 			case 1044:
 				err = fmt.Errorf("database %q cannot be accessed, it might not exist or you do not have permission to access it (%d): %s", cfg.Database, mysqlErr.Number, mysqlErr.Message)
 			}
-		} else if errors.As(err, &netConnErr) {
+		} else if netConnErr, ok := errors.AsType[*net.DNSError](err); ok {
 			if netConnErr.IsNotFound {
 				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
-		} else if errors.As(err, &netOpErr) {
+		} else if netOpErr, ok := errors.AsType[*net.OpError](err); ok {
 			if netOpErr.Timeout() {
 				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
@@ -95,48 +92,76 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, "def", resourcePaths)
+// datetimeFieldMeta is attached to the ExistingField.Meta of a DATETIME
+// column to carry its fractional-seconds precision.
+type datetimeFieldMeta struct {
+	precision int
 }
 
-var migrationSteps = []sql.ColumnMigrationStep{
-	sql.StdMigrationSteps[0],
-	sql.StdMigrationSteps[1],
-	sql.StdMigrationSteps[2],
-	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		var queries []string
-		for _, ins := range instructions {
-			queries = append(
-				queries,
-				fmt.Sprintf(
-					"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
-					table.Identifier,
-					ins.TempColumnIdentifier,
-					ins.TypeMigration.Identifier,
-					ins.TypeMigration.DDL,
-				),
-			)
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	if err := sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, "def", resourcePaths); err != nil {
+		return err
+	} else if len(resourcePaths) == 0 {
+		return nil
+	}
+
+	schemas := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		loc := c.ep.Dialect.TableLocator(p)
+		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+	}
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		SELECT table_name, column_name, datetime_precision
+		FROM information_schema.columns
+		WHERE table_catalog = 'def' AND table_schema IN (%s) AND data_type = 'datetime'`,
+		strings.Join(schemas, ",")))
+	if err != nil {
+		return fmt.Errorf("querying datetime precisions: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tn, cn string
+		var precision int
+		if err := rows.Scan(&tn, &cn, &precision); err != nil {
+			return err
 		}
-
-		return queries, nil
-	},
-	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		var queries []string
-
-		for _, ins := range instructions {
-			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
-				queries = append(
-					queries,
-					fmt.Sprintf("ALTER TABLE %s MODIFY %s %s;",
-						table.Identifier,
-						ins.TypeMigration.Identifier,
-						ins.TypeMigration.DDL,
-					),
-				)
+		if res := is.GetResource([]string{tn}); res != nil {
+			if field := res.GetField(cn); field != nil {
+				field.Meta = datetimeFieldMeta{precision: precision}
 			}
 		}
+	}
+	return rows.Err()
+}
 
-		return queries, nil
+// Each step alters all of its columns in one statement, since MySQL and
+// MariaDB can rebuild the whole table for every ALTER TABLE that adds, drops or
+// redefines a column.
+var migrationSteps = []sql.ColumnMigrationStep{
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("ADD COLUMN %s %s", ins.TempColumnIdentifier, ins.TypeMigration.NullableDDL)
+	}),
+	sql.StdMigrationSteps[1],
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("DROP COLUMN %s", ins.TypeMigration.Identifier)
+	}),
+	sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+		return fmt.Sprintf("CHANGE COLUMN %s %s %s", ins.TempColumnIdentifier, ins.TypeMigration.Identifier, ins.TypeMigration.DDL)
+	}),
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		var notNull []sql.MigrationInstruction
+		for _, ins := range instructions {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				notNull = append(notNull, ins)
+			}
+		}
+		return sql.BatchedColumnMigrationStep(func(ins sql.MigrationInstruction) string {
+			return fmt.Sprintf("MODIFY %s %s", ins.TypeMigration.Identifier, ins.TypeMigration.DDL)
+		})(dialect, table, notNull)
 	},
 }
 

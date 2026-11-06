@@ -31,7 +31,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	// In non-read-only mode we still need to verify watermarks table usability.
 	// In read-only non-replica mode we need to verify that sys.dm_cdc_log_scan_sessions is accessible.
 	// In read-only replica mode we have no additional requirements.
-	var isReplica, _ = isReplicaDatabase(ctx, db.conn)
+	var isReplica, _ = db.replicaStatus(ctx)
 	if !db.featureFlags["read_only"] {
 		checks = append(checks,
 			db.prerequisiteWatermarksTable,
@@ -145,7 +145,8 @@ func (db *sqlserverDatabase) prerequisiteCDCEnabled(ctx context.Context) error {
 
 func isCDCEnabled(ctx context.Context, conn *sql.DB, dbName string) (bool, error) {
 	var cdcEnabled bool
-	if err := conn.QueryRowContext(ctx, fmt.Sprintf(`SELECT is_cdc_enabled FROM sys.databases WHERE name = '%s';`, dbName)).Scan(&cdcEnabled); err != nil {
+	const query = `SELECT is_cdc_enabled FROM sys.databases WHERE name = @p1;`
+	if err := conn.QueryRowContext(ctx, query, mssqldb.NVarCharMax(dbName)).Scan(&cdcEnabled); err != nil {
 		return false, fmt.Errorf("unable to query CDC status of database %q: %w", dbName, err)
 	}
 	return cdcEnabled, nil
@@ -217,8 +218,7 @@ func (db *sqlserverDatabase) prerequisiteViewCDCScanHistory(ctx context.Context)
 	var _, err = latestCDCLogScanSession(ctx, db.conn)
 	if err != nil {
 		log.WithField("err", err).Error("failed to list CDC log scan sessions")
-		var msErr mssqldb.Error
-		if errors.As(err, &msErr) && msErr.SQLErrorNumber() == 297 { // Error 297 = "The user does not have permission to perform this action"
+		if msErr, ok := errors.AsType[mssqldb.Error](err); ok && msErr.SQLErrorNumber() == 297 { // Error 297 = "The user does not have permission to perform this action"
 			return fmt.Errorf("user %q needs the VIEW DATABASE STATE permission", db.config.User)
 		}
 		return fmt.Errorf("failed to query sys.dm_cdc_log_scan_sessions: %w", err)

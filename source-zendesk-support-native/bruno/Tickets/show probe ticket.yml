@@ -1,0 +1,90 @@
+info:
+  name: show probe ticket
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets/{{probe_ticket_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // probe_ticket_id normally arrives from `Seeding / C2 - Create SLA ticket`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('probe_ticket_id') && !bru.getEnvVar('probe_ticket_id')) {
+          throw new Error('probe_ticket_id not set: run `Seeding / C2 - Create SLA ticket` first in this session, or bru.setVar it');
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - ticket 49 at 15:58:37, after its 15:56:19 SLA breach (projection)"
+    request:
+      url: "{{base_url}}/tickets/49"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "19"
+      body:
+        type: json
+        data: |-
+          {}
+  - name: "200 - ticket 48 after F1 restore: updated_at bumped to the restore time (projection)"
+    request:
+      url: "{{base_url}}/tickets/48"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+      body:
+        type: json
+        data: |-
+          {
+            "ticket": {
+              "id": 48,
+              "status": "open",
+              "created_at": "2026-10-07T15:52:08Z",
+              "updated_at": "2026-10-07T20:38:30Z"
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Show Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#show-ticket)
+
+  **WHY:** V8. Reads the `updated_at` of the ticket created by
+  `Seeding / C2 - Create SLA ticket`, to compare with its `breach` event time.
+
+  **VERIFIED (2026-10-07):** ticket 49 (`Seeding / C2 - Create SLA ticket`) still has
+  `updated_at` 15:55:19, its creation time, after its `reply_time` SLA breached at
+  15:56:19.
+
+  **VERIFIED (2026-10-07):** restoring a deleted ticket bumps its `updated_at` to the restore
+  time. Ticket 48 (deleted 15:52:09) was restored by `Seeding / F1 - Restore deleted
+  ticket` and now has `status: open` and `updated_at` 20:38:30. It is the newest ticket in
+  `Tickets / descending sweep page 1` and no longer appears in
+  `Deleted / deleted_tickets`. The `tickets` A8 sweep re-captures a restored ticket
+  after its deletion document was emitted (V12).
+

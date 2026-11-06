@@ -3,6 +3,7 @@ package testutil
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -73,6 +74,134 @@ func taskNames(bundled []byte) []string {
 		return true
 	})
 	return names
+}
+
+// snapshotT is cupaloy.SnapshotT which, on a mismatch, also writes this run's
+// value beside the snapshot as `<name>.actual`. CI uploads that file: a
+// cloud-credentialed connector's snapshot can only be regenerated where its
+// endpoint is reachable, and the job log is no substitute, since GitHub's secret
+// redaction rewrites the connector state these snapshots embed.
+func snapshotT(t *testing.T, got string) {
+	t.Helper()
+
+	name := strings.ReplaceAll(t.Name(), "/", "-")
+	path := filepath.Join(".snapshots", name)
+
+	// cupaloy writes a lone string verbatim with a trailing newline, so this
+	// reproduces exactly what it would compare against.
+	if prev, err := os.ReadFile(path); err == nil && string(prev) != got+"\n" {
+		if err := os.WriteFile(path+".actual", []byte(got+"\n"), 0o644); err != nil {
+			t.Logf("failed to write %s.actual: %s", path, err)
+		} else {
+			t.Logf("wrote %s.actual with this run's value", path)
+		}
+	}
+
+	cupaloy.SnapshotT(t, got)
+}
+
+// snapshotNamed is snapshotT against the snapshot file `name`. cupaloy derives
+// the file name from the calling test, so a differently named snapshot is
+// compared here directly, in cupaloy's format: the string verbatim with a
+// trailing newline, written (or rewritten) when UPDATE_SNAPSHOTS is set. On a
+// mismatch the diff is `.snapshots/<name>` against `<name>.actual`.
+func snapshotNamed(t *testing.T, name string, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", name)
+	want := got + "\n"
+
+	prev, err := os.ReadFile(path)
+	if err == nil && string(prev) == want {
+		return
+	}
+	if err == nil {
+		if err := os.WriteFile(path+".actual", []byte(want), 0o644); err != nil {
+			t.Logf("failed to write %s.actual: %s", path, err)
+		} else {
+			t.Logf("wrote %s.actual with this run's value", path)
+		}
+	}
+	if os.Getenv("UPDATE_SNAPSHOTS") != "" {
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(want), 0o644))
+		t.Logf("snapshot %s %s", path, map[bool]string{true: "updated", false: "created"}[err == nil])
+		return
+	}
+	if err != nil {
+		t.Errorf("snapshot %s does not exist; run with UPDATE_SNAPSHOTS=true to create it", path)
+		return
+	}
+	t.Errorf("snapshot %s not equal; this run's value is in %s.actual", path, path)
+}
+
+// runtimeV1SnapshotName is the runtime v1 pass's snapshot file for this test:
+// a table-only golden, since the pass omits the apply/state output. Its content
+// is what a runtime-next run leaves in the destination, so a connector's first
+// one is generated like any other, with UPDATE_SNAPSHOTS=true against its
+// endpoint. Until then the pass logs and enforces liveness alone.
+func runtimeV1SnapshotName(t *testing.T) (name string, exists bool) {
+	name = strings.ReplaceAll(t.Name(), "/", "-") + "-runtime-v1"
+	if _, err := os.Stat(filepath.Join(".snapshots", name)); err == nil || os.Getenv("UPDATE_SNAPSHOTS") != "" {
+		return name, true
+	}
+	t.Logf("no runtime v1 snapshot .snapshots/%s; run with UPDATE_SNAPSHOTS=true to create it", name)
+	return name, false
+}
+
+// stripRuntimeNextOutput removes from a runtime-next snapshot the lines only a
+// runtime-next run produces: flowctl's `--output-apply` / `--output-state`
+// records, which single-shard runs capture under each resource. What remains
+// is the destination alone, in the shape the runtime v1 pass snapshots.
+func stripRuntimeNextOutput(snapshot string) string {
+	var out []string
+	for _, line := range strings.Split(snapshot, "\n") {
+		if strings.HasPrefix(line, `["applied.actionDescription",`) || strings.HasPrefix(line, `["connectorState",`) {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// unsignedExponent matches a JSON number with an unsigned exponent, such as
+// `1e21`, where it stands as a value of its own: after `:`, `,`, `[` or
+// whitespace, and before `,`, `}`, `]` or whitespace. The bounds keep it off
+// the digits of strings such as UUIDs.
+var unsignedExponent = regexp.MustCompile(`([:,\[\s]|^)(-?\d+(?:\.\d+)?[eE])(\d+)([,}\]\s]|$)`)
+
+// signExponents writes every unsigned exponent with a `+`. The runtime v1 pass
+// runs a pinned flowctl whose serializer writes `1e21`, where runtime-next's
+// writes `1e+21`.
+func signExponents(s string) string {
+	for {
+		// Adjacent numbers share a bound, so each pass may leave one to the next.
+		var next = unsignedExponent.ReplaceAllString(s, "${1}${2}+${3}${4}")
+		if next == s {
+			return s
+		}
+		s = next
+	}
+}
+
+// requireMatchesRuntimeNextSnapshot requires the runtime v1 pass's value to
+// equal this test's runtime-next golden with the runtime-next-only output
+// lines removed: both runtimes must leave the same destination behind.
+func requireMatchesRuntimeNextSnapshot(t *testing.T, got string) {
+	t.Helper()
+
+	path := filepath.Join(".snapshots", strings.ReplaceAll(t.Name(), "/", "-"))
+	golden, err := os.ReadFile(path)
+	require.NoErrorf(t, err, "reading the runtime-next snapshot to compare the runtime v1 run against")
+
+	want := strings.TrimSuffix(stripRuntimeNextOutput(string(golden)), "\n")
+	if signExponents(want) == signExponents(got) {
+		return
+	}
+	if err := os.WriteFile(path+".runtime-v1.actual", []byte(got+"\n"), 0o644); err == nil {
+		t.Logf("wrote %s.runtime-v1.actual with the runtime v1 run's value", path)
+	}
+	t.Errorf("runtime v1 run does not match the runtime-next snapshot %s with its output lines removed; the run's value is in %s.runtime-v1.actual", path, path)
 }
 
 // RunTestAllTasks calls testFn for each materialization task found in the spec
@@ -147,17 +276,27 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
+	runtime RuntimeConfig,
 ) {
+	requireRuntimeV1Selected(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers))
+		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime))
 	})
 
-	cupaloy.SnapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
+	}
 }
 
 // RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
@@ -169,12 +308,15 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
+	runtime RuntimeConfig,
 ) {
+	requireRuntimeV1Selected(t)
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers)
+		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers, runtime)
 	})
 
 	var snap strings.Builder
@@ -183,7 +325,14 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	if !RuntimeV1() {
+		snapshotT(t, snap.String())
+	} else {
+		if name, ok := runtimeV1SnapshotName(t); ok {
+			snapshotNamed(t, name, snap.String())
+		}
+		requireMatchesRuntimeNextSnapshot(t, snap.String())
+	}
 }
 
 // RunApplyTest tests a variety of scenarios involving changes to materialized
@@ -197,7 +346,7 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 // `testdata/validate_apply_test_cases/generated_specs`. Ideally we'd figure out
 // a way to use `flowctl` commands instead of generating the binary spec files -
 // the main blocker for this is that there is not a way to simulate a previously
-// applied materialization spec via `flowctl preview` etc.
+// applied materialization spec via `flowctl raw preview-next` etc.
 func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	driver boilerplate.Connector,
@@ -205,6 +354,8 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -213,7 +364,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 
 	for _, taskName := range taskNames(bundled) {
 		cfg := decryptConfig[EC](t, bundled, taskName)
-		materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -253,7 +404,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 		}
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunApplyTestParallel is like RunApplyTest but runs tasks concurrently (up to
@@ -266,11 +417,13 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
-		materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -318,7 +471,7 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
 }
 
 // RunMigrationTest tests migrations of all known schema widening scenarios.
@@ -342,6 +495,8 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	var snap strings.Builder
 
@@ -353,7 +508,154 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
+	snapshotT(t, snap.String())
+}
+
+// FeatureFlagMigrationPhase is a single apply within a
+// RunFeatureFlagMigrationTest. The binding is materialized with the given
+// feature flags and fixture data. Running consecutive phases against the same
+// resource exercises column type migrations that are driven by a feature flag
+// change rather than a collection schema change.
+type FeatureFlagMigrationPhase struct {
+	// FeatureFlags is the value of the endpoint's advanced.feature_flags for
+	// this phase, e.g. "objects_and_arrays_as_json=false".
+	FeatureFlags string
+	// Fixture is the path to the fixture document data applied in this phase.
+	Fixture string
+}
+
+// RunFeatureFlagMigrationTest applies a single binding repeatedly against the
+// same resource, changing the endpoint's feature flags between each phase. It
+// verifies column type migrations that are triggered by a feature flag change
+// rather than a collection schema change - notably that the flow_document column
+// migrates in place between JSON and text when objects_and_arrays_as_json is
+// toggled, without requiring a backfill.
+//
+// The source spec must have one or more materialization tasks with a single
+// binding. Each phase snapshots the apply action (migration DDL) and the
+// resulting table so that both the schema and data can be verified.
+func RunFeatureFlagMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	phases []FeatureFlagMigrationPhase,
+	actionDescSanitizers []func(string) string,
+) {
+	SkipRuntimeV1(t)
+
+	ctx := context.Background()
+	var snap strings.Builder
+
+	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	for _, taskName := range taskNames(bundled) {
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
+		snap.WriteString(runFeatureFlagMigrationForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, phases, actionDescSanitizers))
+	}
+
+	snapshotT(t, snap.String())
+}
+
+func runFeatureFlagMigrationForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	taskName string,
+	bundled []byte,
+	suffix string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	phases []FeatureFlagMigrationPhase,
+	actionDescSanitizers []func(string) string,
+) string {
+	var snap strings.Builder
+
+	rndSuffix := "_" + uuid.NewString()[:8] + suffix
+	workingTableName := "migration_test" + rndSuffix
+	workingTaskName := taskName + rndSuffix
+
+	cfg := decryptConfig[EC](t, bundled, taskName)
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
+	require.NoError(t, err)
+
+	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
+	resCfgRaw, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		fmt.Sprintf("materializations.%s.bindings.0.resource", taskName),
+		json.RawMessage(resCfgRaw),
+	)
+	require.NoError(t, err)
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		"materializations."+workingTaskName,
+		json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s", taskName)).Raw),
+	)
+	require.NoError(t, err)
+
+	// The config is decrypted once so that each phase can override its feature
+	// flags. flowctl passes a plaintext (non-sops) config to the connector
+	// unchanged, so writing the decrypted config back inline is sufficient.
+	rawCfg := decryptConfigRaw(t, bundled, workingTaskName)
+
+	// The phase's flags are appended to whatever the source config already sets
+	// (later entries win in ParseFeatureFlags), so that flags the test relies on
+	// - notably allow_existing_tables_for_new_bindings, which lets each phase
+	// re-apply to the table created by the previous phase - are preserved.
+	baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String()
+
+	path, _, err := res.Parameters()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		CleanupTestResources(t, ctx, materializer, [][]string{path}, suffix)
+		cleanupTestTasks(t, ctx, materializer, suffix)
+	})
+
+	for idx, phase := range phases {
+		if idx > 0 {
+			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
+		}
+
+		phaseFlags := phase.FeatureFlags
+		if baseFlags != "" {
+			phaseFlags = baseFlags + "," + phaseFlags
+		}
+		phaseCfg, err := sjson.SetBytes(rawCfg, "advanced.feature_flags", phaseFlags)
+		require.NoError(t, err)
+
+		phaseBundled, err := sjson.SetRawBytes(
+			bundled,
+			"materializations."+workingTaskName+".endpoint.local.config",
+			phaseCfg,
+		)
+		require.NoError(t, err)
+
+		source := filepath.Join(t.TempDir(), "source.flow.yaml")
+		require.NoError(t, os.WriteFile(source, phaseBundled, 0o600))
+
+		actionDescription := RunFlowctl(
+			t,
+			"raw", "preview-next",
+			"--name", workingTaskName,
+			"--source", source,
+			"--fixture", phase.Fixture,
+			"--network", "flow-test",
+			"--output-apply",
+		)
+		for _, sanitize := range actionDescSanitizers {
+			actionDescription = []byte(sanitize(string(actionDescription)))
+		}
+
+		snap.WriteString(fmt.Sprintf("Feature flags: %q\n", phase.FeatureFlags))
+		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rndSuffix, true))
+	}
+
+	return snap.String()
 }
 
 // RunMigrationTestParallel is like RunMigrationTest but runs tasks concurrently
@@ -366,6 +668,8 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
+	SkipRuntimeV1(t)
+
 	ctx := context.Background()
 	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -379,96 +683,7 @@ func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.Fi
 		snap.WriteString(results[name])
 	}
 
-	cupaloy.SnapshotT(t, snap.String())
-}
-
-func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
-	t *testing.T,
-	ctx context.Context,
-	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
-	taskName string,
-	bundled []byte,
-	tsSuffix string,
-	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
-	actionDescSanitizers []func(string) string,
-) string {
-	var snap strings.Builder
-
-	rndSuffix := "_" + uuid.NewString()[:8] + tsSuffix
-	workingTaskName := taskName + rndSuffix
-	cfg := decryptConfig[EC](t, bundled, taskName)
-
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
-	require.NoError(t, err)
-
-	var snapshotResources []RC
-	var testResourcePaths [][]string
-	gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).ForEach(func(bindingIdx, binding gjson.Result) bool {
-		// Replace the final resource path part with a unique name for this test
-		// run, to prevent concurrent runs of the test from interfering with
-		// each other.
-		var res RC
-		require.NoError(t, boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
-		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
-		require.NoError(t, err)
-		lastPathPart := path[len(path)-1] + rndSuffix
-
-		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
-		path, _, err = res.WithDefaults(cfg).Parameters()
-		require.NoError(t, err)
-		resCfgRaw, err := json.Marshal(res)
-		require.NoError(t, err)
-		snapshotResources = append(snapshotResources, res)
-		testResourcePaths = append(testResourcePaths, path)
-
-		bundled, err = sjson.SetBytes(
-			bundled,
-			fmt.Sprintf("materializations.%s.bindings.%d.resource", taskName, bindingIdx.Int()),
-			json.RawMessage(resCfgRaw),
-		)
-
-		return true
-	})
-
-	// Also replace the name of the materialization itself with a unique name,
-	// again to prevent concurrent tasks from clobbering each other. This is
-	// mostly relevant for materializations that use a "checkpoints" table keyed
-	// on the task name.
-	bundled, err = sjson.SetBytes(
-		bundled,
-		"materializations."+workingTaskName,
-		json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s", taskName)).Raw),
-	)
-	require.NoError(t, err)
-
-	source := filepath.Join(t.TempDir(), "test.flow.yaml")
-	require.NoError(t, os.WriteFile(source, bundled, 0o600))
-
-	t.Cleanup(func() {
-		CleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix)
-		cleanupTestTasks(t, ctx, materializer, tsSuffix)
-	})
-
-	// Drive task with the data from the fixture.
-	actionDescription := RunFlowctl(
-		t,
-		"preview",
-		"--name", workingTaskName,
-		"--source", source,
-		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
-		"--network", "flow-test",
-		"--output-apply",
-		"--output-state",
-	)
-	for _, sanitize := range actionDescSanitizers {
-		actionDescription = []byte(sanitize(string(actionDescription)))
-	}
-
-	for _, res := range snapshotResources {
-		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rndSuffix, true))
-	}
-
-	return snap.String()
+	snapshotT(t, snap.String())
 }
 
 func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -499,31 +714,22 @@ func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConf
 	snap.WriteString(schema)
 	snap.WriteString("\n")
 	if withTableData {
-		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
+		data, err := SnapshotResource(ctx, m, path)
 		require.NoError(t, err)
 		snap.WriteString("Table Data:\n")
-		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString(data)
 		snap.WriteString("\n")
 	}
 
 	return snap.String()
 }
 
-func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) string {
-	var data strings.Builder
-	enc := json.NewEncoder(&data)
-	for _, r := range rows {
-		doc := make(map[string]any, len(columnNames))
-		for i, col := range columnNames {
-			doc[col] = r[i]
-		}
-		require.NoError(t, enc.Encode(doc))
-	}
-
-	return data.String()
-}
-
-func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
+// decryptConfigRaw returns a task's endpoint config as raw JSON. If the config
+// is sops-encrypted it is decrypted and the _sops suffixes are stripped, so the
+// result is the plaintext config the connector expects. A plaintext (non-sops)
+// config is passed through to flowctl and the connector unchanged, which allows
+// callers to edit it (e.g. overriding feature flags) between applies.
+func decryptConfigRaw(t *testing.T, bundled []byte, taskName string) json.RawMessage {
 	t.Helper()
 
 	raw := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
@@ -541,8 +747,14 @@ func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte
 		require.NoError(t, sopsCmd.Wait())
 	}
 
+	return raw
+}
+
+func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
+	t.Helper()
+
 	var out EC
-	require.NoError(t, boilerplate.UnmarshalStrict(raw, &out))
+	require.NoError(t, boilerplate.UnmarshalStrict(decryptConfigRaw(t, bundled, taskName), &out))
 
 	return out
 }
@@ -564,7 +776,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("Big Schema Initial Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	// Initial apply with no previously existing table.
 	_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
@@ -577,7 +789,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Re-validated Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	// Apply again - this should be a no-op.
 	_, err = driver.Apply(ctx, applyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
@@ -590,7 +802,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	snap.WriteString("\nBig Schema Materialized Resource Schema With All Fields Required:\n")
 	snap.WriteString(sch)
@@ -619,7 +831,7 @@ func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types With Backfill Constraints:\n")
-	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].ProjectionConstraints))
 
 	_, err = driver.Apply(ctx, applyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
@@ -699,16 +911,36 @@ func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerpla
 
 	// Validate and apply twice to make sure that a re-application does not attempt to re-create
 	// any columns. This makes sure we are able to read back the schema we have created
-	// correctly.
+	// correctly. Optionals are included so the challenging-named fields are
+	// materialized: recommended/optional fields are not selected by name alone.
 	for range 2 {
 		validateRes, err := driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
-		_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
+		_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 	}
 
 	snap.WriteString("Challenging Field Names Materialized Columns:\n")
 	snap.WriteString(dumpSchema(t, ctx, m, res))
+}
+
+// clearTaskCheckpointBetweenPhases drops the connector's persisted checkpoint
+// for a task between two preview runs of it.
+//
+// Each phase is a separate `flowctl raw preview-next` invocation starting from
+// an empty recovery log, so a connector reporting back a checkpoint of its own
+// -- every materialization with a fenced checkpoints table -- makes the runtime
+// refuse to open. Clearing it makes each phase start as the fresh task run it
+// actually is, which costs the migration tests nothing: Apply migrates columns
+// by comparing the spec against the live table, not from the checkpoint.
+func clearTaskCheckpointBetweenPhases[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m boilerplate.Materializer[EC, FC, RC, MT],
+	workingTaskName string,
+) {
+	t.Helper()
+	require.NoError(t, m.CleanupTestTask(ctx, workingTaskName))
 }
 
 func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -730,7 +962,7 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	bundledMigratedCollection := RunFlowctl(t, "raw", "bundle", "--source", relativePath(t, "testdata/integration/collections.migrate-migrated.flow.yaml"))
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 	require.NoError(t, err)
 
 	bindings := gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
@@ -780,14 +1012,17 @@ func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.Fie
 	// state. The second one will both cause the columns to be migrated, as well
 	// as put some more data in the new form into the table to make sure it
 	// works.
-	for _, tc := range []struct{ source, fixture string }{
+	for idx, tc := range []struct{ source, fixture string }{
 		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-base.json")},
 		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migrate-migrated.json")},
 	} {
+		if idx > 0 {
+			clearTaskCheckpointBetweenPhases(t, ctx, materializer, workingTaskName)
+		}
 
 		actionDescription := RunFlowctl(
 			t,
-			"preview",
+			"raw", "preview-next",
 			"--name", workingTaskName,
 			"--source", tc.source,
 			"--fixture", tc.fixture,
@@ -829,7 +1064,14 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 	spec.Bindings[0].ResourceConfigJson = resourceConfig
 	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
 	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
-	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
+
+	// The live (prior) field selection keeps previously materialized fields
+	// selected, just as the control plane does.
+	var live pf.FieldSelection
+	if lastSpec != nil && len(lastSpec.Bindings) > 0 {
+		live = lastSpec.Bindings[0].FieldSelection
+	}
+	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, live, includeOptional)
 
 	req := &pm.Request_Apply{
 		Materialization:     spec,
@@ -840,20 +1082,88 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 	return req
 }
 
-// selectedFields creates a field selection that includes all possible fields.
-func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
+// selectedFields emulates the control plane's field selection from a binding's
+// projection_constraints, mirroring extract_constraints and build_selection in
+// flow's field_selection.rs. A field is selected when something wants it and
+// nothing fatally rejects it.
+//
+// Wants that are independent of the connector's "optional" opinion ("hard"
+// wants) are: group-by keys and the root document (always selected); the live
+// (prior) field selection, which keeps previously materialized fields stable;
+// and a connector FIELD_REQUIRED or LOCATION_REQUIRED constraint. When
+// includeOptional is set, every other non-rejected field is wanted too,
+// emulating a `recommended` selection depth.
+//
+// Per flow, LOCATION_RECOMMENDED and FIELD_OPTIONAL are equivalent and carry no
+// selection signal on their own. FIELD_FORBIDDEN always rejects. INCOMPATIBLE
+// rejects a field unless it is independently (hard-)wanted, in which case the
+// field is selected presuming a backfill.
+func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, live pf.FieldSelection, includeOptional bool) pf.FieldSelection {
 	out := pf.FieldSelection{}
+
+	// Group the binding's projection_constraints by field, preserving order so
+	// the folded field is taken from the first constraint, as the control plane
+	// does.
+	byField := make(map[string][]*pm.Response_Validated_Constraint)
+	var fieldOrder []string
+	for _, pc := range binding.ProjectionConstraints {
+		if _, ok := byField[pc.Field]; !ok {
+			fieldOrder = append(fieldOrder, pc.Field)
+		}
+		byField[pc.Field] = append(byField[pc.Field], pc.Constraint)
+	}
+
+	liveFields := make(map[string]struct{})
+	for _, f := range live.AllFields() {
+		liveFields[f] = struct{}{}
+	}
 
 	var foldedFieldMap = make(map[string]struct{})
 
-	for field, constraint := range binding.Constraints {
-		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
+	for _, field := range fieldOrder {
+		constraints := byField[field]
+
+		var forbidden, incompatible, required bool
+		for _, c := range constraints {
+			switch c.Type {
+			case pm.Response_Validated_Constraint_FIELD_FORBIDDEN:
+				forbidden = true
+			case pm.Response_Validated_Constraint_INCOMPATIBLE,
+				pm.Response_Validated_Constraint_UNSATISFIABLE:
+				incompatible = true
+			case pm.Response_Validated_Constraint_FIELD_REQUIRED,
+				pm.Response_Validated_Constraint_LOCATION_REQUIRED:
+				required = true
+			case pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+				pm.Response_Validated_Constraint_FIELD_OPTIONAL:
+				// Neither selected nor rejected by the connector; selection
+				// depends on includeOptional below.
+			}
+		}
+
+		proj := collection.GetProjection(field)
+		_, inLive := liveFields[field]
+		isKey := proj != nil && proj.IsPrimaryKey
+		isDoc := proj != nil && proj.IsRootDocumentProjection()
+		hardWanted := required || isKey || isDoc || inLive
+
+		switch {
+		case forbidden:
+			continue
+		case hardWanted:
+			// Selected even if also INCOMPATIBLE: presumes a backfill.
+		case incompatible:
+			// A bare incompatible field with no independent want is dropped.
+			continue
+		case includeOptional:
+			// Recommended/optional field selected at this depth.
+		default:
 			continue
 		}
 
 		var foldedField = field
-		if constraint.FoldedField != "" {
-			foldedField = constraint.FoldedField
+		if constraints[0].FoldedField != "" {
+			foldedField = constraints[0].FoldedField
 		}
 
 		// The runtime only keeps one of the fields which have equal FoldedFields. We replicate
@@ -863,10 +1173,10 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 		}
 		foldedFieldMap[foldedField] = struct{}{}
 
-		proj := collection.GetProjection(field)
-		if proj.IsPrimaryKey {
+		switch {
+		case isKey:
 			out.Keys = append(out.Keys, field)
-		} else if proj.IsRootDocumentProjection() {
+		case isDoc:
 			if out.Document == "" {
 				out.Document = field
 			} else {
@@ -874,7 +1184,7 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 				// one is the document, and the rest are materialized as values.
 				out.Values = append(out.Values, field)
 			}
-		} else {
+		default:
 			out.Values = append(out.Values, field)
 		}
 	}
@@ -885,9 +1195,10 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 	return out
 }
 
-// snapshotConstraints makes a compact string representation of a set of constraints, with one
-// constraint printed per line.
-func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+// snapshotConstraints makes a compact string representation of a binding's
+// projection_constraints, with one constraint printed per line. A field may
+// carry multiple constraints, each of which is printed.
+func snapshotConstraints(t *testing.T, pcs []*pm.Response_Validated_ProjectionConstraint) string {
 	t.Helper()
 
 	type constraintRow struct {
@@ -897,18 +1208,18 @@ func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 		Reason     string
 	}
 
-	rows := make([]constraintRow, 0, len(cs))
-	for f, c := range cs {
+	rows := make([]constraintRow, 0, len(pcs))
+	for _, pc := range pcs {
 		rows = append(rows, constraintRow{
-			Field:      f,
-			Type:       int(c.Type),
-			TypeString: c.Type.String(),
-			Reason:     c.Reason,
+			Field:      pc.Field,
+			Type:       int(pc.Constraint.Type),
+			TypeString: pc.Constraint.Type.String(),
+			Reason:     pc.Constraint.Reason,
 		})
 	}
 
 	slices.SortFunc(rows, func(i, j constraintRow) int {
-		return strings.Compare(i.Field, j.Field)
+		return cmp.Or(strings.Compare(i.Field, j.Field), cmp.Compare(i.Type, j.Type))
 	})
 
 	var out strings.Builder
@@ -928,18 +1239,9 @@ func cleanupTestTasks[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 ) {
 	t.Helper()
 
-	tasks, err := m.ListTestTasks(ctx)
+	outcomes, err := SweepTestTasks(ctx, m, tsSuffix, false)
 	require.NoError(t, err)
-	now := time.Now()
-	for _, task := range tasks {
-		if shouldCleanup(t, now, task, tsSuffix) {
-			if err := m.CleanupTestTask(ctx, task); err != nil {
-				t.Log("failed to clean up task", err)
-			} else {
-				t.Log("cleaned up task", task)
-			}
-		}
-	}
+	logSweep(t, "task", outcomes)
 }
 
 func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -951,49 +1253,82 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 ) {
 	t.Helper()
 
-	is := boilerplate.InitInfoSchema(m.Config())
-	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths))
-	now := time.Now()
+	outcomes, err := SweepTestResources(ctx, m, paths, tsSuffix, false)
+	require.NoError(t, err)
+	logSweep(t, "resource", outcomes)
+}
 
-	for _, r := range is.Resources() {
-		if shouldCleanup(t, now, r.Location()[len(r.Location())-1], tsSuffix) {
-			_, fn, err := m.DeleteResource(ctx, r.Location())
-			require.NoError(t, err)
+func logSweep(t *testing.T, kind string, outcomes []SweepOutcome) {
+	t.Helper()
 
-			if err := fn(ctx); err != nil {
-				t.Log("failed to clean up resource", err)
-			} else {
-				t.Log("cleaned up resource", r.Location())
-			}
+	for _, o := range outcomes {
+		if o.Err != nil {
+			t.Logf("failed to clean up %s %s: %s", kind, o.Item, o.Err)
+		} else if o.Swept {
+			t.Logf("cleaned up %s %s (%s)", kind, o.Item, o.Reason)
+		} else {
+			t.Logf("did not clean up %s %s (%s)", kind, o.Item, o.Reason)
 		}
 	}
 }
 
-func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool {
+// shouldCleanup reports whether a test resource or task should be removed, along
+// with the reason, which callers log.
+func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
+	// Destinations such as Snowflake fold unquoted names to upper case.
+	item, suffix = strings.ToLower(item), strings.ToLower(suffix)
 	if item == flowCheckpointsTableName {
 		// Never cleanup the meta checkpoints table: leaving it in place keeps
 		// it out of the next run's Apply action description (so snapshots stay
 		// stable), and prevents parallel test runs sharing a database from
 		// racing to delete each other's checkpoints table.
-		return false
+		return false, "is the meta checkpoints table"
 	}
 	if !strings.Contains(item, testItemIdentifier) {
-		// Not created for testing.
-		return false
-	} else if strings.HasSuffix(item, suffix) {
-		// Created specifically by this test run.
-		return true
+		return false, "not created for testing"
+		// A caller with no run of its own passes an empty suffix, which must not
+		// match here: it would otherwise claim every test item, including those
+		// a concurrent run is still using.
+	} else if suffix != "" && strings.HasSuffix(item, suffix) {
+		return true, "created by this test run"
 	} else if parts := strings.Split(item, "_"); len(parts) < 2 {
-		t.Log("malformed test item name", item)
+		return false, "malformed test item name"
 	} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
-		t.Log("failed to parse timestamp from test item name", item, err)
-	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 5*time.Minute {
-		t.Log("will cleanup old test item", item)
-		return true
+		return false, fmt.Sprintf("failed to parse timestamp from test item name: %s", err)
+	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 60*time.Minute {
+		// The threshold must comfortably exceed the longest single test run,
+		// since concurrent CI jobs sharing a database will otherwise drop each
+		// other's in-use tables mid-test.
+		return true, "left over from an old test run"
 	}
 
-	t.Log("will not cleanup recent test item", item)
-	return false
+	return false, "from a recent test run"
+}
+
+// flowctlCommand builds a flowctl invocation whose behavior does not vary with
+// the machine running it.
+func flowctlCommand(args ...string) *exec.Cmd {
+	// Set TZ=UTC to make tests always run as if the machine
+	// has UTC timezone, consisent across contributors' machines
+	// and the CI
+	os.Setenv("TZ", "UTC")
+
+	// FLOW_TEST_FLOWCTL names the flowctl binary to drive tests with; CI points
+	// the runtime v1 pass at a pinned release whose `flowctl preview` is still
+	// the legacy runtime (see fetch-flow.sh).
+	flowctl := os.Getenv("FLOW_TEST_FLOWCTL")
+	if flowctl == "" {
+		flowctl = "flowctl"
+	}
+	cmd := exec.Command(flowctl, args...)
+	cmd.Env = append(cmd.Environ(),
+		// Set the LOG_FORMAT to text instead of color for better to avoid
+		// escaping of ansi control characters and better compatibility with
+		// dumb terminals.
+		"LOG_FORMAT=text",
+	)
+
+	return cmd
 }
 
 // RunFlowctl runs the flowctl command with the given arguments, and returns its
@@ -1001,37 +1336,46 @@ func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool
 // logged to the test log.
 func RunFlowctl(t *testing.T, args ...string) []byte {
 	t.Helper()
+	stdout, _ := runFlowctl(t, args...)
+	return stdout
+}
 
-	// Set TZ=UTC to make tests always run as if the machine
-	// has UTC timezone, consisent across contributors' machines
-	// and the CI
-	os.Setenv("TZ", "UTC")
-	cmd := exec.Command("flowctl", args...)
-	stdout, err := cmd.StdoutPipe()
+// runFlowctl is RunFlowctl, also returning the captured stderr. Task logs of a
+// preview run land there, and are the observable output of the boilerplate's
+// transaction health check.
+func runFlowctl(t *testing.T, args ...string) (stdout, stderr []byte) {
+	t.Helper()
+
+	cmd := flowctlCommand(args...)
+
+	stdoutPipe, err := cmd.StdoutPipe()
 	require.NoError(t, err)
-	stderr, err := cmd.StderrPipe()
+	stderrPipe, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	require.NoError(t, cmd.Start())
 
+	var stderrBuf bytes.Buffer
 	var wg sync.WaitGroup
 	wg.Add(1)
-	ansiEscape := regexp.MustCompile(`\\x1b\[[0-9;]*m`)
 	go func() {
 		defer wg.Done()
-		scanner := bufio.NewScanner(stderr)
+		scanner := bufio.NewScanner(stderrPipe)
+		scanner.Buffer(make([]byte, 0, 1<<20), 1<<24)
 		for scanner.Scan() {
-			t.Log(ansiEscape.ReplaceAllString(scanner.Text(), ""))
+			t.Log(scanner.Text())
+			stderrBuf.Write(scanner.Bytes())
+			stderrBuf.WriteByte('\n')
 		}
 	}()
 
 	var stdoutBuf bytes.Buffer
-	_, err = io.Copy(&stdoutBuf, stdout)
+	_, err = io.Copy(&stdoutBuf, stdoutPipe)
 	require.NoError(t, err)
 
 	require.NoError(t, cmd.Wait())
 	wg.Wait()
 
-	return stdoutBuf.Bytes()
+	return stdoutBuf.Bytes(), stderrBuf.Bytes()
 }
 
 func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
@@ -1079,4 +1423,17 @@ func rawJson(t *testing.T, v any) json.RawMessage {
 	require.NoError(t, err)
 
 	return b
+}
+
+// harnessFlags resolves feature flags for a harness that has no runtime spec to
+// take a creation date from. Date-gated flags therefore resolve as they do for a
+// brand-new task; a harness which needs a specific era must resolve against a
+// spec carrying that CreatedAt itself.
+func harnessFlags[EC boilerplate.EndpointConfiger](t *testing.T, cfg EC) map[string]bool {
+	t.Helper()
+
+	flags, err := boilerplate.ResolveFlags(cfg, &pf.MaterializationSpec{})
+	require.NoError(t, err)
+
+	return flags
 }

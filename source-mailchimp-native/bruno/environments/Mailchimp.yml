@@ -1,0 +1,21 @@
+variables:
+  - name: base_url
+    value: https://dc.api.mailchimp.com/3.0
+  - name: config_path
+    value: ../config.yaml
+  - name: resource
+    value: lists
+  - name: child
+    value: members
+  - name: child_items_key
+    value: members
+  - name: list_id
+    value: f34247943d
+  - name: interest_category_id
+    value: 1d3affa9d2
+  - name: segment_id
+    value: "2225593"
+  - name: campaign_id
+    value: 5dfc22e163
+  - name: workflow_id
+    value: PIN_FROM_AUTOMATIONS_BARE

@@ -1,0 +1,36 @@
+info:
+  name: A4 - Delete organization
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: "{{base_url}}/organizations/{{seed_org_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_org_id normally arrives from `Seeding / A3 - Create organization to delete`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('seed_org_id') && !bru.getEnvVar('seed_org_id')) {
+          throw new Error('seed_org_id not set: run `Seeding / A3 - Create organization to delete` first in this session, or bru.setVar it');
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete Organization](https://developer.zendesk.com/api-reference/ticketing/organizations/organizations/#delete-organization)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V7. Deletes the organization created by `Seeding / A3 - Create organization
+  to delete` (run A3 first in the same session). Afterwards re-run
+  `Incremental / organizations` and `Organizations / bare`.
+
+  **Outcome:** Ran 2026-10-07; V7 VERIFIED in `Incremental / organizations`, `Organizations / bare`.

@@ -1,13 +1,17 @@
-package main
+package connector
 
 import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 
+	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -39,36 +43,112 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 
+	// Enum type names embed the full table name, which includes the test-run-specific random
+	// suffix. The test framework strips the full rndSuffix via strings.ReplaceAll, but when
+	// the table name is truncated to 42 bytes inside the enum type name (hash mode), only a
+	// prefix of rndSuffix survives. We strip that truncated prefix here too.
+	// Additionally, the 8-hex hash in hash-mode type names is computed from the random table
+	// name and therefore changes per run; normalize it to a stable placeholder.
+	actionDescSanitizers := []func(string) string{
+		func(s string) string {
+			// Strip truncated test-suffix components (_<uuid8>_flow_test_<partial_ts>) that
+			// remain after the full rndSuffix has already been removed by the framework.
+			return regexp.MustCompile(`_[0-9a-f]{8}_flow_test_\d+`).ReplaceAllString(s, "")
+		},
+		func(s string) string {
+			// Normalize the content-addressed hash in hash-mode enum type names.
+			return regexp.MustCompile(`_[0-9a-f]{8}_flow_enum`).ReplaceAllString(s, "_<hash>_flow_enum")
+		},
+	}
+
 	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
+	})
+
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+			uri, err := cfg.ToURI(ctx)
+			require.NoError(t, err)
+
+			conn, err := pgx.Connect(ctx, uri)
+			require.NoError(t, err)
+			defer conn.Close(ctx)
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				var rows, err = conn.Query(ctx, "SELECT id FROM "+pgx.Identifier(task.Path(t, table)).Sanitize()+" ORDER BY id;")
+				require.NoError(t, err)
+				ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+				require.NoError(t, err)
+				require.Equal(t, want, ids, table)
+			}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newPostgresDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("fence", func(t *testing.T) {
 		sql.RunFencingTest(
 			t,
-			newPostgresDriver(),
+			NewDriver(),
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
 			testTemplates.createTargetTable,
-			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
+			func(ctx context.Context, c sql.Client, fence sql.Fence) error {
 				var fenceUpdate strings.Builder
 				if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
 				}
-				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
+				// The fence update is parameterized, so it must be executed with
+				// bind arguments rather than as a plain statement, mirroring the
+				// driver's own fenced-off detection via RowsAffected.
+				res, err := c.(*client).db.ExecContext(ctx, fenceUpdate.String(), fenceUpdateArgs(fence)...)
+				if err != nil {
+					return fmt.Errorf("updating fence: %w", err)
+				} else if rows, err := res.RowsAffected(); err != nil {
+					return fmt.Errorf("fetching fence update rows: %w", err)
+				} else if rows != 1 {
+					return fmt.Errorf("this instance was fenced off by another")
+				}
+				return nil
 			},
 		)
 	})
@@ -121,7 +201,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(cfg)).Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(cfg), testFlagDefaults()).Unwrap())
 		})
 	}
 }

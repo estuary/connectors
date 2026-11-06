@@ -1,0 +1,10 @@
+# Benchmark sizing for materialize-elasticsearch's integration-test stack. Its
+# 2 GB heap trips Elasticsearch's parent circuit breaker under a TPC-DS load.
+services:
+  db:
+    environment:
+      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
+    deploy:
+      resources:
+        limits:
+          memory: 12g

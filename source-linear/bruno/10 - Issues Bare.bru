@@ -1,0 +1,299 @@
+meta {
+  name: 10 - Issues Bare
+  type: graphql
+  seq: 10
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IssuesBare {
+    issues(first: 2, includeArchived: true, sort: [{updatedAt: {order: Ascending}}]) {
+      nodes {
+        id
+        createdAt
+        updatedAt
+        archivedAt
+        number
+        identifier
+        title
+        description
+        priority
+        priorityLabel
+        estimate
+        sortOrder
+        prioritySortOrder
+        subIssueSortOrder
+        startedAt
+        startedTriageAt
+        triagedAt
+        completedAt
+        canceledAt
+        autoClosedAt
+        autoArchivedAt
+        addedToProjectAt
+        addedToCycleAt
+        addedToTeamAt
+        snoozedUntilAt
+        dueDate
+        slaStartedAt
+        slaBreachesAt
+        slaType
+        customerTicketCount
+        branchName
+        url
+        trashed
+        team { id }
+        state { id }
+        assignee { id }
+        creator { id }
+        delegate { id }
+        project { id }
+        projectMilestone { id }
+        cycle { id }
+        parent { id }
+        snoozedBy { id }
+        lastAppliedTemplate { id }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  The canonical Issues selection set — this is verbatim what the connector will send. It
+  is the SHAPE reference for the stream: one full representative item, so the document
+  model and the discovered schema can be diffed against a real response.
+
+  Design of the selection set (GraphQL returns nothing you do not ask for, so unlike a
+  REST connector this list is exhaustive by construction):
+
+  - **Scalars are taken wholesale.** At 0.1 points each they are nearly free, and Estuary's
+    schema inference picks up everything the Pydantic model does not declare.
+  - **Relations are `{ id }` only — never nested objects.** An object costs 1 point vs a
+    scalar's 0.1, so ten `{ id }` relations cost as much as 100 scalars. Expanding even one
+    into its own field set would multiply that across all 250 nodes.
+  - **No nested CONNECTIONS.** `labels`, `comments`, `history`, `attachments`, `children`,
+    `subscribers` and friends are all deliberately omitted. A connection multiplies its
+    children's cost by its page size, so a single `labels(first: 20) { nodes { id } }`
+    adds ~22 points PER NODE — pushing a 250-row page from ~3,700 to ~9,500 points, right
+    against the 10,000 cap. Issue-to-label membership belongs in a separate child stream,
+    not in this selection set.
+
+  Static cost arithmetic under the documented formula (30 scalars, 11 relation objects):
+  per node = 1 + 30 x 0.1 + 11 x 1.1 = ~16.1 points; at `first: 250` that is ~4,025 points,
+  comfortably inside the 10,000-point per-query cap with ~2.5x headroom.
+
+  `includeArchived: true` is set here and on every cluster request — see
+  `14 - Issues Include Archived` for the justification.
+
+  **Limitation:** this workspace holds only 4 issues (Linear's stock onboarding set), all
+  with `archivedAt: null` and all sharing one `updatedAt`. The saved example proves the
+  FIELD SHAPE and the pageInfo contract; it cannot demonstrate archived rows, cursor
+  movement, or realistic complexity. See `Seeding/` for the handoff that would close those
+  gaps, and `05 - Complexity Envelope` for why the recorded `X-Complexity` does not
+  extrapolate.
+}
+
+example {
+  name: 200 — full representative Issue (2 of 4)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IssuesBare {
+        issues(first: 2, includeArchived: true, sort: [{updatedAt: {order: Ascending}}]) {
+          nodes {
+            id
+            createdAt
+            updatedAt
+            archivedAt
+            number
+            identifier
+            title
+            description
+            priority
+            priorityLabel
+            estimate
+            sortOrder
+            prioritySortOrder
+            subIssueSortOrder
+            startedAt
+            startedTriageAt
+            triagedAt
+            completedAt
+            canceledAt
+            autoClosedAt
+            autoArchivedAt
+            addedToProjectAt
+            addedToCycleAt
+            addedToTeamAt
+            snoozedUntilAt
+            dueDate
+            slaStartedAt
+            slaBreachesAt
+            slaType
+            customerTicketCount
+            branchName
+            url
+            trashed
+            team { id }
+            state { id }
+            assignee { id }
+            creator { id }
+            delegate { id }
+            project { id }
+            projectMilestone { id }
+            cycle { id }
+            parent { id }
+            snoozedBy { id }
+            lastAppliedTemplate { id }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 10
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2491
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999979
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "issues": {
+              "nodes": [
+                {
+                  "id": "431c9f95-fe23-44cb-9391-f4880c51bede",
+                  "createdAt": "2026-07-30T21:35:03.808Z",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": "2026-08-04T18:13:09.393Z",
+                  "number": 2,
+                  "identifier": "EST-2",
+                  "title": "Connect your tools",
+                  "description": "Integrations turn Linear into your source of truth around product development. Keep data in sync, and eliminate manual updates between tools.\n\n![connect-your-tools.png](https://uploads.linear.app/fe63b3e2-bf87-46c0-8784-cd7d639287c8/c2eae035-37e2-4754-adcb-b8305431aa1f/c92d70c7-e6d0-4fa2-a0fd-78f6e780993a)\n\n### **Key integrations**\n\n* [**Slack**](<https://linear.app/settings/integrations/slack>)\n  Create issues from Slack messages and sync threads\n* **[GitHub](<https://linear.app/settings/integrations/github>) / [GitLab](<https://linear.app/settings/integrations/gitlab>)**\n  Automate your pull request, commit workflows, and keep issues synced both ways\n* [**Agents**](<https://linear.app/integrations/agents>)\n  Deploy AI agents that work alongside you as teammates\n\n### **Browse all integrations**\n\nDiscover 150+ available connections in our [integration directory](<https://linear.app/integrations>) – from bug creation via support tools (Intercom, Zendesk), to issues created from design explorations (Figma).\n\n### **Linear API**\n\nIf you need something more custom, you can build directly on the Linear API (built on GraphQL). [See our Dev Docs to learn more](<https://linear.app/developers>).",
+                  "priority": 0,
+                  "priorityLabel": "No priority",
+                  "estimate": null,
+                  "sortOrder": -2005,
+                  "prioritySortOrder": -3485.39,
+                  "subIssueSortOrder": null,
+                  "startedAt": null,
+                  "startedTriageAt": null,
+                  "triagedAt": null,
+                  "completedAt": null,
+                  "canceledAt": null,
+                  "autoClosedAt": null,
+                  "autoArchivedAt": null,
+                  "addedToProjectAt": null,
+                  "addedToCycleAt": null,
+                  "addedToTeamAt": "2026-07-30T21:35:04.127Z",
+                  "snoozedUntilAt": null,
+                  "dueDate": null,
+                  "slaStartedAt": null,
+                  "slaBreachesAt": null,
+                  "slaType": "all",
+                  "customerTicketCount": 0,
+                  "branchName": "jonathan/est-2-connect-your-tools",
+                  "url": "https://linear.app/estuary-test/issue/EST-2/connect-your-tools",
+                  "trashed": null,
+                  "team": {
+                    "id": "ae4e7ae3-6e8b-4528-a1eb-4d77ce563971"
+                  },
+                  "state": {
+                    "id": "c69eb093-d5ab-42b7-a54d-0c8ed98c9ee0"
+                  },
+                  "assignee": null,
+                  "creator": null,
+                  "delegate": null,
+                  "project": null,
+                  "projectMilestone": null,
+                  "cycle": null,
+                  "parent": null,
+                  "snoozedBy": null,
+                  "lastAppliedTemplate": null
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "createdAt": "2026-07-30T21:35:03.808Z",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null,
+                  "number": 4,
+                  "identifier": "EST-4",
+                  "title": "Set up your teams",
+                  "description": "This workspace is a container for your organization’s work. \n\n* [Learn more about Workspaces](<https://linear.app/docs/workspaces>)\n  How to configure settings and workflows \n\nTeams are how you organize people and work in Linear.\n\n* [Learn about Teams](<https://linear.app/docs/teams>)\n  How to structure teams and configure workflows\n\nTeams are made of members with defined roles (Admin, Member, Guest).\n\n* [Learn more about Members](<https://linear.app/docs/invite-members>)\n  Add your team and assign roles\n\n---\n\nReady to add your team? Invite via CSV or a unique link in [settings](<http://linear.app/settings/members>).",
+                  "priority": 0,
+                  "priorityLabel": "No priority",
+                  "estimate": null,
+                  "sortOrder": -51,
+                  "prioritySortOrder": -3742.76,
+                  "subIssueSortOrder": null,
+                  "startedAt": null,
+                  "startedTriageAt": null,
+                  "triagedAt": null,
+                  "completedAt": null,
+                  "canceledAt": null,
+                  "autoClosedAt": null,
+                  "autoArchivedAt": null,
+                  "addedToProjectAt": null,
+                  "addedToCycleAt": null,
+                  "addedToTeamAt": "2026-07-30T21:35:04.190Z",
+                  "snoozedUntilAt": null,
+                  "dueDate": null,
+                  "slaStartedAt": null,
+                  "slaBreachesAt": null,
+                  "slaType": "all",
+                  "customerTicketCount": 0,
+                  "branchName": "jonathan/est-4-set-up-your-teams",
+                  "url": "https://linear.app/estuary-test/issue/EST-4/set-up-your-teams",
+                  "trashed": null,
+                  "team": {
+                    "id": "ae4e7ae3-6e8b-4528-a1eb-4d77ce563971"
+                  },
+                  "state": {
+                    "id": "c69eb093-d5ab-42b7-a54d-0c8ed98c9ee0"
+                  },
+                  "assignee": null,
+                  "creator": null,
+                  "delegate": null,
+                  "project": null,
+                  "projectMilestone": null,
+                  "cycle": null,
+                  "parent": null,
+                  "snoozedBy": null,
+                  "lastAppliedTemplate": null
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": true,
+                "endCursor": "eyJrZXkiOiI4NmVlYjUwYy0zMzJjLTQ2YTctYmViZi1hMGI2N2RjMzQ2YmYiLCJncm91cHMiOlsiIiwiIl19"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

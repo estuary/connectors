@@ -1,7 +1,100 @@
-# source-postgres
+# Changelog
 
-## v2, 2022-10-17
-- Use new network-tunnel
+## 2026-11-04
 
-## v1, 2022-07-27
-- Beginning of changelog.
+### Added
+- The `activate_streams_before_catchup` feature flag activates new and
+  re-backfilled bindings for replication before the initial catch-up stream,
+  so changes since the checkpointed cursor are replicated for them.
+
+## 2026-10-30
+
+### Changed
+- Captures now report that they have started before connecting to the database or running prerequisite checks.
+
+## 2026-10-28
+
+### Changed
+- Starting a capture now reads table schemas from the source database once instead of twice.
+
+## 2026-10-21
+
+### Added
+- The `extended_field_truncation_threshold` feature flag raises the per-field
+  truncation threshold from 8 MiB to 32 MiB for text, bytea, and JSON values.
+  Enable it in `advanced.feature_flags` for captures with a single large column
+  per row. Documents remain subject to the platform's 64 MiB message limit.
+
+### Changed
+- Backfill progress in the connector status now counts tables which finished
+  backfilling since the capture last restarted, and includes an approximate
+  time remaining.
+
+## 2026-10-12
+
+### Fixed
+- An unreachable database or an incorrect password is now reported as that,
+  instead of as a list of failed prerequisite checks.
+
+## 2026-09-14
+
+### Fixed
+- Stream Abort replication messages are now logged and ignored instead of
+  failing the capture. PostgreSQL 18 can send one for a subtransaction of a
+  large, rolled back transaction even though the connector never enables
+  streaming of in-progress transactions.
+
+## 2026-08-18
+
+### Added
+- New `additional_backfill_filter` advanced option on each binding. When set,
+  the filter clause is applied to all backfill queries for that table, so rows
+  which the filter excludes are never backfilled. Setting or changing the
+  filter requires re-backfilling the binding, while clearing it does not.
+  Filters cannot be combined with the `Precise` backfill mode. The filter
+  combines with the `min_backfill_xid` setting when both are in use.
+
+## 2026-07-30
+
+### Added
+- New `rediscovery_interval` advanced option controls how often the connector
+  re-runs discovery while a capture is running, to notice schema changes and
+  newly added tables. It defaults to 15 minutes.
+
+### Changed
+- Captures no longer run discovery twice when they start up.
+- The timing of mid-capture rediscovery is now spread out rather than fixed, so
+  captures which started at the same moment no longer query the catalog in
+  lockstep every interval. The average rate of rediscovery is unchanged.
+
+## 2026-07-21
+
+### Added
+- New "Discovery Filters" configuration section which controls the set of
+  tables visible to discovery. Where these filters overlap with existing
+  Advanced Options, the settings are combined as a union.
+
+### Changed
+- Discovery fetches per-table metadata in chunks, so discovery of databases with
+  very large numbers of tables no longer times out or exhausts memory.
+
+## 2026-07-20
+
+### Fixed
+- Replication slot creation and deletion now use replication protocol commands
+  instead of SQL functions. This avoids holding a transaction snapshot while
+  slot creation blocks waiting for a consistent point.
+
+## 2026-07-16
+
+### Changed
+- Replication slot creation is exempted from `statement_timeout`, slot creation
+  blocks indefinitely rather than timing out in the presence of long-running
+  transactions.
+
+## 2026-07-14
+
+### Changed
+- Queries now use a default `statement_timeout` of 2 minutes when the
+  `statement_timeout` advanced option is left blank. Set to `0` for the
+  previous behavior of disabling timeouts.

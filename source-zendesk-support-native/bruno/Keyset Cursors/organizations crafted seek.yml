@@ -1,0 +1,186 @@
+info:
+  name: organizations crafted seek
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/organizations?sort={{seek_sort}}&page[size]=100&page[after]={{crafted_cursor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Build a keyset cursor from plain values instead of one Zendesk returned:
+        // base64(JSON {"o": <order>, "v": base64(type byte + int64 LE, ...)}), with
+        // type 'd' = epoch-seconds updated_at and 'i' = id. Not a credential, so a
+        // runtime var is fine.
+        const T = BigInt(bru.getEnvVar('seek_updated_at'));
+        const id = BigInt(bru.getEnvVar('seek_id'));
+        const order = bru.getEnvVar('seek_order');
+        const buf = Buffer.alloc(18);
+        buf.write('d', 0); buf.writeBigInt64LE(T, 1);
+        buf.write('i', 9); buf.writeBigInt64LE(id, 10);
+        const cursor = Buffer.from(JSON.stringify({ o: order, v: buf.toString('base64') })).toString('base64');
+        bru.setVar('crafted_cursor', cursor);
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - seek (1727211934, 0): included (projection)"
+    request:
+      url: "{{base_url}}/organizations?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "14"
+      body:
+        type: json
+        data: |-
+          {
+            "organizations": [
+              {
+                "id": 28835714737428,
+                "name": "Estuary",
+                "updated_at": "2024-09-24T21:05:34Z"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUlNsaU5ZNUdnQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUlNsaU5ZNUdnQUEifQ=="
+            }
+          }
+  - name: "200 - seek (1727211935, 0): empty"
+    request:
+      url: "{{base_url}}/organizations?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjhwODJZQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "11"
+      body:
+        type: json
+        data: |-
+          {
+            "organizations": [],
+            "meta": {
+              "has_more": false,
+              "after_cursor": null,
+              "before_cursor": null
+            }
+          }
+  - name: "200 - seek (1727211934, 28835714737428): empty, exact resume after the org"
+    request:
+      url: "{{base_url}}/organizations?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUlNsaU5ZNUdnQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "697"
+        - name: "ratelimit-remaining"
+          value: "697"
+        - name: "ratelimit-reset"
+          value: "9"
+      body:
+        type: json
+        data: |-
+          {
+            "organizations": [],
+            "meta": {
+              "has_more": false,
+              "after_cursor": null,
+              "before_cursor": null
+            }
+          }
+  - name: "200 - seek (1727211934, 28835714737427): included (projection)"
+    request:
+      url: "{{base_url}}/organizations?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUk9saU5ZNUdnQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "696"
+        - name: "ratelimit-remaining"
+          value: "696"
+        - name: "ratelimit-reset"
+          value: "6"
+      body:
+        type: json
+        data: |-
+          {
+            "organizations": [
+              {
+                "id": 28835714737428,
+                "name": "Estuary",
+                "updated_at": "2024-09-24T21:05:34Z"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUlNsaU5ZNUdnQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSjRwODJZQUFBQUFhUlNsaU5ZNUdnQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Organizations](https://developer.zendesk.com/api-reference/ticketing/organizations/organizations/#list-organizations)
+
+  **WHY:** Whether `/organizations` accepts client-built `(updated_at, id)` cursors, and
+  whether the tie-break is the public organization id. If so, a resume cursor built
+  from the last emitted organization resumes exactly (A8). Seeks: `(T, 0)` and
+  `(T, id - 1)` should include the organization at T; `(T, id)` and `(T + 1, 0)` should not.
+
+  **VERIFIED (2026-10-07):** `/organizations` accepts client-built `(updated_at, id)` cursors, and
+  the tie-break is the public organization id. For the organization at
+  `2024-09-24T21:05:34Z` (id 28835714737428): `(T, 0)` and `(T, id - 1)` include it,
+  while `(T, id)` and `(T + 1, 0)` return nothing. A cursor built from the last emitted
+  organization's `(updated_at, id)` resumes exactly after it. Ordering across multiple
+  organizations is not observable on this account (one live organization); it rests on
+  the same keyset mechanism verified with multiple records on `/tickets` and `/users`.

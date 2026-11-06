@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
 	"unsafe"
 
+	"github.com/estuary/connectors/go/tableglob"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
@@ -18,14 +20,142 @@ import (
 
 const (
 	truncateColumnThreshold = 8 * 1024 * 1024 // Arbitrarily selected value
+
+	// discoveryChunkSize is the number of tables per chunk in DiscoverTableDetails.
+	// Each chunk runs four queries against information_schema, so the value bounds
+	// per-query response size and memory usage when discovering many tables.
+	discoveryChunkSize = 100
 )
 
-// DiscoverTables queries the database for information about tables available for capture.
-func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
-	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+type discoveryFilters struct {
+	IncludeSchemas []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options." jsonschema_extras:"nonsensitive=true"`
+	ExcludeSchemas []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery." jsonschema_extras:"nonsensitive=true"`
+	TablePatterns  []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards." jsonschema_extras:"nonsensitive=true"`
+}
+
+// Validate checks that the configured discovery filters are well-formed. The
+// only thing that can actually be invalid here is a malformed table pattern.
+func (f *discoveryFilters) Validate() error {
+	for _, raw := range f.TablePatterns {
+		if _, err := tableglob.Compile(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// apply filters the input table list by the configured exclude-schemas and
+// table patterns. The include-schemas list is intentionally not consulted
+// here: it is expected to have already been pushed into the listTables query.
+func (f *discoveryFilters) apply(tables []sqlcapture.TableID) ([]sqlcapture.TableID, error) {
+	var patterns = make([]*tableglob.Pattern, 0, len(f.TablePatterns))
+	for _, raw := range f.TablePatterns {
+		var p, err = tableglob.Compile(raw)
+		if err != nil {
+			return nil, err
+		}
+		patterns = append(patterns, p)
+	}
+	var excluded = make(map[string]struct{}, len(f.ExcludeSchemas))
+	for _, schema := range f.ExcludeSchemas {
+		excluded[schema] = struct{}{}
+	}
+	var filtered = make([]sqlcapture.TableID, 0, len(tables))
+	for _, t := range tables {
+		if _, ok := excluded[t.Schema]; ok {
+			continue
+		}
+		if len(patterns) > 0 && !matchesAnyPattern(patterns, t) {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+	return filtered, nil
+}
+
+func matchesAnyPattern(patterns []*tableglob.Pattern, t sqlcapture.TableID) bool {
+	for _, p := range patterns {
+		if p.MatchTable(t.Schema, t.Table) {
+			return true
+		}
+	}
+	return false
+}
+
+// ListTables returns identifiers for all tables visible for capture after the
+// connector's configured discovery filters are applied.
+func (db *mysqlDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
+	var includeSchemas = slices.Concat(db.config.DiscoveryFilters.IncludeSchemas, db.config.Advanced.DiscoverSchemas)
+	slices.Sort(includeSchemas)
+	includeSchemas = slices.Compact(includeSchemas)
+
+	var tables, err = listTables(ctx, db.conn, includeSchemas)
 	if err != nil {
-		return nil, fmt.Errorf("error discovering tables: %w", err)
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	tables, err = db.config.DiscoveryFilters.apply(tables)
+	if err != nil {
+		return nil, fmt.Errorf("error applying discovery filters: %w", err)
+	}
+	return tables, nil
+}
+
+// DiscoverTableDetails queries the database for detailed schema information
+// about the specified tables. The query is chunked across small batches of
+// tables to bound per-query response size and memory usage when discovering
+// many tables at once.
+func (db *mysqlDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
+
+	// Group the requested tables by schema so that each chunk's queries can use
+	// more efficient `table_schema = ? AND table_name IN (...)` predicates.
+	var bySchema = make(map[string][]string)
+	for _, t := range requested {
+		bySchema[t.Schema] = append(bySchema[t.Schema], t.Table)
+	}
+	for _, schema := range slices.Sorted(maps.Keys(bySchema)) {
+		var tables = bySchema[schema]
+		slices.Sort(tables)
+		for i := 0; i < len(tables); i += discoveryChunkSize {
+			var end = min(i+discoveryChunkSize, len(tables))
+			if err := db.extendTableDetails(ctx, tableMap, schema, tables[i:end]); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// Determine whether the database sorts the keys of each table in a
+	// predictable order or not. The term "predictable" here specifically
+	// means "able to be reproduced using bytewise lexicographic ordering of
+	// the serialized row keys generated by this connector".
+	for _, info := range tableMap {
+		for _, colName := range info.PrimaryKey {
+			if !predictableColumnOrder(info.Columns[colName].DataType) {
+				info.UnpredictableKeyOrdering = true
+			}
+		}
+	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		for id, info := range tableMap {
+			logrus.WithFields(logrus.Fields{
+				"stream":     id,
+				"keyColumns": info.PrimaryKey,
+			}).Debug("discovered table")
+		}
+	}
+
+	return tableMap, nil
+}
+
+// extendTableDetails runs the per-chunk discovery queries (tables, columns,
+// primary keys, secondary indexes) for one batch of requested tables and
+// merges the results into dst. The collision check against dst spans chunks,
+// so duplicate-after-normalization StreamIDs are caught even across batches.
+func (db *mysqlDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, schema string, requested []string) error {
+	var tables, err = getTables(ctx, db.conn, schema, requested, db.featureFlags["system_versioned_tables"])
+	if err != nil {
+		return fmt.Errorf("error discovering tables: %w", err)
 	}
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
@@ -33,8 +163,8 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 		// Depending on feature flag settings, we may normalize multiple table names
 		// to the same StreamID. This is a problem and other parts of discovery won't
 		// be able to handle it gracefully, so it's a fatal error.
-		if other, ok := tableMap[streamID]; ok {
-			return nil, fmt.Errorf("table name collision between %q and %q",
+		if other, ok := dst[streamID]; ok {
+			return fmt.Errorf("table name collision between %q and %q",
 				fmt.Sprintf("%s.%s", table.Schema, table.Name),
 				fmt.Sprintf("%s.%s", other.Schema, other.Name),
 			)
@@ -54,60 +184,51 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 		}
 		table.UseSchemaInference = db.featureFlags["use_schema_inference"]
 		table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
-		tableMap[streamID] = table
+		dst[streamID] = table
 	}
 
-	// Enumerate every column of every table, and then aggregate into a
-	// map from StreamID to TableInfo structs.
-	columns, err := db.getColumns(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	columns, err := db.getColumns(ctx, db.conn, schema, requested)
 	if err != nil {
-		return nil, fmt.Errorf("error discovering columns: %w", err)
+		return fmt.Errorf("error discovering columns: %w", err)
 	}
 	for _, column := range columns {
-		// Create or look up the appropriate TableInfo struct for a given schema+name
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
-		var info, ok = tableMap[streamID]
+		var info, ok = dst[streamID]
 		if !ok {
-			continue // Ignore information about excluded tables
+			continue
 		}
-
-		// Finally we can add to the column info map and column-name-ordering list
 		if info.Columns == nil {
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
 		info.Columns[column.Name] = column
 		info.ColumnNames = append(info.ColumnNames, column.Name)
-		tableMap[streamID] = info
+		dst[streamID] = info
 	}
 
-	// Enumerate the primary key of every table and add that information
-	// into the table map.
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, schema, requested)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
+		return fmt.Errorf("unable to list database primary keys: %w", err)
 	}
 	for id, key := range primaryKeys {
-		var info, ok = tableMap[id]
+		var info, ok = dst[id]
 		if !ok {
-			continue // Ignore information about excluded tables
+			continue
 		}
 		info.PrimaryKey = key
-		tableMap[id] = info
+		dst[id] = info
 	}
 
-	// Enumerate secondary indexes and use those as a fallback where present
-	// for tables whose primary key is unset.
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	// Use secondary indexes as a fallback key for tables whose primary key is unset.
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, schema, requested)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
+		return fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
 	for streamID, indexColumns := range secondaryIndexes {
-		var info, ok = tableMap[streamID]
+		var info, ok = dst[streamID]
 		if !ok || info.PrimaryKey != nil {
 			continue
 		}
 
-		// Make a list of all usable indexes.
 		logrus.WithFields(logrus.Fields{
 			"table":   streamID,
 			"indices": len(indexColumns),
@@ -141,28 +262,117 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 		}
 	}
 
-	// Determine whether the database sorts the keys of a each table in a
-	// predictable order or not. The term "predictable" here specifically
-	// means "able to be reproduced using bytewise lexicographic ordering of
-	// the serialized row keys generated by this connector".
-	for _, info := range tableMap {
-		for _, colName := range info.PrimaryKey {
-			if !predictableColumnOrder(info.Columns[colName].DataType) {
-				info.UnpredictableKeyOrdering = true
+	// MariaDB system-versioned tables in implicit form have hidden row_start
+	// and row_end columns that are not present in information_schema. Detect
+	// them and synthesize the appropriate column and primary-key metadata.
+	if db.versionProduct == "MariaDB" && db.featureFlags["system_versioned_tables"] {
+		if err := db.applySystemVersioning(ctx, dst, schema, requested); err != nil {
+			return fmt.Errorf("error applying system-versioning metadata: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Implicit system-versioning column names used by MariaDB when a table is
+// declared `WITH SYSTEM VERSIONING` without an explicit `PERIOD FOR SYSTEM_TIME`
+// clause. The lowercase forms match what MariaDB emits in binlog row metadata,
+// which is the case-sensitive consumer of these names.
+const (
+	implicitSystemVersioningStartColumn = "row_start"
+	implicitSystemVersioningEndColumn   = "row_end"
+)
+
+// applySystemVersioning fills in the system-versioning details of any MariaDB
+// tables in the current chunk which were reported as `SYSTEM VERSIONED` by
+// getTables. Tables in implicit form (declared `WITH SYSTEM VERSIONING` but
+// without an explicit `PERIOD FOR SYSTEM_TIME` clause) have hidden row_start
+// and row_end columns which information_schema omits entirely, so for those we
+// synthesize the column and primary-key metadata here.
+func (db *mysqlDatabase) applySystemVersioning(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, schema string, requested []string) error {
+	var versioned []string
+	for _, table := range requested {
+		if info, ok := dst[sqlcapture.JoinStreamID(schema, table)]; ok {
+			if details, ok := info.ExtraDetails.(*mysqlTableDiscoveryDetails); ok && details.SystemVersioned {
+				versioned = append(versioned, table)
 			}
 		}
 	}
+	if len(versioned) == 0 {
+		return nil
+	}
+	explicit, err := getExplicitSystemTimePeriods(ctx, db.conn, schema, versioned)
+	if err != nil {
+		return err
+	}
+	for _, table := range versioned {
+		var streamID = sqlcapture.JoinStreamID(schema, table)
+		if explicit[streamID] {
+			continue
+		}
+		var info = dst[streamID]
+		info.ExtraDetails.(*mysqlTableDiscoveryDetails).ImplicitSystemVersioning = true
 
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		for id, info := range tableMap {
-			logrus.WithFields(logrus.Fields{
-				"stream":     id,
-				"keyColumns": info.PrimaryKey,
-			}).Debug("discovered table")
+		// Synthesize the hidden columns. MariaDB always assigns them type
+		// TIMESTAMP(6) NOT NULL and places them at the end of the column list.
+		var startCol = sqlcapture.ColumnInfo{
+			TableSchema: info.Schema,
+			TableName:   info.Name,
+			Index:       len(info.ColumnNames),
+			Name:        implicitSystemVersioningStartColumn,
+			DataType:    "timestamp",
+		}
+		var endCol = sqlcapture.ColumnInfo{
+			TableSchema: info.Schema,
+			TableName:   info.Name,
+			Index:       len(info.ColumnNames) + 1,
+			Name:        implicitSystemVersioningEndColumn,
+			DataType:    "timestamp",
+		}
+		if info.Columns == nil {
+			info.Columns = make(map[string]sqlcapture.ColumnInfo)
+		}
+		info.Columns[startCol.Name] = startCol
+		info.Columns[endCol.Name] = endCol
+		info.ColumnNames = append(info.ColumnNames, startCol.Name, endCol.Name)
+		// MariaDB implicitly extends the primary key of a system-versioned table
+		// by the row_end column, but this extension is not reflected in
+		// information_schema.statistics for the implicit form, so we mirror it
+		// when the table has a usable key. A table without a primary or suitable
+		// fallback key must remain keyless because row_end alone is not unique.
+		if len(info.PrimaryKey) > 0 {
+			info.PrimaryKey = append(info.PrimaryKey, endCol.Name)
 		}
 	}
+	return nil
+}
 
-	return tableMap, nil
+// getExplicitSystemTimePeriods reports which of the listed system-versioned
+// tables declare an explicit `PERIOD FOR SYSTEM_TIME`, and therefore have
+// their versioning columns visible in information_schema like any other
+// column. Tables absent from the result are in implicit form.
+//
+// The declared period columns are identified by their `ROW START` and `ROW END`
+// generation expressions rather than via information_schema.periods, which only
+// exists as of MariaDB 11.4 while system versioning dates back to 10.3.
+func getExplicitSystemTimePeriods(_ context.Context, conn mysqlClient, schema string, tables []string) (map[sqlcapture.StreamID]bool, error) {
+	var filter, args = schemaTablesFilter(schema, tables)
+	var query = fmt.Sprintf(
+		`SELECT DISTINCT table_schema, table_name`+
+			`  FROM information_schema.columns`+
+			`  WHERE generation_expression IN ('ROW START', 'ROW END') AND %s;`, filter)
+
+	var results, err = conn.Execute(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error querying system-versioning columns: %w", err)
+	}
+	defer results.Close()
+
+	var explicit = make(map[sqlcapture.StreamID]bool, len(results.Values))
+	for _, row := range results.Values {
+		explicit[sqlcapture.JoinStreamID(string(row[0].AsString()), string(row[1].AsString()))] = true
+	}
+	return explicit, nil
 }
 
 // Returns true if the bytewise lexicographic ordering of serialized row keys for
@@ -222,10 +432,10 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isP
 			return nil, fmt.Errorf("unhandled MySQL type %q", typeName)
 		}
 		schema.nullable = column.IsNullable
-		schema.extras = make(map[string]interface{})
+		schema.extras = make(map[string]any)
 		switch columnType.Type {
 		case "enum":
-			var options []interface{}
+			var options []any
 			for _, val := range columnType.EnumValues {
 				options = append(options, val)
 			}
@@ -287,10 +497,12 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isP
 	return schema.toType(), nil
 }
 
-func getTables(_ context.Context, conn mysqlClient, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
+// listTables performs the raw enumeration query of all tables in the database,
+// optionally restricted to a list of specified schemas.
+func listTables(_ context.Context, conn mysqlClient, selectedSchemas []string) ([]sqlcapture.TableID, error) {
 	var query = new(strings.Builder)
 	var args []any
-	fmt.Fprintf(query, `SELECT table_schema, table_name, table_type, engine, table_collation`)
+	fmt.Fprintf(query, `SELECT table_schema, table_name`)
 	fmt.Fprintf(query, `  FROM information_schema.tables`)
 	if len(selectedSchemas) > 0 {
 		fmt.Fprintf(query, `  WHERE table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
@@ -308,18 +520,62 @@ func getTables(_ context.Context, conn mysqlClient, selectedSchemas []string) ([
 	}
 	defer results.Close()
 
+	var tables = make([]sqlcapture.TableID, 0, len(results.Values))
+	for _, row := range results.Values {
+		tables = append(tables, sqlcapture.TableID{
+			Schema: string(row[0].AsString()),
+			Table:  string(row[1].AsString()),
+		})
+	}
+	return tables, nil
+}
+
+// schemaTablesFilter builds a `table_schema = ? AND table_name IN (?, ...)`
+// predicate and the corresponding argument slice for a set of tables which all
+// share the same schema. This shape lets the MySQL optimizer push down schema
+// filtering for more efficient execution.
+func schemaTablesFilter(schema string, tables []string) (string, []any) {
+	var placeholders = strings.Join(slices.Repeat([]string{"?"}, len(tables)), ", ")
+	var args = make([]any, 0, len(tables)+1)
+	args = append(args, schema)
+	for _, table := range tables {
+		args = append(args, table)
+	}
+	return fmt.Sprintf("table_schema = ? AND table_name IN (%s)", placeholders), args
+}
+
+func getTables(_ context.Context, conn mysqlClient, schema string, requested []string, includeSystemVersioned bool) ([]*sqlcapture.DiscoveryInfo, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var filter, args = schemaTablesFilter(schema, requested)
+	var query = fmt.Sprintf(
+		`SELECT table_schema, table_name, table_type, engine, table_collation`+
+			`  FROM information_schema.tables`+
+			`  WHERE %s;`, filter)
+
+	var results, err = conn.Execute(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	defer results.Close()
+
 	var tables []*sqlcapture.DiscoveryInfo
 	for _, row := range results.Values {
 		var tableSchema = string(row[0].AsString())
 		var tableName = string(row[1].AsString())
 		var collation = string(row[4].AsString())
+		var tableType = string(row[2].AsString())
+		var isBaseTable = strings.EqualFold(tableType, "BASE TABLE")
+		var isSystemVersioned = strings.EqualFold(tableType, "SYSTEM VERSIONED")
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
 			Schema:    tableSchema,
 			Name:      tableName,
-			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+			BaseTable: isBaseTable || (isSystemVersioned && includeSystemVersioned),
 			ExtraDetails: &mysqlTableDiscoveryDetails{
-				StorageEngine:  string(row[3].AsString()),
-				DefaultCharset: charsetFromCollation(collation),
+				StorageEngine:   string(row[3].AsString()),
+				DefaultCharset:  charsetFromCollation(collation),
+				SystemVersioned: isSystemVersioned,
 			},
 		})
 	}
@@ -354,24 +610,26 @@ func charsetFromCollation(name string) string {
 type mysqlTableDiscoveryDetails struct {
 	StorageEngine  string
 	DefaultCharset string
+	// SystemVersioned is set for any MariaDB table declared `WITH SYSTEM
+	// VERSIONING`, in either implicit or explicit form.
+	SystemVersioned bool
+	// ImplicitSystemVersioning is set for the subset of SystemVersioned tables
+	// declared without an explicit `PERIOD FOR SYSTEM_TIME` clause.
+	ImplicitSystemVersioning bool
 }
 
-func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, selectedSchemas []string) ([]sqlcapture.ColumnInfo, error) {
-	var query = new(strings.Builder)
-	var args []any
-	fmt.Fprintf(query, `SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name, character_maximum_length`)
-	fmt.Fprintf(query, `  FROM information_schema.columns`)
-	if len(selectedSchemas) > 0 {
-		fmt.Fprintf(query, `  WHERE table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
-		for _, schema := range selectedSchemas {
-			args = append(args, schema)
-		}
-	} else {
-		fmt.Fprintf(query, `  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')`)
+func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, schema string, requested []string) ([]sqlcapture.ColumnInfo, error) {
+	if len(requested) == 0 {
+		return nil, nil
 	}
-	fmt.Fprintf(query, `  ORDER BY table_schema, table_name, ordinal_position;`)
+	var filter, args = schemaTablesFilter(schema, requested)
+	var query = fmt.Sprintf(
+		`SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name, character_maximum_length`+
+			`  FROM information_schema.columns`+
+			`  WHERE %s`+
+			`  ORDER BY table_schema, table_name, ordinal_position;`, filter)
 
-	var results, err = conn.Execute(query.String(), args...)
+	var results, err = conn.Execute(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying columns: %w", err)
 	}
@@ -528,7 +786,10 @@ func decodeUTF8(bs []byte) (string, error) {
 }
 
 func decodeLatin1(bs []byte) (string, error) {
-	var decoder = charmap.ISO8859_1.NewDecoder()
+	// MySQL's `latin1` charset is actually Windows-1252, not ISO 8859-1. The two agree
+	// except in the 0x80-0x9F range, where cp1252 has printable characters which ISO 8859-1
+	// leaves as C1 control codes.
+	var decoder = charmap.Windows1252.NewDecoder()
 	var decodedBytes, err = decoder.Bytes(bs)
 	if err != nil {
 		return "", nil
@@ -626,23 +887,19 @@ var mysqlStringEscapeReplacements = map[string]string{
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(_ context.Context, conn mysqlClient, selectedSchemas []string) (map[sqlcapture.StreamID][]string, error) {
-	var query = new(strings.Builder)
-	var args []any
-	fmt.Fprintf(query, `SELECT table_schema, table_name, column_name, seq_in_index`)
-	fmt.Fprintf(query, `  FROM information_schema.statistics`)
-	fmt.Fprintf(query, `  WHERE index_name = 'primary'`)
-	if len(selectedSchemas) > 0 {
-		fmt.Fprintf(query, `    AND table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
-		for _, schema := range selectedSchemas {
-			args = append(args, schema)
-		}
-	} else {
-		fmt.Fprintf(query, `    AND table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')`)
+func getPrimaryKeys(_ context.Context, conn mysqlClient, schema string, requested []string) (map[sqlcapture.StreamID][]string, error) {
+	if len(requested) == 0 {
+		return nil, nil
 	}
-	fmt.Fprintf(query, `  ORDER BY table_schema, table_name, seq_in_index;`)
+	var filter, args = schemaTablesFilter(schema, requested)
+	var query = fmt.Sprintf(
+		`SELECT table_schema, table_name, column_name, seq_in_index`+
+			`  FROM information_schema.statistics`+
+			`  WHERE index_name = 'primary'`+
+			`    AND %s`+
+			`  ORDER BY table_schema, table_name, seq_in_index;`, filter)
 
-	var results, err = conn.Execute(query.String(), args...)
+	var results, err = conn.Execute(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)
 	}
@@ -665,24 +922,20 @@ func getPrimaryKeys(_ context.Context, conn mysqlClient, selectedSchemas []strin
 	return keys, nil
 }
 
-func getSecondaryIndexes(_ context.Context, conn mysqlClient, selectedSchemas []string) (map[sqlcapture.StreamID]map[string][]string, error) {
-	var query = new(strings.Builder)
-	var args []any
-	fmt.Fprintf(query, `SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, stat.seq_in_index`)
-	fmt.Fprintf(query, `  FROM information_schema.statistics stat`)
-	fmt.Fprintf(query, `  WHERE stat.non_unique = 0`)
-	fmt.Fprintf(query, `    AND stat.index_name != 'PRIMARY'`)
-	if len(selectedSchemas) > 0 {
-		fmt.Fprintf(query, `    AND stat.table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
-		for _, schema := range selectedSchemas {
-			args = append(args, schema)
-		}
-	} else {
-		fmt.Fprintf(query, `    AND stat.table_schema NOT IN ('information_schema', 'sys', 'performance_schema', 'mysql')`)
+func getSecondaryIndexes(_ context.Context, conn mysqlClient, schema string, requested []string) (map[sqlcapture.StreamID]map[string][]string, error) {
+	if len(requested) == 0 {
+		return nil, nil
 	}
-	fmt.Fprintf(query, `  ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index`)
+	var filter, args = schemaTablesFilter(schema, requested)
+	var query = fmt.Sprintf(
+		`SELECT table_schema, table_name, index_name, column_name, seq_in_index`+
+			`  FROM information_schema.statistics`+
+			`  WHERE non_unique = 0`+
+			`    AND index_name != 'PRIMARY'`+
+			`    AND %s`+
+			`  ORDER BY table_schema, table_name, index_name, seq_in_index`, filter)
 
-	var results, err = conn.Execute(query.String(), args...)
+	var results, err = conn.Execute(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
 	}
@@ -713,7 +966,7 @@ type columnSchema struct {
 	description     string
 	format          string
 	nullable        bool
-	extras          map[string]interface{}
+	extras          map[string]any
 	jsonType        string
 	minLength       *uint64
 	maxLength       *uint64
@@ -723,13 +976,11 @@ func (s columnSchema) toType() *jsonschema.Schema {
 	var out = &jsonschema.Schema{
 		Format:      s.format,
 		Description: s.description,
-		Extras:      make(map[string]interface{}),
+		Extras:      make(map[string]any),
 		MinLength:   s.minLength,
 		MaxLength:   s.maxLength,
 	}
-	for k, v := range s.extras {
-		out.Extras[k] = v
-	}
+	maps.Copy(out.Extras, s.extras)
 
 	if s.contentEncoding != "" {
 		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.

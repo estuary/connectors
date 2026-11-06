@@ -1,4 +1,85 @@
 # materialize-redshift
 
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
+## 2026-10-31
+
+### Changed
+- Log messages about the sync schedule now say when the next sync is and how
+  to sync sooner, and explain in plain language when a sync does not wait for
+  the schedule.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+### Changed
+- The warning about rows a backfill did not delete now names every affected
+  table instead of only the latest one.
+
+## 2026-10-12
+
+### Fixed
+- A connection or login failure is now reported as that, instead of as an
+  `enable_case_sensitive_identifier` query error. This also applies when the
+  materialization is saved, so messages such as "incorrect username or
+  password" are shown again.
+
+## 2026-09-29
+
+### Added
+- When a collection is backfilled, rows the backfill did not re-send are deleted
+  from standard-updates tables once it completes, so documents removed from the
+  source no longer linger in the destination. Delta-updates tables keep every
+  row. A table that excludes the `flow_published_at` field is left unchanged,
+  and a warning on the task page explains why.
+  Disable it with the `no_truncate_after_backfill` feature flag. It is also
+  disabled while `retain_existing_data_on_backfill` is enabled.
+
+## 2026-09-23
+
+### Fixed
+- An SQL LIKE pattern was not quoted correctly which could cause issues if the
+  bucket path contained special characters.
+
+## 2026-09-11
+
+### Fixed
+- Materializations sharing a metadata schema on a database using
+  `SERIALIZABLE` isolation failed with `ERROR: 1023` (serializable isolation
+  violation) when they committed concurrently, because the checkpoints table
+  lock was taken after the transaction's snapshot. The lock is now the commit
+  transaction's first statement, as it was before the post-commit apply
+  change, and a serialization failure or deadlock during the commit is
+  retried instead of failing the task.
+
+## 2026-08-29
+
+### Changed
+- The destination commit now runs after the runtime commits its recovery log,
+  in `Acknowledge`, rather than on the critical path of every transaction. The
+  checkpoints table stops holding a fence and runtime checkpoint and instead
+  records the token of each applied transaction, so a recovered transaction is
+  applied exactly once, delta-updates bindings included. On the v2 runtime the
+  task scales out: every shard stages its own files, and the shard whose key
+  range begins at zero commits all shards' files for a table with a single COPY
+  and MERGE per transaction. Existing tasks cross over automatically.
+  Downgrading a task to an earlier image requires draining it first and would
+  need a backfill, since the checkpoints row no longer advances the runtime
+  checkpoint.
+
+## 2026-08-25
+
+### Added
+- `1m`, `2m30s`, and `20m` are now valid `Sync Frequency` values, filling the
+  gaps between `30s`-`5m` and `15m`-`30m`.
+
 ## v1, 2023-03-10
 - Beginning of changelog.

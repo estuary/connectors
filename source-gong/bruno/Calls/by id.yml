@@ -1,0 +1,32 @@
+info:
+  name: by id
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/v2/calls/{{seed_call_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#get-/v2/calls/-id-
+
+  **WHY:** fetch one call by its Gong id, bypassing the date filters. Useful
+  when a seeded call is not showing up in `bare` and the question is whether
+  it exists at all versus is merely being excluded from the filtered list.
+  Pass the id explicitly:
+
+      bru run "Calls/by id.yml" --env Gong --sandbox developer --env-var seed_call_id=<id>
+
+  **VERIFIED (2026-08-31):** a call Gong has not processed answers `404` with
+  `{"errors":["Call ID … was not found"]}` — a different string from the
+  empty-filter 404, and deliberately *not* matched by
+  `_NO_RESULTS_404_PATTERN` in `source_gong/api.py`. That is the correct
+  outcome: a genuinely missing call should be fatal to the connector, not
+  swallowed as an empty page.

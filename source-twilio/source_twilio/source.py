@@ -60,9 +60,19 @@ class SourceTwilio(AbstractSource):
                     config["auth_token"],
                 ),
             )
-            accounts_gen = Accounts(authenticator=auth).read_records(sync_mode=SyncMode.full_refresh)
+            accounts_gen = Accounts(
+                authenticator=auth,
+                sync_subaccounts=config.get("sync_subaccounts", True),
+                config_account_sid=config["account_sid"],
+            ).read_records(sync_mode=SyncMode.full_refresh)
             next(accounts_gen)
             return True, None
+        except StopIteration:
+            return (
+                False,
+                "Connected to the Twilio API, but no account matched. If 'Capture Subaccount Data' is disabled, "
+                "the connector only captures the main account or the account matching the configured Account SID.",
+            )
         except Exception as error:
             return False, f"Unable to connect to Twilio API with the provided credentials - {repr(error)}"
 
@@ -76,12 +86,18 @@ class SourceTwilio(AbstractSource):
                 config["auth_token"],
             ),
         )
-        full_refresh_stream_kwargs = {"authenticator": auth}
+        full_refresh_stream_kwargs = {
+            "authenticator": auth,
+            "sync_subaccounts": config.get("sync_subaccounts", True),
+            "config_account_sid": config["account_sid"],
+        }
         incremental_stream_kwargs = {
             "authenticator": auth,
             "start_date": config["start_date"],
             "lookback_window": config.get("lookback_window", 0),
             "slice_step_map": config.get("slice_step_map", {}),
+            "sync_subaccounts": config.get("sync_subaccounts", True),
+            "config_account_sid": config["account_sid"],
         }
 
         # Fix for `Date range specified in query is partially or entirely outside of retention window of 400 days`

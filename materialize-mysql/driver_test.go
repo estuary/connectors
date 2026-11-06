@@ -1,16 +1,18 @@
-package main
+package connector
 
 import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/estuary/connectors/go/common"
 	"os/exec"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
@@ -50,22 +52,74 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newMysqlDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
+	})
+
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if boilerplate.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		boilerplate.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			t.Run(taskName, func(t *testing.T) {
+				var ctx = context.Background()
+				var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+				db, err := stdsql.Open("mysql", cfg.ToURI())
+				require.NoError(t, err)
+				defer db.Close()
+
+				boilerplate.RunFlowctl(t, "raw", "preview-next",
+					"--name", task.Name,
+					"--source", task.SourcePath,
+					"--fixture", "testdata/truncate.fixture.json",
+					"--shards", "1",
+					"--timeout", "5m",
+					"--network", "flow-test",
+				)
+
+				// The fixture stores ids 1-3, then re-stores only id 1 during a
+				// backfill. Only the standard table with a flow_published_at
+				// column loses the rows published before the backfill.
+				for table, want := range map[string][]int64{
+					"truncate_standard":        {1},
+					"truncate_delta":           {1, 1, 2, 3},
+					"truncate_no_published_at": {1, 2, 3},
+				} {
+					var rows, err = db.QueryContext(ctx, "SELECT id FROM "+task.Resource(t, table)+" ORDER BY id;")
+					require.NoError(t, err)
+					var ids []int64
+					for rows.Next() {
+						var id int64
+						require.NoError(t, rows.Scan(&id))
+						ids = append(ids, id)
+					}
+					require.NoError(t, rows.Err())
+					require.NoError(t, rows.Close())
+					require.Equal(t, want, ids, table)
+				}
+			})
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newMysqlDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newMysqlDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("fence", func(t *testing.T) {
 		var templates = renderTemplates(testDialect, "mysql")
 		sql.RunFencingTest(
 			t,
-			newMysqlDriver(),
+			NewDriver(),
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
 			templates.createTargetTable,
@@ -80,6 +134,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("additional table create sql", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		ctx := context.Background()
 		cfg := testConfig()
 
@@ -131,6 +186,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply changes", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
 		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {
 				ctx := context.Background()
@@ -177,7 +233,7 @@ func TestIntegration(t *testing.T) {
 				// none of the fields are in the materialized collection.
 				boilerplate.RunFlowctl(
 					t,
-					"preview",
+					"raw", "preview-next",
 					"--name", taskName,
 					"--source", "testdata/apply-changes.flow.yaml",
 					"--fixture", "testdata/fixture.empty.json",
@@ -256,7 +312,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var actual = preReqs(ctx, tt.cfg(cfg)).Unwrap()
+			var actual = preReqs(ctx, tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

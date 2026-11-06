@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -24,8 +25,8 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 }
 
 type AuthType string
@@ -107,7 +108,7 @@ type config struct {
 
 type advancedConfig struct {
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS."`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -138,7 +139,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -257,13 +258,13 @@ type client struct {
 	db *dynamodb.Client
 }
 
-func Driver() driver {
-	return driver{}
-}
-
 type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
+
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Materialize DynamoDB Spec", &config{}).MarshalJSON()
@@ -293,15 +294,15 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		}
 	}
 
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -311,7 +312,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	client, err := cfg.client(ctx)
 	if err != nil {
 		return nil, err
@@ -340,8 +341,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 			TableName: aws.String(tableName),
 		})
 		if err != nil {
-			var errNotFound *types.ResourceNotFoundException
-			if errors.As(err, &errNotFound) {
+			if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
 				// Table hasn't been created yet.
 				continue
 			}
@@ -443,6 +443,10 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	var bindings []binding
 	tablesToBindings := make(map[string]int)
 	for idx, b := range mappedBindings {
@@ -454,6 +458,7 @@ func (d *materialization) NewTransactor(
 		tablesToBindings[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			tableName: b.ResourcePath[0],
+			path:      b.ResourcePath,
 			fields:    mappedFields,
 			docField:  b.Document.Field,
 		})
@@ -462,6 +467,7 @@ func (d *materialization) NewTransactor(
 	return &transactor{
 		client:           d.client,
 		bindings:         bindings,
+		be:               be,
 		tablesToBindings: tablesToBindings,
 	}, nil
 }

@@ -1,0 +1,10 @@
+region: us-central1.gcp
+# Recognised by the connector as "no account behind this config", which skips
+# discovery's permission check. Replace with the real Project key alongside real
+# credentials; see TEST_CONFIG_PROJECT_KEY in source_commercetools/resources.py.
+project_key: dontchangethis.notareal.commercetools.project
+start_date: "2026-08-10T00:00:00Z"
+credentials:
+  credentials_title: OAuth Credentials
+  client_id: <secret>
+  client_secret: <secret>

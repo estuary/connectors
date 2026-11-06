@@ -5,7 +5,7 @@ acmeCo/test_capture/dbo/basics_missingtable_199221_a
 acmeCo/test_capture/dbo/basics_missingtable_199221_b
 sql> DROP TABLE dbo.Basics_MissingTable_199221_b
 === Run: Capture ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 the capture cannot run due to the following error(s):
  - table "dbo.basics_missingtable_199221_b" has no capture instances and user "flow_capture" cannot create one
 

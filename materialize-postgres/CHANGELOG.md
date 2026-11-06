@@ -1,5 +1,63 @@
 # materialize-postgres
 
+## 2026-11-03
+
+### Changed
+- Tasks split into multiple shards now fail to start with an error.
+
+## 2026-11-02
+
+### Fixed
+- With Exclude Flow Document enabled, documents now load correctly when a
+  top-level field has a custom projection name.
+
+### Changed
+- Changing the type of several columns of a table now rewrites the table once
+  instead of once per column, which makes the migration faster and uses less
+  disk I/O and WAL.
+
+## 2026-10-31
+
+### Changed
+- A table that would exceed Postgres's limit of 1600 columns now fails before
+  any binding's table is created or altered, with an error naming the table
+  and its column count and asking you to exclude fields from the binding.
+
+## 2026-10-23
+
+### Fixed
+- Loading existing rows for a large transaction no longer fails after one hour
+  while rows are still being returned. Slow destinations, such as small Amazon
+  Aurora instances, previously retried the same transaction indefinitely with
+  `querying Loads: timeout: context deadline exceeded`.
+
+## 2026-10-22
+
+### Added
+- The connector status on the task page now shows what the materialization is
+  doing, such as loading, staging or committing data, or waiting for its next
+  scheduled sync.
+
+### Changed
+- The warning about rows a backfill did not delete now names every affected
+  table instead of only the latest one.
+
+## 2026-09-29
+
+### Added
+- When a collection is backfilled, rows the backfill did not re-send are deleted
+  from standard-updates tables once it completes, so documents removed from the
+  source no longer linger in the destination. Delta-updates tables keep every
+  row. A table that excludes the `flow_published_at` field is left unchanged,
+  and a warning on the task page explains why.
+  Disable it with the `no_truncate_after_backfill` feature flag. It is also
+  disabled while `retain_existing_data_on_backfill` is enabled.
+
+## 2026-07-20
+
+### Fixed
+- Checkpoint fence updates are now issued as a parameterized `UPDATE` instead of a `DO` block with the checkpoint inlined as a literal. Because a `DO` block is a utility statement whose body cannot be normalized, every commit previously created a distinct `pg_stat_statements` entry, which could exhaust `pg_stat_statements.max` and cause `LWLock:pg_stat_statements` contention on the destination. The parameterized statement collapses into a single normalized entry.
+
 ## v4, 2022-11-30
 
 This version includes breaking changes to materialized table columns. These will provide more

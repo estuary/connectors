@@ -1,0 +1,45 @@
+info:
+  name: A1 - Create Interest Category A
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/interest-categories"
+  body:
+    type: json
+    data: |-
+      {
+        "title": "Estuary Test Category A",
+        "type": "checkboxes"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: "A3 - Create Interest" consumes this id as {{interest_category_id}}.
+        // Runtime var only (resource id, not a credential) — overrides the pinned
+        // interest_category_id in the environment file for this session.
+        if (res.status === 200 && res.body?.id) {
+          bru.setVar('interest_category_id', res.body.id);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/interest-categories/add-interest-category/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** creates an interest category so the interest_categories / interests
+  read probes have data. Run together with "A2 - Create Interest Category B" so
+  the offset pagination probe (count=1&offset=1) has >= 2 categories to page
+  over. Post-response: captures the new category id into the
+  interest_category_id runtime var consumed by "A3 - Create Interest" (run this
+  first in the session).

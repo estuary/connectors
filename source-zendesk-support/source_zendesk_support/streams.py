@@ -207,7 +207,7 @@ class BaseSourceZendeskSupportStream(HttpStream, ABC):
             except requests.exceptions.JSONDecodeError:
                 error = {"title": f"{response.reason}", "message": "Received empty JSON response"}
             self.logger.error(f"Skipping stream {self.name}: Check permissions, error message: {error}.")
-            setattr(self, "raise_on_http_errors", False)
+            self.raise_on_http_errors = False
             return False
         if response.status_code != 200:
             self.logger.warning(f"Received a {response.status_code} response.")

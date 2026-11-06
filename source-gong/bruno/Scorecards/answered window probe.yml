@@ -1,0 +1,61 @@
+info:
+  name: answered window probe
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/v2/stats/activity/scorecards"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "filter": {
+          "reviewFromDate": "{{review_from}}",
+          "reviewToDate": "{{review_to}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://gong.app.gong.io/settings/api/documentation#post-/v2/stats/activity/scorecards
+
+  **WHY:** the same endpoint as `answered`, with the window bounds passed in so
+  the date-granularity behaviour can be probed directly:
+
+      bru run "Scorecards/answered window probe.yml" --env Gong --sandbox developer \
+        --env-var review_from=2026-09-02 --env-var review_to=2026-09-02
+
+  This exists because `source_gong/api.py`'s `fetch_changes` walks in 1-day
+  windows and formats both bounds with `DateFormat.DATE` for this resource.
+
+  **VERIFIED (2026-09-02) — a same-day window returns nothing.**
+
+  | reviewFromDate | reviewToDate | result |
+  |---|---|---|
+  | 2026-09-02 | 2026-09-02 | `404`, empty |
+  | 2026-09-02 | 2026-09-03 | `200`, both reviews |
+
+  **LIMITATION — this is a data-loss bug in the connector.** `fetch_changes`
+  sets `end_date = min(start_date + 1 day, now - LAG)`. On the last window both
+  bounds fall on today and format to the same date, so the request returns
+  nothing. The function then commits `_dt_to_ts(end_date)` — a *mid-day*
+  timestamp — as the new cursor. The next day the window spans
+  `2026-09-02` -> `2026-09-03` and does return the reviews, but they are then
+  dropped by the `doc.cursor_value < log_cursor` guard, because their review
+  times are earlier in the day than the committed cursor. Fetched, filtered,
+  gone for good.
+
+  Root cause: a timestamp-precision cursor driving a date-precision server
+  filter. Any review submitted after the cursor's time-of-day on the day it
+  advances is unreachable. A fix has to day-align the cursor for
+  `DateFormat.DATE` resources rather than patching the window bounds alone.

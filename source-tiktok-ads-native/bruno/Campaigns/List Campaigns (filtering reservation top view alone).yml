@@ -1,0 +1,24 @@
+info:
+  name: List Campaigns (filtering reservation top view alone)
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"CAMPAIGN_STATUS_ALL","buying_types":["RESERVATION_TOP_VIEW"]}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** checks that `RESERVATION_TOP_VIEW` is accepted on its own, since it cannot be combined with other buying types.
+
+  **VERIFIED (2026-10-08, sandbox):** accepted, `code 0`, `total_number 0`
+  (no top-view campaigns exist in the sandbox).

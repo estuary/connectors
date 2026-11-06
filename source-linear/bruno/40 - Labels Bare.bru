@@ -1,0 +1,199 @@
+meta {
+  name: 40 - Labels Bare
+  type: graphql
+  seq: 40
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query LabelsBare {
+    issueLabels(first: 250, includeArchived: true, orderBy: updatedAt) {
+      nodes {
+        id
+        createdAt
+        updatedAt
+        archivedAt
+        name
+        description
+        color
+        isGroup
+        lastAppliedAt
+        retiredAt
+        team { id }
+        parent { id }
+        creator { id }
+        inheritedFrom { id }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/graphql
+
+  The canonical Labels selection set — verbatim what the connector will send.
+
+  **This stream is the odd one out in the cluster, in one specific way:** `issueLabels`
+  does NOT accept the `sort` argument (see `42 - Labels Sort Rejected`). It has only
+  `orderBy`, which `04 - OrderBy Direction Probe` proved is DESCENDING-only. So while
+  Issues / Projects / Initiatives sweep ascending and checkpoint per page, Labels must
+  sweep newest-first and checkpoint ONCE at end-of-sweep, using the maximum `updatedAt`
+  observed across the whole sweep. Everything else about the stream — the connection
+  shape, `first`/`after` pagination, the `IssueLabelFilter.updatedAt` comparator,
+  `includeArchived` — is identical to its siblings, so it stays in the cluster and shares
+  the engine; only the checkpoint policy differs.
+
+  End-of-sweep checkpointing is cheap here specifically because label populations are
+  small — tens to low hundreds per workspace, versus potentially millions of issues. The
+  page size is set to the 250 maximum for that reason: most workspaces will complete this
+  stream in a single request.
+
+  Static cost under the documented formula (10 scalars, 4 relation objects): per node =
+  1 + 10 x 0.1 + 4 x 1.1 = ~6.4 points; at `first: 250` that is ~1,600 points.
+
+  **Workspace-level vs team-level labels — both are returned by this one root field.**
+  `03 - Introspect Entity Types` showed `IssueLabel.team` is NULLABLE, and that nullability
+  is the discriminator:
+
+  - `team == null`  -> a WORKSPACE-level label, available to every team.
+  - `team != null`  -> a label scoped to exactly that one team.
+
+  `issueLabels` returns BOTH populations mixed together in a single connection, with no
+  filter applied by default — so no partition is hidden and no separate sweep is needed.
+  Selecting `team { id }` is what makes the distinction recoverable downstream, which is
+  why it is in the selection set rather than being dropped as an incidental relation. Two
+  labels in different teams may share a `name`, so consumers must not treat `name` as a
+  key — `id` is the only primary key.
+
+  Also selected: `isGroup` and `parent { id }`, which together express Linear's label
+  GROUPS (a group is a label with `isGroup: true`; its members carry `parent`). And
+  `inheritedFrom { id }`, which links a team label back to the workspace label it was
+  inherited from.
+
+  **Limitation / observed finding** (confirmed 2026-07-30): returns 3 rows — `Bug`,
+  `Feature`, `Improvement` — all with `archivedAt: null`, all sharing the bulk-seed
+  `updatedAt` of `2026-07-30T21:35:03.808Z`, and `hasNextPage: false`. All three are
+  Linear's stock defaults. This workspace has a single team, so the team-scoped-label case
+  is present in the schema but has no live example.
+}
+
+example {
+  name: 200 — full representative IssueLabel (3 workspace-level labels)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query LabelsBare {
+        issueLabels(first: 250, includeArchived: true, orderBy: updatedAt) {
+          nodes {
+            id
+            createdAt
+            updatedAt
+            archivedAt
+            name
+            description
+            color
+            isGroup
+            lastAppliedAt
+            retiredAt
+            team { id }
+            parent { id }
+            creator { id }
+            inheritedFrom { id }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 1000
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2481
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999000
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "issueLabels": {
+              "nodes": [
+                {
+                  "id": "d3ffe6ef-6b5a-4af7-8b25-707b9282065c",
+                  "createdAt": "2026-07-30T21:35:03.808Z",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null,
+                  "name": "Bug",
+                  "description": null,
+                  "color": "#EB5757",
+                  "isGroup": false,
+                  "lastAppliedAt": null,
+                  "retiredAt": null,
+                  "team": null,
+                  "parent": null,
+                  "creator": null,
+                  "inheritedFrom": null
+                },
+                {
+                  "id": "57cc6a96-8c08-4c63-b749-dea0c5ceb65c",
+                  "createdAt": "2026-07-30T21:35:03.808Z",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null,
+                  "name": "Feature",
+                  "description": null,
+                  "color": "#BB87FC",
+                  "isGroup": false,
+                  "lastAppliedAt": null,
+                  "retiredAt": null,
+                  "team": null,
+                  "parent": null,
+                  "creator": null,
+                  "inheritedFrom": null
+                },
+                {
+                  "id": "274d6628-3101-41c1-96bd-27241c8301b5",
+                  "createdAt": "2026-07-30T21:35:03.808Z",
+                  "updatedAt": "2026-07-30T21:35:03.808Z",
+                  "archivedAt": null,
+                  "name": "Improvement",
+                  "description": null,
+                  "color": "#4EA7FC",
+                  "isGroup": false,
+                  "lastAppliedAt": null,
+                  "retiredAt": null,
+                  "team": null,
+                  "parent": null,
+                  "creator": null,
+                  "inheritedFrom": null
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "274d6628-3101-41c1-96bd-27241c8301b5"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

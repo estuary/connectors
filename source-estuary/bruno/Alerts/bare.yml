@@ -1,0 +1,354 @@
+info:
+  name: bare
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Alerts($prefix: String!) {
+        alerts(by: { prefix: $prefix }) {
+          pageInfo { hasPreviousPage hasNextPage startCursor endCursor }
+          edges { cursor node { alertType catalogName firedAt resolvedAt arguments resolvedArguments } }
+        }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alerts.rs
+
+  **WHY:** Baseline shape with no paging args. Server source says this takes the
+  backward branch (`last` defaulting to 20, `before` = now+1m) and returns edges
+  newest-first. Confirms the node key set (no `id`), the cursor format
+  `firedAt;alertType;catalogName`, and which pageInfo flag signals more.
+
+  **VERIFIED (2026-10-07):** 15 alerts for `Jonathan_Wihl/`, newest-first by `firedAt`. Node has no `id`. Cursor = `<firedAt RFC3339 µs, +00:00>;<alertType>;<catalogName>`. `arguments.recipients` exists (redacted here; it holds subscriber emails). With no paging args `hasPreviousPage` is the more-flag; `hasNextPage` is always false.
+
+examples:
+  - name: 200 - 15 alerts newest-first, default page
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alerts": {
+                "pageInfo": {
+                  "hasPreviousPage": false,
+                  "hasNextPage": false,
+                  "startCursor": "2026-06-02T13:14:14.852195+00:00;shard_failed;Jonathan_Wihl/wikipedia/user-fact-table",
+                  "endCursor": "2024-02-13T21:58:23.429321+00:00;missing_payment_method;Jonathan_Wihl/alerts/missing_payment_method"
+                },
+                "edges": [
+                  {
+                    "cursor": "2026-06-02T13:14:14.852195+00:00;shard_failed;Jonathan_Wihl/wikipedia/user-fact-table",
+                    "node": {
+                      "alertType": "shard_failed",
+                      "catalogName": "Jonathan_Wihl/wikipedia/user-fact-table",
+                      "firedAt": "2026-06-02T13:14:14.852195+00:00",
+                      "resolvedAt": "2026-06-02T16:40:00.266912+00:00",
+                      "arguments": {
+                        "count": 3,
+                        "error": "Observed 3 recent task shard failures, the latest at 2026-06-02 13:14:11.991201123 UTC. Last failure:\nshard status check showed failed shards",
+                        "first_ts": "2026-06-02T13:14:14.438283440Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-06-02T13:00:34.735123+00:00;shard_failed;Jonathan_Wihl/notion-input",
+                    "node": {
+                      "alertType": "shard_failed",
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "firedAt": "2026-06-02T13:00:34.735123+00:00",
+                      "resolvedAt": "2026-06-02T16:50:03.681473+00:00",
+                      "arguments": {
+                        "count": 3,
+                        "error": "Observed 3 recent task shard failures, the latest at 2026-06-02 13:00:33.498764197 UTC. Last failure:\nshard status check showed failed shards",
+                        "first_ts": "2026-06-02T13:00:34.400879378Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-06-02T12:48:43.441117+00:00;shard_failed;Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "alertType": "shard_failed",
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "firedAt": "2026-06-02T12:48:43.441117+00:00",
+                      "resolvedAt": "2026-06-02T16:50:01.258105+00:00",
+                      "arguments": {
+                        "count": 3,
+                        "error": "Observed 3 recent task shard failures, the latest at 2026-06-02 12:48:41.863298528 UTC. Last failure:\nshard status check showed failed shards",
+                        "first_ts": "2026-06-02T12:48:43.160589278Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-06-02T11:59:50.759409+00:00;shard_failed;Jonathan_Wihl/wikipedia/top-users",
+                    "node": {
+                      "alertType": "shard_failed",
+                      "catalogName": "Jonathan_Wihl/wikipedia/top-users",
+                      "firedAt": "2026-06-02T11:59:50.759409+00:00",
+                      "resolvedAt": "2026-06-02T16:30:57.243107+00:00",
+                      "arguments": {
+                        "count": 3,
+                        "error": "Observed 3 recent task shard failures, the latest at 2026-06-02 11:59:49.515274277 UTC. Last failure:\nshard status check showed failed shards",
+                        "first_ts": "2026-06-02T11:59:50.550108990Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-06-02T11:51:27.861417+00:00;shard_failed;Jonathan_Wihl/wikipedia/user-summary-limit",
+                    "node": {
+                      "alertType": "shard_failed",
+                      "catalogName": "Jonathan_Wihl/wikipedia/user-summary-limit",
+                      "firedAt": "2026-06-02T11:51:27.861417+00:00",
+                      "resolvedAt": "2026-06-02T16:37:47.186539+00:00",
+                      "arguments": {
+                        "count": 3,
+                        "error": "Observed 3 recent task shard failures, the latest at 2026-06-02 11:51:26.621285182 UTC. Last failure:\nshard status check showed failed shards",
+                        "first_ts": "2026-06-02T11:51:27.571093528Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-05-27T00:42:41.566979+00:00;free_trial_stalled;Jonathan_Wihl/alerts/free_trial_stalled",
+                    "node": {
+                      "alertType": "free_trial_stalled",
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial_stalled",
+                      "firedAt": "2026-05-27T00:42:41.566979+00:00",
+                      "resolvedAt": null,
+                      "arguments": {
+                        "has_credit_card": false,
+                        "plan_state": "paid",
+                        "recipients": "REDACTED",
+                        "tenant": "Jonathan_Wihl/",
+                        "trial_end": "2026-05-22T00:00:00",
+                        "trial_start": "2026-04-22"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-05-17T00:34:06.519159+00:00;free_trial_ending;Jonathan_Wihl/alerts/free_trial_ending",
+                    "node": {
+                      "alertType": "free_trial_ending",
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial_ending",
+                      "firedAt": "2026-05-17T00:34:06.519159+00:00",
+                      "resolvedAt": "2026-05-18T00:34:35.902579+00:00",
+                      "arguments": {
+                        "has_credit_card": false,
+                        "plan_state": "free_trial",
+                        "recipients": "REDACTED",
+                        "tenant": "Jonathan_Wihl/",
+                        "trial_end": "2026-05-22T00:00:00",
+                        "trial_start": "2026-04-22"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-04-23T22:21:17.352572+00:00;free_trial;Jonathan_Wihl/alerts/free_trial",
+                    "node": {
+                      "alertType": "free_trial",
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial",
+                      "firedAt": "2026-04-23T22:21:17.352572+00:00",
+                      "resolvedAt": "2026-05-22T00:40:19.514491+00:00",
+                      "arguments": {
+                        "has_credit_card": false,
+                        "plan_state": "free_trial",
+                        "recipients": "REDACTED",
+                        "tenant": "Jonathan_Wihl/",
+                        "trial_end": "2026-05-22T00:00:00",
+                        "trial_start": "2026-04-22"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-03-30T21:02:29.102472+00:00;task_auto_disabled_idle;Jonathan_Wihl/notion-input",
+                    "node": {
+                      "alertType": "task_auto_disabled_idle",
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "firedAt": "2026-03-30T21:02:29.102472+00:00",
+                      "resolvedAt": "2026-04-30T23:46:14.661205+00:00",
+                      "arguments": {
+                        "count": 1,
+                        "error": "task auto-disabled due to inactivity",
+                        "first_ts": "2026-03-30T21:02:28.830154573Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-03-30T18:44:21.201645+00:00;task_auto_disabled_idle;Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "alertType": "task_auto_disabled_idle",
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "firedAt": "2026-03-30T18:44:21.201645+00:00",
+                      "resolvedAt": "2026-04-30T21:35:48.360407+00:00",
+                      "arguments": {
+                        "count": 1,
+                        "error": "task auto-disabled due to inactivity",
+                        "first_ts": "2026-03-30T18:44:21.017660340Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-03-24T15:29:55.834226+00:00;shard_failed;Jonathan_Wihl/user-fact-table",
+                    "node": {
+                      "alertType": "shard_failed",
+                      "catalogName": "Jonathan_Wihl/user-fact-table",
+                      "firedAt": "2026-03-24T15:29:55.834226+00:00",
+                      "resolvedAt": "2026-03-24T18:53:56.369176+00:00",
+                      "arguments": {
+                        "count": 3,
+                        "error": "Observed 3 recent task shard failures, the latest at 2026-03-24 15:29:53.725870508 UTC. Last failure:\nshard status check showed failed shards",
+                        "first_ts": "2026-03-24T15:29:54.896418850Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-03-23T19:55:19.412658+00:00;task_idle;Jonathan_Wihl/notion-input",
+                    "node": {
+                      "alertType": "task_idle",
+                      "catalogName": "Jonathan_Wihl/notion-input",
+                      "firedAt": "2026-03-23T19:55:19.412658+00:00",
+                      "resolvedAt": null,
+                      "arguments": {
+                        "count": 1,
+                        "disable_at": "2026-03-30",
+                        "error": "task has not moved data since it was created",
+                        "first_ts": "2026-03-23T19:55:19.167802535Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2026-03-23T18:22:32.481778+00:00;task_idle;Jonathan_Wihl/gpt-notion",
+                    "node": {
+                      "alertType": "task_idle",
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "firedAt": "2026-03-23T18:22:32.481778+00:00",
+                      "resolvedAt": null,
+                      "arguments": {
+                        "count": 1,
+                        "disable_at": "2026-03-30",
+                        "error": "task has not moved data since 2026-02-13",
+                        "first_ts": "2026-03-23T18:22:32.302069666Z",
+                        "last_ts": null,
+                        "recipients": "REDACTED",
+                        "resolved_at": null,
+                        "spec_type": "collection",
+                        "state": "firing"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2025-03-13T20:00:00.018903+00:00;free_trial_stalled;Jonathan_Wihl/alerts/free_trial_stalled",
+                    "node": {
+                      "alertType": "free_trial_stalled",
+                      "catalogName": "Jonathan_Wihl/alerts/free_trial_stalled",
+                      "firedAt": "2025-03-13T20:00:00.018903+00:00",
+                      "resolvedAt": "2026-04-23T22:21:17.352572+00:00",
+                      "arguments": {
+                        "recipients": "REDACTED",
+                        "tenant": "Jonathan_Wihl/",
+                        "trial_end": "2023-11-02",
+                        "trial_start": "2023-10-02"
+                      },
+                      "resolvedArguments": null
+                    }
+                  },
+                  {
+                    "cursor": "2024-02-13T21:58:23.429321+00:00;missing_payment_method;Jonathan_Wihl/alerts/missing_payment_method",
+                    "node": {
+                      "alertType": "missing_payment_method",
+                      "catalogName": "Jonathan_Wihl/alerts/missing_payment_method",
+                      "firedAt": "2024-02-13T21:58:23.429321+00:00",
+                      "resolvedAt": null,
+                      "arguments": {
+                        "plan_state": "paid",
+                        "recipients": "REDACTED",
+                        "tenant": "Jonathan_Wihl/",
+                        "trial_end": "2023-11-02",
+                        "trial_start": "2023-10-02"
+                      },
+                      "resolvedArguments": null
+                    }
+                  }
+                ]
+              }
+            }
+          }

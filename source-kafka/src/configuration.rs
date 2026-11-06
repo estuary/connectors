@@ -1,9 +1,18 @@
 use anyhow::Result;
 use rdkafka::client::{ClientContext, OAuthToken};
 use rdkafka::consumer::{BaseConsumer, ConsumerContext};
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
+use rdkafka::statistics::Statistics;
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{de, Deserialize, Deserializer, Serialize};
+use std::sync::Mutex;
+
+// How often in milliseconds librdkafka computes consumer statistics and
+// delivers them to the `stats` callback, which logs per-partition lag. This is
+// serviced on the same thread that polls for messages, so the interval is kept
+// coarse to keep the logging overhead negligible.
+const STATISTICS_INTERVAL_MS: &str = "300000"; // 5 minutes
 
 #[derive(Serialize, Deserialize)]
 pub struct EndpointConfig {
@@ -268,6 +277,9 @@ impl JsonSchema for EndpointConfig {
 
 pub struct FlowConsumerContext {
     auth: Option<Credentials>,
+    // The last connectorStatus message emitted, used to suppress duplicate
+    // status updates so an unchanged status is not re-logged every interval.
+    last_status: Mutex<Option<String>>,
 }
 
 impl ClientContext for FlowConsumerContext {
@@ -299,9 +311,122 @@ impl ClientContext for FlowConsumerContext {
             _ => Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into()),
         }
     }
+
+    fn stats(&self, statistics: Statistics) {
+        self.report_lag(&statistics);
+    }
+
+    // A dropped broker connection doesn't end the session, so it's logged as a
+    // warning.
+    fn error(&self, error: KafkaError, reason: &str) {
+        match error {
+            KafkaError::Global(RDKafkaErrorCode::BrokerTransportFailure) => {
+                tracing::warn!("librdkafka: {}: {}", error, reason)
+            }
+            _ => tracing::error!("librdkafka: {}: {}", error, reason),
+        }
+    }
 }
 
 impl ConsumerContext for FlowConsumerContext {}
+
+impl FlowConsumerContext {
+    // Reports consumer lag once per `statistics.interval.ms`. For each topic it
+    // logs a detail line rolled up across the topic's partitions, and it rolls
+    // the whole capture up into a single `connectorStatus` line.
+    // Because the connector emits exactly one captured document per Kafka
+    // message, "messages behind" is equivalently "documents behind", and a topic
+    // is exactly one binding/collection.
+    //
+    // librdkafka delivers `statistics` via the poll thread, so this runs on the
+    // same thread that consumes messages.
+    fn report_lag(&self, statistics: &Statistics) {
+        let mut total_behind: i64 = 0;
+        let mut topics_total: u64 = 0;
+        let mut topics_behind: u64 = 0;
+
+        for topic in statistics.topics.values() {
+            let mut partitions: u64 = 0;
+            let mut partitions_behind: u64 = 0;
+            let mut total_messages_behind: i64 = 0;
+            let mut max_messages_behind: i64 = 0;
+            // The partition owning `max_messages_behind`; a caught-up topic still
+            // names a real partition (the first one seen).
+            let mut max_lag_partition: i32 = -1;
+
+            for partition in topic.partitions.values() {
+                // librdkafka reports an internal aggregate entry under partition -1.
+                if partition.partition < 0 {
+                    continue;
+                }
+
+                // `app_offset` is the offset of the last message handed to us,
+                // which is our true read position. It is unset until the first
+                // message of a session is consumed, so fall back to the fetch
+                // position and then the low watermark for a freshly-assigned
+                // partition. We avoid librdkafka's `consumer_lag` field, which is
+                // derived from the committed offset: this connector never commits
+                // offsets (it tracks them in Flow checkpoints), so that field is
+                // unreliable.
+                let read_offset = [partition.app_offset, partition.next_offset]
+                    .into_iter()
+                    .find(|&offset| offset >= 0)
+                    .unwrap_or(partition.lo_offset.max(0));
+
+                let messages_behind = (partition.hi_offset - read_offset).max(0);
+
+                // The first real partition, or a new maximum, owns the worst-lag slot.
+                if partitions == 0 || messages_behind > max_messages_behind {
+                    max_messages_behind = messages_behind;
+                    max_lag_partition = partition.partition;
+                }
+                partitions += 1;
+                total_messages_behind += messages_behind;
+                if messages_behind > 0 {
+                    partitions_behind += 1;
+                }
+            }
+
+            // Skip topics with no assigned partitions, which carry no useful signal.
+            if partitions == 0 {
+                continue;
+            }
+
+            tracing::info!(
+                topic = topic.topic.as_str(),
+                partitions,
+                partitions_behind,
+                total_messages_behind,
+                max_messages_behind,
+                max_lag_partition,
+                "consumer lag",
+            );
+
+            topics_total += 1;
+            total_behind += total_messages_behind;
+            if total_messages_behind > 0 {
+                topics_behind += 1;
+            }
+        }
+
+        // Nothing assigned yet (e.g. before partition assignment): no status.
+        if topics_total == 0 {
+            return;
+        }
+
+        let status = format!(
+            "{total_behind} messages behind across {topics_behind} of {topics_total} topics"
+        );
+
+        // Only emit connectorStatus when it changes to avoid re-logging an
+        // unchanged status every interval.
+        let mut last_status = self.last_status.lock().unwrap();
+        if last_status.as_deref() != Some(status.as_str()) {
+            tracing::info!(eventType = "connectorStatus", "{status}");
+            *last_status = Some(status);
+        }
+    }
+}
 
 impl EndpointConfig {
     pub async fn to_consumer(&self) -> Result<BaseConsumer<FlowConsumerContext>> {
@@ -311,6 +436,7 @@ impl EndpointConfig {
         config.set("enable.auto.commit", "false");
         config.set("group.id", "source-kafka"); // librdkafka will throw an error if this is left blank
         config.set("security.protocol", self.security_protocol());
+        config.set("statistics.interval.ms", STATISTICS_INTERVAL_MS);
 
         match &self.credentials {
             Some(Credentials::UserPassword {
@@ -333,6 +459,7 @@ impl EndpointConfig {
 
         let ctx = FlowConsumerContext {
             auth: self.credentials.clone(),
+            last_status: Mutex::new(None),
         };
 
         let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx)?;

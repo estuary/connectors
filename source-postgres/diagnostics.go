@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
 )
@@ -48,7 +50,43 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	}
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_flush_lsn() END;")
+	db.reportDiscardedEvents()
 	return nil
+}
+
+// reportDiscardedEvents drains the per-stream discard tally accumulated since the
+// previous call and logs the top N streams by discard count.
+func (db *postgresDatabase) reportDiscardedEvents() {
+	const maxReportedDiscardStreams = 20
+
+	type streamDiscards struct {
+		StreamID sqlcapture.StreamID
+		Count    int64
+	}
+
+	// Drain entries by copying them out under the lock and then clearing the map.
+	db.discardCounts.Lock()
+	var entries = make([]streamDiscards, 0, len(db.discardCounts.byStream))
+	for streamID, count := range db.discardCounts.byStream {
+		entries = append(entries, streamDiscards{StreamID: streamID, Count: count})
+	}
+	clear(db.discardCounts.byStream)
+	db.discardCounts.Unlock()
+
+	if len(entries) == 0 {
+		return
+	}
+	slices.SortFunc(entries, func(a, b streamDiscards) int { return int(b.Count - a.Count) })
+
+	var reported = min(len(entries), maxReportedDiscardStreams)
+	var fields = log.Fields{}
+	for _, e := range entries[:reported] {
+		fields[e.StreamID.String()] = e.Count
+	}
+	if len(entries) > reported {
+		fields["(omitted)"] = len(entries) - reported
+	}
+	log.WithFields(fields).Warn("discarded replication events for inactive tables")
 }
 
 func (db *postgresDatabase) PeriodicChecks(ctx context.Context) error {

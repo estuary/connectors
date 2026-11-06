@@ -36,7 +36,7 @@ type config struct {
 type advancedConfig struct {
 	FlowSchema        string `json:"flowSchema,omitempty" jsonschema:"default=ESTUARY_STAGING,description=The schema in which Flow will create and manage its streams and staging tables."`
 	FlowDB            string `json:"flowDatabase,omitempty" jsonschema:"default=,description=The database in which Flow will create and manage its streams and staging tables. Defaults to the capture database if unset."`
-	FullCopySnapshots bool   `json:"fullCopySnapshots,omitempty" jsonschema:"default=false,description=If set the initial snapshot of a table will be a full copy rather than a zero-copy clone."`
+	FullCopySnapshots bool   `json:"fullCopySnapshots,omitempty" jsonschema:"default=false,description=If set the initial snapshot of a table will be a full copy rather than a zero-copy clone." jsonschema_extras:"nonsensitive=true"`
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)

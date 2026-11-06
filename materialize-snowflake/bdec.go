@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"bytes"
@@ -22,8 +22,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
-	"github.com/apache/arrow-go/v18/parquet/metadata"
-	"github.com/estuary/connectors/go/writer"
+	"github.com/estuary/connectors/materialize-snowflake/bdecparquet"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -49,13 +48,13 @@ const (
 
 	// For blobs we only write a single chunk and a chunk can only have a single
 	// row group, so this ends up being the size limit for the single row group
-	// written by the bdec writer.
+	// written by the bdec writer
 	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/utils/ParameterProvider.java#L64C62-L64C79
 	MAX_CHUNK_SIZE_IN_BYTES_DEFAULT = 256 * 1024 * 1024
 )
 
 type bdecWriter struct {
-	pq        *writer.ParquetWriter
+	pq        *bdecparquet.ParquetWriter
 	blobStats *blobStatsTracker
 	cols      []tableColumn
 	done      bool
@@ -79,7 +78,7 @@ func newBdecWriter(
 	}
 
 	metadata := map[string]string{"primaryFileId": path.Base(string(fileName))}
-	sch := make(writer.ParquetSchema, 0, len(orderedCols))
+	sch := make(bdecparquet.ParquetSchema, 0, len(orderedCols))
 	for _, col := range orderedCols {
 		e, err := makeSchemaElement(col)
 		if err != nil {
@@ -123,15 +122,18 @@ func newBdecWriter(
 		})
 	}
 
-	pq := writer.NewParquetWriter(
+	pq, err := bdecparquet.NewParquetWriter(
 		blobStats,
 		sch,
-		writer.WithParquetCompression(writer.Snappy),
-		writer.WithDisableDictionaryEncoding(), // not only for performance, but also to support some column types (VARIANT)
-		writer.WithParquetMetadata(metadata),
-		writer.WithParquetRowGroupByteLimit(MAX_CHUNK_SIZE_IN_BYTES_DEFAULT),
-		writer.WithParquetRowGroupRowLimit(math.MaxInt64), // no specific limit on the number of rows in a bdec chunk
+		bdecparquet.WithParquetCompression(bdecparquet.Snappy),
+		bdecparquet.WithDisableDictionaryEncoding(), // not only for performance, but also to support some column types (VARIANT)
+		bdecparquet.WithParquetMetadata(metadata),
+		bdecparquet.WithParquetRowGroupByteLimit(MAX_CHUNK_SIZE_IN_BYTES_DEFAULT),
+		bdecparquet.WithParquetRowGroupRowLimit(math.MaxInt64), // no specific limit on the number of rows in a bdec chunk
 	)
+	if err != nil {
+		return nil, fmt.Errorf("creating parquet writer: %w", err)
+	}
 
 	return &bdecWriter{
 		pq:        pq,
@@ -237,21 +239,47 @@ func (bw *bdecWriter) writeRow(row []any) error {
 func (bw *bdecWriter) close() error {
 	if err := bw.pq.Close(); err != nil {
 		return fmt.Errorf("closing parquet writer: %w", err)
-	} else if bw.blobStats.parquetMetadata, err = bw.pq.FileMetadata(); err != nil {
+	}
+	fm, err := bw.pq.FileMetadata()
+	if err != nil {
 		return fmt.Errorf("getting parquet file metadata: %w", err)
 	}
 
 	// A couple of easy sanity checks to verify the recorded blob metadata vs.
 	// the written parquet file metadata. The uncompressed length is taken
 	// directly from the parquet metadata assuming everything else matches.
-	if bw.blobStats.parquetMetadata.NumRowGroups() != 1 {
-		return fmt.Errorf("internal appication error: expected exactly one row group in bdec file, got %d", bw.blobStats.parquetMetadata.NumRowGroups())
-	} else if bw.blobStats.rows != int(bw.blobStats.parquetMetadata.NumRows) {
-		return fmt.Errorf("internal appication error: row count mismatch: %d rows written, but parquet metadata has %d", bw.blobStats.rows, bw.blobStats.parquetMetadata.NumRows)
+	if fm.NumRowGroups() != 1 {
+		return fmt.Errorf("internal appication error: expected exactly one row group in bdec file, got %d", fm.NumRowGroups())
+	} else if bw.blobStats.rows != int(fm.NumRows) {
+		return fmt.Errorf("internal appication error: row count mismatch: %d rows written, but parquet metadata has %d", bw.blobStats.rows, fm.NumRows)
 	}
-	bw.blobStats.lengthUncompressed = int(bw.blobStats.parquetMetadata.RowGroups[0].TotalByteSize)
+	bw.blobStats.lengthUncompressed = int(fm.RowGroups[0].TotalByteSize)
+
+	// Only the scalars needed later are kept from the file metadata: retaining
+	// the *metadata.FileMetaData itself would pin the encoded column
+	// statistics, which can be several MiB per blob when column values are
+	// large, for as long as the tracker is retained.
+	bw.blobStats.parquetStats = parquetFileStats{
+		numRows:         fm.NumRows,
+		numRowGroups:    fm.NumRowGroups(),
+		rowGroupNumRows: fm.RowGroups[0].NumRows,
+		totalByteSize:   fm.RowGroups[0].TotalByteSize,
+	}
+	if s := fm.RowGroups[0].TotalCompressedSize; s != nil {
+		bw.blobStats.parquetStats.totalCompressedSize = *s
+	}
 
 	return nil
+}
+
+// parquetFileStats holds the scalars from the written parquet file's metadata
+// that are used after the blob is finished.
+type parquetFileStats struct {
+	numRows             int64
+	numRowGroups        int
+	rowGroupNumRows     int64
+	totalByteSize       int64
+	totalCompressedSize int64
 }
 
 type blobStatsTracker struct {
@@ -267,7 +295,7 @@ type blobStatsTracker struct {
 	length             int          // total number of bytes in the blob
 	lengthUncompressed int          // estimate of the uncompressed byte size of the blob's data
 
-	parquetMetadata *metadata.FileMetaData // As-written parquet file metadata
+	parquetStats parquetFileStats // As-written parquet file metadata scalars
 
 	columns []*columnStatsTracker
 
@@ -277,25 +305,37 @@ type blobStatsTracker struct {
 	buf    []byte
 }
 
+// encryptChunkSize bounds the scratch buffer used to encrypt bytes on their
+// way to the output. Encrypting in fixed-size chunks keeps the buffer small no
+// matter how large the writes from the parquet writer are (single compressed
+// pages can be tens of MB when values are large), which matters because each
+// blob's tracker is retained until the transaction commits.
+const encryptChunkSize = 64 * 1024
+
 func (bs *blobStatsTracker) Write(p []byte) (int, error) {
-	n := len(p)
-	if n > cap(bs.buf) {
-		bs.buf = slices.Grow(bs.buf, n-len(bs.buf))
+	if bs.buf == nil {
+		bs.buf = make([]byte, encryptChunkSize)
 	}
 
-	bs.stream.XORKeyStream(bs.buf[:n], p)
-	if written, err := bs.w.Write(bs.buf[:n]); err != nil {
-		return written, fmt.Errorf("blobStatsTracker error writing to output: %w", err)
-	} else if written != n {
-		return written, fmt.Errorf("written bytes %d != expected bytes %d", written, n)
-	} else if hashed, err := bs.md5.Write(bs.buf[:n]); err != nil {
-		return written, fmt.Errorf("failed to write md5 for blob: %w", err)
-	} else if hashed != n {
-		return written, fmt.Errorf("hashed bytes %d != expected bytes %d", hashed, n)
+	var total int
+	for len(p) > 0 {
+		n := min(len(p), encryptChunkSize)
+		bs.stream.XORKeyStream(bs.buf[:n], p[:n])
+		if written, err := bs.w.Write(bs.buf[:n]); err != nil {
+			return total + written, fmt.Errorf("blobStatsTracker error writing to output: %w", err)
+		} else if written != n {
+			return total + written, fmt.Errorf("written bytes %d != expected bytes %d", written, n)
+		} else if hashed, err := bs.md5.Write(bs.buf[:n]); err != nil {
+			return total + n, fmt.Errorf("failed to write md5 for blob: %w", err)
+		} else if hashed != n {
+			return total + n, fmt.Errorf("hashed bytes %d != expected bytes %d", hashed, n)
+		}
+		total += n
+		p = p[n:]
 	}
 
-	bs.length += n
-	return n, nil
+	bs.length += total
+	return total, nil
 }
 
 func (bs *blobStatsTracker) Close() error {
@@ -303,6 +343,7 @@ func (bs *blobStatsTracker) Close() error {
 		return fmt.Errorf("blobStatsTracker error closing output: %w", err)
 	}
 	bs.finish = time.Now()
+	bs.buf = nil // nothing more will be written; don't retain the buffer
 
 	return nil
 }
@@ -341,23 +382,32 @@ func (cs *columnStatsTracker) nextStr(v string) {
 		panic(fmt.Sprintf("internal error: nextStr called on non-string column %q", cs.name))
 	}
 
+	cs.strStats.maxLen = max(len(v), cs.strStats.maxLen)
+
+	if len(v) > MAX_LOB_LENGTH+1 {
+		// These ultimately get truncated to MAX_LOB_LENGTH per
+		// truncateBytesAsHex, so there is no reason to buffer more than that
+		// plus one byte, with the extra byte preserving the "value was longer"
+		// signal truncateBytesAsHex uses to round the maximum value up.
+		v = v[:MAX_LOB_LENGTH+1]
+	}
+
+	// Stored values must be cloned: a substring of v aliases v's backing
+	// array, and would otherwise pin the entire value in memory for as long as
+	// the tracker is retained, which is until the transaction commits.
 	if !cs.hasData {
-		cs.strStats.maxLen = len(v)
-		cs.strStats.maxVal = v
-		cs.strStats.minVal = v
+		cs.strStats.maxVal = strings.Clone(v)
+		cs.strStats.minVal = strings.Clone(v)
 		cs.hasData = true
 		return
 	}
 
-	cs.strStats.maxLen = max(len(v), cs.strStats.maxLen)
-
-	if len(v) > MAX_LOB_LENGTH {
-		// These ultimately get truncated per truncateBytesAsHex, so there is no
-		// reason to buffer more than this length.
-		v = v[:MAX_LOB_LENGTH]
+	if v > cs.strStats.maxVal {
+		cs.strStats.maxVal = strings.Clone(v)
 	}
-	cs.strStats.maxVal = max(cs.strStats.maxVal, v)
-	cs.strStats.minVal = min(cs.strStats.minVal, v)
+	if v < cs.strStats.minVal {
+		cs.strStats.minVal = strings.Clone(v)
+	}
 }
 
 func (cs *columnStatsTracker) nextInt(v decimal128.Num) {
@@ -548,9 +598,9 @@ func newUnhandledColError(format string, a ...any) error {
 
 // Loosely adapted from
 // https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/ParquetTypeGenerator.java#L77-L148
-func makeSchemaElement(col tableColumn) (writer.ParquetSchemaElement, error) {
+func makeSchemaElement(col tableColumn) (bdecparquet.ParquetSchemaElement, error) {
 	fieldId := int32(col.Ordinal)
-	e := writer.ParquetSchemaElement{
+	e := bdecparquet.ParquetSchemaElement{
 		Name:     col.Name,
 		Required: !col.Nullable,
 		FieldId:  &fieldId,
@@ -568,27 +618,27 @@ func makeSchemaElement(col tableColumn) (writer.ParquetSchemaElement, error) {
 		if col.PhysicalType == "SB16" && col.Scale == nil || *col.Scale == 0 {
 			// A decimal with 0 precision, like a DECIMAL(38,0) that we use for
 			// integer columns.
-			e.DataType = writer.LogicalTypeDecimal
+			e.DataType = bdecparquet.LogicalTypeDecimal
 			e.Scale = 0
 		} else {
 			return e, newUnhandledColError("fixed column with physical type %q and scale %s not supported", col.PhysicalType, nilOrScale(col.Scale))
 		}
 	case "text", "variant":
-		e.DataType = writer.LogicalTypeString
+		e.DataType = bdecparquet.LogicalTypeString
 	case "timestamp_ltz", "timestamp_ntz", "timestamp_tz":
 		if col.PhysicalType == "SB16" && col.Scale != nil && *col.Scale == 9 {
 			// A timestamp with nanosecond precision.
-			e.DataType = writer.LogicalTypeDecimal
+			e.DataType = bdecparquet.LogicalTypeDecimal
 			e.Scale = 9
 		} else {
 			return e, newUnhandledColError("%s column with physical type %q and scale %s not supported", col.LogicalType, col.PhysicalType, nilOrScale(col.Scale))
 		}
 	case "date":
-		e.DataType = writer.LogicalTypeDate
+		e.DataType = bdecparquet.LogicalTypeDate
 	case "boolean":
-		e.DataType = writer.PrimitiveTypeBoolean
+		e.DataType = bdecparquet.PrimitiveTypeBoolean
 	case "real":
-		e.DataType = writer.PrimitiveTypeNumber
+		e.DataType = bdecparquet.PrimitiveTypeNumber
 	default:
 		return e, newUnhandledColError("unhandled type %q", col.Type)
 	}
@@ -749,6 +799,13 @@ func getNum(val any) (got float64, err error) {
 		got = float64(v)
 	case int64:
 		got = float64(v)
+	case uint64:
+		got = float64(v)
+	case *big.Int:
+		got, _ = v.Float64()
+		if math.IsInf(got, 0) {
+			err = fmt.Errorf("big.Int value %q outside of float64 range", v.String())
+		}
 	case string:
 		// The sqlgen element converter converts these to strings for JSON
 		// serialization. It's kind of silly to have to convert them back again

@@ -90,6 +90,47 @@ func FuzzSerialization(f *testing.F) {
 	})
 }
 
+func TestOmitField(t *testing.T) {
+	var shape = NewShape([]string{"a", "b", "c", "d"})
+	for _, tc := range []struct {
+		name   string
+		values []any
+		want   string
+	}{
+		{
+			name:   "no omissions",
+			values: []any{1, 2, nil, 4},
+			want:   `{"a":1,"b":2,"c":null,"d":4}`,
+		},
+		{
+			name:   "omit middle field",
+			values: []any{1, OmitField, 3, 4},
+			want:   `{"a":1,"c":3,"d":4}`,
+		},
+		{
+			name:   "omit first and last",
+			values: []any{OmitField, 2, 3, OmitField},
+			want:   `{"b":2,"c":3}`,
+		},
+		{
+			name:   "omit all fields",
+			values: []any{OmitField, OmitField, OmitField, OmitField},
+			want:   `{}`,
+		},
+		{
+			name:   "omit distinct from nil",
+			values: []any{nil, OmitField, nil, OmitField},
+			want:   `{"a":null,"c":null}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := shape.Encode(nil, tc.values)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, string(got))
+		})
+	}
+}
+
 func checkEquivalence(t *testing.T, names []string, values [][]any) {
 	var shape = NewShape(names)
 	var shapeBytes []byte

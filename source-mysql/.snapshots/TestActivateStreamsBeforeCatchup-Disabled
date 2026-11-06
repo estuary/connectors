@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/test/activatestreamsbeforecatchup_disabled_31804127": 6 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Disabled_31804127","cursor":"backfill:0"}},"data":"one","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Disabled_31804127","cursor":"backfill:1"}},"data":"two","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Disabled_31804127","cursor":"backfill:2"}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Disabled_31804127","cursor":"backfill:3"}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Disabled_31804127","cursor":"backfill:0"}},"data":"one-updated","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ActivateStreamsBeforeCatchup_Disabled_31804127","cursor":"backfill:1"}},"data":"two","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FActivateStreamsBeforeCatchup_Disabled_31804127":{"backfilled":0,"mode":"Ignore"},"test%2FActivateStreamsBeforeCatchup_Disabled_31804127.v1":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

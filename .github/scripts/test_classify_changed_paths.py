@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""
+Unit tests for classify-changed-paths.sh.
+
+The classifier decides whether each connector CI workflow runs.
+These tests pin both the routing rules and the "when in doubt, build" behaviour.
+"""
+
+import json
+import os
+import subprocess
+import unittest
+from pathlib import Path
+
+SCRIPT = Path(__file__).resolve().parent / "classify-changed-paths.sh"
+
+# The python_connectors value for a change that affects every Python connector.
+ALL = "all"
+
+
+def classify(*paths: str, terminate: bool = True) -> tuple[bool, bool, str | list[str]]:
+    """Run the classifier, returning (python, go_rust, python_connectors).
+
+    `python` is whether the Python lane builds anything, and `go_rust` whether
+    the Go or the Rust lane does. With no import graph, any change that could
+    reach a Go connector selects all of them.
+    """
+    stdin = "\n".join(paths) + ("\n" if terminate else "")
+    env = {k: v for k, v in os.environ.items() if k != "GO_IMPORT_GRAPH"}
+    proc = subprocess.run(
+        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True, env=env
+    )
+    verdict = dict(
+        line.split("=", 1) for line in proc.stdout.strip().splitlines() if "=" in line
+    )
+    connectors = verdict["python_connectors"]
+    return (
+        connectors != "[]",
+        verdict["go_connectors"] != "[]" or verdict["rust_connectors"] != "[]",
+        connectors if connectors == ALL else json.loads(connectors),
+    )
+
+
+def cdk(*paths: str) -> bool:
+    """Run the classifier, returning whether estuary-cdk's checks must run."""
+    stdin = "\n".join(paths) + "\n"
+    proc = subprocess.run(
+        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True
+    )
+    verdict = dict(
+        line.split("=", 1) for line in proc.stdout.strip().splitlines() if "=" in line
+    )
+    return verdict["cdk"] == "true"
+
+
+def verdict(*paths: str) -> dict[str, str]:
+    """Run the classifier, returning its raw verdict lines as a dict."""
+    stdin = "\n".join(paths) + "\n"
+    proc = subprocess.run(
+        [str(SCRIPT)], input=stdin, capture_output=True, text=True, check=True
+    )
+    return dict(
+        line.split("=", 1) for line in proc.stdout.strip().splitlines() if "=" in line
+    )
+
+
+def rust(*paths: str) -> str | list[str]:
+    """Run the classifier, returning rust_connectors."""
+    connectors = verdict(*paths)["rust_connectors"]
+    return connectors if connectors == ALL else json.loads(connectors)
+
+
+class TestLanes(unittest.TestCase):
+    def test_python_connector_is_python_only(self):
+        self.assertEqual(
+            classify("source-sentry/source_sentry/api.py"),
+            (True, False, ["source-sentry"]),
+        )
+
+    def test_cdk_is_python_only(self):
+        # materialize-snowflake's sidecar takes estuary-cdk from PyPI, not
+        # from this directory.
+        self.assertEqual(
+            classify("estuary-cdk/estuary_cdk/http.py"), (True, False, ALL)
+        )
+
+    def test_go_connector_is_go_only(self):
+        self.assertEqual(classify("source-postgres/main.go"), (False, True, []))
+
+    def test_shared_go_package_is_go_only(self):
+        self.assertEqual(classify("sqlcapture/backfill.go"), (False, True, []))
+
+    def test_rust_connector_is_go_only(self):
+        self.assertEqual(classify("source-kafka/src/main.rs"), (False, True, []))
+
+    def test_top_level_file_is_go_only(self):
+        self.assertEqual(classify("go.mod"), (False, True, []))
+
+    def test_shared_plumbing_is_both(self):
+        self.assertEqual(
+            classify(".github/actions/setup/action.yaml"), (True, True, ALL)
+        )
+        self.assertEqual(classify("fetch-flow.sh"), (True, True, ALL))
+
+    def test_docker_build_inputs_are_both(self):
+        # Every image is built from the repo root, and every pushed image goes
+        # through connector-variant.Dockerfile, so neither is Go-only.
+        self.assertEqual(classify(".dockerignore"), (True, True, ALL))
+        self.assertEqual(classify("connector-variant.Dockerfile"), (True, True, ALL))
+
+    def test_workspace_manifests_are_python_all(self):
+        # Every workspace member resolves from the root manifest and lock, so
+        # either one reaches every Python connector -- and only those. The two
+        # Python packages that belong to Go connectors are not members.
+        self.assertEqual(classify("uv.lock"), (True, False, ALL))
+        self.assertEqual(classify("pyproject.toml"), (True, False, ALL))
+
+    def test_docs_are_neither(self):
+        self.assertEqual(classify("CLAUDE.md"), (False, False, []))
+        self.assertEqual(classify("docs/contexts/captures.md"), (False, False, []))
+        self.assertEqual(
+            classify(".claude/skills/add-stream/SKILL.md"), (False, False, [])
+        )
+
+    def test_connector_docs_build_that_connector(self):
+        self.assertEqual(classify("source-postgres/CHANGELOG.md"), (False, True, []))
+        self.assertEqual(
+            classify("source-sentry/README.md"), (True, False, ["source-sentry"])
+        )
+
+    def test_shared_docs_are_neither(self):
+        for path in ["README.md", "sqlcapture/README.md", "estuary-cdk/README.md"]:
+            with self.subTest(path=path):
+                self.assertEqual(classify(path), (False, False, []))
+
+    def test_each_workflow_triggers_itself(self):
+        self.assertEqual(classify(".github/workflows/python.yaml"), (True, False, ALL))
+        self.assertEqual(classify(".github/workflows/go.yaml"), (False, True, []))
+        self.assertEqual(classify(".github/workflows/rust.yaml"), (False, True, []))
+
+    def test_python_connector_list_is_python_only(self):
+        # python.yaml reads its matrix from this file, so editing the list
+        # has to run the Python workflow as editing the matrix did.
+        self.assertEqual(classify(".github/python-connectors.yaml"), (True, False, ALL))
+
+    def test_go_connector_list_is_go_rust_only(self):
+        self.assertEqual(classify(".github/go-connectors.yaml"), (False, True, []))
+
+    def test_rust_connector_list_is_go_rust_only(self):
+        self.assertEqual(classify(".github/rust-connectors.yaml"), (False, True, []))
+
+    def test_auto_rerun_workflow_triggers_neither_connector_lane(self):
+        self.assertEqual(
+            classify(".github/workflows/connectors-auto-rerun.yaml"), (False, False, [])
+        )
+
+    def test_ruff_config_triggers_neither_connector_lane(self):
+        # Lint only reports, so the shared ruff config builds nothing. Without
+        # this rule it would fall through to the Go & Rust lane like go.mod.
+        self.assertEqual(classify("ruff.toml"), (False, False, []))
+
+    def test_nested_pyproject_does_not_make_a_go_connector_python(self):
+        # materialize-iceberg/python/pyproject.toml exists. Classing its parent as
+        # Python would stop go.yaml building a Go connector.
+        self.assertEqual(
+            classify("materialize-iceberg/python/foo.py"), (False, True, [])
+        )
+
+    def test_mixed_change_runs_both(self):
+        self.assertEqual(
+            classify("source-sentry/api.py", "sqlcapture/backfill.go"),
+            (True, True, ["source-sentry"]),
+        )
+
+    def test_unknown_path_builds_rather_than_skipping(self):
+        self.assertEqual(classify("some-new-thing/file.txt"), (False, True, []))
+
+    def test_deleted_connector_is_still_python(self):
+        # source-gone/ is not on disk, so its manifest appearing among the
+        # changed paths is the only thing identifying it as a Python connector.
+        self.assertEqual(
+            classify("source-gone/api.py", "source-gone/pyproject.toml"),
+            (True, False, ["source-gone"]),
+        )
+
+    def test_renamed_connector_is_python_on_both_sides(self):
+        self.assertEqual(
+            classify(
+                "source-old/pyproject.toml",
+                "source-old/api.py",
+                "source-new/pyproject.toml",
+                "source-new/api.py",
+            ),
+            (True, False, ["source-new", "source-old"]),
+        )
+
+    def test_deleted_nested_pyproject_still_does_not_count(self):
+        # The one-level anchor has to hold for the changed-paths check too.
+        self.assertEqual(
+            classify("materialize-iceberg/python/pyproject.toml"), (False, True, [])
+        )
+
+
+class TestPythonConnectors(unittest.TestCase):
+    def test_one_connector(self):
+        self.assertEqual(
+            classify(
+                "source-sentry/source_sentry/api.py", "source-sentry/pyproject.toml"
+            )[2],
+            ["source-sentry"],
+        )
+
+    def test_two_connectors(self):
+        self.assertEqual(
+            classify("source-zuora/source_zuora/api.py", "source-sentry/api.py")[2],
+            ["source-sentry", "source-zuora"],
+        )
+
+    def test_cdk_builds_all(self):
+        self.assertEqual(classify("estuary-cdk/estuary_cdk/http.py")[2], ALL)
+
+    def test_shared_dockerfile_builds_all(self):
+        # Connectors symlink their Dockerfile into estuary-cdk/.
+        self.assertEqual(classify("estuary-cdk/common.Dockerfile")[2], ALL)
+
+    def test_python_workflow_builds_all(self):
+        self.assertEqual(classify(".github/workflows/python.yaml")[2], ALL)
+
+    def test_connector_list_builds_all(self):
+        self.assertEqual(classify(".github/python-connectors.yaml")[2], ALL)
+
+    def test_shared_actions_build_all(self):
+        self.assertEqual(classify(".github/actions/deploy/action.yaml")[2], ALL)
+
+    def test_dockerignore_builds_all(self):
+        self.assertEqual(classify(".dockerignore")[2], ALL)
+
+    def test_connector_plus_cdk_builds_all(self):
+        self.assertEqual(
+            classify("source-sentry/api.py", "estuary-cdk/estuary_cdk/http.py")[2], ALL
+        )
+
+    def test_go_only_change_builds_none(self):
+        self.assertEqual(classify("source-postgres/main.go")[2], [])
+
+    def test_connector_docs_build_that_connector(self):
+        self.assertEqual(classify("source-sentry/CHANGELOG.md")[2], ["source-sentry"])
+
+
+class TestCdk(unittest.TestCase):
+    def test_cdk_runs_its_checks(self):
+        self.assertTrue(cdk("estuary-cdk/estuary_cdk/http.py"))
+
+    def test_workspace_manifests_run_cdk_checks(self):
+        # The CDK resolves from the same root manifest and lock.
+        self.assertTrue(cdk("uv.lock"))
+        self.assertTrue(cdk("pyproject.toml"))
+
+    def test_ruff_config_runs_cdk_checks(self):
+        # It builds no connector, but estuary-cdk's lint gates on it.
+        self.assertTrue(cdk("ruff.toml"))
+
+    def test_python_workflow_runs_cdk_checks(self):
+        self.assertTrue(cdk(".github/workflows/python.yaml"))
+
+    def test_shared_plumbing_runs_cdk_checks(self):
+        self.assertTrue(cdk(".github/actions/classify-changes/action.yaml"))
+
+    def test_one_connector_skips_cdk_checks(self):
+        self.assertFalse(cdk("source-sentry/source_sentry/api.py"))
+
+    def test_go_connector_skips_cdk_checks(self):
+        self.assertFalse(cdk("source-postgres/main.go"))
+
+    def test_docs_skip_cdk_checks(self):
+        self.assertFalse(cdk("docs/contexts/captures.md"))
+
+    def test_empty_input_skips_cdk_checks(self):
+        self.assertFalse(cdk())
+
+
+class TestRustConnectors(unittest.TestCase):
+    def test_rust_connector_builds_only_itself(self):
+        self.assertEqual(rust("source-kafka/src/main.rs"), ["source-kafka"])
+        self.assertEqual(rust("materialize-kafka/Cargo.toml"), ["materialize-kafka"])
+
+    def test_two_rust_connectors(self):
+        self.assertEqual(
+            rust("source-kafka/src/main.rs", "source-http-ingest/VERSION"),
+            ["source-http-ingest", "source-kafka"],
+        )
+
+    def test_rust_connector_docs_build_it(self):
+        self.assertEqual(rust("source-kafka/README.md"), ["source-kafka"])
+        self.assertEqual(rust("source-postgres/README.md"), [])
+
+    def test_go_code_builds_no_rust_connector(self):
+        for path in [
+            "sqlcapture/backfill.go",
+            "source-postgres/main.go",
+            "source-mysql/docker-compose.yaml",
+            "go.mod",
+            "go.sum",
+            "scripts/bulk-publish/main.go",
+            "materialize-iceberg/python/foo.py",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), [])
+
+    def test_bson_transcoder_builds_no_rust_connector(self):
+        # A Rust crate, but only the Go source-mongodb image builds it.
+        self.assertEqual(rust("bson-transcoder/src/main.rs"), [])
+
+    def test_python_and_docs_build_no_rust_connector(self):
+        for path in ["source-sentry/api.py", "estuary-cdk/estuary_cdk/http.py", "docs/x.md"]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), [])
+
+    def test_shared_materialization_tests_build_materialize_kafka(self):
+        self.assertEqual(rust("tests/materialize/run.sh"), ["materialize-kafka"])
+
+    def test_other_test_tooling_builds_every_rust_connector(self):
+        self.assertEqual(rust("tests/smoke.sh"), ALL)
+
+    def test_shared_inputs_build_every_rust_connector(self):
+        for path in [
+            "base-image/Dockerfile",
+            ".github/workflows/rust.yaml",
+            ".github/rust-connectors.yaml",
+            ".github/actions/deploy/action.yaml",
+            "connector-variant.Dockerfile",
+            ".dockerignore",
+            "fetch-flow.sh",
+            ".github/scripts/classify-changed-paths.sh",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), ALL)
+
+    def test_other_ci_files_build_no_rust_connector(self):
+        for path in [
+            ".github/workflows/go.yaml",
+            ".github/workflows/delayed-tag.yaml",
+            ".github/scripts/delayed_tag.py",
+            ".github/go-connectors.yaml",
+            "scripts/obfuscation/config_allowlist.txt",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(rust(path), [])
+
+    def test_unrecognised_path_builds_every_rust_connector(self):
+        # When in doubt, build.
+        self.assertEqual(rust("build-local.sh"), ALL)
+
+
+class TestRobustness(unittest.TestCase):
+    def test_final_line_without_newline_is_still_read(self):
+        # `while read` drops an unterminated final line, which would silently
+        # omit that path from the verdict.
+        self.assertEqual(
+            classify("source-sentry/api.py", "sqlcapture/backfill.go", terminate=False),
+            (True, True, ["source-sentry"]),
+        )
+
+    def test_blank_lines_are_ignored(self):
+        self.assertEqual(
+            classify("", "source-sentry/api.py", ""), (True, False, ["source-sentry"])
+        )
+
+    def test_change_touching_no_manifest_is_not_fatal(self):
+        # The manifest scan greps for pyproject.toml and finds none here. Without
+        # `|| true` that non-zero exit would kill the script under `set -e`,
+        # breaking nearly every change.
+        self.assertEqual(classify("sqlcapture/backfill.go"), (False, True, []))
+
+    def test_empty_input_claims_nothing(self):
+        # The caller treats an empty path list as a broken enumeration and runs
+        # both lanes; the script itself just reports that it saw nothing.
+        self.assertEqual(classify(), (False, False, []))
+
+
+if __name__ == "__main__":
+    unittest.main()

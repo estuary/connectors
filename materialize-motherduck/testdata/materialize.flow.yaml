@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-motherduck/s3:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.s3.yaml
     bindings: &bindings
@@ -30,6 +30,15 @@ materializations:
       source: tests/data-types
       fields:
         recommended: 1
+    - resource:
+        table: merge_renamed
+      source: tests/merge-renamed
+      fields:
+        recommended: true
+        exclude: [renamedString, renamedTotal]
+        include:
+          renamed_string: {}
+          renamed_total: {}
 
   acmeCo/tests/materialize-motherduck/gcs:
     endpoint:
@@ -37,7 +46,7 @@ materializations:
         command:
           - go
           - run
-          - .
+          - ./cmd/connector
         protobuf: true
         config: config.gcs.yaml
     bindings: *bindings

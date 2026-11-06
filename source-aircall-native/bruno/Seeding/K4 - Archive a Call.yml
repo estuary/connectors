@@ -1,0 +1,39 @@
+info:
+  name: K4 - Archive a Call
+  type: http
+  seq: 4
+
+http:
+  method: PUT
+  url: "{{base_url}}/calls/{{seed_call_id}}/archive"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_call_id: `Calls / window asc`'s pin_call_id if run in this session,
+        // else the 2026-09-28 seeded call 4186784158 (outbound, answered).
+        if (!bru.getVar('seed_call_id')) bru.setVar('seed_call_id', bru.getVar('pin_call_id') || '4186784158');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#archive-a-call
+
+    **ONLY THE USER RUNS THIS — never the assistant.** It mutates Aircall state.
+
+    **WHY:** flips `archived` to `true` — confirms an archived call is still
+    returned by `/v1/calls` under the default filters (silent-data-loss audit:
+    the List endpoint documents no `archived` filter, so archived calls should
+    remain visible). Re-run `Calls / window asc` afterwards. Reverse with
+    `PUT /v1/calls/:id/unarchive` if desired.
+
+    **Outcome:** ran 2026-09-28 on 4186784158. Finding VERIFIED in
+    `Calls / window asc` — archived call still listed.
+  type: text/markdown

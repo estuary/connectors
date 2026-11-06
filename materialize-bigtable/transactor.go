@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"cloud.google.com/go/bigtable"
 	m "github.com/estuary/connectors/go/materialize"
@@ -28,6 +30,7 @@ const (
 
 type binding struct {
 	tableName string
+	path      []string
 	table     *bigtable.Table
 
 	// fields are the non-document selected projections, ordered to match the
@@ -41,9 +44,9 @@ type binding struct {
 }
 
 type state struct {
-	// CommittedTimestamp is the last successfully committed cell timestamp;
-	// the timestamp stamped on writes for the in-progress transaction is
-	// always `CommittedTimestamp + 1`.
+	// CommittedTimestamp is the last committed cell timestamp, in microseconds.
+	// Bigtable truncates timestamps to millisecond granularity, so writes step by
+	// 1000µs per transaction to keep each transaction on a distinct cell version.
 	CommittedTimestamp int64 `json:"committed_timestamp"`
 }
 
@@ -51,6 +54,7 @@ type transactor struct {
 	bindings   []binding
 	state      state
 	hardDelete bool
+	be         *m.BindingEvents
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -65,7 +69,11 @@ func (t *transactor) UnmarshalState(raw json.RawMessage) error {
 	return nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	return nil, nil
 }
 
@@ -87,7 +95,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	batches := make(chan loadBatch)
 	group, groupCtx := errgroup.WithContext(ctx)
-	txTS := bigtable.Timestamp(t.state.CommittedTimestamp + 1)
+	txTS := bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
 
 	for range concurrentWorkers {
 		group.Go(func() error {
@@ -212,17 +220,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	batches := make(chan storeBatch)
 	group, groupCtx := errgroup.WithContext(ctx)
+	round := it.Round
+	// stored counts the rows Bigtable acknowledged per binding, for the
+	// transaction health report.
+	stored := make([]atomic.Int64, len(t.bindings))
 
 	for range concurrentWorkers {
 		group.Go(func() error {
-			return t.storeWorker(groupCtx, batches)
+			return t.storeWorker(groupCtx, batches, stored)
 		})
 	}
 
 	var (
 		currentBatch storeBatch
 		currentBytes int
-		ts           = bigtable.Timestamp(t.state.CommittedTimestamp + 1)
+		ts           = bigtable.Timestamp(t.state.CommittedTimestamp + 1000)
 	)
 
 	sendBatch := func() error {
@@ -289,18 +301,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("marshalling state: %w", err)
 	}
 
-	return func(_ context.Context, _ *pc.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return &pf.ConnectorState{UpdatedJson: newState}, m.RunAsyncOperation(func() error {
-			if err := group.Wait(); err != nil {
-				return fmt.Errorf("draining store workers: %w", err)
-			}
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("draining store workers: %w", err)
+	}
+	for i, b := range t.bindings {
+		if n := stored[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
+	}
 
-			return nil
-		})
+	return func(_ context.Context, _ *pc.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		return &pf.ConnectorState{UpdatedJson: newState}, nil
 	}, nil
 }
 
-func (t *transactor) storeWorker(ctx context.Context, batches <-chan storeBatch) error {
+func (t *transactor) storeWorker(ctx context.Context, batches <-chan storeBatch, stored []atomic.Int64) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -320,6 +335,7 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan storeBatch)
 					return fmt.Errorf("ApplyBulk row %q on table %q: %w", batch.rowKeys[i], b.tableName, e)
 				}
 			}
+			stored[batch.binding].Add(int64(len(batch.rowKeys)))
 		}
 	}
 }

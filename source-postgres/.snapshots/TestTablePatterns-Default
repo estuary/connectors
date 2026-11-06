@@ -1,0 +1,10 @@
+sql> CREATE TABLE test.tp_893091_alpha_evt (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.tp_893091_beta_evt (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.tp_893091_alpha_log (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.tp_893091_beta_log (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/tp_893091_alpha_evt
+acmeCo/test_capture/test/tp_893091_alpha_log
+acmeCo/test_capture/test/tp_893091_beta_evt
+acmeCo/test_capture/test/tp_893091_beta_log
+

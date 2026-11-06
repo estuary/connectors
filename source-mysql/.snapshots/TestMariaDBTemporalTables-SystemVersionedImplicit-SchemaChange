@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbtemporaltables_systemversionedimplicit_254008": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_SystemVersionedImplicit_254008","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"six","extra":42,"id":6,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>"}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_SystemVersionedImplicit_254008","cursor":"binlog.000123:56789:123","txid":"0-1-111"},"before":{"data":"one-v3","extra":null,"id":1,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>"}},"data":"one-v3","extra":7,"id":1,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_SystemVersionedImplicit_254008","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"one-v3","extra":null,"id":1,"row_end":"<TIMESTAMP>","row_start":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTemporalTables_SystemVersionedImplicit_254008":{"backfilled":4,"key_columns":["id","row_end"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data","extra"],"implicit_system_versioning":true,"types":{"data":{"charset":"utf8mb4","type":"text"},"extra":{"type":"int"},"id":{"type":"int"},"row_end":"timestamp","row_start":"timestamp"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

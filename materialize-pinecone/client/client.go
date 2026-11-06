@@ -59,6 +59,14 @@ type openAiEmbeddingsError struct {
 	} `json:"error"`
 }
 
+// StatusError is returned when OpenAI responds with a non-200 status.
+type StatusError struct {
+	StatusCode int
+	msg        string
+}
+
+func (e *StatusError) Error() string { return e.msg }
+
 func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]Embedding, error) {
 	res, err := withRetry(ctx, func() (*http.Response, error) {
 		body := new(bytes.Buffer)
@@ -92,12 +100,12 @@ func (c *OpenAiClient) CreateEmbeddings(ctx context.Context, input []string) ([]
 		if err := json.NewDecoder(res.Body).Decode(&errorBody); err != nil {
 			log.WithField("error", err).Warn("could not decode error response body")
 		} else if errorBody.Error.Message != "" {
-			return nil, fmt.Errorf("creating embeddings failed (%s): %s", res.Status, errorBody.Error.Message)
+			return nil, &StatusError{res.StatusCode, fmt.Sprintf("creating embeddings failed (%s): %s", res.Status, errorBody.Error.Message)}
 		} else {
 			log.WithField("errorBody", errorBody).Warn("errorBody error message was empty")
 		}
 
-		return nil, fmt.Errorf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)
+		return nil, &StatusError{res.StatusCode, fmt.Sprintf("OpenAiClient CreateEmbeddings unexpected status: %s", res.Status)}
 	}
 
 	embeddings := OpenAIEmbeddingsResponse{}

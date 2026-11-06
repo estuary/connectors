@@ -101,6 +101,25 @@ collections:
         stringUint64Field: { type: string, format: uint64, maxLength: 20 }
         stringIriField: { type: string, format: iri }
         stringIriReferenceField: { type: string, format: iri-reference }
+        enumField: { type: string, enum: [bar, baz, foo] }
+        enumNullableField: { type: [string, "null"], enum: [one, two] }
       required: [id]
       type: object
     key: [/id]
+
+  # Merges partial documents into the previously loaded one. Bindings select
+  # only the renamed projections, so a load that rebuilds the document must key
+  # it by property rather than field.
+  tests/merge-renamed:
+    schema:
+      properties:
+        id: {type: integer}
+        renamedString: {type: string}
+        renamedTotal: {type: integer, reduce: {strategy: sum}}
+      required: [id]
+      type: object
+      reduce: {strategy: merge}
+    key: [/id]
+    projections:
+      renamed_string: /renamedString
+      renamed_total: /renamedTotal

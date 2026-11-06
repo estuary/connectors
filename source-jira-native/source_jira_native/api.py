@@ -58,6 +58,9 @@ from .models import (
     Sprints,
     Statuses,
     SystemAvatarsResponse,
+    Teams,
+    TeamsResponse,
+    TenantInfoResponse,
     EPOCH,
 )
 
@@ -68,12 +71,16 @@ MIN_CHECKPOINT_INTERVAL = 200
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
 CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
 BOARD_DOES_NOT_SUPPORT_SPRINTS = r"The board does not support sprints"
+BOARD_HAS_NO_MAPPED_STATUS = r"This board has no columns with a mapped status"
 DOES_NOT_EXIST = r"does not exist"
 NEXT_GEN_ISSUE = r"The request contains a next-gen issue"
 
 
 ALL_ISSUE_FIELDS = "*all"
 MINIMAL_ISSUE_FIELDS = "id,updated"
+
+# The Teams API's maximum page size.
+TEAMS_PAGE_SIZE = 300
 
 # HTTP timeout configuration with sock_read to prevent requests from hanging
 # indefinitely during body reading. Without sock_read, a stalled connection
@@ -102,6 +109,8 @@ def url_base(domain: str, api: JiraAPI) -> str:
             return f"{common}/agile/1.0"
         case JiraAPI.SERVICE_MANAGEMENT:
             return f"{common}/servicedeskapi"
+        case JiraAPI.TEAMS:
+            return "https://api.atlassian.com/public/teams/v1"
         case _:
             raise RuntimeError(f"Unknown JiraAPI {api}.")
 
@@ -134,6 +143,65 @@ async def fetch_timezone(
     log.info(f"Using timezone {response.timeZone} ({_format_utc_offset(timezone)}).")
 
     return timezone
+
+
+async def fetch_cloud_id(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> str:
+    """
+    Returns the account's cloud id, which the Teams API calls the site id.
+
+    Atlassian documents looking it up this way in
+    https://support.atlassian.com/jira/kb/retrieve-my-atlassian-sites-cloud-id/.
+    """
+    url = f"https://{domain}/_edge/tenant_info"
+
+    response = TenantInfoResponse.model_validate_json(
+        await http.request(log, url, timeout=HTTP_TIMEOUT)
+    )
+
+    return response.cloudId
+
+
+async def snapshot_teams(
+    http: HTTPSession,
+    domain: str,
+    organization_id: str,
+    stream: type[Teams],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    # Requests without siteId fail with 400 SITE_ID_REQUIRED_FOR_TEAM_API.
+    site_id = await fetch_cloud_id(http, domain, log)
+
+    url = f"{url_base(domain, stream.api)}/org/{organization_id}/{stream.path}"
+
+    params: dict[str, str | int] = {
+        "siteId": site_id,
+        "size": TEAMS_PAGE_SIZE,
+    }
+
+    while True:
+        response = TeamsResponse.model_validate_json(
+            await http.request(log, url, params=params, timeout=HTTP_TIMEOUT)
+        )
+
+        for team in response.entities:
+            yield FullRefreshResource.model_validate(team)
+
+        # Only a null cursor ends the listing: a page can be empty while later
+        # pages still hold teams.
+        if not response.cursor:
+            break
+
+        if response.cursor == params.get("cursor"):
+            log.warning("Teams API returned the cursor it was sent; stopping pagination.", {
+                "cursor": response.cursor,
+            })
+            break
+
+        params["cursor"] = response.cursor
 
 
 async def snapshot_nested_arrayed_resources(
@@ -754,6 +822,11 @@ async def snapshot_board_child_resources(
         except HTTPError as err:
             if err.code == 400 and BOARD_DOES_NOT_SUPPORT_SPRINTS in err.message:
                 continue
+            # Scrum boards whose column configuration maps no statuses cannot
+            # compute sprints, and Jira rejects the request with a 422. This is
+            # a permanent board misconfiguration, so skip the board.
+            elif err.code == 422 and BOARD_HAS_NO_MAPPED_STATUS in err.message:
+                continue
             else:
                 raise
 
@@ -1071,14 +1144,19 @@ async def backfill_issues(
     domain: str,
     timezone: ZoneInfo,
     projects: str | None,
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[JiraResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
+
     last_seen = start
 
     count = 0
@@ -1280,14 +1358,19 @@ async def backfill_issues_child_resources(
     timezone: ZoneInfo,
     projects: str | None,
     stream: type[IssueChildStream],
+    start_date: datetime,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[IssueChildResource | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
+
     last_seen = start
 
     count = 0

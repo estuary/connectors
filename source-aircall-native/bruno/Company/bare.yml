@@ -1,0 +1,41 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/company'
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#retrieve-company
+    **WHY:** the `company` stream; single object — decides the key (`id` vs Airbyte-imported `/name` vs singleton).
+
+    **LIMITATION (VERIFIED 2026-09-28):** response is `{company:{name, users_count, numbers_count}}`. Contrary to the docs, there's **no `id` and no `created_at`**. No natural immutable key: `name` is user-editable, and the counts drift.
+  type: text/markdown
+examples:
+- name: 200 - company object
+  request:
+    url: '{{base_url}}/company'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "company": {
+            "name": "Estuary",
+            "users_count": 1,
+            "numbers_count": 1
+          }
+        }

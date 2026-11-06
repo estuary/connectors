@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"

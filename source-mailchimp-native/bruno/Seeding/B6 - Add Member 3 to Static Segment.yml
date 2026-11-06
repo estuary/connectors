@@ -1,0 +1,32 @@
+info:
+  name: B6 - Add Member 3 to Static Segment
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}/members"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "nicolas+estuary-test-3@estuary.dev"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segment-members/add-member-to-segment/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** adds member 3 to the static segment WHILE STILL SUBSCRIBED —
+  Mailchimp may reject adding non-subscribed members to static segments, so the
+  unsubscribe (B7) deliberately happens after this. {{segment_id}} comes from
+  the pinned env var (2225593, "Estuary Test Segment") or B3's runtime capture.
+  Run AFTER B5 in the same session.

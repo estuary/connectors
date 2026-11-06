@@ -3,7 +3,7 @@ from logging import Logger
 from typing import AsyncGenerator
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource, SortKey
+from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
 
 
 class OrderTransactions(ShopifyGraphQLResource):
@@ -68,12 +68,14 @@ class OrderTransactions(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return OrderTransactions.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

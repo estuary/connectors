@@ -1,0 +1,5 @@
+# The CA bundles that source-mysql and source-mysql-batch trust by default.
+# Listing the capture team here also has it requested for review on the
+# automated refresh PRs from .github/workflows/mysql-cloud-cas.yaml, which the
+# workflow's own token cannot request from a team.
+/go/mysql/tls/cloudcas/ @estuary/capture

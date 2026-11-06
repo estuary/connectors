@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -48,8 +50,8 @@ const (
 	// ought to be getting a consistent stream of results until the query completes.
 	pollingWatchdogTimeout = 5 * time.Minute
 
-	// Maximum number of concurrent polling operations to run at once. Might be
-	// worth making this configurable in the advanced endpoint settings.
+	// Polls must run one at a time so a checkpoint only commits its own poll's
+	// documents, and backfill markers stay alone in their checkpoints.
 	maxConcurrentQueries = 1
 
 	// The minimum time between schema discovery operations. This avoids situations
@@ -83,7 +85,7 @@ type Resource struct {
 	SchemaName   string   `json:"schema,omitempty" jsonschema:"title=Schema Name,description=The name of the schema in which the captured table lives. The query template must be overridden if this is unset."  jsonschema_extras:"order=1"`
 	TableName    string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
 	Cursor       []string `json:"cursor,omitempty" jsonschema:"title=Cursor Columns,description=The names of columns which should be persisted between query executions as a cursor." jsonschema_extras:"order=3"`
-	PollSchedule string   `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	PollSchedule string   `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,nonsensitive=true"`
 	Template     string   `json:"template,omitempty" jsonschema:"title=Query Template Override,description=Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples." jsonschema_extras:"multiline=true,order=5"`
 }
 
@@ -163,6 +165,15 @@ func (drv *BatchSQLDriver) Validate(ctx context.Context, req *pc.Request_Validat
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
+	var lastCreatedAt string // A task which hasn't been published yet has no creation date
+	if req.LastCapture != nil {
+		lastCreatedAt = req.LastCapture.CreatedAt
+	}
+	if createdAt, err := common.ParseCreatedAt(lastCreatedAt); err != nil {
+		return nil, fmt.Errorf("resolving feature flags: %w", err)
+	} else {
+		cfg.resolveFeatureFlags(createdAt)
+	}
 
 	var db, err = drv.Connect(ctx, &cfg)
 	if err != nil {
@@ -192,6 +203,11 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		return fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
+	if createdAt, err := common.ParseCreatedAt(open.Capture.CreatedAt); err != nil {
+		return fmt.Errorf("resolving feature flags: %w", err)
+	} else {
+		cfg.resolveFeatureFlags(createdAt)
+	}
 
 	var db, err = drv.Connect(stream.Context(), &cfg)
 	if err != nil {
@@ -210,6 +226,8 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 			index:         idx,
 			stateKey:      boilerplate.StateKey(binding.StateKey),
 			collectionKey: binding.Collection.Key,
+
+			shouldEmitBackfillSignals: shouldEmitBackfillSignals(&cfg, &res),
 		})
 	}
 
@@ -260,6 +278,13 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 		if stream == nil {
 			stream = &streamState{CursorNames: res.Cursor}
 		}
+		if stream.IsAwaitingBackfillComplete != nil && !binding.shouldEmitBackfillSignals {
+			// This binding no longer sends backfill signals, so the BackfillComplete
+			// it's awaiting must never be sent. The binding's next checkpoint saves
+			// the cleared field.
+			log.WithField("name", res.Name).Warn("binding no longer sends backfill signals, its backfill will not send a BackfillComplete")
+			stream.IsAwaitingBackfillComplete = nil
+		}
 		newState.Streams[sk] = stream
 	}
 	return newState, nil
@@ -285,6 +310,26 @@ type bindingInfo struct {
 	index         int
 	stateKey      boilerplate.StateKey
 	collectionKey []string // The key of the output collection, as an array of JSON pointers.
+
+	// Whether this binding's backfills are bracketed by BackfillBegin and
+	// BackfillComplete. Decided once at startup by shouldEmitBackfillSignals.
+	shouldEmitBackfillSignals bool
+}
+
+// shouldEmitBackfillSignals reports whether backfills of the resource should be
+// bracketed by BackfillBegin and BackfillComplete. That requires emit_backfill_signals.
+// It also requires a backfill that's certain to capture every row of the source,
+// unless ignore_config_for_backfill_signals is set.
+func shouldEmitBackfillSignals(cfg *Config, res *Resource) bool {
+	if !cfg.Advanced.parsedFeatureFlags["emit_backfill_signals"] {
+		return false
+	}
+	if cfg.Advanced.parsedFeatureFlags["ignore_config_for_backfill_signals"] {
+		return true
+	}
+	// The default template's first query reads the whole table or view without a
+	// filter. A template override might not.
+	return res.Template == ""
 }
 
 type captureState struct {
@@ -296,6 +341,11 @@ type streamState struct {
 	CursorValues  []any
 	LastPolled    time.Time
 	DocumentCount int64 // A count of the number of documents emitted since the last full refresh started.
+
+	// True from when BackfillBegin is sent until BackfillComplete is sent, or until
+	// the configuration says backfill signals should no longer be sent. It's what
+	// tells a poll resuming an incremental backfill to send BackfillComplete.
+	IsAwaitingBackfillComplete *bool
 }
 
 func (s *captureState) Validate() error {
@@ -303,6 +353,14 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// With no enabled bindings there are no polling workers, so we'd fall through the
+	// empty worker group and exit silently. This connector normally runs forever, so
+	// report the reason.
+	if len(c.Bindings) == 0 {
+		log.Info("capture has no enabled bindings, shutting down")
+		return nil
+	}
+
 	// Always discover and output SourcedSchemas once at startup.
 	if err := c.emitSourcedSchemas(ctx); err != nil {
 		return err
@@ -352,6 +410,13 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 		} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
 			return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
 		}
+	}
+
+	// Checkpoint the sourced schemas now rather than leaving them for the next
+	// checkpoint, which might not come until the next poll. An empty merge patch
+	// commits them without changing any binding's state.
+	if err := c.Output.Checkpoint(json.RawMessage("{}"), true); err != nil {
+		return fmt.Errorf("error checkpointing sourced schemas: %w", err)
 	}
 	return nil
 }
@@ -566,6 +631,20 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	}
 	defer stmt.Close()
 
+	// Begin only when the query starts from the first row. A second BackfillBegin
+	// while resuming an incremental backfill would move the truncation point past
+	// the rows already captured, and materializations would delete them at
+	// BackfillComplete.
+	if binding.shouldEmitBackfillSignals && isInitialBackfill {
+		var isAwaiting = true
+		state.IsAwaitingBackfillComplete = &isAwaiting
+		if checkpointJSON, err := marshalStreamState(stateKey, state); err != nil {
+			return err
+		} else if err := c.Output.BackfillBegin(binding.index, checkpointJSON, true); err != nil {
+			return fmt.Errorf("error emitting backfill begin: %w", err)
+		}
+	}
+
 	var result mysql.Result
 	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
 
@@ -574,6 +653,15 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var cursorIndices []int
 	var rowValues []any
 	var serializedDocument []byte
+
+	// Partial-progress checkpoint state. For incremental bindings we only checkpoint
+	// at boundaries between distinct cursor values, persisting the previous row's
+	// cursor: that guarantees every row sharing the persisted cursor has been emitted,
+	// so the next poll's `WHERE cursor > @persisted` resume query won't skip rows
+	// which happen to share a cursor value with the checkpoint. Full-refresh bindings
+	// don't have this constraint and just checkpoint every K rows.
+	var documentsSinceLastCheckpoint int
+	var prevCursorValues []any
 
 	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
 		watchdog.Reset(pollingWatchdogTimeout) // Reset the no-data watchdog timeout after each row received
@@ -605,6 +693,53 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			// plus the `_meta` property we add.
 			rowValues = make([]any, len(row)+1)
 		}
+		for idx, val := range row {
+			var field = result.Fields[idx]
+			var translatedValue, err = translateMySQLValue(val.Value(), field.Type, field.Charset)
+			if err != nil {
+				return fmt.Errorf("error translating column %q value: %w", string(field.Name), err)
+			}
+			rowValues[idx+1] = translatedValue
+		}
+
+		// Extract this row's cursor values into a fresh slice. Done before document
+		// emission so we can use the values for the partial-progress decision below.
+		var currentCursorValues []any
+		if !isFullRefresh {
+			currentCursorValues = make([]any, len(cursorIndices))
+			for i, j := range cursorIndices {
+				currentCursorValues[i] = rowValues[j]
+			}
+		}
+
+		// Emit a partial-progress checkpoint *before* this row when enough rows have
+		// accumulated since the last checkpoint, and (for incremental bindings) the
+		// cursor value is about to change. For full-refresh bindings the persisted
+		// cursor is empty and resume semantics don't apply, so the boundary check
+		// reduces to "every K rows".
+		if documentsSinceLastCheckpoint >= documentsPerCheckpoint {
+			var shouldEmit = false
+			if isFullRefresh {
+				shouldEmit = true
+			} else if prevCursorValues != nil && !cursorValuesEqual(prevCursorValues, currentCursorValues) && !slices.Contains(prevCursorValues, nil) {
+				// The checkpointed cursor must not contain NULL. The resume query compares
+				// with `>` and that's never true for NULL, so it would skip rows this pass
+				// hasn't reached yet. A later boundary without NULLs is checkpointed instead.
+
+				// Update CursorValues and DocumentCount in lockstep
+				state.CursorValues = prevCursorValues
+				state.DocumentCount = nextRowID
+				shouldEmit = true
+			}
+
+			if shouldEmit {
+				if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+					return err
+				}
+				documentsSinceLastCheckpoint = 0
+			}
+		}
+
 		var metadata = &documentMetadata{
 			RowID:  nextRowID,
 			Polled: pollTime,
@@ -628,14 +763,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			}
 		}
 		rowValues[0] = metadata
-		for idx, val := range row {
-			var field = result.Fields[idx]
-			var translatedValue, err = translateMySQLValue(val.Value(), field.Type, field.Charset)
-			if err != nil {
-				return fmt.Errorf("error translating column %q value: %w", string(field.Name), err)
-			}
-			rowValues[idx+1] = translatedValue
-		}
 
 		serializedDocument, err = shape.Encode(serializedDocument[:0], rowValues)
 		if err != nil {
@@ -644,34 +771,11 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			return fmt.Errorf("error emitting document: %w", err)
 		}
 
-		if len(cursorValues) != len(cursorNames) {
-			// Allocate a new values list if needed. This is done inside of the loop, so
-			// an empty result set will be a no-op even when the previous state is nil.
-			cursorValues = make([]any, len(cursorNames))
-		}
-		for i, j := range cursorIndices {
-			cursorValues[i] = rowValues[j]
-		}
-		state.CursorValues = cursorValues
+		prevCursorValues = currentCursorValues
 		queryResultsCount++
 		nextRowID++
+		documentsSinceLastCheckpoint++
 
-		if queryResultsCount%documentsPerCheckpoint == 0 {
-			// When a full-refresh binding outputs into a collection with key `/_meta/row_id`
-			// we rely on the persisted DocumentCount not being updated until after the whole
-			// update query completes successfully, so that we can infer deletions of any rows
-			// between the last rowID of the latest query and the persisted DocumentCount.
-			//
-			// But when emitting partial-progress updates on a _non_ full-refresh binding, we
-			// need to update the persisted DocumentCount on each partial progress checkpoint
-			// so that the rowID the next poll resumes from will match the persisted cursor.
-			if !isFullRefresh {
-				state.DocumentCount = nextRowID
-			}
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
-		}
 		if queryResultsCount%100000 == 1 {
 			log.WithFields(log.Fields{
 				"name":  res.Name,
@@ -720,20 +824,57 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 
 	state.LastPolled = pollTime
 	state.DocumentCount = nextRowID // Always update persisted count on successful completion
+	if prevCursorValues != nil {
+		// Advance the persisted cursor to the final emitted row. Within the loop
+		// CursorValues is only updated at distinct-value boundaries to avoid losing
+		// rows on a mid-query restart, so the end-of-poll checkpoint is the one
+		// place where we accept the rest-of-batch-redo cost in exchange for the
+		// cursor advancing past the most recent row.
+		state.CursorValues = prevCursorValues
+	}
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
+	}
+
+	// No need to check shouldEmitBackfillSignals here. updateResourceStates clears
+	// IsAwaitingBackfillComplete at startup when shouldEmitBackfillSignals is false.
+	if state.IsAwaitingBackfillComplete != nil {
+		state.IsAwaitingBackfillComplete = nil
+		if checkpointJSON, err := marshalStreamState(stateKey, state); err != nil {
+			return err
+		} else if err := c.Output.BackfillComplete(binding.index, checkpointJSON, true); err != nil {
+			return fmt.Errorf("error emitting backfill complete: %w", err)
+		}
 	}
 	return nil
 }
 
-func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
-	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
-	checkpointPatch.Streams[sk] = state
+// cursorValuesEqual reports whether two cursor tuples are element-wise equal.
+// Uses reflect.DeepEqual so it handles whatever scan types the driver returns,
+// including []byte and time.Time.
+func cursorValuesEqual(a, b []any) bool {
+	return slices.EqualFunc(a, b, func(x, y any) bool {
+		return reflect.DeepEqual(x, y)
+	})
+}
 
-	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
-		return fmt.Errorf("error serializing state checkpoint: %w", err)
+func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
+	if checkpointJSON, err := marshalStreamState(sk, state); err != nil {
+		return err
 	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 		return fmt.Errorf("error emitting checkpoint: %w", err)
 	}
 	return nil
+}
+
+// marshalStreamState serializes a merge-patch checkpoint updating one stream's state.
+func marshalStreamState(sk boilerplate.StateKey, state *streamState) (json.RawMessage, error) {
+	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
+	checkpointPatch.Streams[sk] = state
+
+	var checkpointJSON, err = json.Marshal(checkpointPatch)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
+	}
+	return checkpointJSON, nil
 }

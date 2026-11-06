@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -34,6 +36,7 @@ var sqlserverDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
 	Connect:          connectSQLServer,
+	MaxStartupDelay:  maxStartupDelay,
 }
 
 const defaultPort = "1433"
@@ -46,12 +49,6 @@ var featureFlagDefaults = map[string]bool{
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
 	"emit_sourced_schemas": true,
-
-	// When set, discovery queries will use a variant with all identifiers capitalized.
-	// We believe this should probably be a safe change (and it's required for discovery
-	// to work in the Turkish_CI_AS locale), but didn't want to release it unconditionally
-	// on a Friday without much testing so it's gated behind a flag for now.
-	"uppercase_discovery_queries": false,
 
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
 	// and LSN positions rather than the old watermark write mechanism.
@@ -73,31 +70,82 @@ var featureFlagDefaults = map[string]bool{
 	"discover_rowversion_as_bytes": false,
 }
 
+type AuthType string
+
+const (
+	UserPassword AuthType = "UserPassword"
+	AWSIAM       AuthType = "AWSIAM"
+	AzureIAM     AuthType = "AzureIAM"
+)
+
+type UserPasswordConfig struct {
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=1"`
+}
+
+// CredentialsConfig is a flat union of the supported authentication methods,
+// discriminated by AuthType. The JSON Schema presents it as a oneOf with one
+// branch per method.
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	UserPasswordConfig
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword),
+		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)),
+		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)),
+	)
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case UserPassword:
+		if c.Password == "" {
+			return errors.New("missing 'password'")
+		}
+		return nil
+	case AWSIAM, AzureIAM:
+		// The embedded IAMConfig has its own auth_type field which JSON decoding
+		// leaves empty (the outer field shadows it), so sync it before ValidateIAM
+		// switches on it.
+		c.IAMConfig.AuthType = iam.AuthType(c.AuthType)
+		return c.ValidateIAM()
+	}
+	return fmt.Errorf("unknown 'auth_type' %q", c.AuthType)
+}
+
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
-	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+	Address     string             `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string             `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string             `json:"password,omitempty" jsonschema:"-"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default"`
+	Database    string             `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Timezone    string             `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4,nonsensitive=true"`
+	HistoryMode bool               `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5,nonsensitive=true"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
+	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	DiscoverOnlyEnabled         bool   `json:"discover_only_enabled,omitempty" jsonschema:"title=Discover Only CDC-Enabled Tables,description=When set the connector will only discover tables which have already had CDC capture instances enabled."`
+	DiscoverOnlyEnabled         bool   `json:"discover_only_enabled,omitempty" jsonschema:"title=Discover Only CDC-Enabled Tables,description=When set the connector will only discover tables which have already had CDC capture instances enabled." jsonschema_extras:"nonsensitive=true"`
 	SkipBackfills               string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize           int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	PollingInterval             string `json:"polling_interval,omitempty" jsonschema:"title=CDC Polling Interval,default=500ms,description=The interval at which the connector polls for CDC changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	BackfillChunkSize           int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
+	PollingInterval             string `json:"polling_interval,omitempty" jsonschema:"title=CDC Polling Interval,default=500ms,description=The interval at which the connector polls for CDC changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$,nonsensitive=true"`
 	AutomaticChangeTableCleanup bool   `json:"change_table_cleanup,omitempty" jsonschema:"title=Automatic Change Table Cleanup,default=false,description=When set the connector will delete CDC change table entries as soon as they are persisted into Flow. Requires DBO permissions to use."`
 	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
 	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
 	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
-	SourceTag                   string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	SourceTag                   string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
+	RediscoveryInterval         string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	MaxStartupDelay             string `json:"max_startup_delay,omitempty" jsonschema:"title=Maximum Startup Delay,description=How long the connector waits at most before connecting to the database and replicating changes on startup. The actual wait is random between zero and this duration. This is useful when many captures against the same server start at once because it spreads out the load on the database. Accepts duration strings like '30s' or '10m30s' or '2h'. No delay when unspecified." jsonschema_extras:"pattern=^([0-9]+(ms|s|m|h))+$,nonsensitive=true"`
+	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 	WatermarksTable             string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=This property is deprecated for new captures as they will no longer use watermark writes by default. The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
 
@@ -115,13 +163,22 @@ func (c *Config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"password", c.Password},
 		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	// Validation runs before normalizeCredentials, so both the legacy flat
+	// password and the credentials union must be accepted here.
+	if c.Credentials == nil {
+		if c.Password == "" {
+			return errors.New("missing 'credentials'")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if c.Timezone != "" {
@@ -137,6 +194,12 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid 'polling_interval' configuration %q: must be at least 100ms", c.Advanced.PollingInterval)
 		}
 	}
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
+	}
+	if _, err := sqlcapture.ParseMaxStartupDelay(c.Advanced.MaxStartupDelay); err != nil {
+		return err
+	}
 
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
@@ -147,6 +210,9 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
 			}
 		}
+	}
+	if err := c.DiscoveryFilters.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -176,27 +242,119 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-// ToURI converts the Config to a DSN string.
-func (c *Config) ToURI() string {
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost
-	// to the target via the bastion server, so we use the tunnel's address.
-	var address = c.Address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		address = "localhost:" + defaultPort
-	}
+// normalizeCredentials folds a legacy top-level password into c.Credentials as a
+// UserPassword credential, so that code downstream of it only ever reads one
+// credentials shape. When both are supplied the explicit credentials win.
+func (c *Config) normalizeCredentials() {
+	var legacyPassword = c.Password
+	c.Password = ""
 
+	if c.Credentials != nil {
+		if legacyPassword != "" {
+			log.Warn("both legacy 'password' and 'credentials' are set; the former will be ignored in favour of the latter")
+		}
+		return
+	}
+	c.Credentials = &CredentialsConfig{
+		AuthType:           UserPassword,
+		UserPasswordConfig: UserPasswordConfig{Password: legacyPassword},
+	}
+}
+
+// ToURI converts the Config to a DSN string. It requires normalizeCredentials
+// to have run, and only reads the credentials union.
+//
+// The DSN host is always the real server address, even when tunneling. We dial localhost (the
+// tunnel) via tunnelDialer, but advertise the real server address as the LOGIN7 ServerName and
+// TLS SNI for SQL Server instances that rely on those being accurate.
+func (c *Config) ToURI() (string, error) {
 	var params = make(url.Values)
 	params.Add("app name", "Flow CDC Connector")
 	params.Add("encrypt", "true")
 	params.Add("TrustServerCertificate", "true")
 	params.Add("database", c.Database)
+
+	var userInfo *url.Userinfo
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		userInfo = url.UserPassword(c.User, c.Credentials.Password)
+	case AWSIAM:
+		userInfo = url.User(c.User)
+	case AzureIAM:
+		// The Entra identity is carried entirely by the access token, so the DSN
+		// has no user info at all.
+		userInfo = nil
+	default:
+		return "", fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
+	}
+
 	var connectURL = &url.URL{
 		Scheme:   "sqlserver",
-		User:     url.UserPassword(c.User, c.Password),
-		Host:     address,
+		User:     userInfo,
+		Host:     c.Address,
 		RawQuery: params.Encode(),
 	}
-	return connectURL.String()
+	return connectURL.String(), nil
+}
+
+// buildConnector constructs a driver connector for the configured
+// authentication method. AWS IAM connections fetch a fresh RDS auth token for
+// each new connection the pool opens, so long-running captures outlive the
+// token's 15-minute validity. Azure IAM connections use the Entra access token
+// injected into the config by the control plane, which restarts the connector
+// with a fresh token before expiry.
+func (c *Config) buildConnector() (*mssqldb.Connector, error) {
+	var uri, err = c.ToURI()
+	if err != nil {
+		return nil, err
+	}
+
+	switch c.Credentials.AuthType {
+	case UserPassword:
+		return mssqldb.NewConnector(uri)
+	case AWSIAM:
+		credProvider, err := c.Credentials.AWSCredentialsProvider()
+		if err != nil {
+			return nil, err
+		}
+		// Tokens are built against the configured address (which SetDefaults has
+		// already given a port), so with a network tunnel the token matches the
+		// real server endpoint just like the DSN host does.
+		var tokenProvider = func(ctx context.Context) (string, error) {
+			return auth.BuildAuthToken(ctx, c.Address, c.Credentials.AWSRegion, c.User, credProvider)
+		}
+		return mssqldb.NewConnectorWithAccessTokenProvider(uri, tokenProvider)
+	case AzureIAM:
+		var token = c.Credentials.AzureToken()
+		return mssqldb.NewConnectorWithAccessTokenProvider(uri, func(ctx context.Context) (string, error) {
+			return token, nil
+		})
+	default:
+		return nil, fmt.Errorf("unsupported 'auth_type' %q", c.Credentials.AuthType)
+	}
+}
+
+// tunnelDialer redirects connections to the local end of the SSH tunnel while the driver keeps
+// the original hostname for its TLS SNI and TDS LOGIN7 ServerName fields, so that SQL Server
+// instances which route on the server name they receive see the real host, not "localhost".
+type tunnelDialer struct {
+	localAddr string // address of the tunnel's local listener, to which all dials are redirected
+	address   string // the server address being tunneled to
+}
+
+func (d *tunnelDialer) DialContext(ctx context.Context, network, _ string) (net.Conn, error) {
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, d.localAddr)
+}
+
+// HostName marks this as a mssqldb.HostDialer so the driver dials the configured host through
+// this dialer instead of resolving it locally, which keeps the real hostname in the LOGIN7
+// ServerName and TLS SNI.
+func (d *tunnelDialer) HostName() string {
+	if host, _, err := net.SplitHostPort(d.address); err == nil {
+		return host
+	}
+	return d.address
 }
 
 func configSchema() json.RawMessage {
@@ -208,12 +366,22 @@ func configSchema() json.RawMessage {
 	return json.RawMessage(configSchema)
 }
 
+// maxStartupDelay parses the config on its own because Pull needs the delay before connecting.
+func maxStartupDelay(cfg json.RawMessage) (time.Duration, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return 0, fmt.Errorf("error parsing config json: %w", err)
+	}
+	return sqlcapture.ParseMaxStartupDelay(config.Advanced.MaxStartupDelay)
+}
+
 func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
 	config.SetDefaults()
+	config.normalizeCredentials()
 
 	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
 	if config.Advanced.FeatureFlags != "" {
@@ -281,10 +449,17 @@ type sqlserverDatabase struct {
 	datatypesConfig *datatypes.Config // Configuration for datatype handling
 
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
+	loggedBackfill  map[sqlcapture.StreamID]struct{}                  // Tracks tables whose backfill query has been logged during this connector invocation
+
+	isReplica *bool // Cached result of replicaStatus, nil until its first successful query
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
+}
+
+func (db *sqlserverDatabase) ActivateStreamsBeforeCatchup() bool {
+	return false
 }
 
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
@@ -293,13 +468,19 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 		"user":    db.config.User,
 	}).Info("connecting to database")
 
-	var conn, err = sql.Open("sqlserver", db.config.ToURI())
+	connector, err := db.config.buildConnector()
 	if err != nil {
-		return fmt.Errorf("unable to connect to database: %w", err)
+		return fmt.Errorf("error creating connector: %w", err)
 	}
+	// The tunnel itself is started in connectSQLServer; here we just redirect the driver's TCP
+	// dial to its local listener while leaving the real hostname in the DSN.
+	if cfg := db.config.NetworkTunnel; cfg != nil && cfg.SSHForwarding != nil && cfg.SSHForwarding.SSHEndpoint != "" {
+		connector.Dialer = &tunnelDialer{localAddr: "localhost:" + defaultPort, address: db.config.Address}
+	}
+
+	var conn = sql.OpenDB(connector)
 	if err := conn.PingContext(ctx); err != nil {
-		var mssqlErr mssqldb.Error
-		if errors.As(err, &mssqlErr) {
+		if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok {
 			switch mssqlErr.Number {
 			case 18456:
 				return cerrors.NewUserError(err, "incorrect username or password")
@@ -355,3 +536,19 @@ func (db *sqlserverDatabase) FallbackCollectionKey() []string {
 }
 
 func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}
+
+func (db *sqlserverDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
+}
+
+func (db *sqlserverDatabase) ReplicationPollingInterval() time.Duration {
+	// A stream-to-fence cycle ends when a polling cycle reports a commit position at or past
+	// the fence, so it can't complete any faster than the CDC polling interval. Validation has
+	// already rejected unparseable values and SetDefaults fills in an empty one, so a failure
+	// here can only mean we have no better estimate than the default threshold.
+	var interval, err = time.ParseDuration(db.config.Advanced.PollingInterval)
+	if err != nil {
+		return 0
+	}
+	return interval
+}

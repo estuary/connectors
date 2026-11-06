@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -23,8 +25,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+
+	// Enable this flag to avoid a one time backfill due to change in date
+	// format in the mapping (a581ab1b761816b2b93b525c63153aac3493d49a).  This
+	// flag should not be used on tasks created after this commit.
+	"ignore_mapping_format_changes": common.FlagDisabled,
 }
 
 type sshForwarding struct {
@@ -48,7 +55,7 @@ type credentials struct {
 type config struct {
 	Credentials credentials `json:"credentials"`
 	Endpoint    string      `json:"endpoint"`
-	HardDelete  bool        `json:"hardDelete,omitempty"`
+	HardDelete  bool        `json:"hardDelete,omitempty" jsonschema_extras:"nonsensitive=true"`
 
 	Advanced advancedConfig `json:"advanced,omitempty"`
 
@@ -56,8 +63,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	Replicas     *int   `json:"number_of_replicas,omitempty"`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	Replicas     *int   `json:"number_of_replicas,omitempty" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // The `go-schema-gen` package doesn't have a good way of dealing with oneOf, and I couldn't get it
@@ -80,7 +87,8 @@ func configSchema() json.RawMessage {
 		    "title": "Hard Delete",
 		    "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
 		    "default": false,
-		    "order": 1
+		    "order": 1,
+		    "nonsensitive": true
 		  },
 		  "credentials": {
 			"type": "object",
@@ -129,12 +137,14 @@ func configSchema() json.RawMessage {
 			  "number_of_replicas": {
 				"type": "integer",
 				"title": "Index Replicas",
-				"description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+				"description": "The number of replicas to create new indexes with. Leave blank to use the cluster default.",
+				"nonsensitive": true
 			  },
 			  "feature_flags": {
 				"type": "string",
 				"title": "Feature Flags",
-				"description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+				"description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+				"nonsensitive": true
 			  }
 			},
 			"type": "object",
@@ -232,7 +242,7 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -273,7 +283,15 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			Username:            c.Credentials.Username,
 			Password:            c.Credentials.Password,
 			APIKey:              c.Credentials.ApiKey,
-			RetryOnStatus:       []int{429, 502, 503, 504},
+			// OpenSearch is an API-compatible fork of Elasticsearch, but the
+			// go-elasticsearch v8 client refuses to talk to it: it requires the
+			// 'X-Elastic-Product: Elasticsearch' response header on the first
+			// successful response, which OpenSearch does not send. We inject the
+			// header when it is absent so the product check passes. Genuine
+			// Elasticsearch always sends this header, so its responses are never
+			// modified and the check still validates against it.
+			Transport:     productHeaderInjector{inner: http.DefaultTransport},
+			RetryOnStatus: []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
 				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
 				log.WithFields(log.Fields{
@@ -293,10 +311,28 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 	return &client{es: es}, nil
 }
 
+// productHeaderInjector forces the 'X-Elastic-Product: Elasticsearch' response
+// header when it is missing, which allows the go-elasticsearch v8 product check
+// to pass against OpenSearch. See the comment where it is installed in toClient.
+type productHeaderInjector struct {
+	inner http.RoundTripper
+}
+
+func (p productHeaderInjector) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := p.inner.RoundTrip(req)
+	if err != nil {
+		return res, err
+	}
+	if res.Header.Get("X-Elastic-Product") == "" {
+		res.Header.Set("X-Elastic-Product", "Elasticsearch")
+	}
+	return res, nil
+}
+
 type resource struct {
 	Index        string `json:"index" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false" jsonschema_extras:"x-delta-updates=true"`
-	Shards       *int   `json:"number_of_shards,omitempty"`
+	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false" jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	Shards       *int   `json:"number_of_shards,omitempty" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (r resource) Validate() error {
@@ -377,13 +413,25 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return new(driver) }
+
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	resourceSchema, err := schemagen.GenerateSchema("Elasticsearch Index", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return boilerplate.RunSpec(ctx, req, "https://go.estuary.dev/materialize-elasticsearch", configSchema(), resourceSchema)
+	// Variants (e.g. materialize-opensearch) supply an alternate documentation
+	// URL via the DOCS_URL environment variable; fall back to the Elasticsearch
+	// default when it is not set.
+	docsURL := "https://go.estuary.dev/materialize-elasticsearch"
+	if fromEnv := os.Getenv("DOCS_URL"); fromEnv != "" {
+		docsURL = fromEnv
+	}
+
+	return boilerplate.RunSpec(ctx, req, docsURL, configSchema(), resourceSchema)
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
@@ -413,26 +461,32 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		}
 	}
 
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
-	cfg        config
-	metaClient *client
-	dataClient *client
+	cfg          config
+	metaClient   *client
+	dataClient   *client
+	featureFlags map[string]bool
+
+	// isOpenSearch is true when connected to an OpenSearch cluster rather than
+	// Elasticsearch. OpenSearch is API-compatible except for a handful of field
+	// mapping types (notably it uses 'flat_object' in place of 'flattened').
+	isOpenSearch bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
 	metaClient, err := cfg.toClient(true)
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata client: %w", err)
@@ -443,10 +497,23 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		return nil, fmt.Errorf("creating data client: %w", err)
 	}
 
+	// Detect whether we're talking to OpenSearch so that type mapping can adapt.
+	// This is best-effort: if the cluster is unreachable we default to
+	// Elasticsearch behavior and let CheckPrerequisites surface the connection
+	// error with a friendlier message.
+	var isOpenSearch bool
+	if info, err := metaClient.info(ctx); err != nil {
+		log.WithError(err).Debug("could not determine server distribution; assuming Elasticsearch")
+	} else {
+		isOpenSearch = info.isOpenSearch()
+	}
+
 	return &materialization{
-		cfg:        cfg,
-		metaClient: metaClient,
-		dataClient: dataClient,
+		cfg:          cfg,
+		metaClient:   metaClient,
+		dataClient:   dataClient,
+		featureFlags: featureFlags,
+		isOpenSearch: isOpenSearch,
 	}, nil
 }
 
@@ -530,7 +597,12 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (property, boilerplate.ElementConverter) {
-	return propForProjection(&p.Projection, p.Inference.Types, fc), nil
+	prop := propForProjection(&p.Projection, p.Inference.Types, fc)
+	prop.IgnoreFormat = d.featureFlags["ignore_mapping_format_changes"]
+	if d.isOpenSearch {
+		prop = adaptForOpenSearch(prop)
+	}
+	return prop, nil
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
@@ -543,7 +615,7 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, property]) (string, boilerplate.ActionApplyFn, error) {
 	indexName := res.ResourcePath[0]
-	props := buildIndexProperties(res.Keys, res.Values, res.Document)
+	props := buildIndexProperties(res.Keys, res.Values, res.Document, d.isOpenSearch)
 
 	return fmt.Sprintf("create index %q", indexName), func(ctx context.Context) error {
 		return d.metaClient.createIndex(ctx, indexName, res.Config.Shards, d.cfg.Advanced.Replicas, props)
@@ -606,10 +678,15 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, property],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	isServerless, err := d.dataClient.isServerless(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting serverless status: %w", err)
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
 	}
+
+	info, err := d.dataClient.info(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting server info: %w", err)
+	}
+	isServerless := info.isServerless()
 	if isServerless {
 		log.Info("connected to a serverless elasticsearch cluster")
 	}
@@ -653,6 +730,7 @@ func (d *materialization) NewTransactor(
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			index:          b.ResourcePath[0],
+			path:           b.ResourcePath,
 			deltaUpdates:   b.DeltaUpdates,
 			fields:         fields,
 			floatFields:    floatFields,
@@ -668,6 +746,7 @@ func (d *materialization) NewTransactor(
 		client:         d.dataClient,
 		bindings:       bindings,
 		isServerless:   isServerless,
+		be:             be,
 		indexToBinding: indexToBinding,
 	}
 	return transactor, nil
@@ -726,5 +805,3 @@ func translateField(f string) string {
 
 	return f
 }
-
-func main() { boilerplate.RunMain(new(driver)) }

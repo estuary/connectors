@@ -1,0 +1,52 @@
+info:
+  name: non-admin prefix
+  type: graphql
+  seq: 2
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query AlertSubscriptions($prefix: Prefix!) {
+        alertSubscriptions(by: { prefix: $prefix }) { catalogPrefix }
+      }
+    variables: |-
+      {
+        "prefix": "estuary/public/"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: false
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alert_subscriptions.rs
+
+  **WHY:** The permission-failure shape the cluster's error handling is designed
+  around: a prefix the key only reads. Redirects are NOT followed here, to see
+  whether the server answers with a 307 provisional-authz redirect or a direct
+  GraphQL error. The connector design pre-filters scopes by capability so it
+  should never send this; the probe documents what happens if it does.
+
+  **LIMITATION (VERIFIED 2026-10-07):** An unauthorized prefix gets **HTTP 307**, not a GraphQL error. It carries `Location: /api/graphql?started=…&retryAfter=…`, `Retry-After` about 24 s out, and body `"provisional PermissionDenied error: … required capability admin"`. The whole request is redirected (no partial data), so aliasing several scopes into one query would fail all of them on one denial.
+
+examples:
+  - name: 307 - provisional PermissionDenied, Retry-After
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 307
+      statusText: Temporary Redirect
+      headers:
+        - name: retry-after
+          value: "Wed, 7 Oct 2026 22:05:25 +0000"
+        - name: location
+          value: "/api/graphql?started=2026-10-07T22:05:01.672Z&retryAfter=2026-10-07T22:05:25.720Z"
+      body:
+        type: json
+        data: |-
+          "provisional PermissionDenied error: REDACTED_EMAIL is not authorized to access prefix or name 'estuary/public/' with required capability admin"

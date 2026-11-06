@@ -8,7 +8,8 @@ insta_format.FmtJson.dump = lambda _self, path, value: path.write_text(json.dump
 #     result = subprocess.run(
 #         [
 #             "flowctl",
-#             "preview",
+#             "raw",
+#             "preview-next",
 #             "--source",
 #             request.fspath.dirname + "/../test.flow.yaml",
 #         ],

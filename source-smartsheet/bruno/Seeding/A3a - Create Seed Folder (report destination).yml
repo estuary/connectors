@@ -1,0 +1,50 @@
+info:
+  name: A3a - Create Seed Folder (report destination)
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/home/folders"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary Connector Seeding"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const folder = res.getBody()?.result;
+        if (folder?.id) {
+          bru.setVar('seed_folder_id', String(folder.id));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create folder in home](https://developers.smartsheet.com/api/smartsheet/openapi/folders/create-folder-home)
+
+  **WHY:** seeding step 3a/4 — `POST /reports` refuses to create a report in
+  Home: `destination` is a required body attribute and its `destinationType`
+  only accepts `folder`/`workspace` (VERIFIED 2026-07-21: submitting without
+  `destination` returns 400 "Required object attribute(s) are missing from
+  your request: destination."; submitting `{"destinationType": "home"}`
+  returns 400 "... missing ...: destinationId."). Unlike `POST /sheets`,
+  which happily lands in Home/Sheets, a seed report therefore needs a real
+  container first. This creates a lightweight folder in Home so
+  `A3 - Create Seed Report` has a portable destination that exists on any
+  account, with zero pre-existing structure assumed.
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS; `result.id` captured into
+  `seed_folder_id` for `A3 - Create Seed Report` (see the saved response
+  example).

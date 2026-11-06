@@ -9,7 +9,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/sirupsen/logrus"
+	"github.com/gogo/protobuf/types"
 	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
@@ -50,6 +50,19 @@ type Transactor interface {
 	// updates of that prior transaction, and thus meet the formal "read-committed"
 	// guarantee required by the runtime.
 	Load(_ *LoadIterator, loaded func(binding int, doc json.RawMessage) error) error
+
+	// Flush ends the load phase of a transaction, so it is called after Load
+	// returns and before the first Store.
+	//
+	// `completes` maps a binding index to its truncation boundary for each
+	// backfill that completed in this transaction. The boundary is the
+	// publication time of the backfill's begin signal. A stored document of
+	// that binding whose `flow_published_at` is earlier than the boundary
+	// predates the backfill, so it is stale and may be deleted.
+	//
+	// Runtime v1 does not populate `completes`.
+	Flush(ctx context.Context, completes map[int]time.Time) error
+
 	// Store consumes Store requests from the StoreIterator and returns
 	// a StartCommitFunc which is used to commit the stored transaction.
 	// StartCommitFunc may be nil, which indicate that commits are a
@@ -62,16 +75,71 @@ type Transactor interface {
 	// and also b) after an OpFuture returned by StartCommit has resolved.
 	// It may use the state populated by UnmarshalState, or the state updated as part of StartCommitFunc
 	//
+	// `statePatches` are the aggregated StartedCommit state patches of ALL of
+	// the task's shards for the just-committed transaction — including this
+	// shard's own contribution — in commit order. Under the v1 runtime it is
+	// always empty. Cooperative multi-shard ("scale-out") connectors use it to
+	// observe their peers' staged work, e.g. so that only the primary shard
+	// applies it; a task that isn't sharded is its own primary, so connectors
+	// without multi-shard support simply ignore it.
+	//
+	// `stateKeys` restricts which binding state keys' pending staged work is
+	// processed. A nil stateKeys processes every state key, including ones a
+	// connector cannot enumerate from the active bindings alone (e.g. entries
+	// staged by since-removed bindings, subject to the connector's own
+	// handling of them); transaction sessions pass nil. A non-nil stateKeys
+	// processes exactly those keys, leaving entries under other state keys
+	// untouched and pending in the persisted state: the Apply RPC invokes
+	// Acknowledge with only the state keys of bindings about to receive
+	// schema updates, committing their staged work before any DDL runs.
+	//
 	// It returns an optional ConnectorState update which will be applied in a best-effort fashion
-	// upon its successful completion.
+	// upon its successful completion. When Acknowledge processed no pending
+	// work at all, it must return a nil ConnectorState rather than a no-op
+	// update, since the Apply RPC uses a non-nil update as its signal to
+	// persist state and re-run.
 	//
 	// Acknowledge may perform long-running, idempotent operations such as merging staged
 	// updates into a base table. Upon its successful return, response.Acknowledged is sent to
 	// the runtime, allowing the next pipelined transaction to begin to close.
-	Acknowledge(context.Context) (*pf.ConnectorState, error)
+	Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error)
 
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
+}
+
+// StateKeyFilter returns a predicate reporting whether pending work staged
+// under a state key must be processed by Acknowledge, per its stateKeys
+// contract: a nil stateKeys processes everything, and a non-nil stateKeys
+// processes exactly those keys.
+func StateKeyFilter(stateKeys []string) func(string) bool {
+	if stateKeys == nil {
+		return func(string) bool { return true }
+	}
+
+	set := make(map[string]struct{}, len(stateKeys))
+	for _, sk := range stateKeys {
+		set[sk] = struct{}{}
+	}
+	return func(sk string) bool {
+		_, ok := set[sk]
+		return ok
+	}
+}
+
+// SplitStatePatches decodes a state_patches_json payload into its individual
+// RFC 7396 merge patches. The wire format is a JSON array whose elements are
+// each followed by a tab; tabs are JSON whitespace, so a standard decode
+// suffices. An empty payload means no patches.
+func SplitStatePatches(payload json.RawMessage) ([]json.RawMessage, error) {
+	if len(payload) == 0 {
+		return nil, nil
+	}
+	var out []json.RawMessage
+	if err := json.Unmarshal(payload, &out); err != nil {
+		return nil, fmt.Errorf("decoding state_patches_json: %w", err)
+	}
+	return out, nil
 }
 
 // Stream is the basic interface used for sending and receiving
@@ -129,7 +197,12 @@ func RunTransactions(
 	open *pm.Request_Open,
 	lvl log.Level,
 ) (_err error) {
-	be := newBindingEvents()
+	be := NewBindingEvents()
+	health := newHealthTracker(open)
+	be.health = health
+	be.status = newStatusTracker(open)
+	stopStatus := be.status.start()
+	defer stopStatus()
 
 	openStart := time.Now()
 	log.Info("requesting materialization Open")
@@ -171,7 +244,9 @@ func RunTransactions(
 	if err != nil {
 		return err
 	}
-	logrus.WithField("eventType", "connectorStatus").Info("Running")
+
+	health.start()
+	defer health.close()
 
 	var (
 		// awaitErr is the last await() result,
@@ -189,6 +264,8 @@ func RunTransactions(
 		lastCommitOp OpFuture, // Resolves when the prior commit completes.
 		awaitDoneCh chan<- struct{}, // To be closed upon return.
 		loadDoneCh <-chan struct{}, // Signaled when load() has completed.
+		statePatches []json.RawMessage, // This transaction's aggregated state patches.
+		committedRound int, // Round being acknowledged, or -1 for the recovery commit.
 	) (__out error) {
 
 		defer func() {
@@ -208,14 +285,25 @@ func RunTransactions(
 			return nil
 		}
 
-		if ackState, err := transactor.Acknowledge(ctx); err != nil {
+		ackState, err := transactor.Acknowledge(ctx, statePatches, nil)
+		if err != nil {
 			return err
-		} else if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
+		}
+		if committedRound < 0 {
+			health.endRecovery()
+		} else {
+			health.acknowledged(committedRound)
+		}
+		if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
 			return err
 		}
 
 		return nil
 	}
+
+	// loaded is the number of Loaded responses sent for the current round,
+	// written by load() and read only after loadDoneCh is closed.
+	var loaded int
 
 	// load is a closure for async execution of Transactor.Load.
 	var load = func(
@@ -223,7 +311,7 @@ func RunTransactions(
 		loadDoneCh chan<- struct{}, // To be closed upon return.
 	) (__out error) {
 
-		var loaded int
+		loaded = 0
 		defer func() {
 			loadErr = __out
 			close(loadDoneCh)
@@ -259,6 +347,9 @@ func RunTransactions(
 	var loadCtx, loadCancel = context.WithCancel(ctx)
 	defer loadCancel()
 
+	// round is the zero-based index of the transaction being processed.
+	var round int
+
 	for {
 		var (
 			awaitDoneCh = make(chan struct{}) // Signals await() is done.
@@ -270,11 +361,19 @@ func RunTransactions(
 			return err
 		}
 
+		// The aggregated cross-shard state patches must be decoded
+		// synchronously, before the concurrent await() and load() phases
+		// begin: `rxRequest` is reused by load()'s recv.
+		var statePatches []json.RawMessage
+		if statePatches, err = SplitStatePatches(rxRequest.Acknowledge.StatePatchesJson); err != nil {
+			return err
+		}
+
 		// Await the commit of the prior transaction, then notify the runtime.
 		// On completion, Acknowledged has been written to the stream,
 		// and a concurrent load() phase may now begin to close.
 		// At exit, `awaitDoneCh` is closed and `awaitErr` is its status.
-		go await(lastCommitOp, awaitDoneCh, loadDoneCh)
+		go await(lastCommitOp, awaitDoneCh, loadDoneCh, statePatches, round-1)
 
 		// Begin an async load of the current transaction.
 		// At exit, `loadDoneCh` is closed and `loadErr` is its status.
@@ -306,12 +405,37 @@ func RunTransactions(
 
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
+		}
+		for _, bb := range rxRequest.Flush.BackfillBegins {
+			var boundary time.Time
+			if boundary, err = types.TimestampFromProto(bb.Timestamp); err != nil {
+				return fmt.Errorf("invalid timestamp in Flush.BackfillBegins: %w", err)
+			}
+			log.WithFields(log.Fields{
+				"binding":  bb.Binding,
+				"boundary": boundary,
+			}).Info("backfill began")
+		}
+		var backfillCompletes = make(map[int]time.Time, len(rxRequest.Flush.BackfillCompletes))
+		for _, bc := range rxRequest.Flush.BackfillCompletes {
+			backfillCompletes[int(bc.Binding)], err = types.TimestampFromProto(bc.Timestamp)
+			if err != nil {
+				return fmt.Errorf("invalid timestamp in Flush.BackfillCompletes: %w", err)
+			}
+			log.WithFields(log.Fields{
+				"binding":  bc.Binding,
+				"boundary": backfillCompletes[int(bc.Binding)],
+			}).Info("backfill completed")
+			health.observeTruncation(round, int(bc.Binding))
+		}
+		if err = transactor.Flush(ctx, backfillCompletes); err != nil {
+			return fmt.Errorf("transactor.Flush: %w", err)
 		} else if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}
 
 		// Process all Store requests until StartCommit is read.
-		var storeIt = StoreIterator{stream: stream, request: &rxRequest, ctx: ctx}
+		var storeIt = StoreIterator{stream: stream, request: &rxRequest, ctx: ctx, Round: round, health: health}
 		var startCommit, err = transactor.Store(&storeIt)
 		if storeIt.err != nil {
 			err = storeIt.err // Prefer an iterator error as it's more directly causal.
@@ -323,6 +447,7 @@ func RunTransactions(
 		if runtimeCheckpoint, err = checkpointFromStartCommit(&rxRequest); err != nil {
 			return err
 		}
+		health.recordExpected(round, int64(loadIt.Total), int64(loaded))
 
 		// `startCommit` may be nil to indicate a no-op commit.
 		var stateUpdate *pf.ConnectorState = nil
@@ -348,5 +473,6 @@ func RunTransactions(
 		if err = writeStartedCommit(stream, &txResponse, stateUpdate); err != nil {
 			return err
 		}
+		round++
 	}
 }

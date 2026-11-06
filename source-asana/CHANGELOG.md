@@ -1,0 +1,16 @@
+# Changelog
+
+## 2026-10-19
+
+### Fixed
+- Captures of large workspaces no longer fail with `Your pagination token has expired` while
+  reading `stories` and similar child streams.
+- Captures that authenticate with OAuth no longer fail with `The bearer token has expired` after
+  running for more than an hour.
+
+## 2026-07-29
+
+### Fixed
+- `portfolios` documents with members or project templates no longer fail collection schema
+  validation — `members` and `project_templates` are now correctly declared as arrays.
+- `portfolios` `due_on` and `start_on` are now declared as dates rather than date-times.

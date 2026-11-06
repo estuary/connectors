@@ -30,6 +30,11 @@ type TableShape struct {
 	// Materializer constructs are more thoroughly integrated into
 	// materialize-sql.
 	FieldConfigJsonMap map[string]json.RawMessage
+	// The raw resource config of the binding which produced this table, for
+	// dialects that render resource-level options (e.g. a custom PARTITION BY)
+	// into DDL. Nil when the table is not from a binding, such as the
+	// checkpoints meta table.
+	ResourceConfigJson json.RawMessage
 
 	Keys, Values []Projection
 	Document     *Projection
@@ -64,22 +69,6 @@ type Column struct {
 	Placeholder string
 	// If this column can be null or not.
 	MustExist bool
-}
-
-// NullableFieldsToStrip returns the list of field names that are optional (may be absent)
-// and non-nullable (schema doesn't allow null). When these fields are SQL NULL (because
-// the document didn't include them), they should be stripped from the reconstructed JSON
-// to avoid schema validation errors.
-func (t *Table) NullableFieldsToStrip() []string {
-	var fields []string
-	for _, cols := range [][]Column{t.Keys, t.Values} {
-		for _, col := range cols {
-			if !col.MustExist && !slices.Contains(col.Inference.Types, "null") {
-				fields = append(fields, col.Field)
-			}
-		}
-	}
-	return fields
 }
 
 // ConvertKey converts a key Tuple to database parameters.
@@ -122,6 +111,48 @@ func (t *Table) convertTuple(in tuple.Tuple, columns []Column, out []interface{}
 	return out, nil
 }
 
+// PublishedAtColumn returns the value column that holds each document's
+// publication time, which is /_meta/uuid projected as a date-time. The error
+// is a clause stating why no column qualifies, suited for an operator to act on.
+func (t *Table) PublishedAtColumn() (*Column, error) {
+	var reason error
+	for i := range t.Values {
+		var col = &t.Values[i]
+		if col.Ptr != "/_meta/uuid" {
+			continue
+		} else if err := publishedAtMismatch(col); err == nil {
+			return col, nil
+		} else if reason == nil {
+			reason = err
+		}
+	}
+	if reason == nil {
+		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+	}
+	return nil, reason
+}
+
+// publishedAtMismatch returns why a column projecting /_meta/uuid cannot be
+// compared as a timestamp, or nil if it can.
+func publishedAtMismatch(col *Column) error {
+	var s = col.Inference.String_
+	if col.UserDefinedDDL {
+		return fmt.Errorf("field %s has a user-defined DDL type", col.Field)
+	} else if s == nil {
+		return fmt.Errorf("field %s projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", col.Field)
+	} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
+		return fmt.Errorf("field %s projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", col.Field, s.Format, s.ContentEncoding)
+	}
+	return nil
+}
+
+// TruncateAfterBackfill reports whether resolved feature flags permit deleting
+// the rows published before a completed backfill. Retaining existing data on
+// backfill forbids it, because those rows are exactly the data being retained.
+func TruncateAfterBackfill(featureFlags map[string]bool) bool {
+	return featureFlags["truncate_after_backfill"] && !featureFlags["retain_existing_data_on_backfill"]
+}
+
 // Columns returns all columns of the Table as a single slice,
 // ordered as Keys, then Values, then the Document.
 func (t *Table) Columns() []*Column {
@@ -144,6 +175,34 @@ func (t *Table) RootLevelColumns() []*Column {
 		}
 	}
 	return rootLevelCols
+}
+
+// RootPropertyColumns returns a column for each materialized root-level
+// property, to rebuild a document from. A property projected by several
+// fields is rebuilt from the first of them.
+func (t *Table) RootPropertyColumns() []*Column {
+	var out []*Column
+	var seen = make(map[string]bool)
+	for _, col := range t.RootLevelColumns() {
+		if prop := col.RootProperty(); !seen[prop] {
+			seen[prop] = true
+			out = append(out, col)
+		}
+	}
+	return out
+}
+
+// NullablePropertiesToStrip returns the properties of a document rebuilt from
+// RootPropertyColumns that are optional and non-nullable. Their SQL NULLs mean
+// the document didn't include them, so they're stripped to keep it valid.
+func (t *Table) NullablePropertiesToStrip() []string {
+	var props []string
+	for _, col := range t.RootPropertyColumns() {
+		if !col.MustExist && !slices.Contains(col.Inference.Types, "null") {
+			props = append(props, col.RootProperty())
+		}
+	}
+	return props
 }
 
 // KeyPtrs returns all keys of the Table as a single slice.
@@ -237,6 +296,7 @@ func BuildTableShape(materializationName string, binding *pf.MaterializationSpec
 		Comment:            comment,
 		DeltaUpdates:       deltaUpdates,
 		FieldConfigJsonMap: binding.FieldSelection.FieldConfigJsonMap,
+		ResourceConfigJson: binding.ResourceConfigJson,
 		Keys:               keys,
 		Values:             values,
 		Document:           document,

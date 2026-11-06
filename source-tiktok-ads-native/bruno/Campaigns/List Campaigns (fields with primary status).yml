@@ -1,0 +1,30 @@
+info:
+  name: List Campaigns (fields with primary status)
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"primary_status":"STATUS_ALL"}&fields=["campaign_id","campaign_name","operation_status","primary_status","secondary_status","modify_time"]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** checks whether `primary_status` (or `secondary_status`) is exposed as a field, so a deleted campaign can be told apart from a paused one.
+
+  **VERIFIED (2026-10-12, sandbox):** rejected, `code 40002`: `primary_status`
+  is not a valid field. The error lists the 38 allowed `fields`; the only
+  status-like ones are `operation_status`, `secondary_status` and
+  `campaign_app_profile_page_state`. `secondary_status` is allowed but the
+  sandbox omits it from responses (see `List Campaigns (fields with secondary
+  status)`).
+  **PENDING:** whether production populates `secondary_status` for deleted
+  campaigns.

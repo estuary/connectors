@@ -1,0 +1,67 @@
+sql> CREATE TABLE dbo.Datatypes_ScanKeyTypes_Time_404671 (k TIME PRIMARY KEY, v TEXT)
+sql> INSERT INTO dbo.Datatypes_ScanKeyTypes_Time_404671 VALUES ('00:00:00', 'Data 0'), ('12:34:54.1234567', 'Data 1'), ('23:59:59.9999999', 'Data 2')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/datatypes_scankeytypes_time_404671
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_time_404671",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Time_404671"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "00:00:00",
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_time_404671",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Time_404671"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "12:34:54.1234567",
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_time_404671",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Time_404671"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "23:59:59.9999999",
+    "v": "Data 2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_ScanKeyTypes_Time_404671": {
+      "backfilled": 3,
+      "key_columns": [
+        "k"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

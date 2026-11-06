@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
+FROM --platform=linux/amd64 golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
@@ -19,7 +19,7 @@ RUN go test -tags nozstd -v ./materialize-boilerplate/...
 RUN go test -tags nozstd -short -v ./materialize-dynamodb/...
 
 # Build the connector.
-RUN go build -tags nozstd -v -o ./connector ./materialize-dynamodb
+RUN go build -tags nozstd -v -o ./connector ./materialize-dynamodb/cmd/connector
 
 # Runtime Stage
 ################################################################################
@@ -33,6 +33,9 @@ COPY --from=builder /builder/connector /connector/materialize-dynamodb
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

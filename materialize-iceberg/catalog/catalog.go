@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/apache/iceberg-go/table"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/clientcredentials"
 	"resty.dev/v3"
 )
@@ -144,6 +146,21 @@ func SetCurrentSchemaUpdate(id int) TableUpdate {
 	}
 }
 
+type upgradeFormatVersionUpdateReq struct {
+	baseUpdate
+	FormatVersion int `json:"format-version"`
+}
+
+func (upgradeFormatVersionUpdateReq) isTableUpdate() {}
+
+// UpgradeFormatVersionUpdate raises the table's Iceberg format version.
+func UpgradeFormatVersionUpdate(version int) TableUpdate {
+	return &upgradeFormatVersionUpdateReq{
+		baseUpdate:    baseUpdate{Action: "upgrade-format-version"},
+		FormatVersion: version,
+	}
+}
+
 type catalogOpts struct {
 	useClientCredential bool
 	oauth2ServerUri     string
@@ -209,10 +226,19 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 		}
 
 		if clientID, clientSecret, ok := strings.Cut(cfg.credential, ":"); ok {
+			// The token endpoint may be on a different host than the catalog,
+			// as with Dremio Cloud (catalog.dremio.cloud vs.
+			// login.dremio.cloud). An absolute oauth2ServerUri is used as-is;
+			// otherwise it is treated as a path relative to the catalog URL.
+			resolvedTokenURL := parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String()
+			if u, err := url.Parse(cfg.oauth2ServerUri); err == nil && u.IsAbs() && u.Host != "" {
+				resolvedTokenURL = cfg.oauth2ServerUri
+			}
+
 			clientCredCfg := &clientcredentials.Config{
 				ClientID:     clientID,
 				ClientSecret: clientSecret,
-				TokenURL:     parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String(),
+				TokenURL:     resolvedTokenURL,
 				Scopes:       scopes,
 			}
 
@@ -392,6 +418,62 @@ func (c *Catalog) ListTables(ctx context.Context, ns string) ([]string, error) {
 	return names, nil
 }
 
+// versionScopedMetadataFields are table metadata fields mapped to the format
+// version that introduced them. Some catalog services include fields from
+// newer format versions in metadata for older-version tables, most notably
+// the v3 row-lineage field 'next-row-id' appearing in v2 metadata. iceberg-go
+// v0.6.0+ rejects such metadata outright, where v0.5.0 ignored the extra
+// fields; dropping them before parsing retains the lenient reading behavior.
+var versionScopedMetadataFields = map[string]int{
+	"last-sequence-number": 2,
+	"next-row-id":          3,
+	"encryption-keys":      3,
+}
+
+// dropFieldsBeyondFormatVersion removes metadata fields that are only valid
+// in format versions newer than the metadata's declared format-version,
+// reporting the dropped field names and the declared version so callers can
+// log which catalog provider is writing out-of-spec metadata. Metadata
+// without a format-version field is returned unchanged: iceberg-go's parsing
+// produces the canonical error for that case, and full validation of the
+// metadata is left to it in general.
+func dropFieldsBeyondFormatVersion(raw json.RawMessage) (json.RawMessage, []string, int, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, nil, 0, fmt.Errorf("parsing table metadata: %w", err)
+	}
+
+	versionRaw, ok := fields["format-version"]
+	if !ok {
+		return raw, nil, 0, nil
+	}
+	var version int
+	if err := json.Unmarshal(versionRaw, &version); err != nil {
+		return nil, nil, 0, fmt.Errorf("parsing format-version: %w", err)
+	}
+	if version < 1 {
+		return nil, nil, 0, fmt.Errorf("invalid format-version %d", version)
+	}
+
+	var dropped []string
+	for f, introduced := range versionScopedMetadataFields {
+		if _, present := fields[f]; present && version < introduced {
+			delete(fields, f)
+			dropped = append(dropped, f)
+		}
+	}
+	if len(dropped) == 0 {
+		return raw, nil, version, nil
+	}
+	slices.Sort(dropped)
+
+	sanitized, err := json.Marshal(fields)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("re-encoding sanitized table metadata: %w", err)
+	}
+	return sanitized, dropped, version, nil
+}
+
 func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table, error) {
 	type resp struct {
 		Config           tableConfig     `json:"config"`
@@ -404,7 +486,23 @@ func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table,
 		return nil, err
 	}
 
-	meta, err := table.ParseMetadataBytes(res.RawMeta)
+	sanitized, dropped, version, err := dropFieldsBeyondFormatVersion(res.RawMeta)
+	if err != nil {
+		return nil, fmt.Errorf("sanitizing table metadata: %w", err)
+	}
+	if len(dropped) > 0 {
+		// Identify catalog providers that write out-of-spec metadata so they
+		// can be notified upstream.
+		log.WithFields(log.Fields{
+			"catalog":       c.rHttp.BaseURL(),
+			"namespace":     ns,
+			"table":         name,
+			"formatVersion": version,
+			"fields":        dropped,
+		}).Warn("dropped metadata fields not valid for the table's format version")
+	}
+
+	meta, err := table.ParseMetadataBytes(sanitized)
 	if err != nil {
 		return nil, err
 	}

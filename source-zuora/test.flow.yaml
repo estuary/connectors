@@ -1,0 +1,16 @@
+captures:
+  acmeCo/source-zuora:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_zuora
+        config:
+          credentials:
+            credentials_title: OAuth Credentials
+            client_id: <secret>
+            client_secret: <secret>
+          base_url: https://rest.zuora.com
+          start_date: "2026-07-17T00:00:00Z"
+    bindings: []

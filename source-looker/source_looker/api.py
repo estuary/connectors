@@ -2,7 +2,7 @@ from logging import Logger
 from typing import AsyncGenerator, Awaitable
 
 from estuary_cdk.buffer_ordered import buffer_ordered
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
 
@@ -18,6 +18,21 @@ from .models import (
 
 def url_base(subdomain: str) -> str:
     return f"https://{subdomain}/api/{API_VERSION}"
+
+
+def _is_missing_resource(err: HTTPError) -> bool:
+    """
+    Returns whether the error means Looker cannot serve this specific resource.
+
+    While Looker is unavailable (an outage, scheduled maintenance, or an upgrade) it answers
+    with an HTML error page under a 404 status, the same status it uses for a resource that
+    genuinely cannot be served. Treating an outage as a missing resource would silently
+    truncate a snapshot, and the CDK emits tombstones for the rows a snapshot no longer
+    yields, so an outage would delete live documents and recreate them on the next sweep.
+    Only Looker's JSON API error envelope is considered a missing resource. Anything else
+    propagates and fails the snapshot loudly.
+    """
+    return err.code == 404 and "documentation_url" in err.message
 
 
 async def _paginate_through_search(
@@ -122,7 +137,25 @@ async def snapshot_child_resources(
     # sweeps.
     async def _fetch_child_resources(parent_id: str) -> list[FullRefreshResource]:
         child_url = f"{parent_url}/{parent_id}/{stream.path}"
-        response = await http.request(log, child_url)
+
+        try:
+            response = await http.request(log, child_url)
+        except HTTPError as err:
+            # The parent's `can` permissions don't catch every reason children are
+            # unavailable, like a parent deleted since it was listed. Looker 404s these,
+            # so skip this parent's children rather than fail the entire snapshot.
+            if _is_missing_resource(err):
+                log.warning(
+                    "Skipping inaccessible child resources.",
+                    {
+                        "stream": stream.name,
+                        "parent_id": parent_id,
+                        "error": err.message,
+                    },
+                )
+                return []
+            raise
+
         return TypeAdapter(list[FullRefreshResource]).validate_json(response)
 
     async def _gen() -> AsyncGenerator[Awaitable[list[FullRefreshResource]], None]:
@@ -161,8 +194,23 @@ async def snapshot_lookml_model_explores(
         for explore_name in explores:
             explore_url = f"{lookml_models_url}/{model_name}/explores/{explore_name}"
 
-            explore = FullRefreshResource.model_validate_json(
-                await http.request(log, explore_url)
-            )
+            try:
+                response = await http.request(log, explore_url)
+            except HTTPError as err:
+                # A model's nav listing advertises explores this endpoint won't serve: abstract
+                # explores (`extension: required`), explores in a model that no longer compiles,
+                # and explores the credentials can't see. Looker 404s all of these, so skip the
+                # explore rather than fail the entire snapshot.
+                if _is_missing_resource(err):
+                    log.warning(
+                        "Skipping inaccessible LookML model explore.",
+                        {
+                            "model": model_name,
+                            "explore": explore_name,
+                            "error": err.message,
+                        },
+                    )
+                    continue
+                raise
 
-            yield explore
+            yield FullRefreshResource.model_validate_json(response)

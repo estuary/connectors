@@ -1,11 +1,9 @@
 import asyncio
 from asyncio.exceptions import CancelledError
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from logging import Logger
-from typing import (
-    AsyncGenerator,
-)
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import (
@@ -16,39 +14,43 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.utils import format_error_message
 
 from ..models import (
-    ContactList,
     ContactListMembership,
     ContactListMembershipResponse,
     Names,
 )
-from .contact_lists import request_contact_lists_in_time_range, request_contact_lists
+from .contact_lists import request_contact_lists, request_contact_lists_in_time_range
 from .shared import (
-    HUB,
-    EPOCH_PLUS_ONE_SECOND,
     DELAYED_LAG,
+    EPOCH_PLUS_ONE_SECOND,
+    HUB,
 )
+
+AD_HOC_LIST_TYPE = "ADHOC"
+
 
 async def _request_contact_list_memberships(
     http: HTTPSession,
     log: Logger,
-    contact_list: ContactList,
+    list_id: int,
     start: datetime,
     end: datetime | None = None,
-) -> AsyncGenerator[ContactListMembership, None]:
-    url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships/join-order"
+) -> AsyncGenerator[ContactListMembership]:
+    url = f"{HUB}/crm/v3/lists/{list_id}/memberships/join-order"
     params: dict[str, int | str] = {"limit": 250}
 
     while True:
         response = ContactListMembershipResponse.model_validate_json(
             await http.request(log, url, params=params),
-            context=contact_list,
+            context=list_id,
         )
 
         for item in response.results:
             if end and item.membershipTimestamp >= end:
                 continue
             if item.membershipTimestamp < start:
-                # The endpoint's sorted in descending join date order, so we are now caught up
+                # Results are newest-first, so we are now caught up. HubSpot's
+                # OpenAPI spec says ascending; live responses contradict it, so
+                # don't trust it.
                 return
 
             yield item
@@ -75,20 +77,20 @@ class ContactListMembershipControl:
 async def _list_memberships_worker(
     http: HTTPSession,
     log: Logger,
-    contact_list: ContactList,
+    list_id: int,
     context: ContactListMembershipControl,
     start: datetime,
     end: datetime | None = None,
 ) -> None:
     try:
         async for item in _request_contact_list_memberships(
-            http, log, contact_list, start, end
+            http, log, list_id, start, end
         ):
             await context.results.put(item)
 
         log.debug(
             "finished fetching memberships for list",
-            {"listId": contact_list.listId},
+            {"listId": list_id},
         )
         await context.results.put(None)
     except CancelledError as e:
@@ -101,64 +103,72 @@ async def _list_memberships_worker(
             msg = format_error_message(e)
             context.first_error = msg
 
-            raise Exception(
-                f"Contact list {contact_list.listId} worker was unexpectedly cancelled: {msg}"
+            raise RuntimeError(
+                f"Contact list {list_id} worker was unexpectedly cancelled: {msg}"
             )
         # If a different worker already failed, then this worker task was cancelled by
         # the TaskGroup as part of its exception handling and it's safe to propagate the
         # CancelledError.
         else:
-            raise e
+            raise
     except BaseException as e:
         msg = format_error_message(e)
         if not context.first_error:
             context.first_error = msg
 
         log.error(
-            f"Contact list {contact_list.listId} worker encountered an error.",
+            f"Contact list {list_id} worker encountered an error.",
             {
                 "exception": msg,
             },
         )
-        raise e
+        raise
 
 
 async def _request_all_contact_list_memberships(
     http: HTTPSession, log: Logger, start: datetime, end: datetime | None = None
-) -> AsyncGenerator[ContactListMembership, None]:
+) -> AsyncGenerator[ContactListMembership]:
     log.info(
         "fetching contact list memberships",
-        {
+        extra={
             "start": start.isoformat(),
             "end": end.isoformat() if end else None,
         },
     )
 
     control = ContactListMembershipControl()
-    all_lists = [
-        item
-        async for item in request_contact_lists_in_time_range(
-            http,
-            log,
-            # We only care about listIds, so we do not want to make an extra request
-            #  asking for all the additional properties there are
-            False,
-            start,
-            end,
+    all_list_ids: list[int] = []
+    adhoc_list_ids: list[int] = []
+    async for item in request_contact_lists_in_time_range(
+        http,
+        log,
+        # We only care about listIds, so we do not want to make an extra request
+        #  asking for all the additional properties there are
+        False,
+        start,
+        end,
+    ):
+        # The memberships endpoint rejects ADHOC lists with a 400.
+        if item.processingType == AD_HOC_LIST_TYPE:
+            adhoc_list_ids.append(item.listId)
+        else:
+            all_list_ids.append(item.listId)
+
+    if adhoc_list_ids:
+        log.warning(
+            "skipping ADHOC contact lists",
+            extra={"list_ids": adhoc_list_ids},
         )
-    ]
-    if not all_lists:
+    if not all_list_ids:
         return
 
     async with asyncio.TaskGroup() as tg:
 
         async def dispatcher() -> None:
-            for contact_list in all_lists:
+            for list_id in all_list_ids:
                 _ = await control.task_slots.acquire()
                 _ = tg.create_task(
-                    _list_memberships_worker(
-                        http, log, contact_list, control, start, end
-                    )
+                    _list_memberships_worker(http, log, list_id, control, start, end)
                 )
 
         _ = tg.create_task(dispatcher())
@@ -170,7 +180,7 @@ async def _request_all_contact_list_memberships(
                 control.finished_tasks += 1
                 control.task_slots.release()
 
-                if control.finished_tasks == len(all_lists):
+                if control.finished_tasks == len(all_list_ids):
                     break
             else:
                 yield item
@@ -183,7 +193,7 @@ async def fetch_contact_list_memberships_page(
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
-) -> AsyncGenerator[ContactListMembership | PageCursor, None]:
+) -> AsyncGenerator[ContactListMembership | PageCursor]:
     assert isinstance(page, int | None)
     assert isinstance(cutoff, datetime)
 
@@ -199,7 +209,7 @@ async def fetch_contact_list_memberships_page(
         return
 
     async for membership in _request_contact_list_memberships(
-        http, log, next_list, EPOCH_PLUS_ONE_SECOND
+        http, log, next_list.listId, EPOCH_PLUS_ONE_SECOND
     ):
         yield membership
 
@@ -208,7 +218,7 @@ async def fetch_contact_list_memberships_page(
 
 async def fetch_contact_list_memberships(
     http: HTTPSession, log: Logger, log_cursor: LogCursor
-) -> AsyncGenerator[ContactListMembership | LogCursor, None]:
+) -> AsyncGenerator[ContactListMembership | LogCursor]:
     assert isinstance(log_cursor, datetime)
 
     # We are deliberately not implementing the same delayed stream mechanism
@@ -216,13 +226,24 @@ async def fetch_contact_list_memberships(
     # and we don't want to paginate through all items twice
     start_date = log_cursor - DELAYED_LAG
     now = datetime.now(tz=UTC)
+    # The next run resumes from `now`, so this is its lower bound. Only
+    # memberships after it can be fetched again; caching older ones would
+    # hold the entire window in memory for nothing.
+    next_start_date = now - DELAYED_LAG
 
     async for item in _request_all_contact_list_memberships(http, log, start_date):
-        key = f"{item.listId}:{item.membershipTimestamp}"
+        key = f"{item.listId}:{item.recordId}"
+        ts = item.membershipTimestamp
 
-        if cache.should_yield(
-            Names.contact_list_memberships, key, item.membershipTimestamp
-        ):
-            yield item
+        if cache.has_as_recent_as(Names.contact_list_memberships, key, ts):
+            continue
+
+        if ts > next_start_date:
+            cache.add_recent(Names.contact_list_memberships, key, ts)
+
+        yield item
+
+    evicted = cache.cleanup(Names.contact_list_memberships, next_start_date)
+    log.info("evicted contact list memberships from cache", extra={"evicted": evicted})
 
     yield now

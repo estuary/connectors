@@ -250,3 +250,9 @@ class TableMetadata:
     # Pre-computed set of boolean field names for efficient conversion.
     # Avoids iterating all fields per row - only iterate boolean fields.
     boolean_fields: frozenset[str]
+    # Narrowest row that can still be bound: the number of columns up to and
+    # including IsDelete, which every row carries. Columns past IsDelete were
+    # appended to the table after its initial export, so rows written before an
+    # append lack them and are legitimately narrower than the schema. A row
+    # narrower than this is misaligned rather than merely old.
+    min_row_width: int

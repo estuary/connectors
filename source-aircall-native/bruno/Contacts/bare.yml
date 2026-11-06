@@ -1,0 +1,123 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/contacts?per_page=50"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - full shape (3 contacts)"
+    request:
+      url: "{{base_url}}/contacts?per_page=50"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "meta": {
+              "count": 3,
+              "total": 3,
+              "current_page": 1,
+              "per_page": 50,
+              "next_page_link": null,
+              "previous_page_link": null
+            },
+            "contacts": [
+              {
+                "id": 518690461,
+                "created_at": 1790590869,
+                "updated_at": 1790590869,
+                "first_name": "Echo",
+                "last_name": "Test",
+                "information": "Call this number to test your sound!",
+                "company_name": "Test your sound",
+                "is_shared": true,
+                "direct_link": "https://api.aircall.io/v1/contacts/518690461",
+                "phone_numbers": [
+                  {
+                    "id": 2168224894,
+                    "value": "+16314402060",
+                    "label": "Main"
+                  }
+                ],
+                "emails": []
+              },
+              {
+                "id": 518778628,
+                "created_at": 1790603975,
+                "updated_at": 1790603985,
+                "first_name": "Estuary",
+                "last_name": "Seed Alpha",
+                "information": "estuary connector test seed (updated)",
+                "company_name": null,
+                "is_shared": true,
+                "direct_link": "https://api.aircall.io/v1/contacts/518778628",
+                "phone_numbers": [
+                  {
+                    "value": "+12025550101",
+                    "label": "Work",
+                    "id": 2169247272
+                  }
+                ],
+                "emails": []
+              },
+              {
+                "id": 518778695,
+                "created_at": 1790603982,
+                "updated_at": 1790603982,
+                "first_name": "Estuary",
+                "last_name": "Seed Charlie",
+                "information": "estuary connector test seed",
+                "company_name": null,
+                "is_shared": true,
+                "direct_link": "https://api.aircall.io/v1/contacts/518778695",
+                "phone_numbers": [
+                  {
+                    "label": "Work",
+                    "id": 2169247961,
+                    "value": "+12025550103"
+                  }
+                ],
+                "emails": []
+              }
+            ]
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-contacts
+
+    **WHY:** Full representative shape: envelope key, `meta`, per-item keys, cursor
+    field types, default order, `is_shared`.
+
+    **VERIFIED (2026-09-28):** envelope `{contacts: [...], meta: {count, total,
+    current_page, per_page, next_page_link, previous_page_link}}`. Item keys:
+    `id` (int), `created_at` / `updated_at` (**int unix seconds**), `first_name`,
+    `last_name`, `information`, `company_name` (nullable), `is_shared` (bool),
+    `direct_link`, `phone_numbers[] {id, label, value}`, `emails[]`.
+    Default order is `order_by=created_at&order=asc` (echoed in `previous_page_link`
+    of `Contacts / page just past end`).
+
+    **VERIFIED (2026-09-28):** a deleted contact (`Seeding / C6 - Delete Contact Bravo`)
+    simply disappears — no tombstone, no `deleted` flag. **LIMITATION:** deletions
+    are invisible to incremental capture.
+
+    **DOCUMENTED (2026-09-28):** only *shared* contacts are returned by the Public API
+    (every observed item has `is_shared: true`). **LIMITATION:** users' private
+    contacts are never captured.
+  type: text/markdown

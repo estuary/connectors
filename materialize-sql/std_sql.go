@@ -412,7 +412,9 @@ func StdPopulateInfoSchema(
 			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 			Type:               c.DataType,
 			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
-			HasDefault:         c.ColumnDefault.Valid,
+			// DuckLake and MariaDB report a column with no default as the string
+			// "NULL" rather than SQL NULL.
+			HasDefault: c.ColumnDefault.Valid && !strings.EqualFold(c.ColumnDefault.String, "NULL"),
 		})
 	}
 	if err := columns.Err(); err != nil {
@@ -549,6 +551,22 @@ var StdMigrationSteps = []ColumnMigrationStep{
 	},
 }
 
+// BatchedColumnMigrationStep builds a ColumnMigrationStep which alters all of a
+// table's columns in one multi-clause ALTER TABLE, with clause rendering each
+// column's part of it.
+func BatchedColumnMigrationStep(clause func(MigrationInstruction) string) ColumnMigrationStep {
+	return func(_ Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
+		if len(instructions) == 0 {
+			return nil, nil
+		}
+		clauses := make([]string, len(instructions))
+		for i, ins := range instructions {
+			clauses[i] = clause(ins)
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s\n\t%s;", table.Identifier, strings.Join(clauses, ",\n\t"))}, nil
+	}
+}
+
 func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, migrations []ColumnTypeMigration, steps ...ColumnMigrationStep) ([]string, error) {
 	// Connectors can provide custom steps, if they don't, we default to std steps
 	if len(steps) == 0 {
@@ -559,9 +577,35 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 		return nil, fmt.Errorf("must have at least %d steps", len(StdMigrationSteps))
 	}
 
+	// Migrations whose spec is marked DirectCast are emitted as a single in-place
+	// ALTER ... TYPE statement instead of the multi-step rename. An interrupted
+	// rename (the temporary column already exists) must still finish via the rename
+	// path, otherwise the existing temporary column would be orphaned.
+	var directMigrations, renameMigrations []ColumnTypeMigration
+	for _, migration := range migrations {
+		if migration.DirectCast && !migration.ProgressColumnExists {
+			if dialect.DirectCastSQL == nil {
+				return nil, fmt.Errorf("migration spec for %q is marked DirectCast but dialect has no DirectCastSQL", migration.Field)
+			}
+			log.WithFields(log.Fields{
+				"table": table.Identifier,
+				"ddl":   migration.DDL,
+				"field": migration.Field,
+			}).Info("rendering query for column migration using direct cast")
+			directMigrations = append(directMigrations, migration)
+		} else {
+			renameMigrations = append(renameMigrations, migration)
+		}
+	}
+
+	var directStmts []string
+	if len(directMigrations) > 0 {
+		directStmts = dialect.DirectCastSQL(table, directMigrations)
+	}
+
 	var stepInstructions = make(map[int][]MigrationInstruction)
 
-	for _, migration := range migrations {
+	for _, migration := range renameMigrations {
 		var step = 0
 		if migration.ProgressColumnExists && migration.OriginalColumnExists {
 			step = 1
@@ -600,7 +644,7 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 		}
 	}
 
-	return renderedSteps, nil
+	return append(directStmts, renderedSteps...), nil
 }
 
 func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {

@@ -22,6 +22,11 @@ def create_job_status_response(
     job_id: str,
     status: str = "Job Completed",
     percent: int = 100,
+    error_code: int | None = None,
+    error_subcode: int | None = None,
+    error_message: str | None = None,
+    error_user_title: str | None = None,
+    error_user_msg: str | None = None,
 ) -> dict[str, Any]:
     """Create mock job status response.
 
@@ -29,15 +34,32 @@ def create_job_status_response(
         job_id: The job ID
         status: Job status string (e.g., "Job Completed", "Job Running", "Job Failed")
         percent: Completion percentage (0-100)
+        error_code: Facebook error code, returned on failed report runs
+        error_subcode: Facebook error subcode, which decides the retry/split remedy
+        error_message: Facebook's internal error message
+        error_user_title: Short reason shown in Ads Manager
+        error_user_msg: Long-form reason shown in Ads Manager
 
     Returns:
         {"id": job_id, "async_status": status, "async_percent_completion": percent}
+        plus any error fields provided.
     """
-    return {
+    response: dict[str, Any] = {
         "id": job_id,
         "async_status": status,
         "async_percent_completion": percent,
     }
+
+    optional_fields = {
+        "error_code": error_code,
+        "error_subcode": error_subcode,
+        "error_message": error_message,
+        "error_user_title": error_user_title,
+        "error_user_msg": error_user_msg,
+    }
+    response.update({k: v for k, v in optional_fields.items() if v is not None})
+
+    return response
 
 
 def create_insights_response(

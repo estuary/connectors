@@ -6,6 +6,7 @@ package connector
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/apache/iceberg-go"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -24,6 +25,9 @@ type mergeBoundsBuilder struct {
 
 	lower []any
 	upper []any
+	// unbounded marks key columns whose observed values can't be ordered,
+	// such as a date-time that doesn't parse.
+	unbounded []bool
 }
 
 func newMergeBoundsBuilder(keys []boilerplate.MappedProjection[mapped]) *mergeBoundsBuilder {
@@ -37,9 +41,20 @@ func (b *mergeBoundsBuilder) nextKey(key []any) {
 	if b.lower == nil {
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
+		b.unbounded = make([]bool, len(key))
 	}
 
 	for idx, k := range key {
+		if _, ok := b.keys[idx].Mapped.type_.(iceberg.TimestampTzType); ok {
+			// Date-time strings order by their instant, which text order
+			// doesn't follow across offsets and precisions.
+			if lower, upper, _, ok := sql.MinMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
+				b.lower[idx], b.upper[idx] = lower, upper
+			} else {
+				b.unbounded[idx] = true
+			}
+			continue
+		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
@@ -81,6 +96,13 @@ func maxKey(k1 any, k2 any) any {
 	}
 }
 
+// timestamptzLiteral renders a date-time bound in UTC at microsecond
+// precision. Spark casts this spelling, unlike some that parse as RFC3339, and
+// truncates stored values to microseconds the same way.
+func timestamptzLiteral(t time.Time) string {
+	return t.UTC().Truncate(time.Microsecond).Format("2006-01-02T15:04:05.000000Z07:00")
+}
+
 func (b *mergeBoundsBuilder) build() []mergeBound {
 	conditions := make([]mergeBound, len(b.lower))
 
@@ -89,6 +111,15 @@ func (b *mergeBoundsBuilder) build() []mergeBound {
 
 		switch p.Mapped.type_.(type) {
 		case iceberg.BooleanType, iceberg.BinaryType:
+			continue
+		case iceberg.TimestampTzType:
+			if b.unbounded[idx] {
+				continue
+			}
+			lower, _ := sql.ParseDatetime(b.lower[idx])
+			upper, _ := sql.ParseDatetime(b.upper[idx])
+			conditions[idx].LiteralLower = b.literaler(timestamptzLiteral(lower))
+			conditions[idx].LiteralUpper = b.literaler(timestamptzLiteral(upper))
 			continue
 		}
 
@@ -99,6 +130,7 @@ func (b *mergeBoundsBuilder) build() []mergeBound {
 	// Reset for tracking the next transaction.
 	b.lower = nil
 	b.upper = nil
+	b.unbounded = nil
 
 	return conditions
 }

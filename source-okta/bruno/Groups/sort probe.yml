@@ -1,0 +1,78 @@
+info:
+  name: sort probe
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?limit=200&search={{groups_search}}&sortBy=lastUpdated&sortOrder=asc"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: search
+      value: "{{groups_search}}"
+      type: query
+    - name: sortBy
+      value: lastUpdated
+      type: query
+    - name: sortOrder
+      value: asc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - nested window + watermark accepted, but unsorted and index-stamped lastUpdated (projection)
+    request:
+      url: "{{base_url}}/groups?limit=200&search=((lastUpdated gt \"2026-09-01T00:00:00.000Z\" and lastUpdated le \"2026-10-08T17:00:00.000Z\") or (lastMembershipUpdated gt \"2026-09-01T00:00:00.000Z\" and lastMembershipUpdated le \"2026-10-08T17:00:00.000Z\")) and lastUpdated gt \"2026-09-01T00:00:00.000Z\"&sortBy=lastUpdated&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00g176zmw9j1Wyxqf698", "type": "BUILT_IN", "lastUpdated": "2026-10-08T17:24:43.000Z", "lastMembershipUpdated": "2026-10-08T17:24:38.000Z" },
+            { "id": "00g176zmw9kqvHDny698", "type": "BUILT_IN", "lastUpdated": "2026-09-03T19:36:27.000Z", "lastMembershipUpdated": "2026-09-03T19:36:27.000Z" },
+            { "id": "00g18gur2rc3zz7MS698", "type": "OKTA_GROUP", "lastUpdated": "2026-10-07T14:37:17.000Z", "lastMembershipUpdated": "2026-10-07T14:37:12.000Z" },
+            { "id": "00g18h004ubJFvh3C698", "type": "OKTA_GROUP", "lastUpdated": "2026-10-07T16:26:52.000Z", "lastMembershipUpdated": "2026-10-07T16:26:48.000Z" }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all groups](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroups)
+
+  **WHY:** the sorted backfill's Groups request: the two-field window plus a
+  `lastUpdated` watermark, under `search` with `sortBy=lastUpdated`. It checks
+  that `search` accepts the nested and/or expression, sorts by `lastUpdated`,
+  and still admits groups that enter only through the `lastMembershipUpdated`
+  leg. Run with `--env-var groups_search=…`.
+
+  **LIMITATION (VERIFIED 2026-10-08): Groups `search` serves index documents,
+  not the primary record.** The expression was accepted (200), but:
+  - `lastUpdated` differs from `Groups / bare`, read minutes later. Everyone:
+    search 2026-10-08T17:24:43 vs. list 2026-09-03T19:36:27. Fixture
+    `00g18h004…`: 16:26:52 vs. 16:25:58. Members group: 14:37:17 vs. 14:36:50.
+    The index value sits a few seconds after the group's latest change of
+    *either* kind, so under `search` it moves on membership changes too, unlike
+    the documented field.
+  - `sortBy=lastUpdated` does **not** sort by the `lastUpdated` the body
+    returns: Everyone's index stamp (2026-10-08) would sort it last, yet it came
+    first. The rows are in the *list endpoint's* true `lastUpdated` order, which
+    for these 4 groups coincides with `created` and id order, so this probe
+    can't tell which key the sort really uses (`Groups / sort key probe`).
+    Corrected 2026-10-08: an earlier note here said the sort "was not applied".
+
+  Consequence: captured groups carry the index-stamped `lastUpdated`, not the
+  profile-only value `filter` returns. The connector reads both backfill and
+  incremental through `search`, so every copy of a group carries the same
+  kind of stamp.

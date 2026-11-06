@@ -53,7 +53,7 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
@@ -72,12 +72,15 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	// Compute backfill query and arguments list
-	query, args, err := backfill.BuildBackfillQuery(state, schema, table, columnTypes, db.config.Advanced.BackfillChunkSize)
+	query, args, err := backfill.BuildBackfillQuery(state, schema, table, columnTypes, db.config.Advanced.BackfillChunkSize, backfillFilter)
 	if err != nil {
 		return false, nil, err
 	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
+
+	// If this is the first chunk being backfilled from this table, log the query for debugging.
+	db.logBackfillQuery(streamID, query, args)
 
 	// Set up watchdog timer and run the query
 	var watchdogCtx, cancelWatchdog = context.WithCancel(ctx)

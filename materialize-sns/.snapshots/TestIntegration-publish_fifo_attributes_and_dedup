@@ -1,0 +1,34 @@
+{
+  "after_3_dup_publishes": {
+    "messages": [
+      {
+        "body": "{\"i\":\"dup\"}",
+        "message_group_id": "bc1bd331",
+        "message_deduplication_id": "e8a3639b3cfc84e46bd41f58454e3452b8c9f83e0b9543526265e5d610d91db7"
+      }
+    ],
+    "received_count": 1
+  },
+  "initial_publish": [
+    {
+      "body": "{\"i\":0,\"g\":\"a\"}",
+      "message_group_id": "bc1bd331",
+      "message_deduplication_id": "64b7f31a4ad294e505038237ec0713c3b948188490493b9a90fdaf6f241a590f"
+    },
+    {
+      "body": "{\"i\":1,\"g\":\"a\"}",
+      "message_group_id": "bc1bd331",
+      "message_deduplication_id": "b3997157525019abc958a044c23ef29e558b82734e9ff1a6322d3a071bd8114a"
+    },
+    {
+      "body": "{\"i\":2,\"g\":\"b\"}",
+      "message_group_id": "de22a098",
+      "message_deduplication_id": "d52486636e46a4af6a046b5b84abe5ec0c798e79a97cd49f684d7b08474db4ce"
+    },
+    {
+      "body": "{\"i\":3,\"g\":\"b\"}",
+      "message_group_id": "de22a098",
+      "message_deduplication_id": "0c6061b0891867f5d7a48f78ffb5a8bb2877da64d66fbc8d3aa48f95174581b4"
+    }
+  ]
+}

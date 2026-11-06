@@ -53,10 +53,36 @@
       ],
       "title": "EventInvitee",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "event_invitees"
     ]
   },
   {
@@ -113,70 +139,36 @@
       ],
       "title": "EventType",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/uri"
-    ]
-  },
-  {
-    "recommendedName": "groups",
-    "resourceConfig": {
-      "name": "groups",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "Group",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "event_types"
     ]
   },
   {
@@ -216,147 +208,40 @@
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
         }
       },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "OrganizationMembership",
+      "title": "BaseDocument",
       "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/_meta/row_id"
-    ]
-  },
-  {
-    "recommendedName": "routing_form_submissions",
-    "resourceConfig": {
-      "name": "routing_form_submissions",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
             }
-          },
-          "title": "Meta",
-          "type": "object"
+          }
         }
       },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
         }
-      },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "RoutingFormSubmission",
-      "type": "object",
-      "x-infer-schema": true
+      }
     },
     "key": [
       "/_meta/row_id"
-    ]
-  },
-  {
-    "recommendedName": "routing_forms",
-    "resourceConfig": {
-      "name": "routing_forms",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "description": "Document metadata"
-        },
-        "uri": {
-          "title": "Uri",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "uri",
-        "updated_at"
-      ],
-      "title": "RoutingForm",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "organization_memberships"
     ]
   },
   {
@@ -413,10 +298,36 @@
       ],
       "title": "ScheduledEvent",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/uri"
+    ],
+    "resourcePath": [
+      "scheduled_events"
     ]
   }
 ]

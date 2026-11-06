@@ -304,5 +304,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"temporaltypes_137023":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":10}}}
+{"bindingStateV1":{"temporaltypes_137023":{"DocumentCount":10,"LastPolled":"<TIMESTAMP>"}}}
 

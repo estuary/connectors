@@ -1,0 +1,11 @@
+# ================================
+# Collection "": 3 Documents
+# ================================
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-redelivery","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":2},"idx":0,"kind":"redelivered"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-redelivery","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":2},"idx":1,"kind":"redelivered"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-redelivery","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":2},"idx":2,"kind":"redelivered"}
+# ================================
+# Final State Checkpoint
+# ================================
+{}
+

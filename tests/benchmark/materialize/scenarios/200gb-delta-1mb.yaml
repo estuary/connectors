@@ -1,0 +1,193 @@
+# Delta-updates benchmark: forty transactions of 1 MB documents,
+# 200 GB in total, all fresh creates. Its counterpart at the other
+# document size is 200gb-delta-1kb.yaml.
+#
+# A delta-updates binding never reads the destination and never merges,
+# so every document is an append. That makes overlap fractions
+# meaningless here -- the update/delete knobs the 100gb-3tx-* family
+# varies only shape a merge, which this path does not run. The workload
+# is instead the shape a real delta task carries: an append-only stream
+# of events.
+#
+# On materialize-snowflake this is the only scenario shape that reaches
+# either Snowpipe Streaming write path. Both need a delta-updates
+# binding and key-pair authentication.
+collections:
+  - name: bench/delta_big_50
+    schema:
+      type: object
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+    resource:
+      table: delta_big_50
+      delta_updates: true
+
+transactions:
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+
+  - total_size: 5GB
+    doc_size:   1MB
+    op: c
+

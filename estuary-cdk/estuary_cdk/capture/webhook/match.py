@@ -5,17 +5,15 @@ import re
 from abc import abstractmethod
 from collections.abc import Sequence
 from logging import Logger
-from typing import Any, Literal, override
+from typing import Any, Literal, cast
+from typing_extensions import override
 
 from aiohttp import web
 from aiohttp.web_urldispatcher import DynamicResource
 from pydantic import BaseModel
 from pydantic.fields import Field
 
-from estuary_cdk.pydantic_polyfill import VERSION as _PYDANTIC_VERSION
-
 _BODY_KEY_REGEX = r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$"
-_REGEX_FIELD_KWARG = "pattern" if _PYDANTIC_VERSION == "v2" else "regex"
 
 # ------------------------------------------------------------------------------
 # Match types: concrete match rules used for routing incoming webhooks
@@ -61,7 +59,7 @@ class UrlMatch(MatchRule, frozen=True):
 
         return re.sub("[^a-zA-Z0-9]+", "_", self.value).strip("_")
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any):
         super().__init__(**data)
 
         if self.value != "*":
@@ -214,7 +212,7 @@ class HeaderMatch(_KeyValueMatch, frozen=True):
 
 class BodyMatch(_KeyValueMatch, frozen=True):
     type: Literal["body"] = "body"
-    key: str = Field(**{_REGEX_FIELD_KWARG: _BODY_KEY_REGEX})
+    key: str = Field(pattern=_BODY_KEY_REGEX)
 
     @override
     async def matches(
@@ -233,7 +231,7 @@ class BodyMatch(_KeyValueMatch, frozen=True):
             if not isinstance(parsed, dict):
                 raise ValueError(f"Invalid document type: {type(parsed)}")
 
-            raw_doc = parsed
+            raw_doc = cast(dict[str, Any], parsed)
 
         cursor: dict[str, Any] = raw_doc
         segments = self.key.split(".")
@@ -247,7 +245,7 @@ class BodyMatch(_KeyValueMatch, frozen=True):
                 )
                 return False
 
-            cursor = nested
+            cursor = cast(dict[str, Any], nested)
 
         value = cursor.get(segments[-1])
         if value is None:
@@ -300,7 +298,7 @@ class UrlDiscriminator(Discriminator, frozen=True):
     type: Literal["url"] = "url"
     known_values: set[str] = set()
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any):
         super().__init__(**data)
 
         for v in self.known_values:

@@ -1,0 +1,55 @@
+info:
+  name: Add Temp Schema Attribute
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{base_url}}/meta/schemas/user/default"
+  body:
+    type: json
+    data: |-
+      {
+        "definitions": {
+          "custom": {
+            "id": "#custom",
+            "type": "object",
+            "properties": {
+              "estuaryProbeTemp": {
+                "title": "Estuary probe (temporary)",
+                "description": "Throwaway attribute for the schema-deletion probe; removed by Seeding/Remove Temp Schema Attribute",
+                "type": "string",
+                "required": false
+              }
+            },
+            "required": []
+          }
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user schema](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Schema/#tag/Schema/operation/updateUserProfile)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`. It changes
+  the **org-wide default user schema**, so it uses a throwaway attribute and
+  never touches `estuarySeedCostCode`, which the snapshots session's probes
+  rely on.
+
+  **WHY:** defines `estuaryProbeTemp` so `Seeding / Set Temp Attribute Value`
+  can give the fixture user a value, which
+  `Seeding / Remove Temp Schema Attribute` then deletes at the schema level.
+  `POST` is a partial update; other properties are untouched.
+
+  **Cleanup:** `Seeding / Remove Temp Schema Attribute`.
+
+  **Outcome:** ran 2026-10-08 (schema `lastUpdated` 12:29:16); custom properties
+  became `estuaryProbeTemp, estuarySeedCostCode`. The fixture user's
+  `lastUpdated` was unchanged. Cleaned up by
+  `Seeding / Remove Temp Schema Attribute` the same day.

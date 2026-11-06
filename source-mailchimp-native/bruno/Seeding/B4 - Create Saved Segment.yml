@@ -1,0 +1,42 @@
+info:
+  name: B4 - Create Saved Segment
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/segments"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "estuary-test-saved-segment",
+        "options": {
+          "match": "all",
+          "conditions": [
+            {
+              "condition_type": "TextMerge",
+              "field": "FNAME",
+              "op": "contains",
+              "value": "Estuary"
+            }
+          ]
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segments/add-segment/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** creates a saved (condition-based) segment alongside the
+  sibling-seeded static one, so the segments stream observes both `type`
+  values, the offset probe has a second row, and `since_updated_at` has two
+  distinct updated_at values to discriminate between.

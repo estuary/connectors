@@ -1,0 +1,98 @@
+name: Docs / publish dispatch
+
+# Post-merge: tells estuary/docs to publish as soon as connector docs land on
+# main, instead of waiting out its hourly cron.
+#
+# estuary/docs owns docs.estuary.dev and pulls this repo's docs in through a git
+# submodule, so nothing merged here publishes itself. Its deploy runs on a
+# `15 * * * *` cron that advances the submodule, and observed drift on that
+# schedule is up to 34 minutes, so a connector doc change can sit unpublished
+# for over an hour. This dispatch brings that down to the length of one build,
+# measured at 2m57s.
+#
+# The receiving side is the `repository_dispatch` trigger on
+# estuary/docs .github/workflows/deploy-cloudflare.yml, listening for
+# `connector-docs-updated`. The hourly cron there stays as the backstop and
+# must not be removed on the strength of this workflow: a dispatch that never
+# arrives leaves no trace on the receiver, and the cron is what covers that.
+#
+# Requires the "estuary-docs-previews" GitHub App (PREVIEW_APP_ID repo variable
+# + PREVIEW_APP_PRIVATE_KEY secret, installed on both estuary/docs and
+# estuary/connectors). Without them the job skips rather than failing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # The two paths estuary/docs actually reads out of the submodule:
+      # aggregate-docs.sh rsyncs reference/Connectors/ into the site's content
+      # tree, and docusaurus.config.js reads redirects.yaml to build the
+      # connector redirect table. The rest of docs/ is internal engineering
+      # notes that publish nothing, so they should not spend a deploy.
+      - docs/reference/Connectors/**
+      - docs/redirects.yaml
+
+concurrency:
+  # Serialise on the branch, and do not cancel: each merge should result in a
+  # dispatch. Cancelling an in-flight dispatch to start a newer one risks
+  # dropping the only signal for a merge.
+  group: docs-publish-dispatch-main
+  cancel-in-progress: false
+
+# The job only ever uses the App-minted token, scoped to estuary/docs, so it
+# needs none of the ambient GITHUB_TOKEN's scope.
+permissions: {}
+
+jobs:
+  dispatch:
+    name: Dispatch publish to estuary/docs
+    # Skip rather than fail if the App configuration is ever removed. A missed
+    # dispatch degrades to the hourly cron; a red workflow on main does not.
+    if: vars.PREVIEW_APP_ID != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Mint token for estuary/docs
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PREVIEW_APP_ID }}
+          private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
+          owner: estuary
+          repositories: docs
+
+      - name: Dispatch publish to estuary/docs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # The receiver ignores client_payload; the SHA is carried so the
+          # dispatch is self-describing when reading the events API or
+          # working out which merge produced a given deploy.
+          gh api repos/estuary/docs/dispatches --input - <<EOF
+          {
+            "event_type": "connector-docs-updated",
+            "client_payload": {
+              "connectors_sha": "${SHA}"
+            }
+          }
+          EOF
+
+      - name: Note what to check
+        run: |
+          {
+            echo "### Publish dispatched"
+            echo
+            echo "Sent \`connector-docs-updated\` to \`estuary/docs\`."
+            echo
+            echo "A green result here means only that the API call returned 204."
+            echo "If \`estuary/docs\` has no matching \`repository_dispatch\`"
+            echo "trigger, the call still succeeds and nothing happens. Confirm"
+            echo "on the receiving side:"
+            echo
+            echo '```'
+            echo "gh run list --repo estuary/docs --workflow deploy-cloudflare.yml \\"
+            echo "  --limit 5 --json createdAt,event,conclusion"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

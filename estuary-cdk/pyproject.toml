@@ -1,42 +1,52 @@
-[tool.poetry]
+[project]
 name = "estuary_cdk"
-version = "0.2.0"
+version = "0.3.0"
 description = "Estuary Connector Development Kit"
-authors = ["Joseph Shearer <joseph@estuary.dev>", "Johnny Graettinger <johnny@estuary.dev>"]
+authors = [
+    { name = "Joseph Shearer", email = "joseph@estuary.dev" },
+    { name = "Johnny Graettinger", email = "johnny@estuary.dev" },
+]
+# The CDK is consumed outside this workspace -- source-netsuite lives in its
+# own repository, pins estuary-cdk, and runs on 3.11 -- so this floor is what
+# those consumers see, not what the workspace resolves to. Tested on 3.11,
+# 3.12, 3.13 and 3.14; see .github/workflows/python.yaml. The ceiling is
+# deliberately a major: too low a floor silently drops a consumer, but too low
+# a ceiling blocks one outright, with no opt-out, the day that release ships.
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "aiocsv>=1.3.2,<2.0.0",
+    "aiodns>=4.0.4,<5.0.0",
+    "aiohttp>=3.14.3,<4.0.0",
+    "orjson>=3.11.6,<4.0.0",
+    # 2.12 is the floor because shim_airbyte_cdk's model_json_schema
+    # override forwards `union_format`, which super() only accepts from
+    # 2.12 on. Lowering this makes the shim raise TypeError on spec.
+    "pydantic>=2.12,<3",
+    "xxhash>=4.0.2,<5.0.0",
+    "ijson>=3.3.0,<4.0.0",
+    "pycron>=3.1.2,<4.0.0",
+    "stream-unzip==0.0.101",
+    "typing-extensions>=4.13,<5.0",
+    "google-auth[requests]>=2.40.3",
+]
+
+[project.urls]
 homepage = "https://github.com/estuary/connectors/tree/main/estuary-cdk"
 
-[tool.poetry.dependencies]
-python = "^3.11"
+# The vendored Airbyte fork, built from `vendor/`; see vendor/README.md. Only
+# tests/test_airbyte_cdk.py needs it here -- the connectors still on the shim
+# depend on it directly. A group rather than an extra, because groups stay out
+# of wheel metadata: the published wheel must not name a distribution that
+# exists only in this workspace.
+[dependency-groups]
+airbyte-shim = ["estuary-cdk-airbyte-shim"]
 
-aiocsv = "^1.3.2"
-aiodns = "^3.1.1"
-aiohttp = "^3.13.4"
-orjson = "^3.11.6"
-pydantic = ">1.10,<3"
-xxhash = "^3.4.1"
-ijson = "^3.3.0"
-pycron = "^3.1.2"
-stream-unzip = "0.0.99"
+[tool.uv.sources]
+estuary-cdk-airbyte-shim = { workspace = true }
 
-google-auth = {version = ">=2.40.3", extras = ["requests"]}
-pendulum = "<=2.0.0 | >=3.0.0"
-
-airbyte-cdk = {version = "<=6.56.0", optional = true}
-
-[tool.poetry.extras]
-airbyte-shim = ["airbyte-cdk"]
-
-[tool.poetry.group.dev.dependencies]
-debugpy = "^1.8.0"
-mypy = "^1.8.0"
-pytest = "^7.4.3"
-pytest-insta = "^0.3.0"
-pytest-asyncio = "0.23.8"
-airbyte-cdk = "<=6.56.0"
-
-[tool.ruff]
-target-version = "py311"
+[tool.hatch.build.targets.wheel]
+packages = ["estuary_cdk"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

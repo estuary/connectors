@@ -196,7 +196,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			return nil, err
 		}
 
-		constraints := make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range b.Collection.Projections {
 
 			var constraint = new(pm.Response_Validated_Constraint)
@@ -218,12 +218,15 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 				constraint.Reason = "This field can be materializaed"
 			}
-			constraints[projection.Field] = constraint
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      projection.Field,
+				Constraint: constraint,
+			})
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: false,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          []string{cfg.Index, res.Namespace},
 		})
@@ -239,7 +242,11 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -269,6 +276,8 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 
 		bindings = append(bindings, binding{
 			conn:        conn,
+			collection:  b.Collection.Name.String(),
+			path:        b.ResourcePath,
 			dataHeaders: b.FieldSelection.AllFields(),
 		})
 	}
@@ -276,6 +285,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 	return &transactor{
 		openAiClient: cfg.openAiClient(),
 		bindings:     bindings,
+		be:           be,
 	}, &pm.Response_Opened{}, nil, nil
 }
 

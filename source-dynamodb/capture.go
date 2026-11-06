@@ -53,6 +53,10 @@ type capture struct {
 
 	listShardsLimiter *rate.Limiter
 	sem               *semaphore.Weighted
+
+	// idleBackoffMax is the endpoint's configured maximum wait between polls
+	// of an idle open stream shard.
+	idleBackoffMax time.Duration
 }
 
 func (c *capture) getSegmentState(sk boilerplate.StateKey, segment int) segmentState {

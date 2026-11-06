@@ -1,12 +1,10 @@
-package main
+package connector
 
 import (
 	"bytes"
 	"compress/gzip"
 	"context"
 	stdsql "database/sql"
-	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -18,14 +16,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 )
@@ -153,7 +149,27 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+// connectError maps a connection failure to a readable error.
+func connectError(err error, cfg config) error {
+	if pgErr, ok := errors.AsType[*pgconn.ConnectError](err); ok {
+		err = pgErr.Unwrap()
+		if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
+			err = fmt.Errorf("incorrect username or password")
+		} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
+			err = fmt.Errorf("database %q does not exist", cfg.Database)
+		} else if strings.Contains(errStr, "context deadline exceeded") {
+			errStr := `connection to host at address %q timed out, possible causes:
+				* Redshift endpoint is not set to be publicly accessible
+				* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
+				* the configured address is incorrect, possibly with an incorrect host or port
+				* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
+			err = fmt.Errorf(errStr, cfg.Address)
+		}
+	}
+	return err
+}
+
+func preReqs(ctx context.Context, cfg config, featureFlags map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := stdsql.Open("pgx", cfg.toURI())
@@ -169,31 +185,10 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	defer cancel()
 
 	if err := db.PingContext(pingCtx); err != nil {
-		// Provide a more user-friendly representation of some common error causes.
-		var pgErr *pgconn.ConnectError
-
-		if errors.As(err, &pgErr) {
-			err = pgErr.Unwrap()
-			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
-				err = fmt.Errorf("incorrect username or password")
-			} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
-				err = fmt.Errorf("database %q does not exist", cfg.Database)
-			} else if strings.Contains(errStr, "context deadline exceeded") {
-				errStr := `connection to host at address %q timed out, possible causes:
-					* Redshift endpoint is not set to be publicly accessible
-					* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
-					* the configured address is incorrect, possibly with an incorrect host or port
-					* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
-				err = fmt.Errorf(errStr, cfg.Address)
-			}
-		}
-
-		errs.Err(err)
+		errs.Err(connectError(err, cfg))
 	}
 
-	parsedFlags := common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-
-	s3client, err := cfg.toS3Client(ctx, parsedFlags)
+	s3client, err := cfg.toS3Client(ctx, featureFlags)
 	if err != nil {
 		// This is not caused by invalid S3 credentials, and would most likely be a logic error in
 		// the connector code.
@@ -204,13 +199,12 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
 	testKey := path.Join(cfg.effectiveBucketPath(), uuid.NewString())
 
-	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
-		if errors.As(err, &awsErr) {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
 			// exist but the configured credentials aren't authorized to write to it.
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
@@ -224,7 +218,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)
@@ -232,7 +226,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)
@@ -245,18 +239,9 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
-func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	if err := c.withDB(func(db *stdsql.DB) error {
-		var err error
-		fence, err = installFence(ctx, db, checkpoints, fence)
-		if err != nil {
-			return fmt.Errorf("installing fence: %w", err)
-		}
-		return nil
-	}); err != nil {
-		return sql.Fence{}, err
-	}
-
+// InstallFence is a no-op: the checkpoints table holds applied-transaction
+// tokens rather than a fence, and nothing reads the fence column.
+func (c *client) InstallFence(_ context.Context, _ sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return fence, nil
 }
 
@@ -298,40 +283,6 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 		return err
 	}); err != nil {
 		return nil, nil, err
-	}
-
-	// Checkpoint data is stored as base64(gzip(bytes)) in a VARBYTE column.
-	// snapshotTestTable queries VARBYTE values via FROM_VARBYTE(col, 'base64'),
-	// so the value already comes back as base64(utf8(base64(gzip(bytes)))).
-	// Unwrap that extra layer and the gzip wrapper to produce plain
-	// base64(bytes) for snapshot comparison.
-	for i, col := range columnNames {
-		if col != "checkpoint" {
-			continue
-		}
-		for _, row := range rows {
-			s, ok := row[i].(string)
-			if !ok || s == "" {
-				continue
-			}
-			// Base64 decode to get the UTF-8 bytes of the inner base64 string.
-			utf8Bytes, err := base64.StdEncoding.DecodeString(s)
-			if err != nil {
-				continue
-			}
-			// Base64 decode again to get the gzip-compressed bytes.
-			gzBytes, err := base64.StdEncoding.DecodeString(string(utf8Bytes))
-			if err != nil {
-				continue
-			}
-			// Decompress to get the original checkpoint bytes.
-			raw, err := maybeDecompressBytes(gzBytes)
-			if err != nil {
-				continue
-			}
-			// Re-encode as plain base64 for snapshot comparison.
-			row[i] = base64.StdEncoding.EncodeToString(raw)
-		}
 	}
 
 	return columnNames, rows, nil
@@ -409,6 +360,7 @@ func (c *client) withDB(fn func(*stdsql.DB) error) error {
 	return fn(db)
 }
 
+// compressBytes gzips b, matching the format decodeLegacyCheckpoint expects.
 func compressBytes(b []byte) ([]byte, error) {
 	var gzb bytes.Buffer
 	w := gzip.NewWriter(&gzb)
@@ -421,7 +373,7 @@ func compressBytes(b []byte) ([]byte, error) {
 }
 
 func maybeDecompressBytes(b []byte) ([]byte, error) {
-	if b[0] == 0x1f && b[1] == 0x8b { // Valid gzip header bytes
+	if len(b) >= 2 && b[0] == 0x1f && b[1] == 0x8b { // Valid gzip header bytes
 		var out bytes.Buffer
 		if r, err := gzip.NewReader(bytes.NewReader(b)); err != nil {
 			return nil, fmt.Errorf("decompressing bytes: %w", err)
@@ -435,139 +387,4 @@ func maybeDecompressBytes(b []byte) ([]byte, error) {
 		log.Info("loaded uncompressed bytes")
 		return b, nil
 	}
-}
-
-// installFence is a modified version of sql.StdInstallFence that handles
-// compression of the checkpoint and reading varbyte values from Redshift.
-func installFence(ctx context.Context, db *stdsql.DB, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	// TODO(whb): With the historical usage of sql.StdInstallFence, we were actually
-	// base64 encoding the checkpoint bytes and then sending that UTF8 string to
-	// Redshift, which stores those characters as bytes in the VARBYTE column. A
-	// slightly more direct & efficient way to handle this would be to store the
-	// bytes directly using TO_VARBYTE(checkpoint, 'base64'). This would require
-	// handling for the pre-existing checkpoints that were encoded in the previous
-	// way, and is not being implemented right now.
-	var txn, err = db.BeginTx(ctx, nil)
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("db.BeginTx: %w", err)
-	}
-	defer func() {
-		if txn != nil {
-			_ = txn.Rollback()
-		}
-	}()
-
-	// Increment the fence value of _any_ checkpoint which overlaps our key range.
-	if _, err = txn.Exec(
-		fmt.Sprintf(`
-			UPDATE %s
-				SET fence=fence+1
-				WHERE materialization=%s
-				AND key_end>=%s
-				AND key_begin<=%s
-			;
-			`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-	); err != nil {
-		return sql.Fence{}, fmt.Errorf("incrementing fence: %w", err)
-	}
-
-	// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
-	var readBegin, readEnd uint32
-	var checkpoint string
-
-	if err = txn.QueryRow(
-		fmt.Sprintf(`
-			SELECT fence, key_begin, key_end, checkpoint
-				FROM %s
-				WHERE materialization=%s
-				AND key_begin<=%s
-				AND key_end>=%s
-				ORDER BY key_end - key_begin ASC
-				LIMIT 1
-			;
-			`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpoint); err == stdsql.ErrNoRows {
-		// Set an invalid range, which compares as unequal to trigger an insertion below.
-		readBegin, readEnd = 1, 0
-	} else if err != nil {
-		return sql.Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if hexBytes, err := hex.DecodeString(checkpoint); err != nil {
-		return sql.Fence{}, fmt.Errorf("hex.DecodeString(checkpoint): %w", err)
-	} else if base64Bytes, err := base64.StdEncoding.DecodeString(string(hexBytes)); err != nil {
-		return sql.Fence{}, fmt.Errorf("base64.Decode(string(decompressed)): %w", err)
-	} else if fence.Checkpoint, err = maybeDecompressBytes(base64Bytes); err != nil {
-		return sql.Fence{}, fmt.Errorf("maybeDecompressBytes(fenceHexBytes): %w", err)
-	}
-
-	// If a checkpoint for this exact range doesn't exist then insert it now.
-	if readBegin == fence.KeyBegin && readEnd == fence.KeyEnd {
-		// Exists; no-op.
-	} else if compressedCheckpoint, err := compressBytes(fence.Checkpoint); err != nil {
-		return sql.Fence{}, fmt.Errorf("compressing checkpoint: %w", err)
-	} else if _, err = txn.Exec(
-		fmt.Sprintf(
-			"INSERT INTO %s (materialization, key_begin, key_end, fence, checkpoint) VALUES (%s, %s, %s, %s, %s);",
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-			checkpoints.Values[0].Placeholder,
-			checkpoints.Values[1].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-		fence.Fence,
-		base64.StdEncoding.EncodeToString(compressedCheckpoint),
-	); err != nil {
-		return sql.Fence{}, fmt.Errorf("inserting fence: %w", err)
-	}
-
-	err = txn.Commit()
-	txn = nil // Disable deferred rollback.
-
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("txn.Commit: %w", err)
-	}
-	return fence, nil
-}
-
-// updateFence updates a fence and reports if the materialization instance was
-// fenced off. It handles compression of the checkpoint, and is used instead of
-// the typical templated fence update query because of that.
-func updateFence(ctx context.Context, txn pgx.Tx, dialect sql.Dialect, fence sql.Fence) error {
-	if compressedCheckpoint, err := compressBytes(fence.Checkpoint); err != nil {
-		return fmt.Errorf("compressing checkpoint: %w", err)
-	} else if res, err := txn.Exec(ctx, fmt.Sprintf(
-		"UPDATE %s SET checkpoint = $1 WHERE materialization = $2 AND key_begin = $3 AND key_end = $4 AND fence = $5;",
-		dialect.Identifier(fence.TablePath...),
-	),
-		base64.StdEncoding.EncodeToString(compressedCheckpoint),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-		fence.Fence,
-	); err != nil {
-		return fmt.Errorf("fetching fence update rows: %w", err)
-	} else if res.RowsAffected() != 1 {
-		return fmt.Errorf("this instance was fenced off by another")
-	}
-
-	return nil
 }

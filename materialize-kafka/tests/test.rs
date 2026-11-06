@@ -47,13 +47,17 @@ async fn test_materialization() {
     ensure_services_up();
     drop_topics().await;
 
+    // The legacy task's configuration predates `avro_logical_types`, so it
+    // omits the field and keeps string-encoded date-times.
     for name in [
         "acmeCo/materialize-kafka/avro",
+        "acmeCo/materialize-kafka/avro-legacy",
         "acmeCo/materialize-kafka/json",
     ] {
         let output = std::process::Command::new("flowctl")
             .args([
-                "preview",
+                "raw",
+                "preview-next",
                 "--source",
                 "tests/test.flow.yaml",
                 "--fixture",

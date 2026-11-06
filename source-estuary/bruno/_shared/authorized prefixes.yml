@@ -1,0 +1,147 @@
+info:
+  name: authorized prefixes
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query AuthorizedPrefixes {\n  prefixes(by: { minCapability: read }) {\n    edges { node { prefix userCapability } }\n  }\n}",
+        "variables": {}
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — 15 prefixes, nested under Artificial-Industries/"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "prefixes": {
+                "edges": [
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/",
+                      "userCapability": "admin"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/databricks/",
+                      "userCapability": "admin"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Artificial-Industries/postgres-shipments/",
+                      "userCapability": "admin"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Dani/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Dave/",
+                      "userCapability": "admin"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "Jonathan_Wihl/",
+                      "userCapability": "admin"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "dani-demo/",
+                      "userCapability": "admin"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "demo/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "estuary/public/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops.us-central1.v1/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/private/estuary/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/private/solutions/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/dp/public/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/tasks/private/estuary/",
+                      "userCapability": "read"
+                    }
+                  },
+                  {
+                    "node": {
+                      "prefix": "ops/tasks/private/solutions/",
+                      "userCapability": "read"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [prefixes resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/prefixes.rs)
+
+  **WHY:** Every stream in the spec-graph cluster walks `liveSpecs(by: {prefix})`
+  once per configured prefix (or per authorized prefix when `prefixes` is empty).
+  Authorized prefixes can nest (`Artificial-Industries/` and
+  `Artificial-Industries/databricks/`); the connector must collapse nested
+  prefixes to their outermost ancestor before walking, or every spec under the
+  child is read twice.
+
+  **VERIFIED (2026-10-07):** 15 readable prefixes. `Artificial-Industries/` is listed alongside its children `Artificial-Industries/databricks/` and `Artificial-Industries/postgres-shipments/`, and `ops/` appears as several sibling sub-prefixes. **LIMITATION:** the empty-`prefixes` default must collapse nested prefixes to their outermost ancestor before walking `liveSpecs`.

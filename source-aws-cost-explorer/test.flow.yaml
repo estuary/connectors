@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-aws-cost-explorer:
+    endpoint:
+      local:
+        command:
+          - python
+          - -m
+          - source_aws_cost_explorer
+        config: config.yaml
+    bindings: []

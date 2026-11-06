@@ -369,27 +369,34 @@ func TestUnicodeText(t *testing.T) {
 	}
 
 	for idx, tc := range []struct {
-		Name    string
-		Options string
-		Inputs  []string
+		Name   string
+		Column string // The `data` column definition, e.g. "TEXT COLLATE latin1_swedish_ci".
+		Inputs []string
 	}{
-		{"latin1_swedish_ci", "COLLATE latin1_swedish_ci", latinTestStrings},                                    // Default in older MySQL and MariaDB releases
-		{"utf8mb4_0900_ai_ci", "COLLATE utf8mb4_0900_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in modern MySQL releases
-		{"utf8mb4_general_ci", "COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in Debian MariaDB
-		{"utf8mb3_general_ci", "COLLATE utf8mb3_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Testing 3-byte UTF-8 for completeness
-		{"ucs2_general_ci", "COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},       // Testing UCS-2 for completeness
+		{"latin1_swedish_ci", "TEXT COLLATE latin1_swedish_ci", latinTestStrings},                                    // Default in older MySQL and MariaDB releases
+		{"utf8mb4_0900_ai_ci", "TEXT COLLATE utf8mb4_0900_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in modern MySQL releases
+		{"utf8mb4_general_ci", "TEXT COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in Debian MariaDB
+		{"utf8mb3_general_ci", "TEXT COLLATE utf8mb3_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Testing 3-byte UTF-8 for completeness
+		{"ucs2_general_ci", "TEXT COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},       // Testing UCS-2 for completeness
 
 		// Testing binary charset/collation for completeness. Apparently what happens when you declare
 		// a column as `TEXT COLLATE binary` is that MySQL just gives you a `BLOB` column and then the
 		// bytes are the correct UTF-8 representation of the input text for both backfill and replication.
-		{"binary", "COLLATE binary", slices.Concat(latinTestStrings, otherTestStrings)},
+		{"binary", "TEXT COLLATE binary", slices.Concat(latinTestStrings, otherTestStrings)},
+
+		// CHAR/VARCHAR columns arrive via replication as a Go string rather than a byte slice.
+		// These cases exercise that path across UTF-8 and non-UTF-8 charsets.
+		{"latin1_varchar", "VARCHAR(255) COLLATE latin1_swedish_ci", latinTestStrings},
+		{"latin1_char", "CHAR(64) COLLATE latin1_swedish_ci", latinTestStrings},
+		{"ucs2_varchar", "VARCHAR(255) COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},
+		{"utf8mb4_varchar", "VARCHAR(255) COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},
 
 		// Default in MariaDB after v11.6.0. Cannot be tested against MySQL 8.4 but we have two other utf8mb4 charsets so that's okay.
-		// {"utf8mb4_uca1400_ai_ci", "COLLATE utf8mb4_uca1400_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)},
+		// {"utf8mb4_uca1400_ai_ci", "TEXT COLLATE utf8mb4_uca1400_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("78412948_%02d", idx)
-			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id INTEGER PRIMARY KEY, data TEXT %s)", tc.Options))
+			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id INTEGER PRIMARY KEY, data %s)", tc.Column))
 			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 			cs.Validator = &st.OrderedCaptureValidator{}
 
@@ -837,4 +844,53 @@ func TestSpatialTypes(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 
 	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// TestActivateStreamsBeforeCatchup re-backfills a binding with a backfill filter after
+// rows outside the filter were modified while the capture was stopped. Without the flag
+// those modifications are lost, since the re-backfilled binding is only activated after
+// the catch-up stream. With it they are replicated.
+func TestActivateStreamsBeforeCatchup(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		uniqueID string
+		flags    string
+	}{
+		{"Disabled", "31804127", ""},
+		{"Enabled", "89725316", "activate_streams_before_catchup"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var tb, ctx = mysqlTestBackend(t), context.Background()
+			var tableName = tb.CreateTable(ctx, t, tc.uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+			tb.Insert(ctx, t, tableName, [][]any{{1, "one"}, {2, "two"}, {3, "three"}, {4, "four"}})
+
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(tc.uniqueID))
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flags
+			cs.Validator = &st.OrderedCaptureValidator{}
+			sqlcapture.TestShutdownAfterCaughtUp = true
+			t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+			// Initial backfill
+			cs.Capture(ctx, t, nil)
+
+			// Changes to rows both inside and outside the upcoming backfill filter
+			tb.Update(ctx, t, tableName, "id", 1, "data", "one-updated")
+			tb.Update(ctx, t, tableName, "id", 3, "data", "three-updated")
+			tb.Insert(ctx, t, tableName, [][]any{{5, "five"}, {6, "six"}})
+			tb.Delete(ctx, t, tableName, "id", 4)
+
+			// Re-backfill with a filter, which gives the binding a new state key
+			var res sqlcapture.Resource
+			require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
+			res.Advanced = &sqlcapture.AdvancedResourceOptions{AdditionalBackfillFilter: "id <= 2"}
+			resJSON, err := json.Marshal(res)
+			require.NoError(t, err)
+			cs.Bindings[0].ResourceConfigJson = resJSON
+			cs.Bindings[0].StateKey += ".v1"
+			cs.Bindings[0].Backfill = 1
+			cs.Capture(ctx, t, nil)
+
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
 }

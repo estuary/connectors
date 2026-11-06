@@ -15,12 +15,109 @@ use schema_registry_converter::async_impl::schema_registry::SrSettings;
 use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
 use serde_json::json;
 
+// Waits in this file are bounded and named. An unbounded one does not fail the
+// job, it holds it until GitHub's six-hour ceiling, reporting nothing.
+
+/// Await `fut`, failing with `what` if it outlives `secs`.
+async fn deadline<F: std::future::Future>(what: &str, secs: u64, fut: F) -> F::Output {
+    match tokio::time::timeout(Duration::from_secs(secs), fut).await {
+        Ok(v) => v,
+        Err(_) => panic!("timed out after {secs}s waiting for: {what}"),
+    }
+}
+
+/// reqwest's default client has no timeout at all.
+fn http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .connect_timeout(Duration::from_secs(5))
+        .build()
+        .unwrap()
+}
+
+/// tests/test.flow.yaml, with the connector command rewritten to the binary
+/// cargo built for this run.
+///
+/// The checked-in `cargo run` would nest a second cargo inside `cargo test`,
+/// which resolves features differently and so rebuilds what the other just
+/// built, while holding target/debug/.cargo-lock. Generating beside the
+/// original keeps its relative `import:` valid.
+fn catalog() -> &'static str {
+    static PATH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    PATH.get_or_init(|| {
+        const GENERATED: &str = "tests/test.generated.flow.yaml";
+        let source = std::fs::read_to_string("tests/test.flow.yaml").unwrap();
+
+        let anchor = "        command:\n          - cargo\n          - run\n";
+        assert!(
+            source.contains(anchor),
+            "tests/test.flow.yaml no longer declares `cargo run` as the connector \
+             command; update catalog() to match",
+        );
+        let rewritten = source.replace(
+            anchor,
+            &format!(
+                "        command:\n          - {}\n",
+                env!("CARGO_BIN_EXE_source-kafka")
+            ),
+        );
+        std::fs::write(GENERATED, rewritten).unwrap();
+        GENERATED.to_string()
+    })
+}
+
+/// Run `program` under coreutils `timeout`, capturing output to files.
+///
+/// `timeout` bounds the child and signals its whole process group. Files rather
+/// than pipes because `Command::output` waits for EOF, not for exit, so a
+/// grandchild holding stderr blocks the read; flowctl spawns the connector, so
+/// grandchildren are the norm.
+fn bounded_command(what: &str, secs: u64, program: &str, args: &[&str]) -> std::process::Output {
+    let dir = std::env::temp_dir();
+    let stem = uuid::Uuid::new_v4();
+    let (out_path, err_path) = (
+        dir.join(format!("kafka-test-{stem}.out")),
+        dir.join(format!("kafka-test-{stem}.err")),
+    );
+    let out_file = std::fs::File::create(&out_path).unwrap();
+    let err_file = std::fs::File::create(&err_path).unwrap();
+
+    let status = Command::new("timeout")
+        .args(["--signal=TERM", "--kill-after=10", &secs.to_string(), program])
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(out_file))
+        .stderr(Stdio::from(err_file))
+        .spawn()
+        .unwrap_or_else(|e| panic!("failed to spawn {program} for {what}: {e}"))
+        .wait()
+        .unwrap_or_else(|e| panic!("failed to wait for {program} during {what}: {e}"));
+
+    let stdout = std::fs::read(&out_path).unwrap();
+    let stderr = std::fs::read(&err_path).unwrap();
+    let _ = std::fs::remove_file(&out_path);
+    let _ = std::fs::remove_file(&err_path);
+
+    // `timeout` exits 124 when it had to fire.
+    if status.code() == Some(124) {
+        panic!(
+            "`{program}` exceeded {secs}s during {what}\n--- stderr ---\n{}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+
+    std::process::Output { status, stdout, stderr }
+}
+
 #[test]
+#[serial_test::serial]
 fn test_spec() {
-    let output = std::process::Command::new("flowctl")
-        .args(["raw", "spec", "--source", "tests/test.flow.yaml"])
-        .output()
-        .unwrap();
+    let output = bounded_command(
+        "test_spec: flowctl raw spec",
+        120,
+        "flowctl",
+        &["raw", "spec", "--source", catalog()],
+    );
 
     assert!(output.status.success());
     let got: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
@@ -32,20 +129,22 @@ fn test_spec() {
 async fn test_discover() {
     setup_test().await;
 
-    let output = std::process::Command::new("flowctl")
-        .args([
+    let output = bounded_command(
+        "test_discover: flowctl raw discover",
+        300,
+        "flowctl",
+        &[
             "--profile",
             "local",
             "raw",
             "discover",
             "--source",
-            "tests/test.flow.yaml",
+            catalog(),
             "-o",
             "json",
             "--emit-raw",
-        ])
-        .output()
-        .unwrap();
+        ],
+    );
 
     assert!(output.status.success());
 
@@ -65,21 +164,24 @@ async fn test_discover() {
 async fn test_capture() {
     setup_test().await;
 
-    let output = std::process::Command::new("flowctl")
-        .args([
+    let output = bounded_command(
+        "test_capture: flowctl raw preview-next",
+        300,
+        "flowctl",
+        &[
             "--profile",
             "local",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
-            "tests/test.flow.yaml",
+            catalog(),
             "--sessions",
             "1",
             "--delay",
             "2s",
             "--output-state",
-        ])
-        .output()
-        .unwrap();
+        ],
+    );
 
     println!("{}", std::str::from_utf8(&output.stderr).unwrap());
 
@@ -126,27 +228,37 @@ async fn test_capture_resume() {
             "1": 1,
             "2": 1
           }
+        },
+        "protobuf-wkt-topic": {
+          "partitions": {
+            "1": 1,
+            "2": 1
+          }
         }
       }
     });
 
-    let output = std::process::Command::new("flowctl")
-        .args([
+    let initial_state = initial_state.to_string();
+    let output = bounded_command(
+        "test_capture_resume: flowctl raw preview-next",
+        300,
+        "flowctl",
+        &[
             "--profile",
             "local",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
-            "tests/test.flow.yaml",
+            catalog(),
             "--sessions",
             "1",
             "--delay",
             "2s",
             "--output-state",
             "--initial-state",
-            &initial_state.to_string(),
-        ])
-        .output()
-        .unwrap();
+            &initial_state,
+        ],
+    );
 
     assert!(output.status.success());
 
@@ -178,7 +290,7 @@ async fn setup_test() {
         (&JsonRawTestDataEncoder::new(), "json-raw-topic"),
     ];
 
-    let http = reqwest::Client::default();
+    let http = http_client();
 
     let admin: AdminClient<_> = ClientConfig::new()
         .set("bootstrap.servers", bootstrap_servers)
@@ -304,6 +416,24 @@ async fn setup_test() {
         &producer,
     )
     .await;
+
+    // Protobuf schema importing a google well-known type (timestamp.proto).
+    // Regression test for the DescriptorPool well-known types fix.
+    setup_protobuf_wkt_test(
+        &admin,
+        &opts,
+        &http,
+        schema_registry_endpoint,
+        num_messages,
+        num_partitions,
+        topic_replication,
+        &producer,
+    )
+    .await;
+
+    // Avro schema with references (unsupported). Regression test for discovery
+    // resilience: one unsupported schema must not fail discovery of the others.
+    setup_avro_ref_test(&admin, &opts, &http, schema_registry_endpoint, num_partitions, topic_replication).await;
 }
 
 async fn setup_protobuf_test(
@@ -399,21 +529,28 @@ async fn setup_protobuf_test(
     // The Confluent producer registered schemas with the temp topic name.
     // Retry in a loop since the producer may not have registered schemas yet.
     for suffix in ["key", "value"] {
-        let schema_resp = loop {
-            let resp = http
-                .get(format!(
-                    "{}/subjects/{}-{}/versions/latest",
-                    schema_registry_endpoint, temp_topic, suffix
-                ))
-                .send()
-                .await
-                .unwrap();
+        let schema_resp = deadline(
+            &format!("schema registry to publish {temp_topic}-{suffix}"),
+            60,
+            async {
+                loop {
+                    let resp = http
+                        .get(format!(
+                            "{}/subjects/{}-{}/versions/latest",
+                            schema_registry_endpoint, temp_topic, suffix
+                        ))
+                        .send()
+                        .await
+                        .unwrap();
 
-            if resp.status().is_success() {
-                break resp.json::<serde_json::Value>().await.unwrap();
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        };
+                    if resp.status().is_success() {
+                        break resp.json::<serde_json::Value>().await.unwrap();
+                    }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            },
+        )
+        .await;
 
         let schema = schema_resp["schema"].as_str().unwrap();
 
@@ -485,8 +622,12 @@ fn produce_to_temp_topic(enc: &ProtobufTestDataEncoder, temp_topic: &str, num_me
     let key_schema = enc.key_schema_string().replace('\n', " ");
     let value_schema = enc.payload_schema_string().replace('\n', " ");
 
-    let mut child = Command::new("docker")
+    let mut child = Command::new("timeout")
         .args([
+            "--signal=TERM",
+            "--kill-after=10",
+            "120",
+            "docker",
             "exec",
             "-i",
             "schema-registry",
@@ -522,6 +663,13 @@ fn produce_to_temp_topic(enc: &ProtobufTestDataEncoder, temp_topic: &str, num_me
         .wait_with_output()
         .expect("failed to wait for producer");
 
+    if output.status.code() == Some(124) {
+        panic!(
+            "kafka-protobuf-console-producer exceeded 120s producing to {temp_topic}\n\
+             --- stderr ---\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
     if !output.status.success() {
         panic!(
             "kafka-protobuf-console-producer failed: {}",
@@ -695,6 +843,252 @@ async fn setup_protobuf_ref_test(
     }
 }
 
+async fn setup_protobuf_wkt_test(
+    admin: &AdminClient<rdkafka::client::DefaultClientContext>,
+    opts: &AdminOptions,
+    http: &reqwest::Client,
+    schema_registry_endpoint: &str,
+    num_messages: usize,
+    num_partitions: i32,
+    topic_replication: i32,
+    producer: &FutureProducer,
+) {
+    let topic = "protobuf-wkt-topic";
+
+    // Delete and recreate the topic.
+    admin.delete_topics(&[topic], opts).await.unwrap();
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                topic,
+                num_partitions,
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete existing schemas for the topic.
+    for suffix in ["key", "value"] {
+        http.delete(format!(
+            "{}/subjects/{}-{}",
+            schema_registry_endpoint, topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "{}/subjects/{}-{}?permanent=true",
+            schema_registry_endpoint, topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Register a simple key schema (no references).
+    let key_schema = r#"syntax = "proto3"; message WktKey { int32 idx = 1; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-key/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({"schema": key_schema, "schemaType": "PROTOBUF"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register wkt key schema: {:?}",
+        resp.text().await
+    );
+
+    // Value schema imports the google well-known Timestamp type, resolved
+    // natively rather than via a Schema Registry reference.
+    let value_schema = r#"syntax = "proto3"; import "google/protobuf/timestamp.proto"; message WktValue { string value = 1; google.protobuf.Timestamp ts = 2; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-value/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({"schema": value_schema, "schemaType": "PROTOBUF"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register wkt value schema: {:?}",
+        resp.text().await
+    );
+
+    // Get the assigned schema IDs.
+    let key_info: serde_json::Value = http
+        .get(format!(
+            "{}/subjects/{}-key/versions/latest",
+            schema_registry_endpoint, topic
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let key_schema_id = key_info["id"].as_u64().unwrap() as u32;
+
+    let value_info: serde_json::Value = http
+        .get(format!(
+            "{}/subjects/{}-value/versions/latest",
+            schema_registry_endpoint, topic
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let value_schema_id = value_info["id"].as_u64().unwrap() as u32;
+
+    // Produce messages with manually constructed Confluent wire-format bytes.
+    for idx in 0..num_messages {
+        let key = encode_confluent_protobuf(key_schema_id, &encode_ref_key(idx as i32));
+        let value = encode_confluent_protobuf(value_schema_id, &encode_wkt_value(idx));
+        send_message(topic, &key, Some(&value), idx, num_partitions, producer).await;
+    }
+
+    // Produce tombstone (deletion) records.
+    for idx in 0..num_partitions {
+        let key = encode_confluent_protobuf(key_schema_id, &encode_ref_key(idx));
+        send_message(
+            topic,
+            &key,
+            None::<&[u8]>,
+            idx as usize,
+            num_partitions,
+            producer,
+        )
+        .await;
+    }
+}
+
+async fn setup_avro_ref_test(
+    admin: &AdminClient<rdkafka::client::DefaultClientContext>,
+    opts: &AdminOptions,
+    http: &reqwest::Client,
+    schema_registry_endpoint: &str,
+    num_partitions: i32,
+    topic_replication: i32,
+) {
+    let topic = "avro-ref-topic";
+
+    // Delete and recreate the topic.
+    admin.delete_topics(&[topic], opts).await.unwrap();
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                topic,
+                num_partitions,
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete existing schemas for the topic value and the shared subject.
+    for subject in [format!("{}-value", topic), "avro-ref-common".to_string()] {
+        http.delete(format!("{}/subjects/{}", schema_registry_endpoint, subject))
+            .send()
+            .await
+            .unwrap();
+        http.delete(format!(
+            "{}/subjects/{}?permanent=true",
+            schema_registry_endpoint, subject
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Register a shared/common Avro record as its own subject.
+    let common_schema = r#"{"type":"record","name":"Common","namespace":"acme","fields":[{"name":"common_field","type":"string"}]}"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/avro-ref-common/versions",
+            schema_registry_endpoint
+        ))
+        .json(&json!({"schema": common_schema, "schemaType": "AVRO"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register common avro schema: {:?}",
+        resp.text().await
+    );
+
+    // Register the topic value schema WITH an Avro reference to the common schema.
+    // The connector does not support Avro references and will error fetching this
+    // schema; discovery must remain resilient and still surface the topic.
+    let value_schema = r#"{"type":"record","name":"AvroRefValue","namespace":"acme","fields":[{"name":"common","type":"acme.Common"},{"name":"value","type":"string"}]}"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-value/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({
+            "schema": value_schema,
+            "schemaType": "AVRO",
+            "references": [{
+                "name": "acme.Common",
+                "subject": "avro-ref-common",
+                "version": 1
+            }]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register avro value schema with references: {:?}",
+        resp.text().await
+    );
+
+    // Intentionally produce no messages: this case exercises discovery resilience only.
+}
+
+/// Encode WktValue { value: "value-N", ts: google.protobuf.Timestamp { seconds } }
+/// as raw protobuf bytes.
+fn encode_wkt_value(idx: usize) -> Vec<u8> {
+    let value_str = format!("value-{}", idx);
+    // Deterministic, non-zero seconds so the Timestamp serializes to a stable RFC3339.
+    let seconds = ((idx + 1) * 86_400) as u64;
+
+    // Inner google.protobuf.Timestamp { seconds = <n> } (field 1, varint).
+    let mut inner = Vec::new();
+    inner.push(0x08);
+    encode_unsigned_varint(seconds, &mut inner);
+
+    let mut buf = Vec::new();
+    // Field 1: string value (length-delimited).
+    buf.push(0x0A);
+    encode_unsigned_varint(value_str.len() as u64, &mut buf);
+    buf.extend_from_slice(value_str.as_bytes());
+    // Field 2: Timestamp message (length-delimited).
+    buf.push(0x12);
+    encode_unsigned_varint(inner.len() as u64, &mut buf);
+    buf.extend_from_slice(&inner);
+
+    buf
+}
+
 /// Wrap protobuf bytes in Confluent wire format:
 /// [magic:0x00][schema_id:4 bytes BE][msg_index_array_len:0x00][proto_bytes]
 fn encode_confluent_protobuf(schema_id: u32, proto_bytes: &[u8]) -> Vec<u8> {
@@ -778,7 +1172,12 @@ async fn send_message<K, P>(
         rec = rec.payload(payload);
     }
 
-    producer.send(rec, None).await.unwrap();
+    // `None` here would be rdkafka's `Timeout::Never`: an unbounded block when
+    // the producer queue is full.
+    producer
+        .send(rec, Duration::from_secs(30))
+        .await
+        .expect("producing test message");
 }
 
 fn unix_millis_fixture(idx: usize) -> i64 {

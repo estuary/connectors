@@ -23,6 +23,9 @@ async def fetch_forms(
 
     input: dict[str, Any] = {
         "limit": 500,
+        # HubSpot defaults to formTypes=hubspot, so we have
+        # to explicitly ask for all formTypes.
+        "formTypes": "all",
     }
 
     while True:

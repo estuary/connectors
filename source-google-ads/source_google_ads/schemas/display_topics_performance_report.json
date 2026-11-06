@@ -66,7 +66,7 @@
     "metrics.average_cpm": {
       "type": ["null", "number"]
     },
-    "metrics.average_cpv": {
+    "metrics.trueview_average_cpv": {
       "type": ["null", "number"]
     },
     "ad_group.base_ad_group": {
@@ -238,10 +238,10 @@
     "metrics.video_quartile_p75_rate": {
       "type": ["null", "number"]
     },
-    "metrics.video_view_rate": {
+    "metrics.video_trueview_view_rate": {
       "type": ["null", "number"]
     },
-    "metrics.video_views": {
+    "metrics.video_trueview_views": {
       "type": ["null", "integer"]
     },
     "metrics.view_through_conversions": {

@@ -1,0 +1,46 @@
+info:
+  name: A3 - Create Interest
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/interest-categories/{{interest_category_id}}/interests"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary Test Interest"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // {{interest_category_id}} normally arrives as a runtime var captured by
+        // "A1 - Create Interest Category A"'s post-response script. Fail loudly if
+        // neither that var nor a real pinned env value is available.
+        const v = bru.getVar('interest_category_id') ?? bru.getEnvVar('interest_category_id');
+        if (!v || String(v).startsWith('PIN_FROM_')) {
+          throw new Error(
+            'interest_category_id not set — run "A1 - Create Interest Category A" first '
+            + 'in this session, or pin the env var to a real category id',
+          );
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/interests/add-interest-in-category/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** creates one interest inside {{interest_category_id}}, so the
+  Interests read probe can observe a populated response. Run AFTER "A1 - Create
+  Interest Category A" in the same session (its post-response script captures
+  the id); out-of-session, pin the env var to a real category id first.

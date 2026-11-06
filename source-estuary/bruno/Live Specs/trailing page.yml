@@ -1,0 +1,63 @@
+info:
+  name: trailing page
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query LiveSpecsTrailing($prefix: Prefix!, $after: String!) {\n  liveSpecs(by: { prefix: $prefix }, first: 50, after: $after) {\n    pageInfo { hasNextPage endCursor }\n    edges { node { catalogName } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}",
+          "after": "{{ls_end_cursor}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — empty trailing page"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": null
+                },
+                "edges": []
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [liveSpecs resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/live_spec_refs.rs)
+
+  **WHY:** The continuation page after an exact-multiple page. It should be empty
+  with `hasNextPage: false`. The `after` cursor is a plain catalog name compared
+  with `catalog_name > $after`, so it is derived and stable (it is not an opaque
+  token).
+
+  Run `Live Specs / exact multiple page` first.
+
+  **VERIFIED (2026-10-07):** `edges: []`, `hasNextPage: false`, `endCursor: null`. Terminate on `hasNextPage == false`. An empty page is normal, not an error. Don't read `endCursor` from an empty page (it is null).

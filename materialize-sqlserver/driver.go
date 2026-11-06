@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -11,9 +11,12 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -28,10 +31,11 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type AuthType string
@@ -94,8 +98,8 @@ type tunnelConfig struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // config represents the endpoint configuration for sql server.
@@ -104,8 +108,8 @@ type config struct {
 	User        string             `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password    string             `json:"password" jsonschema:"-" jsonschema_extras:"secret=true,order=2"`
 	Database    string             `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
-	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table" jsonschema_extras:"order=4"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5,nonsensitive=true"`
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default,order=6"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
@@ -147,7 +151,7 @@ func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -241,7 +245,7 @@ func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 }
 
 // Validate the resource configuration.
@@ -270,7 +274,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-func newSqlServerDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlserver",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -318,6 +322,15 @@ func newSqlServerDriver() *sql.Driver[config, tableConfig] {
 
 			db := stdsql.OpenDB(connector)
 			defer db.Close()
+
+			// sql.OpenDB does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
 
 			collation, err := getCollation(ctx, db)
 			if err != nil {
@@ -371,6 +384,12 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -391,8 +410,17 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
+		if err := boilerplate.RequireSingleShard(open); err != nil {
+			return nil, err
+		}
+
 		var cfg = ep.Config
-		var d = &transactor{templates: templates, cfg: cfg, be: be}
+		var d = &transactor{
+			templates:             templates,
+			cfg:                   cfg,
+			be:                    be,
+			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+		}
 		d.store.fence = fence
 
 		connector, err := ep.Config.ToSQLConnector(ctx)
@@ -411,7 +439,7 @@ func prepareNewTransactor(
 		}
 
 		for _, binding := range bindings {
-			if err := d.addBinding(ctx, binding, featureFlags); err != nil {
+			if err := d.addBinding(ctx, binding, is); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -436,6 +464,7 @@ type binding struct {
 	// will always be false
 	needsMerge bool
 	hasData    bool
+	staged     int64 // rows bulk-copied into the store table this round
 
 	createLoadTableSQL string
 	loadQuerySQL       string
@@ -450,10 +479,15 @@ type binding struct {
 	tempStoreTruncate   string
 	mergeInto           string
 	directCopy          string
+
+	// truncateSQL deletes the rows published before a boundary. It is empty
+	// when truncateReason states why the table cannot be truncated.
+	truncateSQL    string
+	truncateReason error
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFlags map[string]bool) error {
-	var b = &binding{target: target, nullFieldsToStrip: target.NullableFieldsToStrip()}
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
+	var b = &binding{target: target, nullFieldsToStrip: target.NullablePropertiesToStrip()}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
@@ -486,6 +520,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 		}
 	}
 
+	if col, err := target.PublishedAtColumn(); err != nil {
+		b.truncateReason = err
+	} else {
+		b.truncateReason = addTruncation(b, col, is)
+	}
+
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
@@ -502,8 +542,57 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+// addTruncation prepares b to delete the rows whose col is earlier than a
+// boundary, compared in the type that col has in the table. It returns why b
+// cannot be truncated, as a clause suited for an operator.
+func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) error {
+	var res = is.GetResource(b.target.Path)
+	if res == nil {
+		return fmt.Errorf("table %s was not found in the database", b.target.Identifier)
+	}
+	var existing = res.GetField(col.Field)
+	if existing == nil {
+		return fmt.Errorf("column %s was not found in the table", col.Identifier)
+	}
+	meta, ok := existing.Meta.(datetimeFieldMeta)
+	if !ok {
+		return fmt.Errorf("column %s is not a DATETIME, DATETIME2 or SMALLDATETIME", col.Identifier)
+	}
+
+	// Stored values reach col by conversion from a DATETIME2(7), so the
+	// boundary takes the same conversion. It rounds monotonically, so a row
+	// published at or after the boundary never compares below it.
+	b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < CAST(CAST(@p1 AS DATETIME2(7)) AS %s);", b.target.Identifier, col.Identifier, meta.ddl)
+	return nil
+}
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -634,6 +723,24 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// memory use
 	var lastBinding = -1
 
+	// Finishing a bulk insert reports the rows it copied.
+	finishBatch := func(idx int) error {
+		batch, ok := batches[idx]
+		if !ok {
+			return nil
+		}
+		var b = d.bindings[idx]
+		if res, err := batch.ExecContext(ctx); err != nil {
+			return fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+		} else if n, err := res.RowsAffected(); err == nil {
+			b.staged += n
+		}
+		return nil
+	}
+
+	round := it.Round
+	var truncations = d.truncations
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		if lastBinding == -1 {
@@ -643,11 +750,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// The last binding is fully processed for this RPC now, we can drain its
 		// remaining batches
 		if lastBinding != it.Binding {
-			if batch, ok := batches[lastBinding]; ok {
-				var b = d.bindings[lastBinding]
-				if _, err := batch.ExecContext(ctx); err != nil {
-					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
-				}
+			if err := finishBatch(lastBinding); err != nil {
+				return nil, err
 			}
 			lastBinding = it.Binding
 		}
@@ -688,76 +792,97 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	if lastBinding != -1 {
-		if batch, ok := batches[lastBinding]; ok {
-			if _, err := batch.ExecContext(ctx); err != nil {
-				return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
-			}
+		if err := finishBatch(lastBinding); err != nil {
+			return nil, err
 		}
 	}
 
 	defuser.Defuse()
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			defer txn.Rollback()
+		defer txn.Rollback()
 
-			for _, b := range d.bindings {
-				if !b.hasData {
-					continue
-				}
+		for i, b := range d.bindings {
+			var boundary, truncate = truncations[i]
+			if !b.hasData && !truncate {
+				continue
+			}
 
-				d.be.StartedResourceCommit(b.target.Path)
+			d.be.StartedResourceCommit(b.target.Path)
+			var stats, report = m.TotalRowStats(0), truncate
+			if b.hasData {
+				// A single-statement batch, so RowsAffected is the target rows
+				// this statement touched; MERGE counts every clause that fired.
+				stmt, what := b.directCopy, "direct insert"
 				if b.needsMerge {
-					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
-						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
-					}
-				} else {
-					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
-						return fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
-					}
+					stmt, what = b.mergeInto, "merge"
+				}
+				if res, err := txn.ExecContext(ctx, stmt); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("store batch %s on %q: %w", what, b.target.Identifier, err))
+				} else if n, err := res.RowsAffected(); err == nil {
+					stats, report = m.TotalRowStats(n).WithStaged(b.staged), true
 				}
 
-				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
-					return fmt.Errorf("truncating store table: %w", err)
+				if _, err := txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating store table: %w", err))
 				}
-				d.be.FinishedResourceCommit(b.target.Path)
-
-				// reset the value for next transaction
-				b.needsMerge = false
-				b.hasData = false
 			}
 
-			var err error
-			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+			// The truncation follows the binding's stores, so it removes only
+			// the rows they did not rewrite.
+			if truncate {
+				// The boundary is bound in UTC, because a cast to DATETIME2
+				// keeps the wall-clock time of its offset.
+				var n int64
+				if res, err := txn.ExecContext(ctx, b.truncateSQL, boundary.UTC()); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+				} else if n, err = res.RowsAffected(); err != nil {
+					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill (rows affected): %w", b.target.Identifier, err))
+				}
+				stats = stats.WithTruncated(n)
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"deleted":  n,
+				}).Info("truncated rows published before the backfill")
 			}
-
-			var fenceUpdate strings.Builder
-			if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
+			if report {
+				d.be.ReportRowStats(round, b.target.Path, stats)
 			}
+			d.be.FinishedResourceCommit(b.target.Path)
 
-			if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
-			} else if rowsAffected, err := results.RowsAffected(); err != nil {
-				return fmt.Errorf("updating flow checkpoint (rows affected): %w", err)
-			} else if rowsAffected < 1 {
-				return fmt.Errorf("This instance was fenced off by another")
-			}
+			// reset the value for next transaction
+			b.needsMerge = false
+			b.hasData = false
+			b.staged = 0
+		}
 
-			if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
-			}
+		var err error
+		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
 
-			return nil
-		})
+		var fenceUpdate strings.Builder
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+		}
+
+		if results, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
+		} else if rowsAffected, err := results.RowsAffected(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint (rows affected): %w", err))
+		} else if rowsAffected < 1 {
+			return nil, m.FinishedOperation(fmt.Errorf("This instance was fenced off by another"))
+		}
+
+		if err := txn.Commit(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("committing Store transaction: %w", err))
+		}
+
+		return nil, nil
 	}, nil
 }
 
 func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
-}
-
-func main() {
-	boilerplate.RunMain(newSqlServerDriver())
 }

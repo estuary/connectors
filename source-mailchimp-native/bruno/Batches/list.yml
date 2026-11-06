@@ -1,0 +1,82 @@
+info:
+  name: list
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/batches?count=10"
+  params:
+    - name: count
+      value: "10"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - account has never run a batch (empty list)
+    request:
+      url: "{{base_url}}/batches?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "batches": [],
+            "total_items": 0,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [List batch requests](https://mailchimp.com/developer/marketing/api/batches/list-batch-requests/)
+
+  **WHY:** read-only. Documents the Batch Operations API, EVALUATED AND REJECTED
+  for this connector — this doc is the canonical record of that rejection. Kept
+  here so the contrast with our gated-incremental solution is legible from the
+  collection itself.
+
+  **How the batch flow differs from ours:**
+  - You `POST /batches` a *list of sub-requests* (e.g. one
+    `GET /reports/{id}/email-activity` per campaign), get back a batch `id`,
+    then poll `GET /batches/{id}` until `status: finished`.
+  - The result is NOT inline JSON: `response_body_url` points at a **gzipped
+    tar archive of JSON files**, one per sub-request, that you download and
+    unpack. URL valid ~10 min; results expire after 7 days.
+  - Account cap: 500 pending batches; no completion SLA.
+
+  **Why it was rejected (v1):**
+  1. Throughput is abysmal at scale: online sources that use batch for this
+     exact endpoint report Mailchimp completing only on the order of tens of
+     email-activity export batch operations per day.
+  2. State-mutating by construction: every poll `POST`s provider-side state
+     against the shared 500-pending quota — unverifiable without user-run
+     requests, unexercisable in CI.
+  3. Opaque, expiring resumption state: results last 7 days and any
+     `response_body_url` only ~10 min — checkpointing provider-GC'd tokens is a
+  latent data-loss bug.
+  4. No completion SLA, and a second polling state machine beside the capture's
+     own cursor.
+  5. Result plumbing: no CDK streaming tar+gzip path — bespoke machinery for
+     one stream.
+
+  The one point in its favor: batched GETs without a `count` param auto-page
+  the entire collection, so one op per campaign covers pagination for free.
+  Outweighed by all of the above.
+
+  **VERIFIED (2026-07-13):** first observed empty (`{"batches": [],
+  "total_items": 0}` — saved example below). After the `Seeding/F1` batch was
+  submitted, the list returned that one batch; its per-object shape is
+  documented in `Batches / get by id` (id, status,
+  total/finished/errored_operations, submitted_at, completed_at,
+  response_body_url, _links). That 3-op batch finished in ~2 s.

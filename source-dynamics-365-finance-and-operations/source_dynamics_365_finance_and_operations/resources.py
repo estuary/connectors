@@ -16,7 +16,7 @@ from .models import (
 )
 
 from .adls_gen2_client import ADLSGen2Client
-from .api import fetch_model_dot_json, fetch_changes, ModelFormat
+from .api import fetch_model_dot_json, fetch_changes, ModelFormat, TableSchemaHistory
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -65,6 +65,11 @@ def resources(
                 fetch_changes,
                 adls_client,
                 model.name,
+                # Owned by the binding rather than a single sweep, so the
+                # append-only check spans consecutive sweeps too. It starts
+                # empty on restart, leaving that sweep's first folder
+                # unchecked.
+                TableSchemaHistory(),
             )
         )
 

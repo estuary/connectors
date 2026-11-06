@@ -29,6 +29,7 @@
               "default": "P2D",
               "description": "Window size for incremental streams in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
               "format": "duration",
+              "nonsensitive": true,
               "title": "Window Size",
               "type": "string"
             }
@@ -206,6 +207,7 @@
               "default": "PT0S",
               "description": "Interval between updates for this resource",
               "format": "duration",
+              "nonsensitive": true,
               "title": "Interval",
               "type": "string"
             },

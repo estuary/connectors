@@ -1,0 +1,44 @@
+info:
+  name: Create Members Group
+  type: http
+  seq: 22
+
+http:
+  method: POST
+  url: "{{base_url}}/groups"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "name": "estuary-members-group",
+          "description": "Estuary connector test fixture (members cluster)"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('members_seed_group_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/addGroup
+
+  SEEDING REQUEST — sandbox tenant only (`seeding: assistant`).
+
+  **WHY:** an OKTA_GROUP whose membership we control. Feeds `Group members / bare`,
+  `Group members / limit 1 page`, and (via `Seeding / Assign Group to App`) the
+  `scope: GROUP` case of `Application users / bare`.
+
+  **Cleanup:** `DELETE /groups/{id}`.
+
+  Outcome: ran 2026-10-07 (assistant, sandbox tenant); findings VERIFIED in
+  `Group members / bare`, `Application users / bare` and `Application users / parent apps`.

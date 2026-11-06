@@ -1,19 +1,21 @@
-package main
+package connector
 
 import (
+	"cmp"
 	"context"
 	stdsql "database/sql"
-	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -24,12 +26,14 @@ import (
 	sf "github.com/snowflakedb/gosnowflake/v2"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 type tableConfig struct {
-	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
+	Table      string `json:"table" jsonschema_extras:"x-collection-name=true"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
+	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
+	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true,nonsensitive=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to
@@ -52,6 +56,22 @@ func (c tableConfig) Validate() error {
 		return fmt.Errorf("expected table")
 	}
 	return nil
+}
+
+// ClusteringColumns parses the comma-separated clustering column list, trimming
+// whitespace and ignoring empty entries.
+func (c tableConfig) ClusteringColumns() []string {
+	if c.Clustering == "" {
+		return nil
+	}
+	parts := strings.Split(c.Clustering, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func schemasEqual(s1 string, s2 string) bool {
@@ -79,8 +99,18 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-// newSnowflakeDriver creates a new Driver for Snowflake.
-func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
+// NewDriver creates a new Driver for Snowflake, and is this connector's entry
+// point: an importing caller is handed the assembled driver rather than its
+// pieces.
+func NewDriver() *sql.Driver[config, tableConfig] {
+	// gosnowflake also uses logrus for logging and the logs it produces may be
+	// confusing when intermixed with our connector logs. We disable the
+	// gosnowflake logger here and log as needed when handling errors from the
+	// sql driver. Its logger is a package-level global of the SDK, so this is
+	// done here to apply to every user of the driver rather than only when
+	// running as a connector.
+	sf.GetLogger().SetLogLevel("OFF")
+
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -101,6 +131,15 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("newSnowflakeDriver stdsql.Open: %w", err)
 			}
 			defer db.Close()
+
+			// sql.Open does not connect. db.Conn logs in without running a query,
+			// so a failure here is a connection failure. Closing it returns the
+			// connection to the pool for the queries below.
+			conn, err := db.Conn(ctx)
+			if err != nil {
+				return nil, cerrors.NewUserError(err, "unable to connect to database: "+connectError(err, cfg).Error())
+			}
+			conn.Close()
 
 			timestampTypeMapping, isExplicit, err := getTimestampTypeMapping(ctx, db)
 			if err != nil {
@@ -161,6 +200,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				KeyChangeInPlace:    true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -176,7 +216,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 }
 
 func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, bool, error) {
-	xdb := sqlx.NewDb(db, "snowflake").Unsafe()
+	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
 
 	type paramRow struct {
 		Value string `db:"value"`
@@ -209,12 +249,14 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 var _ m.Transactor = (*transactor)(nil)
 
 type transactor struct {
-	runtimeCheckpoint m.RuntimeCheckpoint
-	cfg               config
-	ep                *sql.Endpoint[config]
-	db                *stdsql.DB
-	streamManager     *streamManager
-	pipeClient        *PipeClient
+	runtimeCheckpoint   m.RuntimeCheckpoint
+	cfg                 config
+	featureFlags        map[string]bool
+	ep                  *sql.Endpoint[config]
+	db                  *stdsql.DB
+	snowpipeStreaming   *streamManager
+	snowpipeStreamingV2 *streamV2Manager
+	pipeClient          *PipeClient
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -226,8 +268,13 @@ type transactor struct {
 	}
 	templates templates
 	bindings  []*binding
+	uploads   *semaphore.Weighted
 	be        *m.BindingEvents
 	cp        checkpoint
+	profiler  *boilerplate.QueryProfiler
+	// commitProfile is the profile of the commit queries of the checkpoint
+	// last built, which Acknowledge runs.
+	commitProfile *boilerplate.QueryProfile
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
@@ -236,6 +283,13 @@ type transactor struct {
 	// If this is still the recovery (first after startup) commit, where special
 	// handling may be needed for registering streaming files.
 	didRecovery bool
+
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a backfill that
+	// completed in the current transaction, for staging into the checkpoint.
+	truncations map[int]time.Time
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -274,6 +328,7 @@ func newTransactor(
 	}
 
 	var sm *streamManager
+	var sv2 *streamV2Manager
 	var pipeClient *PipeClient
 	if cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var accountName string
@@ -283,21 +338,34 @@ func newTransactor(
 			return nil, fmt.Errorf("newStreamManager: %w", err)
 		} else if pipeClient, err = NewPipeClient(&cfg, accountName, materializationName); err != nil {
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
+		} else if sv2, err = newStreamV2Manager(&cfg, db, ep.Dialect, sm, open.Materialization.TaskName(), accountName, open.Range); err != nil {
+			return nil, fmt.Errorf("newStreamV2Manager: %w", err)
 		}
-
 	}
 
 	var d = &transactor{
-		runtimeCheckpoint: fence.Checkpoint,
-		cfg:               cfg,
-		ep:                ep,
-		templates:         renderTemplates(ep.Dialect),
-		db:                db,
-		streamManager:     sm,
-		pipeClient:        pipeClient,
-		_range:            open.Range,
-		version:           open.Version,
-		be:                be,
+		runtimeCheckpoint:   fence.Checkpoint,
+		cfg:                 cfg,
+		featureFlags:        featureFlags,
+		ep:                  ep,
+		templates:           renderTemplates(ep.Dialect),
+		db:                  db,
+		snowpipeStreaming:   sm,
+		snowpipeStreamingV2: sv2,
+		pipeClient:          pipeClient,
+		_range:              open.Range,
+		version:             open.Version,
+		be:                  be,
+		cp:                  make(checkpoint),
+		uploads:             newUploadLimiter(),
+
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+	}
+
+	if len(open.StateJson) > 0 {
+		if err := d.UnmarshalState(open.StateJson); err != nil {
+			return nil, fmt.Errorf("unmarshalling connector state: %w", err)
+		}
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
@@ -318,14 +386,24 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, featureFlags["snowpipe_streaming"]); err != nil {
+		if err = d.addBinding(ctx, binding, *cmp.Or(d.cp[binding.StateKey], &checkpointItem{})); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
+	}
+
+	if err := requireMultiShardCapable(open.Range, d.bindings); err != nil {
+		return nil, err
+	}
+
+	if err := d.syncClustering(ctx, bindings, open); err != nil {
+		return nil, fmt.Errorf("syncing clustering keys: %w", err)
 	}
 
 	go func() {
 		d.logAllClusteringInfo(ctx)
 	}()
+	d.profiler = newQueryProfiler(db, d.bindings)
+	d.commitProfile = d.profiler.NewProfile()
 
 	return d, nil
 }
@@ -333,8 +411,16 @@ func newTransactor(
 type binding struct {
 	target sql.Table
 
-	streaming bool
-	pipeName  string
+	streaming   bool
+	streamingV2 bool
+	pipeName    string
+	// clusteringExpr is the parenthesized CLUSTER BY expression for this
+	// binding, or empty if clustering is not configured.
+	clusteringExpr string
+	// truncateSQL deletes rows published before a backfill's boundary, which
+	// it binds as an RFC3339 string. Empty if the binding has no usable
+	// flow_published_at column.
+	truncateSQL string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery   string
@@ -349,26 +435,64 @@ type binding struct {
 		copyInto    string
 		mustMerge   bool
 		mergeBounds *sql.MergeBoundsBuilder
+		rows        int64
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
 	var b = new(binding)
 	b.target = target
-	b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
+	}
+	b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
-		loc := d.ep.Dialect.TableLocator(b.target.Path)
-		if err := d.streamManager.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
-			var apiError *streamingApiError
-			var colError *unhandledColError
-			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {
+	if d.cfg.isStreamsV2(b.target.DeltaUpdates, d.featureFlags) {
+		if len(cp.StreamBlobs) > 0 {
+			// We're upgrading from streams v1, and the v1 path left behind some
+			// blobs that only it can drain.
+
+			if err := d.snowpipeStreaming.addBinding(ctx, d.ep.Identifier(loc.TableSchema), d.ep.Identifier(loc.TableName), b.target); err != nil {
+				return fmt.Errorf(
+					"opening the snowpipe_streaming channel on %s to finish %d staged blob(s): %w. Restore the snowpipe_streaming write path for one transaction before moving the binding onto snowpipe_streaming_v2, or backfill the binding, which discards those blobs and materializes their documents again",
+					b.target.Identifier, len(cp.StreamBlobs), err)
+			}
+
+			log.WithFields(log.Fields{
+				"table": b.target.Identifier,
+				"blobs": len(cp.StreamBlobs),
+			}).Info("opened a snowpipe_streaming channel to finish the blobs that path staged")
+		}
+
+		d.snowpipeStreamingV2.addBinding(d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), b.target, cp.StreamV2)
+		b.streamingV2 = true
+		d.bindings = append(d.bindings, b)
+		return nil
+	}
+
+	if len(cp.StreamV2.channelNames()) > 0 {
+		// We're switching away from streams v2, and the v2 path left behind
+		// some channels that only it can clean up.
+
+		if err := d.snowpipeStreamingV2.sweep(ctx, d.cfg.Database, loc.TableSchema, d.ep.Identifier(loc.TableName), nil); err != nil {
+			return fmt.Errorf("dropping the snowpipe_streaming_v2 channels of %s: %w", b.target.Identifier, err)
+		}
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"channels": cp.StreamV2.channelNames(),
+		}).Warn("this binding is leaving the snowpipe_streaming_v2 write path; documents its channels committed beyond the checkpoint will be materialized again; with delta updates these duplicates would be permanent")
+	}
+
+	if d.cfg.isStreamsV1(b.target.DeltaUpdates, d.featureFlags) {
+		if err := d.snowpipeStreaming.addBinding(ctx, d.ep.Identifier(loc.TableSchema), d.ep.Identifier(loc.TableName), b.target); err != nil {
+			if apiError, ok := errors.AsType[*streamingApiError](err); ok && (apiError.Code == 6 || apiError.Code == 55) {
 				// Streaming API errors with code 6 or 55  come from tables that
 				// don't support streaming at all, so we will fall back to a
 				// non-streaming strategy for them if they are encountered.
-			} else if errors.As(err, &colError) {
+			} else if _, ok := errors.AsType[*unhandledColError](err); ok {
 				// This column type is something that we haven't yet implemented
 				// Snowpipe Streaming support for, although we could at some
 				// point.
@@ -383,8 +507,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		}
 	}
 
-	b.load.stage = newStagedFile(os.TempDir())
-	b.store.stage = newStagedFile(os.TempDir())
+	b.load.stage = newStagedFile(os.TempDir(), d.uploads)
+	b.store.stage = newStagedFile(os.TempDir(), d.uploads)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
@@ -414,8 +538,10 @@ type loadDoc struct {
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 
+	var profile = d.profiler.NewProfile()
 	for it.Next() {
 		var b = d.bindings[it.Binding]
+		profile.AddKeys(it.Binding, 1)
 
 		if err := b.load.stage.start(ctx, d.db); err != nil {
 			return err
@@ -434,9 +560,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries = make(map[int]string)
 	var filesToCleanup []string
 	for i, b := range d.bindings {
-		if b.streaming || !b.load.stage.started {
-			// Pass.
-		} else if dir, err := b.load.stage.flush(); err != nil {
+		if b.streaming || b.streamingV2 || !b.load.stage.started {
+			// Streaming bindings have no load stage at all, so they must be
+			// excluded before the stage is dereferenced.
+			continue
+		}
+
+		if dir, err := b.load.stage.wait(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
 			// Choose appropriate load query template based on configuration
@@ -445,7 +575,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = d.templates.loadQueryNoFlowDocument
 			}
 
-			if subqueries[i], err = renderBoundedQueryTemplate(loadTemplate, b.target, dir, b.load.mergeBounds.Build()); err != nil {
+			var bounds = b.load.mergeBounds.Build()
+			profile.SetBounds(i, bounds)
+			if subqueries[i], err = renderBoundedQueryTemplate(loadTemplate, b.target, dir, bounds); err != nil {
 				return fmt.Errorf("loadQuery template: %w", err)
 			} else {
 				filesToCleanup = append(filesToCleanup, dir)
@@ -482,13 +614,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// In order for the concurrent requests below to be actually run concurrently we need
 	// a separate connection for each
-	for _, queryLoop := range subqueries {
+	for i, queryLoop := range subqueries {
 		var query = queryLoop
-		group.Go(func() error {
+		group.Go(func() (err error) {
 			log.WithFields(log.Fields{
 				"query": query,
 			}).Debug("querying Load documents")
 			start := time.Now()
+
+			var queryCtx, trace = profile.Trace(ctx, i, "load")
+			defer func() { trace.Finish(err) }()
 
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the load channel.
@@ -496,7 +631,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// NB: Not using groupCtx here since the Go Snowflake driver
 			// retains contexts internally, and the group context is cancelled
 			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(ctx, query)
+			rows, err := d.db.QueryContext(queryCtx, query)
+			trace.Executed()
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -518,6 +654,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				rowsProcessed += 1
 
 				message := slices.Clone(document)
+				trace.AddDocument(len(message))
 				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
 				select {
 				case <-groupCtx.Done():
@@ -586,34 +723,67 @@ type checkpointItem struct {
 	Query         string
 	StagedDir     string
 	StreamBlobs   []*blobMetadata
+	StreamV2      streamV2Checkpoint `json:",omitempty"`
 	PipeName      string
 	PipeFiles     []fileRecord
 	Version       string
 	EncryptionKey string
+	// Round and Rows are the transaction round and number of rows staged,
+	// for reporting the commit's row stats when it runs in Acknowledge.
+	Round int
+	Rows  int64
+	// TruncateBefore is the boundary of a backfill that completed in the
+	// transaction. Applying the item deletes the table's rows published
+	// before it, after the item's stores. It is omitted when unset, so that
+	// the item stays readable by a connector build without it.
+	TruncateBefore *time.Time `json:",omitempty"`
 }
 
 type checkpoint = map[string]*checkpointItem
 
+// streamV2Only reports whether the item holds streaming v2 channel state and no
+// staged work.
+func (item *checkpointItem) streamV2Only() bool {
+	return len(item.StreamV2) > 0 && len(item.Query) == 0 && len(item.StreamBlobs) == 0 && len(item.PipeFiles) == 0
+}
+
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
+	var round = it.Round
 
+	var lastBinding = -1
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+
+		// Store requests are ordered by binding, so the previous binding has received all of
+		// its rows and its staged file can be finished now rather than held open until commit.
+		if lastBinding != -1 && lastBinding != it.Binding {
+			if last := d.bindings[lastBinding]; !last.streaming && !last.streamingV2 && last.store.stage.started {
+				if err := last.store.stage.finish(); err != nil {
+					return nil, fmt.Errorf("finishing staged file for %s: %w", last.target.Path, err)
+				}
+			}
+		}
+		lastBinding = it.Binding
 
 		if it.Exists {
 			b.store.mustMerge = true
 		}
 
-		if !b.streaming {
+		if !b.streaming && !b.streamingV2 {
 			if err := b.store.stage.start(ctx, d.db); err != nil {
 				return nil, err
 			}
 		}
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
+		} else if b.streamingV2 {
+			if err := d.snowpipeStreamingV2.writeRow(ctx, it.Binding, it.PackedKey, converted); err != nil {
+				return nil, fmt.Errorf("appending Store to stream for resource %s: %w", b.target.Path, err)
+			}
 		} else if b.streaming {
-			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
+			if err := d.snowpipeStreaming.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
 		} else if err = b.store.stage.writeRow(append(converted, d.cfg.HardDelete && it.Delete)); err != nil {
@@ -621,13 +791,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
+		b.store.rows++
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var checkpointJSON, err = d.buildDriverCheckpoint(ctx, runtimeCheckpoint)
+		var checkpointJSON, err = d.buildDriverCheckpoint(ctx, runtimeCheckpoint, round)
 		if err != nil {
 			return nil, pf.FinishedOperation(err)
 		}
@@ -636,27 +807,51 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (json.RawMessage, error) {
+func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint, round int) (json.RawMessage, error) {
+	d.commitProfile = d.profiler.NewProfile()
 	streamBlobs := make(map[int][]*blobMetadata)
 	keys := make(map[int]string)
-	if d.streamManager != nil {
+	if d.snowpipeStreaming != nil {
 		// The "base token" only really needs to be sufficiently random that it
 		// doesn't collide with the prior or next transaction's value. Deriving
 		// it from the runtime checkpoint is not absolutely necessary, but it's
 		// convenient to make testing outputs consistent.
 		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
 			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if streamBlobs, keys, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
+		} else if streamBlobs, keys, err = d.snowpipeStreaming.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
 			return nil, fmt.Errorf("flushing stream manager: %w", err)
 		}
 	}
 
+	streamV2Entries := make(map[int]streamV2Checkpoint)
+	if d.snowpipeStreamingV2 != nil {
+		var err error
+		if streamV2Entries, err = d.snowpipeStreamingV2.flush(ctx); err != nil {
+			return nil, fmt.Errorf("committing stream v2 rows: %w", err)
+		}
+	}
+
 	for idx, b := range d.bindings {
+		if b.streamingV2 {
+			if entries, ok := streamV2Entries[idx]; ok {
+				d.cp[b.target.StateKey] = &checkpointItem{
+					Table:    b.target.Identifier,
+					StreamV2: entries,
+				}
+			}
+			continue
+		}
+
+		rows := b.store.rows
+		b.store.rows = 0
+
 		if b.streaming {
 			if blobs, ok := streamBlobs[idx]; ok {
 				d.cp[b.target.StateKey] = &checkpointItem{
 					StreamBlobs:   blobs,
 					EncryptionKey: keys[idx],
+					Round:         round,
+					Rows:          rows,
 				}
 			}
 			continue
@@ -666,13 +861,14 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		dir, err := b.store.stage.flush()
+		dir, err := b.store.stage.wait()
 		if err != nil {
 			return nil, err
 		}
 
+		var bounds = b.store.mergeBounds.Build()
 		if b.store.mustMerge {
-			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, bounds)
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}
@@ -681,7 +877,10 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Query:     mergeIntoQuery,
 				StagedDir: dir,
 				Version:   d.version,
+				Round:     round,
+				Rows:      rows,
 			}
+			d.commitProfile.SetBounds(idx, bounds)
 			// Reset for next round.
 			b.store.mustMerge = false
 		} else if b.pipeName != "" {
@@ -720,6 +919,8 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				PipeFiles: b.store.stage.uploaded,
 				PipeName:  b.pipeName,
 				Version:   d.version,
+				Round:     round,
+				Rows:      rows,
 			}
 
 		} else {
@@ -730,10 +931,23 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 					Table:     b.target.Identifier,
 					Query:     copyIntoQuery,
 					StagedDir: dir,
+					Round:     round,
+					Rows:      rows,
 				}
 			}
 		}
 	}
+
+	for idx, boundary := range d.truncations {
+		var b = d.bindings[idx]
+		var item = d.cp[b.target.StateKey]
+		if item == nil {
+			item = &checkpointItem{Table: b.target.Identifier, Round: round}
+			d.cp[b.target.StateKey] = item
+		}
+		item.TruncateBefore = &boundary
+	}
+	d.truncations = nil
 
 	var checkpointJSON, err = json.Marshal(d.cp)
 	if err != nil {
@@ -747,6 +961,19 @@ type pipeRecord struct {
 	files     []fileRecord
 	dir       string
 	tableName string
+	path      []string
+	round     int
+	rows      int64 // rows staged
+	loaded    int64 // rows Snowpipe reports having loaded
+}
+
+// finished reports the pipe's row stats once all of its files have loaded.
+func (pipe *pipeRecord) finished(be *m.BindingEvents) {
+	stats := m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
+	if pipe.rows > 0 {
+		stats = stats.WithStaged(pipe.rows)
+	}
+	be.ReportRowStats(pipe.round, pipe.path, stats)
 }
 
 // When a file has been successfully loaded, we remove it from the pipe record
@@ -765,6 +992,7 @@ type copyHistoryRow struct {
 	fileName          string
 	status            string
 	firstErrorMessage string
+	rowCount          int64
 }
 
 func (d *transactor) copyHistory(ctx context.Context, tableName string, fileNames []string) ([]copyHistoryRow, error) {
@@ -786,10 +1014,11 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 		status                    string
 		firstErrorMessage         string
 		firstErrorMessageNullable stdsql.NullString
+		rowCount                  stdsql.NullInt64
 	)
 
 	for rows.Next() {
-		if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable); err != nil {
+		if err := rows.Scan(&fileName, &status, &firstErrorMessageNullable, &rowCount); err != nil {
 			return nil, fmt.Errorf("scanning copy history row: %w", err)
 		}
 
@@ -807,6 +1036,7 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 			fileName:          fileName,
 			status:            status,
 			firstErrorMessage: firstErrorMessage,
+			rowCount:          rowCount.Int64,
 		})
 	}
 
@@ -817,8 +1047,31 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 	return items, nil
 }
 
+func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	d.truncations = make(map[int]time.Time, len(completes))
+
+	for idx, boundary := range completes {
+		var b = d.bindings[idx]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !d.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		} else if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			d.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		d.truncations[idx] = boundary
+	}
+	return nil
+}
+
 // Acknowledge merges data from temporary table to main table
-func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	defer func() {
 		d.didRecovery = true
 	}()
@@ -827,57 +1080,57 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
 
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	var drained []string
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
-		path := d.pathForStateKey(stateKey)
-		// we skip queries that belong to tables which do not have a binding anymore
-		// since these tables might be deleted already
-		if len(path) == 0 {
+		if item.streamV2Only() {
+			// The checkpoint item for this state key was written by the streaming
+			// v2 write path. The next Open reads this item, so it stays in the
+			// checkpoint.
 			continue
 		}
 
-		if len(item.Query) > 0 {
+		if !shouldProcess(stateKey) {
+			continue
+		}
+
+		idx := d.bindingForStateKey(stateKey)
+		// we skip queries that belong to tables which do not have a binding anymore
+		// since these tables might be deleted already
+		if idx < 0 {
+			continue
+		}
+		path := d.bindings[idx].target.Path
+
+		drained = append(drained, stateKey)
+
+		if len(item.Query) > 0 || item.TruncateBefore != nil {
 			item := item
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
-				if strings.HasPrefix(item.Query, "\nMERGE INTO") {
-					conn, err := d.db.Conn(ctx)
-					if err != nil {
-						return fmt.Errorf("getting connection for MERGE INTO: %w", err)
-					}
-					defer conn.Close()
-
-					var queryID string
-					err = conn.Raw(func(x any) error {
-						stmt, err := x.(driver.ConnPrepareContext).PrepareContext(ctx, item.Query)
-						if err != nil {
-							return err
-						}
-						result, err := stmt.(driver.StmtExecContext).ExecContext(ctx, nil)
-						if err != nil {
-							return err
-						}
-						queryID = result.(sf.SnowflakeResult).GetQueryID()
-						return nil
-					})
-					if err != nil {
-						return fmt.Errorf("running ack query: %w", err)
-					}
-
-					logQueryStats(ctx, d.db, queryID, item.Table)
-				} else {
-					if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
-						return fmt.Errorf("running ack query: %w", err)
+				if len(item.Query) > 0 {
+					if err := d.runStoreQuery(ctx, item, idx, path); err != nil {
+						return err
 					}
 				}
-
+				// The truncation runs after the stores, so that it keeps the
+				// rows they just wrote, which were published after the boundary.
+				if item.TruncateBefore != nil {
+					if err := d.runTruncation(ctx, item, idx, path); err != nil {
+						return err
+					}
+				}
 				d.be.FinishedResourceCommit(path)
 
-				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
-					return fmt.Errorf("cleaning up files: %w", err)
+				if item.StagedDir != "" {
+					if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
+						return fmt.Errorf("cleaning up files: %w", err)
+					}
 				}
 
 				return nil
@@ -885,10 +1138,17 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		} else if len(item.StreamBlobs) > 0 {
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
-				if err := d.streamManager.write(groupCtx, item.StreamBlobs, item.EncryptionKey, !d.didRecovery); err != nil {
+				if err := d.snowpipeStreaming.write(groupCtx, item.StreamBlobs, item.EncryptionKey, !d.didRecovery); err != nil {
 					return fmt.Errorf("writing streaming blobs for %s: %w", path, err)
 				}
 				d.be.FinishedResourceCommit(path)
+
+				// Snowpipe Streaming gives no row counts back.
+				stats := m.RowStats{}
+				if item.Rows > 0 {
+					stats = stats.WithStaged(item.Rows)
+				}
+				d.be.ReportRowStats(item.Round, path, stats)
 
 				return nil
 			})
@@ -901,8 +1161,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			}
 
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
-				var insertErr InsertFilesError
-				if errors.As(err, &insertErr) && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
+				if insertErr, ok := errors.AsType[InsertFilesError](err); ok && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
 					// This error can happen if either the pipe was not found, or we are not authorized to use it
 					// It is possible to not be authorized to use the pipe even though we have created it. When creating the pipe
 					// we specify the role by which to create the pipe, but when using Snowpipe, we can't specify a role. Rather, the
@@ -929,6 +1188,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				files:     item.PipeFiles,
 				dir:       item.StagedDir,
 				tableName: item.Table,
+				path:      path,
+				round:     item.Round,
+				rows:      item.Rows,
 			}
 		}
 	}
@@ -943,6 +1205,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// If we see no results from the REST API for 10 minutes, then we fallback to asking the `COPY_HISTORY` table
 	var retryDelay = 500 * time.Millisecond
 	var maxTryTime = time.Now().Add(10 * time.Minute)
+
+	// Try to get file status from the COPY_HISTORY for at least this long,
+	// even if no results are listed.
+	var minTryTime = time.Now().Add(30 * time.Minute)
 
 	for len(pipes) > 0 {
 		for pipeName, pipe := range pipes {
@@ -993,7 +1259,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 				for _, row := range rows {
 					if row.status == "Loaded" {
-						pipe.fileLoaded(row.fileName)
+						if pipe.fileLoaded(row.fileName) {
+							pipe.loaded += row.rowCount
+						}
 					} else if row.status == "Load in progress" {
 						hasItemsInProgress = true
 					} else {
@@ -1009,6 +1277,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				}
 
 				if len(pipe.files) > 0 {
+					if time.Now().Before(minTryTime) {
+						maxTryTime = time.Now().Add(1 * time.Minute)
+						time.Sleep(retryDelay)
+						continue
+					}
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
 				}
 
@@ -1016,13 +1289,16 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				if err := d.deleteFiles(ctx, []string{pipe.dir}); err != nil {
 					return nil, fmt.Errorf("cleaning up files: %w", err)
 				}
+				pipe.finished(d.be)
 				delete(pipes, pipeName)
 				continue
 			}
 
 			for _, reportFile := range report.Files {
 				if reportFile.Status == "LOADED" {
-					pipe.fileLoaded(reportFile.Path)
+					if pipe.fileLoaded(reportFile.Path) {
+						pipe.loaded += int64(reportFile.RowsInserted)
+					}
 				} else if reportFile.Status == "LOAD_FAILED" || reportFile.Status == "PARTIALLY_LOADED" {
 					return nil, fmt.Errorf("failed to load files in pipe %q: %s, %s", pipeName, reportFile.FirstError, reportFile.SystemError)
 				} else if reportFile.Status == "LOAD_IN_PROGRESS" {
@@ -1035,6 +1311,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				if err := d.deleteFiles(ctx, []string{pipe.dir}); err != nil {
 					return nil, fmt.Errorf("cleaning up files: %w", err)
 				}
+				pipe.finished(d.be)
 				delete(pipes, pipeName)
 			}
 
@@ -1082,6 +1359,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
+	if len(drained) == 0 {
+		return nil, nil
+	}
+
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
 	// Note that this is an best-effort "attempt" and there is no guarantee that this checkpoint update
@@ -1091,9 +1372,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
 	var checkpointClear = make(checkpoint)
-	for _, b := range d.bindings {
-		checkpointClear[b.target.StateKey] = nil
-		delete(d.cp, b.target.StateKey)
+	for _, sk := range drained {
+		checkpointClear[sk] = nil
+		delete(d.cp, sk)
 	}
 
 	checkpointJSON, err := json.Marshal(checkpointClear)
@@ -1104,13 +1385,125 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-func (d *transactor) pathForStateKey(stateKey string) []string {
-	for _, b := range d.bindings {
-		if b.target.StateKey == stateKey {
-			return b.target.Path
-		}
+// runStoreQuery runs a checkpoint item's MERGE INTO or COPY INTO and reports
+// the row counts from its result set. A result that can't be read is logged
+// and skipped; only the query itself can fail the commit.
+func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, binding int, path []string) error {
+	isMerge := strings.HasPrefix(item.Query, "\nMERGE INTO")
+
+	var queryCtx, trace = d.commitProfile.Trace(ctx, binding, boilerplate.StatementKind(item.Query))
+	rows, err := d.db.QueryContext(queryCtx, item.Query)
+	trace.Finish(err)
+	if err != nil {
+		return fmt.Errorf("running ack query: %w", err)
 	}
+
+	stats, err := scanStoreResult(rows, isMerge)
+	if err != nil {
+		log.WithError(err).WithField("table", item.Table).Warn("could not read store query result")
+		return nil
+	}
+	if item.Rows > 0 {
+		stats = stats.WithStaged(item.Rows)
+	}
+	d.be.ReportRowStats(item.Round, path, stats)
 	return nil
+}
+
+// runTruncation deletes the rows of the item's table published before its
+// TruncateBefore boundary, and reports how many it deleted.
+func (d *transactor) runTruncation(ctx context.Context, item *checkpointItem, binding int, path []string) error {
+	var b = d.bindings[binding]
+	if b.truncateSQL == "" {
+		var _, reason = b.target.PublishedAtColumn()
+		return fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
+			item.TruncateBefore.Format(time.RFC3339Nano), b.target.Identifier, reason)
+	}
+
+	var queryCtx, trace = d.profiler.Trace(ctx, binding, boilerplate.StatementKind(b.truncateSQL))
+	result, err := d.db.ExecContext(queryCtx, b.truncateSQL, item.TruncateBefore.UTC().Format(time.RFC3339Nano))
+	trace.Finish(err)
+	if err != nil {
+		return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("reading rows deleted from %s after backfill: %w", b.target.Identifier, err)
+	}
+
+	d.be.ReportRowStats(item.Round, path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
+	log.WithFields(log.Fields{
+		"table":    b.target.Identifier,
+		"boundary": *item.TruncateBefore,
+		"deleted":  deleted,
+	}).Info("truncated rows published before the backfill")
+	return nil
+}
+
+// scanStoreResult reads a MERGE INTO result ("number of rows inserted" /
+// "updated" / "deleted") or a COPY INTO result (one row per file with
+// "rows_loaded"; a lone "status" row when no files were processed).
+func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return m.RowStats{}, err
+	}
+	colIdx := make(map[string]int, len(cols))
+	for i, c := range cols {
+		colIdx[strings.ToLower(c)] = i
+	}
+
+	vals := make([]stdsql.NullString, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	col := func(name string) (int64, bool) {
+		i, ok := colIdx[name]
+		if !ok || !vals[i].Valid {
+			return 0, false
+		}
+		n, err := strconv.ParseInt(vals[i].String, 10, 64)
+		return n, err == nil
+	}
+
+	var inserted, updated, deleted, loaded int64
+	var seen bool
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			return m.RowStats{}, err
+		}
+		if isMerge {
+			i, okI := col("number of rows inserted")
+			u, okU := col("number of rows updated")
+			d, okD := col("number of rows deleted")
+			if !okI && !okU && !okD {
+				return m.RowStats{}, fmt.Errorf("unexpected MERGE result columns %v", cols)
+			}
+			inserted, updated, deleted = inserted+i, updated+u, deleted+d
+		} else if n, ok := col("rows_loaded"); ok {
+			loaded += n
+		}
+		seen = true
+	}
+	if err := rows.Err(); err != nil {
+		return m.RowStats{}, err
+	} else if !seen {
+		return m.RowStats{}, fmt.Errorf("store query returned no result rows")
+	}
+
+	if isMerge {
+		return m.ExactRowStats(inserted, updated, deleted), nil
+	}
+	return m.ExactRowStats(loaded, 0, 0).WithLoaded(loaded), nil
+}
+
+// bindingForStateKey is the index of the binding with the state key, or -1 if
+// there's none.
+func (d *transactor) bindingForStateKey(stateKey string) int {
+	return slices.IndexFunc(d.bindings, func(b *binding) bool { return b.target.StateKey == stateKey })
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
@@ -1187,44 +1580,17 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 }
 
 func (d *transactor) Destroy() {
+	d.profiler.Stop()
 	d.load.conn.Close()
 	d.store.conn.Close()
 	d.db.Close()
 }
 
-func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
-	var scanned, total stdsql.NullInt64
-	row := db.QueryRowContext(ctx,
-		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
-         FROM TABLE(GET_QUERY_OPERATOR_STATS(?)),
-         LATERAL FLATTEN(INPUT => operator_statistics)
-         WHERE VALUE:"partitions_scanned" IS NOT NULL`,
-		queryID,
-	)
-	if err := row.Scan(&scanned, &total); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch query partition stats")
+func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
+	if !log.IsLevelEnabled(log.DebugLevel) {
 		return
 	}
 
-	var queuedOverloadTime stdsql.NullInt64
-	row = db.QueryRowContext(ctx,
-		`SELECT QUEUED_OVERLOAD_TIME FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) WHERE QUERY_ID = ?`,
-		queryID,
-	)
-	if err := row.Scan(&queuedOverloadTime); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch queued overload time")
-	}
-
-	log.WithFields(log.Fields{
-		"table":                   table,
-		"query_id":                queryID,
-		"partitions_scanned":      scanned.Int64,
-		"partitions_total":        total.Int64,
-		"queued_overload_time_ms": queuedOverloadTime.Int64,
-	}).Info("query stats")
-}
-
-func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
 	var result stdsql.NullString
 	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
 	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
@@ -1258,30 +1624,121 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 		"average_depth":    info.AverageDepth,
 		"average_overlaps": info.AverageOverlaps,
 		"total_partitions": info.TotalPartitions,
-	}).Info("clustering information")
+	}).Debug("clustering information")
 }
 
-func clusteringKeyExpr(keys []sql.Column) string {
-	parts := make([]string, len(keys))
-	for i, k := range keys {
-		parts[i] = k.Identifier
+// clusteringKeyExpr builds a Snowflake CLUSTER BY expression from the given
+// collection field names by resolving each one to its quoted column identifier
+// in the table.
+func clusteringKeyExpr(table sql.Table, fieldNames []string) (string, error) {
+	parts := make([]string, len(fieldNames))
+	for i, name := range fieldNames {
+		var ident string
+		for _, col := range table.Columns() {
+			if col.Field == name {
+				ident = col.Identifier
+				break
+			}
+		}
+		if ident == "" {
+			return "", fmt.Errorf("clustering column %q not found in materialized fields of %s", name, table.Identifier)
+		}
+		parts[i] = ident
 	}
-	return "(" + strings.Join(parts, ", ") + ")"
+	return "(" + strings.Join(parts, ", ") + ")", nil
+}
+
+// queryCurrentClusterBy returns the current CLUSTER BY expression for a table,
+// or an empty string if the table has no clustering key.
+func queryCurrentClusterBy(ctx context.Context, db *stdsql.DB, schema, table string) (string, error) {
+	// The pattern is escaped so that `_` and `%` in the table name match
+	// literally, and the returned name is still compared exactly because
+	// LIKE matches case-insensitively.
+	var query = fmt.Sprintf("SHOW TABLES LIKE '%s' IN SCHEMA %q;", escapeShowLikePattern(table), schema)
+
+	type tableRow struct {
+		Name      string            `db:"name"`
+		ClusterBy stdsql.NullString `db:"cluster_by"`
+	}
+
+	var tableRows []tableRow
+	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
+	if err := xdb.SelectContext(ctx, &tableRows, query); err != nil {
+		return "", fmt.Errorf("querying table clustering state: %w", err)
+	}
+
+	for _, row := range tableRows {
+		if row.Name == table {
+			return row.ClusterBy.String, nil
+		}
+	}
+	return "", nil
+}
+
+// escapeShowLikePattern quotes an identifier for literal use inside a SHOW
+// ... LIKE '<pattern>' string. Snowflake unescapes the string literal before
+// LIKE sees it, so each wildcard needs a doubled backslash to survive as an
+// escaped wildcard.
+func escapeShowLikePattern(name string) string {
+	return strings.NewReplacer(
+		`\\`, `\\\\`,
+		`_`, `\\_`,
+		`%`, `\\%`,
+		`'`, `''`,
+	).Replace(name)
+}
+
+func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, open pm.Request_Open) error {
+	for i, table := range bindings {
+		var rc tableConfig
+		if err := json.Unmarshal(open.Materialization.Bindings[i].ResourceConfigJson, &rc); err != nil {
+			return fmt.Errorf("parsing resource config for %s: %w", table.Identifier, err)
+		}
+
+		fields := rc.ClusteringColumns()
+		if len(fields) > 0 {
+			keyExpr, err := clusteringKeyExpr(table, fields)
+			if err != nil {
+				return err
+			}
+			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", table.Identifier, keyExpr)
+			if _, err := d.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("enabling clustering on %s: %w", table.Identifier, err)
+			}
+			log.WithFields(log.Fields{
+				"table":          table.Identifier,
+				"clustering_key": keyExpr,
+			}).Info("enabled automatic clustering")
+			d.bindings[i].clusteringExpr = keyExpr
+		} else {
+			loc := d.ep.Dialect.TableLocator(table.Path)
+			currentClusterBy, err := queryCurrentClusterBy(ctx, d.db, loc.TableSchema, loc.TableName)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"table": table.Identifier,
+				}).WithError(err).Warn("could not check current clustering state")
+				continue
+			}
+			if currentClusterBy != "" {
+				stmt := fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY;", table.Identifier)
+				if _, err := d.db.ExecContext(ctx, stmt); err != nil {
+					return fmt.Errorf("dropping clustering key on %s: %w", table.Identifier, err)
+				}
+				log.WithFields(log.Fields{
+					"table":               table.Identifier,
+					"previous_cluster_by": currentClusterBy,
+				}).Info("dropped clustering key")
+			}
+		}
+	}
+	return nil
 }
 
 func (d *transactor) logAllClusteringInfo(ctx context.Context) {
 	for _, b := range d.bindings {
-		if len(b.target.Keys) == 0 {
+		if b.clusteringExpr == "" {
 			continue
 		}
-		logClusteringInfo(ctx, d.db, b.target.Identifier, clusteringKeyExpr(b.target.Keys))
+		logClusteringInfo(ctx, d.db, b.target.Identifier, b.clusteringExpr)
 	}
-}
-
-func main() {
-	// gosnowflake also uses logrus for logging and the logs it produces may be confusing when
-	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
-	// when handling errors from the sql driver.
-	sf.GetLogger().SetLogLevel("OFF")
-	boilerplate.RunMain(newSnowflakeDriver())
 }

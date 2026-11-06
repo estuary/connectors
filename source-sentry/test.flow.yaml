@@ -30,3 +30,7 @@ captures:
         name: Issues
         interval: PT5M
       target: acmeCo/Issues
+    - resource:
+        name: custom_explore_my_spans
+        interval: PT5M
+      target: acmeCo/custom_explore_my_spans

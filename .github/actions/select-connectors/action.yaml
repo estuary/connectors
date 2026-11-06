@@ -1,0 +1,48 @@
+name: Select Connectors
+description: >-
+  Turn a connector list file and the change classifier's answer for that lane
+  into the build matrix: the connectors the classifier reported, or all of them.
+
+inputs:
+  list:
+    description: >-
+      The lane's connector list, a YAML list of objects with a `name`, such as
+      .github/python-connectors.yaml. Each matrix entry is one of its objects.
+    required: true
+  connectors:
+    description: >-
+      The classifier's answer for the lane: `all`, or a JSON list of connector
+      directories.
+    required: true
+
+outputs:
+  matrix:
+    description: The list entries to build, as compact JSON.
+    value: ${{ steps.select.outputs.matrix }}
+  run:
+    description: >-
+      Whether there is anything to build. GitHub rejects an empty matrix, so the
+      build jobs gate on this rather than on the matrix.
+    value: ${{ steps.select.outputs.run }}
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Select the connectors to build
+      id: select
+      shell: bash
+      env:
+        # Passed through env, never interpolated into the script.
+        LIST: ${{ inputs.list }}
+        CONNECTORS: ${{ inputs.connectors }}
+      run: |
+        set -euo pipefail
+        ALL=$(yq -o=json -I=0 '.' "$LIST")
+        if [ "$CONNECTORS" = all ]; then
+          MATRIX=$ALL
+        else
+          MATRIX=$(jq -c --argjson want "$CONNECTORS" 'map(select(.name | IN($want[])))' <<< "$ALL")
+        fi
+        echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+        if [ "$MATRIX" = '[]' ]; then echo "run=false"; else echo "run=true"; fi >> "$GITHUB_OUTPUT"

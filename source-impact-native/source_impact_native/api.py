@@ -1,17 +1,31 @@
-from datetime import datetime, timedelta, UTC
-from decimal import Decimal
-from estuary_cdk.http import HTTPSession
-from logging import Logger
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import json
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from logging import Logger
+from typing import Any, AsyncGenerator, Awaitable, Callable, Iterable
 
 from estuary_cdk.capture.common import (
-    PageCursor,
     LogCursor,
+    PageCursor,
 )
+from estuary_cdk.http import HTTPSession
+from pydantic import JsonValue
+
+from source_impact_native.models import ActionInquiries, Actions
 
 API = "https://api.impact.com"
 API_CATALOG = "Advertisers"
+
+# Impact's endpoints are eventually consistent.A record can become
+# queryable minutes after its timestamp, after the connector has
+# already seen records with later timestamps. Since the incremental
+# cursor is a high-water mark, anything that surfaces below it would
+# be filtered out and lost forever. To avoid that, we never advance
+# the cursor over records younger than INCREMENTAL_LAG, giving late
+# arrivals time to appear before the cursor moves past their timestamp.
+INCREMENTAL_LAG = timedelta(hours=1)
+
+PAGE_SIZE = 20000
 
 async def fetch_incremental(
     cls,
@@ -24,32 +38,39 @@ async def fetch_incremental(
     This method has the basic behaviour of querying data after the logcursor, comparing and yielding
     records accorrding.
     """
+    assert isinstance(log_cursor, datetime)
     _cls: Any = cls  # Silence mypy false-positive
     
     iterating = True
 
     url = f"{API}/{API_CATALOG}/{account_sid}/{_cls.NAME}"
-    parameters = None
+    first_page_params: dict[str, JsonValue] = {"PageSize": PAGE_SIZE}
     headers = {'Accept': 'application/json'} # required by the source, else results are XML
 
     if _cls.START_DATE_INCREMENTAL:
-        parameters = {f"{_cls.START_DATE_INCREMENTAL}": _cursor_dt(_cls.NAME, log_cursor)}
+        first_page_params[f"{_cls.START_DATE_INCREMENTAL}"] = _cursor_dt(_cls.NAME, log_cursor)
+    parameters: dict[str, JsonValue] | None = first_page_params
     max_ts = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     while iterating:
         result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
         for results in result[f"{_cls.NAME}"]:
-            if _s_to_dt(results[f"{_cls.REP_KEY}"]) > log_cursor:
-                max_ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+            ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+            if log_cursor <= ts < horizon:
+                max_ts = max(max_ts, ts)
                 doc = _cls.model_validate_json(json.dumps(results))
                 yield doc
-        
-            elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < log_cursor:
+
+            elif ts < log_cursor:
                 iterating = False
                 break
         if result.get("@nextpageuri"):
+            # The next-page URI already carries every query parameter, so
+            # clear `parameters` to avoid sending them a second time
             url = API + result["@nextpageuri"]
+            parameters = None
         else:
             break
     if max_ts != log_cursor:
@@ -59,39 +80,42 @@ async def fetch_incremental(
 async def fetch_backfill(
     cls,
     config_start_date: datetime,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor,
+    cutoff: LogCursor,
 )-> AsyncGenerator:
     """Fetch backfill is the default FetchPagesFn handler for source-impact-native
     This method has the basic behaviour of backfilling data and (when possible) query data from
     specific ranges. Its page_cursor is already the full URI for the next page
     """
-
+    assert isinstance(cutoff, datetime)
     _cls: Any = cls
     headers = {'Accept': 'application/json'}
-    parameters = None
+    parameters: dict[str, JsonValue] | None = None
 
     if page:
+        assert isinstance(page, str)
         url = API + page
-    
+
     else:
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
+        parameters = {"PageSize": PAGE_SIZE}
         if _cls.START_DATE:
-            parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, config_start_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
+            parameters[f"{_cls.START_DATE}"] = _cursor_dt(cls.NAME, config_start_date)
+            parameters[f"{_cls.END_DATE}"] = _cursor_dt(cls.NAME, cutoff)
 
     result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
     for results in result[f"{_cls.NAME}"]:
-        if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
+        ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+        if ts == config_start_date:
             doc = _cls.model_validate_json(json.dumps(results))
             yield doc
+        elif ts < config_start_date:
             return
-        elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
-            return
-        elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
+        elif ts < cutoff:
             doc = _cls.model_validate_json(json.dumps(results))
             yield doc
 
@@ -104,7 +128,7 @@ async def fetch_backfill(
 
 async def fetch_incremental_actions(
     cls_parent,
-    cls,
+    cls: Actions | ActionInquiries,
     account_sid,
     http: HTTPSession,
     log: Logger,
@@ -116,6 +140,8 @@ async def fetch_incremental_actions(
     This method does not use the action updates endpoint. Instead, we only call for the basic Actions endpoint, which returns recent data since the last 7 days.
     we do this since the action updates endpoint returns data in a totally diffent object, which does not match the original Actions endpoint.
     """
+    assert isinstance(log_cursor, datetime)
+
     headers = {'Accept': 'application/json'}
 
     campaign_list = set()
@@ -124,28 +150,33 @@ async def fetch_incremental_actions(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
+    max_ts = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
+
     for campaign in campaign_list:
 
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-        parameters = {"CampaignId": campaign}
-        max_ts = log_cursor
+        parameters: dict[str, JsonValue] | None = {"CampaignId": campaign, "PageSize": PAGE_SIZE}
 
         _cls: Any = cls  # Silence mypy false-positive
 
         while iterating:
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
-
             for results in result[f"{cls.NAME}"]:
-                if _s_to_dt(results[f"CreationDate"]) > log_cursor:
-                    max_ts = _s_to_dt(results[f"CreationDate"])
+                ts = _s_to_dt(results["CreationDate"])
+                if log_cursor <= ts < horizon:
                     doc = _cls.model_validate_json(json.dumps(results))
+                    max_ts = max(max_ts, doc.CreationDate)
                     yield doc
 
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 iterating = False
     if max_ts != log_cursor:
@@ -157,11 +188,11 @@ async def fetch_backfill_actions(
     cls_parent,
     cls,
     config_start_date: datetime,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor,
+    cutoff: LogCursor,
 )-> AsyncGenerator:
     """Fetch backfill actions is the default FetchPageFn handler for Actions Streams
     This method requires CampaignIds to query for actions data.
@@ -172,8 +203,9 @@ async def fetch_backfill_actions(
     start_date and end_date cant be set more than 45 days apart.
     
     """
+    assert isinstance(cutoff, datetime)
     headers = {'Accept': 'application/json'}
-    parameters = {}
+    parameters: dict[str, JsonValue] = {"PageSize": PAGE_SIZE}
 
 
     if cutoff - timedelta(days=1095) <= config_start_date <= cutoff:
@@ -192,11 +224,11 @@ async def fetch_backfill_actions(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
+    base_url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
+
+    _cls: Any = cls
+
     for campaign in campaign_list:
-        url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-
-        _cls: Any = cls
-
         parameters["CampaignId"] = campaign
 
         for start, end in dates:
@@ -205,18 +237,26 @@ async def fetch_backfill_actions(
             parameters["ActionDateStart"] = _cursor_dt(cls.NAME, start)
             parameters["ActionDateEnd"] = _cursor_dt(cls.NAME, end)
 
+            # The first page of each (campaign, date-range) window is requested
+            # from the base URL with the query parameters. Subsequent pages use
+            # the @nextpageuri, which already embeds every parameter
+            url = base_url
+            request_params: dict[str, JsonValue] | None = parameters
 
             while iterating:
 
-                result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
+                result = json.loads(
+                    await http.request(
+                        log, url, method="GET", params=request_params, headers=headers
+                    )
+                )
 
                 for results in result[f"{_cls.NAME}"]:
                     if _s_to_dt(results[f"CreationDate"]) == config_start_date:
                         doc = _cls.model_validate_json(json.dumps(results))
                         yield doc
-                        iterating = False
-                        break
                     elif _s_to_dt(results[f"CreationDate"]) < config_start_date:
+                        iterating = False
                         break
                     elif _s_to_dt(results[f"CreationDate"]) < cutoff:
                         doc = _cls.model_validate_json(json.dumps(results))
@@ -224,13 +264,15 @@ async def fetch_backfill_actions(
 
                 if result.get("@nextpageuri"):
                     url = API + result["@nextpageuri"]
+                    request_params = None
                 else:
                     iterating = False
     return
 
+
 async def fetch_snapshot(
     cls,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator:
@@ -240,7 +282,7 @@ async def fetch_snapshot(
     iterating = True
 
     url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
-    parameters = None
+    parameters: dict[str, JsonValue] | None = {"PageSize": PAGE_SIZE}
     headers = {'Accept': 'application/json'}
 
     while iterating:
@@ -251,7 +293,10 @@ async def fetch_snapshot(
             yield doc
 
         if result.get("@nextpageuri"):
+            # The next-page URI already carries every query parameter, so
+            # clear `parameters` to avoid sending them a second time
             url = API + result["@nextpageuri"]
+            parameters = None
         else:
             break
 
@@ -270,7 +315,7 @@ async def fetch_incremental_child(
     
     This method requires CampaignId values from the Campaigns stream.
     """
-
+    assert isinstance(log_cursor, datetime)
     _cls: Any = cls  # Silence mypy false-positive
 
     campaign_list = set()
@@ -279,7 +324,8 @@ async def fetch_incremental_child(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
-    
+    max_ts = log_cursor
+    horizon = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     for campaign in campaign_list:
         iterating = True
@@ -287,26 +333,30 @@ async def fetch_incremental_child(
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
         if cls.NAME == "Tasks":
             url = f"{API}/{API_CATALOG}/{account_sid}/Programs/{campaign}/{cls.NAME}"
-        parameters = None
+        first_page_params: dict[str, JsonValue] = {"PageSize": PAGE_SIZE}
         headers = {'Accept': 'application/json'}
         if _cls.START_DATE_INCREMENTAL:
-            parameters = {f"{_cls.START_DATE_INCREMENTAL}": _cursor_dt(cls.NAME, log_cursor)}
-        max_ts = log_cursor
+            first_page_params[f"{_cls.START_DATE_INCREMENTAL}"] = _cursor_dt(cls.NAME, log_cursor)
+        parameters: dict[str, JsonValue] | None = first_page_params
 
         while iterating:
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{_cls.NAME}"]:
-                if _s_to_dt(results[f"{_cls.REP_KEY}"]) > log_cursor:
-                    max_ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+                ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+                if log_cursor <= ts < horizon:
+                    max_ts = max(max_ts, ts)
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
-            
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < log_cursor:
+
+                elif ts < log_cursor:
                     iterating = False
                     break
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 break
     if max_ts != log_cursor:
@@ -317,11 +367,11 @@ async def fetch_backfill_child(
     cls_parent,
     cls,
     config_start_date: datetime,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
+    page: PageCursor,
+    cutoff: LogCursor,
 )-> AsyncGenerator:
     """_Fetch backfill child is the default FetchPagesFn handler for source-impact-native child streams.
     This method has the basic behaviour of backfilling data and (when possible) query data from
@@ -330,10 +380,9 @@ async def fetch_backfill_child(
     
     This method requires CampaignId values from the Campaigns stream.
     """
-
+    assert isinstance(cutoff, datetime)
     _cls: Any = cls
     headers = {'Accept': 'application/json'}
-    parameters = None
 
     campaign_list = set()
 
@@ -347,7 +396,7 @@ async def fetch_backfill_child(
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
         if cls.NAME == "Tasks":
             url = f"{API}/{API_CATALOG}/{account_sid}/Programs/{campaign}/{cls.NAME}"
-        headers = {'Accept': 'application/json'}
+        parameters: dict[str, JsonValue] | None = {"PageSize": PAGE_SIZE}
         # if _cls.START_DATE:
         #     parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, config_start_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
 
@@ -355,18 +404,21 @@ async def fetch_backfill_child(
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{_cls.NAME}"]:
-                if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
+                ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+                if ts == config_start_date:
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
-
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
+                elif ts < config_start_date:
                     iterating = False
                     break
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
+                elif ts < cutoff:
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 iterating = False
     return
@@ -375,7 +427,7 @@ async def fetch_backfill_child(
 async def fetch_snapshot_child(
     cls_parent,
     cls,
-    account_sid,
+    account_sid: str,
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator:
@@ -388,14 +440,11 @@ async def fetch_snapshot_child(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
-    
-
     for campaign in campaign_list:
-    
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/Campaigns/{campaign}/{cls.NAME}"
-        parameters = None
+        parameters: dict[str, JsonValue] | None = {"PageSize": PAGE_SIZE}
         headers = {'Accept': 'application/json'}
 
         while iterating:
@@ -406,25 +455,27 @@ async def fetch_snapshot_child(
                 yield doc
 
             if result.get("@nextpageuri"):
+                # The next-page URI already carries every query parameter, so
+                # clear `parameters` to avoid sending them a second time
                 url = API + result["@nextpageuri"]
+                parameters = None
             else:
                 break
 
 
 
-def _s_to_dt(date: str):
-    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S%z")
-    return date
+def _s_to_dt(date: str) -> datetime:
+    return datetime.fromisoformat(date)
 
-def _cursor_dt(name, logcursor):
+def _cursor_dt(name: str, logcursor: datetime) -> str:
     new_logcursor = logcursor.strftime("%Y-%m-%dT%H:%M:%S%z")
     if name == "PhoneNumbers" or name == "Jobs":
         new_logcursor = logcursor.strftime("%Y-%m-%d")
     return new_logcursor
 
-def get_date_ranges(start_date, end_date, step=40):
+def get_date_ranges(start_date: datetime, end_date: datetime, step: int = 40) -> list[tuple[datetime, datetime]]:
     current_start = start_date
-    date_ranges = []
+    date_ranges: list[tuple[datetime, datetime]] = []
 
     while current_start < end_date:
         current_end = min(current_start + timedelta(days=step), end_date)

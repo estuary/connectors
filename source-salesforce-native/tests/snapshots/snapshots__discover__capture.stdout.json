@@ -49,12 +49,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Account"
     ]
   },
   {
@@ -107,12 +135,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Campaign"
     ]
   },
   {
@@ -165,12 +221,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Case"
     ]
   },
   {
@@ -223,12 +307,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Contact"
     ]
   },
   {
@@ -281,12 +393,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Entitlement"
     ]
   },
   {
@@ -339,12 +479,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Lead"
     ]
   },
   {
@@ -397,12 +565,126 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "LeadHistory"
+    ]
+  },
+  {
+    "recommendedName": "LiveChatTranscript",
+    "resourceConfig": {
+      "name": "LiveChatTranscript",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
+      }
+    },
+    "key": [
+      "/Id"
+    ],
+    "resourcePath": [
+      "LiveChatTranscript"
     ]
   },
   {
@@ -455,12 +737,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "MessagingSession"
     ]
   },
   {
@@ -513,12 +823,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Opportunity"
     ]
   },
   {
@@ -571,12 +909,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ServiceAppointment"
     ]
   },
   {
@@ -629,12 +995,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "ServiceContract"
     ]
   },
   {
@@ -687,12 +1081,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Task"
     ]
   },
   {
@@ -745,12 +1167,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "User"
     ]
   },
   {
@@ -803,12 +1253,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "WorkOrder"
     ]
   },
   {
@@ -861,12 +1339,40 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "WorkOrderLineItem"
     ]
   }
 ]

@@ -1,0 +1,168 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/reports/{{campaign_id}}/email-activity?count=10"
+  params:
+    - name: count
+      value: "10"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - populated activity, opens and clicks
+    request:
+      url: "{{base_url}}/reports/{{campaign_id}}/email-activity?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "campaign_id": "5dfc22e163",
+                "list_id": "f34247943d",
+                "list_is_active": true,
+                "email_id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "activity": [],
+                "_links": "REDACTED"
+              },
+              {
+                "campaign_id": "5dfc22e163",
+                "list_id": "f34247943d",
+                "list_is_active": true,
+                "email_id": "6409961b1c262a7e6fb62624ce95ddf5",
+                "email_address": "nicolas+estuary-test-1@estuary.dev",
+                "activity": [
+                  {
+                    "action": "open",
+                    "timestamp": "2026-07-08T17:56:26+00:00",
+                    "ip": "72.14.199.44"
+                  },
+                  {
+                    "action": "open",
+                    "timestamp": "2026-07-08T18:01:27+00:00",
+                    "ip": "66.249.88.43"
+                  },
+                  {
+                    "action": "click",
+                    "timestamp": "2026-07-08T18:01:29+00:00",
+                    "url": "https://estuary.dev/?seed=email-activity",
+                    "ip": "201.235.239.178"
+                  },
+                  {
+                    "action": "click",
+                    "timestamp": "2026-07-08T18:01:39+00:00",
+                    "url": "https://estuary.dev/?seed=email-activity",
+                    "ip": "181.199.158.5"
+                  }
+                ],
+                "_links": "REDACTED"
+              },
+              {
+                "campaign_id": "5dfc22e163",
+                "list_id": "f34247943d",
+                "list_is_active": true,
+                "email_id": "3abd9d34d7d6953d8a91a79904b6631d",
+                "email_address": "nicolas+estuary-test-2@estuary.dev",
+                "activity": [
+                  {
+                    "action": "open",
+                    "timestamp": "2026-07-08T17:56:26+00:00",
+                    "ip": "72.14.199.43"
+                  },
+                  {
+                    "action": "open",
+                    "timestamp": "2026-07-08T18:00:37+00:00",
+                    "ip": "66.249.88.43"
+                  },
+                  {
+                    "action": "click",
+                    "timestamp": "2026-07-08T18:00:45+00:00",
+                    "url": "https://estuary.dev/?seed=email-activity",
+                    "ip": "201.235.239.178"
+                  },
+                  {
+                    "action": "click",
+                    "timestamp": "2026-07-08T18:00:54+00:00",
+                    "url": "https://estuary.dev/?seed=email-activity",
+                    "ip": "181.15.96.9"
+                  }
+                ],
+                "_links": "REDACTED"
+              }
+            ],
+            "campaign_id": "5dfc22e163",
+            "total_items": 3,
+            "_links": "REDACTED"
+          }
+  - name: 200 - envelope confirmed; activity[] empty (pre-seeding, campaign 61cc0c44a6)
+    request:
+      url: "{{base_url}}/reports/{{campaign_id}}/email-activity?count=10"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "emails": [
+              {
+                "campaign_id": "61cc0c44a6",
+                "list_id": "f34247943d",
+                "list_is_active": true,
+                "email_id": "4c172e0eb420fb2c5678834e0b5e55b4",
+                "email_address": "connector-dev+mailchimp@estuary.dev",
+                "activity": []
+              }
+            ],
+            "campaign_id": "61cc0c44a6",
+            "total_items": 1
+          }
+
+docs: |-
+  **REFERENCE:** [List email activity](https://mailchimp.com/developer/marketing/api/email-activity-reports/list-email-activity/)
+
+  **WHY:** bare per-campaign email-activity list, against the seeded sent
+  campaign `5dfc22e163` (3 recipients; opened + clicked 2026-07-08). Teaches the
+  envelope, the per-recipient row shape, the nested event shape per action, and
+  what `total_items` counts.
+
+  **VERIFIED (2026-07-08):** envelope `{emails, campaign_id, total_items,
+  _links}`; each `emails[]` entry carries `campaign_id`, `list_id`,
+  `list_is_active`, `email_id`, `email_address`, and nested `activity[]`.
+  `total_items` counts RECIPIENTS (members), not flattened events. Event shape:
+  opens are `{action: "open", timestamp, ip}` (no url), clicks are
+  `{action: "click", timestamp, url, ip}`. Repeat same-action events per member
+  appear with distinct timestamps. Recipients with no events return an empty
+  `activity[]`, not an absent field. Events recorded while the campaign was
+  still sending (timestamps 19s after `send_time`) do appear — automated
+  image-proxy prefetch registered as opens seconds after delivery.
+
+  **LIMITATION (VERIFIED 2026-07-13):** `activity[].action` is only `open` /
+  `click` / `bounce`. Unsubscribes are NOT reported here — after a recipient
+  unsubscribed, their `activity[]` still showed only opens, no `unsub` event.
+  So this stream does not capture unsubscribes; they surface as an
+  `unsubscribed` count on `/reports` and as a `status`/`last_changed` change
+  on the (sibling) list-members stream, or via a separate
+  `/reports/{id}/unsubscribed` report (out of scope for email_activity).

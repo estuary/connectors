@@ -177,7 +177,7 @@ SELECT 0, JSON_BUILD_OBJECT(
     'array', r.`array`,
     'binary', TO_BASE64(r.`binary`),
     'boolean', r.`boolean`,
-    'field_with_projection', r.field_with_projection,
+    'fieldWithProjection', r.field_with_projection,
     'integer', r.`integer`,
     'integerGt128Bit', r.`integerGt128Bit`,
     'integerGt256Bit', r.`integerGt256Bit`,

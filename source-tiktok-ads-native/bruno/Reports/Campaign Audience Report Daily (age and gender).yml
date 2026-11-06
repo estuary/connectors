@@ -1,0 +1,23 @@
+info:
+  name: Campaign Audience Report Daily (age and gender)
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: '{{base_url}}/report/integrated/get/?advertiser_id={{advertiser_id}}&report_type=AUDIENCE&data_level=AUCTION_CAMPAIGN&dimensions=["campaign_id","stat_time_day","age","gender"]&metrics=["spend","impressions","clicks"]&page=1&page_size=1000&start_date=2026-09-14&end_date=2026-10-13&filtering=[{"field_name":"campaign_status","filter_type":"IN","filter_value":"[\"STATUS_ALL\"]"}]'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Run a synchronous report"
+  (`GET /open_api/v1.3/report/integrated/get/`).
+
+  **WHY:** an audience report with the one permitted two-dimension breakdown (age and gender) and the campaign-level include-deleted filter.
+
+  **VERIFIED (2026-10-13, sandbox):** `code 0`: an audience report with `age` and `gender` together and the `campaign_status` include-deleted filter is accepted.

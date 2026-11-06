@@ -17,7 +17,7 @@ from .supported_standard_objects import (
 
 from .bulk_job_manager import BulkJobManager
 from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, now, VERSION
+from .shared import now, VERSION
 
 from .models import (
     EndpointConfig,
@@ -39,6 +39,7 @@ from .api import (
     fetch_object_fields,
 )
 from .auth import (
+    SalesforceClientCredentials,
     SalesforceTokenSource,
     OAUTH2_SPEC,
     update_oauth_spec,
@@ -109,16 +110,13 @@ def full_refresh_resource(
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
-    resource = common.Resource(
+    resource = common.SnapshotResource(
         name=name,
-        key=["/_meta/row_id"],
         model=FullRefreshResource,
         open=open,
-        initial_state=ResourceState(),
         initial_config=SalesforceResourceConfigWithSchedule(
             name=name, interval=timedelta(minutes=5)
         ),
-        schema_inference=True,
         disable=not enable
     )
 
@@ -170,7 +168,7 @@ def incremental_resource(
                 name,
                 fields,
                 model_cls,
-                config.advanced.window_size
+                config.start_date,
             ),
             fetch_changes=functools.partial(
                 fetch_incremental_resources,
@@ -180,7 +178,7 @@ def incremental_resource(
                 rest_query_manager,
                 instance_url,
                 name,
-                config.advanced.window_size,
+                config.advanced.window_size.as_timedelta,
             ),
         )
 
@@ -193,7 +191,7 @@ def incremental_resource(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=SalesforceResourceConfigWithSchedule(
             name=name,
@@ -289,22 +287,24 @@ async def _object_to_resource(
         )
 
 
-def _fetch_instance_url(log: Logger, config: EndpointConfig) -> str:
-    if isinstance(config.credentials, UserPass):
-        _, instance_url = config.credentials.fetch_access_token_and_instance_url(config.is_sandbox)
-    else:
-        instance_url = config.credentials.instance_url
+async def _fetch_instance_url(log: Logger, http: HTTPMixin, config: EndpointConfig) -> str:
+    # UserPass and Client Credentials both learn the instance URL from the token exchange that the
+    # token source performs and caches (the SOAP login and the client_credentials token response,
+    # respectively). OAuth persists its instance URL in the config during the OAuth flow.
+    if isinstance(config.credentials, (UserPass, SalesforceClientCredentials)):
+        assert isinstance(http.token_source, SalesforceTokenSource)
+        return await http.token_source.fetch_instance_url(log, http)
 
-    return instance_url
+    return config.credentials.instance_url
 
 
 # enabled_resources returns resources for only enabled bindings.
 async def enabled_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, bindings: list[common._ResolvableBinding]
 ) -> list[common.Resource]:
-    update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
-    instance_url = _fetch_instance_url(log, config)
+    update_oauth_spec(config.is_sandbox, config.my_domain)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox, my_domain=config.my_domain)
+    instance_url = await _fetch_instance_url(log, http, config)
 
     enabled_binding_names: list[str] = []
 
@@ -343,9 +343,9 @@ async def enabled_resources(
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
-    instance_url = _fetch_instance_url(log, config)
+    update_oauth_spec(config.is_sandbox, config.my_domain)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox, my_domain=config.my_domain)
+    instance_url = await _fetch_instance_url(log, http, config)
 
     queryable_object_names = await _fetch_queryable_objects(log, http, instance_url)
 

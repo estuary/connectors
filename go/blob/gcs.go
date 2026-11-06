@@ -20,8 +20,9 @@ import (
 var _ Bucket = (*GCSBucket)(nil)
 
 type GCSBucket struct {
-	client *storage.Client
-	bucket string
+	client        *storage.Client
+	bucket        string
+	singleRequest bool
 }
 
 // NewGCSBucket creates a GCS object storage bucket. At least one ClientOption
@@ -38,6 +39,27 @@ func NewGCSBucket(ctx context.Context, bucket string, authOpt option.ClientOptio
 	}, nil
 }
 
+// NewGCSSingleRequestBucket creates a GCS object storage bucket whose uploads
+// are each a single request, so an object's MD5 attribute is the MD5 of its
+// bytes. At least one ClientOption must be provided to specify authentication.
+func NewGCSSingleRequestBucket(ctx context.Context, bucket string, authOpt option.ClientOption, otherOpts ...option.ClientOption) (*GCSBucket, error) {
+	b, err := NewGCSBucket(ctx, bucket, authOpt, otherOpts...)
+	if err != nil {
+		return nil, err
+	}
+	b.singleRequest = true
+	return b, nil
+}
+
+func (b *GCSBucket) newObjectWriter(ctx context.Context, key string) *storage.Writer {
+	w := b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
+	if b.singleRequest {
+		// A ChunkSize of 0 buffers nothing and sends the object in one request.
+		w.ChunkSize = 0
+	}
+	return w
+}
+
 func (b *GCSBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
 	r, err := b.client.Bucket(b.bucket).Object(key).NewReader(ctx)
 	if err != nil {
@@ -48,17 +70,19 @@ func (b *GCSBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, e
 }
 
 func (b *GCSBucket) NewWriter(ctx context.Context, key string, opts ...WriterOption) io.WriteCloser {
-	return b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
+	return b.newObjectWriter(ctx, key)
 }
 
 func (b *GCSBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
-	w := b.client.Bucket(b.bucket).Object(key).NewWriter(ctx)
-	w.Metadata = getWriterConfig(opts).metadata
+	cfg := getWriterConfig(opts)
+	w := b.newObjectWriter(ctx, key)
+	w.Metadata = cfg.metadata
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("copying r to w: %w", err)
 	} else if err := w.Close(); err != nil {
 		return fmt.Errorf("closing writer: %w", err)
 	}
+	cfg.setETag(w.Attrs().Etag)
 
 	return nil
 }
@@ -79,8 +103,7 @@ func (b *GCSBucket) Delete(ctx context.Context, uris []string) error {
 		}
 		group.Go(func() error {
 			if err := b.client.Bucket(bucket).Object(key).Delete(groupCtx); err != nil {
-				var gErr *googleapi.Error
-				if errors.As(err, &gErr) && gErr.Code == http.StatusNotFound {
+				if gErr, ok := errors.AsType[*googleapi.Error](err); ok && gErr.Code == http.StatusNotFound {
 					return nil
 				}
 
@@ -125,9 +148,8 @@ func (b *GCSBucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsCo
 	bucketHandle := b.client.Bucket(b.bucket)
 
 	checkReadOnlyFn := func(key string) error {
-		var apiErr *googleapi.Error
 		_, err := bucketHandle.Object(key).Attrs(ctx)
-		if !errors.As(err, &apiErr) || apiErr.Code != 404 {
+		if apiErr, ok := errors.AsType[*googleapi.Error](err); !ok || apiErr.Code != 404 {
 			return err
 		}
 

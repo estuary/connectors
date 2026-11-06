@@ -1,0 +1,21 @@
+services:
+  localstack:
+    image: localstack/localstack:3
+    environment:
+      SERVICES: sns,sqs,sts
+      AWS_DEFAULT_REGION: us-east-1
+      DEBUG: "0"
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sns list-topics >/dev/null && awslocal sqs list-queues >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

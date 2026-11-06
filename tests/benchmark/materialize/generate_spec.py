@@ -21,6 +21,23 @@ out of the box. Pass --docker to run the connector as a Docker image instead
 
 The scenario's `collections[].resource` (if present) is passed through to the
 binding; otherwise we derive `{table: <basename>}` from the collection name.
+
+A TPC-DS scenario (see tpcds.py) takes its collections from source-tpc-ds
+discovery, and also needs:
+
+  --capture-output PATH  where to write the source-tpc-ds capture spec
+  --capture-task NAME    the capture's task name
+
+  --shard-flag K=V   task shard flag, repeatable. Needed by connectors that
+                     gate a write path on a runtime flag, e.g.
+                     --shard-flag enable-runtime-v2=true for the v2 runtime.
+  --table-suffix S   appended to every binding's table name.
+  --shard-log-level L  task shards.logLevel. The runtime forces the connector's
+                     LOG_LEVEL from this (flow crates/runtime/src/local_connector.rs),
+                     so a shell export cannot raise it -- this is the only way. Lets two arms of
+                     one comparison write to separate tables from a single
+                     scenario file, which matters where the destination keeps
+                     per-table state (Snowpipe Streaming channel offsets).
 """
 
 import argparse
@@ -32,6 +49,8 @@ import sys
 from typing import Any
 
 import yaml
+
+import tpcds
 
 
 def _table_name(collection_name: str) -> str:
@@ -117,6 +136,10 @@ def build_spec(
     task: str | None = None,
     compose_file: str | None = None,
     collection_name_field: str = "table",
+    shard_flags: dict[str, str] | None = None,
+    table_suffix: str = "",
+    shard_log_level: str | None = None,
+    tpcds_bindings: list[dict] | None = None,
 ) -> dict:
     scenario = _load_yaml(scenario_path)
 
@@ -126,13 +149,34 @@ def build_spec(
     collections_out: dict[str, dict] = {}
     bindings_out: list[dict] = []
 
-    for c in scenario.get("collections", []):
+    if tpcds_bindings is not None:
+        workload = tpcds.load(scenario)
+        collections = [
+            {
+                "name": tpcds.collection_name(b["recommendedName"]),
+                "schema": b["documentSchema"],
+                "key": b["key"],
+                "resource": {
+                    collection_name_field: b["recommendedName"],
+                    **workload.resource,
+                },
+            }
+            for b in tpcds_bindings
+        ]
+    else:
+        collections = scenario.get("collections", [])
+
+    for c in collections:
         name = c["name"]
         collections_out[name] = {
             "schema": c["schema"],
             "key": c["key"],
         }
-        resource = c.get("resource") or {collection_name_field: _table_name(name)}
+        resource = dict(c.get("resource") or {collection_name_field: _table_name(name)})
+        if table_suffix:
+            resource[collection_name_field] = (
+                f"{resource[collection_name_field]}{table_suffix}"
+            )
         bindings_out.append({"source": name, "resource": resource})
 
     config = _load_yaml(config_path)
@@ -149,20 +193,31 @@ def build_spec(
     else:
         endpoint = {
             "local": {
-                "command": [f"./{connector}/connector"],
+                "command": [
+                    os.path.join(
+                        os.environ.get("ROOT_DIR", "."), connector, "connector"
+                    )
+                ],
                 "protobuf": True,
                 "config": config,
             }
         }
 
+    materialization: dict[str, Any] = {
+        "endpoint": endpoint,
+        "bindings": bindings_out,
+    }
+    shards: dict[str, Any] = {}
+    if shard_flags:
+        shards["flags"] = shard_flags
+    if shard_log_level:
+        shards["logLevel"] = shard_log_level
+    if shards:
+        materialization["shards"] = shards
+
     return {
         "collections": collections_out,
-        "materializations": {
-            task: {
-                "endpoint": endpoint,
-                "bindings": bindings_out,
-            }
-        },
+        "materializations": {task: materialization},
     }
 
 
@@ -177,6 +232,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tag", default=None)
     p.add_argument("--task", default=None)
     p.add_argument("--output", default="-")
+    p.add_argument("--shard-flag", action="append", default=[], metavar="K=V",
+                   help="Task shard flag, repeatable (e.g. enable-runtime-v2=true)")
+    p.add_argument("--table-suffix", default="",
+                   help="Suffix appended to every binding's table name")
+    p.add_argument("--shard-log-level", default=None,
+                   help="Task shards.logLevel (e.g. debug); the runtime derives the "
+                        "connector's LOG_LEVEL from it")
+    p.add_argument("--capture-output", default=None,
+                   help="Where to write the capture spec of a tpcds scenario")
+    p.add_argument("--capture-task", default=None,
+                   help="Task name of a tpcds scenario's capture")
     args = p.parse_args(argv)
 
     # Auto-discover the compose file for localhost rewriting in --docker mode.
@@ -191,7 +257,24 @@ def main(argv: list[str] | None = None) -> int:
                 compose_file = cand
                 break
 
+    shard_flags = {}
+    for flag in args.shard_flag:
+        if "=" not in flag:
+            p.error(f"--shard-flag wants K=V, got: {flag}")
+        k, v = flag.split("=", 1)
+        shard_flags[k] = v
+
     collection_name_field = _get_collection_name_field(args.connector)
+
+    tpcds_bindings = None
+    workload = tpcds.load(_load_yaml(args.scenario))
+    if workload is not None:
+        if not args.capture_output or not args.capture_task:
+            p.error("a tpcds scenario needs --capture-output and --capture-task")
+        tpcds_bindings = tpcds.discover(workload)
+        capture = tpcds.capture_spec(workload, tpcds_bindings, args.capture_task)
+        with open(args.capture_output, "w") as f:
+            yaml.safe_dump(capture, f, sort_keys=False, default_flow_style=False)
 
     spec = build_spec(
         scenario_path=args.scenario,
@@ -203,6 +286,10 @@ def main(argv: list[str] | None = None) -> int:
         task=args.task,
         compose_file=compose_file,
         collection_name_field=collection_name_field,
+        shard_flags=shard_flags,
+        table_suffix=args.table_suffix,
+        shard_log_level=args.shard_log_level,
+        tpcds_bindings=tpcds_bindings,
     )
 
     text = yaml.safe_dump(spec, sort_keys=False, default_flow_style=False)

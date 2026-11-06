@@ -31,7 +31,15 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-const outputWriteBuffer = 1 * 1024 * 1024 // 1MiB output buffer to amortize write syscall overhead
+const (
+	// requestedOutputPipeSize is the kernel pipe capacity we ask for on stdout.
+	requestedOutputPipeSize = 1 * 1024 * 1024
+
+	// outputWriteBuffer amortizes the cost of a write syscall across multiple documents.
+	// It needs to be smaller than the output pipe so that flushes only block due to
+	// runtime backpressure.
+	outputWriteBuffer = 64 * 1024
+)
 
 // StateKey is used to key binding-specific state a connector's driver checkpoint. It's just a type
 // alias for a string to help differentiate any old string from where a specific state key from the
@@ -92,6 +100,10 @@ func RunMain(connector Connector) {
 // It omits portions of setup which are only appropriate for a standalone binary.
 func InnerMain(ctx context.Context, connector Connector, r io.Reader, w io.Writer) error {
 	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
+
+	if f, ok := w.(*os.File); ok {
+		enlargeOutputPipe(f, requestedOutputPipeSize)
+	}
 
 	var stream streamCodec
 	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
@@ -167,7 +179,10 @@ func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
 			}
 		case request.Open != nil:
 			log.WithField("eventType", "connectorStatus").Info("Starting capture")
-			return s.Connector.Pull(request.Open, &PullOutput{Connector_CaptureServer: stream})
+			return s.Connector.Pull(request.Open, &PullOutput{
+				Connector_CaptureServer: stream,
+				NumBindings:             len(request.Open.Capture.Bindings),
+			})
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
@@ -181,6 +196,11 @@ type PullOutput struct {
 	sync.Mutex
 	pc.Connector_CaptureServer
 
+	// NumBindings is the number of enabled bindings the capture was opened
+	// with. A capture with zero bindings will sit idle without producing any
+	// documents, which is worth mentioning in the startup status message.
+	NumBindings int
+
 	reused struct {
 		msg pc.Response          // Preallocated message to avoid allocations in Document()
 		doc pc.Response_Captured // Preallocated captured document to avoid allocations in Document()
@@ -193,7 +213,14 @@ type PullOutput struct {
 
 // Ready sends a PullResponse_Opened message to indicate that the capture has started.
 func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
-	log.WithField("eventType", "connectorStatus").Info("Capture started")
+	if out.NumBindings == 0 {
+		log.WithField("eventType", "connectorStatus").Info("Capture started, no bindings are enabled")
+	} else {
+		log.WithFields(log.Fields{
+			"eventType": "connectorStatus",
+			"bindings":  out.NumBindings,
+		}).Info("Capture started")
+	}
 	out.Lock()
 	defer out.Unlock()
 	if err := out.Send(&pc.Response{
@@ -231,6 +258,13 @@ func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
 
 // Checkpoint emits a state checkpoint, with or without RFC 7396 patch-merge semantics.
 func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	return out.sendCheckpoint(checkpoint, merge)
+}
+
+// sendCheckpoint sends a state checkpoint. The caller must hold the lock.
+func (out *PullOutput) sendCheckpoint(checkpoint json.RawMessage, merge bool) error {
 	var msg = &pc.Response{
 		Checkpoint: &pc.Response_Checkpoint{
 			State: &pf.ConnectorState{
@@ -239,9 +273,6 @@ func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error 
 			},
 		},
 	}
-
-	out.Lock()
-	defer out.Unlock()
 	if err := out.Send(msg); err != nil {
 		return fmt.Errorf("writing checkpoint: %w", err)
 	}
@@ -319,6 +350,37 @@ func (out *PullOutput) SourcedSchema(binding int, schema json.RawMessage) error 
 	// Update the last-hash tracking.
 	out.schemaHashes[binding] = hash
 	return nil
+}
+
+// BackfillBegin signals that the binding is about to restate all of its source
+// data, followed by the given state checkpoint. Everything the binding captured
+// before this point is considered stale once the backfill completes.
+//
+// The runtime requires that the marker is sent alone in its own checkpoint. The
+// caller must checkpoint any output it has sent first.
+func (out *PullOutput) BackfillBegin(binding int, checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Send(&pc.Response{
+		BackfillBegin: &pc.Response_BackfillBegin{Binding: uint32(binding)},
+	}); err != nil {
+		return fmt.Errorf("writing backfill begin: %w", err)
+	}
+	return out.sendCheckpoint(checkpoint, merge)
+}
+
+// BackfillComplete signals that the binding has finished restating all of its
+// source data, followed by the given state checkpoint. The caller has the same
+// requirements as for BackfillBegin.
+func (out *PullOutput) BackfillComplete(binding int, checkpoint json.RawMessage, merge bool) error {
+	out.Lock()
+	defer out.Unlock()
+	if err := out.Send(&pc.Response{
+		BackfillComplete: &pc.Response_BackfillComplete{Binding: uint32(binding)},
+	}); err != nil {
+		return fmt.Errorf("writing backfill complete: %w", err)
+	}
+	return out.sendCheckpoint(checkpoint, merge)
 }
 
 type streamCodec interface {

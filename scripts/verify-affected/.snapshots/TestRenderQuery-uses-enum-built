@@ -1,0 +1,11 @@
+SELECT
+    m.catalog_name        AS task,
+    m.connector_image_name AS image,
+    c.catalog_name        AS collection
+FROM live_specs m
+JOIN live_specs c ON c.catalog_name = ANY(m.reads_from)
+WHERE m.spec_type = 'materialization'
+  AND m.connector_image_name = ANY($1)
+  AND c.spec_type = 'collection'
+  AND (c.built_spec::text LIKE '%"enum":%')
+ORDER BY m.catalog_name, c.catalog_name;

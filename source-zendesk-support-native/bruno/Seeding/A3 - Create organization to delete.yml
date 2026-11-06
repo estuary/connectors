@@ -1,0 +1,44 @@
+info:
+  name: A3 - Create organization to delete
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/organizations"
+  body:
+    type: json
+    data: |-
+      {
+        "organization": {
+          "name": "Bruno probe V7 deleted organization"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Seeding / A4 - Delete organization` consumes this id as {{seed_org_id}}.
+        // Runtime var only (a resource id, not a credential).
+        if (res.status >= 200 && res.status < 300 && res.body?.organization?.id) {
+          bru.setVar('seed_org_id', res.body.organization?.id);
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create Organization](https://developer.zendesk.com/api-reference/ticketing/organizations/organizations/#create-organization)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V7. Creates an organization that `Seeding / A4 - Delete organization`
+  deletes, to see how the incremental organization export and `/organizations`
+  represent a deleted organization.
+
+  **Outcome:** Ran 2026-10-07 (organization 54337481956884); V7 VERIFIED in `Incremental / organizations`, `Organizations / bare`.

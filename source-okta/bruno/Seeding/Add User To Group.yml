@@ -1,0 +1,37 @@
+info:
+  name: Add User To Group
+  type: http
+  seq: 6
+
+http:
+  method: PUT
+  url: "{{base_url}}/groups/{{seed_group_id}}/users/{{seed_user_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id')) await bru.runRequest('Seeding/Create Active User');
+        if (!bru.getVar('seed_group_id')) await bru.runRequest('Seeding/Create Group');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Assign a user to a group](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/assignUserToGroup)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** a membership change. It should bump the group's
+  `lastMembershipUpdated` and leave its `lastUpdated` alone; it feeds
+  `Groups / updated or membership filter`. It also shows whether a membership
+  change bumps the *user's* `lastUpdated`.
+
+  **Outcome:** ran 2026-10-07 and returned 204. The group's
+  `lastMembershipUpdated` moved to 16:20:27 and its `lastUpdated` was unchanged.
+  The user's `lastUpdated` was also unchanged. VERIFIED in
+  `Groups / cursor filter`.

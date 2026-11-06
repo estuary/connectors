@@ -6,6 +6,7 @@ Resource: simple_standard
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":true,"Type":"text"}
@@ -23,6 +24,7 @@ Resource: simple_delta
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"_meta/op","Nullable":true,"Type":"text"}
@@ -39,6 +41,7 @@ Resource: not_simple
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":" ,;{}()_- problematicField � 𐀀 嶲 ","Nullable":true,"Type":"text"}
@@ -70,10 +73,13 @@ Resource: data_types
 ["connectorState",{}]
 ["connectorState",{}]
 ["connectorState",{}]
+["applied.actionDescription", ""]
 ["connectorState",{"updated":{}}]
 
 {"Name":"arrayField","Nullable":true,"Type":"flattened"}
 {"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"enumField","Nullable":true,"Type":"text"}
+{"Name":"enumNullableField","Nullable":true,"Type":"text"}
 {"Name":"flow_document","Nullable":true,"Type":"flattened"}
 {"Name":"flow_published_at","Nullable":true,"Type":"date"}
 {"Name":"id","Nullable":true,"Type":"long"}

@@ -172,6 +172,7 @@ fn topic_schema_to_collection_spec(
             key_shape.type_ = JsonSchema::types::OBJECT;
             key_shape.object.properties = vec![ObjProperty {
                 name: "_key".into(),
+                is_property: true,
                 is_required: true,
                 shape: scalar_shape,
             }];
@@ -186,19 +187,23 @@ fn topic_schema_to_collection_spec(
             .map(|(ptr, ..)| ptr.to_string())
             .collect();
 
-        let mut key_schema = to_schema(key_shape);
+        let key_schema =
+            serde_json::to_value(to_schema(key_shape)).expect("key schema must serialize");
+        let object = collection_schema.schema.object();
 
-        collection_schema
-            .schema
-            .object()
-            .properties
-            .append(&mut key_schema.schema.object().properties);
-
-        collection_schema
-            .schema
-            .object()
-            .required
-            .append(&mut key_schema.schema.object().required);
+        if let Some(properties) = key_schema.get("properties").and_then(|v| v.as_object()) {
+            for (name, property) in properties {
+                object.properties.insert(
+                    name.clone(),
+                    serde_json::from_value(property.clone()).expect("property schema converts"),
+                );
+            }
+        }
+        if let Some(required) = key_schema.get("required").and_then(|v| v.as_array()) {
+            for name in required.iter().filter_map(|v| v.as_str()) {
+                object.required.insert(name.to_string());
+            }
+        }
     }
 
     Ok((collection_schema, collection_key))
@@ -270,6 +275,7 @@ fn avro_key_schema_to_shape(schema: &AvroSchema) -> Result<Shape> {
 
                     Ok(ObjProperty {
                         name: field.name.clone().into(),
+                        is_property: true,
                         is_required: field.default.is_none(),
                         shape: field_shape,
                     })
@@ -309,7 +315,7 @@ fn json_key_schema_to_shape(schema: &serde_json::Value) -> Result<Shape> {
     let json_schema = doc::validation::build_bundle(schema.to_string().as_bytes())?;
     let validator = doc::Validator::new(json_schema)?;
     Ok(doc::Shape::infer(
-        &validator.schemas()[0],
+        validator.schema(),
         validator.schema_index(),
     ))
 }
@@ -567,7 +573,7 @@ mod tests {
                     avro_key_schema_to_shape(&AvroSchema::parse(&schema_json).unwrap()).unwrap();
                 if usable_key_shape(&shape) {
                     assert_eq!(
-                        serde_json::to_value(&to_schema(shape).schema).unwrap(),
+                        serde_json::to_value(to_schema(shape)).unwrap(),
                         serde_json::to_value(&want.clone().unwrap()).unwrap()
                     )
                 } else {

@@ -1,16 +1,19 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.27-trixie AS builder
 
 RUN apt-get update \
     && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.89
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.91
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN rustup component add clippy
+# `cargo auditable build` embeds the binary's dependency list, for the
+# image's SBOM to read.
+RUN cargo install cargo-auditable --version 0.7.7 --locked
 
 WORKDIR /connector
 
@@ -18,11 +21,18 @@ COPY materialize-kafka/Cargo.* /connector/
 
 # Avoid having to install/build all dependencies by copying the Cargo files and
 # making a dummy src/main.rs and empty lib.rs files.
+#
+# Keep these the same invocations, in the same profile, as the build below:
+# cargo keys artifacts on both, so priming anything else just compiles every
+# dependency twice. Release is the cheaper profile to share -- `cargo test
+# --release` reuses all but the dev-dependencies of the release build, and
+# clippy then compiles nothing.
 RUN mkdir src \
     && echo "fn main() {}" > src/main.rs \
     && touch src/lib.rs \
-    && cargo test --locked \
-    && cargo build --release --locked \
+    && cargo test --release --locked --no-run \
+    && cargo clippy --release --locked --no-deps \
+    && cargo auditable build --release --locked \
     && rm -r src
 
 COPY materialize-kafka/src ./src
@@ -31,8 +41,8 @@ COPY materialize-kafka/src ./src
 RUN touch src/main.rs \
     && touch src/lib.rs \
     && cargo test --release --locked --offline \
-    && cargo clippy --locked --offline --no-deps \
-    && cargo build --release --locked --offline
+    && cargo clippy --release --locked --offline --no-deps \
+    && cargo auditable build --release --locked --offline
 
 # Runtime Stage
 ################################################################################
@@ -42,13 +52,6 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 COPY --from=busybox:latest /bin/sh /bin/sh
-
-# Copy in the shared library files we linked against.
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libdb-5.3.so* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/sasl2/libsasldb.so* /usr/lib/x86_64-linux-gnu/sasl2/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libsasl2.so.2* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libssl.so.1* /usr/lib/x86_64-linux-gnu/
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libcrypto.so.1* /usr/lib/x86_64-linux-gnu/
 
 # Copy in the connector artifact.
 COPY --from=builder /connector/target/release/materialize-kafka ./

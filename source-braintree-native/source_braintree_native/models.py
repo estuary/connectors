@@ -71,6 +71,25 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
+# Default maximum number of concurrent requests used to fetch a stream. Disputes default
+# lower than other streams: each disputes advanced_search re-runs the full search server-side
+# (there is no ids endpoint to page over cheaply), and Braintree has flagged a high volume of
+# these long-running requests as harmful to endpoint availability. Full-refresh snapshots don't
+# fetch pages concurrently, so they use 1.
+DEFAULT_CONCURRENCY = 20
+DEFAULT_DISPUTES_CONCURRENCY = 5
+DEFAULT_SNAPSHOT_CONCURRENCY = 1
+
+
+class ResourceConfig(ResourceConfigWithSchedule):
+    concurrency: Annotated[int, Field(
+        title="Concurrency",
+        description="Maximum number of concurrent requests used to fetch this stream. Only affects streams fetched via concurrent pagination or batching. Lower this if Braintree reports elevated errors or throttles requests.",
+        default=DEFAULT_CONCURRENCY,
+        gt=0,
+    )]
+
+
 ConnectorState = GenericConnectorState[ResourceState]
 
 

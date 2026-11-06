@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -25,6 +25,7 @@ func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	boilerplate.SkipRuntimeV1(t)
 
 	out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
 	require.NoError(t, err, "docker compose up failed: %s", string(out))
@@ -44,7 +45,7 @@ func TestIntegration(t *testing.T) {
 	// Drive the connector with test data.
 	boilerplate.RunFlowctl(
 		t,
-		"preview",
+		"raw", "preview-next",
 		"--source", "testdata/test.flow.yaml",
 		"--fixture", "testdata/fixture.json",
 		"--name", "acmeCo/tests/materialize-s3-parquet",

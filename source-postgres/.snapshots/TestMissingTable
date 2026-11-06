@@ -5,7 +5,7 @@ acmeCo/test_capture/test/missingtable_551059_a
 acmeCo/test_capture/test/missingtable_551059_b
 sql> DROP TABLE test.missingtable_551059_b
 === Run: Capture ===
-error: flowctl preview failed:
+error: flowctl raw preview-next failed:
 the capture cannot run due to the following error(s):
  - user "flow_capture" cannot read from table "test.missingtable_551059_b"
 

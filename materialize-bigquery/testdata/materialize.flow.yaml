@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-bigquery:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.yaml
     bindings:
@@ -28,3 +28,13 @@ materializations:
       source: tests/data-types
       fields:
         recommended: true
+    - resource:
+        table: merge_renamed
+        dataset: testing
+      source: tests/merge-renamed
+      fields:
+        recommended: true
+        exclude: [renamedString, renamedTotal]
+        include:
+          renamed_string: {}
+          renamed_total: {}

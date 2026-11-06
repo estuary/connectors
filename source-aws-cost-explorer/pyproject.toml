@@ -1,0 +1,22 @@
+[project]
+name = "source-aws-cost-explorer"
+version = "0.1.0"
+description = ""
+authors = [
+    { name = "Seán Whelan", email = "sean@estuary.dev" },
+]
+requires-python = ">=3.14"
+dependencies = [
+    "estuary-cdk",
+    "pydantic>=2,<3",
+    "boto3>=1.40,<2.0",
+]
+
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

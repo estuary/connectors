@@ -1,0 +1,50 @@
+info:
+  name: Create Delete-Probe User
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{base_url}}/users?activate=false"
+  params:
+    - name: activate
+      value: "false"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "firstName": "Estuary",
+          "lastName": "DeleteProbe",
+          "email": "nicolas+okta-updated-delprobe@estuary.dev",
+          "login": "nicolas+okta-updated-delprobe@estuary.dev"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200) bru.setVar('delprobe_user_id', res.getBody().id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create a user](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/createUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** a throwaway user that `Seeding / Deactivate Delete-Probe User` and
+  `Seeding / Delete Delete-Probe User` take through to a hard delete, so
+  `Deletes / delete events` can show the user-delete event type and its
+  `target[]` shape. It is separate from the long-lived fixtures so they
+  survive.
+
+  **Outcome:** ran 2026-10-08 and created `00u18ijfskhIUfYlp698` (STAGED,
+  17:24:38). The user was hard-deleted by `Seeding / Delete Delete-Probe User`.

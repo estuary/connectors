@@ -44,6 +44,7 @@ The connector uses `view=Detailed` for all requests. However, only a few resourc
 RingCentral uses page-based pagination with `page` and `perPage` parameters:
 - Maximum page size varies by endpoint (generally 100-250)
 - The `navigation.nextPage` field in responses provides the URL for the next page
+- The company directory endpoint (`internal_contacts`) returns no `navigation`. Its `paging.page` and `paging.totalPages` fields tell whether more pages remain
 - Page numbers are 1-indexed
 
 ### Rate Limiting

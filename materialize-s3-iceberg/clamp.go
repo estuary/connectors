@@ -1,23 +1,27 @@
-package main
+package connector
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
-// Bounds of Python `datetime`. pyiceberg.add_files reads parquet column
-// min/max stats through pyarrow, which materializes them as Python
-// datetime/date - so any value outside this band crashes the append with
-// `OverflowError: date value out of range`, even though Iceberg's INT64
-// micros (timestamptz) and INT32 days (date) encodings would accept it.
+// Date and timestamp values are clamped to years [1, 9999]. This bound was
+// originally forced by the removed pyiceberg/pyarrow tool, which materialized
+// parquet min/max stats as Python datetime/date objects and crashed the append
+// with `OverflowError: date value out of range` for anything outside the band.
+// iceberg-go reads those stats as raw INT32 days (date) / INT64 micros
+// (timestamptz) and has no such limit, so the clamp is retained only to keep
+// newly-written values consistent with data already materialized by the old
+// tool; it could be relaxed if that consistency is not required.
 const (
-	pyMinYear = 1
-	pyMaxYear = 9999
+	minYear = 1
+	maxYear = 9999
 )
 
 // dateLikeRe matches YYYY-MM-DD with any digit-count year (Postgres can emit
@@ -25,26 +29,56 @@ const (
 var dateLikeRe = regexp.MustCompile(`^(\d+)-(\d{2})-(\d{2})$`)
 
 // clampTimestamp returns a boundary RFC3339Nano value when v parses cleanly
-// but its UTC-normalized year is outside [pyMinYear, pyMaxYear].
+// but its UTC-normalized year is outside [minYear, maxYear].
 func clampTimestamp(v tuple.TupleElement) (any, error) {
 	s, ok := v.(string)
 	if !ok {
 		return v, nil
 	}
 
-	t, err := time.Parse(time.RFC3339Nano, strings.Replace(s, "z", "Z", 1))
+	t, canonical, err := sql.ParseRFC3339Nano(s)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse %q as RFC3339 timestamp: %w", s, err)
+		return nil, err
 	}
-	// UTC year is what reaches pyarrow: "9999-12-31T23:59:59-14:00" looks
-	// like 9999 locally but materializes as 10000 in UTC.
+	// The UTC-normalized year is what determines the bound:
+	// "9999-12-31T23:59:59-14:00" looks like 9999 locally but is 10000 in UTC.
 	switch year := t.UTC().Year(); {
-	case year > pyMaxYear:
-		return time.Date(pyMaxYear, 12, 31, 23, 59, 59, 999999000, time.UTC).Format(time.RFC3339Nano), nil
-	case year < pyMinYear:
-		return time.Date(pyMinYear, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano), nil
+	case year > maxYear:
+		return time.Date(maxYear, 12, 31, 23, 59, 59, 999999000, time.UTC).Format(time.RFC3339Nano), nil
+	case year < minYear:
+		return time.Date(minYear, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339Nano), nil
 	}
-	return s, nil
+	return canonical, nil
+}
+
+// nsMinTime and nsMaxTime are the bounds of the int64 nanoseconds-since-epoch
+// encoding of an Iceberg timestamptz_ns column (roughly years 1677 to 2262).
+// Beyond them time.Time.UnixNano is undefined and wraps, so out-of-range values
+// are clamped to the boundary instants before they reach the writer.
+var (
+	nsMinTime = time.Unix(0, math.MinInt64).UTC()
+	nsMaxTime = time.Unix(0, math.MaxInt64).UTC()
+)
+
+// clampTimestampNanos is the nanosecond-precision analog of clampTimestamp,
+// bounded by the int64-ns band rather than [minYear, maxYear].
+func clampTimestampNanos(v tuple.TupleElement) (any, error) {
+	s, ok := v.(string)
+	if !ok {
+		return v, nil
+	}
+
+	t, canonical, err := sql.ParseRFC3339Nano(s)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case t.After(nsMaxTime):
+		return nsMaxTime.Format(time.RFC3339Nano), nil
+	case t.Before(nsMinTime):
+		return nsMinTime.Format(time.RFC3339Nano), nil
+	}
+	return canonical, nil
 }
 
 // clampDate also rescues > 4-digit years, which time.Parse(time.DateOnly, ...)
@@ -61,10 +95,10 @@ func clampDate(v tuple.TupleElement) (any, error) {
 	}
 	year, _ := strconv.Atoi(m[1])
 	switch {
-	case year > pyMaxYear:
-		return fmt.Sprintf("%04d-12-31", pyMaxYear), nil
-	case year < pyMinYear:
-		return fmt.Sprintf("%04d-01-01", pyMinYear), nil
+	case year > maxYear:
+		return fmt.Sprintf("%04d-12-31", maxYear), nil
+	case year < minYear:
+		return fmt.Sprintf("%04d-01-01", minYear), nil
 	}
 	return s, nil
 }

@@ -17,9 +17,13 @@ import (
 // DiscoverCatalog queries the database and generates discovered bindings
 // describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovered_Binding, error) {
-	tables, err := db.DiscoverTables(ctx)
+	tableIDs, err := db.ListTables(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error listing database tables: %w", err)
+	}
+	tables, err := db.DiscoverTableDetails(ctx, tableIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error discovering database tables: %w", err)
 	}
 
 	var catalog []*pc.Response_Discovered_Binding
@@ -110,8 +114,8 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	var sourceSchema = db.SourceMetadataSchema(fullWriteSchema)
 
 	if db.HistoryMode() && fullWriteSchema {
-		sourceSchema.Extras = map[string]interface{}{
-			"reduce": map[string]interface{}{
+		sourceSchema.Extras = map[string]any{
+			"reduce": map[string]any{
 				"strategy":    "lastWriteWins",
 				"associative": false,
 			},
@@ -302,14 +306,6 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	return documentSchema, keyPointers, isFallback, nil
 }
 
-// Per the flow JSON schema: Collection names are paths of Unicode letters, numbers, '-', '_', or
-// '.'. Each path component is separated by a slash '/', and a name may not begin or end in a '/'.
-
-// There is also a requirement for gazette journals that they must be a "clean" path. As a
-// simplification to ensure that recommended collection names meet this requirement we will replace
-// any occurences of '/' with '_' as well.
-var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
-
 var LowercaseRecommendedNames = true
 
 func recommendedCatalogName(schema, table string) string {
@@ -317,9 +313,20 @@ func recommendedCatalogName(schema, table string) string {
 		schema = strings.ToLower(schema)
 		table = strings.ToLower(table)
 	}
-	var sanitizedSchema = catalogNameSanitizerRe.ReplaceAllString(schema, "_")
-	var sanitizedTable = catalogNameSanitizerRe.ReplaceAllString(table, "_")
-	return sanitizedSchema + "/" + sanitizedTable
+	return sanitizeCatalogNameComponent(schema) + "/" + sanitizeCatalogNameComponent(table)
+}
+
+var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
+
+// sanitizeCatalogNameComponent replaces characters which are invalid in collection
+// names with underscores, and rewrites the path elements '.' and '..' so that the
+// resulting slash-joined name is always a clean path.
+func sanitizeCatalogNameComponent(name string) string {
+	name = catalogNameSanitizerRe.ReplaceAllString(name, "_")
+	if name == "." || name == ".." {
+		return strings.ReplaceAll(name, ".", "_")
+	}
+	return name
 }
 
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key

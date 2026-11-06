@@ -1,0 +1,4 @@
+credentials:
+  credentials_title: AWS Access Key
+  access_key_id: not_a_real_access_key_id
+  secret_access_key: not_a_real_secret_access_key

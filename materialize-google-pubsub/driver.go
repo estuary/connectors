@@ -63,7 +63,7 @@ func (c *config) client(ctx context.Context) (*pubsub.Client, error) {
 type resource struct {
 	TopicName                 string `json:"topic" jsonschema:"title=Topic Name" jsonschema_extras:"x-collection-name=true"`
 	Identifier                string `json:"identifier,omitempty" jsonschema:"title=Resource Binding Identifier"`
-	CreateDefaultSubscription bool   `json:"create_default_subscription" jsonschema:"title=Create with Default Subscription,default=true"`
+	CreateDefaultSubscription bool   `json:"create_default_subscription" jsonschema:"title=Create with Default Subscription,default=true" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {
@@ -144,7 +144,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 		topicNames[res.TopicName] = struct{}{}
 
-		constraints := make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, projection := range b.Collection.Projections {
 			var constraint = new(pm.Response_Validated_Constraint)
 			switch {
@@ -157,7 +157,10 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 				constraint.Reason = "PubSub only materializes the full document"
 			}
-			constraints[projection.Field] = constraint
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      projection.Field,
+				Constraint: constraint,
+			})
 		}
 
 		// Include identifier in the resource path if configured.
@@ -168,7 +171,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: false,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          resourcePath,
 		})
@@ -252,7 +255,11 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -280,6 +287,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 		// https://cloud.google.com/pubsub/docs/ordering
 		t.EnableMessageOrdering = true
 		topicBindings = append(topicBindings, &topicBinding{
+			path:       b.ResourcePath,
 			identifier: res.Identifier,
 			topic:      t,
 		})
@@ -287,6 +295,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 
 	return &transactor{
 		bindings: topicBindings,
+		be:       be,
 	}, &pm.Response_Opened{}, nil, nil
 }
 

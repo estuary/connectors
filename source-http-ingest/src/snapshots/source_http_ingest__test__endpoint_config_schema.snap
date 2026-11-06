@@ -101,13 +101,76 @@ expression: schema
           ]
         },
         {
+          "title": "Zoom",
+          "properties": {
+            "maxSignatureAge": {
+              "title": "Max Signature Age",
+              "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+              "type": "integer",
+              "default": 300,
+              "maximum": 259200,
+              "minimum": 1,
+              "order": 2
+            },
+            "provider": {
+              "type": "string",
+              "const": "zoom",
+              "default": "zoom",
+              "order": 0
+            },
+            "publicKey": {
+              "title": "Secret Token",
+              "description": "Zoom webhook secret token used as the HMAC-SHA256 key.",
+              "type": "string",
+              "order": 1,
+              "secret": true
+            }
+          },
+          "required": [
+            "provider",
+            "publicKey"
+          ]
+        },
+        {
+          "title": "Knock",
+          "properties": {
+            "maxSignatureAge": {
+              "title": "Max Signature Age",
+              "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+              "type": "integer",
+              "default": 300,
+              "maximum": 259200,
+              "minimum": 1,
+              "order": 2
+            },
+            "provider": {
+              "type": "string",
+              "const": "knock",
+              "default": "knock",
+              "order": 0
+            },
+            "publicKey": {
+              "title": "Signing Key",
+              "description": "Knock webhook signing key used as the HMAC-SHA256 secret.",
+              "type": "string",
+              "order": 1,
+              "secret": true
+            }
+          },
+          "required": [
+            "provider",
+            "publicKey"
+          ]
+        },
+        {
           "title": "Custom",
           "properties": {
             "algorithm": {
               "title": "Algorithm",
               "type": "string",
-              "default": "ecdsa",
+              "default": "hmac_sha256",
               "enum": [
+                "hmac_sha256",
                 "ecdsa"
               ],
               "order": 1
@@ -119,7 +182,7 @@ expression: schema
               "default": 300,
               "maximum": 259200,
               "minimum": 1,
-              "order": 5
+              "order": 7
             },
             "provider": {
               "type": "string",
@@ -129,30 +192,48 @@ expression: schema
             },
             "publicKey": {
               "title": "Public Key",
-              "description": "PEM-encoded public key.",
+              "description": "PEM-encoded public key for ECDSA, or shared secret for HMAC.",
               "type": "string",
               "multiline": true,
               "order": 2,
               "secret": true
             },
+            "signatureEncoding": {
+              "title": "Signature Encoding",
+              "description": "Encoding of the signature value in the header. Defaults to hex.",
+              "type": "string",
+              "default": "hex",
+              "enum": [
+                "hex",
+                "base64"
+              ],
+              "order": 4
+            },
             "signatureHeader": {
               "title": "Signature Header",
-              "description": "HTTP header containing the base64-encoded signature.",
+              "description": "HTTP header containing the signature.",
               "type": "string",
               "order": 3
+            },
+            "signingStringTemplate": {
+              "title": "Signing String Template",
+              "description": "Template used to construct the string that is signed. Must include {PAYLOAD}, may include {TIMESTAMP}. Example: \"{TIMESTAMP}:{PAYLOAD}\".",
+              "type": "string",
+              "order": 5
             },
             "timestampHeader": {
               "title": "Timestamp Header",
               "description": "Optional HTTP header containing the timestamp.",
               "type": "string",
-              "order": 4
+              "order": 6
             }
           },
           "required": [
             "provider",
             "algorithm",
             "publicKey",
-            "signatureHeader"
+            "signatureHeader",
+            "signingStringTemplate"
           ]
         }
       ],

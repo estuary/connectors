@@ -1,0 +1,153 @@
+name: Classify Changed Paths
+description: >
+  Decide which connector CI lanes a change affects.
+  Python connectors are recognised by a top-level
+  pyproject.toml rather than by name.
+
+outputs:
+  python_connectors:
+    description: >
+      The Python connectors to build: `all`, or a JSON list of connector
+      directories.
+    value: ${{ steps.classify.outputs.python_connectors }}
+  go_connectors:
+    description: >
+      The Go connectors to build: `all`, or a JSON list of connector
+      directories.
+    value: ${{ steps.classify.outputs.go_connectors }}
+  rust_connectors:
+    description: >
+      The Rust connectors to build: `all`, or a JSON list of connector
+      directories.
+    value: ${{ steps.classify.outputs.rust_connectors }}
+  cdk:
+    description: Whether estuary-cdk's own tests and checks need to run.
+    value: ${{ steps.classify.outputs.cdk }}
+
+runs:
+  using: "composite"
+  steps:
+
+    # The classifier picks Go connectors from the repository's import graph.
+    # Only the toolchain go.mod asks for is needed: `go list` parses imports
+    # from source, so nothing is downloaded and there's nothing to cache.
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+        cache: false
+
+    # `-e` reports packages whose dependencies can't be loaded instead of
+    # failing, and GOPROXY=off keeps it from fetching them; their imports are
+    # still listed. A failure leaves the file empty, which the classifier
+    # reads as "every Go connector".
+    - name: List the Go import graph
+      shell: bash
+      run: |
+        GOFLAGS=-mod=mod GOPROXY=off go list -e \
+          -f '{{.ImportPath}}|{{join .Imports ","}}|{{join .TestImports ","}}|{{join .XTestImports ","}}' \
+          ./... > "${RUNNER_TEMP}/go-import-graph.txt" 2> /dev/null ||
+          : > "${RUNNER_TEMP}/go-import-graph.txt"
+
+    - name: Classify the changed paths
+      id: classify
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GO_IMPORT_GRAPH: ${{ runner.temp }}/go-import-graph.txt
+      run: |
+        set -uo pipefail
+
+        # Every failure path below builds every connector in every lane.
+        fallback() {
+          echo "$1; building every connector to be safe"
+          printf 'python_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
+          exit 0
+        }
+
+        # Scheduled and manual runs have no change to classify; they exist to
+        # build everything.
+        case "${{ github.event_name }}" in
+          schedule | workflow_dispatch)
+            echo "${{ github.event_name }} run; building every connector"
+            printf 'python_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+          # A release publishes estuary-cdk from a tag; nothing is changed, so
+          # no connector is rebuilt. `cdk=true` because the publish job waits
+          # on the CDK's own checks.
+          release)
+            echo "release run; estuary-cdk only"
+            printf 'python_connectors=[]\ngo_connectors=[]\nrust_connectors=[]\ncdk=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+            ;;
+        esac
+
+        # Which paths changed comes from the API rather than from git history
+        # for various reasons, mostly to avoid re-engineering the "which paths
+        # have changed?" logic ourselves.
+        #
+        # The catch is that neither endpoint promises the full list - they cap
+        # out at 300 or 3000 files and truncate silently. A missing path can only
+        # turn a lane off, so each branch proves its list is complete before a
+        # "false" is believed.
+        #
+        # A renamed file's old path is only in `previous_filename`. It is listed
+        # too, since whatever used the file there is affected as much as its new
+        # home. COUNT then counts paths, which can only reach a cap early and
+        # build everything.
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # Paginated but capped at 3000 files. A list sitting at the 3000
+          # path cap cannot be assumed complete.
+          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)' > changed.txt ||
+            fallback "could not list pull request files"
+
+          COUNT=$(wc -l < changed.txt)
+          [ "$COUNT" -lt 3000 ] ||
+            fallback "listed ${COUNT} paths, at or above the API's 3000-file cap"
+        else
+          # The compare endpoint reports at most 300 files and does not paginate
+          # them. They appear only on the first page, so a diff sitting at
+          # the 300 path cap cannot be assumed complete.
+          gh api "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" \
+            --jq '.files[] | .filename, (.previous_filename // empty)' > changed.txt ||
+            fallback "could not compare ${{ github.event.before }}...${{ github.sha }}"
+
+          COUNT=$(wc -l < changed.txt)
+          [ "$COUNT" -lt 300 ] ||
+            fallback "compare returned ${COUNT} paths, at or above the API's 300-file cap"
+        fi
+
+        echo "${COUNT} changed path(s)"
+
+        # An empty list contradicts the workflow having triggered at all, so read
+        # it as a broken enumeration rather than as "nothing to do".
+        if [ "$COUNT" -eq 0 ]; then
+          fallback "no paths enumerated"
+        fi
+
+        SCRIPT="${{ github.workspace }}/.github/scripts/classify-changed-paths.sh"
+        if ! VERDICT=$("$SCRIPT" < changed.txt); then
+          fallback "classifier exited non-zero"
+        fi
+
+        # Guard the shape of the verdict too: an empty or malformed value would
+        # compare unequal to 'true' in the callers' `if:` and skip everything.
+        # Each lane's connectors are `all` or a JSON array, which callers pass
+        # to fromJSON.
+        is_connectors() {
+          local value
+          value=$(sed -n "s/^$1=//p" <<< "$VERDICT")
+          [ "$value" = all ] || jq -e 'type == "array"' <<< "$value" > /dev/null 2>&1
+        }
+        if ! grep -Eq '^cdk=(true|false)$' <<< "$VERDICT" ||
+           ! is_connectors python_connectors ||
+           ! is_connectors go_connectors ||
+           ! is_connectors rust_connectors; then
+          fallback "classifier gave '${VERDICT}'"
+        fi
+
+        echo "verdict:"
+        echo "$VERDICT"
+        echo "$VERDICT" >> "$GITHUB_OUTPUT"

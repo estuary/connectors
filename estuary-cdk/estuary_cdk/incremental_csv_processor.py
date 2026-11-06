@@ -3,9 +3,9 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, overload
+from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, cast, overload
 from dataclasses import dataclass
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from estuary_cdk.capture.common import BaseDocument
 
 
@@ -29,16 +29,16 @@ class BaseCSVRow(BaseDocument):
     # can subclass and override NULL_VALUES as needed.
     NULL_VALUES: ClassVar[set[str]] = {""}
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     @model_validator(mode='before')
     @classmethod
     def handle_null_values(cls, data: Any) -> Any:
         if isinstance(data, dict):
+            fields = cast(dict[str, Any], data)
             return {
                 key: None if isinstance(value, str) and value in cls.NULL_VALUES else value
-                for key, value in data.items()
+                for key, value in fields.items()
             }
         return data
 
@@ -60,12 +60,38 @@ class CSVConfig:
 class CSVProcessingError(Exception):
     """Exception raised when CSV processing fails."""
 
-    def __init__(self, message: str, config: dict | None = None):
+    def __init__(self, message: str, config: dict[str, Any] | None = None):
         self.config = config
         if config:
             config_str = ", ".join([f"{k}={repr(v)}" for k, v in config.items()])
             message = f"{message}. CSV reader configuration: {config_str}"
         super().__init__(message)
+
+
+# Sentinels for column-count validation. aiocsv's dict reader collects surplus
+# cells under `restkey` and pads short rows with `restval`. Using unique objects
+# for both lets us detect either mismatch without mistaking a genuinely empty
+# field ("") for a missing one.
+_SURPLUS_COLUMNS_KEY = object()
+_MISSING_COLUMN = object()
+
+
+def _dialect_kwargs(config: CSVConfig) -> dict[str, Any]:
+    """Build the csv dialect kwargs shared by both processors."""
+    kwargs: dict[str, Any] = {
+        'delimiter': config.delimiter,
+        'quotechar': config.quotechar,
+        'doublequote': config.doublequote,
+        'skipinitialspace': config.skipinitialspace,
+        'lineterminator': config.lineterminator,
+        'quoting': config.quoting,
+        'strict': config.strict,
+    }
+
+    if config.escapechar is not None:
+        kwargs['escapechar'] = config.escapechar
+
+    return kwargs
 
 
 class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
@@ -77,24 +103,30 @@ class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
         self._exhausted = False
 
     async def read(self, size: int = -1) -> str:
-        """Read and incrementally decode data from the byte stream."""
-        if self._exhausted:
-            return ""
+        """Read and incrementally decode data from the byte stream.
 
-        try:
-            chunk = await self.byte_gen.__anext__()
+        aiocsv takes an empty string as the end of the file, so a chunk that
+        decodes to no text (an empty chunk, a lone byte-order mark, or part of
+        a multi-byte character) is never returned; the next chunk is read
+        instead.
+        """
+        while not self._exhausted:
+            try:
+                chunk = await self.byte_gen.__anext__()
+            except StopAsyncIteration:
+                self._exhausted = True
+
+                # Finalize the decoder to get any remaining characters.
+                # This will raise UnicodeDecodeError if there are incomplete characters.
+                return self.decoder.decode(b'', final=True)
+
             # Use incremental decoder to handle multi-byte characters
             # that may be split across chunk boundaries.
-            return self.decoder.decode(chunk, final=False)
+            text = self.decoder.decode(chunk, final=False)
+            if text:
+                return text
 
-        except StopAsyncIteration:
-            self._exhausted = True
-
-            # Finalize the decoder to get any remaining characters.
-            # This will raise UnicodeDecodeError if there are incomplete characters.
-            final_chunk = self.decoder.decode(b'', final=True)
-
-            return final_chunk if final_chunk else ""
+        return ""
 
 
 class IncrementalCSVProcessor(Generic[T]):
@@ -229,24 +261,115 @@ class IncrementalCSVProcessor(Generic[T]):
         """
         async_reader = _AsyncByteReader(self.byte_iterator, self.config.encoding)
 
-        reader_kwargs = {
-            'delimiter': self.config.delimiter,
-            'quotechar': self.config.quotechar,
-            'doublequote': self.config.doublequote,
-            'skipinitialspace': self.config.skipinitialspace,
-            'lineterminator': self.config.lineterminator,
-            'quoting': self.config.quoting,
-            'strict': self.config.strict,
-        }
-
-        if self.config.escapechar is not None:
-            reader_kwargs['escapechar'] = self.config.escapechar
+        reader_kwargs = _dialect_kwargs(self.config)
 
         if self.fieldnames is not None:
             reader_kwargs['fieldnames'] = self.fieldnames
 
+        # Route surplus cells and short-row padding to sentinels so a
+        # column-count mismatch is detectable and distinct from an empty field.
+        reader_kwargs['restkey'] = _SURPLUS_COLUMNS_KEY
+        reader_kwargs['restval'] = _MISSING_COLUMN
+
         try:
-            async for row in aiocsv.AsyncDictReader(async_reader, **reader_kwargs):
+            reader = aiocsv.AsyncDictReader(async_reader, **reader_kwargs)
+            async for row in reader:
+                self._validate_column_count(row, reader)
+                yield row
+        except csv.Error as e:
+            raise CSVProcessingError(f"Failed to parse CSV data: {str(e)}", config=reader_kwargs) from e
+
+    @staticmethod
+    def _validate_column_count(row: dict[Any, Any], reader: "aiocsv.AsyncDictReader") -> None:
+        """Raise CSVProcessingError if `row` has more or fewer columns than the
+        reader's header/fieldnames."""
+        expected = len(reader.fieldnames or [])
+
+        if _SURPLUS_COLUMNS_KEY in row:
+            actual = expected + len(row[_SURPLUS_COLUMNS_KEY])
+            raise CSVProcessingError(
+                f"CSV row {reader.line_num} has {actual} columns but {expected} were expected."
+            )
+
+        missing = sum(1 for value in row.values() if value is _MISSING_COLUMN)
+        if missing:
+            raise CSVProcessingError(
+                f"CSV row {reader.line_num} has {expected - missing} columns but "
+                f"{expected} were expected."
+            )
+
+
+class IncrementalCSVRowProcessor:
+    """
+    Process a stream of CSV bytes incrementally, yielding each row's cells.
+
+    This is a lower level counterpart to IncrementalCSVProcessor. It parses
+    rows but does not bind cells to field names, so it has no notion of an
+    expected column count and performs no column count validation.
+
+    Use it for sources whose rows can legitimately differ in width from the
+    schema describing them, where deciding which widths are acceptable - and
+    how to bind cells to names once they are - requires knowledge of the source
+    that only the connector has. Callers take on that responsibility in full:
+    binding cells to names positionally is silently wrong when a row is not the
+    width you assume, so validate widths before binding.
+
+    Prefer IncrementalCSVProcessor whenever a row's width is expected to match
+    its schema. It validates that for you and yields named rows.
+
+    Example usage:
+    ```python
+    async for cells in IncrementalCSVRowProcessor(byte_iterator):
+        cells[0]  # cells is list[str]
+    ```
+    """
+
+    def __init__(
+        self,
+        byte_iterator: AsyncGenerator[bytes, None],
+        config: CSVConfig | None = None,
+    ):
+        """
+        Initialize the processor with byte iterator and optional CSV configuration.
+
+        Args:
+            byte_iterator: Async generator of CSV byte chunks
+            config: Optional CSV configuration options
+        """
+        self.byte_iterator = byte_iterator
+        self.config = config or CSVConfig()
+        self._row_iterator: AsyncGenerator[list[str], None] | None = None
+
+    def __aiter__(self) -> "IncrementalCSVRowProcessor":
+        return self
+
+    async def __anext__(self) -> list[str]:
+        if self._row_iterator is None:
+            self._row_iterator = self._process_stream()
+
+        return await self._row_iterator.__anext__()
+
+    async def _process_stream(self) -> AsyncGenerator[list[str], None]:
+        """
+        Internal method to process the byte stream and yield CSV records.
+
+        Yields:
+            list[str]: Complete CSV records as lists of cells
+
+        Raises:
+            CSVProcessingError: When CSV data is malformed or cannot be parsed
+        """
+        async_reader = _AsyncByteReader(self.byte_iterator, self.config.encoding)
+
+        reader_kwargs = _dialect_kwargs(self.config)
+
+        try:
+            reader = aiocsv.AsyncReader(async_reader, **reader_kwargs)
+            async for row in reader:
+                # aiocsv's dict reader skips blank lines; do the same here so
+                # callers don't have to distinguish a blank line from a row.
+                if not row:
+                    continue
                 yield row
         except csv.Error as e:
             raise CSVProcessingError(f"Failed to parse CSV data: {str(e)}", config=reader_kwargs) from e

@@ -209,7 +209,10 @@
     "resourceConfig": {
       "stream": "accounts",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "accounts"
+    ]
   },
   {
     "documentSchema": {
@@ -334,7 +337,10 @@
     "resourceConfig": {
       "stream": "addresses",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "addresses"
+    ]
   },
   {
     "documentSchema": {
@@ -457,7 +463,10 @@
       ],
       "stream": "alerts",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "alerts"
+    ]
   },
   {
     "documentSchema": {
@@ -612,7 +621,10 @@
     "resourceConfig": {
       "stream": "applications",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "applications"
+    ]
   },
   {
     "documentSchema": {
@@ -690,7 +702,10 @@
     "resourceConfig": {
       "stream": "available_phone_number_countries",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "available_phone_number_countries"
+    ]
   },
   {
     "documentSchema": {
@@ -822,7 +837,10 @@
     "resourceConfig": {
       "stream": "available_phone_numbers_local",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "available_phone_numbers_local"
+    ]
   },
   {
     "documentSchema": {
@@ -954,7 +972,10 @@
     "resourceConfig": {
       "stream": "available_phone_numbers_mobile",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "available_phone_numbers_mobile"
+    ]
   },
   {
     "documentSchema": {
@@ -1086,7 +1107,10 @@
     "resourceConfig": {
       "stream": "available_phone_numbers_toll_free",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "available_phone_numbers_toll_free"
+    ]
   },
   {
     "documentSchema": {
@@ -1345,7 +1369,10 @@
       ],
       "stream": "calls",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "calls"
+    ]
   },
   {
     "documentSchema": {
@@ -1457,7 +1484,10 @@
     "resourceConfig": {
       "stream": "conference_participants",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "conference_participants"
+    ]
   },
   {
     "documentSchema": {
@@ -1576,7 +1606,10 @@
       ],
       "stream": "conferences",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "conferences"
+    ]
   },
   {
     "documentSchema": {
@@ -1683,7 +1716,10 @@
     "resourceConfig": {
       "stream": "conversations",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "conversations"
+    ]
   },
   {
     "documentSchema": {
@@ -1887,7 +1923,10 @@
     "resourceConfig": {
       "stream": "conversation_messages",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "conversation_messages"
+    ]
   },
   {
     "documentSchema": {
@@ -2009,7 +2048,10 @@
     "resourceConfig": {
       "stream": "conversation_participants",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "conversation_participants"
+    ]
   },
   {
     "documentSchema": {
@@ -2215,7 +2257,10 @@
     "resourceConfig": {
       "stream": "dependent_phone_numbers",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "dependent_phone_numbers"
+    ]
   },
   {
     "documentSchema": {
@@ -2312,7 +2357,10 @@
     "resourceConfig": {
       "stream": "flows",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "flows"
+    ]
   },
   {
     "documentSchema": {
@@ -2425,7 +2473,10 @@
     "resourceConfig": {
       "stream": "executions",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "executions"
+    ]
   },
   {
     "documentSchema": {
@@ -2700,7 +2751,10 @@
     "resourceConfig": {
       "stream": "incoming_phone_numbers",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "incoming_phone_numbers"
+    ]
   },
   {
     "documentSchema": {
@@ -2753,7 +2807,10 @@
     "resourceConfig": {
       "stream": "keys",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "keys"
+    ]
   },
   {
     "documentSchema": {
@@ -2827,7 +2884,10 @@
       ],
       "stream": "message_media",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "message_media"
+    ]
   },
   {
     "documentSchema": {
@@ -2995,7 +3055,10 @@
       ],
       "stream": "messages",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "messages"
+    ]
   },
   {
     "documentSchema": {
@@ -3066,7 +3129,10 @@
     "resourceConfig": {
       "stream": "outgoing_caller_ids",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "outgoing_caller_ids"
+    ]
   },
   {
     "documentSchema": {
@@ -3164,7 +3230,10 @@
     "resourceConfig": {
       "stream": "queues",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "queues"
+    ]
   },
   {
     "documentSchema": {
@@ -3350,7 +3419,10 @@
       ],
       "stream": "recordings",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "recordings"
+    ]
   },
   {
     "documentSchema": {
@@ -3441,7 +3513,10 @@
     "resourceConfig": {
       "stream": "roles",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "roles"
+    ]
   },
   {
     "documentSchema": {
@@ -3678,7 +3753,10 @@
     "resourceConfig": {
       "stream": "services",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "services"
+    ]
   },
   {
     "documentSchema": {
@@ -3793,7 +3871,10 @@
     "resourceConfig": {
       "stream": "step",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "step"
+    ]
   },
   {
     "documentSchema": {
@@ -3900,7 +3981,10 @@
     "resourceConfig": {
       "stream": "transcriptions",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "transcriptions"
+    ]
   },
   {
     "documentSchema": {
@@ -4088,7 +4172,10 @@
     "resourceConfig": {
       "stream": "trunks",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "trunks"
+    ]
   },
   {
     "documentSchema": {
@@ -4260,7 +4347,10 @@
       ],
       "stream": "usage_records",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "usage_records"
+    ]
   },
   {
     "documentSchema": {
@@ -4386,7 +4476,10 @@
     "resourceConfig": {
       "stream": "usage_triggers",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "usage_triggers"
+    ]
   },
   {
     "documentSchema": {
@@ -4501,7 +4594,10 @@
     "resourceConfig": {
       "stream": "users",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "users"
+    ]
   },
   {
     "documentSchema": {
@@ -4660,7 +4756,10 @@
     "resourceConfig": {
       "stream": "user_conversations",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "user_conversations"
+    ]
   },
   {
     "documentSchema": {
@@ -4893,6 +4992,9 @@
     "resourceConfig": {
       "stream": "verify_services",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "verify_services"
+    ]
   }
 ]

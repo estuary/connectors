@@ -21,8 +21,32 @@
 #                            #   or    <connector>/testdata/config.yaml
 #     [--docker]             # run connector as Docker image (default: local binary)
 #     [--seed N]             # default: 0
+#     [--no-docker-compose]  # if set skip docker compose setup; implies --keep
 #     [--keep]               # don't tear down docker-compose on exit
 #     [--out-dir DIR]        # default: tests/benchmark/materialize/runs/<ts>
+#     [--shard-flag K=V]     # task shard flag, repeatable. Needed where a
+#                            #   connector gates a write path on the runtime,
+#                            #   e.g. enable-runtime-v2=true.
+#     [--table-suffix S]     # appended to every binding's table name, so two
+#                            #   arms of one comparison can run the same
+#                            #   scenario against separate tables.
+#     [--shard-log-level L]  # task shards.logLevel, e.g. debug. The runtime
+#                            #   forces the connector's LOG_LEVEL from this, so
+#                            #   exporting LOG_LEVEL has no effect.
+#     [--shards N]           # default: 1. Drives N synthetic shards in one
+#                            #   process. Fixture documents hash-route by
+#                            #   collection key, so each document lands on
+#                            #   exactly one shard.
+#
+#     [--preview-arg ARG]    # extra argument to the materialization's
+#                            #   `flowctl raw preview-next`, repeatable.
+#     [--tpcds-cache DIR]    # TPC-DS only: generate the fixture into DIR once
+#                            #   before the run and replay it, here and in
+#                            #   later runs of the same workload.
+#
+# A scenario with a `tpcds` block streams the TPC-DS dataset from the
+# source-tpc-ds capture instead of synthetic documents (see tpcds.py). Its
+# image is $TPCDS_IMAGE, default ghcr.io/estuary/source-tpc-ds:dev.
 
 set -o errexit
 set -o pipefail
@@ -37,7 +61,14 @@ CONFIG=""
 SEED=0
 KEEP=0
 OUT_DIR=""
+DOCKER_COMPOSE=1
 DOCKER=0
+SHARD_FLAGS=()
+TABLE_SUFFIX=""
+SHARD_LOG_LEVEL=""
+SHARDS=1
+TPCDS_CACHE=""
+PREVIEW_EXTRA=()
 
 while (($#)); do
   case "$1" in
@@ -45,11 +76,18 @@ while (($#)); do
     --scenario)  SCENARIO="$2";  shift 2 ;;
     --config)    CONFIG="$2";    shift 2 ;;
     --seed)      SEED="$2";      shift 2 ;;
+    --no-docker-compose) DOCKER_COMPOSE=0; KEEP=1; shift ;;
     --keep)      KEEP=1;         shift   ;;
     --docker)    DOCKER=1;       shift   ;;
     --out-dir)   OUT_DIR="$2";   shift 2 ;;
+    --shard-flag)   SHARD_FLAGS+=("$2"); shift 2 ;;
+    --table-suffix) TABLE_SUFFIX="$2";   shift 2 ;;
+    --shard-log-level) SHARD_LOG_LEVEL="$2"; shift 2 ;;
+    --shards)    SHARDS="$2";    shift 2 ;;
+    --tpcds-cache) TPCDS_CACHE="$2"; shift 2 ;;
+    --preview-arg) PREVIEW_EXTRA+=("$2"); shift 2 ;;
     -h|--help)
-      sed -n '2,26p' "$0"; exit 0 ;;
+      sed -n '2,47p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -79,19 +117,41 @@ fi
   exit 2
 }
 
-# Ensure the connector is available in the selected mode.
+# Always rebuild the connector so each run picks up the latest code.
 if (( DOCKER )); then
-  IMAGE="ghcr.io/estuary/${CONNECTOR}:local"
-  if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-    echo "image $IMAGE not found; building with build-local.sh"
-    (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
+  echo "building docker image for $CONNECTOR"
+  (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
+elif [[ -f "$ROOT_DIR/$CONNECTOR/Cargo.toml" ]]; then
+  CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
+  if [[ -x "$CONNECTOR_BIN" ]]; then
+	  echo "using prebuilt connector binary: $CONNECTOR_BIN due to presence of Cargo.toml"
+  else
+	  echo "no binary found at $CONNECTOR_BIN; expected due to presence of Cargo.toml" >&2
+	  exit 1
   fi
 else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
-  if [[ ! -x "$CONNECTOR_BIN" ]]; then
-    echo "building connector binary: $CONNECTOR_BIN"
-    (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" ./$CONNECTOR/...)
+  # Connectors structured as a library plus a cmd/ main (all the SQL ones)
+  # match more than one package under ./<connector>/..., which `go build -o
+  # <file>` refuses. Prefer the cmd package when there is one, and
+  # cmd/connector where cmd holds several mains.
+  if [[ -d "$ROOT_DIR/$CONNECTOR/cmd/connector" ]]; then
+    BUILD_PKG="./$CONNECTOR/cmd/connector/..."
+  elif [[ -d "$ROOT_DIR/$CONNECTOR/cmd" ]]; then
+    BUILD_PKG="./$CONNECTOR/cmd/..."
+  else
+    BUILD_PKG="./$CONNECTOR/..."
   fi
+  echo "building connector binary: $CONNECTOR_BIN (from $BUILD_PKG)"
+  echo go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG"
+  (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" "$BUILD_PKG")
+  # "go build -o" against a pattern that matches no main package compiles the
+  # libraries and exits 0 without writing anything, which surfaces much later
+  # as a preview that cannot start the connector.
+  [[ -x "$CONNECTOR_BIN" ]] || {
+    echo "build produced no binary at $CONNECTOR_BIN ($BUILD_PKG matched no main package)" >&2
+    exit 1
+  }
 fi
 
 # Output directory.
@@ -105,35 +165,92 @@ echo "scenario:  $SCENARIO"
 echo "config:    $CONFIG"
 if (( DOCKER )); then echo "mode:      docker"; else echo "mode:      local"; fi
 echo "seed:      $SEED"
+if (( ${#SHARD_FLAGS[@]} )); then echo "shard flags: ${SHARD_FLAGS[*]}"; fi
+if [[ -n "$TABLE_SUFFIX" ]]; then echo "table suffix: $TABLE_SUFFIX"; fi
+echo "shards:    $SHARDS"
 echo "out-dir:   $OUT_DIR"
+
+# Every run gets its own task name. A task's stored checkpoint otherwise
+# carries over between runs. The _flow_test_<timestamp> shape is what
+# `testctl -mode sweep` recognises, so a run that has been killed can still
+# be cleaned up afterwards.
+RUN_SUFFIX="_flow_test_$(date +%s)"
+TASK="bench/${CONNECTOR}${RUN_SUFFIX}"
+echo "task:      $TASK"
 
 # Bring up the connector's docker-compose stack (DB only). Some connectors
 # keep it under tests/materialize/<connector>/ (the integration-test convention),
 # others keep it at the connector root. Try both.
 COMPOSE_FILE=""
-for cand in \
-  "$ROOT_DIR/tests/materialize/$CONNECTOR/docker-compose.yaml" \
-  "$ROOT_DIR/$CONNECTOR/docker-compose.yaml"
-do
-  if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
-done
-if [[ -n "$COMPOSE_FILE" ]]; then
-  echo "starting docker-compose: $COMPOSE_FILE"
-  docker compose -f "$COMPOSE_FILE" up --wait
-  cleanup() {
-    if (( ! KEEP )); then
-      echo "tearing down docker-compose"
-      docker compose -f "$COMPOSE_FILE" down -v || true
-    else
-      echo "--keep set; leaving docker-compose running"
-    fi
-  }
-  trap cleanup EXIT
-  # Same grace period as tests/materialize/<connector>/setup.sh.
-  sleep 5
-else
-  echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
+COMPOSE_ARGS=()
+if (( DOCKER_COMPOSE )); then
+  for cand in \
+    "$ROOT_DIR/tests/materialize/$CONNECTOR/docker-compose.yaml" \
+    "$ROOT_DIR/$CONNECTOR/docker-compose.yaml"
+  do
+    if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
+  done
+  # setup/<connector>.compose.yaml, when present, sizes the integration-test
+  # stack for benchmark loads.
+  COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+  if [[ -f "$BENCH_DIR/setup/${CONNECTOR}.compose.yaml" ]]; then
+    COMPOSE_ARGS+=(-f "$BENCH_DIR/setup/${CONNECTOR}.compose.yaml")
+  fi
+  if [[ -n "$COMPOSE_FILE" ]]; then
+    echo "starting docker-compose: ${COMPOSE_ARGS[*]}"
+    docker compose "${COMPOSE_ARGS[@]}" up --wait
+    # Same grace period as tests/materialize/<connector>/setup.sh.
+    sleep 5
+  else
+    echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
+  fi
 fi
+
+# clean up the destination resources using testctl
+TESTCTL="$OUT_DIR/testctl"
+echo "building testctl"
+(cd "$ROOT_DIR" && go build -tags nozstd -o "$TESTCTL" ./tests/materialize/testctl)
+
+drop_destination() {
+  local when="$1" res
+  for res in "$OUT_DIR"/resource-*.json; do
+    [[ -f "$res" ]] || continue
+    if "$TESTCTL" -connector "$CONNECTOR" -config "$CONFIG" -resource "$res" \
+         -task "$TASK" -mode drop >>"$OUT_DIR/cleanup.log" 2>&1; then
+      echo "  dropped $(basename "$res" .json) ($when)"
+    else
+      echo "  no $(basename "$res" .json) to drop ($when)"
+    fi
+  done
+}
+
+sweep_run() {
+  local res
+  for res in "$OUT_DIR"/resource-*.json; do
+    [[ -f "$res" ]] || continue
+    "$TESTCTL" -connector "$CONNECTOR" -config "$CONFIG" -resource "$res" \
+      -task "$TASK" -mode sweep -run-suffix "$RUN_SUFFIX" \
+      >>"$OUT_DIR/cleanup.log" 2>&1 || echo "  sweep reported errors (see cleanup.log)"
+    return
+  done
+}
+
+cleanup() {
+  local status=$?
+  if (( KEEP )); then
+    echo "--keep set; leaving the destination and docker-compose in place"
+  else
+    echo "cleaning up"
+    drop_destination "teardown"
+    sweep_run
+    if [[ -n "$COMPOSE_FILE" ]]; then
+      echo "tearing down docker-compose"
+      docker compose "${COMPOSE_ARGS[@]}" down -v || true
+    fi
+  fi
+  return $status
+}
+trap cleanup EXIT INT TERM
 
 # Per-connector setup hook. Runs after docker-compose is up but before the
 # preview. Used for steps like creating an S3 bucket that the connector
@@ -144,6 +261,14 @@ if [[ -x "$SETUP_SCRIPT" ]]; then
   BENCH_CONFIG="$CONFIG" "$SETUP_SCRIPT"
 fi
 
+TPCDS=0
+if python3 -c 'import sys, yaml; sys.exit("tpcds" not in (yaml.safe_load(open(sys.argv[1])) or {}))' "$SCENARIO"; then
+  TPCDS=1
+  CAPTURE_SPEC="$OUT_DIR/capture.flow.yaml"
+  CAPTURE_TASK="bench/source-tpc-ds${RUN_SUFFIX}"
+  echo "workload:  TPC-DS via ${TPCDS_IMAGE:-ghcr.io/estuary/source-tpc-ds:dev}"
+fi
+
 # Render the flow spec.
 SPEC="$OUT_DIR/flow.yaml"
 SPEC_ARGS=(
@@ -151,142 +276,125 @@ SPEC_ARGS=(
   --connector "$CONNECTOR"
   --config    "$CONFIG"
   --output    "$SPEC"
+  --task      "$TASK"
 )
+if (( TPCDS )); then
+  SPEC_ARGS+=(--capture-output "$CAPTURE_SPEC" --capture-task "$CAPTURE_TASK")
+fi
 if (( DOCKER )); then
   SPEC_ARGS+=(--docker)
+fi
+for flag in "${SHARD_FLAGS[@]+"${SHARD_FLAGS[@]}"}"; do
+  SPEC_ARGS+=(--shard-flag "$flag")
+done
+if [[ -n "$TABLE_SUFFIX" ]]; then
+  SPEC_ARGS+=(--table-suffix "$TABLE_SUFFIX")
+fi
+if [[ -n "$SHARD_LOG_LEVEL" ]]; then
+  SPEC_ARGS+=(--shard-log-level "$SHARD_LOG_LEVEL")
 fi
 echo "rendering spec: $SPEC"
 python3 "$BENCH_DIR/generate_spec.py" "${SPEC_ARGS[@]}"
 
-TASK="bench/$CONNECTOR"
+# One resource configuration file per binding, for testctl.
+python3 - "$SPEC" "$OUT_DIR" <<'RESOURCES'
+import json, sys, yaml
+
+spec_path, out_dir = sys.argv[1], sys.argv[2]
+with open(spec_path) as f:
+    spec = yaml.safe_load(f)
+materialization = next(iter(spec["materializations"].values()))
+for index, binding in enumerate(materialization["bindings"]):
+    with open(f"{out_dir}/resource-{index}.json", "w") as f:
+        json.dump(binding["resource"], f)
+RESOURCES
+
+# Drop whatever an earlier run left behind, so this run starts against an empty
+# destination however that run ended.
+echo "preparing destination"
+drop_destination "before run"
 
 # Set up FIFO + background generator.
 FIFO="$OUT_DIR/fixture.fifo"
 [[ -p "$FIFO" ]] || mkfifo "$FIFO"
 
 STATE_LOG="$OUT_DIR/state.json"
-echo "starting generator (seed=$SEED)"
-python3 "$BENCH_DIR/generate.py" \
-  --scenario "$SCENARIO" \
-  --seed     "$SEED" \
-  --output   "$FIFO" \
-  --state    "$STATE_LOG" \
-  >"$OUT_DIR/generator.stderr" 2>&1 &
+if (( TPCDS )); then
+  TPCDS_ARGS=(
+    --scenario "$SCENARIO"
+    --source   "$CAPTURE_SPEC"
+    --name     "$CAPTURE_TASK"
+    --log      "$OUT_DIR/capture.log"
+  )
+  if [[ -n "$TPCDS_CACHE" ]]; then
+    TPCDS_ARGS+=(--cache "$TPCDS_CACHE")
+    # Generate before the preview starts, so the run times only the replay.
+    python3 "$BENCH_DIR/tpcds.py" prepare "${TPCDS_ARGS[@]}"
+    echo "replaying cached TPC-DS fixture from $TPCDS_CACHE"
+  else
+    echo "starting source-tpc-ds capture (log: $OUT_DIR/capture.log)"
+  fi
+  python3 "$BENCH_DIR/tpcds.py" relay "${TPCDS_ARGS[@]}" \
+    --output "$FIFO" \
+    --state  "$STATE_LOG" \
+    >"$OUT_DIR/generator.stderr" 2>&1 &
+else
+  echo "starting generator (seed=$SEED)"
+  python3 "$BENCH_DIR/generate.py" \
+    --scenario "$SCENARIO" \
+    --seed     "$SEED" \
+    --output   "$FIFO" \
+    --state    "$STATE_LOG" \
+    >"$OUT_DIR/generator.stderr" 2>&1 &
+fi
 GEN_PID=$!
 
-# Run flowctl preview, timing the whole thing.
+# Run the preview, timing the whole thing.
 PREVIEW_LOG="$OUT_DIR/preview.log"
-echo "running flowctl preview (logs: $PREVIEW_LOG)"
 
 PREVIEW_ARGS=(
   --source  "$SPEC"
   --name    "$TASK"
   --fixture "$FIFO"
-  --output-state
+  --shards  "$SHARDS"
 )
 # Docker mode needs --network so the connector container can reach the DB.
 if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
 fi
+PREVIEW_ARGS+=("${PREVIEW_EXTRA[@]+"${PREVIEW_EXTRA[@]}"}")
 
-# Pipe preview stdout through a timestamper. Each connectorState line from
-# flowctl marks a commit boundary. The first is Apply (DDL/table creation),
-# subsequent ones are data transactions. The timestamper records monotonic
-# nanosecond timestamps so we can compute per-transaction wall times and
-# exclude Apply from the data throughput measurement.
-TIMESTAMPS="$OUT_DIR/timestamps.json"
+# flowctl publishes one `transaction stats` line per round at info, which is
+# what results.py derives the transaction boundaries from. The task keeps its
+# default warn level, which still forwards the connector's own warnings as
+# `ops:` lines.
+export RUST_LOG="info"
+
+echo "running flowctl raw preview-next --shards $SHARDS (logs: $PREVIEW_LOG)"
 set +e
-flowctl preview "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
-  | python3 -c "
-import sys, time, json
-ts = [time.monotonic_ns()]  # ts[0] = start (before any data)
-for line in sys.stdin:
-    sys.stdout.write(line)
-    sys.stdout.flush()
-    if '\"connectorState\"' in line:
-        ts.append(time.monotonic_ns())
-with open('$TIMESTAMPS', 'w') as f:
-    json.dump(ts, f)
-" >"$OUT_DIR/preview.stdout"
-PREVIEW_RC=${PIPESTATUS[0]}
+flowctl raw preview-next "${PREVIEW_ARGS[@]}" \
+  >"$OUT_DIR/preview.stdout" 2>"$PREVIEW_LOG"
+PREVIEW_RC=$?
 set -e
 
-# If the generator is still alive (e.g., preview died early), it's blocked
-# on writing to a FIFO no one reads. Kill it so we don't hang.
-if kill -0 $GEN_PID 2>/dev/null; then
+# If the preview died early, the generator is blocked writing to a FIFO no one
+# reads. Kill it so we don't hang. After a clean preview it has closed the FIFO
+# and is at most stopping its capture.
+if (( PREVIEW_RC )) && kill -0 $GEN_PID 2>/dev/null; then
   kill $GEN_PID 2>/dev/null || true
 fi
-wait $GEN_PID 2>/dev/null || true
+GEN_RC=0
+wait $GEN_PID 2>/dev/null || GEN_RC=$?
 
 echo "preview exit: $PREVIEW_RC"
+if (( GEN_RC )); then
+  echo "generator exit: $GEN_RC (see $OUT_DIR/generator.stderr)"
+  # A preview that drained a truncated fixture still exits 0.
+  (( PREVIEW_RC )) || PREVIEW_RC=$GEN_RC
+fi
 
-# Build results.json from state log + per-commit timestamps.
-# timestamps.json has one entry per connectorState line: the first is Apply
-# (DDL), the rest are data transactions.
-python3 - "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" >"$OUT_DIR/results.json" <<'PY'
-import json, sys, os
-state_path, ts_path, rc, connector, scenario, seed = sys.argv[1:7]
-with open(state_path) as f:
-    state = json.load(f)
-try:
-    with open(ts_path) as f:
-        timestamps = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    timestamps = []
-
-# timestamps[0] = preview start, timestamps[1] = end of Apply (DDL),
-# timestamps[2..N] = end of each data transaction.
-apply_seconds = None
-tx_boundaries = []  # (start_ns, end_ns) per data transaction
-if len(timestamps) >= 2:
-    apply_seconds = (timestamps[1] - timestamps[0]) / 1e9
-    for i in range(2, len(timestamps)):
-        tx_boundaries.append((timestamps[i - 1], timestamps[i]))
-
-txs = []
-total_docs = 0
-total_bytes = 0
-for i, tx in enumerate(state["transactions"]):
-    bytes_ = tx["doc_count"] * tx["doc_size"]
-    total_docs  += tx["doc_count"]
-    total_bytes += bytes_
-    entry = {
-        "index": tx["index"],
-        "collection": tx["collection"],
-        "doc_count": tx["doc_count"],
-        "doc_size":  tx["doc_size"],
-        "bytes":     bytes_,
-        "fresh":     tx["fresh"],
-        "overlaps":  tx["overlaps"],
-    }
-    if i < len(tx_boundaries):
-        start_ns, end_ns = tx_boundaries[i]
-        wall_s = (end_ns - start_ns) / 1e9
-        entry["wall_seconds"] = wall_s
-        entry["mb_per_sec"] = (bytes_ / wall_s / (1024*1024)) if wall_s > 0 else None
-        entry["docs_per_sec"] = (tx["doc_count"] / wall_s) if wall_s > 0 else None
-    txs.append(entry)
-
-# Data wall = end of Apply to end of last data tx (excludes Apply).
-if len(timestamps) >= 3:
-    data_wall = (timestamps[-1] - timestamps[1]) / 1e9
-else:
-    data_wall = 0.0
-
-print(json.dumps({
-    "connector": connector,
-    "scenario":  os.path.basename(scenario),
-    "seed":      int(seed),
-    "preview_exit_code": int(rc),
-    "apply_seconds": apply_seconds,
-    "wall_seconds": data_wall,
-    "total_docs":   total_docs,
-    "total_bytes":  total_bytes,
-    "docs_per_sec": (total_docs  / data_wall) if data_wall > 0 else None,
-    "mb_per_sec":   (total_bytes / data_wall / (1024*1024)) if data_wall > 0 else None,
-    "transactions": txs,
-}, indent=2))
-PY
+# Build results.json from the state log and the preview log's own timings.
+python3 "$BENCH_DIR/results.py" "$STATE_LOG" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" "$PREVIEW_LOG" >"$OUT_DIR/results.json"
 
 echo "results: $OUT_DIR/results.json"
 

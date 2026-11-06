@@ -41,6 +41,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         &spec.bindings,
         &config.message_format,
         config.schema_registry.as_ref(),
+        config.avro_logical_types,
     )
     .await?;
 

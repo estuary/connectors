@@ -6,14 +6,58 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "default": 18250,
-              "description": "Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
-              "exclusiveMinimum": 0,
-              "title": "Window size",
-              "type": "integer"
+              "description": "How much time a single incremental query covers when the connector sweeps for changes. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+              "discriminator": {
+                "mapping": {
+                  "days": "#/$defs/WindowSizeInDays",
+                  "interval": "#/$defs/WindowSizeAsInterval"
+                },
+                "propertyName": "window_type"
+              },
+              "nonsensitive": true,
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/WindowSizeAsInterval"
+                },
+                {
+                  "$ref": "#/$defs/WindowSizeInDays"
+                }
+              ],
+              "title": "Incremental Query Window Size"
             }
           },
           "title": "Advanced",
+          "type": "object"
+        },
+        "SalesforceClientCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Client Credentials",
+              "default": "Client Credentials",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "description": "The Consumer Key of the Connected App or External Client App.",
+              "order": 1,
+              "secret": true,
+              "title": "Consumer Key",
+              "type": "string"
+            },
+            "client_secret": {
+              "description": "The Consumer Secret of the Connected App or External Client App.",
+              "order": 2,
+              "secret": true,
+              "title": "Consumer Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "Client Credentials",
           "type": "object"
         },
         "UserPass": {
@@ -49,6 +93,55 @@
             "security_token"
           ],
           "title": "UserPass",
+          "type": "object"
+        },
+        "WindowSizeAsInterval": {
+          "properties": {
+            "window_type": {
+              "const": "interval",
+              "default": "interval",
+              "nonsensitive": true,
+              "order": 0,
+              "title": "Window Type",
+              "type": "string"
+            },
+            "interval": {
+              "description": "Size of the date window each incremental query covers, as an ISO 8601 duration, e.g. PT1H for one hour.",
+              "format": "duration",
+              "nonsensitive": true,
+              "order": 1,
+              "title": "Duration",
+              "type": "string"
+            }
+          },
+          "required": [
+            "interval"
+          ],
+          "title": "Duration",
+          "type": "object"
+        },
+        "WindowSizeInDays": {
+          "properties": {
+            "window_type": {
+              "const": "days",
+              "default": "days",
+              "nonsensitive": true,
+              "order": 0,
+              "title": "Window Type",
+              "type": "string"
+            },
+            "days": {
+              "description": "Size of the date window each incremental query covers, in whole days.",
+              "exclusiveMinimum": 0,
+              "order": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "days"
+          ],
+          "title": "Days",
           "type": "object"
         },
         "_OAuth2Credentials": {
@@ -103,9 +196,17 @@
           "title": "Sandbox",
           "type": "boolean"
         },
+        "my_domain": {
+          "default": "",
+          "description": "Your Salesforce My Domain login host. Enter the full host ending in .my.salesforce.com to login with your My Domain host. e.g. mycompany.my.salesforce.com, acme--uat.sandbox.my.salesforce.com. Leave blank to log in via the standard login/test endpoint. Required when authenticating with Client Credentials.",
+          "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9.-]*\\.my\\.salesforce\\.com$",
+          "title": "My Domain",
+          "type": "string"
+        },
         "credentials": {
           "discriminator": {
             "mapping": {
+              "Client Credentials": "#/$defs/SalesforceClientCredentials",
               "OAuth Credentials": "#/$defs/_OAuth2Credentials",
               "Username, Password, & Security Token": "#/$defs/UserPass"
             },
@@ -117,6 +218,9 @@
             },
             {
               "$ref": "#/$defs/UserPass"
+            },
+            {
+              "$ref": "#/$defs/SalesforceClientCredentials"
             }
           ],
           "title": "Authentication"
@@ -140,6 +244,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -158,12 +263,14 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
+          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         },
         "schedule": {
           "default": "",
           "description": "Schedule to automatically refresh formula fields. Accepts a cron expression.",
+          "nonsensitive": true,
           "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
           "title": "Formula Field Refresh Schedule",
           "type": "string"
@@ -178,8 +285,8 @@
     "documentationUrl": "https://go.estuary.dev/source-salesforce-native",
     "oauth2": {
       "provider": "salesforce",
-      "authUrlTemplate": "https://{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com/services/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
-      "accessTokenUrlTemplate": "https://{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com/services/oauth2/token",
+      "authUrlTemplate": "https://{{#config.my_domain}}{{{config.my_domain}}}{{/config.my_domain}}{{^config.my_domain}}{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com{{/config.my_domain}}/services/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://{{#config.my_domain}}{{{config.my_domain}}}{{/config.my_domain}}{{^config.my_domain}}{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com{{/config.my_domain}}/services/oauth2/token",
       "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {
         "content-type": "application/x-www-form-urlencoded"

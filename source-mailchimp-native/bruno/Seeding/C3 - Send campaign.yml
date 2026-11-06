@@ -1,0 +1,34 @@
+info:
+  name: C3 - Send campaign
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{base_url}}/campaigns/{{campaign_id}}/actions/send"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Normally set by C1's post-response script; conditional fallback pinned from
+        // the 2026-06-10 seeding run for out-of-order sessions.
+        if (!bru.getVar('campaign_id')) bru.setVar('campaign_id', '61cc0c44a6');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/campaigns/send-campaign/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. State-mutating
+  seed step 3/3.
+
+  **WHY:** sends the campaign. After delivery, manually open the email (with
+  image loading enabled, so the tracking pixel fires) and click the link — that
+  produces open + click activity events. Mailchimp's report pipeline can lag a
+  few minutes before events appear on /reports/{id}/email-activity.

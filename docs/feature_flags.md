@@ -32,6 +32,17 @@ var featureFlagDefaults = map[string]bool{
 }
 ```
 
+Materialization connectors instead hold `common.FlagDefault` values, so that a flag's
+default can be gated on the task's creation date — see
+[Changing Default Behaviors (Materializations)](#changing-default-behaviors-materializations):
+
+```go
+var featureFlagDefaults = map[string]common.FlagDefault{
+  // A short (one or two line) description of what this flag does when set/unset.
+  "do_something": common.FlagDisabled,
+}
+```
+
 Then at the appropriate point(s) in the code, introduce the new logic conditional on the
 flag setting:
 
@@ -51,9 +62,94 @@ Typically this should be default-off, but if it makes things clearer there shoul
 be anything wrong with adding a default-on flag instead and having `no_foobar` be the
 setting which opts into the new behavior.
 
-## Changing Default Behaviors
+## Changing Default Behaviors (Materializations)
 
-The process for changing a default connector behavior is as follows:
+Materialization connectors can gate a flag's default on when a task was created,
+which changes the default for new tasks only, with no config edits and no
+coordinated merge. This is the preferred approach; the manual bulk-editing process in
+the next section remains for most captures, which don't yet resolve flags this way.
+
+The default-values map holds `common.FlagDefault` values rather than plain booleans:
+
+```go
+var featureFlagDefaults = map[string]common.FlagDefault{
+  // A short (one or two line) description of what this flag does when set/unset.
+  "do_something": common.FlagDisabled,
+  // Applies only to tasks created on or after the date this flag was released,
+  // so that tasks already running at that point keep the old behavior.
+  "new_thing": common.FlagEnabledForTasksCreatedAfter("2026-06-10"),
+}
+```
+
+Set the cutoff to the day after the pull request merges. Every task in existence at
+that point is older than the cutoff and keeps the old behavior for the rest of its
+life, while every task created afterwards gets the new behavior from its first
+publication. A user can still opt either way per-task with `new_thing` /
+`no_new_thing` in `/advanced/feature_flags`, which always wins over the cutoff.
+
+The cutoff is a date, not a timestamp, because a date is all a spec records about when
+a task was created — the two dates are compared directly. A flag therefore takes effect
+for the whole of the day it ships on, so pick the date accordingly if that matters.
+
+### How it resolves
+
+Built capture and materialization specs carry a `created_at` date (UTC, `YYYY-MM-DD`),
+derived by the control plane from the task's control-plane ID. The materialization
+boilerplate resolves flags from that date in every RPC:
+
+| RPC | Creation date taken from |
+| --- | --- |
+| Validate | `req.LastMaterialization` — absent for a task that has never been published |
+| Apply | `req.Materialization` |
+| Open | `req.Materialization` |
+
+Resolution is therefore a pure function of the spec: it is stable for the life of the
+task, identical across the three RPCs, and needs nothing persisted in connector state.
+
+The date is absent in exactly one place: the Validate of a task that has not been
+published yet, which has no previous spec to carry one. Publishing the task creates
+it, so its very first Apply and Open — and every RPC after that — do have the date.
+An absent date means "brand new" and resolves against today's, which is the date the
+task is about to be created with.
+
+### Recording the resolved value in the config
+
+So that a task's flags can be read off its config rather than inferred from its
+creation date, Open emits a [`configUpdate`](observable_logs.md) event restating the
+endpoint config with each cutoff-gated flag written out explicitly — `new_thing` or
+`no_new_thing` in `/advanced/feature_flags`. It is recomputed on every Open and stops
+being emitted once the config contains the flag.
+
+The restatement never decrypts and re-encrypts the config. Open carries the task's
+sealed config alongside its decrypted one, and the flag is written into the plaintext
+`sops.overlay` of that document: the runtime merges the overlay over the decrypted
+config, having first checked that every location it touches is annotated
+`nonsensitive: true` in the connector's config schema — which is why
+`/advanced/feature_flags` must carry `jsonschema_extras:"nonsensitive=true"`. The
+encrypted values are copied across untouched, so a config stays under the key it was
+encrypted with, including a customer-managed one that Estuary cannot itself encrypt to.
+A config that isn't encrypted has no ciphertext to preserve and is restated directly.
+
+Property order does matter to sops, which computes its MAC over a document's values in
+the order it encounters them — but it is not something the connector has to preserve.
+The control plane parses the emitted config and re-serializes it when applying the
+update, which sorts its properties, so the restatement is sorted here as well and a
+config that verifies once stored verifies as emitted.
+
+This is a *record*, not a decision. The value written is the one the connector already
+resolved from the creation date, so the config can never contradict the connector's
+behavior, and a task behaves identically whether or not the update has landed yet —
+which is what makes it safe for the write to be asynchronous and best-effort. Failures
+are logged and ignored.
+
+Only cutoff-gated flags are recorded. Flags with a fixed default are deliberately left
+out: writing those into every config would freeze them per-task and defeat any later
+fleet-wide change of the default.
+
+## Changing Default Behaviors Manually
+
+For captures, and for materialization flags that can't be expressed as a creation-date
+cutoff, the process for changing a default connector behavior is as follows:
 
  - Add the feature flag `new_thing` with a default value corresponding to the old behavior (typically false).
  - Edit the endpoint configs of all tasks in production to add the `no_new_thing` flag setting.
@@ -66,6 +162,58 @@ with the endpoint config edit, and doing things in the opposite order would beha
 we got unlucky with task restart timing. The window of concern here is minutes and it only
 impacts new tasks, so just try to perform the two operations close together and keep an eye
 on whether any new tasks were created during the process.
+
+## Verifying Feature Impact
+
+Before changing a default behavior or rolling out a feature, you usually need to know
+*which* production collections have the characteristic that triggers the new behavior,
+and *which* live materialization tasks read those collections. Historically this was
+done with hand-written SQL against the `live_specs` table, which is dangerously
+error-prone.
+
+The `verify-affected.sh` script minimises error and adds two
+independent reviews to every run. It connects to the control plane via the
+`DATABASE_URL` environment variable (a `postgresql://...` string), and runs a fixed,
+tested query that links collections to the materializations which *actually read them*
+via the `reads_from` dependency array. The connector's variants are resolved automatically,
+the query runs inside a read-only transaction, and the expected `live_specs` columns are verified up front so schema drift fails loudly.
+
+The only thing you supply is the predicate that selects "affected" collections, in one
+of two ways:
+
+ - `--check=<name>`: a curated, snapshot-tested check from the registry in
+   `scripts/verify-affected/checks.go` (run `--list-checks` to see them). These are the
+   trusted path — adding a new one is a PR with a snapshot test.
+ - `--check-sql="<expr>"`: an ad-hoc SQL boolean over the collection row (alias `c`),
+   for one-off investigations.
+
+Every run is gated by **two pairs of eyes**:
+
+ 1. A local **Claude Opus 4.8** review of the rendered query and its results, which
+    validates the logic (does it select the right collections, and only the tasks that
+    read them?). This is a **hard gate**: a `CONCERNS` verdict blocks the run unless you
+    pass `--override-ai-review`.
+ 2. An explicit **human sign-off** — interactive confirmation, or `--approver="<name>"`
+    for a non-interactive record.
+
+Both reviews, the rendered SQL, the resolved variants, and the full affected-task list
+are written to a markdown audit report. Typical usage, as the pre-flight step before the
+bulk-editing workflow below:
+
+```bash
+# Requires DATABASE_URL to point at the control-plane Postgres database.
+$ export DATABASE_URL='postgresql://...'
+# List the curated checks.
+$ ../scripts/verify-affected.sh --list-checks
+# Verify which materialize-postgres tasks read enum-using collections.
+$ ../scripts/verify-affected.sh --connector=materialize-postgres --check=uses-enum
+# ... or an ad-hoc predicate (also reviewed):
+$ ../scripts/verify-affected.sh --connector=materialize-postgres \
+        --check-sql="c.spec::text LIKE '%\"enum\":%'"
+```
+
+Once you have the reviewed, signed-off list of affected tasks, feed the same connector
+into the bulk-editing workflow below.
 
 ## Bulk Editing Process
 
@@ -257,6 +405,55 @@ point(s):
 
 ```go
 captureConfig.Advanced.FeatureFlags = *testFeatureFlags
+```
+
+## Appendix: Python (estuary-cdk) Boilerplate
+
+The connector's `advanced` config model subclasses `FeatureFlagsConfig`, which adds the
+`feature_flags` property. Declare a default for every flag in `FEATURE_FLAG_DEFAULTS`,
+keyed by a `StrEnum` of flag names:
+
+```python
+from datetime import date
+from enum import StrEnum
+from typing import ClassVar
+
+from estuary_cdk.feature_flags import FLAG_DISABLED, FeatureFlagsConfig, FlagDefault
+
+class FeatureFlag(StrEnum):
+    DO_SOMETHING = "do_something"
+    NEW_THING = "new_thing"
+
+class Advanced(FeatureFlagsConfig):
+    FEATURE_FLAG_DEFAULTS: ClassVar[dict[str, FlagDefault]] = {
+        # A short (one or two line) description of what this flag does when set/unset.
+        FeatureFlag.DO_SOMETHING: FLAG_DISABLED,
+        # Applies only to tasks created on or after the date this flag was released.
+        FeatureFlag.NEW_THING: FlagDefault.enabled_for_tasks_created_after(date(2026, 6, 10)),
+    }
+```
+
+The CDK resolves the flags against the task's creation date before each request
+reaches the connector. It doesn't [record](#recording-the-resolved-value-in-the-config)
+date-gated values in the config, but logs the resolved flags at Open.
+
+Read flags in the resource layer (`all_resources`, `validate_credentials`) and pass each
+one down as a boolean named for the behavior it controls. API functions should never
+receive `config` or `config.advanced` directly, which keeps credentials out of code
+that might log its arguments:
+
+```python
+# resources.py
+should_do_something = config.advanced.flag(FeatureFlag.DO_SOMETHING)
+
+fetch_changes=functools.partial(fetch_widgets, http, config.domain, should_do_something),
+
+# api.py
+async def fetch_widgets(
+    http: HTTPSession, domain: str, should_do_something: bool, log: Logger, log_cursor: LogCursor
+):
+    if should_do_something:
+        ...
 ```
 
 ## Appendix: Script Usage Notes and Error Conditions

@@ -12,35 +12,7 @@ collections:
     - /customer.id
     - /segments.date
   acmeCo/ad_group_ad_labels:
-    schema:
-      $schema: http://json-schema.org/draft-07/schema#
-      type: object
-      required:
-      - ad_group_ad_label.resource_name
-      properties:
-        ad_group_ad.ad.resource_name:
-          type:
-          - 'null'
-          - string
-        ad_group_ad_label.resource_name:
-          type:
-          - string
-        label.name:
-          type:
-          - 'null'
-          - string
-        label.resource_name:
-          type:
-          - 'null'
-          - string
-        _meta:
-          type: object
-          properties:
-            row_id:
-              type: integer
-          required:
-          - row_id
-      x-infer-schema: true
+    schema: ad_group_ad_labels.schema.yaml
     key:
     - /ad_group_ad_label.resource_name
   acmeCo/ad_group_ad_report:
@@ -58,35 +30,7 @@ collections:
     - /ad_group_ad.ad.id
     - /segments.date
   acmeCo/ad_group_labels:
-    schema:
-      $schema: http://json-schema.org/draft-07/schema#
-      type: object
-      required:
-      - ad_group_label.resource_name
-      properties:
-        ad_group.resource_name:
-          type:
-          - 'null'
-          - string
-        ad_group_label.resource_name:
-          type:
-          - string
-        label.name:
-          type:
-          - 'null'
-          - string
-        label.resource_name:
-          type:
-          - 'null'
-          - string
-        _meta:
-          type: object
-          properties:
-            row_id:
-              type: integer
-          required:
-          - row_id
-      x-infer-schema: true
+    schema: ad_group_labels.schema.yaml
     key:
     - /ad_group_label.resource_name
   acmeCo/ad_groups:
@@ -95,35 +39,7 @@ collections:
     - /ad_group.id
     - /segments.date
   acmeCo/campaign_labels:
-    schema:
-      $schema: http://json-schema.org/draft-07/schema#
-      type: object
-      required:
-      - campaign_label.resource_name
-      properties:
-        campaign.resource_name:
-          type:
-          - 'null'
-          - string
-        campaign_label.resource_name:
-          type:
-          - string
-        label.name:
-          type:
-          - 'null'
-          - string
-        label.resource_name:
-          type:
-          - 'null'
-          - string
-        _meta:
-          type: object
-          properties:
-            row_id:
-              type: integer
-          required:
-          - row_id
-      x-infer-schema: true
+    schema: campaign_labels.schema.yaml
     key:
     - /campaign_label.resource_name
   acmeCo/campaigns:

@@ -72,13 +72,18 @@ async def fetch_reviews(
 async def backfill_resources(
     gcs_client: GCSClient,
     model: type[GooglePlayRow],
+    start: str,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[GooglePlayRow | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
-    cursor_month = str_to_dt(page)
+
+    if page is None:
+        cursor_month = str_to_dt(start)
+    else:
+        assert isinstance(page, str)
+        cursor_month = str_to_dt(page)
 
     if cursor_month >= cutoff:
         return

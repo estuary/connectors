@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -13,24 +13,41 @@ import (
 type elasticPropertyType string
 
 const (
-	elasticTypeKeyword   elasticPropertyType = "keyword"
-	elasticTypeBoolean   elasticPropertyType = "boolean"
-	elasticTypeLong      elasticPropertyType = "long"
-	elasticTypeDouble    elasticPropertyType = "double"
-	elasticTypeText      elasticPropertyType = "text"
-	elasticTypeBinary    elasticPropertyType = "binary"
-	elasticTypeDate      elasticPropertyType = "date"
-	elasticTypeIp        elasticPropertyType = "ip"
+	elasticTypeKeyword      elasticPropertyType = "keyword"
+	elasticTypeBoolean      elasticPropertyType = "boolean"
+	elasticTypeLong         elasticPropertyType = "long"
+	elasticTypeDouble       elasticPropertyType = "double"
+	elasticTypeText         elasticPropertyType = "text"
+	elasticTypeBinary       elasticPropertyType = "binary"
+	elasticTypeDate         elasticPropertyType = "date"
+	elasticTypeIp           elasticPropertyType = "ip"
 	elasticTypeUnsignedLong elasticPropertyType = "unsigned_long"
 	elasticTypeFlattened    elasticPropertyType = "flattened"
+	// elasticTypeFlatObject is OpenSearch's equivalent of Elasticsearch's
+	// "flattened" type. OpenSearch does not support "flattened".
+	elasticTypeFlatObject elasticPropertyType = "flat_object"
 )
 
+// adaptForOpenSearch rewrites a property produced for Elasticsearch into its
+// OpenSearch equivalent. OpenSearch uses "flat_object" in place of "flattened",
+// and unlike "flattened" it does not accept the "ignore_above" or "index"
+// mapping parameters.
+func adaptForOpenSearch(p property) property {
+	if p.Type == elasticTypeFlattened {
+		p.Type = elasticTypeFlatObject
+		p.IgnoreAbove = 0
+		p.Index = nil
+	}
+	return p
+}
+
 type property struct {
-	Type        elasticPropertyType `json:"type"`
-	Coerce      bool                `json:"coerce,omitempty"`
-	Index       *bool               `json:"index,omitempty"`
-	IgnoreAbove int                 `json:"ignore_above,omitempty"`
-	Format      string              `json:"format,omitempty"`
+	Type         elasticPropertyType `json:"type"`
+	Coerce       bool                `json:"coerce,omitempty"`
+	Index        *bool               `json:"index,omitempty"`
+	IgnoreAbove  int                 `json:"ignore_above,omitempty"`
+	Format       string              `json:"format,omitempty"`
+	IgnoreFormat bool                `json:"-"`
 }
 
 func (p property) String() string {
@@ -38,6 +55,9 @@ func (p property) String() string {
 }
 
 func (p property) Compatible(existing boilerplate.ExistingField) bool {
+	if p.IgnoreFormat {
+		return strings.EqualFold(existing.Type, string(p.Type))
+	}
 	return strings.EqualFold(existing.Type, string(p.Type)) &&
 		strings.EqualFold(existing.Format, string(p.Format))
 }
@@ -143,7 +163,7 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 	}
 }
 
-func buildIndexProperties(keys, values []boilerplate.MappedProjection[property], document *boilerplate.MappedProjection[property]) map[string]property {
+func buildIndexProperties(keys, values []boilerplate.MappedProjection[property], document *boilerplate.MappedProjection[property], isOpenSearch bool) map[string]property {
 	props := make(map[string]property)
 
 	for _, v := range append(keys, values...) {
@@ -153,12 +173,15 @@ func buildIndexProperties(keys, values []boilerplate.MappedProjection[property],
 	if document != nil {
 		// Do not index the root document projection, since this would be less useful than other
 		// selected fields and potentially costly.
-		props[translateField(document.Field)] = property{
+		docProp := property{
 			Type: elasticTypeFlattened,
 			// See above for comment on pf.JsonTypeObject.
 			IgnoreAbove: 32766 / 4,
 			Index:       boolPtr(false)}
-
+		if isOpenSearch {
+			docProp = adaptForOpenSearch(docProp)
+		}
+		props[translateField(document.Field)] = docProp
 	}
 
 	return props

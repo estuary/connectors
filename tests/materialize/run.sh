@@ -30,6 +30,8 @@ else
     TIMEOUT=40m
   elif [ "$CONNECTOR" = "materialize-iceberg" ]; then
     TIMEOUT=60m
+  elif [ "$CONNECTOR" = "materialize-snowflake" ]; then
+    TIMEOUT=30m
   fi
   cd $ROOT_DIR/$CONNECTOR && go test -v ./... -timeout $TIMEOUT
 fi

@@ -1,12 +1,24 @@
+// Links in the allocator crate, which sets the global allocator to jemalloc.
+extern crate allocator;
+
 use anyhow::Context;
 use source_kafka::run_connector;
 use tokio::io;
 
+// The Flow runtime reads the connector's output from a pipe that holds 64 KiB
+// by default. A bigger pipe lets the connector keep writing while the runtime
+// pauses, and gives the runtime output to read while the connector pauses.
+const STDOUT_PIPE_SIZE: libc::c_int = 1024 * 1024;
+
 fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
+    enlarge_stdout_pipe(STDOUT_PIPE_SIZE);
 
     let stdin = io::BufReader::new(io::stdin());
-    let stdout = std::io::stdout();
+    // Wrap stdout in a BufWriter so captured documents are batched into a few
+    // large writes. Rust's `Stdout` is itself a LineWriter that would otherwise
+    // flush a syscall on every newline.
+    let stdout = std::io::BufWriter::with_capacity(256 * 1024, std::io::stdout());
 
     let result = runtime.block_on(run_connector(stdin, stdout));
 
@@ -20,6 +32,32 @@ fn main() -> anyhow::Result<()> {
 
     result
 }
+
+/// Does nothing if stdout isn't a pipe, such as when the connector runs in a
+/// terminal.
+#[cfg(target_os = "linux")]
+fn enlarge_stdout_pipe(size: libc::c_int) {
+    use std::os::fd::AsRawFd;
+
+    let fd = std::io::stdout().as_raw_fd();
+    // SAFETY: these fcntl commands only read or change the capacity of the pipe
+    // behind `fd`, and fail if `fd` isn't a pipe.
+    let current = unsafe { libc::fcntl(fd, libc::F_GETPIPE_SZ) };
+    if current < 0 || current >= size {
+        return;
+    }
+    if unsafe { libc::fcntl(fd, libc::F_SETPIPE_SZ, size) } < 0 {
+        tracing::warn!(
+            error = %std::io::Error::last_os_error(),
+            current,
+            requested = size,
+            "couldn't enlarge the stdout pipe",
+        );
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn enlarge_stdout_pipe(_size: libc::c_int) {}
 
 fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
     // The level string "debug" results in enabling debug logging for all the crates

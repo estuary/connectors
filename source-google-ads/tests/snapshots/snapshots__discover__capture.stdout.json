@@ -109,90 +109,6 @@
             "type": "string"
           }
         },
-        "ad_group_ad.ad.call_ad.business_name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.call_tracked": {
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.conversion_action": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.conversion_reporting_state": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.country_code": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.description1": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.description2": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.disable_call_conversion": {
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.headline1": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.headline2": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.path1": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.path2": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.phone_number": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "ad_group_ad.ad.call_ad.phone_number_verification_url": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "ad_group_ad.ad.device_preference": {
           "type": [
             "null",
@@ -936,11 +852,37 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/ad_group_ad.ad.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "ad_group_ads"
     ]
   },
   {
@@ -991,10 +933,36 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/ad_group_ad_label.resource_name"
+    ],
+    "resourcePath": [
+      "ad_group_ad_labels"
     ]
   },
   {
@@ -1205,11 +1173,37 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/ad_group.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "ad_groups"
     ]
   },
   {
@@ -1260,10 +1254,36 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/ad_group_label.resource_name"
+    ],
+    "resourcePath": [
+      "ad_group_labels"
     ]
   },
   {
@@ -1405,6 +1425,12 @@
             "string"
           ]
         },
+        "customer.video_brand_safety_suitability": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "segments.date": {
           "type": [
             "string"
@@ -1423,11 +1449,37 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/customer.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "accounts"
     ]
   },
   {
@@ -1478,10 +1530,36 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/campaign_label.resource_name"
+    ],
+    "resourcePath": [
+      "campaign_labels"
     ]
   },
   {
@@ -1607,12 +1685,38 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/click_view.gclid",
       "/segments.date",
       "/segments.ad_network_type"
+    ],
+    "resourcePath": [
+      "click_view"
     ]
   },
   {
@@ -1674,10 +1778,36 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/geo_target_constant.id"
+    ],
+    "resourcePath": [
+      "geo_target_constant"
     ]
   },
   {
@@ -1794,7 +1924,7 @@
             "boolean"
           ]
         },
-        "campaign.end_date": {
+        "campaign.end_date_time": {
           "type": [
             "null",
             "string"
@@ -2006,7 +2136,7 @@
             "integer"
           ]
         },
-        "campaign.start_date": {
+        "campaign.start_date_time": {
           "type": [
             "null",
             "string"
@@ -2138,12 +2268,6 @@
             "string"
           ]
         },
-        "campaign.video_brand_safety_suitability": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "metrics.clicks": {
           "type": [
             "null",
@@ -2180,7 +2304,7 @@
             "number"
           ]
         },
-        "metrics.video_views": {
+        "metrics.video_trueview_views": {
           "type": [
             "null",
             "number"
@@ -2215,12 +2339,38 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/campaign.id",
       "/segments.date",
       "/segments.hour"
+    ],
+    "resourcePath": [
+      "campaigns"
     ]
   },
   {
@@ -2385,7 +2535,7 @@
             "number"
           ]
         },
-        "metrics.average_cpv": {
+        "metrics.trueview_average_cpv": {
           "type": [
             "null",
             "number"
@@ -2481,13 +2631,13 @@
             "number"
           ]
         },
-        "metrics.video_view_rate": {
+        "metrics.video_trueview_view_rate": {
           "type": [
             "null",
             "number"
           ]
         },
-        "metrics.video_views": {
+        "metrics.video_trueview_views": {
           "type": [
             "null",
             "number"
@@ -2511,7 +2661,30 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.ad_network_type",
@@ -2519,6 +2692,9 @@
       "/customer.id",
       "/campaign.id",
       "/user_location_view.resource_name"
+    ],
+    "resourcePath": [
+      "user_location_report"
     ]
   },
   {
@@ -2647,7 +2823,7 @@
             "number"
           ]
         },
-        "metrics.average_cpv": {
+        "metrics.trueview_average_cpv": {
           "type": [
             "null",
             "number"
@@ -2852,13 +3028,13 @@
             "number"
           ]
         },
-        "metrics.video_view_rate": {
+        "metrics.video_trueview_view_rate": {
           "type": [
             "null",
             "number"
           ]
         },
-        "metrics.video_views": {
+        "metrics.video_trueview_views": {
           "type": [
             "null",
             "integer"
@@ -2894,13 +3070,39 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.ad_network_type",
       "/segments.device",
       "/segments.date",
       "/customer.id"
+    ],
+    "resourcePath": [
+      "account_performance_report"
     ]
   },
   {
@@ -3047,7 +3249,7 @@
             "number"
           ]
         },
-        "metrics.average_cpv": {
+        "metrics.trueview_average_cpv": {
           "type": [
             "null",
             "number"
@@ -3365,13 +3567,13 @@
             "number"
           ]
         },
-        "metrics.video_view_rate": {
+        "metrics.video_trueview_view_rate": {
           "type": [
             "null",
             "number"
           ]
         },
-        "metrics.video_views": {
+        "metrics.video_trueview_views": {
           "type": [
             "null",
             "integer"
@@ -3407,7 +3609,30 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.ad_network_type",
@@ -3417,6 +3642,9 @@
       "/customer.id",
       "/campaign.id",
       "/ad_group_criterion.criterion_id"
+    ],
+    "resourcePath": [
+      "display_topics_performance_report"
     ]
   },
   {
@@ -3561,7 +3789,7 @@
             "number"
           ]
         },
-        "metrics.average_cpv": {
+        "metrics.trueview_average_cpv": {
           "type": [
             "null",
             "number"
@@ -3878,13 +4106,13 @@
             "number"
           ]
         },
-        "metrics.video_view_rate": {
+        "metrics.video_trueview_view_rate": {
           "type": [
             "null",
             "number"
           ]
         },
-        "metrics.video_views": {
+        "metrics.video_trueview_views": {
           "type": [
             "null",
             "integer"
@@ -3924,7 +4152,30 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.ad_network_type",
@@ -3934,6 +4185,9 @@
       "/customer.id",
       "/campaign.id",
       "/ad_group_criterion.criterion_id"
+    ],
+    "resourcePath": [
+      "display_keyword_performance_report"
     ]
   },
   {
@@ -4306,7 +4560,30 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.ad_network_type",
@@ -4316,6 +4593,9 @@
       "/customer.id",
       "/campaign.id",
       "/segments.product_item_id"
+    ],
+    "resourcePath": [
+      "shopping_performance_report"
     ]
   },
   {
@@ -4497,7 +4777,7 @@
             "number"
           ]
         },
-        "metrics.average_cpv": {
+        "metrics.trueview_average_cpv": {
           "type": [
             "null",
             "number"
@@ -5134,13 +5414,13 @@
             "number"
           ]
         },
-        "metrics.video_view_rate": {
+        "metrics.video_trueview_view_rate": {
           "type": [
             "null",
             "number"
           ]
         },
-        "metrics.video_views": {
+        "metrics.video_trueview_views": {
           "type": [
             "null",
             "integer"
@@ -5176,7 +5456,30 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.ad_network_type",
@@ -5185,6 +5488,9 @@
       "/campaign.id",
       "/customer.id",
       "/ad_group_ad.ad.id"
+    ],
+    "resourcePath": [
+      "ad_group_ad_report"
     ]
   },
   {
@@ -5245,13 +5551,39 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.date",
       "/ad_group.id",
       "/geographic_view.country_criterion_id",
       "/customer.descriptive_name"
+    ],
+    "resourcePath": [
+      "geographic_report"
     ]
   },
   {
@@ -5406,12 +5738,38 @@
           ]
         }
       },
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/segments.date",
       "/ad_group.id",
       "/ad_group_criterion.criterion_id"
+    ],
+    "resourcePath": [
+      "keyword_report"
     ]
   },
   {
@@ -5491,12 +5849,11 @@
             "null"
           ]
         },
-        "campaign.start_date": {
+        "campaign.start_date_time": {
           "type": [
             "string",
             "null"
-          ],
-          "format": "date"
+          ]
         },
         "segments.date": {
           "type": "string",
@@ -5519,11 +5876,37 @@
         "customer.id",
         "segments.date"
       ],
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/customer.id",
       "/segments.date"
+    ],
+    "resourcePath": [
+      "my_custom_query"
     ]
   }
 ]

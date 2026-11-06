@@ -1,0 +1,803 @@
+"""Unit tests for delayed_tag.py."""
+
+import io
+import json
+import tempfile
+import unittest
+import urllib.error
+from pathlib import Path
+from unittest import mock
+from delayed_tag import (
+    ConnectorImage,
+    PullRequest,
+    PlanEntry,
+    LaterEntry,
+    Verdict,
+    _http_error_body,
+    _truncate_diff,
+    build_safe_plan,
+    build_claude_content,
+    build_claude_prompt,
+    call_claude,
+    current_delayed_commit,
+    filter_backward_moves,
+    find_boundary,
+    inspect_image,
+    load_connector_images,
+    load_verdict_cache,
+    parse_claude_verdict,
+    pr_touches_dir,
+    resolve_family,
+    revision_label,
+    verdict_cache_key,
+    write_verdict_cache,
+)
+
+
+def make_pr(number: int, merged_epoch: int, sha_prefix: str, paths: list) -> PullRequest:
+    return PullRequest(
+        number=number,
+        title=f'PR {number}',
+        merged_epoch=merged_epoch,
+        merge_sha=sha_prefix * (40 // len(sha_prefix) + 1),
+        paths=frozenset(paths),
+    )
+
+
+def make_plan(image: str, sha7: str = 'abc1234', pr: int = 1, source_dir: str = '') -> PlanEntry:
+    return PlanEntry(
+        image_name=image,
+        chosen_sha7=sha7,
+        chosen_pr=pr,
+        source_dir=source_dir or image,
+    )
+
+
+NEVER_REVERTED = lambda sha: False
+ALWAYS_REVERTED = lambda sha: True
+
+
+# ---------------------------------------------------------------------------
+# pr_touches_dir
+# ---------------------------------------------------------------------------
+
+class TestPrTouchesDir(unittest.TestCase):
+
+    def test_direct_child_file(self):
+        pr = make_pr(1, 0, 'a', ['source-mysql/main.go'])
+        self.assertTrue(pr_touches_dir(pr, 'source-mysql'))
+
+    def test_nested_file(self):
+        pr = make_pr(1, 0, 'a', ['source-mysql/internal/cfg/config.go'])
+        self.assertTrue(pr_touches_dir(pr, 'source-mysql'))
+
+    def test_prefix_does_not_match_sibling(self):
+        # source-mysql-batch should NOT match source-mysql
+        pr = make_pr(1, 0, 'a', ['source-mysql-batch/main.go'])
+        self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
+
+    def test_unrelated_dir(self):
+        pr = make_pr(1, 0, 'a', ['source-postgres/main.go'])
+        self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
+
+    def test_empty_paths(self):
+        pr = make_pr(1, 0, 'a', [])
+        self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
+
+    def test_root_files_dont_match(self):
+        pr = make_pr(1, 0, 'a', ['Makefile', 'go.sum', '.github/workflows/go.yaml'])
+        self.assertFalse(pr_touches_dir(pr, 'source-mysql'))
+
+    def test_multiple_paths_one_matches(self):
+        pr = make_pr(1, 0, 'a', ['source-postgres/main.go', 'source-mysql/main.go'])
+        self.assertTrue(pr_touches_dir(pr, 'source-mysql'))
+        self.assertTrue(pr_touches_dir(pr, 'source-postgres'))
+
+    def test_trailing_slash_on_dir_arg(self):
+        pr = make_pr(1, 0, 'a', ['source-mysql/main.go'])
+        self.assertTrue(pr_touches_dir(pr, 'source-mysql/'))
+
+
+# ---------------------------------------------------------------------------
+# find_boundary
+# ---------------------------------------------------------------------------
+
+class TestFindBoundary(unittest.TestCase):
+
+    def test_basic_selection(self):
+        cutoff = 1000
+        prs = [
+            make_pr(3, 1200, 'ccc', ['source-foo/c.go']),  # after cutoff → later
+            make_pr(2, 900,  'bbb', ['source-foo/b.go']),  # within cutoff ← chosen
+            make_pr(1, 600,  'aaa', ['source-foo/a.go']),  # older, not considered
+        ]
+        chosen, later = find_boundary('source-foo', 'source-foo', prs, cutoff, NEVER_REVERTED)
+        self.assertIsNotNone(chosen)
+        self.assertEqual(chosen.chosen_pr, 2)
+        self.assertEqual(chosen.chosen_sha7, prs[1].merge_sha[:7])
+        self.assertEqual(len(later), 1)
+        self.assertEqual(later[0].pr_number, 3)
+
+    def test_skips_prs_in_other_dirs(self):
+        cutoff = 1000
+        prs = [
+            make_pr(2, 900, 'bbb', ['source-bar/a.go']),  # wrong dir
+            make_pr(1, 800, 'aaa', ['source-foo/a.go']),  # correct dir ← chosen
+        ]
+        chosen, later = find_boundary('source-foo', 'source-foo', prs, cutoff, NEVER_REVERTED)
+        self.assertIsNotNone(chosen)
+        self.assertEqual(chosen.chosen_pr, 1)
+        self.assertEqual(later, [])
+
+    def test_skips_reverted_and_falls_back(self):
+        cutoff = 1000
+        reverted_sha = 'aaaa' * 10
+        prs = [
+            PullRequest(2, 'PR 2', 900, reverted_sha, frozenset(['source-foo/a.go'])),
+            make_pr(1, 800, 'bbb', ['source-foo/b.go']),  # not reverted ← chosen
+        ]
+        chosen, later = find_boundary(
+            'source-foo', 'source-foo', prs, cutoff,
+            is_reverted=lambda sha: sha == reverted_sha,
+        )
+        self.assertIsNotNone(chosen)
+        self.assertEqual(chosen.chosen_pr, 1)
+
+    def test_returns_none_when_all_within_cutoff(self):
+        cutoff = 1000
+        prs = [make_pr(1, 1100, 'aaa', ['source-foo/a.go'])]
+        chosen, later = find_boundary('source-foo', 'source-foo', prs, cutoff, NEVER_REVERTED)
+        self.assertIsNone(chosen)
+        self.assertEqual(len(later), 1)
+
+    def test_returns_none_when_all_reverted(self):
+        cutoff = 1000
+        prs = [make_pr(1, 900, 'aaa', ['source-foo/a.go'])]
+        chosen, later = find_boundary('source-foo', 'source-foo', prs, cutoff, ALWAYS_REVERTED)
+        self.assertIsNone(chosen)
+        self.assertEqual(later, [])
+
+    def test_returns_none_when_empty(self):
+        chosen, later = find_boundary('source-foo', 'source-foo', [], 1000, NEVER_REVERTED)
+        self.assertIsNone(chosen)
+        self.assertEqual(later, [])
+
+    def test_later_includes_only_connector_prs(self):
+        cutoff = 1000
+        prs = [
+            make_pr(5, 1400, 'eee', ['source-foo/a.go']),  # later, same dir
+            make_pr(4, 1200, 'ddd', ['source-bar/a.go']),  # later, different dir → excluded
+            make_pr(3, 1100, 'ccc', ['source-foo/b.go']),  # later, same dir
+            make_pr(2, 900,  'bbb', ['source-foo/c.go']),  # chosen
+            make_pr(1, 700,  'aaa', ['source-foo/d.go']),  # older
+        ]
+        chosen, later = find_boundary('source-foo', 'source-foo', prs, cutoff, NEVER_REVERTED)
+        self.assertEqual(chosen.chosen_pr, 2)
+        self.assertEqual({e.pr_number for e in later}, {3, 5})
+
+    def test_image_name_propagated_to_later_entries(self):
+        cutoff = 1000
+        prs = [
+            make_pr(2, 1200, 'bbb', ['source-foo/a.go']),
+            make_pr(1, 900, 'aaa', ['source-foo/b.go']),
+        ]
+        chosen, later = find_boundary(
+            'source-foo-variant', 'source-foo', prs, cutoff, NEVER_REVERTED
+        )
+        self.assertEqual(chosen.image_name, 'source-foo-variant')
+        self.assertEqual(later[0].image_name, 'source-foo-variant')
+
+    def test_sha7_is_first_seven_chars(self):
+        cutoff = 1000
+        prs = [make_pr(1, 900, 'deadbeef1', ['source-foo/a.go'])]
+        chosen, _ = find_boundary('source-foo', 'source-foo', prs, cutoff, NEVER_REVERTED)
+        self.assertEqual(chosen.chosen_sha7, prs[0].merge_sha[:7])
+
+
+# ---------------------------------------------------------------------------
+# parse_claude_verdict
+# ---------------------------------------------------------------------------
+
+class TestParseClaudeVerdict(unittest.TestCase):
+
+    def test_safe_verdict(self):
+        raw = '{"verdict": "safe", "reason": "unrelated change", "fix_prs": []}'
+        v = parse_claude_verdict(raw, 'img')
+        self.assertEqual(v.verdict, 'safe')
+        self.assertEqual(v.reason, 'unrelated change')
+        self.assertEqual(v.image_name, 'img')
+
+    def test_hold_verdict(self):
+        raw = '{"verdict": "hold", "reason": "PR #42 patches regression in CHOSEN", "fix_prs": [42]}'
+        v = parse_claude_verdict(raw, 'img')
+        self.assertEqual(v.verdict, 'hold')
+        self.assertIn('42', v.reason)
+
+    def test_invalid_json_falls_back_to_safe(self):
+        v = parse_claude_verdict('not valid json!', 'img')
+        self.assertEqual(v.verdict, 'safe')
+        self.assertIn('could not parse', v.reason)
+
+    def test_unknown_verdict_value_falls_back_to_safe(self):
+        raw = '{"verdict": "maybe", "reason": "unsure"}'
+        v = parse_claude_verdict(raw, 'img')
+        self.assertEqual(v.verdict, 'safe')
+
+    def test_missing_verdict_key_defaults_to_safe(self):
+        raw = '{"reason": "looks fine"}'
+        v = parse_claude_verdict(raw, 'img')
+        self.assertEqual(v.verdict, 'safe')
+
+    def test_empty_string_falls_back_to_safe(self):
+        v = parse_claude_verdict('', 'img')
+        self.assertEqual(v.verdict, 'safe')
+
+    def test_verdict_case_insensitive(self):
+        raw = '{"verdict": "HOLD", "reason": "bug found"}'
+        v = parse_claude_verdict(raw, 'img')
+        self.assertEqual(v.verdict, 'hold')
+
+    def test_missing_reason_defaults_to_empty(self):
+        raw = '{"verdict": "safe"}'
+        v = parse_claude_verdict(raw, 'img')
+        self.assertEqual(v.reason, '')
+
+
+# ---------------------------------------------------------------------------
+# build_safe_plan
+# ---------------------------------------------------------------------------
+
+class TestBuildSafePlan(unittest.TestCase):
+
+    def test_no_verdicts_all_pass(self):
+        plan = [make_plan('a'), make_plan('b')]
+        safe, held = build_safe_plan(plan, {})
+        self.assertEqual([e.image_name for e in safe], ['a', 'b'])
+        self.assertEqual(held, [])
+
+    def test_hold_removes_entry(self):
+        plan = [make_plan('a'), make_plan('b'), make_plan('c')]
+        verdicts = {'b': Verdict('b', 'hold', 'regression found')}
+        safe, held = build_safe_plan(plan, verdicts)
+        self.assertEqual([e.image_name for e in safe], ['a', 'c'])
+        self.assertEqual([e.image_name for e in held], ['b'])
+
+    def test_safe_verdict_passes_entry(self):
+        plan = [make_plan('a')]
+        verdicts = {'a': Verdict('a', 'safe', 'all good')}
+        safe, held = build_safe_plan(plan, verdicts)
+        self.assertEqual(len(safe), 1)
+        self.assertEqual(held, [])
+
+    def test_multiple_holds(self):
+        plan = [make_plan('a'), make_plan('b'), make_plan('c')]
+        verdicts = {
+            'a': Verdict('a', 'hold', 'bug a'),
+            'c': Verdict('c', 'hold', 'bug c'),
+        }
+        safe, held = build_safe_plan(plan, verdicts)
+        self.assertEqual([e.image_name for e in safe], ['b'])
+        self.assertEqual({e.image_name for e in held}, {'a', 'c'})
+
+    def test_preserves_plan_order(self):
+        plan = [make_plan('z'), make_plan('a'), make_plan('m')]
+        safe, _ = build_safe_plan(plan, {})
+        self.assertEqual([e.image_name for e in safe], ['z', 'a', 'm'])
+
+
+# ---------------------------------------------------------------------------
+# build_claude_prompt
+# ---------------------------------------------------------------------------
+
+class TestBuildClaudePrompt(unittest.TestCase):
+
+    def test_contains_image_and_dir(self):
+        prompt = build_claude_prompt(
+            'source-mysql', 'source-mysql', 42,
+            'Title\n\nbody text', [(99, 'fix title\n\nfix body')]
+        )
+        self.assertIn('source-mysql', prompt)
+        self.assertIn('PR #42', prompt)
+        self.assertIn('PR #99', prompt)
+
+    def test_instructs_json_response(self):
+        prompt = build_claude_prompt('img', 'dir', 1, 'body', [])
+        self.assertIn('"verdict"', prompt)
+        self.assertIn('"hold"', prompt)
+        self.assertIn('"safe"', prompt)
+
+    def test_multiple_later_prs(self):
+        later = [(10, 'PR ten'), (20, 'PR twenty'), (30, 'PR thirty')]
+        prompt = build_claude_prompt('img', 'dir', 5, 'chosen', later)
+        self.assertIn('PR #10', prompt)
+        self.assertIn('PR #20', prompt)
+        self.assertIn('PR #30', prompt)
+
+    def test_no_later_prs(self):
+        prompt = build_claude_prompt('img', 'dir', 5, 'chosen body', [])
+        self.assertIn('PR #5', prompt)
+
+
+# ---------------------------------------------------------------------------
+# build_claude_content (prompt caching)
+# ---------------------------------------------------------------------------
+
+class TestBuildClaudeContent(unittest.TestCase):
+
+    def test_two_blocks_prefix_is_cached(self):
+        blocks = build_claude_content('img', 'dir', 5, 'chosen', [(9, 'fix')])
+        self.assertEqual(len(blocks), 2)
+        self.assertEqual(blocks[0]['cache_control'], {'type': 'ephemeral'})
+        self.assertNotIn('cache_control', blocks[1])
+
+    def test_chosen_pr_is_in_uncached_tail(self):
+        # The per-connector CHOSEN PR must live in the trailing block, not the
+        # cached prefix — otherwise the prefix would differ per connector.
+        blocks = build_claude_content('img', 'dir', 5, 'chosen', [(9, 'fix')])
+        self.assertNotIn('CHOSEN: PR #5', blocks[0]['text'])
+        self.assertIn('CHOSEN: PR #5', blocks[1]['text'])
+        self.assertIn('LATER: PR #9', blocks[0]['text'])
+
+    def test_shared_later_set_yields_identical_prefix(self):
+        # The whole point: two connectors with different CHOSEN PRs but the same
+        # LATER set produce a byte-identical cacheable prefix (a cache hit).
+        later = [(99, 'sweep diff')]
+        a = build_claude_content('conn-a', 'conn-a', 1, 'a body', later)
+        b = build_claude_content('conn-b', 'conn-b', 2, 'b body', later)
+        self.assertEqual(a[0]['text'], b[0]['text'])
+        self.assertNotEqual(a[1]['text'], b[1]['text'])
+
+    def test_later_section_sorted_for_byte_stability(self):
+        # Same LATER set in different order must still produce the same prefix.
+        forward = build_claude_content('i', 'd', 1, 'c', [(10, 'x'), (20, 'y')])
+        reverse = build_claude_content('i', 'd', 1, 'c', [(20, 'y'), (10, 'x')])
+        self.assertEqual(forward[0]['text'], reverse[0]['text'])
+
+
+# ---------------------------------------------------------------------------
+# load_connector_images
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+class TestLoadConnectorImages(unittest.TestCase):
+
+    def load(self, **overrides):
+        paths = {
+            'go_connectors': REPO_ROOT / '.github/go-connectors.yaml',
+            'python_connectors': REPO_ROOT / '.github/python-connectors.yaml',
+            'rust_connectors': REPO_ROOT / '.github/rust-connectors.yaml',
+        }
+        paths.update(overrides)
+        return load_connector_images(**{k: str(v) for k, v in paths.items()})
+
+    def test_reads_every_connector_list(self):
+        names = [c.image_name for c in self.load()]
+        self.assertIn('source-postgres', names)
+        self.assertIn('source-kafka', names)
+        self.assertIn('source-sentry', names)
+
+    def test_unreadable_python_list_is_fatal(self):
+        # Reading it as empty would drop every Python connector from the plan.
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.load(python_connectors=REPO_ROOT / 'nonexistent.yaml')
+
+    def test_unreadable_go_list_is_fatal(self):
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.load(go_connectors=REPO_ROOT / 'nonexistent.yaml')
+
+    def test_unreadable_rust_list_is_fatal(self):
+        with self.assertRaises(SystemExit), \
+                mock.patch('sys.stderr', new_callable=io.StringIO):
+            self.load(rust_connectors=REPO_ROOT / 'nonexistent.yaml')
+
+
+# ---------------------------------------------------------------------------
+# resolve_family
+# ---------------------------------------------------------------------------
+
+class TestResolveFamily(unittest.TestCase):
+    # source-postgres with two variants, plus an unrelated connector.
+    IMAGES = [
+        ConnectorImage('source-postgres', 'source-postgres'),
+        ConnectorImage('source-alloydb', 'source-postgres'),
+        ConnectorImage('source-amazon-rds-postgres', 'source-postgres'),
+        ConnectorImage('source-mysql', 'source-mysql'),
+    ]
+
+    def test_parent_returns_whole_family(self):
+        family = resolve_family(self.IMAGES, 'source-postgres')
+        self.assertEqual(
+            {c.image_name for c in family},
+            {'source-postgres', 'source-alloydb', 'source-amazon-rds-postgres'},
+        )
+
+    def test_variant_returns_whole_family(self):
+        # Selecting a variant still fast-forwards the entire family.
+        family = resolve_family(self.IMAGES, 'source-alloydb')
+        self.assertEqual(
+            {c.image_name for c in family},
+            {'source-postgres', 'source-alloydb', 'source-amazon-rds-postgres'},
+        )
+
+    def test_standalone_connector(self):
+        family = resolve_family(self.IMAGES, 'source-mysql')
+        self.assertEqual([c.image_name for c in family], ['source-mysql'])
+
+    def test_unknown_connector_is_empty(self):
+        self.assertEqual(resolve_family(self.IMAGES, 'source-nope'), [])
+
+
+# ---------------------------------------------------------------------------
+# filter_backward_moves
+# ---------------------------------------------------------------------------
+
+class TestFilterBackwardMoves(unittest.TestCase):
+    # Linear history old -> ... -> new, expressed as an ordering so the fake
+    # is_ancestor can answer "a older-or-equal b" by index.
+    ORDER = ['old1234', 'mid1234', 'new1234', 'tip1234']
+
+    def is_ancestor(self, a, b):
+        if a not in self.ORDER or b not in self.ORDER:
+            return False
+        return self.ORDER.index(a) <= self.ORDER.index(b)
+
+    def run_filter(self, plan, current):
+        return filter_backward_moves(
+            plan,
+            current_commit=lambda img: current.get(img),
+            is_ancestor=self.is_ancestor,
+        )
+
+    def test_keeps_forward_move(self):
+        # boundary newer than current :delayed -> normal progress, keep.
+        plan = [make_plan('a', sha7='new1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'mid1234'})
+        self.assertEqual([e.image_name for e in kept], ['a'])
+        self.assertEqual(skipped, [])
+
+    def test_skips_backward_move(self):
+        # boundary older than current :delayed -> would regress, skip.
+        plan = [make_plan('a', sha7='mid1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'new1234'})
+        self.assertEqual(kept, [])
+        self.assertEqual([(e.image_name, cur) for e, cur in skipped], [('a', 'new1234')])
+
+    def test_keeps_equal_commit(self):
+        plan = [make_plan('a', sha7='mid1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'mid1234'})
+        self.assertEqual([e.image_name for e in kept], ['a'])
+        self.assertEqual(skipped, [])
+
+    def test_keeps_when_no_current_commit(self):
+        plan = [make_plan('a', sha7='mid1234')]
+        kept, skipped = self.run_filter(plan, {})
+        self.assertEqual([e.image_name for e in kept], ['a'])
+        self.assertEqual(skipped, [])
+
+    def test_holds_when_history_unrelated(self):
+        # Neither commit is an ancestor of the other (or one is unknown to git).
+        plan = [make_plan('a', sha7='tip1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'side123'})
+        self.assertEqual(kept, [])
+        self.assertEqual([(e.image_name, cur) for e, cur in skipped], [('a', 'side123')])
+
+    def test_mixed_plan(self):
+        plan = [
+            make_plan('fwd', sha7='mid1234'),   # backward   -> skip
+            make_plan('norm', sha7='tip1234'),  # forward    -> keep
+            make_plan('fresh', sha7='old1234'), # no tag yet -> keep
+        ]
+        kept, skipped = self.run_filter(plan, {'fwd': 'tip1234', 'norm': 'mid1234'})
+        self.assertEqual([e.image_name for e in kept], ['norm', 'fresh'])
+        self.assertEqual([e.image_name for e, _ in skipped], ['fwd'])
+
+
+# ---------------------------------------------------------------------------
+# current_delayed_commit
+# ---------------------------------------------------------------------------
+
+REV = '0123456789abcdef0123456789abcdef01234567'
+
+
+def labeled(rev: str) -> dict:
+    return {'config': {'Labels': {'org.opencontainers.image.revision': rev}}}
+
+
+class TestRevisionLabel(unittest.TestCase):
+
+    def test_single_platform_config(self):
+        self.assertEqual(revision_label(labeled(REV)), '0123456')
+
+    def test_platform_map(self):
+        self.assertEqual(revision_label({'linux/amd64': labeled(REV)}), '0123456')
+
+    def test_missing_or_malformed(self):
+        self.assertIsNone(revision_label({'config': {'Labels': None}}))
+        self.assertIsNone(revision_label(labeled('not-a-sha')))
+        self.assertIsNone(revision_label({}))
+
+
+class TestInspectImage(unittest.TestCase):
+
+    def run_with(self, returncode, stdout='', stderr=''):
+        result = mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+        with mock.patch('delayed_tag.subprocess.run', return_value=result):
+            return inspect_image('ghcr.io/estuary/a:delayed')
+
+    def test_parses_output(self):
+        self.assertEqual(self.run_with(0, '{"config": {}}'), {'config': {}})
+
+    def test_not_found_is_none(self):
+        self.assertIsNone(self.run_with(
+            1, stderr='ERROR: ghcr.io/estuary/a:delayed: not found'))
+
+    def test_other_failure_raises(self):
+        with self.assertRaises(RuntimeError):
+            self.run_with(1, stderr='ERROR: unexpected status: 503')
+
+
+class TestCurrentDelayedCommit(unittest.TestCase):
+
+    def resolve(self, inspected):
+        with mock.patch('delayed_tag.inspect_image', return_value=inspected) as m:
+            sha = current_delayed_commit('a')
+        m.assert_called_once_with('ghcr.io/estuary/a:delayed')
+        return sha
+
+    def test_reads_revision_label(self):
+        self.assertEqual(self.resolve(labeled(REV)), '0123456')
+
+    def test_no_delayed_tag_or_label_is_none(self):
+        self.assertIsNone(self.resolve(None))
+        self.assertIsNone(self.resolve({'config': {}}))
+
+    def test_registry_failure_raises(self):
+        with mock.patch('delayed_tag.inspect_image', side_effect=RuntimeError('503')):
+            with self.assertRaises(RuntimeError):
+                current_delayed_commit('a')
+
+
+# ---------------------------------------------------------------------------
+# verdict cache key
+# ---------------------------------------------------------------------------
+
+class TestVerdictCacheKey(unittest.TestCase):
+
+    def test_later_order_independent(self):
+        self.assertEqual(
+            verdict_cache_key(10, 'source-foo', [3, 1, 2]),
+            verdict_cache_key(10, 'source-foo', [2, 3, 1]),
+        )
+
+    def test_differs_on_chosen_pr(self):
+        self.assertNotEqual(
+            verdict_cache_key(10, 'source-foo', [1]),
+            verdict_cache_key(11, 'source-foo', [1]),
+        )
+
+    def test_differs_on_source_dir(self):
+        self.assertNotEqual(
+            verdict_cache_key(10, 'source-foo', [1]),
+            verdict_cache_key(10, 'source-bar', [1]),
+        )
+
+    def test_differs_on_later_set(self):
+        self.assertNotEqual(
+            verdict_cache_key(10, 'source-foo', [1]),
+            verdict_cache_key(10, 'source-foo', [1, 2]),
+        )
+
+    def test_variants_share_key_via_source_dir(self):
+        # A connector and its variant share source_dir, so they collapse to the
+        # same key and the verdict is computed once.
+        self.assertEqual(
+            verdict_cache_key(10, 'materialize-foo', [1]),
+            verdict_cache_key(10, 'materialize-foo', [1]),
+        )
+
+
+# ---------------------------------------------------------------------------
+# verdict cache round-trip
+# ---------------------------------------------------------------------------
+
+class TestVerdictCacheIO(unittest.TestCase):
+
+    def round_trip(self, cache: dict) -> dict:
+        with tempfile.TemporaryDirectory() as d:
+            path = str(Path(d) / 'sub' / 'verdict_cache.json')  # parent missing
+            write_verdict_cache(cache, path)
+            return load_verdict_cache(path)
+
+    def test_round_trip_preserves_entries(self):
+        cache = {
+            '10|source-foo|1,2': {'verdict': 'safe', 'reason': 'ok'},
+            '11|source-bar|': {'verdict': 'hold', 'reason': 'fix of 11'},
+        }
+        self.assertEqual(self.round_trip(cache), cache)
+
+    def test_write_creates_missing_parent_dir(self):
+        # round_trip points at a non-existent 'sub/' dir; success implies mkdir.
+        self.assertEqual(self.round_trip({'k': {'verdict': 'safe', 'reason': ''}}),
+                         {'k': {'verdict': 'safe', 'reason': ''}})
+
+    def test_missing_file_is_empty_cache(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(load_verdict_cache(str(Path(d) / 'nope.json')), {})
+
+    def test_corrupt_file_is_empty_cache(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'bad.json'
+            path.write_text('{not json')
+            self.assertEqual(load_verdict_cache(str(path)), {})
+
+    def test_drops_entries_with_invalid_verdict(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'c.json'
+            path.write_text(json.dumps({
+                'good': {'verdict': 'safe', 'reason': 'r'},
+                'bad-value': {'verdict': 'maybe', 'reason': 'r'},
+                'bad-shape': ['not', 'a', 'dict'],
+            }))
+            self.assertEqual(
+                load_verdict_cache(str(path)),
+                {'good': {'verdict': 'safe', 'reason': 'r'}},
+            )
+
+
+# ---------------------------------------------------------------------------
+# call_claude retry / fail-loud behavior
+# ---------------------------------------------------------------------------
+
+def _http_error(code: int) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError('https://api', code, f'status {code}', None, None)
+
+
+class TestCallClaudeRetry(unittest.TestCase):
+
+    def setUp(self):
+        self.slept = []
+        self.sleep = lambda d: self.slept.append(d)
+
+    def call(self, side_effect, attempts=4):
+        with mock.patch('delayed_tag._claude_request', side_effect=side_effect) as m:
+            result = call_claude(
+                'prompt', 'key', attempts=attempts,
+                base_delay=2.0, sleep=self.sleep,
+            )
+        return result, m
+
+    def test_returns_on_first_success(self):
+        result, m = self.call(['ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 1)
+        self.assertEqual(self.slept, [])  # no retry, no sleep
+
+    def test_retries_transient_then_succeeds(self):
+        result, m = self.call([urllib.error.URLError('boom'), _http_error(503), 'ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 3)
+        self.assertEqual(self.slept, [2.0, 4.0])  # exponential backoff
+
+    def test_retries_rate_limit(self):
+        result, m = self.call([_http_error(429), 'ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 2)
+
+    def test_retries_truncated_json(self):
+        result, m = self.call([json.JSONDecodeError('x', 'doc', 0), 'ok'])
+        self.assertEqual(result, 'ok')
+        self.assertEqual(m.call_count, 2)
+
+    def test_unexpected_shape_not_retried(self):
+        # A 200 with a missing key surfaces as KeyError: an identical request
+        # would parse identically, so it propagates without retrying.
+        with self.assertRaises(KeyError):
+            self.call([KeyError('content'), 'ok'])
+        self.assertEqual(self.slept, [])
+
+    def test_exhausts_attempts_then_raises(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            self.call([urllib.error.URLError('down')] * 4, attempts=4)
+        self.assertIn('after 4 attempts', str(ctx.exception))
+        self.assertEqual(self.slept, [2.0, 4.0, 8.0])  # 3 sleeps between 4 tries
+
+    def test_non_retryable_status_fails_fast(self):
+        # 401 won't be fixed by retrying: raise immediately, no sleeps.
+        with self.assertRaises(RuntimeError) as ctx:
+            self.call([_http_error(401), 'ok'])
+        self.assertIn('401', str(ctx.exception))
+        self.assertEqual(self.slept, [])
+
+    def test_bad_request_fails_fast(self):
+        with self.assertRaises(RuntimeError):
+            self.call([_http_error(400)] + ['ok'])
+        self.assertEqual(self.slept, [])
+
+
+# ---------------------------------------------------------------------------
+# _truncate_diff — diff size caps
+# ---------------------------------------------------------------------------
+
+class TestTruncateDiff(unittest.TestCase):
+
+    def test_under_all_caps_is_unchanged(self):
+        lines = ['+a', '-b', ' c']
+        self.assertEqual(
+            _truncate_diff(lines, line_cap=10, line_char_cap=10, char_cap=1000),
+            '+a\n-b\n c',
+        )
+
+    def test_line_count_cap(self):
+        lines = [f'+line{i}' for i in range(100)]
+        out = _truncate_diff(lines, line_cap=5, line_char_cap=100, char_cap=10_000)
+        self.assertEqual(len(out.splitlines()), 6)  # 5 lines + the marker
+        self.assertIn('truncated at 5 lines', out)
+
+    def test_long_line_truncated_in_place_not_dropped(self):
+        # A single enormous line (a regenerated golden-snapshot line) is the bug
+        # that 400'd the run: it must be truncated, not silently dropped.
+        lines = ['+' + 'x' * 60_000, '+kept']
+        out = _truncate_diff(lines, line_cap=10, line_char_cap=100, char_cap=10_000)
+        self.assertIn('line truncated, was 60001 chars', out)
+        self.assertIn('+kept', out)
+        # No remaining line is anywhere near the original 60k chars.
+        self.assertTrue(all(len(l) < 200 for l in out.splitlines()))
+
+    def test_total_char_cap(self):
+        lines = ['+' + 'a' * 50 for _ in range(100)]  # ~5100 chars total
+        out = _truncate_diff(lines, line_cap=1000, line_char_cap=1000, char_cap=200)
+        self.assertIn('truncated at 200 chars', out)
+        self.assertLess(len(out), 400)
+
+    def test_caps_compose_keep_request_bounded(self):
+        # 2000 lines of 60k chars each — the EventBridge case — must collapse to
+        # a small, sendable diff under all three caps applied together.
+        lines = ['+' + 'x' * 60_000 for _ in range(2000)]
+        out = _truncate_diff(lines, line_cap=2000, line_char_cap=1000, char_cap=120_000)
+        self.assertLessEqual(len(out), 121_000)
+
+
+# ---------------------------------------------------------------------------
+# _http_error_body / call_claude error surfacing
+# ---------------------------------------------------------------------------
+
+class TestHttpErrorBody(unittest.TestCase):
+
+    def test_reads_body(self):
+        exc = urllib.error.HTTPError(
+            'https://api', 400, 'Bad Request', {},
+            io.BytesIO(b'{"error":{"message":"prompt is too long"}}'),
+        )
+        self.assertIn('prompt is too long', _http_error_body(exc))
+
+    def test_unreadable_body_is_empty(self):
+        exc = urllib.error.HTTPError('https://api', 400, 'Bad Request', {}, None)
+        self.assertEqual(_http_error_body(exc), '')
+
+    def test_body_truncated(self):
+        exc = urllib.error.HTTPError(
+            'https://api', 400, 'Bad Request', {}, io.BytesIO(b'x' * 5000),
+        )
+        self.assertEqual(len(_http_error_body(exc)), 2000)
+
+    def test_call_claude_includes_body_in_error(self):
+        # The fail-fast RuntimeError must carry the API's reason so CI logs say
+        # WHY, not just 'HTTP 400'.
+        def boom(*a, **k):
+            raise urllib.error.HTTPError(
+                'https://api', 400, 'Bad Request', {},
+                io.BytesIO(b'{"error":{"message":"prompt is too long: 9 > 8"}}'),
+            )
+        with mock.patch('delayed_tag._claude_request', side_effect=boom):
+            with self.assertRaises(RuntimeError) as ctx:
+                call_claude('prompt', 'key', attempts=1, sleep=lambda d: None)
+        self.assertIn('prompt is too long', str(ctx.exception))
+        self.assertIn('400', str(ctx.exception))
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

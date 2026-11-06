@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -38,8 +39,8 @@ var sqliteDialect = func() sql.Dialect {
 				sql.QuoteTransform("\"", "\\\""),
 			))),
 		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
-		Placeholderer: sql.PlaceholderFn(func(_ int) string {
-			return "?"
+		Placeholderer: sql.PlaceholderFn(func(index int) string {
+			return fmt.Sprintf("?%d", index+1)
 		}),
 		TypeMapper: mapper,
 	}
@@ -48,7 +49,7 @@ var sqliteDialect = func() sql.Dialect {
 var (
 	tplAll = sql.MustParseTemplate(sqliteDialect, "root", `
   {{ define "temp_name" -}}
-  flow_temp_table_{{ $.Binding }}
+  load.flow_temp_table_{{ $.Binding }}
   {{- end }}
 
   -- Templated creation of a materialized table definition and comments:
@@ -140,7 +141,7 @@ var (
   {{- if $ind }},{{ end }}
   {{ $val.Identifier}} = {{ $val.Placeholder }}
   {{- end }}
-  {{- if $.Document }},
+  {{- if $.Document }}{{ if $.Values }},{{ end }}
   {{ $.Document.Identifier }} = {{ $.Document.Placeholder }}
   {{- end -}}
   {{ range $ind, $key := $.Keys }}

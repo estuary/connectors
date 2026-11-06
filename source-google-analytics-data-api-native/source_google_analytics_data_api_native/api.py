@@ -213,13 +213,18 @@ async def backfill_report(
     property_id: str,
     report_doc_model: type[ReportDocument],
     report: Report,
+    start_date: datetime,
     log: Logger,
-    page: PageCursor,
+    page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[ReportDocument | PageCursor, None]:
-    assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
-    start = str_to_dt(page)
+
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
 
     # The incremental task will capture records for the cutoff day.
     if start >= cutoff or _are_same_day(start, cutoff):

@@ -1,0 +1,111 @@
+meta {
+  name: 42 - Labels Sort Rejected
+  type: graphql
+  seq: 42
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query LabelsSortRejected {
+    issueLabels(first: 10, sort: [{updatedAt: {order: Ascending}}]) {
+      nodes { id updatedAt }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  Pins down the one real asymmetry in this cluster. `02 - Introspect Pagination Args`
+  showed `issues`, `projects` and `initiatives` each carry a `sort` argument while
+  `issueLabels` does not; this request confirms that against the live API rather than
+  trusting the introspection read.
+
+  **Limitation / observed finding** (confirmed 2026-07-30): rejected.
+
+      HTTP 400
+      { "errors": [{
+          "message": "Unknown argument \"sort\" on field \"Query.issueLabels\".",
+          "extensions": { "code": "GRAPHQL_VALIDATION_FAILED",
+                          "type": "graphql error", "userError": true,
+                          "http": { "status": 400 } } }] }
+
+  So Labels genuinely cannot sort ascending, and is locked to descending `orderBy`. That
+  is the sole reason it takes a different checkpoint policy from its three siblings — see
+  `40 - Labels Bare`.
+
+  **Secondary finding, and an important one for the retry design:** this is a
+  QUERY-VALIDATION error and it comes back as a real **HTTP 400**. Compare
+  `06 - Page Size Over Limit`, where an argument-VALUE violation returns HTTP 200 with
+  `data: null`. Linear therefore uses 400 for both permanent schema errors (this request)
+  and for RATE LIMITING (`extensions.code == "RATELIMITED"`). A retry policy keyed on the
+  status code alone would either retry this unfixable query forever or treat a rate limit
+  as fatal. **`extensions.code`, not the HTTP status, is the only reliable discriminator.**
+
+  **Third finding — this response carries NO rate-limit headers at all.** Note the saved
+  example has no `x-complexity` / `x-ratelimit-*` block, unlike every other example in the
+  collection. A GraphQL validation failure is rejected before execution, so Linear reports
+  neither a complexity charge nor the remaining budget. The connector must therefore treat
+  its cached rate-limit state as STALE-BUT-VALID across such an error rather than assuming
+  every response refreshes the budget — reading a missing header as zero remaining would
+  trigger a spurious hour-long sleep on what is really a permanent, fail-fast bug in our
+  own query.
+}
+
+example {
+  name: 400 — GRAPHQL_VALIDATION_FAILED: unknown argument "sort"
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query LabelsSortRejected {
+        issueLabels(first: 10, sort: [{updatedAt: {order: Ascending}}]) {
+          nodes { id updatedAt }
+        }
+      }
+    }
+  }
+
+  response: {
+    status: {
+      code: 400
+      text: Bad Request
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "errors": [
+            {
+              "message": "Unknown argument \"sort\" on field \"Query.issueLabels\".",
+              "locations": [
+                {
+                  "line": 2,
+                  "column": 26
+                }
+              ],
+              "extensions": {
+                "http": {
+                  "status": 400,
+                  "headers": {}
+                },
+                "code": "GRAPHQL_VALIDATION_FAILED",
+                "type": "graphql error",
+                "userError": true
+              }
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

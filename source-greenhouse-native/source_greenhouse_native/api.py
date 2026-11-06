@@ -8,6 +8,7 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     GreenhouseResource,
+    GreenhouseSnapshotResource,
 )
 
 from .shared import (
@@ -22,13 +23,13 @@ EVENTUAL_CONSISTENCY_LAG = timedelta(minutes=5)
 MAX_LIMIT = 500
 
 
-async def _fetch_page(
+async def _fetch_page[T: GreenhouseSnapshotResource](
     http: HTTPSession,
-    model: type[GreenhouseResource],
+    model: type[T],
     log: Logger,
     url: str,
     params: dict[str, str | int],
-) -> tuple[AsyncGenerator[GreenhouseResource, None], str | None]:
+) -> tuple[AsyncGenerator[T, None], str | None]:
     """Fetch a single page of results from a Greenhouse v3 endpoint.
 
     Returns a streaming async generator of resources and the next cursor
@@ -36,19 +37,19 @@ async def _fetch_page(
     headers, body = await http.request_stream(log, url, params=params)
     next_cursor = extract_next_cursor(headers)
 
-    async def docs() -> AsyncGenerator[GreenhouseResource, None]:
+    async def docs() -> AsyncGenerator[T, None]:
         async for doc in IncrementalJsonProcessor(body(), "item", model):
             yield doc
 
     return docs(), next_cursor
 
 
-async def _paginate_greenhouse_resources(
+async def _paginate_greenhouse_resources[T: GreenhouseSnapshotResource](
     http: HTTPSession,
-    model: type[GreenhouseResource],
+    model: type[T],
     log: Logger,
     params: dict[str, str | int],
-) -> AsyncGenerator[GreenhouseResource, None]:
+) -> AsyncGenerator[T, None]:
     """Paginate through all pages of a Greenhouse v3 endpoint."""
     url = f"{GREENHOUSE_BASE_URL}/{model.path}"
 
@@ -99,6 +100,17 @@ async def fetch_greenhouse_resources(
 
     if most_recent_cursor > log_cursor:
         yield most_recent_cursor
+
+
+async def snapshot_greenhouse_resources(
+    http: HTTPSession,
+    model: type[GreenhouseSnapshotResource],
+    log: Logger,
+) -> AsyncGenerator[GreenhouseSnapshotResource, None]:
+    params: dict[str, str | int] = {"per_page": MAX_LIMIT}
+
+    async for resource in _paginate_greenhouse_resources(http, model, log, params):
+        yield resource
 
 
 async def backfill_greenhouse_resources(

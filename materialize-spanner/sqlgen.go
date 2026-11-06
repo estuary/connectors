@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -93,7 +93,11 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp":   {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(timestampToStringCast))},
 			"string(max)": {sql.NewMigrationSpec([]string{"bytes(max)"}, sql.WithCastSQL(stringToBytesCast))},
 			"bytes(max)":  {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(bytesToStringCast))},
-			"*":           {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			// Spanner rejects CAST(JSON AS STRING), so reverting object/array
+			// fields from JSON storage back to STRING uses TO_JSON_STRING, which
+			// renders the canonical JSON text.
+			"json": {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(jsonToStringCast))},
+			"*":    {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 2 {
@@ -143,6 +147,13 @@ func timestampToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+}
+
+// jsonToStringCast renders a JSON column as its canonical JSON text. Spanner
+// does not permit CAST(JSON AS STRING), so TO_JSON_STRING is used instead when
+// reverting object/array fields from JSON storage back to a STRING column.
+func jsonToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_JSON_STRING(%s)`, migration.Identifier)
 }
 
 // stringToBytesCast decodes a base64-encoded STRING(MAX) column into native
@@ -288,9 +299,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
-{{- range $i, $col := $.RootLevelColumns}}
+{{- range $i, $col := $.RootPropertyColumns}}
 	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
 FROM {{ template "temp_name" . }} AS l
@@ -318,7 +329,9 @@ UPDATE {{ Identifier $.TablePath }}
 -- Verify the update succeeded (Spanner doesn't have @@ROWCOUNT)
 -- We'll handle verification in the Go code instead
 {{ end }}
-`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
+`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix), template.FuncMap{
+		"QuoteAlias": sql.QuoteTransformEscapedBackslash("`", "\\`"),
+	})
 
 	return templates{
 		createLoadTable:         tplAll.Lookup("createLoadTable"),

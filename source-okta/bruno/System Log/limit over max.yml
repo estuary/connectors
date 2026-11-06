@@ -1,0 +1,63 @@
+info:
+  name: limit over max
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?limit=1001"
+  params:
+    - name: limit
+      value: "1001"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/SystemLog/#tag/SystemLog/operation/listLogEvents
+
+  **WHY:** `limit` is documented as 0–1000. The enforcement mode for 1001
+  (reject vs clamp) decides whether the connector must clamp before sending.
+
+  **VERIFIED (2026-10-07):** rejected — HTTP 400 `E0000001` "limit: must be
+  between 0 and 1000". The connector requests `limit=1000` exactly. Cap
+  truncation order (needs > 1000 matching events; the sandbox has 443) is not
+  observed: trusted to the documented sort (published for bounded, persistence
+  time for polling), and both connector modes follow next links rather than
+  trusting a count, so a clamp could not lose rows anyway.
+
+examples:
+- name: 400 - limit 1001 rejected E0000001
+  request:
+    url: '{{base_url}}/logs?limit=1001'
+    method: GET
+  response:
+    status: 400
+    statusText: Bad Request
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '55'
+    - name: x-rate-limit-reset
+      value: '1791382870'
+    body:
+      type: json
+      data: |-
+        {
+          "errorCode": "E0000001",
+          "errorSummary": "API validation failed: 'limit': must be between 0 and 1000.",
+          "errorId": "33a66e5d-be90-482c-9286-c4484b443b6d",
+          "errorCauses": [
+            {
+              "errorSummary": "limit: must be between 0 and 1000"
+            }
+          ]
+        }

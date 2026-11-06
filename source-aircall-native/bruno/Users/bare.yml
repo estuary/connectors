@@ -1,0 +1,67 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url_v2}}/users?per_page=50'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-users-v2
+    **WHY:** the `users` stream's endpoint (v1 list is sunset 2026-09-30). Confirms envelope key, meta/pagination shape on v2, and the per-item key set.
+
+    **VERIFIED (2026-09-28):** envelope `{users:[…], meta:{count,total,current_page,per_page,next_page_link,previous_page_link}}` — same meta as v1. Item keys: `id` (int), `direct_link`, `name`, `email`, `created_at` (RFC3339), `available`, `availability_status`, `substatus`, `state`, `time_zone`, `language`, `wrap_up_time`, `extension`, `default_number_id`. No `numbers` array. No update cursor — snapshot.
+    **UNOBSERVABLE:** multi-page walk on v2 (account has 1 user; seeding users consumes paid seats). Relying on the identical meta contract VERIFIED on v1 in `_top-level / page walk`.
+  type: text/markdown
+examples:
+- name: 200 - populated list (1 user)
+  request:
+    url: '{{base_url_v2}}/users?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "users": [
+            {
+              "id": 2078847,
+              "name": "Jonathan Wihl",
+              "email": "jonathan@estuary.dev",
+              "direct_link": "https://api.aircall.io/v2/users/2078847",
+              "language": "en-US",
+              "created_at": "2026-09-28T10:21:09.000Z",
+              "time_zone": "Etc/UTC",
+              "state": "always_opened",
+              "wrap_up_time": 0,
+              "extension": "001",
+              "availability_status": "available",
+              "available": false,
+              "default_number_id": 1389850,
+              "substatus": "always_opened"
+            }
+          ],
+          "meta": {
+            "count": 1,
+            "total": 1,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

@@ -1,16 +1,20 @@
-from pydantic import BaseModel, NonNegativeInt
+from datetime import date
+
+from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from typing import Generic, Any
 
 from ..flow import (
+    UNLINKED,
     CaptureSpec,
     CollectionSpec,
     ConnectorState,
     ConnectorType,
     EndpointConfig,
+    Linked,
     RangeSpec,
     ResourceConfig,
+    link_bindings,
 )
-from ..pydantic_polyfill import GenericModel
 
 
 class Spec(BaseModel):
@@ -20,42 +24,49 @@ class Spec(BaseModel):
     connectorType: ConnectorType = "IMAGE"
 
 
-class Discover(GenericModel, Generic[EndpointConfig]):
+class Discover(BaseModel, Generic[EndpointConfig]):
     connectorType: ConnectorType
     config: EndpointConfig
+    createdAt: date | None = None
 
 
-class ValidateBinding(GenericModel, Generic[ResourceConfig]):
-    collection: CollectionSpec
+class ValidateBinding(BaseModel, Generic[ResourceConfig]):
+    collection: CollectionSpec = UNLINKED
+    collectionIndex: NonNegativeInt = 0
     resourceConfig: ResourceConfig
     backfill: NonNegativeInt = 0
 
 
-class ValidateBase(GenericModel, Generic[ResourceConfig]):
+class ValidateBase(Linked, BaseModel, Generic[ResourceConfig]):
     name: str
     connectorType: ConnectorType
     bindings: list[ValidateBinding[ResourceConfig]] = []
+    linkedCollections: list[CollectionSpec] = []
+
+    def _link(self) -> None:
+        link_bindings(self.bindings, self.linkedCollections)
 
 
 class ValidateLastCaptureEndpointConfig(BaseModel):
     config: dict[str, Any]
 
 
-class ValidateLastCapture(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
+class ValidateLastCapture(ValidateBase[ResourceConfig], Generic[EndpointConfig, ResourceConfig]):
     config: ValidateLastCaptureEndpointConfig
+    createdAt: date | None = None
 
 
-class Validate(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
+class Validate(ValidateBase[ResourceConfig], Generic[EndpointConfig, ResourceConfig]):
     config: EndpointConfig
     lastCapture: ValidateLastCapture[EndpointConfig, ResourceConfig] | None = None
 
 
-class Apply(GenericModel, Generic[EndpointConfig, ResourceConfig]):
+class Apply(BaseModel, Generic[EndpointConfig, ResourceConfig]):
     capture: CaptureSpec[EndpointConfig, ResourceConfig]
     version: str
 
 
-class Open(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
+class Open(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
     capture: CaptureSpec[EndpointConfig, ResourceConfig]
     version: str
     range: RangeSpec
@@ -63,4 +74,4 @@ class Open(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]
 
 
 class Acknowledge(BaseModel):
-    checkpoints: NonNegativeInt
+    checkpoints: PositiveInt

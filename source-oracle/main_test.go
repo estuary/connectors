@@ -212,6 +212,8 @@ func argsTuple(row []any) string {
 			tuple += ","
 		}
 		switch v := value.(type) {
+		case nil:
+			tuple += "NULL"
 		case string:
 			tuple += fmt.Sprintf("'%s'", v)
 		case int:

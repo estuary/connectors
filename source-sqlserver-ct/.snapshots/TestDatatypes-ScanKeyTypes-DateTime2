@@ -1,0 +1,67 @@
+sql> CREATE TABLE dbo.Datatypes_ScanKeyTypes_DateTime2_334144 (k DATETIME2 PRIMARY KEY, v TEXT)
+sql> INSERT INTO dbo.Datatypes_ScanKeyTypes_DateTime2_334144 VALUES ('1991-08-31T12:34:54.1234567', 'Data 0'), ('1991-08-31T12:34:54.7654321', 'Data 1'), ('2000-01-01T01:01:01', 'Data 2')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/datatypes_scankeytypes_datetime2_334144
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_datetime2_334144",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_DateTime2_334144"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:54.1234567Z",
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_datetime2_334144",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_DateTime2_334144"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:54.7654321Z",
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_datetime2_334144",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_DateTime2_334144"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "2000-01-01T01:01:01Z",
+    "v": "Data 2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_ScanKeyTypes_DateTime2_334144": {
+      "backfilled": 3,
+      "key_columns": [
+        "k"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

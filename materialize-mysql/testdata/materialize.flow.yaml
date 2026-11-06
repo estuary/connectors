@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-mysql/mysql:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.mysql.yaml
     bindings: &bindings
@@ -33,11 +33,20 @@ materializations:
       source: tests/data-types
       fields:
         recommended: 1
+    - resource:
+        table: merge_renamed
+      source: tests/merge-renamed
+      fields:
+        recommended: true
+        exclude: [renamedString, renamedTotal]
+        include:
+          renamed_string: {}
+          renamed_total: {}
 
   acmeCo/tests/materialize-mysql/singlestore:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.singlestore.yaml
     bindings: *bindings
@@ -48,7 +57,7 @@ materializations:
         command:
           - go
           - run
-          - .
+          - ./cmd/connector
         protobuf: true
         config: config.mariadb.yaml
     bindings:
@@ -76,3 +85,12 @@ materializations:
       source: tests/data-types
       fields:
         recommended: 1
+    - resource:
+        table: merge_renamed
+      source: tests/merge-renamed
+      fields:
+        recommended: true
+        exclude: [renamedString, renamedTotal]
+        include:
+          renamed_string: {}
+          renamed_total: {}

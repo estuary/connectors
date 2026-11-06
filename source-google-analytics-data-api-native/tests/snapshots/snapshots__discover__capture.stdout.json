@@ -57,12 +57,38 @@
       ],
       "title": "daily_active_users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "daily_active_users"
     ]
   },
   {
@@ -138,7 +164,30 @@
       ],
       "title": "devices",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -147,6 +196,9 @@
       "/deviceCategory",
       "/operatingSystem",
       "/browser"
+    ],
+    "resourcePath": [
+      "devices"
     ]
   },
   {
@@ -207,12 +259,38 @@
       ],
       "title": "four_weekly_active_users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "four_weekly_active_users"
     ]
   },
   {
@@ -288,7 +366,30 @@
       ],
       "title": "locations",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -297,6 +398,9 @@
       "/country",
       "/city",
       "/date"
+    ],
+    "resourcePath": [
+      "locations"
     ]
   },
   {
@@ -362,13 +466,39 @@
       ],
       "title": "my_custom_report_with_a_filter",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
       "/report_date",
       "/date",
       "/browser"
+    ],
+    "resourcePath": [
+      "my_custom_report_with_a_filter"
     ]
   },
   {
@@ -439,7 +569,30 @@
       ],
       "title": "pages",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -447,6 +600,9 @@
       "/date",
       "/hostName",
       "/pagePathPlusQueryString"
+    ],
+    "resourcePath": [
+      "pages"
     ]
   },
   {
@@ -517,7 +673,30 @@
       ],
       "title": "traffic_sources",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -525,6 +704,9 @@
       "/date",
       "/sessionSource",
       "/sessionMedium"
+    ],
+    "resourcePath": [
+      "traffic_sources"
     ]
   },
   {
@@ -585,12 +767,38 @@
       ],
       "title": "website_overview",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "website_overview"
     ]
   },
   {
@@ -651,12 +859,38 @@
       ],
       "title": "weekly_active_users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
       "/report_date",
       "/date"
+    ],
+    "resourcePath": [
+      "weekly_active_users"
     ]
   }
 ]

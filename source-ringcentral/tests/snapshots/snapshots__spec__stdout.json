@@ -10,6 +10,7 @@
               "description": "Number of hours to look back when fetching call logs during incremental sync. Call log records can be updated after creation, so the connector re-fetches records within this window once per day to capture updates. Default is 24 hours.",
               "maximum": 168,
               "minimum": 1,
+              "nonsensitive": true,
               "title": "Call Log Lookback Window (Hours)",
               "type": "integer"
             }
@@ -120,6 +121,7 @@
           "default": "PT0S",
           "description": "Interval between updates for this resource",
           "format": "duration",
+          "nonsensitive": true,
           "title": "Interval",
           "type": "string"
         }

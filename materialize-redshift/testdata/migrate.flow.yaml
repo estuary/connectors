@@ -5,7 +5,7 @@ materializations:
   acmeCo/tests/materialize-redshift:
     endpoint:
       local:
-        command: ["go", "run", "."]
+        command: ["go", "run", "./cmd/connector"]
         protobuf: true
         config: config.local.yaml
     bindings:
@@ -14,6 +14,10 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        include:
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
         exclude:
           - intStr064ToInt064
           - intStr064ToInt128
@@ -100,3 +104,12 @@ materializations:
           - intStr129ToNumStr
           - intStr257ToNum
           - intStr257ToNumStr
+          # These type changes have no migration support in redshift
+          # (NUMERIC->BIGINT): Validate returns INCOMPATIBLE, which the
+          # control plane would resolve by backfilling the binding. The test
+          # harness doesn't emulate that resolution, so exclude them rather
+          # than let Apply skip the migration and leave a column type the
+          # spec doesn't expect.
+          - intStr000ToInt000
+          - intStr000ToInt032
+          - intStr000ToInt064

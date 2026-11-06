@@ -25,21 +25,21 @@ tests/
 
 ```bash
 # Run all tests
-poetry run pytest tests/ -v
+uv run --group dev pytest tests/ -v
 
 # Run specific test category
-poetry run pytest tests/unit/ -v
-poetry run pytest tests/integration/ -v
-poetry run pytest tests/e2e/ -v
+uv run --group dev pytest tests/unit/ -v
+uv run --group dev pytest tests/integration/ -v
+uv run --group dev pytest tests/e2e/ -v
 
 # Run with DEBUG logging (see job manager logs)
-poetry run pytest tests/integration/ -v --log-cli-level=DEBUG
+uv run --group dev pytest tests/integration/ -v --log-cli-level=DEBUG
 
 # Run specific test
-poetry run pytest tests/integration/test_job_manager.py::TestJobSplitting::test_binary_split_at_campaign_level -v
+uv run --group dev pytest tests/integration/test_job_manager.py::TestJobSplitting::test_binary_split_at_campaign_level -v
 
 # Run with coverage
-poetry run pytest tests/ --cov=source_facebook_marketing_native.insights
+uv run --group dev pytest tests/ --cov=source_facebook_marketing_native.insights
 ```
 
 ## Test Categories
@@ -324,7 +324,7 @@ assert all(r["account_id"] == "act_123" for r in results)
 
 1. **Run with DEBUG logging** to see job manager decisions:
    ```bash
-   poetry run pytest tests/integration/test_job_manager.py -v --log-cli-level=DEBUG
+   uv run --group dev pytest tests/integration/test_job_manager.py -v --log-cli-level=DEBUG
    ```
 
 2. **Print mock requests** to see what URLs were called:

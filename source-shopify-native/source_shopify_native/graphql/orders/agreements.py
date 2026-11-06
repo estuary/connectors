@@ -4,7 +4,7 @@ from logging import Logger
 from typing import AsyncGenerator, Any
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource, SortKey
+from ...models import ShopifyGraphQLResource, SortKey, StoreCapabilities
 
 
 class OrderAgreements(ShopifyGraphQLResource):
@@ -59,12 +59,14 @@ class OrderAgreements(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return OrderAgreements.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

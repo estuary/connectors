@@ -1,0 +1,77 @@
+info:
+  name: per_page limits probe
+  type: http
+  seq: 2
+http:
+  method: GET
+  url: '{{base_url}}/{{resource}}?per_page=51'
+  params:
+  - name: per_page
+    value: '51'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#pagination
+    **WHY:** docs say per_page max is 50. Push to 51 to learn the enforcement mode (reject / clamp / truncate) — the connector hardcodes the page size. Set `resource` in the env (tags, teams, numbers, webhooks, users/availabilities).
+
+    **VERIFIED (2026-09-28) (tags):** 200, `meta.per_page: 50`, all 9 returned. Silent clamp. The connector sends 50.
+  type: text/markdown
+examples:
+- name: tags - per_page 51 clamped to 50 (projection)
+  request:
+    url: '{{base_url}}/{{resource}}?per_page=51'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "tags": [
+            {
+              "id": 3037353
+            },
+            {
+              "id": 3037354
+            },
+            {
+              "id": 3037355
+            },
+            {
+              "id": 3037356
+            },
+            {
+              "id": 3037357
+            },
+            {
+              "id": 3037358
+            },
+            {
+              "id": 3037359
+            },
+            {
+              "id": 3037360
+            },
+            {
+              "id": 3037361
+            }
+          ],
+          "meta": {
+            "count": 9,
+            "total": 9,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

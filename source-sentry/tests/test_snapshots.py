@@ -3,16 +3,24 @@ import subprocess
 
 
 def test_capture(request, snapshot):
+    OMITTED_STREAMS = [
+        # Sentry deletes Releases that don't have a deployment within the past 90 days.
+        # We aren't frequently deploying a Release just so it appears in the capture
+        # snapshot, so don't include any documents for it in the snapshot.
+        "acmeCo/Releases",
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
             "1",
             "--delay",
-            "10s",
+            "30s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -20,10 +28,45 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    for line in lines:
-        line[1]["stats"] = "redacted-object"
+    # These fields drift independently of connector behavior: `stats` and
+    # `features` are server-side aggregates/flags Sentry toggles over time, and
+    # the event-aggregate timestamps move as seeded events age out of the
+    # retention window. Redact every occurrence at any nesting depth (e.g.
+    # `stats` also appears under `lifetime`).
+    FIELDS_TO_REDACT = {
+        "stats",
+        "features",
+        "firstEvent",
+        "lastEvent",
+        "firstSeen",
+        "lastSeen",
+    }
 
-    assert snapshot("stdout.json") == lines
+    def redact(value):
+        if isinstance(value, dict):
+            return {
+                key: "redacted" if key in FIELDS_TO_REDACT else redact(val)
+                for key, val in value.items()
+            }
+        if isinstance(value, list):
+            return [redact(item) for item in value]
+        return value
+
+    # Keep only the first captured document per stream so the snapshot stays
+    # small and stable regardless of how many rows a stream returns.
+    unique_stream_lines = []
+    seen = set()
+    for line in lines:
+        stream = line[0]
+        if stream in seen or stream in OMITTED_STREAMS:
+            continue
+        seen.add(stream)
+        line[1] = redact(line[1])
+        unique_stream_lines.append(line)
+
+    unique_stream_lines.sort(key=lambda l: l[0])
+
+    assert snapshot("stdout.json") == unique_stream_lines
 
 
 def test_discover(request, snapshot):

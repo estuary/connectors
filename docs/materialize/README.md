@@ -374,6 +374,54 @@ Much more complexity for the client.
 Aside from internal usage, only very sophisticated users would successfully use
 this.
 
+### Backfill truncation
+
+`Request.Flush` also carries the backfill signals of the transaction.
+`m.RunTransactions` decodes them and calls the required `Transactor.Flush`
+method once per transaction, after `Load` returns and before the first
+`Store`:
+
+```go
+Flush(ctx context.Context, completes map[int]time.Time) error
+```
+
+`completes` maps a binding index to its truncation boundary, which is the
+publication time of the backfill's begin signal. Once a binding appears there,
+the connector may delete its rows whose `flow_published_at` is earlier than the
+boundary, because the backfill has re-sent every document that still exists. A
+complete may arrive a transaction or more late, which is safe because the
+boundary travels with it.
+
+A connector that cannot delete keeps a no-op `Flush`. A connector that
+truncates owns three concerns:
+
+- **Shards.** With more than one shard, one shard's delete can remove rows that
+  another shard is about to update but hasn't committed yet. A connector that
+  runs multiple shards must therefore have a single shard delete, after every
+  shard's stores for the transaction have been applied.
+- **Timing.** The backfill-complete signal arrives in `Flush`, before the
+  transaction's stores. The connector must still delete after those stores, in
+  the same destination transaction. If it deleted first, a store that updates an
+  existing row would find the row already gone, and the update would be lost.
+- **Crash safety.** A pending truncation belongs in the state returned from
+  `StartCommit`, because that state commits atomically with the transaction's
+  checkpoint. State returned from `Acknowledge` commits after the transaction,
+  and a crash before it persists causes `Acknowledge` to run again.
+
+Two rules apply to every truncating connector:
+
+- **Delta-updates bindings are exempt.** A backfill re-sends only the current
+  version of each document, so deleting a delta table's older rows would drop
+  history the backfill cannot reproduce.
+- **Precision.** The boundary is compared at the column's own precision. A
+  destination whose timestamp columns are coarser than the boundary floors the
+  boundary first, so that a live row never rounds below it.
+
+A binding that excludes `flow_published_at` cannot be truncated. The connector
+skips it and reports the reason with `BindingEvents.Warn`, which surfaces it on
+the task page (see [Connector status](#connector-status)). Rows deleted by truncation are reported on the
+transaction health line as `truncated` (see [Transaction health](#transaction-health)).
+
 ## Request.Store + Request.StartCommit + Request.Acknowledge
 
 These three messages are highly related, and depending on the various patterns
@@ -661,6 +709,177 @@ Note that many reductions require only last-write-wins delivery, and that for
 these use cases, delta updates do the "right thing" by trivially replacing
 each document with its most recent version.
 This matches the behavior of Kafka Connect, for example.
+
+# Connector status
+
+Every Go materialization built on `m.RunTransactions` keeps its connector
+status (an INFO or WARN log with `eventType: connectorStatus`, shown on the
+task page) current with the step it is in, in plain language:
+
+| Status | While |
+|---|---|
+| Starting up: connecting to the destination | Open |
+| Recovery commit: finishing the transaction that was in progress when the task last stopped | The first Acknowledge |
+| Waiting, no new collection data since T | Acknowledged until the next Load or Flush |
+| Reading new data (round X) | Load requests until Flush |
+| Loading existing rows (M documents from N collections, round X) | Flush until Flushed |
+| Staging changes at destination (M documents from N collections, round X) | Store requests until StartedCommit |
+| Committing changes (M documents from N collections, round X) | StartedCommit until Acknowledged |
+| Waiting, next scheduled sync at T (every F) | The sync schedule's acknowledgement delay |
+
+A commit runs alongside the next round's Load requests, and is reported while
+it runs. Stage statuses are prefixed with "Backlog catchup:" while recent
+transactions are large enough to skip the sync delay.
+
+Each status is also a log line, so a stage is reported only once it has lasted
+a minute, and then once a minute with its counts and elapsed time ("running for
+5m"). The starting, recovery and sync-wait statuses are reported right away. A
+task whose stages are all shorter than a minute instead reports a rollup every
+five minutes: "Streaming changes (M documents, N transactions in the last 5
+minutes)". Only the shard whose range starts at zero reports progress, since
+all shards write the same status.
+
+A connector reports a condition that needs the user's attention with
+`BindingEvents.Warn(key, msg)`. Warnings replace progress until the connector
+stops, and the status lists every distinct key's message.
+
+# Transaction health
+
+Every Go materialization built on `m.RunTransactions` logs an INFO-level
+`transaction health` line that reconciles what the runtime asked the connector
+to do against what the destination reports it did. It is always on, needs no
+configuration, and is observation only: no verdict ever fails, delays or blocks
+a transaction. Its purpose is to surface a regression in the commit path (a
+MERGE that appends instead of updating, a delete branch that stops firing, a
+COPY that loads nothing) within minutes of a release rather than days later
+from a row count.
+
+## Expected side
+
+The boilerplate's `StoreIterator` classifies every Store request per binding
+and per transaction round using the `Exists` and `Delete` flags the runtime
+sends and the hard-delete argument the connector passes to `it.Next(...)`:
+
+| Exists | Delete | Hard delete | Expected op                          |
+|--------|--------|-------------|--------------------------------------|
+| no     | no     | any         | `insert`                             |
+| yes    | no     | any         | `update`                             |
+| yes    | yes    | on          | `delete`                             |
+| yes    | yes    | off         | `update`, also counted `softDeleted` |
+| no     | yes    | on          | `skipped` (never handed to the connector) |
+| no     | yes    | off         | `insert`, also counted `softDeleted` |
+
+`softDeleted` and `skipped` are visibility buckets only; the comparison uses
+`insert`, `update` and `delete`. Delta-updates bindings never see `Exists` and
+so expect only inserts. The line also carries the round's `loadRequests` and
+`loaded` responses, and a `truncate` count of the backfills that completed in
+it (see `Request.Flush`), each of which permits the connector to delete rows
+published before its boundary. `truncate` is a visibility bucket too.
+
+## Actual side: the reporting contract
+
+A connector reports the destination's own result with
+`BindingEvents.ReportRowStats(round, resourcePath, stats)` from wherever that
+result is in hand: inside its `StartCommitFunc`, in a deferred `Acknowledge`
+that merges staged files, or from a later poll such as a Snowpipe insert
+report. The `round` is the `StoreIterator.Round` of the transaction whose
+stores produced the result, captured in `Store`; connectors that commit from
+persisted pending state carry it alongside that state. The call is
+goroutine-safe, repeated reports for one binding and round are summed, and it
+is active regardless of extended logging. A connector that never calls it
+remains valid.
+
+`RowStats` carries a fidelity:
+
+- `exact`: the destination gives inserted, updated and deleted counts
+  (`m.ExactRowStats(ins, upd, del)`; use `.WithTotal(n)` when it also reports
+  an independent total). Snowflake MERGE output, BigQuery DML statistics,
+  Databricks MERGE output, Elasticsearch bulk item results and MongoDB
+  bulk-write results are examples.
+- `total`: only the number of affected rows is known
+  (`m.TotalRowStats(n)`), summed across a binding's statements in the round.
+  Postgres, MySQL, SQL Server, Redshift, MotherDuck, Fabric, SQLite,
+  ClickHouse (rows moved from its stage table) and Pinecone (upserted vector
+  count) report at this level, as do sinks whose API acknowledges each record
+  without a count and so report the records it accepted: Spanner, DynamoDB,
+  Bigtable, HubSpot, SNS, EventBridge, webhooks and the file sinks.
+- `none`: no usable result (a zero `RowStats`, or no report at all).
+
+Each driver owns the correctness of its number: it must count only rows of the
+target table, exclude checkpoint and staging-table statements, and configure
+its client to report matched rather than changed rows where those differ
+(MySQL's `clientFoundRows`). Optional `.WithStaged(n)` and `.WithLoaded(n)`
+carry rows written to and loaded from a staging area, for connectors that
+already have them. `.WithTruncated(n)` carries the rows deleted because they
+were published before a completed backfill. It is never checked, and it is
+kept out of `deleted` and `total` so that a truncation cannot fail the
+comparison. A connector that truncates in a round with no stores for the
+binding still reports, with `m.TotalRowStats(0).WithTruncated(n)`.
+
+## Verdicts
+
+Rounds are judged per binding, once their commit is acknowledged, so that
+offsetting errors across bindings cannot cancel. At `exact` the triplet must
+match and the total must equal its sum; at `total` the total must equal
+`insert + update + delete`. Further checks: `loaded` responses never exceed
+`loadRequests`; a reported `staged` equals the documents stored; a reported
+`loaded` equals `staged`. A delta binding that merges rather than appends
+fails the `insert`/`update` checks since it expects only inserts.
+
+- `ok`: every check passed. A round that stored nothing has nothing to check
+  and is `ok` at fidelity `none`.
+- `mismatch`: at least one check failed. The line carries a `mismatches`
+  array of `{check, resourcePath, expected, actual}` entries, one per failed
+  check and binding, with `expected` and `actual` summed over the rounds the
+  line covers.
+- `unchecked`: nothing could be compared, because fidelity was `none`, a
+  binding that stored documents never reported before the window flushed
+  (`pending` counts them), the line is a recovery replay (`recovery: true`),
+  or the task runs on a multi-shard range (`sharded: true`), where each shard
+  logs its own expected counts and only the primary logs actuals.
+
+## Output
+
+Healthy and unchecked rounds are rate-limited to one line each per five
+minutes. A judged round is logged at once when nothing has been logged for
+that long, so a task that commits rarely, or a short preview run, reports each
+round promptly; a busier task's rounds accumulate and flush as one line with
+summed `expected` and `actual` buckets, `rounds`, `firstRound` and
+`lastRound`. The first mismatch after five quiet minutes is never held back:
+it flushes the pending windows first and is then logged on its own. Further
+mismatching rounds within that interval roll up into one `mismatch` line, so a
+systematic discrepancy costs one line per interval rather than one per
+transaction. The windows also flush on graceful shutdown. Rounds whose commit was never acknowledged in the session are not
+judged; recovery re-applies them.
+Every line is marked `observable: true` and carries the `catalog_task_name`,
+so the data plane forwards it into the Grafana log stream operators alert on;
+it is also published to the tenant's ops logs like any connector log. Every
+line also carries `connector` (the image's connector name: the binary's name,
+or `CONNECTOR_NAME` for a variant built from another connector's image) and
+`connectorVersion` (`CONNECTOR_VERSION`, which CI bakes into the image as
+`<VERSION>-<short sha>`, e.g. `v1-3f2a9c1`; local builds report `dev` or
+`local-<sha>`), so dashboards can aggregate verdicts by connector and build.
+Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
+`loaded`, `expected.{insert,update,delete,softDeleted,skipped}` (plus
+`truncate` when nonzero) and `actual.{inserted,updated,deleted,total}` (plus
+`staged`/`loaded`/`truncated` when reported).
+
+## Testing
+
+The integration harness (`RunMaterializationTest`) captures the preview run's
+task logs and requires every judged round to be `ok` at the fidelity the
+connector's test declares through `RuntimeConfig.Fidelity`, so a connector's
+existing suite proves its reporting against a live destination and a silent
+downgrade to `none` fails the suite. The recovery line from the drain session
+is tolerated. A connector that reports nothing declares `FidelityNone`, and
+its rounds must then be `unchecked`.
+
+# Consistency testing
+
+See the [materialize-consistency suite][materialize-consistency] in the [flow] repo.
+
+[materialize-consistency]: https://github.com/estuary/flow/tree/master/crates/materialize-consistency
+[flow]: https://github.com/estuary/flow
 
 [connectors]: https://docs.estuary.dev/concepts/connectors/
 [collections]: https://docs.estuary.dev/concepts/collections/

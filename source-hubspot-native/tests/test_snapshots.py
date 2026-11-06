@@ -4,25 +4,30 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from estuary_cdk.utils import compare_capture_records
 
 
 def test_capture(request, snapshot):
     FIELDS_TO_REDACT = [
         "url",
+        "updatedAt",
     ]
 
     PROPERTY_PATTERNS_TO_REDACT = [
         re.compile(r"^hs_time_in_"),
         re.compile(r"^hs_date_entered_"),
         re.compile(r"^hs_date_exited_"),
+        re.compile(r"^lastmodifieddate$"),
+        re.compile(r"^hs_lastmodifieddate$"),
+        # HubSpot recalculates list sizes on its own schedule.
+        re.compile(r"^hs_total_size_calculated_at$"),
     ]
 
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
@@ -36,10 +41,20 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    for l in lines:
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
         _collection, record = l[0], l[1]
 
-        for key in ["properties", "propertiesWithHistory"]:
+        # Lists carry their properties in `additionalProperties`.
+        for key in ["properties", "propertiesWithHistory", "additionalProperties"]:
             if key in record:
                 for prop in record[key].keys():
                     if any(
@@ -51,16 +66,18 @@ def test_capture(request, snapshot):
             if field in record:
                 record[field] = "redacted"
 
-    snapshot_path = Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__stdout.json"
+    snapshot_path = (
+        Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__stdout.json"
+    )
     insta_mode = request.config.getoption("--insta", default=None)
 
     if insta_mode == "update" or not snapshot_path.exists():
         # Update snapshot or create initial baseline.
-        assert snapshot("stdout.json") == lines
+        assert snapshot("stdout.json") == unique_stream_lines
     else:
         # Compare capture snapshots. New fields are allowed, but missing or changed fields cause a failure.
         expected = json.loads(snapshot_path.read_text())
-        errors = compare_capture_records(actual=lines, expected=expected)
+        errors = compare_capture_records(actual=unique_stream_lines, expected=expected)
         if errors:
             pytest.fail("Capture snapshots are different:\n" + "\n".join(errors))
 

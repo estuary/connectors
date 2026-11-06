@@ -1,0 +1,19 @@
+bucket: test-warehouse
+region: us-east-1
+prefix: warehouse
+namespace: tests
+upload_interval: PT1S
+s3_endpoint: http://localhost:9702
+credentials:
+    auth_type: AWSAccessKey
+    awsAccessKeyId: flow
+    awsSecretAccessKey: flow
+catalog:
+    catalog_type: Iceberg REST Server
+    uri: http://localhost:9700/api/catalog
+    credential: root:s3cr3t
+    warehouse: test_warehouse
+    scope: PRINCIPAL_ROLE:ALL
+advanced:
+    nanosecond_timestamps: true
+    feature_flags: allow_existing_tables_for_new_bindings

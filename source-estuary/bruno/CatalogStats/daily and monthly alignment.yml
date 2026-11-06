@@ -1,0 +1,145 @@
+info:
+  name: daily and monthly alignment
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  headers:
+    - name: content-type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {"query":"query { d: catalogStats(by:{names:[\"Jonathan_Wihl/\"],grain:DAILY,start:\"2026-09-01T00:00:00Z\",end:\"2026-10-08T00:00:00Z\"}){ edges{ node{ catalogName grain timestamp statsSummary{ usageSeconds txnCount } } } } m: catalogStats(by:{names:[\"Jonathan_Wihl/\"],grain:MONTHLY,start:\"2025-01-01T00:00:00Z\",end:\"2026-11-01T00:00:00Z\"}){ edges{ node{ catalogName grain timestamp statsSummary{ usageSeconds txnCount } } } } }"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** flow origin/master `crates/control-plane-api/src/server/public/graphql/catalog_stats/mod.rs` (`CatalogStatsQuery::catalog_stats`, `MAX_BUCKETS = 10_000`, 30 s timeout)
+  
+  **WHY:** confirms DAILY timestamps are midnight UTC and MONTHLY are day 1
+  midnight UTC, and how far back MONTHLY history goes (retention bounds the
+  useful `start_date`). Projection: summary counters only.
+
+  **VERIFIED (2026-10-07):** DAILY timestamps are `T00:00:00+00:00` (37 rows
+  09-01 … 10-07 including the open day); MONTHLY timestamps are day 1
+  midnight (21 rows, 2025-02-01 … 2026-10-01 including the open month).
+
+examples:
+  - name: "200 — DAILY midnight UTC, MONTHLY day-1 midnight UTC (projection: first 2 + last 2 per alias)"
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "d": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "DAILY",
+                      "timestamp": "2026-09-01T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "1317149"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "DAILY",
+                      "timestamp": "2026-09-02T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "1280160"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "DAILY",
+                      "timestamp": "2026-10-06T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "1443894"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "DAILY",
+                      "timestamp": "2026-10-07T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "1412055"
+                      }
+                    }
+                  }
+                ]
+              },
+              "m": {
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "MONTHLY",
+                      "timestamp": "2025-02-01T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "693723"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "MONTHLY",
+                      "timestamp": "2025-03-01T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "120240",
+                        "txnCount": "9360080"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "MONTHLY",
+                      "timestamp": "2026-09-01T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "46258380"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/",
+                      "grain": "MONTHLY",
+                      "timestamp": "2026-10-01T00:00:00+00:00",
+                      "statsSummary": {
+                        "usageSeconds": "0",
+                        "txnCount": "10523713"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }

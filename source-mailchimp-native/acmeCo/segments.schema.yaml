@@ -1,0 +1,65 @@
+$defs:
+  Meta:
+    additionalProperties: true
+    description: |-
+      `extra="allow"` lets context-stamped parent IDs ride in `_meta`;
+      `BaseDocument.Meta` otherwise drops unknown keys.
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: |-
+  List segment. Every `type` partition (`saved`, `static`, `fuzzy`) flows
+  through the one endpoint, and the bare listing is the full population —
+  segments have no archived/hidden state (unlike members). Member tags
+  materialize as `type: static` segments, so this stream is a superset of
+  the `tags` stream's projection.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    title: Id
+    type: integer
+  list_id:
+    title: List Id
+    type: string
+  updated_at:
+    format: date-time
+    title: Updated At
+    type: string
+required:
+- id
+- list_id
+- updated_at
+title: Segment
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

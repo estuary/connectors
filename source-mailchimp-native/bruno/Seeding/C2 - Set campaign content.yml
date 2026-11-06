@@ -1,0 +1,38 @@
+info:
+  name: C2 - Set campaign content
+  type: http
+  seq: 12
+
+http:
+  method: PUT
+  url: "{{base_url}}/campaigns/{{campaign_id}}/content"
+  body:
+    type: json
+    data: |-
+      {
+        "html": "<html><body><p>Estuary email-activity seed.</p><p><a href=\"https://estuary.dev/?seed=email-activity\">Click me to generate a click event</a></p></body></html>"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Normally set by C1's post-response script; conditional fallback pinned from
+        // the 2026-06-10 seeding run for out-of-order sessions.
+        if (!bru.getVar('campaign_id')) bru.setVar('campaign_id', '61cc0c44a6');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/campaign-content/set-campaign-content/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. State-mutating
+  seed step 2/3.
+
+  **WHY:** sets HTML content with one tracked link so a click event can be
+  generated.

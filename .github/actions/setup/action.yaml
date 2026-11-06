@@ -5,12 +5,6 @@ inputs:
   github_token:
     description: GitHub token to use.
     required: true
-  gcp_project_id:
-    description: GCP Project for which to set up a service account.
-    required: true
-  gcp_service_account_key:
-    description: GCP Service account.
-    required: true
 
 outputs:
   tag_sha:
@@ -28,12 +22,6 @@ runs:
         TAG=$(echo $GITHUB_SHA | head -c7)
         echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
-    - name: Download latest Flow release binaries and add them to $PATH
-      shell: bash
-      run: |
-        ./fetch-flow.sh
-        echo "${PWD}/flow-bin" >> $GITHUB_PATH
-    
     - name: Login to GitHub package docker registry
       shell: bash
       run: |
@@ -52,7 +40,9 @@ runs:
     - name: Authenticate with GCloud
       uses: google-github-actions/auth@v2
       with:
-        credentials_json: ${{ inputs.gcp_service_account_key }}
+        project_id: estuary-theatre
+        workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
+        service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
 
     - name: Set up GCloud SDK
       uses: google-github-actions/setup-gcloud@v2

@@ -2,12 +2,10 @@ credentials:
     credentials_title: OAuth Credentials
     client_id_sops: ENC[AES256_GCM,data:fMXpKq4TrDG9vbkRFa7EYhOsdk6FtTLLT+jU5hokrHEB2FF8h39CquHiOp0+El0Mg/4zQMTdJ5wDp90WKSPa9yxzaMAi97ExkqfNWPM2FNAK2KmAYg==,iv:8lNVaJITypPnTuUZM4kMXUMdJglGFdkDYGNGhyPsxVU=,tag:yT1ENGiQzGZKM8DCT8gS0g==,type:str]
     client_secret_sops: ENC[AES256_GCM,data:jJgwo0E280bY9JApzBDCXuFaEbnnMMhtT0zYrwybJcOtZc+6RXNkxtQSbXvw9DpAAC6jbGEXMMc6yONx4y21ww==,iv:KqFuPgJzjVgDdOdKGRrnvEda/ZUUBvvlBjUcEdiALeg=,tag:M2RoEtnWixP86GOv/uwMIw==,type:str]
-    refresh_token_sops: ENC[AES256_GCM,data:eIILYvGXEoiYFUkiINynzZD0KpHZtE9Bp1gmztE2qF/NEA21bV53GMJMliOdHGxEB1CDxL+4qPfctUcPTH32ibuAUIu6dxOUk9Kbzf+uU7yYmm9GxZlv,iv:ibZwf82Oyy3s+86izmjI8PR8r0x5G3ohUYaa7glG26A=,tag:4LDfYELUD9KzFL0Y8OUk7Q==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:98PiAbyj/foKifMeNSeWZV70de1M19iUO11tFAOzIyI4LXsQIzo1ToZXEawa5BkgJvYbkBhQ9QMgUiepDq1x2Gi9cOse7T7G5fqp5vy2BTwEu0bHHqRh,iv:3iJwqPx7JOtF7hrtIxvzGSg4jN58RWoXy+MFvGaS13E=,tag:JWXniDmarDcd1J1buil6+g==,type:str]
     instance_url: https://estuary2-dev-ed.develop.my.salesforce.com
 is_sandbox: false
 start_date: "2024-07-26T00:00:00Z"
-advanced:
-    window_size: 1000
 sops:
     kms: []
     gcp_kms:
@@ -17,8 +15,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-11-13T20:09:56Z"
-    mac: ENC[AES256_GCM,data:iNZwuj2CybdBustBKyHjASgPIfYAaxjguTmaECpL+kHXcVOlDU5wXuKvXyf/8mPFQFeojhC0EuxcolGsUpx42DLCa/xgOs+e2Dn1JPaya9g6bn60E1cqIyMeGCwtVvpgqXzgQGsQDyr/MEa5dRJCx4Eo7oADoFhVqJiUWdwRnl4=,iv:jrJjYzyoQabCJIPyLP73FoKNocvt6q15TmITqHu2bbw=,tag:sydnFP4qPnlipxBJnH+Kdw==,type:str]
+    lastmodified: "2026-09-16T23:06:30Z"
+    mac: ENC[AES256_GCM,data:AEOzSXqcNMKbtJrgz31vQDFfMWSruPTxgja3h0X80fyWZ2CcUZGvh+4hbxhcJct7UZiG0tNMNWFiZKcAV68Peh4L4I2+Y8jrvSNrCIQ4uqMKeq2YU4CH0MVToLSRQZPJzIdIAqGhLfpG9xfn0+vwYkb2A2z/CHIttj+weSW0FYA=,iv:V+y5OcfL5jvaO3wEmM+oXFS1fZ5pJqmgyNCHp56sru8=,tag:FkFT+9CENdznKwu1QKXCOw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.0

@@ -14,7 +14,7 @@ import pendulum
 from airbyte_cdk.models import FailureType
 from airbyte_cdk.utils import AirbyteTracedException
 from google.ads.googleads.client import GoogleAdsClient
-from google.ads.googleads.v21.services.types.google_ads_service import (
+from google.ads.googleads.v25.services.types.google_ads_service import (
     GoogleAdsRow,
     SearchGoogleAdsResponse,
 )
@@ -43,7 +43,7 @@ REPORT_MAPPING = {
     "keyword_report": "keyword_view",
     "geo_target_constant": "geo_target_constant",
 }
-API_VERSION = "v21"
+API_VERSION = "v25"
 GRPC_TIMEOUT = 300.0
 REQUEST_TIMEOUT = 420.0
 logger = logging.getLogger("airbyte")
@@ -239,8 +239,8 @@ class GoogleAds:
         #
         # To prevent JSON from throwing an error during deserialization, we made such a hack.
         # For example:
-        # 1. ad_group_ad.ad.responsive_display_ad.long_headline - type AdTextAsset (https://developers.google.com/google-ads/api/reference/rpc/v6/AdTextAsset?hl=en).
-        # 2. ad_group_ad.ad.legacy_app_install_ad - type LegacyAppInstallAdInfo (https://developers.google.com/google-ads/api/reference/rpc/v7/LegacyAppInstallAdInfo?hl=en).
+        # 1. ad_group_ad.ad.responsive_display_ad.long_headline - type AdTextAsset (https://developers.google.com/google-ads/api/reference/rpc/v25/AdTextAsset?hl=en).
+        # 2. ad_group_ad.ad.legacy_app_install_ad - type LegacyAppInstallAdInfo (https://developers.google.com/google-ads/api/reference/rpc/v25/LegacyAppInstallAdInfo?hl=en).
         #
         if not (
             isinstance(field_value, (list, int, float, str, bool, dict))

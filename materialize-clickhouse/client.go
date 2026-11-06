@@ -1,8 +1,9 @@
-package main
+package connector
 
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
 
 type client struct {
@@ -20,12 +22,21 @@ type client struct {
 	ep *sql.Endpoint[config]
 }
 
+// existingFieldMeta is ClickHouse-specific column metadata attached to
+// boilerplate.ExistingField.Meta by PopulateInfoSchema.
+type existingFieldMeta struct {
+	// isKeyColumn is set for columns in the table's sorting key or partition
+	// key. ClickHouse forbids ALTERing the type of such columns (code 524),
+	// including widening them to Nullable.
+	isKeyColumn bool
+}
+
 func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	var db = clickhouse.OpenDB(ep.Config.newClickhouseOptions())
 	return &client{db: db, ep: ep}, nil
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	var errs = &cerrors.PrereqErr{}
 
 	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
@@ -50,11 +61,14 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	var database = c.ep.Config.Database
 
 	// Query tables from system.tables.
-	var tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT database, name FROM system.tables WHERE database = %s",
-		c.ep.Dialect.Literal(database),
-	))
-	if err != nil {
+	var tableRows *stdsql.Rows
+	if err := transientRetryPolicy.retry(ctx, "querying system.tables", isTransientErr, func() (err error) {
+		tableRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
+			"SELECT database, name FROM system.tables WHERE database = %s",
+			c.ep.Dialect.Literal(database),
+		))
+		return err
+	}); err != nil {
 		return fmt.Errorf("querying system.tables: %w", err)
 	}
 	defer tableRows.Close()
@@ -71,9 +85,8 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	}
 
 	// Query columns from system.columns.
-	var colRows *stdsql.Rows
-	colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT database, table, name, type, default_expression FROM system.columns WHERE database = %s",
+	var colRows, err = c.db.QueryContext(ctx, fmt.Sprintf(
+		"SELECT database, table, name, type, default_expression, is_in_sorting_key, is_in_partition_key FROM system.columns WHERE database = %s",
 		c.ep.Dialect.Literal(database),
 	))
 	if err != nil {
@@ -83,7 +96,8 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	for colRows.Next() {
 		var dbName, tableName, colName, colType, defaultExpr string
-		if err := colRows.Scan(&dbName, &tableName, &colName, &colType, &defaultExpr); err != nil {
+		var isInSortingKey, isInPartitionKey uint8
+		if err := colRows.Scan(&dbName, &tableName, &colName, &colType, &defaultExpr, &isInSortingKey, &isInPartitionKey); err != nil {
 			return fmt.Errorf("scanning column row: %w", err)
 		}
 
@@ -104,6 +118,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			Nullable:   isNullable,
 			Type:       baseType,
 			HasDefault: defaultExpr != "",
+			Meta:       existingFieldMeta{isKeyColumn: isInSortingKey == 1 || isInPartitionKey == 1},
 		})
 	}
 	if err := colRows.Err(); err != nil {
@@ -236,6 +251,30 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
+	// ClickHouse forbids changing the type of a sorting-key or partition-key
+	// column (code 524), so such a column cannot be widened to Nullable. It
+	// doesn't need to be: inserts name their columns explicitly, and a
+	// non-nullable column omitted from an insert receives the type's zero value.
+	// Writes keep working and the sorting key cannot be altered, so there is
+	// nothing here for a user to act on -- which is why this is a debug line and
+	// not surfaced through validation like a key that destroys rows.
+	var dropNotNulls []boilerplate.ExistingField
+	var skippedKeyColumns []string
+	for _, col := range ta.DropNotNulls {
+		if meta, ok := col.Meta.(existingFieldMeta); ok && meta.isKeyColumn {
+			skippedKeyColumns = append(skippedKeyColumns, col.Name)
+			continue
+		}
+		dropNotNulls = append(dropNotNulls, col)
+	}
+	ta.DropNotNulls = dropNotNulls
+	if len(skippedKeyColumns) > 0 {
+		log.WithFields(log.Fields{
+			"table":   ta.Identifier,
+			"columns": skippedKeyColumns,
+		}).Debug("not making key columns nullable because ClickHouse forbids ALTER of sorting-key and partition-key columns")
+	}
+
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder
 		if err := renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete).alterTargetColumns.Execute(&alterStmtBuilder, ta); err != nil {
@@ -252,7 +291,24 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		var steps, err = sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, clickHouseMigrationSteps...)
+		// A column referenced by the table's PARTITION BY key cannot change
+		// type at all: ClickHouse forbids both MODIFY COLUMN (code 524) and
+		// DROP COLUMN (code 47) on partition-key columns, so the multi-step
+		// rename migration can never succeed. Fail before executing any step,
+		// so no temporary column is left behind and the error says what to do.
+		partitionKeyCols, err := c.partitionKeyColumns(ctx, ta.Path[0])
+		if err != nil {
+			return "", nil, err
+		}
+		for _, m := range ta.ColumnTypeChanges {
+			if partitionKeyCols[m.Field] {
+				return "", nil, fmt.Errorf(
+					"cannot change the type of column %q: it is referenced by the PARTITION BY key of table %s, which ClickHouse forbids altering; backfill the binding to re-create the table with the new column type",
+					m.Field, ta.Identifier)
+			}
+		}
+
+		steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, clickHouseMigrationSteps...)
 		if err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		}
@@ -269,8 +325,34 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}, nil
 }
 
+// partitionKeyColumns returns the set of column names referenced by the
+// table's PARTITION BY key.
+func (c *client) partitionKeyColumns(ctx context.Context, table string) (map[string]bool, error) {
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		"SELECT name FROM system.columns WHERE database = %s AND table = %s AND is_in_partition_key = 1",
+		c.ep.Dialect.Literal(c.ep.Config.Database), c.ep.Dialect.Literal(table),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying partition key columns of %q: %w", table, err)
+	}
+	defer rows.Close()
+
+	var out = make(map[string]bool)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scanning partition key column of %q: %w", table, err)
+		}
+		out[name] = true
+	}
+	return out, rows.Err()
+}
+
 func (c *client) TruncateTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmt = fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+	// SYNC because a replicated table (every table on ClickHouse Cloud)
+	// otherwise truncates asynchronously, and a queued truncate would drop the
+	// rows the shard materializes once this backfill has been applied.
+	var stmt = fmt.Sprintf("TRUNCATE TABLE %s SYNC;", c.ep.Dialect.Identifier(path...))
 	return stmt, func(ctx context.Context) error {
 		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("executing truncate table: %w", err)
@@ -288,8 +370,21 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
-func (c *client) MustRecreateResource(_ *pm.Request_Apply, _, _ *pf.MaterializationSpec_Binding) (bool, error) {
-	return false, nil
+// MustRecreateResource reports a changed partition_by, which can only be
+// applied by dropping and re-creating the table: ClickHouse never accepts
+// PARTITION BY via ALTER, and TRUNCATE preserves the partition key.
+func (c *client) MustRecreateResource(_ *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	if lastBinding == nil || newBinding == nil {
+		return false, nil
+	}
+	var lastRC, newRC tableConfig
+	if err := json.Unmarshal(lastBinding.ResourceConfigJson, &lastRC); err != nil {
+		return false, fmt.Errorf("parsing last binding resource config: %w", err)
+	}
+	if err := json.Unmarshal(newBinding.ResourceConfigJson, &newRC); err != nil {
+		return false, fmt.Errorf("parsing new binding resource config: %w", err)
+	}
+	return strings.TrimSpace(lastRC.PartitionBy) != strings.TrimSpace(newRC.PartitionBy), nil
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {

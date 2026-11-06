@@ -1,0 +1,158 @@
+materializations:
+  acmeCo/tests/materialize-hubspot:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: materialize-hubspot.template.config.yaml
+    bindings:
+    - resource:
+        name: contacts
+        delta_updates: true
+        object: Contacts
+      source: tests/contacts
+      fields:
+        recommended: true
+    - resource:
+        name: companies
+        delta_updates: true
+        object: Companies
+      source: tests/companies
+      fields:
+        recommended: true
+    - resource:
+        name: line_items
+        delta_updates: true
+        object: Line Items
+      source: tests/line_items
+      fields:
+        recommended: true
+    - resource:
+        name: deals
+        delta_updates: true
+        object: Deals
+      source: tests/deals
+      fields:
+        recommended: true
+    - resource:
+        name: meetings
+        delta_updates: true
+        object: Meetings
+      source: tests/meetings
+      fields:
+        recommended: true
+    - resource:
+        name: calls
+        delta_updates: true
+        object: Calls
+      source: tests/calls/convert-property-name
+      fields:
+        recommended: true
+
+collections:
+  tests/contacts:
+    schema:
+      type: object
+      properties:
+        firstname: { type: string }
+        lastname: { type: string }
+        email: { type: string }
+        city: { type: string }
+        company: { type: string }
+        hs_lead_status: { type: string }
+        followercount: { type: integer }
+      required:
+        - email
+    key:
+      - /email
+
+  tests/companies:
+    schema:
+      type: object
+      properties:
+        name: { type: string }
+        domain: { type: string }
+        city: { type: string }
+        phone: { type: string }
+        closedate: { type: string, format: date-time }
+        hs_current_customer: { type: string }
+      required:
+        - domain
+    key:
+      - /domain
+
+  tests/line_items:
+    schema:
+      type: object
+      properties:
+        createdate: { type: string, format: date-time }
+        description: { type: string }
+        discount: { type: number }
+        name: { type: string }
+        price: { type: number }
+        quantity: { type: integer }
+        tax: { type: number }
+      required:
+        - name
+    key:
+      - /name
+
+  tests/deals:
+    schema:
+      type: object
+      properties:
+        dealname: { type: string }
+        amount: { type: integer }
+        dealstage: { type: string }
+        closedate: { type: string, format: date-time }
+        description: { type: string }
+      required:
+        - dealname
+    key:
+      - /dealname
+
+  tests/meetings:
+    schema:
+      type: object
+      properties:
+        hs_unique_id: { type: string }
+        hs_include_description_in_reminder: { type: boolean }
+        hs_meeting_body: { type: string }
+        hs_meeting_end_time: { type: string, format: date-time }
+        hs_meeting_external_url: { type: string }
+        hs_meeting_location: { type: string }
+        hs_meeting_location_type: { type: string }
+        hs_meeting_notetaker_selection: { type: string }
+        hs_meeting_outcome: { type: string }
+        hs_meeting_start_time: { type: string, format: date-time }
+        hs_meeting_title: { type: string }
+        hs_product_name: { type: string }
+        hs_timestamp: { type: string, format: date-time }
+      required:
+        - hs_unique_id
+    key:
+      - /hs_unique_id
+
+  tests/calls/convert-property-name:
+    schema:
+      type: object
+      properties:
+        properties:
+          type: object
+          properties:
+            hs_unique_id: { type: string }
+          required:
+            - hs_unique_id
+        HS_TIMESTAMP: { type: string, format: date-time }
+        _hs_call_title: { type: string }
+        hs_call_body: { type: string }
+        hs_call_direction: { type: string }
+        hs_call_disposition: { type: string }
+        hs_call_duration: { type: integer }
+        hs_call_from_number: { type: string }
+        hs_call_to_number: { type: string }
+        hs_call_status: { type: string }
+      required:
+        - properties
+    key:
+      - /properties/hs_unique_id

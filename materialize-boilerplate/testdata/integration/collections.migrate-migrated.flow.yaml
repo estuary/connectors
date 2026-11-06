@@ -217,6 +217,8 @@ collections:
         numStrUnionToMulti: { type: [number, string] }
         objectToMulti: { type: [object, boolean] }
         stringToMulti: { type: [string, boolean] }
+        objectToString: *string
+        arrayToString: *string
         binaryToString: *string
         stringToBinary: *binary
         'binary"With"Quote': *binary
@@ -246,5 +248,8 @@ collections:
         uint064ToString: *string
         iriToString: *string
         iriReferenceToString: *string
+        stringToEnum: { type: string, enum: [active, inactive] }
+        enumToString: { type: string }
+        enumToExtendedEnum: { type: string, enum: [active, inactive, pending] }
       required: [id]
     key: [/id]

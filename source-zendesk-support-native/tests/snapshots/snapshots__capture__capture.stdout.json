@@ -197,6 +197,7 @@
       "phone_number_id": 28835744176276,
       "post_call_summary": null,
       "post_call_summary_created": null,
+      "post_call_transcription": null,
       "post_call_transcription_created": null,
       "quality_issues": [
         "none"
@@ -248,8 +249,10 @@
         "capacity_rules_access": "none",
         "chat_access": false,
         "custom_objects": {},
+        "delete_brands": false,
         "end_user_list_access": "full",
         "end_user_profile_access": "readonly",
+        "execute_it_asset_management_actions": false,
         "explore_access": "readonly",
         "explore_reports": {
           "brands_ticket_access": "all",
@@ -265,12 +268,15 @@
         "it_asset_management_access": "view",
         "light_agent": true,
         "macro_access": "readonly",
+        "manage_api_credentials": false,
         "manage_approval_requests": false,
         "manage_automations": false,
+        "manage_brands": "none",
         "manage_business_rules": false,
         "manage_contextual_workspaces": false,
         "manage_deletion_schedules": "none",
         "manage_dynamic_content": false,
+        "manage_end_user_settings": false,
         "manage_extensions_and_channels": false,
         "manage_facebook": false,
         "manage_group_memberships": false,
@@ -284,6 +290,7 @@
         "manage_roles": "none",
         "manage_skills": false,
         "manage_slas": false,
+        "manage_support_apps": false,
         "manage_suspended_tickets": false,
         "manage_team_members": "readonly",
         "manage_ticket_fields": false,
@@ -312,9 +319,9 @@
         "update_user_own_alias": false,
         "update_user_own_name": false,
         "update_user_own_signature": false,
+        "use_conversational_assistance": false,
         "user_view_access": "none",
         "view_access": "readonly",
-        "view_access_logs": false,
         "view_audit_logs": false,
         "view_deleted_tickets": false,
         "view_filter_tickets": true,
@@ -340,20 +347,20 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "active": true,
-      "agent_label": "New",
+      "agent_label": "Open",
       "created_at": "2024-07-26T15:41:00Z",
       "default": true,
-      "description": "Ticket is awaiting assignment to an agent",
+      "description": "Staff is working on the ticket",
       "end_user_description": "We are working on a response for you",
       "end_user_label": "Open",
-      "id": 28835740806676,
-      "raw_agent_label": "{{zd.status_new}}",
-      "raw_description": "{{zd.status_new_description}}",
-      "raw_end_user_description": "{{zd.status_end_user_new_description}}",
-      "raw_end_user_label": "{{zd.status_end_user_new}}",
-      "status_category": "new",
+      "id": 28835714727188,
+      "raw_agent_label": "{{zd.status_open}}",
+      "raw_description": "{{zd.status_open_description}}",
+      "raw_end_user_description": "{{zd.status_end_user_open_description}}",
+      "raw_end_user_label": "{{zd.status_end_user_open}}",
+      "status_category": "open",
       "updated_at": "redacted",
-      "url": "https://d3v-estuary.zendesk.com/api/v2/custom_statuses/28835740806676.json"
+      "url": "https://d3v-estuary.zendesk.com/api/v2/custom_statuses/28835714727188.json"
     }
   ],
   [
@@ -448,6 +455,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
         "row_id": 0
       },
+      "children_count": 0,
       "created_at": "2024-07-26T15:41:00Z",
       "deleted_at": null,
       "details": "",
@@ -463,6 +471,7 @@
       "tags": [
         "test-tag"
       ],
+      "ticket_restriction": "restricted",
       "updated_at": "redacted",
       "url": "https://d3v-estuary.zendesk.com/api/v2/organizations/28835714737428.json"
     }
@@ -611,6 +620,38 @@
       "name": "Test schedule",
       "time_zone": "Eastern Time (US & Canada)",
       "updated_at": "redacted"
+    }
+  ],
+  [
+    "acmeCo/side_conversations",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2026-05-08T13:22:48.141Z",
+      "external_ids": {},
+      "id": "01ad1c9e-4ae1-11f1-9738-b5e9d567b472",
+      "message_added_at": "2026-05-08T13:22:48.141Z",
+      "participants": [
+        {
+          "email": "alexb@estuary.dev",
+          "name": "Alex Bair",
+          "user_id": 28835702984212
+        },
+        {
+          "email": "someone@example.com",
+          "name": "Someone",
+          "user_id": 49045981562772
+        }
+      ],
+      "preview_text": "The smoke is very colorful.",
+      "state": "open",
+      "state_updated_at": "2026-05-08T13:22:48.141Z",
+      "subject": "My mouse is on fire!",
+      "ticket_id": 1,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1/side_conversations/01ad1c9e-4ae1-11f1-9738-b5e9d567b472"
     }
   ],
   [
@@ -944,7 +985,7 @@
       },
       "assigned_at": "2024-07-26T15:41:04Z",
       "assignee_stations": 1,
-      "assignee_updated_at": "2024-08-01T14:45:47Z",
+      "assignee_updated_at": "redacted",
       "created_at": "2024-07-26T15:41:04Z",
       "custom_status_updated_at": "2024-07-26T15:41:04Z",
       "first_resolution_time_in_minutes": {
@@ -998,24 +1039,7 @@
         "brand_id": 28835714705684,
         "collaborator_ids": [],
         "created_at": "2024-07-26T15:41:04Z",
-        "custom_fields": [
-          {
-            "id": 28835767646868,
-            "value": null
-          },
-          {
-            "id": 39405384709780,
-            "value": null
-          },
-          {
-            "id": 43010621832468,
-            "value": null
-          },
-          {
-            "id": 48494958189844,
-            "value": null
-          }
-        ],
+        "custom_fields": "redacted",
         "custom_status_id": 28835714727188,
         "deleted_ticket_form_id": null,
         "description": "Hi there,\n\nI\u2019m sending an email because I\u2019m having a problem setting up your new product. Can you help me troubleshoot?\n\nThanks,\n The Customer\n\n",
@@ -1023,29 +1047,12 @@
         "email_cc_ids": [],
         "encoded_id": "Y4NVZV-M3XM2",
         "external_id": null,
-        "fields": [
-          {
-            "id": 28835767646868,
-            "value": null
-          },
-          {
-            "id": 39405384709780,
-            "value": null
-          },
-          {
-            "id": 43010621832468,
-            "value": null
-          },
-          {
-            "id": 48494958189844,
-            "value": null
-          }
-        ],
+        "fields": "redacted",
         "follower_ids": [],
         "followup_ids": [],
         "forum_topic_id": null,
         "from_messaging_channel": false,
-        "generated_timestamp": 1722523548,
+        "generated_timestamp": "redacted",
         "group_id": 28835740822676,
         "has_incidents": false,
         "id": 1,
@@ -1071,7 +1078,7 @@
         ],
         "ticket_form_id": 28835740693908,
         "type": "incident",
-        "updated_at": "2024-08-01T14:45:47Z",
+        "updated_at": "redacted",
         "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1.json",
         "via": {
           "channel": "sample_ticket",
@@ -1100,53 +1107,19 @@
       "brand_id": 28835714705684,
       "collaborator_ids": [],
       "created_at": "2024-07-26T15:41:04Z",
-      "custom_fields": [
-        {
-          "id": 28835767646868,
-          "value": null
-        },
-        {
-          "id": 39405384709780,
-          "value": null
-        },
-        {
-          "id": 43010621832468,
-          "value": null
-        },
-        {
-          "id": 48494958189844,
-          "value": null
-        }
-      ],
+      "custom_fields": "redacted",
       "custom_status_id": 28835714727188,
       "description": "Hi there,\n\nI\u2019m sending an email because I\u2019m having a problem setting up your new product. Can you help me troubleshoot?\n\nThanks,\n The Customer\n\n",
       "due_at": null,
       "email_cc_ids": [],
       "encoded_id": "Y4NVZV-M3XM2",
       "external_id": null,
-      "fields": [
-        {
-          "id": 28835767646868,
-          "value": null
-        },
-        {
-          "id": 39405384709780,
-          "value": null
-        },
-        {
-          "id": 43010621832468,
-          "value": null
-        },
-        {
-          "id": 48494958189844,
-          "value": null
-        }
-      ],
+      "fields": "redacted",
       "follower_ids": [],
       "followup_ids": [],
       "forum_topic_id": null,
       "from_messaging_channel": false,
-      "generated_timestamp": 1722523548,
+      "generated_timestamp": "redacted",
       "group_id": 28835740822676,
       "has_incidents": false,
       "id": 1,

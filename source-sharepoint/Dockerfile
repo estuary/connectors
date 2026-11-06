@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
@@ -46,3 +46,4 @@ ENTRYPOINT ["/connector/source-sharepoint"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
 LABEL CONNECTOR_PROTOCOL=flow-capture
+LABEL dev.estuary.usage-rate=0.33

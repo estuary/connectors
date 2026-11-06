@@ -170,7 +170,8 @@
       "tos_acceptance": {
         "date": 1715112768
       },
-      "type": "express"
+      "type": "express",
+      "url": "redacted"
     }
   ],
   [
@@ -311,6 +312,7 @@
           },
           "regulated_status": "unregulated",
           "three_d_secure": null,
+          "transaction_link_id": null,
           "wallet": null
         },
         "type": "card"
@@ -371,7 +373,7 @@
         "postal_code": "",
         "state": ""
       },
-      "balance": 0,
+      "balance": "redacted",
       "created": 1698086773,
       "currency": "brl",
       "customer_account": null,
@@ -391,7 +393,7 @@
       "livemode": false,
       "metadata": {},
       "name": "Cos Tumer",
-      "next_invoice_sequence": 1,
+      "next_invoice_sequence": "redacted",
       "object": "customer",
       "phone": null,
       "preferred_locales": [
@@ -499,6 +501,7 @@
       "livemode": false,
       "metadata": {},
       "object": "payment_method",
+      "shared_payment_granted_token": null,
       "type": "card"
     }
   ]

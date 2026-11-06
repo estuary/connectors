@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -28,12 +28,18 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
+
 func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		uri, err := url.Parse(cfg.Address)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address for network tunnel: %w", err)
+			// A *url.Error repeats its input, which may contain a password, so unwrap it
+			// to get the actual error.
+			return nil, fmt.Errorf("parsing address for network tunnel: %w", errors.Unwrap(err))
 		}
 
 		var sshConfig = &networkTunnel.SshConfig{
@@ -65,11 +71,9 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 
 	// Ping the primary
 	if err := client.Ping(ctx, readpref.Primary()); err != nil {
-		var mongoErr mongoDriver.Error
-
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", cfg.Address))
-		} else if errors.As(err, &mongoErr) {
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to address %q: double check your configuration, and make sure Estuary's IP is allowed to connect to your database", redactedAddress(cfg.Address)))
+		} else if mongoErr, ok := errors.AsType[mongoDriver.Error](err); ok {
 			if mongoErr.Code == 18 {
 				// See https://github.com/mongodb/mongo-go-driver/blob/master/docs/common-issues.md#authentication-failed
 				// An auth error can occur for any of these reasons, and the mongo driver gives us no way to tell them apart:
@@ -88,6 +92,17 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	return client, nil
 }
 
+// redactedAddress masks any password in the address for use in messages. The
+// address shouldn't contain credentials, but users sometimes paste a full
+// connection string.
+func redactedAddress(address string) string {
+	uri, err := url.Parse(address)
+	if err != nil {
+		return "<unparseable address>"
+	}
+	return uri.Redacted()
+}
+
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	configSchema, err := schemagen.GenerateSchema("Materialize MongoDB Spec", &config{}).MarshalJSON()
 	if err != nil {
@@ -103,33 +118,37 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
 	cfg    config
 	client *mongo.Client
+	// truncateAfterBackfill permits deleting the documents published before
+	// a completed backfill.
+	truncateAfterBackfill bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	client, err := connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
 	return &materialization{
-		cfg:    cfg,
-		client: client,
+		cfg:                   cfg,
+		client:                client,
+		truncateAfterBackfill: featureFlags["truncate_after_backfill"],
 	}, nil
 }
 
@@ -199,11 +218,10 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		err := d.client.Database(dbName).CreateCollection(ctx, collectionName)
 
 		if err != nil {
-			mongoErr := mongo.CommandError{}
 			// Error code 48 is "Collection already exists", which we ignore
 			// this error is no longer emitted since Mongo 8, and we keep this code
 			// for backward compatibility with older Mongo versions
-			if errors.As(err, &mongoErr) {
+			if mongoErr, ok := errors.AsType[mongo.CommandError](err); ok {
 				if mongoErr.Code != 48 {
 					return err
 				}
@@ -250,19 +268,58 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	var bindings []*binding
 	for _, b := range mappedBindings {
+		var keyRestorations []keyRestoration
+		for i, k := range b.Keys {
+			if isIntegerKeyType(k.Inference.Types) {
+				keyRestorations = append(keyRestorations, keyRestoration{
+					tupleIndex: i,
+					tokens:     parsePointerTokens(k.Ptr),
+				})
+			}
+		}
+
 		bindings = append(bindings, &binding{
-			collection:   d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
-			deltaUpdates: b.DeltaUpdates,
+			collection:      d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
+			path:            b.ResourcePath,
+			deltaUpdates:    b.DeltaUpdates,
+			keyRestorations: keyRestorations,
 		})
 	}
 
 	return &transactor{
-		cfg:      &d.cfg,
-		client:   d.client,
-		bindings: bindings,
+		cfg:                   &d.cfg,
+		client:                d.client,
+		bindings:              bindings,
+		be:                    be,
+		truncateAfterBackfill: d.truncateAfterBackfill,
 	}, nil
+}
+
+// isIntegerKeyType reports whether a key field's declared JSON-schema types
+// (from its projection's Inference.Types) are exactly "integer", modulo
+// "null" — the only shape whose stored precision needs restoring (see
+// storeDocument). A polymorphic key (e.g. ["integer","string"]) is excluded:
+// its packed tuple element isn't guaranteed to be an integer, so restoring it
+// unconditionally could flip its stored BSON type inconsistently across
+// documents.
+func isIntegerKeyType(types []string) bool {
+	nonNull, isInteger := 0, false
+	for _, t := range types {
+		if t == "null" {
+			continue
+		}
+		nonNull++
+		if t == "integer" {
+			isInteger = true
+		}
+	}
+	return nonNull == 1 && isInteger
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {
@@ -343,7 +400,3 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 }
 
 func (d *materialization) Close(ctx context.Context) {}
-
-func main() {
-	boilerplate.RunMain(driver{})
-}

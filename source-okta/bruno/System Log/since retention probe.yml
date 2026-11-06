@@ -1,0 +1,94 @@
+info:
+  name: since retention probe
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/logs?since={{logs_since}}&limit=1"
+  params:
+    - name: since
+      value: "{{logs_since}}"
+      type: query
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/reference/system-log-query/
+
+  **WHY:** the connector's `start_date` is user-supplied. Data older than 90
+  days is gone, and `since` older than 180 days is documented to fail with
+  400 E0000053 — if so, the connector must clamp `start_date` before
+  sending. Run with `since` 100 and 189 days back.
+
+  **VERIFIED (2026-10-07):** both return 200, starting from the oldest
+  retained event. The documented 180-day E0000053 rejection did not occur in
+  polling mode, nor in bounded mode (`System Log / bounded boundary probe`),
+  so `start_date` needs no clamp. **DOCUMENTED (2026-10-07):** retention is
+  90 days (https://developer.okta.com/docs/reference/system-log-query/).
+  The sandbox org was created 2026-09-03, so the 90-day cut itself cannot be
+  observed here.
+
+examples:
+- name: 200 - polling since 100d back accepted (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-06-29T00%3A00%3A00Z&limit=1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '59'
+    - name: x-rate-limit-reset
+      value: '1791382870'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-06-29T00%3A00%3A00Z&limit=1>; rel="self", <{{base_url}}/logs?since=2026-06-29T00%3A00%3A00Z&limit=1&after=1788464187011_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z"
+          }
+        ]
+- name: 200 - polling since 189d back accepted, no E0000053 (projection)
+  request:
+    url: '{{base_url}}/logs?since=2026-04-01T00%3A00%3A00Z&limit=1'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    - name: x-rate-limit-limit
+      value: '60'
+    - name: x-rate-limit-remaining
+      value: '58'
+    - name: x-rate-limit-reset
+      value: '1791382870'
+    - name: link
+      value: <{{base_url}}/logs?since=2026-04-01T00%3A00%3A00Z&limit=1>; rel="self", <{{base_url}}/logs?since=2026-04-01T00%3A00%3A00Z&limit=1&after=1788464187011_1>; rel="next"
+    body:
+      type: json
+      data: |-
+        [
+          {
+            "uuid": "c1035a75-a7ce-11f1-8b98-03fd214cae0d",
+            "published": "2026-09-03T19:36:26.852Z"
+          }
+        ]

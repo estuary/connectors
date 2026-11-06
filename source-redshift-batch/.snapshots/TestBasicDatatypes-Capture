@@ -143,5 +143,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"basicdatatypes_261881":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":1}}}
+{"bindingStateV1":{"basicdatatypes_261881":{"DocumentCount":1,"LastPolled":"<TIMESTAMP>"}}}
 

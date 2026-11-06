@@ -1,0 +1,306 @@
+info:
+  name: Get Sheet (page beyond last CLAMPS not empty)
+  type: http
+  seq: 24
+
+http:
+  method: GET
+  url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}?page=100&pageSize=2"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - totalRowCount=8, version=0, 2 rows returned x 9 columns
+    request:
+      url: "{{base_url}}/sheets/{{PIN_SHEET_ID}}?page=100&pageSize=2"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+        - name: x-ratelimit-limit
+          value: 80000
+        - name: x-ratelimit-remaining
+          value: 79200
+        - name: x-ratelimit-reset
+          value: 1784638460
+      body:
+        type: json
+        data: |-
+          {
+            "id": 4312824539121540,
+            "name": "Project Sheet",
+            "version": 0,
+            "totalRowCount": 8,
+            "accessLevel": "OWNER",
+            "effectiveAttachmentOptions": [
+              "DROPBOX",
+              "BOX_COM",
+              "FILE",
+              "EVERNOTE",
+              "LINK",
+              "GOOGLE_DRIVE",
+              "EGNYTE",
+              "ONEDRIVE"
+            ],
+            "ganttEnabled": true,
+            "dependenciesEnabled": false,
+            "resourceManagementEnabled": false,
+            "resourceManagementType": "NONE",
+            "cellImageUploadEnabled": true,
+            "userSettings": {
+              "criticalPathEnabled": false,
+              "displaySummaryTasks": true
+            },
+            "userPermissions": {
+              "summaryPermissions": "ADMIN"
+            },
+            "workspace": {
+              "id": 3258769762215811,
+              "name": "First Project"
+            },
+            "hasSummaryFields": false,
+            "permalink": "https://app.smartsheet.eu/sheets/M4wc8jH3r8C9wCRr7FMggMq9hCw6QmMVFRCf6RQ1",
+            "createdAt": "2026-07-07T13:40:44Z",
+            "modifiedAt": "2026-07-07T13:40:44Z",
+            "isMultiPicklistEnabled": true,
+            "columns": [
+              {
+                "id": 233555655526276,
+                "version": 0,
+                "index": 0,
+                "title": "At Risk",
+                "type": "CHECKBOX",
+                "symbol": "FLAG",
+                "validation": true,
+                "width": 72
+              },
+              {
+                "id": 4737155282896772,
+                "version": 0,
+                "index": 1,
+                "title": "Task",
+                "type": "TEXT_NUMBER",
+                "primary": true,
+                "validation": false,
+                "width": 337
+              },
+              {
+                "id": 2485355469211524,
+                "version": 0,
+                "index": 2,
+                "title": "Resource Allocation",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 318
+              },
+              {
+                "id": 6988955096582020,
+                "version": 0,
+                "index": 3,
+                "title": "Description",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 157
+              },
+              {
+                "id": 1359455562368900,
+                "version": 0,
+                "index": 4,
+                "title": "Assigned To",
+                "type": "CONTACT_LIST",
+                "contactOptions": [
+                  {
+                    "name": "Harley Sterling",
+                    "email": "harley@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Jamal King",
+                    "email": "jamal@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Guadalupe Garcia",
+                    "email": "guadalupe@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Aviv Perez",
+                    "email": "aviv@demo.mbfcorp.com"
+                  },
+                  {
+                    "name": "Diana Kennedy",
+                    "email": "diana@demo.mbfcorp.com"
+                  }
+                ],
+                "validation": false,
+                "width": 150
+              },
+              {
+                "id": 5863055189739396,
+                "version": 0,
+                "index": 5,
+                "title": "Status",
+                "type": "PICKLIST",
+                "options": [
+                  "Not Started",
+                  "In Progress",
+                  "Blocked",
+                  "Complete"
+                ],
+                "validation": true,
+                "width": 135
+              },
+              {
+                "id": 3611255376054148,
+                "version": 0,
+                "index": 6,
+                "title": "Start Date",
+                "type": "DATE",
+                "tags": [
+                  "GANTT_START_DATE"
+                ],
+                "validation": true,
+                "width": 87
+              },
+              {
+                "id": 8114855003424644,
+                "version": 0,
+                "index": 7,
+                "title": "End Date",
+                "type": "DATE",
+                "tags": [
+                  "GANTT_END_DATE"
+                ],
+                "validation": true,
+                "width": 80
+              },
+              {
+                "id": 796505608947588,
+                "version": 0,
+                "index": 8,
+                "title": "Estimated Effort in Days",
+                "type": "TEXT_NUMBER",
+                "validation": false,
+                "width": 115
+              }
+            ],
+            "rows": [
+              {
+                "id": 269025857374084,
+                "rowNumber": 7,
+                "parentId": 4350413019678596,
+                "siblingId": 8854012647049092,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276,
+                    "value": false
+                  },
+                  {
+                    "columnId": 4737155282896772,
+                    "value": "Manage risks",
+                    "displayValue": "Manage risks"
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900,
+                    "value": "Guadalupe Garcia",
+                    "displayValue": "Guadalupe Garcia"
+                  },
+                  {
+                    "columnId": 5863055189739396,
+                    "value": "Blocked",
+                    "displayValue": "Blocked"
+                  },
+                  {
+                    "columnId": 3611255376054148,
+                    "value": "2025-08-13",
+                    "formula": "=TODAY(14)"
+                  },
+                  {
+                    "columnId": 8114855003424644,
+                    "value": "2025-08-19",
+                    "formula": "=TODAY(20)"
+                  },
+                  {
+                    "columnId": 796505608947588,
+                    "value": 6,
+                    "displayValue": "6",
+                    "formula": "=[End Date]@row - [Start Date]@row"
+                  }
+                ]
+              },
+              {
+                "id": 4772625484744580,
+                "rowNumber": 8,
+                "siblingId": 3224513112835972,
+                "expanded": true,
+                "createdAt": "2026-07-07T13:40:44Z",
+                "modifiedAt": "2026-07-07T13:40:44Z",
+                "cells": [
+                  {
+                    "columnId": 233555655526276
+                  },
+                  {
+                    "columnId": 4737155282896772
+                  },
+                  {
+                    "columnId": 2485355469211524
+                  },
+                  {
+                    "columnId": 6988955096582020
+                  },
+                  {
+                    "columnId": 1359455562368900
+                  },
+                  {
+                    "columnId": 5863055189739396
+                  },
+                  {
+                    "columnId": 3611255376054148
+                  },
+                  {
+                    "columnId": 8114855003424644
+                  },
+                  {
+                    "columnId": 796505608947588
+                  }
+                ]
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Get sheet](https://developers.smartsheet.com/api/smartsheet/openapi/sheets/getsheet)
+
+  **WHY:** requests a page far beyond the last valid page (8 rows / pageSize 2
+  = 4 pages; requested page 100) to check whether the detail endpoint clamps
+  to the last page, errors, or returns empty — this determines how the
+  connector's row-pagination loop must decide when to stop.
+
+  **VERIFIED (2026-07-21):** `page=100&pageSize=2` returns 200 with rows
+  `[269025857374084, 4772625484744580]` — identical to page=4 (the last valid
+  page), never empty; `totalRowCount=8`, `version=0`. Confirmed at page=5, 6,
+  and 100 in this session, all identical. The response carries **no
+  `pageNumber`/`totalPages` field at all** — nothing in the envelope
+  distinguishes a valid last page from an out-of-range one (contrast the list
+  endpoint's clamp signal in `List Sheets (page beyond last clamps)`).
+
+  **Limitation (VERIFIED 2026-07-21):** the detail row endpoint carries no
+  `pageNumber`/`totalPages` and clamps past-the-end pages (this example shows
+  the last page's rows, not empty), so the connector must page by
+  `totalRowCount`, never "stop when a page is empty" — see
+  `Get Sheet (page pagination walk pageSize 2)`.

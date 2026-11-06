@@ -4,7 +4,7 @@ import json
 from typing import Any, AsyncGenerator
 from ..metafields import MetafieldsResource
 
-from source_shopify_native.models import SortKey
+from source_shopify_native.models import SortKey, StoreCapabilities
 
 
 class ProductMetafields(MetafieldsResource):
@@ -20,12 +20,14 @@ class ProductMetafields(MetafieldsResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return ProductMetafields.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod
@@ -80,10 +82,15 @@ class ProductVariantMetafields(MetafieldsResource):
     """
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        capabilities: StoreCapabilities | None = None,
+    ) -> str:
         return ProductVariantMetafields.build_query_with_fragment(
             start,
             end,
+            capabilities=capabilities,
         )
 
     @staticmethod

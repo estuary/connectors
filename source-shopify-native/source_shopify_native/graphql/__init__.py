@@ -11,6 +11,7 @@ from .inventory.inventory_items import InventoryItems
 from .inventory.inventory_levels import InventoryLevels
 from .locations.locations import Locations
 from .locations.metafields import LocationMetafields
+from .markets import Markets
 from .products.products import Products
 from .products.variants import ProductVariants
 from .products.media import ProductMedia
@@ -22,12 +23,16 @@ from .orders.fulfillments import Fulfillments
 from .orders.metafields import OrderMetafields
 from .orders.orders import Orders
 from .orders.refunds import OrderRefunds
+from .orders.returns import OrderReturns
 from .orders.risks import OrderRisks
 from .orders.transactions import OrderTransactions
 from .subscriptions.subscription_contracts import SubscriptionContracts
+from .staff_members import StaffMembers
+from .disputes import Disputes
 
 
 __all__ = [
+    "StaffMembers",
     "AbandonedCheckouts",
     "ShopifyGraphQLClient",
     "CustomCollections",
@@ -40,6 +45,7 @@ __all__ = [
     "InventoryLevels",
     "Locations",
     "LocationMetafields",
+    "Markets",
     "Products",
     "ProductVariants",
     "ProductMedia",
@@ -51,7 +57,9 @@ __all__ = [
     "Orders",
     "OrderMetafields",
     "OrderRefunds",
+    "OrderReturns",
     "OrderRisks",
     "OrderTransactions",
+    "Disputes",
     "SubscriptionContracts",
 ]

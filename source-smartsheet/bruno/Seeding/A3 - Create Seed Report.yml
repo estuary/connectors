@@ -1,0 +1,68 @@
+info:
+  name: A3 - Create Seed Report
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/reports"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Estuary Connector Test Report",
+        "destination": { "destinationType": "folder", "destinationId": {{seed_folder_id}} },
+        "scope": [
+          { "assetType": "sheet", "assetId": {{seed_sheet_id}} }
+        ],
+        "columns": [
+          { "title": "Task Name", "type": "TEXT_NUMBER", "primary": true, "index": 0 },
+          { "title": "Status", "type": "PICKLIST", "index": 1 },
+          { "title": "Due Date", "type": "DATE", "index": 2 }
+        ]
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_sheet_id') && !bru.getEnvVar('seed_sheet_id')) throw new Error('seed_sheet_id is not set — run `A1 - Create Seed Sheet` first in this session, or inject it with `--env-var seed_sheet_id=<id>`');
+        if (!bru.getVar('seed_folder_id') && !bru.getEnvVar('seed_folder_id')) throw new Error('seed_folder_id is not set — run `A3a - Create Seed Folder (report destination)` first in this session, or inject it with `--env-var seed_folder_id=<id>`');
+    - type: after-response
+      code: |-
+        const report = res.getBody()?.result;
+        if (report?.id) {
+          bru.setVar('seed_report_id', String(report.id));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create report](https://developers.smartsheet.com/api/smartsheet/openapi/reports/createreport)
+
+  **WHY:** seeding step 4/4 — creates a row report scoped to the seed sheet
+  from `A1 - Create Seed Sheet`, matching all 3 seed columns by
+  `[type, title]`, so the Reports stream's read-only probes have a real
+  report to run against. By default ONLY THE USER RUNS THIS — never the
+  assistant (Law #5, verify-endpoint-with-bruno); the 2026-07-21 run was
+  executed by the assistant under explicit owner authorization. Run
+  `A1 - Create Seed Sheet`, `A2 - Add Seed Rows`, and `A3a - Create Seed
+  Folder (report destination)` first in the same `bru run` invocation (or
+  inject `--env-var seed_sheet_id=... --env-var seed_folder_id=...`).
+
+  **VERIFIED (2026-07-21):** 200 SUCCESS. Created report
+  `id 3852843205396356` ("Estuary Connector Test Report") in seed folder
+  `1442957044803459`. Two failed shapes on the way pinned down the
+  `destination` contract (both saved in this session's run log, cited in
+  `A3a`'s docs): omitting `destination` → 400 "Required object attribute(s)
+  are missing from your request: destination."; `{"destinationType":
+  "home"}` → 400 "... missing ...: destinationId." — i.e. the original
+  destination-less body of this request could never have succeeded, further
+  evidence the seeding runbook had not been executed before 2026-07-21.

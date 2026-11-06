@@ -23,19 +23,19 @@ func TestTemplates(t *testing.T) {
 	}
 
 	keys := []boilerplate.MappedProjection[mapped]{
-		{Projection: makeProjection("first-key"), Mapped: mapped{iceberg.StringType{}, "first-key"}},
-		{Projection: makeProjection("second-key"), Mapped: mapped{iceberg.BinaryType{}, "second-key"}},
-		{Projection: makeProjection("third-key"), Mapped: mapped{iceberg.Int64Type{}, "third-key"}},
+		{Projection: makeProjection("first-key"), Mapped: mapped{type_: iceberg.StringType{}, Name: "first-key"}},
+		{Projection: makeProjection("second-key"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "second-key"}},
+		{Projection: makeProjection("third-key"), Mapped: mapped{type_: iceberg.Int64Type{}, Name: "third-key"}},
 	}
 
 	values := []boilerplate.MappedProjection[mapped]{
-		{Projection: makeProjection("first-val"), Mapped: mapped{iceberg.StringType{}, "first-val"}},
-		{Projection: makeProjection("second-val"), Mapped: mapped{iceberg.StringType{}, "second-val"}},
-		{Projection: makeProjection("third-val"), Mapped: mapped{iceberg.BinaryType{}, "third-val"}},
-		{Projection: makeProjection("fourth-val"), Mapped: mapped{iceberg.StringType{}, "fourth-val"}},
+		{Projection: makeProjection("first-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "first-val"}},
+		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "second-val"}},
+		{Projection: makeProjection("third-val"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "third-val"}},
+		{Projection: makeProjection("fourth-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "fourth-val"}},
 	}
 
-	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{iceberg.StringType{}, "flow_document"}}
+	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.StringType{}, Name: "flow_document"}}
 
 	input := templateInput{
 		binding: binding{
@@ -84,7 +84,46 @@ func TestTemplates(t *testing.T) {
 				FromType:   "binary",
 				TargetType: iceberg.StringType{},
 			},
+			{
+				Name:       "string_to_variant",
+				FromType:   "string",
+				TargetType: iceberg.VariantType{},
+			},
+			{
+				Name:       "variant_to_string",
+				FromType:   "variant",
+				TargetType: iceberg.StringType{},
+			},
+			{
+				Name:       "binary_to_variant",
+				FromType:   "binary",
+				TargetType: iceberg.VariantType{},
+			},
 		},
+	}
+
+	// The same binding with variant columns: the merge view already yields
+	// variant values for them, so only the document column's sentinel
+	// comparison and the load's document output change.
+	variantValues := []boilerplate.MappedProjection[mapped]{
+		{Projection: makeProjection("first-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "first-val"}},
+		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "second-val"}},
+		{Projection: makeProjection("third-val"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "third-val"}},
+	}
+	variantDoc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.VariantType{}, Name: "flow_document"}}
+	variantInput := templateInput{
+		binding: binding{
+			Idx: 1,
+			Mapped: &boilerplate.MappedBinding[config, resource, mapped]{
+				MaterializationSpec_Binding: pf.MaterializationSpec_Binding{
+					ResourcePath: []string{"foo", "bar"},
+				},
+				Keys:     keys[:1],
+				Values:   variantValues,
+				Document: variantDoc,
+			},
+		},
+		Bounds: []mergeBound{{MappedProjection: keys[0]}},
 	}
 
 	snap.WriteString("--- Begin load query ---\n")
@@ -102,6 +141,18 @@ func TestTemplates(t *testing.T) {
 	snap.WriteString("--- Begin migrate query ---\n")
 	require.NoError(t, templates.migrateQuery.Execute(&snap, mInput))
 	snap.WriteString("--- End migrate query ---")
+
+	snap.WriteString("\n\n")
+
+	snap.WriteString("--- Begin variant load query ---\n")
+	require.NoError(t, templates.loadQuery.Execute(&snap, variantInput))
+	snap.WriteString("--- End variant load query ---")
+
+	snap.WriteString("\n\n")
+
+	snap.WriteString("--- Begin variant merge query ---\n")
+	require.NoError(t, templates.mergeQuery.Execute(&snap, variantInput))
+	snap.WriteString("--- End variant merge query ---")
 
 	cupaloy.SnapshotT(t, snap.String())
 

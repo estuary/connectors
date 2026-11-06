@@ -1,0 +1,71 @@
+info:
+  name: search campaign
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/AssetGroups/QueryByCampaignId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"CampaignId": "{{search_campaign_id}}"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("search_campaign_id")) throw new Error("run `Campaigns / all types comma` first to set search_campaign_id");
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getassetgroupsbycampaignid?view=bingads-13
+
+  **WHY:** the docs say `CampaignId` is "the ID of the performance max
+  campaign". This checks what happens for any other campaign, which decides
+  whether the connector must skip non-Performance Max campaigns.
+
+  **VERIFIED (2026-11-03):** a Search campaign (`1150435732`) is rejected
+  with 400, code 6746 `UnsupportedCampaignTypeForAssetGroup`. So the
+  connector must skip non-Performance Max campaigns, which
+  `snapshot_asset_groups` in `api.py` does. Run `Campaigns / all types
+  comma` first to set `search_campaign_id`.
+
+examples:
+  - name: 400 - Search campaign rejected
+    request:
+      url: "{{campaign_management_url}}/AssetGroups/QueryByCampaignId"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "BatchErrors": [],
+            "OperationErrors": [
+              {
+                "Code": 6746,
+                "ErrorCode": "UnsupportedCampaignTypeForAssetGroup",
+                "Details": null,
+                "Message": "The campaign type is not supported for asset groups."
+              }
+            ],
+            "TrackingId": "4cd45408-5646-489f-b8cd-0cb78b2fb138",
+            "Type": "ApiFaultDetail"
+          }

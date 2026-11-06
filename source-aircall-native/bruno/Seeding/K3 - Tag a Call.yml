@@ -1,0 +1,47 @@
+info:
+  name: K3 - Tag a Call
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/calls/{{seed_call_id}}/tags"
+  body:
+    type: json
+    data: |-
+      {
+        "tags": [{{seed_tag_id}}]
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_call_id: `Calls / window asc`'s pin_call_id if run in this session,
+        // else the 2026-09-28 seeded call 4186784158 (outbound, answered).
+        if (!bru.getVar('seed_call_id')) bru.setVar('seed_call_id', bru.getVar('pin_call_id') || '4186784158');
+        if (!bru.getVar('seed_tag_id')) bru.setVar('seed_tag_id', 'PIN_FROM_TAGS_BARE');
+        if (String(bru.getVar('seed_tag_id')).startsWith('PIN_')) throw new Error('seed_tag_id is unpinned — pin it from Tags / bare');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#tag-a-call
+
+    **ONLY THE USER RUNS THIS — never the assistant.** It mutates Aircall state.
+
+    **WHY:** a second post-creation mutation (tags) — same purpose as
+    `Seeding / K2 - Comment a Call`: prove it surfaces on re-read with no
+    timestamp movement on the Call. Pin `seed_tag_id` from `Tags / bare`
+    (tags are created in the Dashboard by admins). Expected: 201 Created.
+
+    **Outcome:** not run 2026-09-28 (skipped; K2 + K4 already prove
+    mutations carry no update marker). Tag mutation stays DOCUMENTED
+    (`call.tagged` webhook event).
+  type: text/markdown

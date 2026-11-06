@@ -86,8 +86,7 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 			Type:         spec.optType,
 		})
 		if err != nil {
-			var notFound *glueTypes.EntityNotFoundException
-			if !errors.As(err, &notFound) {
+			if _, ok := errors.AsType[*glueTypes.EntityNotFoundException](err); !ok {
 				return fmt.Errorf("checking %s optimizer for %s.%s: %w", spec.optType, ns, tableName, err)
 			}
 

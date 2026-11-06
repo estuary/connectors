@@ -23,6 +23,8 @@ from .models import (
 class Connector(
     BaseCaptureConnector[EndpointConfig, HubspotResourceConfigWithSchedule, ConnectorState],
 ):
+    retain_projections = False
+
     def request_class(self):
         return Request[EndpointConfig, HubspotResourceConfigWithSchedule, ConnectorState]
 

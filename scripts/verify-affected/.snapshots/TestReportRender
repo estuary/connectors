@@ -1,0 +1,65 @@
+# Feature-impact verification report
+
+- **Status:** APPROVED
+- **Timestamp:** 2026-06-02T00:00:00Z
+- **Connector:** materialize-postgres
+- **Check:** uses-enum
+- **Predicate column:** built_spec
+- **Human reviewer:** Mahdi Dibaiee
+- **AI reviewer:** claude-opus-4-8 — verdict **PASS**
+
+## Intent
+
+Collections whose schema constrains a field with an enum.
+
+## Connector images matched
+
+- `ghcr.io/estuary/materialize-postgres`
+
+## Rendered SQL
+
+```sql
+SELECT
+    m.catalog_name        AS task,
+    m.connector_image_name AS image,
+    c.catalog_name        AS collection
+FROM live_specs m
+JOIN live_specs c ON c.catalog_name = ANY(m.reads_from)
+WHERE m.spec_type = 'materialization'
+  AND m.connector_image_name = ANY($1)
+  AND c.spec_type = 'collection'
+  AND (c.built_spec::text LIKE '%"enum":%')
+ORDER BY m.catalog_name, c.catalog_name;
+```
+
+## AI review (claude-opus-4-8)
+
+- Join uses reads_from; scope looks correct.
+
+<details><summary>Full review output</summary>
+
+```
+PASS
+```
+
+</details>
+
+## Result summary
+
+```
+  affected tasks:       2
+  affected collections: 3
+  matched rows:         3
+  by tenant:
+    acmeCo                         tasks=1 collections=2
+    beta                           tasks=1 collections=1
+```
+
+## Affected tasks and collections
+
+| Task | Collection | Image |
+|------|------------|-------|
+| acmeCo/prod/to-pg | acmeCo/orders | ghcr.io/estuary/materialize-postgres |
+| acmeCo/prod/to-pg | acmeCo/users | ghcr.io/estuary/materialize-postgres |
+| beta/sink | beta/events | ghcr.io/estuary/materialize-postgres |
+

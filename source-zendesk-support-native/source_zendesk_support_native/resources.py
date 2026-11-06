@@ -8,6 +8,7 @@ from estuary_cdk.capture import common, Task
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
+    AccountSettings,
     AuditLog,
     ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
@@ -22,6 +23,7 @@ from .models import (
     TalkIncrementalExportResponse,
     ResourceConfig,
     ResourceState,
+    SideConversation,
     TimestampedResource,
     ZendeskResource,
     EPOCH,
@@ -47,6 +49,7 @@ from .api import (
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
     backfill_talk_incremental_export_resources,
+    backfill_side_conversations,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
@@ -58,6 +61,7 @@ from .api import (
     fetch_post_child_resources,
     fetch_post_comment_votes,
     fetch_satisfaction_ratings,
+    fetch_side_conversations,
     fetch_talk_incremental_export_resources,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -65,7 +69,9 @@ from .api import (
     snapshot_offset_paginated_resources,
     snapshot_cursor_paginated_resources,
     url_base,
-    _dt_to_s,
+    dt_to_s,
+    INCREMENTAL_LAG,
+    TICKET_METRIC_EVENTS_LAG,
     TIME_PARAMETER_DELAY,
 )
 
@@ -90,6 +96,11 @@ HELP_DESK_STREAMS = [
 TALK_STREAMS = [
     "calls",
     "call_legs",
+]
+
+
+SIDE_CONVERSATION_STREAMS = [
+    "side_conversations",
 ]
 
 
@@ -133,6 +144,45 @@ async def _is_talk_enabled(
             raise err
 
     return True
+
+
+async def _is_talk_export_available(
+        log: Logger, http: HTTPMixin, config: EndpointConfig, name: str, path: str
+) -> bool:
+    # Zendesk is ending third-party access to its incremental exports, and we
+    # don't know which client error it will return once it does. So any client
+    # error counts as the export being unavailable.
+    start_time = dt_to_s(datetime.now(tz=UTC) - 2 * TIME_PARAMETER_DELAY)
+    try:
+        await http.request(
+            log,
+            f"{url_base(config.subdomain)}/channels/voice/stats/incremental/{path}",
+            params={"start_time": start_time},
+        )
+    except HTTPError as err:
+        if 400 <= err.code < 500:
+            log.warning("Talk incremental export is not accessible, so the stream will not be discovered", {
+                "stream": name,
+                "status_code": err.code,
+                "error": err.message,
+            })
+            return False
+        else:
+            raise err
+
+    return True
+
+
+# I'm not sure if this is the best way to determine if side conversations are enabled
+# for a given Zendesk instance, but I couldn't find a better check. If we see lots of
+# tasks attempting to capture side_conversations but are hitting 4xx errors, we should
+# re-evaluate this check.
+async def _is_side_conversations_enabled(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    body = await http.request(log, f"{url_base(config.subdomain)}/account/settings")
+    settings = AccountSettings.model_validate_json(body)
+    return settings.settings.side_conversations.show_in_context_panel
 
 
 async def validate_credentials(
@@ -182,7 +232,7 @@ def audit_logs(
             )
         )
 
-    cutoff = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC) - INCREMENTAL_LAG
 
     return common.Resource(
         name="audit_logs",
@@ -232,7 +282,7 @@ def ticket_metrics(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     return common.Resource(
         name="ticket_metrics",
@@ -279,16 +329,13 @@ def full_refresh_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_RESOURCES
     ]
@@ -325,16 +372,13 @@ def full_refresh_offset_paginated_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_OFFSET_PAGINATED_RESOURCES
     ]
@@ -371,16 +415,13 @@ def full_refresh_cursor_paginated_resources(
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=60)
             ),
-            schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_CURSOR_PAGINATED_RESOURCES
     ]
@@ -513,10 +554,11 @@ def satisfaction_ratings(
                 backfill_satisfaction_ratings,
                 http,
                 config.subdomain,
+                config.start_date,
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     return common.Resource(
         name="satisfaction_ratings",
@@ -525,7 +567,7 @@ def satisfaction_ratings(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
         ),
         initial_config=ResourceConfig(
             name="satisfaction_ratings", interval=timedelta(minutes=5)
@@ -543,6 +585,7 @@ def incremental_cursor_paginated_resources(
         filter_param: FilterParam,
         cursor_field: str,
         response_model: type[IncrementalCursorPaginatedResponse],
+        lag: timedelta,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -562,6 +605,7 @@ def incremental_cursor_paginated_resources(
                 filter_param,
                 cursor_field,
                 response_model,
+                lag,
             ),
             fetch_page=functools.partial(
                 backfill_incremental_cursor_paginated_resources,
@@ -575,25 +619,29 @@ def incremental_cursor_paginated_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC)
+    resources: list[common.Resource] = []
 
-    resources = [
+    for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES:
+        lag = TICKET_METRIC_EVENTS_LAG if name == "ticket_metric_events" else INCREMENTAL_LAG
+
+        cutoff = datetime.now(tz=UTC) - max(lag, TIME_PARAMETER_DELAY)
+
+        resources.append(
             common.Resource(
-            name=name,
-            key=["/id"],
-            model=ZendeskResource,
-            open=functools.partial(open, path, filter_param, cursor_field, response_model),
-            initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
-            ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
-            ),
-            schema_inference=True,
+                name=name,
+                key=["/id"],
+                model=ZendeskResource,
+                open=functools.partial(open, path, filter_param, cursor_field, response_model, lag),
+                initial_state=ResourceState(
+                    inc=ResourceState.Incremental(cursor=cutoff),
+                    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+                ),
+                initial_config=ResourceConfig(
+                    name=name, interval=timedelta(minutes=5)
+                ),
+                schema_inference=True,
+            )
         )
-        for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES
-    ]
 
     return resources
 
@@ -632,10 +680,11 @@ def incremental_time_export_resources(
                 name,
                 path,
                 response_model,
+                config.start_date,
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(
@@ -645,7 +694,7 @@ def incremental_time_export_resources(
             open=functools.partial(open, name, path, response_model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)
@@ -692,10 +741,11 @@ def talk_incremental_export_resources(
                 name,
                 path,
                 response_model,
+                config.start_date,
             )
         )
 
-    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
     resources = [
             common.Resource(
@@ -705,7 +755,7 @@ def talk_incremental_export_resources(
             open=functools.partial(open, name, path, response_model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
             ),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)
@@ -753,7 +803,7 @@ def incremental_cursor_export_resources(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     resources = [
             common.Resource(
@@ -814,7 +864,7 @@ def ticket_child_resources(
     cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
     # Initial state is the stringified version of the cutoff as an timestamp. Ex: "1738126891"
     # This is done to maintain the strictly increasing nature of yielded LogCursors.
-    initial_state = (str(_dt_to_s(cutoff)),)
+    initial_state = (str(dt_to_s(cutoff)),)
 
     resources = [
             common.Resource(
@@ -835,6 +885,56 @@ def ticket_child_resources(
     ]
 
     return resources
+
+
+def side_conversations(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_side_conversations,
+                http,
+                config.subdomain,
+            ),
+            fetch_page=functools.partial(
+                backfill_side_conversations,
+                http,
+                config.subdomain,
+                config.start_date,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    # Initial state is the stringified version of the cutoff as a Unix timestamp.
+    # This is done to maintain the strictly increasing nature of yielded LogCursors.
+    initial_state = (str(dt_to_s(cutoff)),)
+
+    return common.Resource(
+        name="side_conversations",
+        key=["/id"],
+        model=SideConversation,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=initial_state),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="side_conversations", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
 
 
 def post_child_resources(
@@ -939,6 +1039,7 @@ def _generate_resources(
         *talk_incremental_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
+        side_conversations(log, http, config),
         *post_child_resources(log, http, config),
         post_comment_votes(log, http, config),
     ]
@@ -962,6 +1063,13 @@ async def all_resources(
 
     if not await _is_talk_enabled(log, http, config):
         excluded_streams.update(TALK_STREAMS)
+    else:
+        for (name, path, _) in TALK_INCREMENTAL_EXPORT_RESOURCES:
+            if not await _is_talk_export_available(log, http, config, name, path):
+                excluded_streams.add(name)
+
+    if not await _is_side_conversations_enabled(log, http, config):
+        excluded_streams.update(SIDE_CONVERSATION_STREAMS)
 
     if excluded_streams:
         resources = [r for r in resources if r.name not in excluded_streams]

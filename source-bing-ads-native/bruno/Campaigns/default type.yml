@@ -1,0 +1,52 @@
+info:
+  name: default type
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+  headers:
+    - name: CustomerId
+      value: "{{customer_id}}"
+    - name: CustomerAccountId
+      value: "{{account_id}}"
+  body:
+    type: json
+    data: |-
+      {"AccountId": "{{account_id}}"}
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://learn.microsoft.com/en-us/advertising/campaign-management-service/getcampaignsbyaccountid?view=bingads-13
+
+  **WHY:** with no `CampaignType` the docs say only Search campaigns come
+  back. A control: if `Campaigns / all types comma` returns no more than
+  this, the comma form isn't being read as every type.
+
+  **VERIFIED (2026-10-29):** returns `[]` for an account whose only campaign
+  is PerformanceMax, so the default really is Search only.
+
+examples:
+  - name: 200 - Search only, no campaigns
+    request:
+      url: "{{campaign_management_url}}/Campaigns/QueryByAccountId"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "Campaigns": []
+          }

@@ -45,27 +45,29 @@ class EndpointConfig(BaseModel, extra="allow"):
 class Actions(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Actions"
     START_DATE: ClassVar[str] = ""
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
     PRIMARY_KEY: ClassVar[str] = "/Id"
 
     Id: str
+    CreationDate: datetime
 
 class ActionInquiries(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "ActionInquiries"
     START_DATE: ClassVar[str] = "StartDate"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     END_DATE: ClassVar[str] = "EndDate"
     REP_KEY: ClassVar[str] = "CreationDate"
     PRIMARY_KEY: ClassVar[str] = "/Id"
 
     Id: str
+    CreationDate: datetime
 
 class Ads(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Ads"
     START_DATE: ClassVar[str] = ""
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
     PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
@@ -73,7 +75,7 @@ class Ads(BaseDocument, extra="allow"):
 class Catalogs(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Catalogs"
     START_DATE: ClassVar[str] = ""
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
     PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
@@ -90,7 +92,7 @@ class Invoices(BaseDocument, extra="allow"):
 
 class Deals(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Deals"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "StartDate"
@@ -100,7 +102,7 @@ class Deals(BaseDocument, extra="allow"):
 
 class TrackingValueRequests(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "TrackingValueRequests"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "DatePlaced"
@@ -110,7 +112,7 @@ class TrackingValueRequests(BaseDocument, extra="allow"):
 
 class ExceptionLists(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "ExceptionLists"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "CreatedDate"
@@ -132,7 +134,7 @@ class Jobs(BaseDocument, extra="allow"):
 class Campaigns(BaseDocument, extra="allow"):
     # No query parameters available, and no date replication key
     # will probably need to use snapshot
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     NAME: ClassVar[str] = "Campaigns"
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
@@ -144,7 +146,7 @@ class Reports(BaseDocument, extra="allow"):
     # No query parameters available, and no date replication key
     # will probably need to use snapshot
     NAME: ClassVar[str] = "Reports"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
@@ -152,7 +154,7 @@ class Reports(BaseDocument, extra="allow"):
 
 class UniqueUrls(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "UniqueUrls"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "DateCreated"
@@ -162,7 +164,7 @@ class UniqueUrls(BaseDocument, extra="allow"):
 
 class PhoneNumbers(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "PhoneNumbers"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "DateCreated"
@@ -187,7 +189,7 @@ class Tasks(BaseDocument, extra="allow"):
     # URI example
     # https://api.impact.com/Advertisers/<AccountSID>/Programs/1000/Tasks
     NAME: ClassVar[str] = "Tasks"
-    START_DATE_INCREMENTAL: ClassVar[str]  = None
+    START_DATE_INCREMENTAL: ClassVar[str | None]  = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "DateCreated"
@@ -211,7 +213,7 @@ class BlockRedirectRules(BaseDocument, extra="allow"):
 class MediaPartnerGroups(BaseDocument, extra="allow"):
 
     NAME: ClassVar[str] = "MediaPartnerGroups"
-    START_DATE_INCREMENTAL: ClassVar[str] = None
+    START_DATE_INCREMENTAL: ClassVar[str | None] = None
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
@@ -232,7 +234,7 @@ class Contracts(BaseDocument, extra="allow"):
     START_DATE_INCREMENTAL: ClassVar[str] = "DateLastUpdatedAfter"
     START_DATE: ClassVar[str] = "StartDateAfter"
     END_DATE: ClassVar[str] = "EndDateBefore"
-    REP_KEY: ClassVar[str] = "DateCreated"
+    REP_KEY: ClassVar[str] = "DateLastUpdated"
     PRIMARY_KEY: ClassVar[str] = "/Id"
 
     Id: str

@@ -1,18 +1,22 @@
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator, Callable, TypeVar, Union
+from typing import Any, AsyncGenerator, Callable, TypeVar
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from .models import (
+    CreationRecord,
+    DeletionEvent,
     DeletionRecord,
     IncrementalResource,
+    ObjectKeyNotRecordNo,
     SnapshotResource,
+    parse_backfill_record,
 )
 from .sage import Sage
 
-T = TypeVar("T", IncrementalResource, DeletionRecord)
+T = TypeVar("T", IncrementalResource, CreationRecord, DeletionEvent)
 
 
 # This function is kind of intense, but what it's doing is repeatedly issuing
@@ -57,20 +61,21 @@ async def _fetch_records_generic(
         this_count = 0
         async for rec in fetch_since(object, cursor):
             rec = cls.model_validate(rec.model_dump())
-            if last_record_ts and rec.WHENMODIFIED != last_record_ts:
+            rec_ts = rec.cursor_value()
+            if last_record_ts and rec_ts != last_record_ts:
                 # Got a timestamp change, which means the timestamp of the prior
                 # record has been fully read.
                 last_completed_ts = last_record_ts
 
-            if horizon and rec.WHENMODIFIED > now - horizon:
+            if horizon and rec_ts > now - horizon:
                 # Stop short if the record is too recent. This will trigger the
                 # "read fewer documents than the page size" condition a little
                 # further down.
                 break
 
             this_count += 1
-            last_record_ts = rec.WHENMODIFIED
-            if cache.should_yield(object, getattr(rec, id_field), rec.WHENMODIFIED):
+            last_record_ts = rec_ts
+            if cache.should_yield(object, getattr(rec, id_field), rec_ts):
                 yield rec
 
         total_count += this_count
@@ -102,7 +107,7 @@ async def _fetch_records_generic(
                 rec = cls.model_validate(rec.model_dump())
                 last_record_identifier = getattr(rec, id_field)
                 this_count += 1
-                if cache.should_yield(object, getattr(rec, id_field), rec.WHENMODIFIED):
+                if cache.should_yield(object, getattr(rec, id_field), rec.cursor_value()):
                     yield rec
 
             if this_count < page_size:
@@ -133,6 +138,27 @@ async def fetch_changes(
         yield item
 
 
+async def fetch_creations(
+    object: str,
+    sage: Sage,
+    horizon: timedelta | None,
+    page_size: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[CreationRecord | LogCursor, None]:
+    async for item in _fetch_records_generic(
+        object=object,
+        cls=CreationRecord,
+        id_field="RECORDNO",
+        horizon=horizon,
+        page_size=page_size,
+        cursor=cursor,
+        fetch_since=sage.fetch_created_since,
+        fetch_at=sage.fetch_created_at,
+    ):
+        yield item
+
+
 async def fetch_deletions(
     object: str,
     sage: Sage,
@@ -143,7 +169,7 @@ async def fetch_deletions(
 ) -> AsyncGenerator[DeletionRecord | LogCursor, None]:
     async for item in _fetch_records_generic(
         object=object,
-        cls=DeletionRecord,
+        cls=DeletionEvent,
         id_field="ID",
         horizon=horizon,
         page_size=page_size,
@@ -151,10 +177,28 @@ async def fetch_deletions(
         fetch_since=sage.fetch_deleted,
         fetch_at=sage.fetch_deleted_at,
     ):
-        if isinstance(item, DeletionRecord):
-            item.meta_ = item.Meta(op="d")
+        if not isinstance(item, DeletionEvent):
+            yield item
+            continue
 
-        yield item
+        # Sage records some objects' deletions under their user-facing text ID
+        # rather than their RECORDNO. Such a tombstone cannot be addressed to a
+        # document in the RECORDNO-keyed collection, so it is skipped.
+        try:
+            doc = DeletionRecord.from_event(item)
+        except ObjectKeyNotRecordNo:
+            log.debug(
+                "skipping deletion whose OBJECTKEY is not a RECORDNO",
+                {
+                    "object": object,
+                    "object_key": item.OBJECTKEY,
+                    "access_time": item.ACCESSTIME,
+                    "audit_id": item.ID,
+                },
+            )
+            continue
+
+        yield doc
 
 
 async def fetch_page(
@@ -164,18 +208,18 @@ async def fetch_page(
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
-) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+) -> AsyncGenerator[IncrementalResource | CreationRecord | PageCursor, None]:
     assert isinstance(page, int | None)
     assert isinstance(cutoff, datetime)
 
     last: int | None = None
     count = 0
     async for rec in sage.fetch_all(object, page):
-        rec = IncrementalResource.model_validate(rec.model_dump())
-        last = rec.RECORDNO
+        doc = parse_backfill_record(rec.model_dump())
+        last = doc.RECORDNO
         count += 1
-        if rec.WHENMODIFIED < cutoff:
-            yield rec
+        if doc.cursor_value() < cutoff:
+            yield doc
 
     if count < page_size:
         return

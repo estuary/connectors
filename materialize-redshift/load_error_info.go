@@ -1,11 +1,22 @@
-package main
+package connector
 
 import (
 	"context"
 	"fmt"
+	"path"
+	"slices"
 	"strings"
 
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/jackc/pgx/v5"
+)
+
+// likePatternReplacer escapes a SQL LIKE pattern that is using ^ as the escape
+// character.  This char is picked since it is not special in SQL.
+var likePatternReplacer = strings.NewReplacer(
+	`^`, `^^`,
+	`_`, `^_`,
+	`%`, `^%`,
 )
 
 type loadErrorInfo struct {
@@ -16,7 +27,22 @@ type loadErrorInfo struct {
 	colLength string // Yes, this is actually a char(10) column in Redshift for some reason
 }
 
-func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, bucket, prefix string) (loadErrorInfo, error) {
+// getLoadErrorInfo looks up the load error recorded for any of the staged
+// files, which may sit under several prefixes when shards' files are copied
+// together.
+func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, dialect sql.Dialect, bucket string, files []string) (loadErrorInfo, error) {
+	var prefixes []string
+	for _, f := range files {
+		bucketPath := fmt.Sprintf("s3://%s/%s/", bucket, path.Dir(f))
+		bucketPattern := likePatternReplacer.Replace(bucketPath) + "%"
+		if p := fmt.Sprintf("file_name LIKE %s ESCAPE '^'", dialect.Literal(bucketPattern)); !slices.Contains(prefixes, p) {
+			prefixes = append(prefixes, p)
+		}
+	}
+	if len(prefixes) == 0 {
+		return loadErrorInfo{}, fmt.Errorf("no staged files to look up")
+	}
+
 	q := fmt.Sprintf(`
 	SELECT 
 		error_message,
@@ -25,10 +51,10 @@ func getLoadErrorInfo(ctx context.Context, conn *pgx.Conn, bucket, prefix string
 		column_type,
 		column_length
 	FROM sys_load_error_detail 
-	WHERE file_name LIKE 's3://%s/%s/%%';
+	WHERE %s
+	LIMIT 1;
 	`,
-		bucket,
-		prefix,
+		strings.Join(prefixes, " OR "),
 	)
 
 	var out loadErrorInfo

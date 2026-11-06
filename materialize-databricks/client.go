@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/databricks/databricks-sdk-go"
-	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
@@ -44,23 +43,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	var wsConfig *databricks.Config
-	switch cfg.Credentials.AuthType {
-	case OAUTH_M2M_AUTH_TYPE:
-		wsConfig = &databricks.Config{
-			Host:         fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			ClientID:     cfg.Credentials.ClientID,
-			ClientSecret: cfg.Credentials.ClientSecret,
-		}
-	default: // PAT_AUTH_TYPE
-		wsConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.PersonalAccessToken,
-			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-		}
-	}
-
-	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
+	wsClient, err := databricks.NewWorkspaceClient(cfg.workspaceConfig())
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace client: %w", err)
 	}
@@ -172,6 +155,29 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	}, nil
 }
 
+// Each ALTER TABLE is a Delta commit and a warehouse round trip, so columns are
+// added and dropped in one statement per step. Databricks renames only one
+// column per statement.
+var columnMigrationSteps = []sql.ColumnMigrationStep{
+	func(_ sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		cols := make([]string, len(instructions))
+		for i, ins := range instructions {
+			cols[i] = fmt.Sprintf("%s %s", ins.TempColumnIdentifier, ins.TypeMigration.NullableDDL)
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s ADD COLUMNS (%s);", table.Identifier, strings.Join(cols, ", "))}, nil
+	},
+	sql.StdMigrationSteps[1],
+	func(_ sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		cols := make([]string, len(instructions))
+		for i, ins := range instructions {
+			cols[i] = ins.TypeMigration.Identifier
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s DROP COLUMNS (%s);", table.Identifier, strings.Join(cols, ", "))}, nil
+	},
+	sql.StdMigrationSteps[3],
+	sql.StdMigrationSteps[4],
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
@@ -194,7 +200,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, columnMigrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
 			stmts = append(stmts, steps...)
@@ -236,26 +242,10 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return fmt.Sprintf("CREATE SCHEMA %s;", schemaName), err
 }
 
-func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	var wsConfig *databricks.Config
-	switch cfg.Credentials.AuthType {
-	case OAUTH_M2M_AUTH_TYPE:
-		wsConfig = &databricks.Config{
-			Host:         fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			ClientID:     cfg.Credentials.ClientID,
-			ClientSecret: cfg.Credentials.ClientSecret,
-		}
-	default: // PAT_AUTH_TYPE
-		wsConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.PersonalAccessToken,
-			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-		}
-	}
-
-	wsClient, err := databricks.NewWorkspaceClient(wsConfig)
+	wsClient, err := databricks.NewWorkspaceClient(cfg.workspaceConfig())
 	if err != nil {
 		errs.Err(fmt.Errorf("creating workspace client: %w", err))
 		return errs
@@ -318,20 +308,16 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	// https://github.com/databricks/databricks-sql-go/issues/198
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var execErr dbsqlerr.DBExecutionError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
-		if errors.As(err, &execErr) {
+		if execErr, ok := errors.AsType[dbsqlerr.DBExecutionError](err); ok {
 			// See https://pkg.go.dev/github.com/databricks/databricks-sql-go/errors#pkg-constants
 			// and https://docs.databricks.com/en/error-messages/index.html
 			switch execErr.SqlState() {
 			}
-		} else if errors.As(err, &netConnErr) {
+		} else if netConnErr, ok := errors.AsType[*net.DNSError](err); ok {
 			if netConnErr.IsNotFound {
 				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
-		} else if errors.As(err, &netOpErr) {
+		} else if netOpErr, ok := errors.AsType[*net.OpError](err); ok {
 			if netOpErr.Timeout() {
 				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}

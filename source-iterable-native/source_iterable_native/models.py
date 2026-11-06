@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Annotated, ClassVar, TypeVar
+from typing import Annotated, Any, ClassVar, TypeVar
 
 import xxhash
 from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, model_validator
@@ -146,14 +146,27 @@ class EventTypes(StrEnum):
     WHATSAPP_USAGE_INFO = "whatsAppUsageInfo"
 
 
+def build_sourced_schema(key_properties: dict[str, Any]) -> dict[str, Any]:
+    """Build a stream's sourced schema from the key fields it needs to preserve.
+
+    Everything uniform across connectors — `_meta`, closure, `required`, and
+    default string and numeric bounds — is filled in by the CDK's
+    `with_sourced_schema_defaults()`, so a stream states only its key fields.
+    """
+    return {"properties": key_properties}
+
+
 class IterableResource(BaseDocument, extra="allow"):
     name: ClassVar[str]
     path: ClassVar[str]
     interval: ClassVar[timedelta] = timedelta(minutes=15)
     disable: ClassVar[bool] = False
+    # Key fields to name in this stream's sourced schema. Streams keyed on
+    # /_meta/row_id need nothing beyond the _meta block.
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {}
 
 
-TIterableResource = TypeVar(name="TIterableResource", bound=IterableResource)
+TIterableResource = TypeVar("TIterableResource", bound=IterableResource)
 
 
 class ResourceWithId(IterableResource, extra="allow"):
@@ -195,6 +208,10 @@ class ListUsers(IterableResource):
     interval: ClassVar[timedelta] = timedelta(hours=24)
     schedule: ClassVar[str] = "55 23 * * *"
     disable: ClassVar[bool] = True
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
+        "list_id": {"type": "integer"},
+        "user_id": {"type": "string"},
+    }
 
     list_id: int
     user_id: str
@@ -228,9 +245,18 @@ class Campaigns(ResourceWithId):
     name: ClassVar[str] = "campaigns"
     path: ClassVar[str] = "campaigns"
     interval: ClassVar[timedelta] = timedelta(minutes=5)
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
+        "id": {"type": "integer"},
+        "campaignState": {"type": "string", "minLength": 0, "maxLength": 16},
+    }
 
     createdAt: int
     updatedAt: int
+    startAt: int = Field(
+        default=None,
+        # Don't schematize the default value.
+        json_schema_extra=lambda x: x.pop('default') # type: ignore
+    )
     endedAt: int = Field(
         default=None,
         # Don't schematize the default value.
@@ -244,6 +270,22 @@ class Campaigns(ResourceWithId):
             return max(self.updatedAt, self.endedAt)
         return self.updatedAt
 
+    @property
+    def change_timestamps(self) -> list[int]:
+        """The timestamps that move when a campaign changes.
+
+        `updatedAt` tracks edits only; Iterable leaves it at the last edit when a
+        campaign starts or finishes.
+        `startAt` is the scheduled start, so it enters a poll's window exactly
+        when that start elapses.
+        `endedAt` is stamped on completion.
+        `createdAt` never exceeds `updatedAt` and is omitted.
+        """
+        return [
+            ts for ts in (self.updatedAt, self.startAt, self.endedAt)
+            if ts is not None
+        ]
+
 
 class CampaignsResponse(BaseModel):
     campaigns: list[Campaigns]
@@ -255,6 +297,11 @@ class CampaignMetrics(BaseCSVRow):
     path: ClassVar[str] = "campaigns/metrics"
     interval: ClassVar[timedelta] = timedelta(minutes=15)
     disable: ClassVar[bool] = False
+    # CampaignMetrics descends from BaseCSVRow rather than IterableResource,
+    # so it declares KEY_PROPERTIES itself.
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
+        "id": {"type": "integer"},
+    }
 
     id: int
 
@@ -333,7 +380,7 @@ class ExportResource(IterableResource):
         raise NotImplementedError
 
 
-TExportResource = TypeVar(name="TExportResource", bound=ExportResource)
+TExportResource = TypeVar("TExportResource", bound=ExportResource)
 
 
 @dataclass
@@ -343,6 +390,11 @@ class EventValidationContext:
 
 class Events(ExportResource):
     name: ClassVar[str] = "events"
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
+        # A 128 bit hash rendered as hex is always exactly 32 characters.
+        "_estuary_id": {"type": "string", "minLength": 32, "maxLength": 32},
+        "eventType": {"type": "string"},
+    }
 
     createdAt: AwareDatetime
     eventType: str
@@ -422,6 +474,9 @@ class BaseUsers(ExportResource):
 
 class UsersWithIds(BaseUsers):
     primary_key: ClassVar[str] = "itblUserId"
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
+        "itblUserId": {"type": "string"},
+    }
 
     itblUserId: str
 
@@ -432,6 +487,9 @@ class UsersWithIds(BaseUsers):
 
 class UsersWithEmails(BaseUsers):
     primary_key: ClassVar[str] = "email"
+    KEY_PROPERTIES: ClassVar[dict[str, Any]] = {
+        "email": {"type": "string"},
+    }
 
     email: str
 

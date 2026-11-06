@@ -3,6 +3,23 @@
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -23,6 +40,12 @@
       "required": [
         "id"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Accounts",
       "type": "object",
       "x-infer-schema": true
@@ -34,12 +57,32 @@
     "resourceConfig": {
       "stream": "accounts",
       "syncMode": "full_refresh"
-    }
+    },
+    "resourcePath": [
+      "accounts"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -60,6 +103,12 @@
       "required": [
         "account"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "AccountUsers",
       "type": "object",
       "x-infer-schema": true
@@ -74,12 +123,32 @@
       ],
       "stream": "account_users",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "account_users"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -105,6 +174,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -120,12 +195,32 @@
       ],
       "stream": "ad_campaign_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_campaign_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -151,6 +246,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -166,12 +267,32 @@
       ],
       "stream": "ad_creative_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_creative_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -197,6 +318,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -212,12 +339,32 @@
       ],
       "stream": "ad_impression_device_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_impression_device_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -243,6 +390,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -258,12 +411,32 @@
       ],
       "stream": "ad_member_company_size_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_company_size_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -289,6 +462,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -304,12 +483,32 @@
       ],
       "stream": "ad_member_country_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_country_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -335,6 +534,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -350,12 +555,32 @@
       ],
       "stream": "ad_member_job_function_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_job_function_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -381,6 +606,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -396,12 +627,32 @@
       ],
       "stream": "ad_member_job_title_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_job_title_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -427,6 +678,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -442,12 +699,32 @@
       ],
       "stream": "ad_member_industry_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_industry_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -473,6 +750,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -488,12 +771,32 @@
       ],
       "stream": "ad_member_seniority_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_seniority_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -519,6 +822,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -534,12 +843,32 @@
       ],
       "stream": "ad_member_region_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_region_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -565,6 +894,12 @@
         "string_of_pivot_values",
         "end_date"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Ad Creative Analytics",
       "type": "object",
       "x-infer-schema": true
@@ -580,12 +915,32 @@
       ],
       "stream": "ad_member_company_analytics",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "ad_member_company_analytics"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -606,6 +961,12 @@
       "required": [
         "id"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Campaign Groups",
       "type": "object",
       "x-infer-schema": true
@@ -620,12 +981,32 @@
       ],
       "stream": "campaign_groups",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "campaign_groups"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -654,6 +1035,12 @@
       "required": [
         "id"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Campaigns",
       "type": "object",
       "x-infer-schema": true
@@ -668,12 +1055,32 @@
       ],
       "stream": "campaigns",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "campaigns"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "additionalProperties": true,
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -694,6 +1101,12 @@
       "required": [
         "id"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Creatives",
       "type": "object",
       "x-infer-schema": true
@@ -708,11 +1121,31 @@
       ],
       "stream": "creatives",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "creatives"
+    ]
   },
   {
     "documentSchema": {
       "$schema": "https://json-schema.org/draft-07/schema#",
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
       "properties": {
         "_meta": {
           "properties": {
@@ -733,6 +1166,12 @@
       "required": [
         "id"
       ],
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "title": "Conversions",
       "type": "object",
       "x-infer-schema": true
@@ -747,6 +1186,9 @@
       ],
       "stream": "conversions",
       "syncMode": "incremental"
-    }
+    },
+    "resourcePath": [
+      "conversions"
+    ]
   }
 ]

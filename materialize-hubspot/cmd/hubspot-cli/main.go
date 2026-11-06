@@ -1,0 +1,423 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"os/exec"
+	"os/signal"
+	"runtime"
+	"strings"
+	"time"
+
+	arg "github.com/alexflint/go-arg"
+	hubspot "github.com/estuary/connectors/materialize-hubspot"
+	log "github.com/sirupsen/logrus"
+)
+
+func parseConfig(filename string) (*hubspot.Config, error) {
+	var f *os.File
+	if filename == "-" {
+		f = os.Stdin
+	} else {
+		var err error
+		f, err = os.Open(filename)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+	}
+	input, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	var config hubspot.Config
+	err = json.Unmarshal(input, &config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = config.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+func ResolveObjectTypeID(ctx context.Context, client *hubspot.Client, object hubspot.CRMObject, customObjectName string) (hubspot.ObjectTypeID, error) {
+	objectTypeID := hubspot.ObjectTypeID(object.String())
+	if object == hubspot.CustomObjectObject {
+		objectTypeIDs, err := client.GetCustomObjectTypeIDs(ctx)
+		if err != nil {
+			return hubspot.ObjectTypeID(""), err
+		}
+
+		objectName, err := hubspot.CustomObjectName(customObjectName)
+		if err != nil {
+			return hubspot.ObjectTypeID(""), err
+		}
+
+		if id, ok := objectTypeIDs[objectName]; ok {
+			objectTypeID = id
+		} else {
+			return hubspot.ObjectTypeID(""), fmt.Errorf("definition not found for Custom Object: %q", customObjectName)
+		}
+	}
+
+	return objectTypeID, nil
+}
+
+type AuthCmd struct {
+	// RedirectHost must match the app's setting.
+	RedirectHost string `arg:"--redirect-host" default:"localhost:3000"`
+	// Attempt to open the authorize link in a browser automatically.
+	AutoOpen bool `arg:"--auto-open"`
+}
+
+func (c *AuthCmd) Run(ctx context.Context, client *hubspot.Client, creds hubspot.Credentials) error {
+	redirectBaseURL := &url.URL{
+		Scheme: "http",
+		Host:   c.RedirectHost,
+		Path:   "oauth",
+	}
+
+	server, err := client.StartOAuth2CallbackServer(ctx, redirectBaseURL)
+	if err != nil {
+		return fmt.Errorf("unable to start server: %w", err)
+	}
+
+	params := url.Values{}
+	params.Set("client_id", creds.ClientID)
+	params.Set("scope", strings.Join(hubspot.Oauth2Scopes, " "))
+	params.Set("redirect_uri", redirectBaseURL.String())
+	uri := *hubspot.AuthURL
+	uri.RawQuery = params.Encode()
+
+	fmt.Printf("Authorize URL: %s\n", uri.String())
+
+	if c.AutoOpen {
+		switch runtime.GOOS {
+		case "darwin":
+			err = exec.Command("open", uri.String()).Start()
+		default:
+			err = exec.Command("xdg-open", uri.String()).Start()
+		}
+		if err != nil {
+			log.WithError(err).Error("error opening link")
+		}
+	}
+
+	tokenUpdate, err := server.WaitTokens()
+	if err != nil {
+		return fmt.Errorf("server error: %w", err)
+	}
+
+	tokens := map[string]string{
+		"refresh_token":           tokenUpdate.RefreshToken.Expose(),
+		"access_token":            tokenUpdate.AccessToken.Expose(),
+		"access_token_expires_at": tokenUpdate.AccessTokenExpiresAt.Format(time.RFC3339),
+	}
+	data, err := json.MarshalIndent(tokens, "", "    ")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s\n", data)
+
+	return nil
+}
+
+type RefreshTokensCmd struct{}
+
+func (*RefreshTokensCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	now := time.Now()
+	tokenUpdate, err := client.RefreshTokens(ctx, now)
+	if err != nil {
+		return err
+	}
+
+	tokens := map[string]string{
+		"refresh_token":           tokenUpdate.RefreshToken.Expose(),
+		"access_token":            tokenUpdate.AccessToken.Expose(),
+		"access_token_expires_at": tokenUpdate.AccessTokenExpiresAt.Format(time.RFC3339),
+	}
+	data, err := json.MarshalIndent(tokens, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+
+	return nil
+}
+
+type InspectTokensCmd struct{}
+
+func (*InspectTokensCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	tokens, err := client.InspectTokens(ctx)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(tokens, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+
+	return nil
+}
+
+type GetPropertyCmd struct {
+	Object           string `arg:"positional,required"`
+	Name             string `arg:"--name,required"`
+	CustomObjectName string `arg:"--custom-object-name"`
+}
+
+func (c *GetPropertyCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	property, err := client.GetProperty(ctx, objectTypeID, c.Name)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(property, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+	return nil
+}
+
+type ListPropertiesCmd struct {
+	Object           string `arg:"positional,required"`
+	CustomObjectName string `arg:"--custom-object-name"`
+}
+
+func (c *ListPropertiesCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	properties, err := client.ListProperties(ctx, objectTypeID)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(properties, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+	return nil
+}
+
+type ListPropertyGroupsCmd struct {
+	Object           string `arg:"positional,required"`
+	CustomObjectName string `arg:"--custom-object-name"`
+}
+
+func (c *ListPropertyGroupsCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	groups, err := client.ListPropertyGroups(ctx, objectTypeID)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(groups, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+	return nil
+}
+
+type BatchReadCmd struct {
+	Object           string   `arg:"positional,required"`
+	IDProperty       string   `arg:"--idproperty,required"`
+	Inputs           []string `arg:"--inputs,separate,required"`
+	Properties       []string `arg:"--properties,separate"`
+	CustomObjectName string   `arg:"--custom-object-name"`
+}
+
+func (c *BatchReadCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	read := &hubspot.BatchReadRequest{
+		IDProperty: c.IDProperty,
+		Inputs:     hubspot.NewBatchReadInputs(c.Inputs),
+		Properties: c.Properties,
+	}
+
+	batch, err := client.BatchRead(ctx, objectTypeID, read)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(batch, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+	return nil
+}
+
+type SearchEqualCmd struct {
+	Object           string   `arg:"positional,required"`
+	IDProperty       string   `arg:"--idproperty,required"`
+	Values           []string `arg:"--values,separate,required"`
+	Properties       []string `arg:"--properties,separate"`
+	CustomObjectName string   `arg:"--custom-object-name"`
+}
+
+func (c *SearchEqualCmd) Run(ctx context.Context, client *hubspot.Client) error {
+	object, err := hubspot.NewCRMObject(c.Object)
+	if err != nil {
+		return err
+	}
+
+	objectTypeID, err := ResolveObjectTypeID(ctx, client, object, c.CustomObjectName)
+	if err != nil {
+		return err
+	}
+
+	request := &hubspot.SearchRequest{
+		FilterGroups: hubspot.NewFilterGroupsEquals(c.IDProperty, c.Values),
+	}
+	if len(c.Properties) > 0 {
+		request.Properties = c.Properties
+	}
+
+	results, err := client.Search(ctx, objectTypeID, request)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.MarshalIndent(results, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", data)
+	return nil
+}
+
+type Args struct {
+	Config string `arg:"-c,--config" default:"-"`
+
+	Auth               *AuthCmd               `arg:"subcommand:auth"`
+	RefreshTokens      *RefreshTokensCmd      `arg:"subcommand:refresh-tokens"`
+	InspectTokens      *InspectTokensCmd      `arg:"subcommand:inspect-tokens"`
+	GetProperty        *GetPropertyCmd        `arg:"subcommand:get-property"`
+	ListProperties     *ListPropertiesCmd     `arg:"subcommand:list-properties"`
+	ListPropertyGroups *ListPropertyGroupsCmd `arg:"subcommand:list-property-groups"`
+
+	BatchRead   *BatchReadCmd   `arg:"subcommand:batch-read"`
+	SearchEqual *SearchEqualCmd `arg:"subcommand:search-equal"`
+}
+
+func main() {
+	args := Args{}
+	argParser, err := arg.NewParser(arg.Config{}, &args)
+	if err != nil {
+		log.WithError(err).Error("unable to create parser")
+		os.Exit(1)
+	}
+
+	err = argParser.Parse(os.Args[1:])
+	switch {
+	case err == arg.ErrHelp:
+		argParser.WriteHelp(os.Stdout)
+		os.Exit(0)
+	case err != nil:
+		fmt.Printf("unable to parse arguments: %v\n", err)
+		argParser.WriteUsage(os.Stderr)
+		os.Exit(1)
+	}
+	if argParser.Subcommand() == nil {
+		argParser.Fail("missing subcommand")
+		os.Exit(1)
+	}
+
+	config, err := parseConfig(args.Config)
+	if err != nil {
+		log.WithError(err).Error("unable to parse config")
+		os.Exit(1)
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	client, err := hubspot.NewClient(config.Credentials, config.Limiter(), config.SearchLimiter())
+	if err != nil {
+		log.WithError(err).Error("unable to create client")
+		os.Exit(1)
+	}
+
+	switch {
+	case args.Auth != nil:
+		err = args.Auth.Run(ctx, client, config.Credentials)
+	case args.RefreshTokens != nil:
+		err = args.RefreshTokens.Run(ctx, client)
+	case args.InspectTokens != nil:
+		err = args.InspectTokens.Run(ctx, client)
+	case args.GetProperty != nil:
+		err = args.GetProperty.Run(ctx, client)
+	case args.ListProperties != nil:
+		err = args.ListProperties.Run(ctx, client)
+	case args.ListPropertyGroups != nil:
+		err = args.ListPropertyGroups.Run(ctx, client)
+	case args.BatchRead != nil:
+		err = args.BatchRead.Run(ctx, client)
+	case args.SearchEqual != nil:
+		err = args.SearchEqual.Run(ctx, client)
+	default:
+		err = fmt.Errorf("unimplemented command")
+	}
+
+	if err != nil {
+		log.WithError(err).Error("exiting with error")
+		os.Exit(1)
+	}
+}

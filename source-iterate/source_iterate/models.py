@@ -29,18 +29,18 @@ class FullRefreshResource(BaseDocument, extra="allow"):
     pass
 
 
-class SurveysResponse(BaseModel, extra="forbid"):
+class SurveysResponse(BaseModel, extra="ignore"):
     results: list[FullRefreshResource]
 
 
-class SurveyResponsesResponse(BaseModel, extra="allow"):
-    class Results(BaseModel, extra="forbid"):
+class SurveyResponsesResponse(BaseModel, extra="ignore"):
+    class Results(BaseModel, extra="allow"):
         count: int
         list: list[FullRefreshResource]
 
     results: Results
 
-    class Links(BaseModel, extra="forbid"):
+    class Links(BaseModel, extra="ignore"):
         next: str
 
     # links is not present on the last page of results.

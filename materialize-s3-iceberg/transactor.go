@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -65,6 +65,9 @@ type bindingState struct {
 	PreviousCheckpoint string   `json:"previousCheckpoint,omitempty"`
 	CurrentCheckpoint  string   `json:"currentCheckpoint,omitempty"`
 	FileKeys           []string `json:"fileKeys"`
+	// Round and Rows are what Acknowledge reports once FileKeys are appended.
+	Round int   `json:"round,omitempty"`
+	Rows  int64 `json:"rows,omitempty"`
 }
 
 func hashCheckpoint(cp *protocol.Checkpoint) (string, error) {
@@ -84,6 +87,7 @@ type transactor struct {
 	prefix          string
 	store           *filesink.S3Store
 	state           connectorState
+	be              *m.BindingEvents
 }
 
 var _ m.Transactor = &transactor{}
@@ -120,7 +124,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var group errgroup.Group
 	var states = t.state.BindingStates
 
-	startFile := func(b binding) {
+	startFile := func(b binding) error {
 		// Start uploading a new file, either because the binding changed or because the prior file
 		// got sufficiently large.
 		r, w := io.Pipe()
@@ -137,7 +141,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil
 		})
 
-		pqw = writer.NewParquetWriter(w, b.pqSchema, writer.WithParquetCompression(writer.Snappy))
+		var err error
+		pqw, err = writer.NewParquetWriter(w, b.pqSchema, writer.WithParquetCompression(writer.Snappy))
+		if err != nil {
+			// Unblock and terminate the upload goroutine so it doesn't leak waiting on the pipe.
+			w.CloseWithError(err)
+			return fmt.Errorf("creating parquet writer: %w", err)
+		}
+
+		return nil
 	}
 
 	finishFile := func() error {
@@ -153,9 +165,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
+	rows := make(map[int]int64)
 	lastBinding := -1
 	for it.Next(false) {
 		b := t.bindings[it.Binding]
+		rows[it.Binding]++
 
 		if lastBinding != -1 && lastBinding != it.Binding {
 			if err := finishFile(); err != nil {
@@ -165,7 +179,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		lastBinding = it.Binding
 
 		if pqw == nil {
-			startFile(b)
+			if err := startFile(b); err != nil {
+				return nil, fmt.Errorf("starting file: %w", err)
+			}
 		}
 
 		row, err := b.mapped.ConvertAll(it.Key, it.Values, it.RawJSON)
@@ -190,6 +206,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := finishFile(); err != nil {
 		return nil, fmt.Errorf("final finishFile: %w", err)
 	}
+	round := it.Round
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		// The driver checkpoint for this transaction will include the list of files upload for each
@@ -201,7 +218,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(err)
 		}
 
-		for _, b := range t.bindings {
+		for idx, b := range t.bindings {
 			bindingState := t.state.BindingStates[b.stateKey]
 
 			if len(bindingState.FileKeys) == 0 {
@@ -209,6 +226,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 
 			bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint = bindingState.CurrentCheckpoint, currentCp
+			bindingState.Round = round
+			bindingState.Rows += rows[idx]
 		}
 
 		checkpointJSON, err := json.Marshal(t.state)
@@ -220,13 +239,27 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	var processed bool
 	for _, b := range t.bindings {
+		if !shouldProcess(b.stateKey) {
+			// This state key's pending work was not requested to be processed,
+			// so it remains staged in the persisted state.
+			continue
+		}
+
 		bindingState := t.state.BindingStates[b.stateKey]
 
 		if len(bindingState.FileKeys) == 0 {
 			continue // no data for this binding
 		}
+		processed = true
 
 		ll := log.WithFields(log.Fields{
 			"table":              pathToFQN(b.path),
@@ -242,7 +275,17 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 		ll.Info("finished appendFiles for table")
 
+		// Checkpoints from before Rows was recorded have nothing to report.
+		if bindingState.Rows > 0 {
+			t.be.ReportRowStats(bindingState.Round, b.path, m.TotalRowStats(bindingState.Rows).WithStaged(bindingState.Rows))
+		}
+
 		bindingState.FileKeys = nil // reset for next txn
+		bindingState.Round, bindingState.Rows = 0, 0
+	}
+
+	if !processed {
+		return nil, nil
 	}
 
 	checkpointJSON, err := json.Marshal(t.state)

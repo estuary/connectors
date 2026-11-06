@@ -16,8 +16,12 @@ services:
         limits:
           memory: 4g
     healthcheck:
-      test: "true"
-      interval: 30s
+      # Stock entrypoint with no initialization script, so accepting
+      # connections is the whole of readiness.
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -U sa -P '!Flow1234' -Q 'SELECT 1'"]
+      interval: 2s
+      timeout: 10s
+      retries: 60
     ports:
       - "1433:1433"
 

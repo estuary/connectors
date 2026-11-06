@@ -1,0 +1,48 @@
+info:
+  name: Delete Group
+  type: http
+  seq: 2
+
+http:
+  method: DELETE
+  url: "{{base_url}}/groups/{{seed_group_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_group_id')) await bru.runRequest('Seeding/Create Group');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/deleteGroup
+
+  **WHY:** cleanup for `Seeding / Create Group`, and a second fresh System Log
+  event (`group.lifecycle.delete`) for `System Log / polling resume after`.
+
+  Outcome: ran 2026-10-07 three times; each returned 204. The groups are gone.
+
+examples:
+- name: 204 - group deleted
+  request:
+    url: '{{base_url}}/groups/00g18gufag5uksKzH698'
+    method: DELETE
+  response:
+    status: 204
+    statusText: No Content
+    headers:
+    - name: x-rate-limit-limit
+      value: '500'
+    - name: x-rate-limit-remaining
+      value: '499'
+    - name: x-rate-limit-reset
+      value: '1791383353'
+    body:
+      type: json
+      data: ''

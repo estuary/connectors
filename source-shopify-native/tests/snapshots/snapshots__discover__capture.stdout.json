@@ -3,7 +3,8 @@
     "recommendedName": "abandoned_checkouts",
     "resourceConfig": {
       "name": "abandoned_checkouts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -53,18 +54,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "abandoned_checkouts"
     ]
   },
   {
     "recommendedName": "customers",
     "resourceConfig": {
       "name": "customers",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -114,18 +142,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "customers"
     ]
   },
   {
     "recommendedName": "customer_metafields",
     "resourceConfig": {
       "name": "customer_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -175,18 +230,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "customer_metafields"
     ]
   },
   {
     "recommendedName": "products",
     "resourceConfig": {
       "name": "products",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -236,18 +318,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "products"
     ]
   },
   {
     "recommendedName": "product_media",
     "resourceConfig": {
       "name": "product_media",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -297,18 +406,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_media"
     ]
   },
   {
     "recommendedName": "product_metafields",
     "resourceConfig": {
       "name": "product_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -358,18 +494,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_metafields"
     ]
   },
   {
     "recommendedName": "product_variants",
     "resourceConfig": {
       "name": "product_variants",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -419,18 +582,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_variants"
     ]
   },
   {
     "recommendedName": "product_variant_metafields",
     "resourceConfig": {
       "name": "product_variant_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -480,18 +670,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "product_variant_metafields"
     ]
   },
   {
     "recommendedName": "fulfillment_orders",
     "resourceConfig": {
       "name": "fulfillment_orders",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -541,18 +758,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "fulfillment_orders"
     ]
   },
   {
     "recommendedName": "fulfillments",
     "resourceConfig": {
       "name": "fulfillments",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -602,18 +846,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "fulfillments"
     ]
   },
   {
     "recommendedName": "orders",
     "resourceConfig": {
       "name": "orders",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -663,18 +934,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "orders"
     ]
   },
   {
     "recommendedName": "order_agreements",
     "resourceConfig": {
       "name": "order_agreements",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -724,18 +1022,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_agreements"
     ]
   },
   {
     "recommendedName": "order_metafields",
     "resourceConfig": {
       "name": "order_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -785,18 +1110,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_metafields"
     ]
   },
   {
     "recommendedName": "order_transactions",
     "resourceConfig": {
       "name": "order_transactions",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -846,18 +1198,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_transactions"
     ]
   },
   {
     "recommendedName": "order_refunds",
     "resourceConfig": {
       "name": "order_refunds",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -907,18 +1286,133 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_refunds"
+    ]
+  },
+  {
+    "recommendedName": "order_returns",
+    "resourceConfig": {
+      "name": "order_returns",
+      "interval": "PT5M",
+      "schedule": ""
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "store": {
+              "default": "",
+              "description": "The Shopify store this document belongs to",
+              "title": "Store",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ShopifyGraphQLResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/store",
+      "/id"
+    ],
+    "resourcePath": [
+      "order_returns"
     ]
   },
   {
     "recommendedName": "order_risks",
     "resourceConfig": {
       "name": "order_risks",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -968,18 +1462,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "order_risks"
     ]
   },
   {
     "recommendedName": "inventory_items",
     "resourceConfig": {
       "name": "inventory_items",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1029,18 +1550,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "inventory_items"
     ]
   },
   {
     "recommendedName": "inventory_levels",
     "resourceConfig": {
       "name": "inventory_levels",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1090,18 +1638,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "inventory_levels"
     ]
   },
   {
     "recommendedName": "custom_collections",
     "resourceConfig": {
       "name": "custom_collections",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1151,18 +1726,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "custom_collections"
     ]
   },
   {
     "recommendedName": "smart_collections",
     "resourceConfig": {
       "name": "smart_collections",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1212,18 +1814,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "smart_collections"
     ]
   },
   {
     "recommendedName": "custom_collection_metafields",
     "resourceConfig": {
       "name": "custom_collection_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1273,18 +1902,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "custom_collection_metafields"
     ]
   },
   {
     "recommendedName": "smart_collection_metafields",
     "resourceConfig": {
       "name": "smart_collection_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1334,18 +1990,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "smart_collection_metafields"
     ]
   },
   {
     "recommendedName": "locations",
     "resourceConfig": {
       "name": "locations",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1395,18 +2078,45 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "locations"
     ]
   },
   {
     "recommendedName": "location_metafields",
     "resourceConfig": {
       "name": "location_metafields",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": ""
     },
     "documentSchema": {
       "$defs": {
@@ -1456,11 +2166,205 @@
       ],
       "title": "ShopifyGraphQLResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/store",
       "/id"
+    ],
+    "resourcePath": [
+      "location_metafields"
+    ]
+  },
+  {
+    "recommendedName": "disputes",
+    "resourceConfig": {
+      "name": "disputes",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "store": {
+              "default": "",
+              "description": "The Shopify store this document belongs to",
+              "title": "Store",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "ShopifyGraphQLResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/store",
+      "/id"
+    ],
+    "resourcePath": [
+      "disputes"
+    ]
+  },
+  {
+    "recommendedName": "markets",
+    "resourceConfig": {
+      "name": "markets",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "store": {
+              "default": "",
+              "description": "The Shopify store this document belongs to",
+              "title": "Store",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "ShopifyDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/store",
+      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "markets"
     ]
   }
 ]

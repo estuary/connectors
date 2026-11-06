@@ -1,0 +1,92 @@
+info:
+  name: sort probe
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/users?limit=200&{{users_query}}&sortBy=lastUpdated&sortOrder=asc"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: sortBy
+      value: lastUpdated
+      type: query
+    - name: sortOrder
+      value: asc
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 400 - filter rejects sortBy (E0000001)
+    request:
+      url: "{{base_url}}/users?limit=200&filter=lastUpdated gt \"1970-01-01T00:00:00.000Z\"&sortBy=lastUpdated&sortOrder=asc"
+      method: GET
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "errorCode": "E0000001",
+            "errorSummary": "Api validation failed: UserSearchQueryV2",
+            "errorLink": "E0000001",
+            "errorId": "oaeg6dSj8miRSucKHUtVXLIOA",
+            "errorCauses": [
+              { "errorSummary": "Cannot use sortBy with non-search queries." }
+            ]
+          }
+  - name: 200 - search sorts by lastUpdated asc, all 5 incl. DEPROVISIONED (projection)
+    request:
+      url: "{{base_url}}/users?limit=200&search=lastUpdated gt \"1970-01-01T00:00:00.000Z\"&sortBy=lastUpdated&sortOrder=asc"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            { "id": "00u176zmwbsJ1Uak8698", "status": "ACTIVE", "lastUpdated": "2026-09-03T19:37:36.000Z" },
+            { "id": "00u18gut4epTYtsK2698", "status": "DEPROVISIONED", "lastUpdated": "2026-10-07T14:39:17.000Z" },
+            { "id": "00u18gzxz10URexK9698", "status": "DEPROVISIONED", "lastUpdated": "2026-10-07T16:20:07.000Z" },
+            { "id": "00u18h00o173Yc9fV698", "status": "STAGED", "lastUpdated": "2026-10-08T12:29:33.000Z" },
+            { "id": "00u18gupu552EU005698", "status": "STAGED", "lastUpdated": "2026-10-08T12:44:59.000Z" }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** a backfill that checkpoints a `lastUpdated` watermark after each page
+  needs results sorted by `lastUpdated`. This checks whether `sortBy` is honored
+  under the consistent `filter` param, or only under the eventually consistent
+  `search` param (the spec says "for search queries only"). The fixture users'
+  id order differs from their `lastUpdated` order, so the returned order shows
+  which sort applied. Run with
+  `--env-var 'users_query=filter=lastUpdated gt "1970-01-01T00:00:00.000Z"'`,
+  then with `search=` in place of `filter=`.
+
+  **LIMITATION (VERIFIED 2026-10-08):** `filter` + `sortBy` is rejected with
+  `400 E0000001` "Cannot use sortBy with non-search queries." The consistent
+  `filter` param cannot produce `lastUpdated` order.
+
+  **VERIFIED (2026-10-08):** `search` + `sortBy=lastUpdated&sortOrder=asc`
+  returns all 5 users, including both DEPROVISIONED ones, in true `lastUpdated`
+  order (which differs from the id order `filter` returns). Sorting is available
+  only through `search`, which Okta documents as eventually consistent: "results
+  are sourced from an eventually consistent datasource and may not reflect the
+  latest information" (`listUsers`, DOCUMENTED 2026-10-07).

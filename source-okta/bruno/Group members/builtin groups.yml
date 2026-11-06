@@ -1,0 +1,60 @@
+info:
+  name: builtin groups
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: "{{base_url}}/groups?filter=type eq \"BUILT_IN\""
+  params:
+    - name: filter
+      value: type eq "BUILT_IN"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroups
+
+  **WHY:** Group_members needs the Everyone group's id to attribute `user.lifecycle.create` /
+  `user.lifecycle.delete.completed` to it. This is the lookup: BUILT_IN groups only, then
+  `profile.name == "Everyone"`.
+
+  **VERIFIED (2026-10-09):** `filter=type eq "BUILT_IN"` returns exactly the two built-in
+  groups, Everyone and Okta Administrators; Everyone is identified by `profile.name`.
+
+  **DOCUMENTED (2026-10-09):** a token whose admin has a group-admin role is not shown
+  Everyone (`listGroups` `limit` description in
+  https://raw.githubusercontent.com/okta/okta-management-openapi-spec/master/dist/current/management-oneOfInheritance.yaml).
+
+examples:
+  - name: "200 — BUILT_IN filter returns Everyone and Okta Administrators (projection: id/type/name)"
+    request:
+      url: "{{base_url}}/groups?filter=type%20eq%20%22BUILT_IN%22"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00g176zmw9j1Wyxqf698",
+              "type": "BUILT_IN",
+              "profile.name": "Everyone"
+            },
+            {
+              "id": "00g176zmw9kqvHDny698",
+              "type": "BUILT_IN",
+              "profile.name": "Okta Administrators"
+            }
+          ]

@@ -50,7 +50,7 @@ async def snapshot_survey_responses(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     async for survey in snapshot_surveys(http, log):
-        survey_id = getattr(survey, "id")
+        survey_id = survey.id
         url = f"{API}/surveys/{survey_id}/responses"
         params: dict[str, str | int] = {"v": VERSION}
 

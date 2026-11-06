@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
@@ -118,9 +119,11 @@ type Config struct {
 	User        string            `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture" jsonschema_extras:"order=1"`
 	Password    string            `json:"password,omitempty" jsonschema:"-"`
 	Database    string            `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=2"`
-	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=3"`
+	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=3,nonsensitive=true"`
 	Credentials *credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=4,x-iam-auth=true,x-iam-azure-scope=https://ossrdbms-aad.database.windows.net/.default"`
-	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
+	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
+	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -161,21 +164,26 @@ type advancedConfig struct {
 	SlotName                  string   `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
 	WatermarksTable           string   `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	SkipBackfills             string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize         int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	BackfillChunkSize         int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
 	SSLMode                   string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	DiscoverSchemas           []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	DiscoverSchemas           []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
 	MinimumBackfillXID        string   `json:"min_backfill_xid,omitempty" jsonschema:"title=Minimum Backfill XID,description=Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
-	ReadOnlyCapture           bool     `json:"read_only_capture,omitempty" jsonschema:"title=Read-Only Capture,description=When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."`
-	CaptureAsPartitions       bool     `json:"capture_as_partitions,omitempty" jsonschema:"title=Capture Partitioned Tables As Partitions,description=When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."`
-	DiscoverUnpublishedTables bool     `json:"discover_unpublished_tables,omitempty" jsonschema:"title=Discover Unpublished Tables,description=When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions."`
-	SourceTag                 string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags              string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
-	StatementTimeout          string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default="`
+	ReadOnlyCapture           bool     `json:"read_only_capture,omitempty" jsonschema:"title=Read-Only Capture,description=When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information." jsonschema_extras:"nonsensitive=true"`
+	CaptureAsPartitions       bool     `json:"capture_as_partitions,omitempty" jsonschema:"title=Capture Partitioned Tables As Partitions,description=When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'." jsonschema_extras:"nonsensitive=true"`
+	DiscoverUnpublishedTables bool     `json:"discover_unpublished_tables,omitempty" jsonschema:"title=Discover Unpublished Tables,description=When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions." jsonschema_extras:"nonsensitive=true"`
+	SourceTag                 string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
+	RediscoveryInterval       string   `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	FeatureFlags              string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	StatementTimeout          string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the statement timeout used by the connector. Leave blank to use the default of 2 minutes. Set to '0' to disable statement timeouts entirely.,enum=,enum=0,enum=30s,enum=1m,enum=2m,enum=5m,enum=30m,default=" jsonschema_extras:"nonsensitive=true"`
 
-	DeprecatedDiscoverOnlyPublished bool `json:"discover_only_published,omitempty" jsonschema_extras:"x-hidden-field=true"` // Unused, only supported to avoid breaking existing captures
+	DeprecatedDiscoverOnlyPublished bool `json:"discover_only_published,omitempty" jsonschema_extras:"x-hidden-field=true,nonsensitive=true"` // Unused, only supported to avoid breaking existing captures
 }
 
 var featureFlagDefaults = map[string]bool{
+	// Raise the per-field truncation threshold from 8 MiB to 32 MiB for captures
+	// with a single large column per row. The 64 MiB document limit still applies.
+	"extended_field_truncation_threshold": false,
+
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": true,
@@ -232,6 +240,12 @@ var featureFlagDefaults = map[string]bool{
 
 	// When true, per-table prerequisite checks are skipped. Implied by `skip_prerequisites`.
 	"skip_table_prerequisites": false,
+
+	// When true, pending streams are activated for replication before the initial catch-up
+	// stream and the replication cursor is preserved even when every binding is new, so a
+	// newly added or re-backfilled binding observes changes from the checkpointed cursor
+	// onward. Only safe when no DDL affected those tables since that cursor.
+	"activate_streams_before_catchup": false,
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -294,6 +308,12 @@ func (c *Config) Validate() error {
 		if _, err := time.ParseDuration(c.Advanced.StatementTimeout); err != nil {
 			return fmt.Errorf("invalid statement timeout %q: %w", c.Advanced.StatementTimeout, err)
 		}
+	}
+	if err := sqlcapture.ValidateRediscoveryInterval(c.Advanced.RediscoveryInterval); err != nil {
+		return err
+	}
+	if err := c.DiscoveryFilters.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -410,6 +430,12 @@ type postgresDatabase struct {
 
 	tableStatistics map[sqlcapture.StreamID]*postgresTableStatistics // Tracks table statistics for the current connector invocation
 
+	// Counts of replication events discarded because the table isn't currently active.
+	discardCounts struct {
+		sync.Mutex
+		byStream map[sqlcapture.StreamID]int64
+	}
+
 	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
@@ -418,6 +444,13 @@ type postgresDatabase struct {
 func (db *postgresDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
+
+func (db *postgresDatabase) ActivateStreamsBeforeCatchup() bool {
+	return db.featureFlags["activate_streams_before_catchup"]
+}
+
+// The statement timeout applied to database connections when none is configured.
+const defaultStatementTimeout = 2 * time.Minute
 
 func (db *postgresDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
@@ -445,9 +478,9 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		}
 
 		// Attempt (non-fatal) to set the statement_timeout parameter. If a timeout is
-		// configured in settings we use that, otherwise default to zero so that backfill
-		// queries never get interrupted.
-		var statementTimeout = "0"
+		// configured in settings we use that, otherwise fall back to a conservative
+		// default which bounds runaway queries.
+		var statementTimeout = fmt.Sprintf("%d", defaultStatementTimeout.Milliseconds())
 		if db.config.Advanced.StatementTimeout != "" {
 			if timeout, err := time.ParseDuration(db.config.Advanced.StatementTimeout); err == nil {
 				statementTimeout = fmt.Sprintf("%d", timeout.Milliseconds())
@@ -467,10 +500,15 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return nil
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err == nil {
+		// The pool connects lazily, so without a ping a connection failure
+		// surfaces from whichever query happens to run first.
+		if err = pool.Ping(ctx); err != nil {
+			pool.Close()
+		}
+	}
 	if err != nil {
-		var pgErr *pgconn.PgError
-
-		if errors.As(err, &pgErr) {
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 			switch pgErr.Code {
 			case "28P01":
 				return cerrors.NewUserError(err, "incorrect username or password")
@@ -484,16 +522,12 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
 
-	// Log a message about the statement_timeout setting. If we configured a specific timeout
-	// we just log the value for visibility. If we intended to disable the timeout (config empty
-	// or zero) but the database reports a nonzero value, we warn that backfills might be interrupted.
+	// Log the effective statement_timeout for visibility.
 	var actualTimeout string
 	if err := pool.QueryRow(ctx, "SHOW statement_timeout").Scan(&actualTimeout); err != nil {
 		logrus.WithField("err", err).Warn("failed to query statement_timeout")
-	} else if db.config.Advanced.StatementTimeout != "" {
+	} else {
 		logrus.WithField("timeout", actualTimeout).Info("queried statement_timeout")
-	} else if actualTimeout != "0" {
-		logrus.WithField("timeout", actualTimeout).Info("nonzero statement_timeout")
 	}
 
 	db.conn = pool
@@ -520,6 +554,14 @@ func (db *postgresDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.S
 
 func (db *postgresDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/loc/0", "/_meta/source/loc/1", "/_meta/source/loc/2"}
+}
+
+func (db *postgresDatabase) RediscoveryInterval() time.Duration {
+	return sqlcapture.ParseRediscoveryInterval(db.config.Advanced.RediscoveryInterval)
+}
+
+func (db *postgresDatabase) ReplicationPollingInterval() time.Duration {
+	return 0 // Logical replication events arrive continuously rather than being polled for.
 }
 
 func (db *postgresDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {

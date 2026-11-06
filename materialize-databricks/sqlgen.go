@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -117,7 +117,7 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 				return sql.JoinTransform(".", sql.PassThroughTransform(notQuoted, quoteTf))(path...)
 			}
 		}),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "\\'")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
@@ -150,7 +150,10 @@ type templates struct {
 	alterTableColumns       *template.Template
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
+	loadMatchFiles          *template.Template
 	copyIntoDirect          *template.Template
+	createStagingTable      *template.Template
+	copyIntoStaging         *template.Template
 	mergeInto               *template.Template
 }
 
@@ -186,26 +189,8 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
-	FROM {{ $.Table.Identifier }}
-	JOIN (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Keys }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
-	{{- range $ind, $bound := $.Bounds }}
-	{{ if $ind }}AND {{ else }}ON {{ end -}}
-	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
-	{{- end }}
+SELECT {{ $.Table.Binding }}, {{ $.LoadAlias }}.{{ $.Table.Document.Identifier }}
+	{{ template "loadJoin" $ }}
 {{ else -}}
 SELECT -1, ""
 {{ end -}}
@@ -214,31 +199,117 @@ SELECT -1, ""
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }}, 
+SELECT {{ $.Table.Binding }},
 to_json(struct(
-{{- range $i, $col := $.Table.RootLevelColumns}}
+{{- range $i, $col := $.Table.RootPropertyColumns}}
 	{{- if $i}},{{end}}
-	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col $.LoadAlias) }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
-FROM {{ $.Table.Identifier }}
-JOIN (
-	{{- range $fi, $file := $.Files }}
-	{{ if $fi }} UNION ALL {{ end -}}
-	(
-		SELECT
-		{{ range $ind, $key := $.Table.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ template "cast" $key -}}
-		{{- end }}
-		FROM json.`+"`{{ $file }}`"+`
+{{ template "loadJoin" $ }}
+{{ end }}
+
+-- The first phase of a two-phase load: the files of the table holding rows
+-- that match the load keys, found by reading only the key columns.
+
+{{ define "loadMatchFiles" }}
+SELECT DISTINCT {{ $.LoadAlias }}._metadata.file_path
+	{{ template "loadJoin" $ }}
+{{ end }}
+
+-- The join of the table and the load keys, at the pinned Version and
+-- restricted to MatchedFiles when a two-phase load sets them.
+
+{{ define "loadJoin" -}}
+FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS {{ $.LoadAlias }}{{ end }}
+	JOIN ({{ template "loadSource" $ }}) AS r
+	{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }}AND {{ else }}ON {{ end -}}
+	{{ $.LoadAlias }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- template "boundCondition" (BoundOn $.LoadAlias $bound) }}
+	{{- end }}
+	{{- if $.MatchedFiles }}
+	WHERE {{ $.LoadAlias }}._metadata.file_path IN (
+	{{- range $i, $file := $.MatchedFiles }}{{ if $i }}, {{ end }}{{ Literal $file }}{{ end -}}
 	)
 	{{- end }}
-) AS r
-{{- range $ind, $bound := $.Bounds }}
-{{ if $ind }}AND {{ else }}ON {{ end -}}
-{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+
+-- The range condition of a key column's merge bound: one range of its lower
+-- and upper literals, or the union of its ranges when it has them.
+
+{{ define "boundCondition" -}}
+{{- if $.Bound.Ranges }} AND (
+	{{- range $i, $r := $.Bound.Ranges }}{{ if $i }} OR {{ end -}}
+	({{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $r.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $r.LiteralUpper }})
+	{{- end }})
+{{- else if $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $.Bound.LiteralUpper }}
+{{- end }}
+{{- end }}
+
+-- The staged files of a transaction: one relation per staging directory, and
+-- one scan per file for files staged at the root by earlier versions.
+-- TODO: remove the per-file scans in about January 2027, with the root-level
+-- file path in renderCommitQueries.
+
+{{ define "loadSource" }}
+{{- range $di, $dir := $.Directories }}
+		{{ if $di }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM read_files({{ Literal $dir }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+{{- end }}
+{{- range $fi, $file := $.Files }}
+		{{ if or $fi $.Directories }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Keys }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM json.`+"`{{ $file }}`"+`
+		)
+{{- end }}
+{{ end }}
+
+{{ define "storeSource" }}
+{{- range $ti, $tbl := $.Tables }}
+		{{ if $ti }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			c{{ $ind }} AS {{ $key.Identifier }}
+			{{- end }}, _flow_delete
+			FROM {{ $tbl }}
+		)
+{{- end }}
+{{- range $di, $dir := $.Directories }}
+		{{ if or $di $.Tables }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}, _flow_delete::BOOLEAN
+			FROM read_files({{ Literal $dir }}, format => 'json', schema => {{ Literal $.Schema }}, mode => 'FAILFAST', schemaEvolutionMode => 'none')
+		)
+{{- end }}
+{{- range $fi, $file := $.Files }}
+		{{ if or $fi $.Directories $.Tables }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}, _flow_delete::BOOLEAN
+			FROM json.`+"`{{ $file }}`"+`
+		)
 {{- end }}
 {{ end }}
 
@@ -249,6 +320,15 @@ JOIN (
 {{ $DDL := First (Split $.DDL " ") }}
 {{- if eq $DDL "BINARY" -}}
 	unbase64({{ $.Identifier }})::BINARY as {{ $.Identifier }}
+{{- else -}}
+	{{ $.Identifier }}::{{- $DDL -}}
+{{- end -}}
+{{- end }}
+
+{{ define "castValue" -}}
+{{ $DDL := First (Split $.DDL " ") }}
+{{- if eq $DDL "BINARY" -}}
+	unbase64({{ $.Identifier }})::BINARY
 {{- else -}}
 	{{ $.Identifier }}::{{- $DDL -}}
 {{- end -}}
@@ -280,31 +360,45 @@ JOIN (
   FROM {{ Literal $.StagingPath }}
 	)
   FILEFORMAT = JSON
+  {{- if $.Files }}
   FILES = ('{{ Join $.Files "','" }}')
-  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false' )
+  {{- end }}
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
+  ;
+{{ end }}
+
+{{ define "createStagingTable" }}
+CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
+  {{- range $ind, $col := $.Target.Columns }}
+  {{- if $ind }},{{ end }}
+  c{{ $ind }} {{$col.NullableDDL}}
+  {{- end }},
+  _flow_delete BOOLEAN
+);
+{{ end }}
+
+{{ define "copyIntoStaging" }}
+	COPY INTO {{ $.Identifier }} FROM (
+    SELECT
+		{{ range $ind, $key := $.Target.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "castValue" $key }} AS c{{ $ind }}
+		{{- end }}, _flow_delete::BOOLEAN AS _flow_delete
+  FROM {{ Literal $.Directory }}
+	)
+  FILEFORMAT = JSON
+  FORMAT_OPTIONS ( 'mode' = 'FAILFAST', 'ignoreMissingFiles' = 'false', 'inferSchema' = 'false' )
   ;
 {{ end }}
 
 {{ define "mergeInto" }}
 	MERGE INTO {{ $.Table.Identifier }} AS l
-	USING (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}, _flow_delete::BOOLEAN
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
+	USING ({{ template "storeSource" $ }}) AS r
   ON {{ range $ind, $bound := $.Bounds }}
     {{ if $ind -}} AND {{ end -}}
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-    {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+    {{- template "boundCondition" (BoundOn "l" $bound) }}
   {{- end }}
 	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
@@ -330,28 +424,77 @@ JOIN (
 		{{- end -}}
 	);
 {{ end }}
-  `)
+  `, template.FuncMap{
+		"BoundOn":    func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
+		"QuoteAlias": sql.QuoteTransform("`", "``"),
+	})
 
 	return templates{
 		createTargetTable:       tplAll.Lookup("createTargetTable"),
 		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		loadMatchFiles:          tplAll.Lookup("loadMatchFiles"),
 		copyIntoDirect:          tplAll.Lookup("copyIntoDirect"),
+		createStagingTable:      tplAll.Lookup("createStagingTable"),
+		copyIntoStaging:         tplAll.Lookup("copyIntoStaging"),
 		mergeInto:               tplAll.Lookup("mergeInto"),
 	}
 }
 
 type tableWithFiles struct {
+	// Files are relative to StagingPath for COPY INTO, which reads the whole
+	// of StagingPath when there are none, and full paths otherwise.
 	Files       []string
 	StagingPath string
 	Table       *sql.Table
 	Bounds      []sql.MergeBound
+	// Directories are each read as one relation with Schema, a DDL string.
+	Directories []string
+	Schema      string
+	// Tables are the staging tables a MERGE reads.
+	Tables []string
+	// Version, when set, pins a load to that version of the table, and
+	// MatchedFiles restricts it to those of the table's files.
+	Version      string
+	MatchedFiles []string
+}
+
+// LoadAlias qualifies the table's columns in a load. A table read at a
+// version has no name to qualify them by, so it's aliased.
+func (t *tableWithFiles) LoadAlias() string {
+	if t.Version != "" {
+		return "l"
+	}
+	return t.Table.Identifier
+}
+
+// boundOn is a merge bound on the key column of the table aliased Alias.
+type boundOn struct {
+	Alias string
+	Bound sql.MergeBound
+}
+
+// stagingCopy renders the creation of a staging table and the copy of a
+// directory of staged files into it.
+type stagingCopy struct {
+	Target     *sql.Table
+	Identifier string
+	Directory  string
 }
 
 func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds})
+}
+
+// RenderTableWithStaged renders a load or merge over staging directories and root-level files.
+func RenderTableWithStaged(table sql.Table, dirs, rootFiles []string, schema string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	return renderTemplate(tpl, &tableWithFiles{Table: &table, Directories: dirs, Files: rootFiles, Schema: schema, Bounds: bounds})
+}
+
+func renderTemplate(tpl *template.Template, data any) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds}); err != nil {
+	if err := tpl.Execute(&w, data); err != nil {
 		return "", err
 	}
 	return w.String(), nil

@@ -1,11 +1,18 @@
-package main
+package connector
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
+	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,15 +27,116 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newClickHouseDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
+	})
+
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver().sqlDriver, "testdata/materialize.flow.yaml", makeResourceFn, nil,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newClickHouseDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver().sqlDriver, "testdata/apply.flow.yaml", makeResourceFn)
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = t.Context()
+			var task = sql.PrepareTestTask(t, NewDriver().sqlDriver, bundled, taskName, cfg, makeResourceFn)
+			conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+			require.NoError(t, err)
+			defer conn.Close()
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table loses the rows published before
+			// the backfill; a standard table always carries flow_published_at,
+			// because it is the ReplacingMergeTree version column. Rows are read
+			// without FINAL so that deduplication cannot stand in for deletion.
+			for table, want := range map[string][]int64{
+				"truncate_standard": {1},
+				"truncate_delta":    {1, 1, 2, 3},
+			} {
+				rows, err := conn.Query(ctx, fmt.Sprintf("SELECT id FROM `%s` ORDER BY id;", task.Resource(t, table)))
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
+			}
+		})
+	})
+
+	t.Run("apply-drain", func(t *testing.T) {
+		var ctx = t.Context()
+		var cfg = testConfig()
+		var dialect = clickHouseDialect(cfg.Database)
+
+		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		res := makeResourceFn(tableName, false).WithDefaults(cfg)
+
+		conn, err := clickhouse.Open(cfg.newClickhouseOptions())
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = conn.Close() })
+
+		target := dialect.Identifier(tableName)
+		stage := dialect.Identifier(fmt.Sprintf("flow_temp_store_0_%s", tableName))
+		t.Cleanup(func() { _ = conn.Exec(context.Background(), "DROP TABLE IF EXISTS "+stage) })
+
+		count := func(t *testing.T, ident string) uint64 {
+			t.Helper()
+			var c uint64
+			require.NoError(t, conn.QueryRow(ctx, "SELECT count(*) FROM "+ident).Scan(&c))
+			return c
+		}
+
+		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			// Stage a row of a committed-but-unacknowledged transaction: the
+			// store stage table is a structural copy of the target, holding
+			// rows whose MOVE PARTITION into the target only happens at
+			// Acknowledge.
+			require.NoError(t, conn.Exec(ctx, fmt.Sprintf("CREATE TABLE %s AS %s", stage, target)))
+			require.NoError(t, conn.Exec(ctx, fmt.Sprintf(
+				"INSERT INTO %s (%s, %s, %s, %s, %s, %s) VALUES ('k1', now(), true, 1, 'req', '{}')",
+				stage,
+				dialect.Identifier("key"),
+				dialect.Identifier("flow_published_at"),
+				dialect.Identifier("requiredBoolean"),
+				dialect.Identifier("requiredInteger"),
+				dialect.Identifier("requiredString"),
+				dialect.Identifier("flow_document"),
+			)))
+			return json.RawMessage(fmt.Sprintf(`{%q: {"StoredRows": 1}}`, appliedSpec.Bindings[0].StateKey))
+		}
+
+		verifyDrained := func(t *testing.T, appliedSpec *pf.MaterializationSpec, colNames []string, rows [][]any) {
+			require.Len(t, rows, 1, "the staged row must have been moved to the target")
+			require.EqualValues(t, 0, count(t, stage), "the stage table must have been drained")
+		}
+
+		sql.RunApplyDrainTest(t, NewDriver().sqlDriver, cfg, res, seedPending, verifyDrained)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newClickHouseDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver().sqlDriver, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
 

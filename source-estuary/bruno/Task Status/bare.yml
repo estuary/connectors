@@ -1,0 +1,155 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query TaskStatus($prefix: Prefix!) {\n  liveSpecs(by: { prefix: $prefix }, first: 5) {\n    pageInfo { hasNextPage endCursor }\n    edges { node {\n      catalogName\n      status {\n        type\n        summary\n        controller { nextRun error failures updatedAt }\n        connector { shard { name keyBegin rClockBegin build } ts message fields }\n      }\n    } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}"
+        }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — 5 statuses (OK, TASK_DISABLED, WARNING)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Jonathan_Wihl/my_first_capture/branches"
+                },
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                      "status": {
+                        "type": "OK",
+                        "summary": "Ok",
+                        "controller": {
+                          "nextRun": null,
+                          "error": null,
+                          "failures": 0,
+                          "updatedAt": "2025-03-27T00:50:22.343491+00:00"
+                        },
+                        "connector": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "status": {
+                        "type": "OK",
+                        "summary": "Ok",
+                        "controller": {
+                          "nextRun": "2026-10-07T23:28:34.801486+00:00",
+                          "error": null,
+                          "failures": 0,
+                          "updatedAt": "2026-10-07T21:23:13.909486+00:00"
+                        },
+                        "connector": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "status": {
+                        "type": "TASK_DISABLED",
+                        "summary": "Task shards are disabled",
+                        "controller": {
+                          "nextRun": null,
+                          "error": null,
+                          "failures": 0,
+                          "updatedAt": "2026-04-30T21:53:55.267597+00:00"
+                        },
+                        "connector": {
+                          "shard": {
+                            "name": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                            "keyBegin": "00000000",
+                            "rClockBegin": "00000000",
+                            "build": "1492cd3fdb00028f"
+                          },
+                          "ts": "2026-04-20T22:36:12+00:00",
+                          "message": "Running",
+                          "fields": {
+                            "eventTarget": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                            "eventType": "connectorStatus"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/my_first_capture/assignees",
+                      "status": {
+                        "type": "WARNING",
+                        "summary": "pending data-plane activation",
+                        "controller": {
+                          "nextRun": null,
+                          "error": null,
+                          "failures": 0,
+                          "updatedAt": "2024-06-26T19:28:16.026656+00:00"
+                        },
+                        "connector": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/my_first_capture/branches",
+                      "status": {
+                        "type": "WARNING",
+                        "summary": "pending data-plane activation",
+                        "controller": {
+                          "nextRun": null,
+                          "error": null,
+                          "failures": 0,
+                          "updatedAt": "2024-06-26T20:14:49.351286+00:00"
+                        },
+                        "connector": null
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [status resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/status.rs)
+
+  **WHY:** Shape of the `task_status` snapshot document, as a minimal field set:
+  the summary `type`/`summary`, the controller run bookkeeping, and the
+  connector's last status log. It omits the flattened per-controller sub-statuses
+  (`activation`, `publications`, `autoDiscover`, …), which are deep and large.
+  Also confirms that collections and tests carry `status` with `connector: null`.
+
+  **VERIFIED (2026-10-07):** collections carry `status` with `controller` set and `connector: null`. The disabled materialization reports `TASK_DISABLED` and still carries its last `connector` log (`ts` 2026-04-20). `controller.nextRun` is null when nothing is scheduled. `connector.fields` is a free-form object.

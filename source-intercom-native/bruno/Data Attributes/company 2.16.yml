@@ -1,0 +1,274 @@
+info:
+  name: company 2.16
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/data_attributes?model=company"
+  params:
+    - name: model
+      value: "company"
+      type: query
+  headers:
+    - name: Intercom-Version
+      value: "2.16"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - unchanged on 2.16
+    request:
+      url: "{{base_url}}/data_attributes?model=company"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "list",
+            "data": [
+              {
+                "type": "data_attribute",
+                "name": "name",
+                "full_name": "name",
+                "label": "Company name",
+                "description": "The name of a company",
+                "data_type": "string",
+                "api_writable": true,
+                "ui_writable": true,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "company_id",
+                "full_name": "company_id",
+                "label": "Company ID",
+                "description": "A number identifying a company",
+                "data_type": "string",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "last_request_at",
+                "full_name": "last_request_at",
+                "label": "Company last seen",
+                "description": "The last day anyone from a company visited your site or app",
+                "data_type": "date",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "remote_created_at",
+                "full_name": "remote_created_at",
+                "label": "Company created at",
+                "description": "The day a company was added to Intercom",
+                "data_type": "date",
+                "api_writable": true,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "user_count",
+                "full_name": "user_count",
+                "label": "People",
+                "description": "The number of people in a company",
+                "data_type": "integer",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "session_count",
+                "full_name": "session_count",
+                "label": "Company web sessions",
+                "description": "All visits from anyone in a company to your product's site or app",
+                "data_type": "integer",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "name",
+                "full_name": "plan.name",
+                "label": "Plan",
+                "description": "A specific plan or level within your product that companies have signed up to",
+                "data_type": "string",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "monthly_spend",
+                "full_name": "monthly_spend",
+                "label": "Monthly Spend",
+                "description": "The monthly revenue you receive from a company",
+                "data_type": "float",
+                "api_writable": true,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "size",
+                "full_name": "size",
+                "label": "Company size",
+                "description": "The number of people employed in this company, expressed as a single number",
+                "data_type": "integer",
+                "api_writable": true,
+                "ui_writable": true,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "industry",
+                "full_name": "industry",
+                "label": "Company industry",
+                "description": "The category or domain this company belongs to e.g. 'ecommerce' or 'SaaS'",
+                "data_type": "string",
+                "api_writable": true,
+                "ui_writable": true,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "website",
+                "full_name": "website",
+                "label": "Company website",
+                "description": "The web address for the company's primary marketing site",
+                "data_type": "string",
+                "api_writable": true,
+                "ui_writable": true,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "id",
+                "full_name": "id",
+                "label": "ID",
+                "description": "The Intercom defined id representing the company",
+                "data_type": "string",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "created_at",
+                "full_name": "created_at",
+                "label": "Created at",
+                "description": "The time the company was added to Intercom",
+                "data_type": "date",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "updated_at",
+                "full_name": "updated_at",
+                "label": "Updated at",
+                "description": "The last time the company was updated",
+                "data_type": "date",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "id",
+                "full_name": "plan.id",
+                "label": "Plan ID",
+                "description": "The Intercom defined id representing the plan",
+                "data_type": "string",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              },
+              {
+                "type": "data_attribute",
+                "name": "app_id",
+                "full_name": "app_id",
+                "label": "App ID",
+                "description": "The Intercom defined id representing the app",
+                "data_type": "string",
+                "api_writable": false,
+                "ui_writable": false,
+                "messenger_writable": true,
+                "custom": false,
+                "archived": false,
+                "model": "company"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [List all data attributes (2.16)](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes)
+
+  **WHY:** Sibling audit: does `company_attributes` still work on 2.16?
+
+  **VERIFIED (2026-10-02):** 200, same envelope and item shape (`model: "company"`) as on
+  earlier versions. `company_attributes` is unaffected by 2.16.

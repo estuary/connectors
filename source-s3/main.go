@@ -118,7 +118,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	AscendingKeys bool   `json:"ascendingKeys" jsonschema="title=Ascending Keys,description=Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo."`
+	AscendingKeys bool   `json:"ascendingKeys" jsonschema="title=Ascending Keys,description=Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo." jsonschema_extras:"nonsensitive=true"`
 	Endpoint      string `json:"endpoint" jsonschema="title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS`
 }
 
@@ -234,12 +234,10 @@ func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error 
 	if err != nil {
 		// Note that a listing with zero objects does not return an error here, so we don't have to
 		// account for that case.
-		var noSuchBucket *s3Types.NoSuchBucket
-		var apiErr smithy.APIError
-		switch {
-		case errors.As(err, &noSuchBucket):
+		if _, ok := errors.AsType[*s3Types.NoSuchBucket](err); ok {
 			return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
-		case errors.As(err, &apiErr):
+		}
+		if apiErr, ok := errors.AsType[smithy.APIError](err); ok {
 			switch apiErr.ErrorCode() {
 			case "AccessDenied":
 				return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
@@ -259,8 +257,7 @@ func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error 
 	// successful outcome.
 	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
 	if _, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &cfg.Bucket, Key: aws.String(objectKey)}); err != nil {
-		var notFoundErr *s3Types.NotFound
-		if !errors.As(err, &notFoundErr) {
+		if _, ok := errors.AsType[*s3Types.NotFound](err); !ok {
 			return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
 		}
 	}

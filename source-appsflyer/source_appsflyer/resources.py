@@ -9,12 +9,10 @@ from estuary_cdk.capture.common import (
     Resource,
     ResourceConfig,
     ResourceState,
+    WebhookResourceConfig,
 )
 from estuary_cdk.capture.webhook.match import BodyDiscriminator
-from estuary_cdk.capture.webhook.resources import (
-    WebhookResourceConfig,
-    open_webhook_binding,
-)
+from estuary_cdk.capture.webhook.resources import WebhookResource, open_webhook_binding
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin, TokenSource
 from pydantic import Field, TypeAdapter
@@ -159,12 +157,11 @@ async def all_resources(
 
     discriminator = BodyDiscriminator(key="event_type", known_values=event_types)
     webhook_resources = [
-        Resource(
+        WebhookResource(
             name=f"{rule.display_name}",
             key=["/_meta/estuary_id"],
             model=AppsFlyerWebhookDocument,
             open=open_webhook_binding,  # pyright: ignore[reportArgumentType]
-            initial_state=ResourceState(),
             initial_config=AppsFlyerWebhookResourceConfig(
                 name=f"{rule.display_name}",
                 type="webhook",

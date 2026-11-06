@@ -1,0 +1,31 @@
+info:
+  name: List Campaigns (filtering unknown key)
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"modify_filter_start_time":"2026-10-08 23:08:00"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** evidence for FETCH-SERVER-SIDE-BOUNDARIES: checks whether `campaign/get` has any modify-time filter. An unknown key should either be rejected with the list of valid keys or be ignored (all campaigns returned).
+
+  **VERIFIED (2026-10-12, sandbox):** `code 0`, the live campaign returned:
+  **an unknown `filtering` key is silently ignored**, not rejected. A typo in a
+  filter key therefore widens the query without any error, so every filter the
+  connector relies on must be proven by its effect (as the status, buying-type
+  and creation-time probes do), never by acceptance alone. It also means this
+  probe cannot prove the absence of a modify-time filter.
+  **DOCUMENTED:** `campaign/get` offers a creation-time filter but no
+  modify-time filter, so the incremental window is applied client-side
+  (FETCH-SERVER-SIDE-BOUNDARIES fallback).

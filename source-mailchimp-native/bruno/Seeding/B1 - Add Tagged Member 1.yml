@@ -1,0 +1,33 @@
+info:
+  name: B1 - Add Tagged Member 1
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/members"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "nicolas+estuary-test-1@estuary.dev",
+        "status": "subscribed",
+        "tags": ["estuary-test-tag"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/add-member-to-list/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** adds a subscribed member carrying a tag, which seeds both the members
+  population (needed for segment membership) and the tag-search probes.
+  Mailchimp rejects obviously fake domains (e.g. example.com), so this uses a
+  plus-tagged real mailbox — edit the address if you prefer a different one.

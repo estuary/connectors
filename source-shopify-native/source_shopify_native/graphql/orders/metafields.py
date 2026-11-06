@@ -3,7 +3,7 @@ from logging import Logger
 from typing import AsyncGenerator
 from ..metafields import MetafieldsResource
 
-from source_shopify_native.models import SortKey
+from source_shopify_native.models import SortKey, StoreCapabilities
 
 
 class OrderMetafields(MetafieldsResource):
@@ -19,12 +19,14 @@ class OrderMetafields(MetafieldsResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return OrderMetafields.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

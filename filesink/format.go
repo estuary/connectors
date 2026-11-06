@@ -11,8 +11,9 @@ import (
 // This file contains helpers for building StreamWriter implementations for common file formats.
 
 type ParquetConfig struct {
-	RowGroupRowLimit  int `json:"rowGroupRowLimit,omitempty" jsonschema:"title=Row Group Row Limit,description=Maximum number of rows in a row group. Defaults to 1000000 if blank." jsonschema_extras:"order=0"`
-	RowGroupByteLimit int `json:"rowGroupByteLimit,omitempty" jsonschema:"title=Row Group Byte Limit,description=Approximate maximum number of bytes in a row group. Defaults to 536870912 (512 MiB) if blank." jsonschema_extras:"order=1"`
+	RowGroupRowLimit  int `json:"rowGroupRowLimit,omitempty" jsonschema:"title=Row Group Row Limit,description=Maximum number of rows in a row group. Defaults to 1000000 if blank." jsonschema_extras:"order=0,nonsensitive=true"`
+	RowGroupByteLimit int `json:"rowGroupByteLimit,omitempty" jsonschema:"title=Row Group Byte Limit,description=Approximate maximum number of bytes in a row group. Defaults to 536870912 (512 MiB) if blank." jsonschema_extras:"order=1,nonsensitive=true"`
+	BufferSize        int `json:"bufferSize,omitempty" jsonschema:"title=Buffer Size,description=Approximate size (in bytes) of the in-memory row buffer flushed to disk during writes. Defaults to 25 MiB if blank. Lowering this can reduce memory usage for schemas with very large individual field values. This may also reduce write throughput." jsonschema_extras:"order=2,advanced=true,nonsensitive=true"`
 }
 
 func (c ParquetConfig) Validate() error {
@@ -20,6 +21,8 @@ func (c ParquetConfig) Validate() error {
 		return fmt.Errorf("rowGroupRowLimit cannot be negative: got %d", c.RowGroupRowLimit)
 	} else if c.RowGroupByteLimit < 0 {
 		return fmt.Errorf("rowGroupByteLimit cannot be negative: got %d", c.RowGroupByteLimit)
+	} else if c.BufferSize < 0 {
+		return fmt.Errorf("bufferSize cannot be negative: got %d", c.BufferSize)
 	}
 
 	return nil
@@ -53,16 +56,19 @@ func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io
 	if cfg.RowGroupByteLimit != 0 {
 		opts = append(opts, writer.WithParquetRowGroupByteLimit(cfg.RowGroupByteLimit))
 	}
+	if cfg.BufferSize != 0 {
+		opts = append(opts, writer.WithParquetBufferSize(cfg.BufferSize))
+	}
 
 	// For now, we'll always use Snappy compression, as it is by far the most commonly recommended
 	// compression.
 	opts = append(opts, writer.WithParquetCompression(writer.Snappy))
 
-	return writer.NewParquetWriter(w, sch, opts...), nil
+	return writer.NewParquetWriter(w, sch, opts...)
 }
 
 type CsvConfig struct {
-	SkipHeaders bool `json:"skipHeaders,omitempty" jsonschema:"title=Skip Headers,description=Do not write headers to files." jsonschema_extras:"order=2"`
+	SkipHeaders bool `json:"skipHeaders,omitempty" jsonschema:"title=Skip Headers,description=Do not write headers to files." jsonschema_extras:"order=2,nonsensitive=true"`
 }
 
 func (c CsvConfig) Validate() error {

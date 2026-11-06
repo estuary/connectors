@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import urllib.parse
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar, override
 
-from estuary_cdk.capture.common import (
-    BaseDocument,
-    ResourceConfig,
-    ResourceState,
-)
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
+from estuary_cdk.capture.common import (
+    ResourceState,
+)
+from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.flow import (
+    OAuth2ClientCredentialsPlacement,
     OAuth2Spec,
     RotatingOAuth2Credentials,
 )
@@ -26,16 +25,6 @@ def default_start_date():
     return dt
 
 
-scopes = [
-    "com.intuit.quickbooks.accounting",
-    "com.intuit.quickbooks.payment",
-    "openid",
-    "profile",
-    "email",
-    "phone",
-    "address",
-]
-
 OAUTH2_SPEC = OAuth2Spec(
     provider="intuit",
     accessTokenBody=(
@@ -45,9 +34,8 @@ OAUTH2_SPEC = OAuth2Spec(
     ),
     authUrlTemplate=(
         "https://appcenter.intuit.com/connect/oauth2?"
-        r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-        r"&scope="
-        + urllib.parse.quote(" ".join(scopes))
+        + r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        + r"&scope=com.intuit.quickbooks.accounting"
         + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         + r"&response_type=code"
         + r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
@@ -59,19 +47,38 @@ OAUTH2_SPEC = OAuth2Spec(
         "access_token_expires_at": r"{{#now_plus}}{{ expires_in }}{{/now_plus}}",
     },
     accessTokenHeaders={
+        "Authorization": r"Basic {{#basicauth}}{{{ client_id }}}:{{{ client_secret }}}{{/basicauth}}",
         "Content-Type": "application/x-www-form-urlencoded",
     },
 )
 
 
-if TYPE_CHECKING:
-    OAuth2Credentials = RotatingOAuth2Credentials.with_client_credentials_placement(
-        "headers"
+# Credentials for a user-provided Intuit app. Unlike credentials built with
+# `for_provider`, this class carries no `x-oauth2-provider` annotation, so the
+# UI collects the app's credentials directly instead of offering an OAuth login
+# against a shared Estuary app.
+class OAuth2Credentials(RotatingOAuth2Credentials):
+    client_credentials_placement: ClassVar[OAuth2ClientCredentialsPlacement] = (
+        OAuth2ClientCredentialsPlacement.HEADERS
     )
-else:
-    OAuth2Credentials = RotatingOAuth2Credentials.with_client_credentials_placement(
-        "headers"
-    ).for_provider(OAUTH2_SPEC.provider)
+
+    # `access_token` and `access_token_expires_at` are provided placeholders to
+    # users are not required to fill them in; the connector will generate new
+    # credentials on `Open`
+    access_token: str = Field(
+        default="PLACEHOLDER",
+        title="Access Token",
+        json_schema_extra={"secret": True, "x-hidden-field": True},
+    )
+    access_token_expires_at: datetime = Field(
+        default=EPOCH,
+        title="Access token expiration time.",
+        json_schema_extra={"x-hidden-field": True},
+    )
+
+    @override
+    def _you_must_build_oauth2_credentials_for_a_provider(self):
+        pass
 
 
 class EndpointConfig(BaseModel):
@@ -98,6 +105,12 @@ class EndpointConfig(BaseModel):
         ge=EPOCH,
         json_schema_extra={"order": 2},
     )
+    is_sandbox: bool = Field(
+        description="Enable to capture from a QuickBooks sandbox company instead of production.",
+        title="Use Sandbox Environment",
+        default=False,
+        json_schema_extra={"order": 3},
+    )
 
 
 ConnectorState = GenericConnectorState[ResourceState]
@@ -121,7 +134,7 @@ class Account(QuickBooksEntity):
 
 
 class BillPayment(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Bill Payments"
+    resource_name: ClassVar[str] = "Bill_Payments"
     table_name: ClassVar[str] = "BillPayment"
 
 
@@ -141,7 +154,7 @@ class Class(QuickBooksEntity):
 
 
 class CreditMemo(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Credit Memos"
+    resource_name: ClassVar[str] = "Credit_Memos"
     table_name: ClassVar[str] = "CreditMemo"
 
 
@@ -181,7 +194,7 @@ class Item(QuickBooksEntity):
 
 
 class JournalEntry(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Journal Entries"
+    resource_name: ClassVar[str] = "Journal_Entries"
     table_name: ClassVar[str] = "JournalEntry"
 
 
@@ -191,7 +204,7 @@ class Payment(QuickBooksEntity):
 
 
 class PaymentMethod(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Payment Methods"
+    resource_name: ClassVar[str] = "Payment_Methods"
     table_name: ClassVar[str] = "PaymentMethod"
 
 
@@ -201,32 +214,32 @@ class Purchase(QuickBooksEntity):
 
 
 class PurchaseOrder(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Purchase Orders"
+    resource_name: ClassVar[str] = "Purchase_Orders"
     table_name: ClassVar[str] = "PurchaseOrder"
 
 
 class RefundReceipt(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Refund Receipts"
+    resource_name: ClassVar[str] = "Refund_Receipts"
     table_name: ClassVar[str] = "RefundReceipt"
 
 
 class SalesReceipt(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Sales Receipts"
+    resource_name: ClassVar[str] = "Sales_Receipts"
     table_name: ClassVar[str] = "SalesReceipt"
 
 
 class TaxAgency(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Tax Agencies"
+    resource_name: ClassVar[str] = "Tax_Agencies"
     table_name: ClassVar[str] = "TaxAgency"
 
 
 class TaxCode(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Tax Codes"
+    resource_name: ClassVar[str] = "Tax_Codes"
     table_name: ClassVar[str] = "TaxCode"
 
 
 class TaxRate(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Tax Rates"
+    resource_name: ClassVar[str] = "Tax_Rates"
     table_name: ClassVar[str] = "TaxRate"
 
 
@@ -236,7 +249,7 @@ class Term(QuickBooksEntity):
 
 
 class TimeActivity(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Time Activities"
+    resource_name: ClassVar[str] = "Time_Activities"
     table_name: ClassVar[str] = "TimeActivity"
 
 
@@ -246,7 +259,7 @@ class Transfer(QuickBooksEntity):
 
 
 class VendorCredit(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Vendor Credits"
+    resource_name: ClassVar[str] = "Vendor_Credits"
     table_name: ClassVar[str] = "VendorCredit"
 
 

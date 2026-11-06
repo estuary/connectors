@@ -1,0 +1,469 @@
+info:
+  name: tickets updated window
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/search/export?filter[type]=ticket&query=updated>=2000-01-01T00:00:00Z&page[size]=1000"
+  params:
+    - name: "filter[type]"
+      value: "ticket"
+      type: query
+    - name: "query"
+      value: "updated>=2000-01-01T00:00:00Z"
+      type: query
+    - name: "page[size]"
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - 47 tickets incl. archived (projection)"
+    request:
+      url: "{{base_url}}/search/export?filter[type]=ticket&query=updated>=2000-01-01T00:00:00Z&page[size]=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "687"
+        - name: "ratelimit-remaining"
+          value: "687"
+        - name: "ratelimit-reset"
+          value: "46"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "id": 47,
+                "result_type": "ticket",
+                "updated_at": "2026-09-23T22:12:34Z",
+                "status": "open",
+                "created_at": "2026-09-23T22:12:31Z"
+              },
+              {
+                "id": 46,
+                "result_type": "ticket",
+                "updated_at": "2026-08-20T21:36:36Z",
+                "status": "open",
+                "created_at": "2026-08-20T21:36:34Z"
+              },
+              {
+                "id": 45,
+                "result_type": "ticket",
+                "updated_at": "2026-07-14T22:31:08Z",
+                "status": "open",
+                "created_at": "2026-07-14T22:31:06Z"
+              },
+              {
+                "id": 44,
+                "result_type": "ticket",
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open",
+                "created_at": "2026-06-12T22:40:10Z"
+              },
+              {
+                "id": 43,
+                "result_type": "ticket",
+                "updated_at": "2026-05-06T21:55:52Z",
+                "status": "open",
+                "created_at": "2026-05-06T21:55:47Z"
+              },
+              {
+                "id": 42,
+                "result_type": "ticket",
+                "updated_at": "2026-04-30T14:53:34Z",
+                "status": "open",
+                "created_at": "2026-04-30T14:53:31Z"
+              },
+              {
+                "id": 41,
+                "result_type": "ticket",
+                "updated_at": "2026-03-18T22:55:54Z",
+                "status": "open",
+                "created_at": "2026-03-18T22:55:49Z"
+              },
+              {
+                "id": 40,
+                "result_type": "ticket",
+                "updated_at": "2026-03-05T13:37:54Z",
+                "status": "open",
+                "created_at": "2026-03-05T13:37:54Z"
+              },
+              {
+                "id": 39,
+                "result_type": "ticket",
+                "updated_at": "2026-03-04T12:55:46Z",
+                "status": "open",
+                "created_at": "2026-03-04T12:55:46Z"
+              },
+              {
+                "id": 38,
+                "result_type": "ticket",
+                "updated_at": "2026-02-19T15:49:35Z",
+                "status": "open",
+                "created_at": "2026-02-19T15:49:29Z"
+              },
+              {
+                "id": 37,
+                "result_type": "ticket",
+                "updated_at": "2026-01-16T01:28:25Z",
+                "status": "open",
+                "created_at": "2026-01-16T01:28:25Z"
+              },
+              {
+                "id": 36,
+                "result_type": "ticket",
+                "updated_at": "2025-05-19T17:23:30Z",
+                "status": "open",
+                "created_at": "2025-05-19T17:23:30Z"
+              },
+              {
+                "id": 35,
+                "result_type": "ticket",
+                "updated_at": "2025-05-01T01:27:42Z",
+                "status": "open",
+                "created_at": "2025-05-01T01:27:42Z"
+              },
+              {
+                "id": 34,
+                "result_type": "ticket",
+                "updated_at": "2025-03-17T19:35:27Z",
+                "status": "open",
+                "created_at": "2025-03-17T19:35:27Z"
+              },
+              {
+                "id": 33,
+                "result_type": "ticket",
+                "updated_at": "2025-01-27T19:31:47Z",
+                "status": "open",
+                "created_at": "2025-01-27T19:31:47Z"
+              },
+              {
+                "id": 32,
+                "result_type": "ticket",
+                "updated_at": "2024-11-19T16:58:08Z",
+                "status": "open",
+                "created_at": "2024-11-19T16:58:08Z"
+              },
+              {
+                "id": 31,
+                "result_type": "ticket",
+                "updated_at": "2024-11-19T16:57:12Z",
+                "status": "open",
+                "created_at": "2024-11-19T16:57:12Z"
+              },
+              {
+                "id": 30,
+                "result_type": "ticket",
+                "updated_at": "2024-08-04T17:01:30Z",
+                "status": "closed",
+                "created_at": "2024-08-01T16:14:24Z"
+              },
+              {
+                "id": 29,
+                "result_type": "ticket",
+                "updated_at": "2024-08-04T16:02:20Z",
+                "status": "closed",
+                "created_at": "2024-08-01T15:03:13Z"
+              },
+              {
+                "id": 28,
+                "result_type": "ticket",
+                "updated_at": "2024-08-01T14:32:08Z",
+                "status": "closed",
+                "created_at": "2024-08-01T14:21:37Z"
+              },
+              {
+                "id": 27,
+                "result_type": "ticket",
+                "updated_at": "2024-08-01T14:31:55Z",
+                "status": "closed",
+                "created_at": "2024-08-01T14:14:26Z"
+              },
+              {
+                "id": 26,
+                "result_type": "ticket",
+                "updated_at": "2024-08-01T14:27:40Z",
+                "status": "closed",
+                "created_at": "2024-08-01T14:07:58Z"
+              },
+              {
+                "id": 24,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:11Z"
+              },
+              {
+                "id": 25,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:11Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:11Z"
+              },
+              {
+                "id": 22,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:10Z"
+              },
+              {
+                "id": 23,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:10Z"
+              },
+              {
+                "id": 19,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:09Z"
+              },
+              {
+                "id": 20,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:09Z"
+              },
+              {
+                "id": 21,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:09Z"
+              },
+              {
+                "id": 18,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:08Z"
+              },
+              {
+                "id": 17,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:08Z"
+              },
+              {
+                "id": 15,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:07Z"
+              },
+              {
+                "id": 16,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:07Z"
+              },
+              {
+                "id": 13,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:44:39Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:06Z"
+              },
+              {
+                "id": 14,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:42:06Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:06Z"
+              },
+              {
+                "id": 12,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:45:00Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:05Z"
+              },
+              {
+                "id": 11,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:43:24Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:04Z"
+              },
+              {
+                "id": 10,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:44:32Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:04Z"
+              },
+              {
+                "id": 9,
+                "result_type": "ticket",
+                "updated_at": "2024-10-11T21:48:56Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:03Z"
+              },
+              {
+                "id": 8,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:44:46Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:02Z"
+              },
+              {
+                "id": 7,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:44:56Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:02Z"
+              },
+              {
+                "id": 6,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:43:07Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:01Z"
+              },
+              {
+                "id": 5,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:43:03Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:42:00Z"
+              },
+              {
+                "id": 3,
+                "result_type": "ticket",
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:41:59Z"
+              },
+              {
+                "id": 4,
+                "result_type": "ticket",
+                "updated_at": "2024-07-26T15:43:00Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:41:59Z"
+              },
+              {
+                "id": 2,
+                "result_type": "ticket",
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:41:58Z"
+              },
+              {
+                "id": 1,
+                "result_type": "ticket",
+                "updated_at": "2026-05-08T14:08:44Z",
+                "status": "open",
+                "created_at": "2024-07-26T15:41:04Z"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJmaWVsZCI6ImNyZWF0ZWRfYXQiLCJkZXNjIjp0cnVlLCJ0aWVCcmVha0ZpZWxkIjoiaWQiLCJ0aWVCcmVha0Rlc2MiOmZhbHNlLCJzb3J0VmFsdWVzIjpbMTcyMjAwODQ2NDAwMCwyODgzNTcxNTAyNjU4MF0sImV4cG9ydGVkVGh1c0ZhciI6NDcsInNlc3Npb25TdGFydCI6MTc5MTM4Nzc5NDE3MywiY3JlYXRlZEF0IjoxNzkxMzg3Nzk0MjAyLCJzYWx0ZWRSZXF1ZXN0SGFzaCI6LTE2NzI3MTE3MzksInNhbHRlZEN1cnNvckhhc2giOjIwMjAxNzE5NDAsInZlcnNpb24iOjF9",
+              "before_cursor": null
+            }
+          }
+  - name: "200 - after A5/A6, deleted ticket excluded (projection)"
+    request:
+      url: "{{base_url}}/search/export?filter[type]=ticket&query=updated>=2000-01-01T00:00:00Z&page[size]=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "685"
+        - name: "ratelimit-remaining"
+          value: "685"
+        - name: "ratelimit-reset"
+          value: "30"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "id": 47,
+                "result_type": "ticket",
+                "updated_at": "2026-09-23T22:12:34Z",
+                "status": "open",
+                "created_at": "2026-09-23T22:12:31Z"
+              },
+              {
+                "id": 46,
+                "result_type": "ticket",
+                "updated_at": "2026-08-20T21:36:36Z",
+                "status": "open",
+                "created_at": "2026-08-20T21:36:34Z"
+              },
+              {
+                "id": 45,
+                "result_type": "ticket",
+                "updated_at": "2026-07-14T22:31:08Z",
+                "status": "open",
+                "created_at": "2026-07-14T22:31:06Z"
+              },
+              {
+                "id": 44,
+                "result_type": "ticket",
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open",
+                "created_at": "2026-06-12T22:40:10Z"
+              },
+              {
+                "id": 43,
+                "result_type": "ticket",
+                "updated_at": "2026-05-06T21:55:52Z",
+                "status": "open",
+                "created_at": "2026-05-06T21:55:47Z"
+              }
+            ],
+            "results_total": 47,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJmaWVsZCI6ImNyZWF0ZWRfYXQiLCJkZXNjIjp0cnVlLCJ0aWVCcmVha0ZpZWxkIjoiaWQiLCJ0aWVCcmVha0Rlc2MiOmZhbHNlLCJzb3J0VmFsdWVzIjpbMTcyMjAwODQ2NDAwMCwyODgzNTcxNTAyNjU4MF0sImV4cG9ydGVkVGh1c0ZhciI6NDcsInNlc3Npb25TdGFydCI6MTc5MTM4ODM0OTg2OCwiY3JlYXRlZEF0IjoxNzkxMzg4MzQ5ODk5LCJzYWx0ZWRSZXF1ZXN0SGFzaCI6LTE2NzI3MTE3MzksInNhbHRlZEN1cnNvckhhc2giOjIwNTM0ODMyOTQsInZlcnNpb24iOjF9",
+              "before_cursor": null
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Export Search Results](https://developer.zendesk.com/api-reference/ticketing/ticket-management/search/#export-search-results)
+
+  **WHY:** V6 / A3. A window covering all time, compared ticket-by-ticket with the
+  incremental export, shows whether search export returns archived tickets. It also
+  confirms that datetime `updated>=` queries are accepted.
+
+  **VERIFIED (2026-10-07):** returns all 47 tickets, including the 5 archived ones (ids 26-30)
+  that `/tickets` excludes. A deleted ticket is excluded (still 47 after
+  `Seeding / A6 - Delete ticket`). Results are ordered `created_at` descending; the
+  cursor decodes to `{"field":"created_at","desc":true,...}`. No dedicated
+  rate-limit bucket header (docs: 100 requests per minute).

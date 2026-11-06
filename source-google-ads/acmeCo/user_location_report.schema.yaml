@@ -102,7 +102,7 @@ properties:
     type:
     - 'null'
     - number
-  metrics.average_cpv:
+  metrics.trueview_average_cpv:
     type:
     - 'null'
     - number
@@ -166,11 +166,11 @@ properties:
     type:
     - 'null'
     - number
-  metrics.video_view_rate:
+  metrics.video_trueview_view_rate:
     type:
     - 'null'
     - number
-  metrics.video_views:
+  metrics.video_trueview_views:
     type:
     - 'null'
     - number
@@ -186,3 +186,17 @@ properties:
     required:
     - row_id
 x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

@@ -1,0 +1,10 @@
+collections:
+  key/change:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        tenant: { type: string }
+        value: { type: string }
+      required: [id, tenant]
+    key: [/id]

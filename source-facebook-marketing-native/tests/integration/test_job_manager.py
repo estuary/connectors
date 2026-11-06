@@ -7,11 +7,19 @@ handling using a MockHTTPSession that simulates Facebook's API behavior.
 
 import asyncio
 import json
+import logging
 import pytest
 
 from source_facebook_marketing_native.insights import FacebookInsightsJobManager
 from source_facebook_marketing_native.insights.errors import CannotSplitFurtherError
-from source_facebook_marketing_native.insights.manager import MAX_RETRIES
+from source_facebook_marketing_native.models import (
+    AdsInsights,
+    AdsInsightsAgeAndGender,
+)
+from source_facebook_marketing_native.insights.manager import (
+    MAX_FIELD_LEAF_RETRIES,
+    MAX_RETRIES,
+)
 
 from tests.factories import (
     MockHTTPSession,
@@ -352,6 +360,8 @@ class TestJobSplitting:
         mock_http.add_handler(r"/act_[^/]+/insights$", handle_discovery, method="GET")
         mock_http.add_handler(r"/job_", handle_status, method="GET")
 
+        # Every job fails, so the single ad ends up with no fetchable field and
+        # the capture stops rather than advancing past it.
         with pytest.raises(CannotSplitFurtherError):
             async for _ in job_manager.fetch_insights(
                 mock_log, mock_model, "act_123", time_range
@@ -359,7 +369,8 @@ class TestJobSplitting:
                 pass
 
         # Verify we descended through the full hierarchy
-        # Note: ad.id level doesn't call discovery - it raises CannotSplitFurtherError directly
+        # Note: ad.id level doesn't call discovery - a single ad is split by
+        # field set instead.
         assert "account" in discovery_calls, "Should discover campaigns at account level"
         assert "campaign.id" in discovery_calls, "Should discover adsets for campaign"
         assert "adset.id" in discovery_calls, "Should discover ads for adset"
@@ -374,10 +385,15 @@ class TestAtomicFailure:
     """Test behavior when splitting is no longer possible."""
 
     @pytest.mark.asyncio
-    async def test_single_ad_failure_raises_exception(
+    async def test_entity_unfetchable_at_any_granularity_fails_the_capture(
         self, job_manager, mock_http, mock_log, mock_model, time_range, mock_sleep
     ):
-        """Single ad job that fails raises CannotSplitFurtherError."""
+        """An entity that yields no field at all must stop the capture.
+
+        Dropping some fields is expected. Facebook refusing every field of a
+        single entity is not something splitting explains, so the cursor must
+        not advance past data we never obtained.
+        """
 
         def handle_submit(request):
             return create_job_submission_response("job_1")
@@ -400,6 +416,8 @@ class TestAtomicFailure:
         mock_http.add_handler(r"/act_[^/]+/insights$", handle_discovery, method="GET")
         mock_http.add_handler(r"/job_", handle_status, method="GET")
 
+        # Every request fails, so every field is dropped and nothing is left to
+        # emit. That is a broken entity, not degradation.
         with pytest.raises(CannotSplitFurtherError):
             async for _ in job_manager.fetch_insights(
                 mock_log, mock_model, "act_123", time_range
@@ -432,6 +450,418 @@ class TestAtomicFailure:
             results.append(record)
 
         assert len(results) == 0
+
+
+# =============================================================================
+# TestFieldSplitting - Recovering Atomic Jobs By Splitting Their Field Set
+# =============================================================================
+
+
+class TestFieldSplitting:
+    """A single ad that fails is retried with progressively fewer fields."""
+
+    @staticmethod
+    def _descend_to_single_ad(request):
+        """Discovery responses that walk account -> campaign -> adset -> ad."""
+        params = request.get("params", {})
+        if params and "filtering" in params:
+            filtering = json.loads(params["filtering"])
+            field = filtering[0]["field"]
+            if field == "campaign.id":
+                return create_discovery_response(["single_adset"], "adset_id")
+            elif field == "adset.id":
+                return create_discovery_response(["single_ad"], "ad_id")
+        return create_discovery_response(["single_campaign"], "campaign_id")
+
+    def _wire(
+        self,
+        mock_http,
+        failing_fields: set[str],
+        submits: dict,
+        segments: list[dict[str, str]] | None = None,
+    ):
+        """Fail any job requesting one of `failing_fields`; succeed otherwise.
+
+        Rows carry the primary key columns so merged records can be checked.
+        `segments` stands in for Facebook's breakdown columns: each entry
+        becomes one more row per job, carrying its own metric values, the way
+        a breakdown stream returns one row per age/gender combination.
+        """
+
+        def handle_submit(request):
+            params = request.get("params", {})
+            requested = set(params.get("fields", "").split(","))
+            submits["count"] += 1
+            submits.setdefault("field_sets", []).append(requested)
+            job_id = f"job_{submits['count']}"
+            submits[job_id] = requested
+            return create_job_submission_response(job_id)
+
+        def handle_status(request):
+            job_id = request["url"].split("/")[-1]
+            if submits.get(job_id, set()) & failing_fields:
+                return create_job_status_response(
+                    job_id, "Job Failed", percent=0,
+                    error_code=2, error_subcode=1504044,
+                )
+            return create_job_status_response(job_id, "Job Completed")
+
+        def handle_results(request):
+            job_id = request["url"].split("/")[-2]
+            requested = submits.get(job_id, set())
+            metrics = sorted(requested - {"account_id", "ad_id", "date_start"})
+            rows = []
+            for index, segment in enumerate(segments or [{}]):
+                row = {"ad_id": "single_ad", "date_start": "2024-01-01", **segment}
+                for name in metrics:
+                    row[name] = f"{name}_value_{index}"
+                rows.append(row)
+            return create_insights_response(rows)
+
+        mock_http.add_handler(r"/act_[^/]+/insights$", handle_submit, method="POST")
+        mock_http.add_handler(
+            r"/act_[^/]+/insights$", self._descend_to_single_ad, method="GET"
+        )
+        mock_http.add_handler(r"job_\d+$", handle_status, method="GET")
+        mock_http.add_handler(r"job_\d+/insights", handle_results, method="GET")
+
+    @pytest.mark.asyncio
+    async def test_recovers_every_field_that_can_be_fetched(
+        self, job_manager, mock_http, mock_log, mock_model, time_range, mock_sleep
+    ):
+        """Only the offending field is lost; the rest are merged into one record.
+
+        This is the whole point of field splitting: a single ad whose `actions`
+        array explodes should cost that one field, not the entire ad-day.
+        """
+        submits = {"count": 0}
+        self._wire(mock_http, failing_fields={"impressions"}, submits=submits)
+
+        results = []
+        async for record in job_manager.fetch_insights(
+            mock_log, mock_model, "act_123", time_range
+        ):
+            results.append(record)
+
+        assert len(results) == 1, "parts must re-join into a single record"
+        record = results[0]
+        assert record["clicks"] == "clicks_value_0", "fetchable field survives"
+        assert "impressions" not in record, "unfetchable field is dropped"
+        # Primary keys ride along in every part, so they are always present.
+        assert record["ad_id"] == "single_ad"
+        assert record["date_start"] == "2024-01-01"
+        assert record["account_id"] == "act_123"
+
+    @pytest.mark.asyncio
+    async def test_leaf_retries_before_declaring_a_field_unfetchable(
+        self, job_manager, mock_http, mock_log, mock_model, time_range, mock_sleep
+    ):
+        """Dropping a field is irreversible, so the leaf gets a second chance."""
+        submits = {"count": 0}
+        self._wire(mock_http, failing_fields={"impressions"}, submits=submits)
+
+        async for _ in job_manager.fetch_insights(
+            mock_log, mock_model, "act_123", time_range
+        ):
+            pass
+
+        single_field_attempts = [
+            fields
+            for fields in submits["field_sets"]
+            if fields - {"account_id", "ad_id", "date_start"} == {"impressions"}
+        ]
+        assert len(single_field_attempts) == MAX_FIELD_LEAF_RETRIES
+
+    @pytest.mark.asyncio
+    async def test_reproduces_measured_behaviour_for_the_real_model(
+        self, job_manager, mock_http, mock_log, time_range, mock_sleep
+    ):
+        """Pin the algorithm to what was measured against the live API.
+
+        Probing ad 6947535033445 (account 174802123, 2026-01-11) with the real
+        AdsInsights field set recovered 47 of 48 fields, with `actions` alone
+        irreducibly unfetchable.
+        """
+        submits = {"count": 0}
+        self._wire(mock_http, failing_fields={"actions"}, submits=submits)
+
+        results = []
+        async for record in job_manager.fetch_insights(
+            mock_log, AdsInsights, "act_123", time_range
+        ):
+            results.append(record)
+
+        assert len(results) == 1
+        record = results[0]
+
+        assert "actions" not in record, "the one unfetchable field is dropped"
+        recovered = {f for f in AdsInsights.fields if f in record}
+        assert len(recovered) == len(AdsInsights.fields) - 1
+        assert set(AdsInsights.fields) - recovered == {"actions"}
+
+    @pytest.mark.asyncio
+    async def test_breakdown_rows_survive_field_splitting(
+        self, job_manager, mock_http, mock_log, time_range, mock_sleep
+    ):
+        """A breakdown stream keeps one record per segment, not one per ad-day.
+
+        Parts are joined on the model's whole primary key, which for
+        ads_insights_age_and_gender includes the `age` and `gender` breakdown
+        columns. Those never appear in `fields` - Facebook rejects them there,
+        and returns them because `breakdowns` is set - so joining on only the
+        requestable keys would collapse every segment of an ad-day into one
+        record and let the cursor advance past the rest.
+        """
+        segments = [
+            {"age": "25-34", "gender": "male"},
+            {"age": "25-34", "gender": "female"},
+            {"age": "35-44", "gender": "male"},
+        ]
+        submits = {"count": 0}
+        self._wire(
+            mock_http,
+            failing_fields={"actions"},
+            submits=submits,
+            segments=segments,
+        )
+
+        results = []
+        async for record in job_manager.fetch_insights(
+            mock_log, AdsInsightsAgeAndGender, "act_123", time_range
+        ):
+            results.append(record)
+
+        assert len(results) == len(segments), "every segment must survive the join"
+        by_segment = {(r["age"], r["gender"]): r for r in results}
+        assert set(by_segment) == {(s["age"], s["gender"]) for s in segments}
+
+        # Each segment keeps its own values rather than another segment's, and
+        # loses only the field Facebook refused.
+        for index, segment in enumerate(segments):
+            record = by_segment[(segment["age"], segment["gender"])]
+            assert record["impressions"] == f"impressions_value_{index}"
+            assert record["clicks"] == f"clicks_value_{index}"
+            assert "actions" not in record
+
+        # The breakdown columns must never be requested as fields.
+        for field_set in submits["field_sets"]:
+            assert not field_set & {"age", "gender"}
+
+    @pytest.mark.asyncio
+    async def test_rows_missing_a_key_column_fail_rather_than_collapse(
+        self, job_manager, mock_http, mock_log, time_range, mock_sleep
+    ):
+        """Facebook omitting a key column must fail the day, not merge blindly.
+
+        Rows that do not carry `gender` cannot be told apart, so merging them
+        would collapse unrelated segments into one record and report success.
+        A custom insights model would not even reject the result downstream,
+        because its breakdown columns are optional.
+        """
+        submits = {"count": 0}
+        self._wire(
+            mock_http,
+            # Forces the descent to a single ad and then the field split, which
+            # is the only path that merges parts and so the only one that joins.
+            failing_fields={"actions"},
+            submits=submits,
+            # The second segment's rows come back without `gender`.
+            segments=[{"age": "25-34", "gender": "male"}, {"age": "35-44"}],
+        )
+
+        with pytest.raises(CannotSplitFurtherError, match=r"\['gender'\]"):
+            async for _ in job_manager.fetch_insights(
+                mock_log, AdsInsightsAgeAndGender, "act_123", time_range
+            ):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_chunk_that_returns_no_rows_is_reported_as_degraded(
+        self,
+        job_manager,
+        mock_http,
+        mock_log,
+        mock_model,
+        time_range,
+        mock_sleep,
+        caplog,
+    ):
+        """A chunk that succeeds with no rows still lost its fields.
+
+        The bisect only recurses on failure, so a chunk that comes back empty is
+        terminal: its fields are simply absent from the merged records. That is
+        the same loss as a field Facebook refused to report on, and has to be
+        counted the same way - otherwise the capture claims complete data for
+        the window while quietly missing columns.
+        """
+        submits = {"count": 0}
+
+        def handle_submit(request):
+            params = request.get("params", {})
+            submits["count"] += 1
+            job_id = f"job_{submits['count']}"
+            submits[job_id] = set(params.get("fields", "").split(","))
+            return create_job_submission_response(job_id)
+
+        def handle_status(request):
+            job_id = request["url"].split("/")[-1]
+            # Only the full field set fails, forcing the split into halves.
+            if len(submits.get(job_id, set())) == len(mock_model.fields):
+                return create_job_status_response(
+                    job_id, "Job Failed", percent=0,
+                    error_code=2, error_subcode=1504044,
+                )
+            return create_job_status_response(job_id, "Job Completed")
+
+        def handle_results(request):
+            job_id = request["url"].split("/")[-2]
+            requested = submits.get(job_id, set())
+            # The clicks half succeeds but returns nothing at all.
+            if "clicks" in requested:
+                return create_insights_response([])
+            return create_insights_response(
+                [{"ad_id": "single_ad", "date_start": "2024-01-01", "impressions": 100}]
+            )
+
+        mock_http.add_handler(r"/act_[^/]+/insights$", handle_submit, method="POST")
+        mock_http.add_handler(
+            r"/act_[^/]+/insights$", self._descend_to_single_ad, method="GET"
+        )
+        mock_http.add_handler(r"job_\d+$", handle_status, method="GET")
+        mock_http.add_handler(r"job_\d+/insights", handle_results, method="GET")
+
+        with caplog.at_level(logging.WARNING):
+            results = []
+            async for record in job_manager.fetch_insights(
+                mock_log, mock_model, "act_123", time_range
+            ):
+                results.append(record)
+
+        # The fetchable half is still delivered; only `clicks` is missing.
+        assert len(results) == 1
+        assert results[0]["impressions"] == 100
+        assert "clicks" not in results[0]
+
+        degraded = [
+            record
+            for record in caplog.records
+            if record.getMessage().startswith("Incomplete data")
+        ]
+        assert len(degraded) == 1, "the loss must be reported once for the window"
+        assert degraded[0].unfetched_fields == ["clicks"]
+
+    @pytest.mark.asyncio
+    async def test_entity_with_no_activity_is_not_treated_as_broken(
+        self,
+        job_manager,
+        mock_http,
+        mock_log,
+        mock_model,
+        time_range,
+        mock_sleep,
+        caplog,
+    ):
+        """Zero records is legitimate when every field was fetchable.
+
+        The failure condition is "no field could be fetched", not "no records
+        came back" - an ad that simply had no activity in the window returns
+        nothing, and must not be mistaken for one Facebook refuses to report on.
+        """
+        submits = {"count": 0}
+
+        def handle_submit(request):
+            params = request.get("params", {})
+            submits["count"] += 1
+            job_id = f"job_{submits['count']}"
+            submits[job_id] = set(params.get("fields", "").split(","))
+            return create_job_submission_response(job_id)
+
+        def handle_status(request):
+            job_id = request["url"].split("/")[-1]
+            # Only the full field set fails, forcing a split; halves succeed.
+            if len(submits.get(job_id, set())) == len(mock_model.fields):
+                return create_job_status_response(
+                    job_id, "Job Failed", percent=0,
+                    error_code=2, error_subcode=1504044,
+                )
+            return create_job_status_response(job_id, "Job Completed")
+
+        def handle_results(request):
+            return create_insights_response([])
+
+        mock_http.add_handler(r"/act_[^/]+/insights$", handle_submit, method="POST")
+        mock_http.add_handler(
+            r"/act_[^/]+/insights$", self._descend_to_single_ad, method="GET"
+        )
+        mock_http.add_handler(r"job_\d+$", handle_status, method="GET")
+        mock_http.add_handler(r"job_\d+/insights", handle_results, method="GET")
+
+        with caplog.at_level(logging.WARNING):
+            results = []
+            async for record in job_manager.fetch_insights(
+                mock_log, mock_model, "act_123", time_range
+            ):
+                results.append(record)
+
+        assert results == []
+
+        # Every chunk was empty, so there is no asymmetry to report: the ad had
+        # no activity, which is not the same as data we failed to obtain.
+        assert not [
+            record
+            for record in caplog.records
+            if record.getMessage().startswith("Incomplete data")
+        ]
+
+    @pytest.mark.asyncio
+    async def test_all_fields_fetchable_after_split_loses_nothing(
+        self, job_manager, mock_http, mock_log, mock_model, time_range, mock_sleep
+    ):
+        """When only the full field set is too large, no data is lost at all."""
+        submits = {"count": 0}
+        # Fails only when both metrics are requested together.
+        original_add = mock_http.add_handler
+
+        def handle_submit(request):
+            params = request.get("params", {})
+            requested = set(params.get("fields", "").split(","))
+            submits["count"] += 1
+            job_id = f"job_{submits['count']}"
+            submits[job_id] = requested
+            return create_job_submission_response(job_id)
+
+        def handle_status(request):
+            job_id = request["url"].split("/")[-1]
+            requested = submits.get(job_id, set())
+            if {"impressions", "clicks"} <= requested:
+                return create_job_status_response(
+                    job_id, "Job Failed", percent=0,
+                    error_code=2, error_subcode=1504044,
+                )
+            return create_job_status_response(job_id, "Job Completed")
+
+        def handle_results(request):
+            job_id = request["url"].split("/")[-2]
+            requested = submits.get(job_id, set())
+            row = {"ad_id": "single_ad", "date_start": "2024-01-01"}
+            for name in requested - {"account_id", "ad_id", "date_start"}:
+                row[name] = f"{name}_value"
+            return create_insights_response([row])
+
+        original_add(r"/act_[^/]+/insights$", handle_submit, method="POST")
+        original_add(r"/act_[^/]+/insights$", self._descend_to_single_ad, method="GET")
+        original_add(r"job_\d+$", handle_status, method="GET")
+        original_add(r"job_\d+/insights", handle_results, method="GET")
+
+        results = []
+        async for record in job_manager.fetch_insights(
+            mock_log, mock_model, "act_123", time_range
+        ):
+            results.append(record)
+
+        assert len(results) == 1
+        assert results[0]["impressions"] == "impressions_value"
+        assert results[0]["clicks"] == "clicks_value"
 
 
 # =============================================================================

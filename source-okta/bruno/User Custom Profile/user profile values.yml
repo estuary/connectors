@@ -1,0 +1,122 @@
+info:
+  name: user profile values
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: '{{base_url}}/users?limit=2'
+  params:
+    - name: limit
+      value: '2'
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - before seeding (projection: id, profile, type)"
+    request:
+      url: "{{base_url}}/users?limit=2"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "300"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/users?limit=2>; rel=\"self\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u176zmwbsJ1Uak8698",
+              "profile": {
+                "firstName": "Connector",
+                "lastName": "Dev",
+                "mobilePhone": null,
+                "secondEmail": null,
+                "login": "connector-dev+okta@estuary.dev",
+                "email": "connector-dev+okta@estuary.dev"
+              },
+              "type": {
+                "id": "oty176zmw9ti8gVdP698"
+              }
+            }
+          ]
+  - name: "200 - after adding a custom attribute: no new key in profile (projection)"
+    request:
+      url: "{{base_url}}/users?limit=2"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "300"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/users?limit=2>; rel=\"self\", <https://integrator-9297012.okta.com/api/v1/users?after=2&limit=2>; rel=\"next\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u18gupu552EU005698",
+              "profile": {
+                "firstName": "Estuary",
+                "lastName": "Members A",
+                "mobilePhone": null,
+                "secondEmail": null,
+                "login": "estuary-members-a@example.com",
+                "email": "estuary-members-a@example.com"
+              },
+              "type": {
+                "id": "oty176zmw9ti8gVdP698"
+              }
+            },
+            {
+              "id": "00u18gut4epTYtsK2698",
+              "profile": {
+                "firstName": "Estuary",
+                "lastName": "Members B",
+                "mobilePhone": null,
+                "secondEmail": null,
+                "login": "estuary-members-b@example.com",
+                "email": "estuary-members-b@example.com"
+              },
+              "type": {
+                "id": "oty176zmw9ti8gVdP698"
+              }
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all users](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/listUsers)
+
+  **WHY:** `User_Custom_Profile` is per-user custom attribute *values*, matching Fivetran's
+  `user_custom_profile` table: one row per user per custom attribute, columns `name` (PK),
+  `users_id` (PK, FK → users), `value`. The user supplied that schema on 2026-10-08 (the
+  Fivetran docs pages render client-side, so no fetcher can read them). This probe shows how
+  custom values arrive in `/users`, and so how the Users fetch can derive the resource.
+  Decided 2026-10-08: the resource is reassigned to the Users cluster.
+
+  **VERIFIED (2026-10-07):** `profile` is one flat object; base and custom attributes are not
+  separated. After `Seeding / Add Custom User Attribute`, users who have no value for it
+  show **no** `estuarySeedCostCode` key at all (unset custom attributes are omitted, while
+  some unset base attributes such as `mobilePhone` appear as `null`). So a per-user
+  "custom values" document would need the schema's custom-attribute names to pick keys out
+  of `profile`. Each user carries `type.id`, which maps to its user type (and schema).
+
+  **VERIFIED (2026-10-08, `Seeding / Set Custom Value` + `Users / get by id`):** a user
+  *with* a custom value set carries it as a plain top-level `profile` key
+  (`"estuarySeedCostCode": "CC-12"`), and the partial profile update moves `lastUpdated`.

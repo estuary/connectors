@@ -1,0 +1,55 @@
+info:
+  name: lastUpdated filter
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: '{{base_url}}/apps?filter=lastUpdated gt "2026-09-03T19:37:00.000Z"'
+  params:
+    - name: filter
+      value: 'lastUpdated gt "2026-09-03T19:37:00.000Z"'
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - E0000031 lastUpdated is not a filterable field"
+    request:
+      url: "{{base_url}}/apps?filter=lastUpdated%20gt%20%222026-09-03T19%3A37%3A00.000Z%22"
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+      body:
+        type: json
+        data: |-
+          {
+            "errorCode": "E0000031",
+            "errorSummary": "Invalid search criteria.",
+            "errorLink": "E0000031",
+            "errorId": "REDACTED",
+            "errorCauses": []
+          }
+
+docs: |-
+  **REFERENCE:** [List all applications](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/listApplications)
+
+  **WHY:** the only way Applications could be incremental is a server-side `lastUpdated`
+  filter. The spec lists `id`, `status`, `credentials.signing.kid`, `settings.slo.enabled`
+  and `name` as the supported filter fields (OpenAPI spec v2026.09.2 (`management-oneOfInheritance.yaml`)). This probe records what Okta does
+  with an unsupported field: reject, or silently ignore.
+
+  **LIMITATION (VERIFIED 2026-10-07):** rejected with `400`, `errorCode: E0000031`
+  ("Invalid search criteria."). Applications has no server-side change filter (and the
+  list endpoint has no sort parameter), so it cannot be incremental: it is a **snapshot**.

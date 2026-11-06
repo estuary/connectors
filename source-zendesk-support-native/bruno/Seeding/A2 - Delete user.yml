@@ -1,0 +1,36 @@
+info:
+  name: A2 - Delete user
+  type: http
+  seq: 2
+
+http:
+  method: DELETE
+  url: "{{base_url}}/users/{{seed_user_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // seed_user_id normally arrives from `Seeding / A1 - Create user to delete`'s after-response capture. Fail
+        // loudly out of session rather than sending a malformed URL.
+        if (!bru.getVar('seed_user_id') && !bru.getEnvVar('seed_user_id')) {
+          throw new Error('seed_user_id not set: run `Seeding / A1 - Create user to delete` first in this session, or bru.setVar it');
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Delete User](https://developer.zendesk.com/api-reference/ticketing/users/users/#delete-user)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** V7. Soft-deletes the user created by `Seeding / A1 - Create user to delete`
+  (run A1 first in the same session). Afterwards re-run `Incremental / users cursor`,
+  `Users / bare`, and `Deleted / deleted_users`.
+
+  **Outcome:** Ran 2026-10-07; V7 VERIFIED in `Incremental / users cursor`, `Users / bare`, `Deleted / deleted_users`.

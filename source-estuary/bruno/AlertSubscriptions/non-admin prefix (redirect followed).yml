@@ -1,0 +1,67 @@
+info:
+  name: non-admin prefix (redirect followed)
+  type: graphql
+  seq: 3
+
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query AlertSubscriptions($prefix: Prefix!) {
+        alertSubscriptions(by: { prefix: $prefix }) { catalogPrefix }
+      }
+    variables: |-
+      {
+        "prefix": "estuary/public/"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/envelope.rs
+
+  **WHY:** Same denied query as `AlertSubscriptions / non-admin prefix`, but
+  following the 307 the way the CDK's aiohttp session does (immediate re-POST
+  of the same body to `Location`, ignoring Retry-After). Shows the *terminal*
+  form of a permission denial the connector would actually see, and how long
+  the server holds the re-POST.
+
+  **VERIFIED (2026-10-07):** Following the 307 immediately (as aiohttp does) the server held the re-POST about 5.8 s, then answered **HTTP 200** with `data: null` and `errors[0].message` starting `PermissionDenied:`, with `path: ["alertSubscriptions"]`. That is the terminal form `graphql_request` raises as `GraphQLError`. A denial therefore costs about 6 s, so the connector should never send one: scopes are pre-filtered by capability.
+
+examples:
+  - name: 200 - terminal PermissionDenied in errors after re-POST
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": null,
+            "errors": [
+              {
+                "message": "PermissionDenied: REDACTED_EMAIL is not authorized to access prefix or name 'estuary/public/' with required capability admin",
+                "locations": [
+                  {
+                    "line": 2,
+                    "column": 3
+                  }
+                ],
+                "path": [
+                  "alertSubscriptions"
+                ]
+              }
+            ]
+          }

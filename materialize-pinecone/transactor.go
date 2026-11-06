@@ -1,10 +1,17 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
+	"net/http"
+	"slices"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
@@ -23,13 +30,19 @@ var (
 type transactor struct {
 	openAiClient *client.OpenAiClient
 	bindings     []binding
+	be           *m.BindingEvents
 
 	group    *errgroup.Group
 	groupCtx context.Context
+	// upserted is the number of vectors Pinecone reports having upserted per
+	// binding in the current Store, for the transaction health report.
+	upserted []atomic.Int64
 }
 
 type binding struct {
 	conn        *pinecone.IndexConnection
+	collection  string
+	path        []string
 	dataHeaders []string
 }
 
@@ -39,8 +52,14 @@ type upsertDoc struct {
 	metadata map[string]interface{}
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
@@ -54,8 +73,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	t.group, t.groupCtx = errgroup.WithContext(ctx)
 	t.group.SetLimit(concurrentWorkers)
+	t.upserted = make([]atomic.Int64, len(t.bindings))
+	round := it.Round
 
 	var batch []upsertDoc
+	// Largest serialized size of each field in the batch, to point at likely
+	// culprits if OpenAI rejects it.
+	fieldSizes := make(map[string]int)
 
 	lastBinding := -1
 	for it.Next(false) {
@@ -64,10 +88,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if it.Binding != lastBinding {
-			if err := t.sendBatch(t.bindings[lastBinding], batch); err != nil {
+			if err := t.sendBatch(lastBinding, batch, fieldSizes); err != nil {
 				return nil, fmt.Errorf("sending batch of documents: %w", err)
 			}
-			batch = nil
+			batch, fieldSizes = nil, make(map[string]int)
 			lastBinding = it.Binding
 		}
 
@@ -82,7 +106,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		embeddingInput, err := makeInput(data)
+		embeddingInput, err := makeInput(data, fieldSizes)
 		if err != nil {
 			return nil, err
 		}
@@ -97,26 +121,35 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		})
 
 		if len(batch) >= batchSize {
-			if err := t.sendBatch(b, batch); err != nil {
+			if err := t.sendBatch(it.Binding, batch, fieldSizes); err != nil {
 				return nil, fmt.Errorf("sending batch of documents: %w", err)
 			}
-			batch = nil
+			batch, fieldSizes = nil, make(map[string]int)
 		}
 	}
 
 	if len(batch) != 0 {
-		if err := t.sendBatch(t.bindings[lastBinding], batch); err != nil {
+		if err := t.sendBatch(lastBinding, batch, fieldSizes); err != nil {
 			return nil, fmt.Errorf("sending batch of documents: %w", err)
 		}
 	}
 
-	return nil, t.group.Wait()
+	if err := t.group.Wait(); err != nil {
+		return nil, err
+	}
+	for i, b := range t.bindings {
+		if n := t.upserted[i].Load(); n > 0 {
+			t.be.ReportRowStats(round, b.path, m.TotalRowStats(n))
+		}
+	}
+	return nil, nil
 }
 
 // The embedding input is an aggregate string of all included keys and values of the
 // materialization. It is arranged as "key: value" pairs on newlines with the value being the
-// stringified JSON-encoded of the field value.
-func makeInput(fields map[string]interface{}) (string, error) {
+// stringified JSON-encoded of the field value. The largest size of each field's value is recorded
+// in fieldSizes.
+func makeInput(fields map[string]interface{}, fieldSizes map[string]int) (string, error) {
 	var out strings.Builder
 
 	count := 0
@@ -132,6 +165,7 @@ func makeInput(fields map[string]interface{}) (string, error) {
 			return "", fmt.Errorf("serializing input field: %w", err)
 		}
 		out.WriteString(k + ": " + string(m))
+		fieldSizes[k] = max(fieldSizes[k], len(m))
 
 		count++
 		if count < len(fields) {
@@ -142,7 +176,27 @@ func makeInput(fields map[string]interface{}) (string, error) {
 	return out.String(), nil
 }
 
-func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
+// rejectedBatchError points at the largest document and fields of a batch that
+// OpenAI rejected, without any field values.
+func rejectedBatchError(b binding, batch []upsertDoc, fieldSizes map[string]int, err error) error {
+	largestDoc := slices.MaxFunc(batch, func(a, b upsertDoc) int { return cmp.Compare(len(a.input), len(b.input)) })
+	fields := slices.SortedFunc(maps.Keys(fieldSizes), func(a, b string) int {
+		return cmp.Or(cmp.Compare(fieldSizes[b], fieldSizes[a]), cmp.Compare(a, b))
+	})
+	var largestFields []string
+	for _, f := range fields[:min(3, len(fields))] {
+		largestFields = append(largestFields, fmt.Sprintf("%q (%d bytes)", f, fieldSizes[f]))
+	}
+
+	return fmt.Errorf(
+		"OpenAI rejected a batch of %d documents from collection %s, most likely because a document is over the embedding model's limit of 8192 tokens. "+
+			"The batch's largest document has vector ID %s (%d bytes) and its largest fields are %s; consider excluding large fields from this binding using field selection: %w",
+		len(batch), b.collection, largestDoc.key, len(largestDoc.input), strings.Join(largestFields, ", "), err,
+	)
+}
+
+func (t *transactor) sendBatch(idx int, batch []upsertDoc, fieldSizes map[string]int) error {
+	b := t.bindings[idx]
 	select {
 	case <-t.groupCtx.Done():
 		return t.group.Wait()
@@ -155,6 +209,10 @@ func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
 
 			embeddings, err := t.openAiClient.CreateEmbeddings(t.groupCtx, input)
 			if err != nil {
+				var statusErr *client.StatusError
+				if errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusBadRequest {
+					err = rejectedBatchError(b, batch, fieldSizes, err)
+				}
 				return fmt.Errorf("openAI creating embeddings: %w", err)
 			}
 
@@ -179,6 +237,8 @@ func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
 				return fmt.Errorf("pinecone upserting batch: %w", err)
 			} else if int(count) != len(batch) {
 				return fmt.Errorf("pinecone upserted %d vectors vs. expected %d", count, len(batch))
+			} else {
+				t.upserted[idx].Add(int64(count))
 			}
 			return nil
 		})

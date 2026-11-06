@@ -2,7 +2,7 @@
 acmeCo/test_capture/events
 
 === Run: With Invalid Config ===
-Error: flowctl preview failed: exit status 1
+Error: flowctl raw preview-next failed: exit status 1
 stderr: 2025-12-17T22:55:57.956874Z  WARN flowctl: You are not authenticated. Run `auth login` to login to Flow.
 2025-12-17T22:55:58.107594Z  WARN ops: time="2025-12-17T16:55:58-06:00" level=info msg="Initializing connector" eventType=connectorStatus fields={}
 2025-12-17T22:55:58.228167Z  WARN ops: time="2025-12-17T16:55:58-06:00" level=info msg="Initializing connector" eventType=connectorStatus fields={}

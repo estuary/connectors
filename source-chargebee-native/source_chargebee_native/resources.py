@@ -248,14 +248,11 @@ async def full_refresh_resources(
         available_resources.append(name)
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=ChargebeeResource,
             open=functools.partial(open_standalone, name),
-            initial_state=common.ResourceState(),
             initial_config=common.ResourceConfig(name=name, interval=timedelta(hours=1)),
-            schema_inference=True,
         )
         for name in available_resources
     ]
@@ -363,14 +360,11 @@ async def associated_full_refresh_resources(
         available_resources.append((name, association_config))
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=ChargebeeResource,
             open=functools.partial(open_child, association_config),
-            initial_state=common.ResourceState(),
             initial_config=common.ResourceConfig(name=name, interval=timedelta(minutes=2)),
-            schema_inference=True,
         )
         for name, association_config in available_resources
     ]

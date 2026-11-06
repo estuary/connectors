@@ -66,16 +66,42 @@
       ],
       "title": "Account",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Accounts"
     ]
   },
   {
-    "recommendedName": "Bill Payments",
+    "recommendedName": "Bill_Payments",
     "resourceConfig": {
-      "name": "Bill Payments",
+      "name": "Bill_Payments",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -139,10 +165,36 @@
       ],
       "title": "BillPayment",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Bill_Payments"
     ]
   },
   {
@@ -212,10 +264,36 @@
       ],
       "title": "Bill",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Bills"
     ]
   },
   {
@@ -285,10 +363,36 @@
       ],
       "title": "Budget",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Budgets"
     ]
   },
   {
@@ -358,16 +462,42 @@
       ],
       "title": "Class",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Classes"
     ]
   },
   {
-    "recommendedName": "Credit Memos",
+    "recommendedName": "Credit_Memos",
     "resourceConfig": {
-      "name": "Credit Memos",
+      "name": "Credit_Memos",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -431,10 +561,36 @@
       ],
       "title": "CreditMemo",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Credit_Memos"
     ]
   },
   {
@@ -504,10 +660,36 @@
       ],
       "title": "Customer",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Customers"
     ]
   },
   {
@@ -577,10 +759,36 @@
       ],
       "title": "Department",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Departments"
     ]
   },
   {
@@ -650,10 +858,36 @@
       ],
       "title": "Deposit",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Deposits"
     ]
   },
   {
@@ -723,10 +957,36 @@
       ],
       "title": "Employee",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Employees"
     ]
   },
   {
@@ -796,10 +1056,36 @@
       ],
       "title": "Estimate",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Estimates"
     ]
   },
   {
@@ -869,10 +1155,36 @@
       ],
       "title": "Invoice",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Invoices"
     ]
   },
   {
@@ -942,16 +1254,42 @@
       ],
       "title": "Item",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Items"
     ]
   },
   {
-    "recommendedName": "Journal Entries",
+    "recommendedName": "Journal_Entries",
     "resourceConfig": {
-      "name": "Journal Entries",
+      "name": "Journal_Entries",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1015,16 +1353,42 @@
       ],
       "title": "JournalEntry",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Journal_Entries"
     ]
   },
   {
-    "recommendedName": "Payment Methods",
+    "recommendedName": "Payment_Methods",
     "resourceConfig": {
-      "name": "Payment Methods",
+      "name": "Payment_Methods",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1088,10 +1452,36 @@
       ],
       "title": "PaymentMethod",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Payment_Methods"
     ]
   },
   {
@@ -1161,16 +1551,42 @@
       ],
       "title": "Payment",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Payments"
     ]
   },
   {
-    "recommendedName": "Purchase Orders",
+    "recommendedName": "Purchase_Orders",
     "resourceConfig": {
-      "name": "Purchase Orders",
+      "name": "Purchase_Orders",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1234,10 +1650,36 @@
       ],
       "title": "PurchaseOrder",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Purchase_Orders"
     ]
   },
   {
@@ -1307,16 +1749,42 @@
       ],
       "title": "Purchase",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Purchases"
     ]
   },
   {
-    "recommendedName": "Refund Receipts",
+    "recommendedName": "Refund_Receipts",
     "resourceConfig": {
-      "name": "Refund Receipts",
+      "name": "Refund_Receipts",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1380,16 +1848,42 @@
       ],
       "title": "RefundReceipt",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Refund_Receipts"
     ]
   },
   {
-    "recommendedName": "Sales Receipts",
+    "recommendedName": "Sales_Receipts",
     "resourceConfig": {
-      "name": "Sales Receipts",
+      "name": "Sales_Receipts",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1453,16 +1947,42 @@
       ],
       "title": "SalesReceipt",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Sales_Receipts"
     ]
   },
   {
-    "recommendedName": "Tax Agencies",
+    "recommendedName": "Tax_Agencies",
     "resourceConfig": {
-      "name": "Tax Agencies",
+      "name": "Tax_Agencies",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1526,16 +2046,42 @@
       ],
       "title": "TaxAgency",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tax_Agencies"
     ]
   },
   {
-    "recommendedName": "Tax Codes",
+    "recommendedName": "Tax_Codes",
     "resourceConfig": {
-      "name": "Tax Codes",
+      "name": "Tax_Codes",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1599,16 +2145,42 @@
       ],
       "title": "TaxCode",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tax_Codes"
     ]
   },
   {
-    "recommendedName": "Tax Rates",
+    "recommendedName": "Tax_Rates",
     "resourceConfig": {
-      "name": "Tax Rates",
+      "name": "Tax_Rates",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1672,10 +2244,36 @@
       ],
       "title": "TaxRate",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Tax_Rates"
     ]
   },
   {
@@ -1745,16 +2343,42 @@
       ],
       "title": "Term",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Terms"
     ]
   },
   {
-    "recommendedName": "Time Activities",
+    "recommendedName": "Time_Activities",
     "resourceConfig": {
-      "name": "Time Activities",
+      "name": "Time_Activities",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1818,10 +2442,36 @@
       ],
       "title": "TimeActivity",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Time_Activities"
     ]
   },
   {
@@ -1891,16 +2541,42 @@
       ],
       "title": "Transfer",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Transfers"
     ]
   },
   {
-    "recommendedName": "Vendor Credits",
+    "recommendedName": "Vendor_Credits",
     "resourceConfig": {
-      "name": "Vendor Credits",
+      "name": "Vendor_Credits",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1964,10 +2640,36 @@
       ],
       "title": "VendorCredit",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Vendor_Credits"
     ]
   },
   {
@@ -2037,10 +2739,36 @@
       ],
       "title": "Vendor",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/Id"
+    ],
+    "resourcePath": [
+      "Vendors"
     ]
   }
 ]

@@ -11,8 +11,11 @@ from estuary_cdk.http import HTTPMixin, TokenSource
 
 
 from .models import (
+    DEFAULT_CONCURRENCY,
+    DEFAULT_DISPUTES_CONCURRENCY,
+    DEFAULT_SNAPSHOT_CONCURRENCY,
     EndpointConfig,
-    ResourceConfigWithSchedule,
+    ResourceConfig,
     ResourceState,
     FullRefreshResource,
     IncrementalResource,
@@ -30,7 +33,6 @@ from .models import (
 )
 
 from .api import (
-    dt_to_str,
     fetch_transactions,
     backfill_transactions,
     fetch_incremental_resources,
@@ -114,7 +116,7 @@ def non_paginated_full_refresh_resources(
             response_model: type[NonPaginatedSnapshotResponse],
             gateway: BraintreeGateway,
             braintree_class: NonPaginatedSnapshotBraintreeClass,
-            binding: CaptureBinding[ResourceConfigWithSchedule],
+            binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -138,16 +140,13 @@ def non_paginated_full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, path, response_model, _create_gateway(config), braintree_class),
-            initial_state=ResourceState(),
-            initial_config=ResourceConfigWithSchedule(
-                name=name, interval=timedelta(minutes=5)
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5), concurrency=DEFAULT_SNAPSHOT_CONCURRENCY
             ),
-            schema_inference=True,
         )
         for (name, path, response_model, braintree_class) in NON_PAGINATED_FULL_REFRESH_RESOURCES
     ]
@@ -160,7 +159,7 @@ def paginated_full_refresh_resources(
     def open(
             snapshot_fn: SnapshotFn,
             gateway: BraintreeGateway,
-            binding: CaptureBinding[ResourceConfigWithSchedule],
+            binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -181,16 +180,13 @@ def paginated_full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, snapshot_fn, _create_gateway(config)),
-            initial_state=ResourceState(),
-            initial_config=ResourceConfigWithSchedule(
-                name=name, interval=timedelta(minutes=5)
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5), concurrency=DEFAULT_SNAPSHOT_CONCURRENCY
             ),
-            schema_inference=True,
         )
         for (name, snapshot_fn) in PAGINATED_FULL_REFRESH_RESOURCES
     ]
@@ -206,12 +202,13 @@ def incremental_resources(
             gateway: BraintreeGateway,
             braintree_class: IncrementalResourceBraintreeClass,
             window_size: int,
-            binding: CaptureBinding[ResourceConfigWithSchedule],
+            binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
             all_bindings,
     ):
+        concurrency = binding.resourceConfig.concurrency
         common.open_binding(
             binding,
             binding_index,
@@ -226,6 +223,7 @@ def incremental_resources(
                 gateway,
                 braintree_class,
                 window_size,
+                concurrency,
             ),
             fetch_page=functools.partial(
                 backfill_incremental_resources,
@@ -236,6 +234,8 @@ def incremental_resources(
                 gateway,
                 braintree_class,
                 window_size,
+                concurrency,
+                config.start_date,
             )
         )
 
@@ -249,10 +249,11 @@ def incremental_resources(
             open=functools.partial(open, path, response_model, _create_gateway(config), braintree_class, config.advanced.window_size),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+                backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
             ),
-            initial_config=ResourceConfigWithSchedule(
+            initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5), schedule="0 20 * * 5",
+                concurrency=DEFAULT_CONCURRENCY,
             ),
             schema_inference=True,
         )
@@ -267,12 +268,13 @@ def transactions(
     def open(
             gateway: BraintreeGateway,
             window_size: int,
-            binding: CaptureBinding[ResourceConfigWithSchedule],
+            binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
             all_bindings,
     ):
+        concurrency = binding.resourceConfig.concurrency
         common.open_binding(
             binding,
             binding_index,
@@ -284,6 +286,7 @@ def transactions(
                 base_url,
                 gateway,
                 window_size,
+                concurrency,
             ),
             fetch_page=functools.partial(
                 backfill_transactions,
@@ -291,6 +294,8 @@ def transactions(
                 base_url,
                 gateway,
                 window_size,
+                concurrency,
+                config.start_date,
             )
         )
 
@@ -303,10 +308,10 @@ def transactions(
         open=functools.partial(open, _create_gateway(config), config.advanced.window_size),
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfigWithSchedule(
-            name='transactions', interval=timedelta(minutes=5)
+        initial_config=ResourceConfig(
+            name='transactions', interval=timedelta(minutes=5), concurrency=DEFAULT_CONCURRENCY
         ),
         schema_inference=True,
     )
@@ -317,12 +322,13 @@ def disputes(
 
     def open(
             window_size: int,
-            binding: CaptureBinding[ResourceConfigWithSchedule],
+            binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
             all_bindings,
     ):
+        concurrency = binding.resourceConfig.concurrency
         common.open_binding(
             binding,
             binding_index,
@@ -333,12 +339,15 @@ def disputes(
                 http,
                 base_url,
                 window_size,
+                concurrency,
             ),
             fetch_page=functools.partial(
                 backfill_disputes,
                 http,
                 base_url,
                 window_size,
+                concurrency,
+                config.start_date,
             )
         )
 
@@ -351,10 +360,10 @@ def disputes(
         open=functools.partial(open, config.advanced.window_size),
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfigWithSchedule(
-            name='disputes', interval=timedelta(minutes=5)
+        initial_config=ResourceConfig(
+            name='disputes', interval=timedelta(minutes=5), concurrency=DEFAULT_DISPUTES_CONCURRENCY
         ),
         schema_inference=True,
     )

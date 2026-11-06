@@ -1,18 +1,26 @@
-package main
+package connector
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"go.gazette.dev/core/message"
 	"golang.org/x/sync/errgroup"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -20,6 +28,11 @@ import (
 const (
 	idField    = "_id"
 	idFieldAlt = "_flow" + idField
+
+	// publishedAtField holds a stored document's publication time as a BSON
+	// date, so that the documents published before a boundary can be
+	// selected by a query.
+	publishedAtField = "_flow_published_at"
 
 	batchByteLimit = 5 * 1024 * 1024
 
@@ -32,25 +45,94 @@ const (
 	// The default batchWriteLimit is 100,000 documents. Practically speaking we will be limited to
 	// less than that to keep connector memory usage reasonable.
 	storeBatchSize = 10_000
+
+	// maxStoreRetries bounds how many times a bulk write is attempted when items
+	// fail with a transient (retryable) write error.
+	maxStoreRetries = 5
 )
+
+// retryableWriteErrorCodes are MongoDB write error codes that are transient and
+// safe to retry by re-sending the affected models. Taken from the mongo-driver's
+// own retryableCodes set (x/mongo/driver/errors.go). Note that 11000 (E11000
+// duplicate key) is deliberately absent: a strict InsertOneModel on a !Exists
+// store is a tripwire, and a duplicate key must fail fast rather than retry.
+var retryableWriteErrorCodes = map[int]bool{
+	11600: true, // InterruptedAtShutdown
+	11602: true, // InterruptedDueToReplStateChange
+	10107: true, // NotWritablePrimary
+	13435: true, // NotPrimaryNoSecondaryOk
+	13436: true, // NotPrimaryOrSecondary
+	189:   true, // PrimarySteppedDown
+	91:    true, // ShutdownInProgress
+	7:     true, // HostNotFound
+	6:     true, // HostUnreachable
+	89:    true, // NetworkTimeout
+	9001:  true, // SocketException
+	262:   true, // ExceededTimeLimit
+}
 
 type transactor struct {
 	cfg      *config
 	client   *mongo.Client
 	bindings []*binding
+	be       *m.BindingEvents
+
+	// truncateAfterBackfill permits deleting the documents published before
+	// a completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion after this transaction's stores.
+	truncations map[int]time.Time
 }
 
 type binding struct {
 	collection   *mongo.Collection
+	path         []string
 	deltaUpdates bool
+	// keyRestorations holds, for each of the binding's key fields declared as
+	// JSON-schema integer (the only type whose stored precision needs
+	// restoring — see storeDocument), its index into a store's key tuple and
+	// parsed RFC6901 JSON pointer tokens. Key fields of other declared types
+	// are omitted so the per-document restore loop never re-derives their
+	// (never-integer) type.
+	keyRestorations []keyRestoration
+}
+
+// keyRestoration is a single entry of binding.keyRestorations. tupleIndex
+// indexes into a store's key tuple; tokens is the pre-parsed JSON pointer to
+// that key field's location in the stored document.
+type keyRestoration struct {
+	tupleIndex int
+	tokens     []string
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.deltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			logrus.WithFields(logrus.Fields{
+				"collection": b.path,
+				"boundary":   boundary,
+			}).Info("documents published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
@@ -135,7 +217,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		select {
 		case <-groupCtx.Done():
 			return group.Wait()
-		case sendBatches <- storeBatch{binding: lastBinding, models: batch}:
+		case sendBatches <- storeBatch{binding: lastBinding, round: it.Round, models: batch}:
 			batch = nil
 			batchSize = 0
 			return nil
@@ -157,22 +239,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			batch = append(batch, del)
 			batchSize += len(key)
 		} else {
-			var doc bson.M
-			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
-				return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
-			}
-			if idVal, ok := doc[idField]; ok {
-				// Preserve the original value of a collection field with a name
-				// that collides with the MongoDB _id field by materializing it
-				// with an alternate name.
-				doc[idFieldAlt] = idVal
-				delete(doc, idField)
-			}
-
-			// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
-			// _id for each record we insert
-			if !t.bindings[it.Binding].deltaUpdates {
-				doc[idField] = key
+			b := t.bindings[it.Binding]
+			doc, err := storeDocument(it.RawJSON, key, b.deltaUpdates, it.Key, b.keyRestorations)
+			if err != nil {
+				return nil, err
 			}
 
 			var m mongo.WriteModel
@@ -200,7 +270,36 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	close(sendBatches)
-	return nil, group.Wait()
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	// Truncations run after the stores, because a store of an existing
+	// document replaces it in place and would match nothing once deleted.
+	var truncations = t.truncations
+	t.truncations = nil
+	for binding, boundary := range truncations {
+		var b = t.bindings[binding]
+		// A BSON date holds milliseconds, so the boundary is floored to
+		// match the stored precision.
+		var before = primitive.NewDateTimeFromTime(boundary)
+		res, err := b.collection.DeleteMany(ctx, bson.D{{Key: "$or", Value: bson.A{
+			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$lt", Value: before}}}},
+			bson.D{{Key: publishedAtField, Value: bson.D{{Key: "$exists", Value: false}}}},
+		}}})
+		if err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.path, err)
+		}
+		logrus.WithFields(logrus.Fields{
+			"collection": b.path,
+			"boundary":   boundary,
+			"before":     before.Time().UTC(),
+			"deleted":    res.DeletedCount,
+		}).Info("truncated documents published before the backfill")
+		t.be.ReportRowStats(it.Round, b.path, m.ExactRowStats(0, 0, 0).WithTruncated(res.DeletedCount))
+	}
+
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {}
@@ -225,7 +324,8 @@ func (t *transactor) loadWorker(
 			}
 
 			if err := func() error { // Closure for the deferred cur.Close()
-				collection := t.bindings[batch.binding].collection
+				b := t.bindings[batch.binding]
+				collection := b.collection
 				cur, err := collection.Find(ctx, bson.D{{
 					Key:   idField,
 					Value: bson.D{{Key: "$in", Value: batch.keys}},
@@ -259,6 +359,7 @@ func (t *transactor) loadWorker(
 
 type storeBatch struct {
 	binding int
+	round   int
 	models  []mongo.WriteModel
 }
 
@@ -289,14 +390,27 @@ func (t *transactor) storeWorker(
 				}
 			}
 
-			collection := t.bindings[batch.binding].collection
+			b := t.bindings[batch.binding]
+			collection := b.collection
 
 			// Ordered operations are not needed since each key can only be seen a single time in a
 			// Flow transaction. Turning this off supposedly allows for optimizations by the server.
-			res, err := collection.BulkWrite(ctx, batch.models, options.BulkWrite().SetOrdered(false))
+			// Transient per-item write errors (e.g. a primary stepdown) are retried by re-sending
+			// only the failed models; a duplicate-key (E11000) is terminal and fails fast.
+			res, err := storeBulkWithRetry(ctx, batch.models, maxStoreRetries,
+				func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error) {
+					return collection.BulkWrite(ctx, models, options.BulkWrite().SetOrdered(false))
+				},
+				storeRetryDelay,
+			)
 			if err != nil {
 				return fmt.Errorf("bulk write for collection %s: %w", collection.Name(), err)
 			}
+
+			// Updates are reported as matched rather than modified for the same
+			// reason the sanity check below uses MatchedCount.
+			t.be.ReportRowStats(batch.round, b.path, m.ExactRowStats(
+				res.InsertedCount+res.UpsertedCount, res.MatchedCount, res.DeletedCount))
 
 			// Sanity check the result of the bulk write operation. For updated documents, we check
 			// MatchedCount instead of ModifiedCount since certain Flow reduction strategies can
@@ -331,7 +445,293 @@ func (t *transactor) storeWorker(
 	}
 }
 
+// classifyBulkErr inspects a BulkWrite error. It returns the first terminal
+// (non-retryable) error, if any, and the indices of models that failed with a
+// retryable write error. A terminal error takes precedence: when one is present
+// the caller should fail rather than retry. A non-BulkWriteException error
+// (transport/command level, which the driver has already retried per its own
+// retryable-write logic) and a write-concern error are both treated as terminal.
+func classifyBulkErr(err error) (terminal error, retryable []int) {
+	if err == nil {
+		return nil, nil
+	}
+
+	var bwe, ok = errors.AsType[mongo.BulkWriteException](err)
+	if !ok {
+		return err, nil
+	}
+	if bwe.WriteConcernError != nil {
+		return bwe, nil
+	}
+
+	for _, we := range bwe.WriteErrors {
+		if retryableWriteErrorCodes[we.Code] {
+			retryable = append(retryable, we.Index)
+		} else {
+			// First non-retryable item error (including E11000) wins.
+			return bwe, nil
+		}
+	}
+
+	return nil, retryable
+}
+
+// storeBulkWithRetry sends models via send and, if any models fail with a
+// retryable per-item write error, re-sends only those models after a delay, up
+// to maxAttempts times. Re-sending only the failed models is safe: a failed
+// model did not land, so it is never duplicated, and models that succeeded are
+// never re-sent. BulkWriteResult counts are accumulated across attempts so the
+// caller's sanity check sees the totals across the whole batch.
+func storeBulkWithRetry(
+	ctx context.Context,
+	models []mongo.WriteModel,
+	maxAttempts int,
+	send func(models []mongo.WriteModel) (*mongo.BulkWriteResult, error),
+	delay func(ctx context.Context, attempt int) error,
+) (*mongo.BulkWriteResult, error) {
+	pending := models
+	total := &mongo.BulkWriteResult{}
+
+	for attempt := 0; ; attempt++ {
+		res, err := send(pending)
+		if res != nil {
+			total.InsertedCount += res.InsertedCount
+			total.MatchedCount += res.MatchedCount
+			total.ModifiedCount += res.ModifiedCount
+			total.DeletedCount += res.DeletedCount
+			total.UpsertedCount += res.UpsertedCount
+		}
+
+		terminal, retryable := classifyBulkErr(err)
+		if terminal != nil {
+			return total, terminal
+		}
+		if len(retryable) == 0 {
+			return total, nil
+		}
+		if attempt+1 >= maxAttempts {
+			return total, fmt.Errorf("%d write models still failing after %d attempts: %w", len(retryable), attempt+1, err)
+		}
+
+		next := make([]mongo.WriteModel, len(retryable))
+		for i, idx := range retryable {
+			next[i] = pending[idx]
+		}
+		pending = next
+
+		if err := delay(ctx, attempt); err != nil {
+			return total, err
+		}
+	}
+}
+
+// storeRetryDelay waits before re-sending failed models, with exponential
+// backoff capped at 5s.
+func storeRetryDelay(ctx context.Context, attempt int) error {
+	d := time.Duration(1<<attempt) * time.Second
+	if d > 5*time.Second {
+		d = 5 * time.Second
+	}
+	logrus.WithFields(logrus.Fields{"attempt": attempt, "delay": d.String()}).
+		Info("waiting to retry transient bulk write error")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
+}
+
+// storeDocument builds the MongoDB document for a store from the raw Flow
+// document JSON. It renames any field colliding with MongoDB's reserved _id
+// field and, for standard updates, sets _id to the packed key.
+//
+// Integer key fields are restored to their exact values from the store's key
+// tuple: json.Unmarshal decodes JSON numbers as float64, which rounds integers
+// beyond 2^53, and because the runtime re-derives a store's key from the loaded
+// document body a rounded key field would no longer match — provoking a
+// duplicate-key crash loop. Non-key numbers are intentionally left as float64 so
+// a field's BSON type stays stable regardless of its value.
+func storeDocument(rawJSON json.RawMessage, idValue string, deltaUpdates bool, key tuple.Tuple, keyRestorations []keyRestoration) (bson.M, error) {
+	var doc bson.M
+	if err := json.Unmarshal(rawJSON, &doc); err != nil {
+		return nil, fmt.Errorf("unmarshalling json doc: %w", err)
+	}
+
+	// Renaming runs before key restoration below so a key pointer can be
+	// redirected to wherever its value actually ends up living.
+	_, hadIDCollision := doc[idField]
+	if hadIDCollision {
+		// Preserve the original value of a collection field with a name
+		// that collides with the MongoDB _id field by materializing it
+		// with an alternate name.
+		doc[idFieldAlt] = doc[idField]
+		delete(doc, idField)
+	}
+
+	// Restoring exact integer keys only matters for standard updates, where the
+	// runtime re-derives a store's key from the loaded document body. Delta
+	// updates never load documents and let MongoDB mint a fresh _id, so it is
+	// skipped there to avoid needlessly flipping a key field's BSON type from
+	// double to long. Only int64 values are restored; strings and booleans
+	// already decode exactly. keyRestorations is pre-filtered (see driver.go)
+	// to only the key fields declared as JSON-schema integer, so non-integer
+	// key fields never enter this loop.
+	if !deltaUpdates {
+		for _, kr := range keyRestorations {
+			if kr.tupleIndex >= len(key) {
+				return nil, fmt.Errorf("store key tuple has %d elements but binding declares a key field at index %d", len(key), kr.tupleIndex)
+			}
+			v, ok := key[kr.tupleIndex].(int64)
+			if !ok {
+				continue
+			}
+
+			// A key pointer of exactly /_id addresses the field the rename above
+			// just relocated to _flow_id; redirect there so the value lands where
+			// it now actually lives. A key pointer of exactly /_flow_id colliding
+			// with a renamed _id is irreconcilable: the document has both a
+			// literal _flow_id (the key) and a literal _id (an unrelated value
+			// the rename just pushed onto _flow_id), so there's no single
+			// location left to hold both — fail rather than let the rename
+			// silently clobber the key.
+			target := kr.tokens
+			if hadIDCollision && len(target) == 1 {
+				switch target[0] {
+				case idField:
+					target = []string{idFieldAlt}
+				case idFieldAlt:
+					return nil, fmt.Errorf("document has a field named %q which collides with the reserved name used to materialize its key %q", idField, idFieldAlt)
+				}
+			}
+
+			// Fast path for the overwhelmingly common case: a key at the
+			// document's root (a single pointer segment). This skips
+			// setAtPointer's generic tree walk, which is only needed when a
+			// key is nested under an object or array.
+			if len(target) == 1 {
+				doc[target[0]] = v
+				continue
+			}
+
+			if !setAtPointer(doc, target, v) {
+				return nil, fmt.Errorf("key field at pointer %v could not be located in the document body", target)
+			}
+		}
+	}
+
+	// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
+	// _id for each record we insert
+	if !deltaUpdates {
+		doc[idField] = idValue
+		if err := setPublishedAt(doc); err != nil {
+			return nil, err
+		}
+	}
+
+	return doc, nil
+}
+
+// setPublishedAt stores the publication time carried by the document's
+// /_meta/uuid under publishedAtField. A document without a UUID is stored
+// without the field.
+func setPublishedAt(doc bson.M) error {
+	if _, ok := doc[publishedAtField]; ok {
+		return fmt.Errorf("document has a field named %q which collides with the reserved name used to materialize its publication time", publishedAtField)
+	}
+	if meta, ok := doc["_meta"].(map[string]any); !ok {
+		return nil
+	} else if raw, ok := meta["uuid"].(string); !ok {
+		return nil
+	} else if id, err := uuid.Parse(raw); err != nil {
+		return fmt.Errorf("parsing /_meta/uuid %q: %w", raw, err)
+	} else {
+		doc[publishedAtField] = primitive.NewDateTimeFromTime(message.GetClock(id).AsTime())
+		return nil
+	}
+}
+
+// parsePointerTokens splits an RFC6901 JSON pointer into its decoded reference
+// tokens. It is computed once per binding (see binding.keyRestorations) so
+// that setAtPointer need not re-parse the pointer on every stored document.
+func parsePointerTokens(ptr string) []string {
+	if ptr == "" {
+		return nil
+	}
+
+	tokens := strings.Split(strings.TrimPrefix(ptr, "/"), "/")
+	for i, token := range tokens {
+		token = strings.ReplaceAll(token, "~1", "/")
+		tokens[i] = strings.ReplaceAll(token, "~0", "~")
+	}
+	return tokens
+}
+
+// setAtPointer writes val at the location addressed by the parsed JSON pointer
+// tokens within doc, traversing both JSON objects and arrays. It reports
+// whether the write succeeded; it fails (returns false) without altering doc
+// when the location is absent or a token does not address its parent's type,
+// rather than guessing and altering the document's shape.
+func setAtPointer(doc bson.M, tokens []string, val any) bool {
+	if len(tokens) == 0 {
+		return false
+	}
+
+	// Walk to the parent of the leaf. Objects decoded by json.Unmarshal are
+	// map[string]interface{} (the root is the equivalent bson.M) and arrays are
+	// []interface{}; slices are reference types, so writing back through the
+	// parent below is visible in doc.
+	var current any = map[string]interface{}(doc)
+	for _, token := range tokens[:len(tokens)-1] {
+		current = childAtToken(current, token)
+		if current == nil {
+			return false
+		}
+	}
+
+	leaf := tokens[len(tokens)-1]
+	switch parent := current.(type) {
+	case map[string]interface{}:
+		parent[leaf] = val
+		return true
+	case []interface{}:
+		if idx, ok := arrayIndex(leaf, len(parent)); ok {
+			parent[idx] = val
+			return true
+		}
+	}
+	return false
+}
+
+// childAtToken returns the child of node addressed by a single JSON pointer
+// token, or nil when node is neither an object nor an array or the token does
+// not address an existing element.
+func childAtToken(node any, token string) any {
+	switch n := node.(type) {
+	case map[string]interface{}:
+		return n[token]
+	case []interface{}:
+		if idx, ok := arrayIndex(token, len(n)); ok {
+			return n[idx]
+		}
+	}
+	return nil
+}
+
+// arrayIndex parses an RFC6901 array-index token and reports whether it is a
+// valid in-bounds index into a slice of the given length.
+func arrayIndex(token string, length int) (int, bool) {
+	idx, err := strconv.Atoi(token)
+	if err != nil || idx < 0 || idx >= length {
+		return 0, false
+	}
+	return idx, true
+}
+
 func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} {
+	// The publication time is the connector's own field, which the
+	// collection's schema may forbid.
+	delete(doc, publishedAtField)
 	if idValAlt, ok := doc[idFieldAlt]; ok {
 		// Reverse the renaming of a collection's _id field to _flow_id by
 		// putting the original value back as _id and removing the alternate
@@ -348,6 +748,15 @@ func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} 
 	return sanitizeDocumentInner(doc)
 }
 
+// sanitizeDocumentInner recurses through a loaded document's values, converting
+// any BSON double NaN to the string "NaN" (json.Marshal rejects NaN outright).
+// The mongo-driver decodes nested BSON sub-documents and arrays into the named
+// types primitive.M and primitive.A respectively, never plain
+// map[string]interface{} or []interface{}, so both the named and plain forms
+// are matched here: a type switch only matches the exact dynamic type, and
+// named/unnamed forms of the same underlying type are distinct for that
+// purpose. The plain forms are kept so this is also callable with
+// hand-constructed maps/slices, e.g. from tests.
 func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 	for key, value := range doc {
 		switch v := value.(type) {
@@ -357,8 +766,35 @@ func sanitizeDocumentInner(doc map[string]interface{}) map[string]interface{} {
 			}
 		case map[string]interface{}:
 			doc[key] = sanitizeDocumentInner(v)
+		case primitive.M:
+			doc[key] = sanitizeDocumentInner(v)
+		case primitive.A:
+			doc[key] = sanitizeArrayInner(v)
+		case []interface{}:
+			doc[key] = sanitizeArrayInner(v)
 		}
 	}
 
 	return doc
+}
+
+// sanitizeArrayInner is sanitizeDocumentInner's counterpart for array elements.
+func sanitizeArrayInner(arr []interface{}) []interface{} {
+	for i, value := range arr {
+		switch v := value.(type) {
+		case float64:
+			if math.IsNaN(v) {
+				arr[i] = "NaN"
+			}
+		case map[string]interface{}:
+			arr[i] = sanitizeDocumentInner(v)
+		case primitive.M:
+			arr[i] = sanitizeDocumentInner(v)
+		case primitive.A:
+			arr[i] = sanitizeArrayInner(v)
+		case []interface{}:
+			arr[i] = sanitizeArrayInner(v)
+		}
+	}
+	return arr
 }

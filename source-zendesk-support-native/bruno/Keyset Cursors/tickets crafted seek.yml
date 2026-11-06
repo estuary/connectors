@@ -1,0 +1,333 @@
+info:
+  name: tickets crafted seek
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?sort={{seek_sort}}&page[size]=100&page[after]={{crafted_cursor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Build a keyset cursor from plain values instead of one Zendesk returned:
+        // base64(JSON {"o": <order>, "v": base64(type byte + int64 LE, ...)}), with
+        // type 'd' = epoch-seconds updated_at and 'i' = id. Not a credential, so a
+        // runtime var is fine.
+        const T = BigInt(bru.getEnvVar('seek_updated_at'));
+        const id = BigInt(bru.getEnvVar('seek_id'));
+        const order = bru.getEnvVar('seek_order');
+        const buf = Buffer.alloc(18);
+        buf.write('d', 0); buf.writeBigInt64LE(T, 1);
+        buf.write('i', 9); buf.writeBigInt64LE(id, 10);
+        const cursor = Buffer.from(JSON.stringify({ o: order, v: buf.toString('base64') })).toString('base64');
+        bru.setVar('crafted_cursor', cursor);
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - seek (1778249334, 0): inclusive of that second (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSGJ1L1drQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "16"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99999; resets=16"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 3,
+                "updated_at": "2026-05-08T14:08:54Z",
+                "status": "open"
+              },
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 44,
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open"
+              },
+              {
+                "id": 45,
+                "updated_at": "2026-07-14T22:31:08Z",
+                "status": "open"
+              },
+              {
+                "id": 46,
+                "updated_at": "2026-08-20T21:36:36Z",
+                "status": "open"
+              },
+              {
+                "id": 47,
+                "updated_at": "2026-09-23T22:12:34Z",
+                "status": "open"
+              },
+              {
+                "id": 41,
+                "updated_at": "2026-10-07T15:54:20Z",
+                "status": "open"
+              },
+              {
+                "id": 49,
+                "updated_at": "2026-10-07T15:55:19Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaR2RyeG1vQUFBQUFhUlJWc0hkck1RQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSGJ1L1drQUFBQUFhWlR2VjlnNUdnQUEifQ=="
+            }
+          }
+  - name: "200 - seek (1778249334, int64 max): skips that second (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSGJ1L1drQUFBQUFhZi8vLy8vLy8vOS8ifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "13"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99998; resets=13"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 2,
+                "updated_at": "2026-05-08T15:00:15Z",
+                "status": "open"
+              },
+              {
+                "id": 44,
+                "updated_at": "2026-06-12T22:40:10Z",
+                "status": "open"
+              },
+              {
+                "id": 45,
+                "updated_at": "2026-07-14T22:31:08Z",
+                "status": "open"
+              },
+              {
+                "id": 46,
+                "updated_at": "2026-08-20T21:36:36Z",
+                "status": "open"
+              },
+              {
+                "id": 47,
+                "updated_at": "2026-09-23T22:12:34Z",
+                "status": "open"
+              },
+              {
+                "id": 41,
+                "updated_at": "2026-10-07T15:54:20Z",
+                "status": "open"
+              },
+              {
+                "id": 49,
+                "updated_at": "2026-10-07T15:55:19Z",
+                "status": "open"
+              }
+            ],
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaR2RyeG1vQUFBQUFhUlJWc0hkck1RQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSC82L1drQUFBQUFhWlExc2RnNUdnQUEifQ=="
+            }
+          }
+  - name: "200 - descending seek with order -updated_at,-id (projection)"
+    request:
+      url: "{{base_url}}/tickets?sort=-updated_at&page[size]=100&page[after]=eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpIYnUvV2tBQUFBQWFRQUFBQUFBQUFBQSJ9"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "696"
+        - name: "ratelimit-remaining"
+          value: "696"
+        - name: "ratelimit-reset"
+          value: "7"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99997; resets=7"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 1,
+                "updated_at": "2026-05-08T14:08:44Z",
+                "status": "open"
+              },
+              {
+                "id": 43,
+                "updated_at": "2026-05-06T21:55:52Z",
+                "status": "open"
+              },
+              {
+                "id": 42,
+                "updated_at": "2026-04-30T14:53:34Z",
+                "status": "open"
+              },
+              {
+                "id": 40,
+                "updated_at": "2026-03-05T13:37:54Z",
+                "status": "open"
+              },
+              {
+                "id": 39,
+                "updated_at": "2026-03-04T12:55:46Z",
+                "status": "open"
+              }
+            ],
+            "tickets_total": 35,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpNN0RvMllBQUFBQWFaUmJ2dGs1R2dBQSJ9",
+              "before_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpHenUvV2tBQUFBQWFaUU9qZFk1R2dBQSJ9"
+            }
+          }
+  - name: "200 - seek past newest record: empty, after_cursor null"
+    request:
+      url: "{{base_url}}/tickets?sort=updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSURZMjNBQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "694"
+        - name: "ratelimit-remaining"
+          value: "694"
+        - name: "ratelimit-reset"
+          value: "2"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99995; resets=2"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [],
+            "meta": {
+              "has_more": false,
+              "after_cursor": null,
+              "before_cursor": null
+            }
+          }
+  - name: "400 - cursor order updated_at,id with sort=-updated_at"
+    request:
+      url: "{{base_url}}/tickets?sort=-updated_at&page[size]=100&page[after]=eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaSGJ1L1drQUFBQUFhUUFBQUFBQUFBQUEifQ=="
+      method: GET
+    response:
+      status: 400
+      statusText: "Bad Request"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "695"
+        - name: "ratelimit-remaining"
+          value: "695"
+        - name: "ratelimit-reset"
+          value: "4"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99996; resets=4"
+      body:
+        type: json
+        data: |-
+          {
+            "error": "InvalidPaginationParameter",
+            "description": "page[after] is not valid"
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** Tests whether a cursor built from `(seek_updated_at, seek_id)` is accepted,
+  so the connector could resume or seek from values it derives from documents
+  instead of storing Zendesk's opaque token. With `seek_id=0` it should return every
+  ticket with `updated_at >= seek_updated_at`; with `seek_id` at the int64 max it
+  should skip that second. `seek_order` must match `seek_sort`
+  (`updated_at,id` for `sort=updated_at`).
+
+  **VERIFIED (2026-10-07):** a cursor built by the client is accepted. The format is
+  `base64(JSON {"o": <order>, "v": base64(type byte + int64 little-endian, ...)})`,
+  with `d` = epoch-seconds `updated_at` and `i` = id. It decodes identically to every
+  cursor Zendesk returned in this collection.
+
+  - `(T, 0)` returns every ticket with `updated_at >= T` in ascending order: ticket 3,
+    updated exactly at T, is included.
+  - `(T, int64 max)` skips second T.
+  - Descending order works with `o: "-updated_at,-id"`.
+  - A cursor whose order doesn't match `sort` is rejected loudly with
+    `400 InvalidPaginationParameter`.
+  - Seeking past the newest record returns an empty page with `has_more: false` and
+    `after_cursor: null`. A connector storing returned cursors must keep its previous
+    cursor when a page comes back empty.
+
+  **LIMITATION (VERIFIED 2026-10-07):** the ticket tie-break id is an internal id that ticket
+  responses don't expose anywhere (ticket 47's is 53872748729108). A client-built ticket
+  cursor can only seek to the start or end of a second. To resume mid-second,
+  use the internal id decoded from a returned `after_cursor`
+  (`Keyset Cursors / tickets mid-second resume`).
+
+  **UNOBSERVABLE:** the cursor format is undocumented and could change. The failure
+  mode observed for an unusable cursor is a loud 400, not silent misbehavior.

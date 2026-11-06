@@ -250,14 +250,18 @@ async def fetch_incremental_resources(
 async def backfill_incremental_resources(
     http: HTTPSession,
     model: type[IncrementalStream],
+    start_date: datetime,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[IncrementalStream | PageCursor, None]:
     assert isinstance(cutoff, datetime)
-    assert isinstance(page, str)
 
-    start = str_to_dt(page)
+    if page is None:
+        start = start_date
+    else:
+        assert isinstance(page, str)
+        start = str_to_dt(page)
 
     if start >= cutoff:
         return

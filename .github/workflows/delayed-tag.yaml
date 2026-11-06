@@ -1,0 +1,285 @@
+name: Delayed tag
+
+# Publish a ':delayed' image tag for each connector, pointing at the most
+# recent pull-request affecting that connector that was merged into `main` at
+# least 2 weeks ago AND whose merge has not since been reverted on `main`.
+#
+# The boundary is per-connector: an idle connector keeps a stable ':delayed'
+# tag even when other connectors are seeing churn. The unit is the PR (not the
+# commit): the repo uses rebase-and-merge, so a single PR's commits land on
+# main as a linear sequence of N commits, and mid-PR states may not build or
+# behave correctly. We always pin ':delayed' to a PR's tip commit on main
+# (`mergeCommit.oid`), which is what CI built and pushed to GHCR.
+#
+# After picking a candidate PR per connector we also ask Claude Sonnet to
+# check whether any *later* PR touching the same directory is a roll-forward
+# fix of the candidate — i.e. a hotfix patching a regression the candidate
+# introduced. Connectors where Claude returns "hold" are excluded from
+# tagging: ':delayed' is supposed to be more stable, so we must not knowingly
+# ship a bug that was already fixed in a subsequent PR.
+#
+# Finally, a guard step drops any connector whose boundary is not provably
+# newer than (or the same as) the commit ':delayed' already points at, so a
+# nightly run never moves ':delayed' backward — in particular it never silently
+# undoes a deliberate forward-delayed-tag.yaml fast-forward.
+#
+# Core logic lives in .github/scripts/delayed_tag.py (unit-tested via
+# test_delayed_tag.py). This workflow handles auth, docker setup, and the
+# final tag + DB refresh that require secrets.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  # Shared with the manual forward-delayed-tag workflow so the two never race
+  # on the same ':delayed' tag / DB rows.
+  group: delayed-tag
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish_delayed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history is required: the plan step walks first-parent commits
+          # per connector directory and checks for revert references on main.
+          fetch-depth: 0
+
+      - name: Login to GitHub package docker registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Run unit tests
+        run: cd .github/scripts && python3 -m unittest test_delayed_tag -v
+
+      - name: Plan per-connector delayed PR boundaries
+        # Reads the connector lists in .github/, fetches merged
+        # PRs from GitHub, and for each connector selects the most recent PR
+        # that (a) touched the connector's directory, (b) merged >= 14 days ago,
+        # and (c) has not been reverted on main.
+        # Writes: /tmp/plan.tsv  (image, sha7, pr_num, source_dir)
+        #         /tmp/later.tsv (image, pr_num) — PRs merged after the boundary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 .github/scripts/delayed_tag.py plan
+
+      - name: Restore roll-forward verdict cache
+        # A verdict is determined by (CHOSEN PR, source dir, LATER-PR set), all
+        # of which are stable for an idle connector from one night to the next.
+        # Restoring the prior run's verdicts lets the check step reuse them and
+        # only call Claude for connectors that actually moved. The key is unique
+        # per run (so each run saves a fresh entry); restore-keys falls back to
+        # the most recent prior save.
+        uses: actions/cache/restore@v4
+        with:
+          path: verdict-cache
+          key: delayed-verdict-${{ github.run_id }}
+          restore-keys: |
+            delayed-verdict-
+
+      - name: Check for roll-forward fixes via Claude
+        # For each connector that has LATER PRs, ask Claude Sonnet whether any
+        # LATER PR is a roll-forward fix of the CHOSEN PR (i.e. it patches a
+        # regression introduced by CHOSEN). Connectors flagged "hold" are
+        # excluded from /tmp/safe_plan.tsv so they don't get tagged.
+        # Reuses any unchanged verdict from verdict-cache/verdict_cache.json
+        # (restored above) instead of re-calling Claude.
+        # Writes: /tmp/safe_plan.tsv      (image, sha7) — connectors to tag
+        #         /tmp/claude_verdicts.tsv (image, verdict, reason)
+        #         verdict-cache/verdict_cache.json — verdicts for the next run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          python3 .github/scripts/delayed_tag.py check
+          --verdict-cache verdict-cache/verdict_cache.json
+
+      - name: Save roll-forward verdict cache
+        # Always save: the check step rewrites the cache with this run's
+        # verdicts (dropping connectors no longer in the plan), and on a crash
+        # the restored copy is preserved under the new key so it isn't lost.
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: verdict-cache
+          key: delayed-verdict-${{ github.run_id }}
+
+      - name: Guard against moving ':delayed' backward
+        # Drop any connector whose 2-week boundary isn't newer than the image
+        # ':delayed' already points at — otherwise a nightly run silently undoes
+        # a deliberate forward-delayed-tag.yaml fast-forward. Resolves the
+        # current ':delayed' commit per connector from its revision label and
+        # compares it against the boundary in git history.
+        # Reads:  /tmp/safe_plan.tsv
+        # Writes: /tmp/final_plan.tsv      (image, sha7) — entries safe to tag
+        #         /tmp/backward_skips.tsv  (image, boundary_sha7, current_sha7)
+        run: python3 .github/scripts/delayed_tag.py guard
+
+      - name: Tag images as ':delayed'
+        run: |
+          set -uo pipefail
+          tagged=0; missing=0; failed=0
+          : > /tmp/tagged.txt
+          : > /tmp/missing.txt
+          while IFS=$'\t' read -r IMAGE SHA; do
+            [ -z "${IMAGE}" ] && continue
+            SRC="ghcr.io/estuary/${IMAGE}:${SHA}"
+            DST="ghcr.io/estuary/${IMAGE}:delayed"
+            # `docker buildx imagetools create --tag DST SRC` is a manifest-only
+            # operation that creates DST pointing at the same digest as SRC. No
+            # image layers are downloaded or re-uploaded. It also fails fast
+            # when SRC is missing from the registry.
+            if ! docker buildx imagetools inspect "${SRC}" >/dev/null 2>&1; then
+              echo "skip ${IMAGE}: no image at ${SHA} (may have been pruned from registry)"
+              printf '%s\t%s\n' "${IMAGE}" "${SHA}" >> /tmp/missing.txt
+              missing=$((missing + 1))
+              continue
+            fi
+            if docker buildx imagetools create --tag "${DST}" "${SRC}" >/dev/null; then
+              echo "tagged ${DST} -> ${SHA}"
+              echo "${IMAGE}" >> /tmp/tagged.txt
+              tagged=$((tagged + 1))
+            else
+              echo "::warning::failed to tag ${IMAGE}"
+              failed=$((failed + 1))
+            fi
+          done < /tmp/final_plan.tsv
+          echo "Summary: tagged=${tagged} missing=${missing} failed=${failed}"
+          if [ "${failed}" -gt 0 ]; then
+            exit 1
+          fi
+
+      # Re-queue the ':delayed' connector tags over PostgREST (HTTPS) instead of a
+      # direct psql connection from CI.
+      - name: Re-queue connector_tags rows for ':delayed'
+        env:
+          RT_ID: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
+          RT_SECRET: ${{ secrets.CONNECTOR_REFRESH_RT_SECRET }}
+        run: |
+          set -euo pipefail
+          SUPABASE_URL="https://eyrcnmuzzyriypdajwdk.supabase.co"
+          # Public anon key, used only as the PostgREST apikey header.
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cmNubXV6enlyaXlwZGFqd2RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDg3NTA1NzksImV4cCI6MTk2NDMyNjU3OX0.y1OyXD3-DYMz10eGxzo1eeamVMMUwIIeOoMryTRAoco"
+
+          access_token=$(curl -sS -X POST "$SUPABASE_URL/rest/v1/rpc/generate_access_token" \
+            -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+            -d "{\"refresh_token_id\": \"$RT_ID\", \"secret\": \"$RT_SECRET\"}" | jq -r '.access_token')
+          if [ -z "$access_token" ] || [ "$access_token" = "null" ]; then
+            echo "failed to obtain control-plane access token"; exit 1
+          fi
+
+          while IFS= read -r IMAGE; do
+            [ -z "${IMAGE}" ] && continue
+            curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/requeue_connector_tag" \
+              -H "apikey: $ANON_KEY" -H "Authorization: Bearer $access_token" \
+              -H "Content-Type: application/json" \
+              -d "{\"image_name\": \"ghcr.io/estuary/${IMAGE}\", \"image_tags\": [\":delayed\"]}"
+          done < /tmp/tagged.txt
+
+      - name: Write job summary
+        if: always()
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          {
+            echo "## Delayed Tag Run — $(date -u '+%Y-%m-%d')"
+            echo ""
+
+            TAGGED_COUNT=$(wc -l < /tmp/tagged.txt 2>/dev/null | tr -d ' ') || TAGGED_COUNT=0
+            HELD_COUNT=$(wc -l < /tmp/claude_verdicts.tsv 2>/dev/null \
+              | tr -d ' ') || HELD_COUNT=0
+            MISSING_COUNT=$(wc -l < /tmp/missing.txt 2>/dev/null | tr -d ' ') || MISSING_COUNT=0
+
+            echo "| | Count |"
+            echo "|---|---|"
+            echo "| ✅ Tagged | ${TAGGED_COUNT} |"
+            echo "| ⚪ Missing from registry | ${MISSING_COUNT} |"
+            echo ""
+
+            if [ "${TAGGED_COUNT}" -gt 0 ]; then
+              echo "### ✅ Tagged"
+              echo ""
+              echo "| Connector | PR | SHA |"
+              echo "|-----------|-----|-----|"
+              while IFS= read -r IMAGE; do
+                [ -z "${IMAGE}" ] && continue
+                # Look up PR and SHA from plan.tsv (image, sha7, pr_num, source_dir).
+                PR_NUM=$(awk -F'\t' -v img="${IMAGE}" '$1==img{print $3; exit}' /tmp/plan.tsv)
+                SHA=$(awk -F'\t' -v img="${IMAGE}" '$1==img{print $2; exit}' /tmp/plan.tsv)
+                echo "| \`${IMAGE}\` | [#${PR_NUM}](https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUM}) | \`${SHA}\` |"
+              done < /tmp/tagged.txt
+              echo ""
+            fi
+
+            if [ -s /tmp/claude_verdicts.tsv ]; then
+              HOLD_COUNT=$(awk -F'\t' '$2=="hold"' /tmp/claude_verdicts.tsv | wc -l | tr -d ' ')
+              if [ "${HOLD_COUNT}" -gt 0 ]; then
+                echo "### 🔶 Held by Claude"
+                echo ""
+                echo "| Connector | Reason |"
+                echo "|-----------|--------|"
+                awk -F'\t' '$2=="hold"{print "| `" $1 "` | " $3 " |"}' /tmp/claude_verdicts.tsv
+                echo ""
+              fi
+            fi
+
+            if [ -s /tmp/check_failures.tsv ]; then
+              echo "### ⚠️ Roll-forward check failed (held)"
+              echo ""
+              echo "Claude could not be consulted for these connectors (e.g. an"
+              echo "over-long prompt or a persistent API error), so they were held"
+              echo "rather than tagged. They are re-checked on the next run; a"
+              echo "connector that stays here needs investigation."
+              echo ""
+              echo "| Connector | Error |"
+              echo "|-----------|-------|"
+              while IFS=$'\t' read -r IMAGE ERROR; do
+                [ -z "${IMAGE}" ] && continue
+                echo "| \`${IMAGE}\` | ${ERROR} |"
+              done < /tmp/check_failures.tsv
+              echo ""
+            fi
+
+            if [ -s /tmp/backward_skips.tsv ]; then
+              echo "### ⏪ Held to avoid moving \`:delayed\` backward"
+              echo ""
+              echo "These connectors' 2-week boundary is not newer than the image"
+              echo "\`:delayed\` already points at (e.g. a forward-delayed-tag"
+              echo "fast-forward), so they were left untouched."
+              echo ""
+              echo "| Connector | Boundary (skipped) | Current \`:delayed\` |"
+              echo "|-----------|--------------------|---------------------|"
+              while IFS=$'\t' read -r IMAGE BOUNDARY CURRENT; do
+                [ -z "${IMAGE}" ] && continue
+                echo "| \`${IMAGE}\` | \`${BOUNDARY}\` | \`${CURRENT}\` |"
+              done < /tmp/backward_skips.tsv
+              echo ""
+            fi
+
+            if [ "${MISSING_COUNT}" -gt 0 ]; then
+              echo "### ⚪ Missing from registry"
+              echo ""
+              echo "| Connector | SHA |"
+              echo "|-----------|-----|"
+              while IFS=$'\t' read -r IMAGE SHA; do
+                [ -z "${IMAGE}" ] && continue
+                echo "| \`${IMAGE}\` | \`${SHA}\` |"
+              done < /tmp/missing.txt
+              echo ""
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"

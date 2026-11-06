@@ -1,6 +1,6 @@
 database: ci_testing
 schema: main
-token_sops: ENC[AES256_GCM,data:zJKezW9wWrmo5uZHt3BK/P5AWm6dIWnskg3KTh38q9v5O/w/LsVaSH+WVP+hT92zBF8wl83Q02reRcz3VUK1ma0bNkONkj9u2VPQb16TdlRp0f2lG1SOPcDP/1VhSpnoeRo9DFxsejg3+AwfMbkkTX2iCIZL59+yzFEX6PwRNsih1rtxR66MsjuPyFfspIKaxN1MXDpAUi1ESi1CvSB2N7bUtghLQ6n+87fIJ04FcVFwRUfuOPkdxC9ONNoJi/evha5cvfncZ8jOap8fwC1AjNY/5b13E5kEixmIAryWcnhydg5sgufFGsi6WMTMhMzb+4qkZGcuTd953KF3jGtf5qo6vcku8lYN8KUtTlTZb3WldILNO6Lu0/10s718BxR3n71qKGYmThFWwaeguFHbT79fS+/ffFeenx4ReoffAM+GS4DrWH5B/h7VmjqyHtvU3lOi,iv:u2LmumgY2AOqDd57vagcSbRPc13R6UfQyopX+kK/QHI=,tag:PHuliexX5UNKzcOCVvsuJg==,type:str]
+token_sops: ENC[AES256_GCM,data:t9Q/nNd0SoP15brRAEkzY+KtX6p2p+XBZhmxOtvTs7hieqhZNbbkwr+rCcKIjDkxlcYR+P9Vuc1w8ffy5JqbRb3doft0WKzM9a3ukSR6flPvyPuLRs7McbSZgEX5sGlIf9t+cPlEdQqa54/6LNQ4PcaJB35MSvokhs9icX5E9pufZn5+Lzr6vjMP6bwt5WhcwpzR2Fz1sN2GBZQjhgC/5GrB6DrVbGcPROF51n8UtfkbuCbbkUHA/OTqrGFcnuQjjot3hJHoJO8qOpuhfgGebbYT5diD2Saok0QSfSh/KpQ1zQXuBQeEjJtl28bqiAnvIc5hk4yFfrrcIMtXjoVfIM1Qy+touonfV7JwmbsYpb/G4sFkuETrDz9Y7+ngWMFUHzYmZJ8cu6PcOPkXfAspLoqb/4L6yRd4oCmB52TF3BSle6lgD4d8pIIPQPnB9QP5lV8GdbDcelnpjojMXh1SgFBGopjagYyGnHySJVJPB5E7zoYU4q9VhDS4p+JG03IOMMN+f48wSTe91HGsJzNoOucpuecQOcu/t4I+r4qn1MrFvN+wOjtRHbtBrIvqCUjc9QXtbUbbWo+vpKh2xRnmq8UtaBmY0MggGj99ZtAh/r0NFD7kWr/vrpMYofSlJPoyVO21gK+0a715nSjXjtaPODl+wkaWEb6/66ySvHB5DfxLIm5Cwx8bw4hK2BEjMW+X1w9jJ6jzNQ==,iv:SLJakyqQEsu/Z7SlD9G9/OvY3fulqL8ITK411HPoEIE=,tag:uE2LTxtc7DrXaBcAzlfkMA==,type:str]
 hardDelete: true
 stagingBucket:
     stagingBucketType: S3
@@ -13,16 +13,11 @@ syncSchedule:
 advanced:
     feature_flags: allow_existing_tables_for_new_bindings
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-05-23T21:25:19Z"
           enc: CiQAdmEdwuYd5dgBmZKmE/v2/ebAF9rqZVtWs48HNDf1NOr11gQSSQCSobQjWx53iByTq/afJbpWDsWW4U67+LzfXRO15Ui1vpC2UaJKz58rMXUjoTy/umt1ftuZxKhaa9BzrLWfwLUvKCuBivYAwwA=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-09-03T20:22:20Z"
-    mac: ENC[AES256_GCM,data:HV1nS9/BAxioJNKTjGSI/vCu9D9eS3EDfx4qIE1u0SWH38PGTTxm0fbWXbVg6806jvHSqxiH7BhJAaUFWpGPAKxwsQD0oJ1ygUzrkRxMjTdb7EU0DVFx0QMN3hMBAdYNiXNNRNf1aNWwtut0fTYQqfVk5pS9xYSx9ifNUNGQAHw=,iv:7QQieLRjo+ridaeIfZXcS7KHmgEBEam7zBGUrOPba1A=,tag:lQlUVt1UdgzqDlsEPUYFTg==,type:str]
-    pgp: []
+    lastmodified: "2026-10-08T16:30:18Z"
+    mac: ENC[AES256_GCM,data:byZteM3+TPzR1ykmhonz3aE1xPFsB+TY+piZSexrmLKFS90gODef6V8/hig8QlSfZXNnE+ZWntdGsyaqDVKSJnigESGYsrkK+dEHTbGWZgEc5MkwW6md+BxEMK8V+lKbzrVflUsWjG+/zDMEXkPF55EAE7YO8A5ahfMkKYyEwdw=,iv:rjG+TNZ1VAGCBOndU601CJXvKOnUTYnDGuYOpaOB/Vg=,tag:CUjh8WKf4vAiS8PLTtDVhQ==,type:str]
     encrypted_suffix: _sops
     version: 3.9.4

@@ -6,3 +6,11 @@ materializations:
         protobuf: true
         config: .local/config.rest-local.yaml
     bindings: []
+
+  acmeCo/tests/materialize-iceberg/rest-local-spark4:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: .local/config.rest-local-spark4.yaml
+    bindings: []

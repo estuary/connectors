@@ -1,0 +1,37 @@
+collections:
+  acmeCo/calls:
+    schema: calls.schema.yaml
+    key:
+    - /id
+  acmeCo/company:
+    schema: company.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/contacts:
+    schema: contacts.schema.yaml
+    key:
+    - /id
+  acmeCo/numbers:
+    schema: numbers.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/tags:
+    schema: tags.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/teams:
+    schema: teams.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/user_availability:
+    schema: user_availability.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/webhooks:
+    schema: webhooks.schema.yaml
+    key:
+    - /_meta/row_id

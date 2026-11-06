@@ -14,7 +14,7 @@ from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http.auth import BasicHttpAuthenticator
 from airbyte_cdk.utils.traced_exception import AirbyteTracedException
 from datetime import datetime
-from pydantic.error_wrappers import ValidationError
+from pydantic import ValidationError
 
 from .streams import (
     ApplicationRoles,

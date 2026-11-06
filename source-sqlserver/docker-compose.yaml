@@ -16,8 +16,19 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_AGENT_ENABLED: "true"
     healthcheck:
-      test: "true"
-      interval: 30s
+      # The entrypoint starts sqlservr in the background and then runs the
+      # initialization SQL against it, so the server accepts connections well
+      # before setup has finished: `CREATE DATABASE test` is the first
+      # statement and the CDC configuration comes after it -- roughly ten
+      # seconds after, which is ten seconds of tests running against a server
+      # whose capture jobs aren't started yet.
+      # Gate on the marker file the entrypoint touches once it is done, and on
+      # a live connection, so that a container reusing an already-initialized
+      # volume still waits for the server itself to come up.
+      test: ["CMD-SHELL", "test -e /var/opt/mssql/initdb-performed && /opt/mssql-tools18/bin/sqlcmd -C -U sa -P gf6w6dkD -Q 'SELECT 1'"]
+      interval: 2s
+      timeout: 10s
+      retries: 60
     networks:
       - flow-test
 

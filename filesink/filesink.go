@@ -67,11 +67,11 @@ type StreamWriter interface {
 	Close() error
 }
 
-type resource struct {
+type Resource struct {
 	Path string `json:"path" jsonschema:"title=Path,description=The path that objects will be materialized to." jsonschema_extras:"x-collection-name=true"`
 }
 
-func (r resource) Validate() error {
+func (r Resource) Validate() error {
 	if r.Path == "" {
 		return fmt.Errorf("missing 'path'")
 	}
@@ -87,14 +87,14 @@ func (fc fieldConfig) Validate() error {
 	return nil
 }
 
-var _ boilerplate.Connector = &FileDriver[*SinglePhase]{}
+var _ boilerplate.Connector = &FileDriver[*SinglePhase, Resource]{}
 
 type Upload interface {
 	FileKey() string
 }
 
 // FileDriver contains the behaviors particular to a destination system and file format.
-type FileDriver[T Upload] struct {
+type FileDriver[T Upload, R any] struct {
 	NewConfig        func(raw json.RawMessage) (Config, error)
 	NewStore         func(ctx context.Context, config Config, featureFlags map[string]bool) (Store[T], error)
 	NewWriter        func(config Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error)
@@ -103,11 +103,11 @@ type FileDriver[T Upload] struct {
 	ConfigSchema     func() ([]byte, error)
 }
 
-func (d FileDriver[T]) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error) {
+func (d FileDriver[T, R]) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error) {
 	return &pm.Response_Applied{}, nil
 }
 
-func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
+func (d FileDriver[T, R]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -117,7 +117,7 @@ func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Resp
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := schemagen.GenerateSchema("ResourceConfig", &resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("ResourceConfig", new(R)).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -129,7 +129,7 @@ func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Resp
 	}, nil
 }
 
-func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+func (d FileDriver[T, R]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var out []*pm.Response_Validated_Binding
 
 	var config, err = d.NewConfig(req.ConfigJson)
@@ -138,19 +138,22 @@ func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (
 	}
 
 	for _, b := range req.Bindings {
-		var res resource
+		var res Resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
-		constraints := make(map[string]*pm.Response_Validated_Constraint)
+		var constraints []*pm.Response_Validated_ProjectionConstraint
 		for _, p := range b.Collection.Projections {
-			constraints[p.Field] = d.NewConstraints(&p)
+			constraints = append(constraints, &pm.Response_Validated_ProjectionConstraint{
+				Field:      p.Field,
+				Constraint: d.NewConstraints(&p),
+			})
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
 			CaseInsensitiveFields: config.CommonConfig().CaseInsensitiveFields,
-			Constraints:           constraints,
+			ProjectionConstraints: constraints,
 			DeltaUpdates:          true,
 			ResourcePath:          []string{res.Path},
 		})
@@ -159,7 +162,11 @@ func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d FileDriver[T]) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, nil, nil, err
+	}
+
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -179,7 +186,7 @@ func (d FileDriver[T]) NewTransactor(ctx context.Context, open pm.Request_Open, 
 	bindings := make([]binding, 0, len(open.Materialization.Bindings))
 
 	for _, b := range open.Materialization.Bindings {
-		var res resource
+		var res Resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, nil, nil, err
 		}
@@ -209,6 +216,7 @@ func (d FileDriver[T]) NewTransactor(ctx context.Context, open pm.Request_Open, 
 		bindings: bindings,
 		store:    store,
 		common:   driverCfg.CommonConfig(),
+		be:       be,
 	}, &pm.Response_Opened{}, opts, nil
 }
 
@@ -223,6 +231,7 @@ type transactor[T Upload] struct {
 	bindings []binding
 	store    Store[T]
 	common   CommonConfig
+	be       *m.BindingEvents
 
 	stateLock sync.Mutex
 	state     connectorState[T]
@@ -374,9 +383,11 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
+	rows := make(map[int]int64)
 	lastBinding := -1
 	for it.Next(false) {
 		b := t.bindings[it.Binding]
+		rows[it.Binding]++
 
 		if lastBinding != -1 && lastBinding != it.Binding {
 			if err := finishFile(); err != nil {
@@ -416,6 +427,7 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err := finishFile(); err != nil {
 		return nil, fmt.Errorf("final finishFile: %w", err)
 	}
+	round := it.Round
 
 	return func(ctx context.Context, _ *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		checkpointJSON, err := json.Marshal(t.state)
@@ -423,14 +435,32 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
 
+		// Every file of the round has finished uploading by now.
+		for idx, n := range rows {
+			t.be.ReportRowStats(round, []string{t.bindings[idx].path}, m.TotalRowStats(n).WithStaged(n))
+		}
+
 		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
 	}, nil
 }
 
+func (t *transactor[T]) Flush(context.Context, map[int]time.Time) error {
+	return nil
+}
+
 // Acknowledge completes all staged uploads and removes them from the
 // checkpoint, so that the checkpoint contains only the list of file counts.
-func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *transactor[T]) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	var processed bool
 	for _, b := range t.bindings {
+		if !shouldProcess(b.stateKey) {
+			// This state key's pending work was not requested to be processed,
+			// so it remains staged in the persisted state.
+			continue
+		}
+
 		uploads, ok := t.state.Uploads[b.stateKey]
 		if !ok {
 			continue
@@ -443,9 +473,13 @@ func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, er
 			log.WithField("key", upload.FileKey()).Info("completed file upload")
 		}
 
+		delete(t.state.Uploads, b.stateKey)
+		processed = true
 	}
 
-	t.state.Uploads = make(map[string][]T)
+	if !processed {
+		return nil, nil
+	}
 
 	checkpointJSON, err := json.Marshal(t.state)
 	if err != nil {

@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbtemporaltables_applicationversioned_271800": 6 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"four","id":4,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"},"before":{"data":"one","id":1,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}},"data":"one-v2","id":1,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"},"before":{"data":"one-v2","id":1,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}},"data":"one-v3","id":1,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"two-v2","id":2,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"two-v2","id":5,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+{"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"MariaDBTemporalTables_ApplicationVersioned_271800","cursor":"binlog.000123:56789:123","txid":"0-1-111"}},"data":"four","id":4,"valid_from":"<TIMESTAMP>","valid_to":"<TIMESTAMP>"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTemporalTables_ApplicationVersioned_271800":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","valid_from","valid_to","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"},"valid_from":"datetime","valid_to":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

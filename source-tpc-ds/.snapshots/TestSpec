@@ -1,0 +1,40 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-tpc-ds/config",
+    "properties": {
+      "scale": {
+        "type": "number",
+        "title": "Scale Factor",
+        "description": "TPC-DS scale factor. Values of 1 and above should be one of the benchmark's official factors (1, 3, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000) and give roughly that many GB of raw data. Values from 0.01 up to 1 produce a proportionally smaller dataset for smoke tests and demos; fixed-size tables such as date_dim and time_dim keep their full size. Values below 0.01 are rejected.",
+        "default": 1,
+        "nonsensitive": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "scale"
+    ],
+    "title": "TPC-DS"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-tpc-ds/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the TPC-DS table to emit."
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "TPC-DS Table"
+  },
+  "documentation_url": "https://github.com/estuary/connectors/blob/main/source-tpc-ds/README.md",
+  "resource_path_pointers": [
+    "/table"
+  ]
+}

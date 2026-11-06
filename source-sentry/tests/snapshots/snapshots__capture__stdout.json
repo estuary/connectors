@@ -7,9 +7,8 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "id": "7000936",
-      "name": "production",
-      "stats": "redacted-object"
+      "id": "8972455",
+      "name": "estuary-dev-seed"
     }
   ],
   [
@@ -41,13 +40,8 @@
       "environments": [
         "production"
       ],
-      "features": [
-        "profile-functions-metrics-eap-ingestion",
-        "similarity-embeddings",
-        "similarity-indexing",
-        "similarity-view"
-      ],
-      "firstEvent": "2025-09-18T14:12:28.557000Z",
+      "features": "redacted",
+      "firstEvent": "redacted",
       "firstTransactionEvent": true,
       "hasAccess": true,
       "hasFeedbacks": false,
@@ -91,173 +85,7 @@
           "name": "Estuary",
           "slug": "estuary"
         }
-      ],
-      "stats": "redacted-object"
-    }
-  ],
-  [
-    "acmeCo/Projects",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "access": [
-        "alerts:read",
-        "alerts:write",
-        "event:admin",
-        "event:read",
-        "event:write",
-        "member:read",
-        "org:integrations",
-        "org:read",
-        "project:admin",
-        "project:read",
-        "project:releases",
-        "project:write",
-        "team:admin",
-        "team:read",
-        "team:write"
-      ],
-      "dateCreated": "2025-09-18T14:22:33.172710Z",
-      "environments": [],
-      "features": [
-        "profile-functions-metrics-eap-ingestion",
-        "similarity-embeddings",
-        "similarity-indexing",
-        "similarity-view"
-      ],
-      "firstEvent": null,
-      "firstTransactionEvent": false,
-      "hasAccess": true,
-      "hasFeedbacks": false,
-      "hasFlags": false,
-      "hasInsightsAgentMonitoring": false,
-      "hasInsightsAppStart": false,
-      "hasInsightsAssets": false,
-      "hasInsightsCaches": false,
-      "hasInsightsDb": false,
-      "hasInsightsHttp": false,
-      "hasInsightsMCP": false,
-      "hasInsightsQueues": false,
-      "hasInsightsScreenLoad": false,
-      "hasInsightsVitals": false,
-      "hasLogs": false,
-      "hasMinifiedStackTrace": false,
-      "hasMonitors": false,
-      "hasNewFeedbacks": false,
-      "hasProfiles": false,
-      "hasReplays": false,
-      "hasSessions": false,
-      "hasTraceMetrics": false,
-      "hasUserReports": false,
-      "id": "4510041065979904",
-      "isBookmarked": false,
-      "isMember": true,
-      "latestDeploys": null,
-      "latestRelease": null,
-      "name": "test-nicolas-frontend",
-      "platform": "javascript-react",
-      "platforms": [],
-      "slug": "test-nicolas-frontend",
-      "team": {
-        "id": "4509990432866304",
-        "name": "Estuary",
-        "slug": "estuary"
-      },
-      "teams": [
-        {
-          "id": "4509990432866304",
-          "name": "Estuary",
-          "slug": "estuary"
-        }
-      ],
-      "stats": "redacted-object"
-    }
-  ],
-  [
-    "acmeCo/Projects",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 2,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "access": [
-        "alerts:read",
-        "alerts:write",
-        "event:admin",
-        "event:read",
-        "event:write",
-        "member:read",
-        "org:integrations",
-        "org:read",
-        "project:admin",
-        "project:read",
-        "project:releases",
-        "project:write",
-        "team:admin",
-        "team:read",
-        "team:write"
-      ],
-      "dateCreated": "2025-09-09T16:16:08.051867Z",
-      "environments": [
-        "production"
-      ],
-      "features": [
-        "profile-functions-metrics-eap-ingestion",
-        "releases",
-        "similarity-embeddings",
-        "similarity-indexing",
-        "similarity-view"
-      ],
-      "firstEvent": "2025-09-09T16:48:59.193424Z",
-      "firstTransactionEvent": false,
-      "hasAccess": true,
-      "hasFeedbacks": false,
-      "hasFlags": false,
-      "hasInsightsAgentMonitoring": false,
-      "hasInsightsAppStart": false,
-      "hasInsightsAssets": false,
-      "hasInsightsCaches": false,
-      "hasInsightsDb": false,
-      "hasInsightsHttp": false,
-      "hasInsightsMCP": false,
-      "hasInsightsQueues": false,
-      "hasInsightsScreenLoad": false,
-      "hasInsightsVitals": false,
-      "hasLogs": false,
-      "hasMinifiedStackTrace": false,
-      "hasMonitors": false,
-      "hasNewFeedbacks": false,
-      "hasProfiles": false,
-      "hasReplays": false,
-      "hasSessions": false,
-      "hasTraceMetrics": false,
-      "hasUserReports": false,
-      "id": "4509990551814144",
-      "isBookmarked": false,
-      "isMember": true,
-      "latestDeploys": null,
-      "latestRelease": null,
-      "name": "test-project",
-      "platform": "python",
-      "platforms": [],
-      "slug": "test-project",
-      "team": {
-        "id": "4509990432866304",
-        "name": "Estuary",
-        "slug": "estuary"
-      },
-      "teams": [
-        {
-          "id": "4509990432866304",
-          "name": "Estuary",
-          "slug": "estuary"
-        }
-      ],
-      "stats": "redacted-object"
+      ]
     }
   ],
   [
@@ -287,6 +115,7 @@
       ],
       "avatar": {
         "avatarType": "letter_avatar",
+        "avatarUrl": null,
         "avatarUuid": null
       },
       "dateCreated": "2025-09-09T15:45:53.671857Z",
@@ -300,8 +129,7 @@
       "memberCount": 1,
       "name": "Estuary",
       "slug": "estuary",
-      "teamRole": "admin",
-      "stats": "redacted-object"
+      "teamRole": "admin"
     }
   ]
 ]

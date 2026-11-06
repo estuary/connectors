@@ -1,6 +1,41 @@
 import json
 import subprocess
 
+# Brevo's API is consistently returning HTTP 500 during the
+# "Multiple Services Impacted" incident Brevo opened on 2026-10-27
+# (https://status.brevo.com/). Streams intermittely emit no documents until Brevo
+# resolves it. Once the incident is resolved, we can uncomment & re-enable test_capture.
+#
+# def test_capture(request, snapshot):
+#     result = subprocess.run(
+#         [
+#             "flowctl",
+#             "raw",
+#             "preview-next",
+#             "--source",
+#             request.fspath.dirname + "/../test.flow.yaml",
+#             "--sessions",
+#             "1",
+#             "--delay",
+#             "10s",
+#         ],
+#         stdout=subprocess.PIPE,
+#         text=True,
+#     )
+#     assert result.returncode == 0
+#     lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+#     unique_stream_lines = []
+#     seen = set()
+
+#     for line in lines:
+#         stream = line[0]
+#         if stream not in seen:
+#             unique_stream_lines.append(line)
+#             seen.add(stream)
+
+#     assert snapshot("capture.stdout.json") == unique_stream_lines
+
 
 def test_discover(request, snapshot):
     result = subprocess.run(

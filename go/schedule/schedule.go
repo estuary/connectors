@@ -275,6 +275,23 @@ func (s *alternatingSchedule) Next(after time.Time) time.Time {
 	return n
 }
 
+// IntervalAt is the interval between the times of `s` that applies at `t`, or
+// zero for a schedule without one.
+func IntervalAt(s Schedule, t time.Time) time.Duration {
+	switch s := s.(type) {
+	case *periodicSchedule:
+		return s.Period
+	case *fixedSchedule:
+		return s.period
+	case *alternatingSchedule:
+		if s.altActive(t) {
+			return s.alt.period
+		}
+		return s.def.period
+	}
+	return 0
+}
+
 // altActive is a helper for determining if the "alternate" scheduling period is
 // active for a datetime, taking into account the days of the week that the
 // alternate schedule applies.

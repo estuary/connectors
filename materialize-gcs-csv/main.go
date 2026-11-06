@@ -23,7 +23,7 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -50,7 +50,7 @@ func (c config) CommonConfig() filesink.CommonConfig {
 	}
 }
 
-var driver = filesink.FileDriver[*filesink.SinglePhase]{
+var driver = filesink.FileDriver[*filesink.SinglePhase, filesink.Resource]{
 	NewConfig: func(raw json.RawMessage) (filesink.Config, error) {
 		var cfg config
 		if err := pf.UnmarshalStrict(raw, &cfg); err != nil {

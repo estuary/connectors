@@ -1,26 +1,15 @@
-package main
+package connector
 
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/apache/iceberg-go"
 	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
-)
-
-type icebergType string
-
-const (
-	icebergTypeBoolean     icebergType = "boolean"
-	icebergTypeString      icebergType = "string"
-	icebergTypeLong        icebergType = "long"   // 64 bit integer
-	icebergTypeDouble      icebergType = "double" // 64 bit float
-	icebergTypeTimestamptz icebergType = "timestamptz"
-	icebergTypeDate        icebergType = "date"
-	icebergTypeUuid        icebergType = "uuid"
-	icebergTypeBinary      icebergType = "binary"
 )
 
 var schemaOptions = []writer.ParquetSchemaOption{
@@ -51,8 +40,8 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (writer.ParquetSchema, error) {
-	out := []writer.ParquetSchemaElement{}
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, cfg config) (writer.ParquetSchema, error) {
+	out := make(writer.ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
 		var fc fieldConfig
@@ -64,7 +53,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc)
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -74,52 +63,104 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, cfg config) (writer.ParquetSchemaElement, error) {
+	var nanoseconds, variants = cfg.nanosecondTimestamps(), cfg.variantColumns()
+
+	// With variant_columns enabled ignoreStringFormat is the only way to keep a
+	// JSON-shaped field as a string column, so it is meaningful on object and
+	// array fields that carry no string type. It stays a rejected no-op when
+	// the option is off, where such a field maps to a JSON string regardless.
 	if fc.IgnoreStringFormat {
-		if p.Inference.String_ == nil {
+		if p.Inference.String_ != nil {
+			p.Inference.String_.Format = ""
+		} else if !variants {
 			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
 		}
-		p.Inference.String_.Format = ""
 	}
 
-	return writer.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
+	// Collection key fields keep their conservative (string) mapping even with
+	// variant_columns enabled: Iceberg forbids variant as an identifier field,
+	// and keys are meant to be joined and filtered on across engines.
+	// ignoreStringFormat likewise remains an escape hatch forcing a JSON
+	// string column.
+	var useVariant = variants && !p.IsPrimaryKey && !fc.IgnoreStringFormat
+
+	// Clipped so that appending an option below allocates a new backing array
+	// rather than writing into schemaOptions'.
+	var opts = slices.Clip(schemaOptions)
+	if nanoseconds {
+		opts = append(opts, writer.WithParquetTimestampAsNanoseconds())
+	}
+	if useVariant {
+		opts = append(opts, writer.WithParquetSchemaJSONAsVariant())
+	}
+
+	return writer.ProjectionToParquetSchemaElement(p, false, opts...), nil
 }
 
-func parquetTypeToIcebergType(pqt writer.ParquetDataType) icebergType {
+func parquetTypeToIcebergType(pqt writer.ParquetDataType) iceberg.Type {
 	switch pqt {
 	case writer.PrimitiveTypeInteger:
-		return icebergTypeLong
+		return iceberg.PrimitiveTypes.Int64
 	case writer.PrimitiveTypeNumber:
-		return icebergTypeDouble
+		return iceberg.PrimitiveTypes.Float64
 	case writer.PrimitiveTypeBoolean:
-		return icebergTypeBoolean
+		return iceberg.PrimitiveTypes.Bool
 	case writer.PrimitiveTypeBinary:
-		return icebergTypeBinary
+		return iceberg.PrimitiveTypes.Binary
 	case writer.LogicalTypeString:
-		return icebergTypeString
+		return iceberg.PrimitiveTypes.String
 	case writer.LogicalTypeDate:
-		return icebergTypeDate
+		return iceberg.PrimitiveTypes.Date
 	case writer.LogicalTypeTimestamp:
-		return icebergTypeTimestamptz
+		return iceberg.PrimitiveTypes.TimestampTz
+	case writer.LogicalTypeTimestampNanos:
+		return iceberg.PrimitiveTypes.TimestampTzNs
 	case writer.LogicalTypeUuid:
-		return icebergTypeUuid
+		return iceberg.PrimitiveTypes.UUID
+	case writer.LogicalTypeVariant:
+		return iceberg.VariantType{}
 	default:
 		panic(fmt.Sprintf("unhandled parquet data type: %T (%#v)", pqt, pqt))
 	}
 }
 
+func isVariant(typ iceberg.Type) bool {
+	return typ.Equals(iceberg.VariantType{})
+}
+
 type mappedType struct {
-	icebergType icebergType
+	icebergType iceberg.Type
 }
 
 func (mt mappedType) String() string {
-	return string(mt.icebergType)
+	return mt.icebergType.String()
 }
 
 func (mt mappedType) Compatible(existing boilerplate.ExistingField) bool {
-	return strings.EqualFold(existing.Type, string(mt.icebergType))
+	return strings.EqualFold(existing.Type, mt.icebergType.String())
 }
 
+// CanMigrate permits the microsecond↔nanosecond timestamp pair in both
+// directions, any non-variant type to variant (the variant_columns flip,
+// including column types a JSON-shaped field had previously evolved to), and
+// variant back to string (disabling variant_columns or applying castToString).
+// Iceberg forbids changing a column's type in place, so UpdateResource
+// migrates by dropping and re-adding the column under a new field ID: the new
+// type applies to data going forward, and prior rows read as null for the
+// column.
 func (mt mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
-	return false
+	from, to := strings.ToLower(existing.Type), mt.icebergType.String()
+	switch {
+	case from == "timestamptz" && to == "timestamptz_ns":
+		return true
+	case from == "timestamptz_ns" && to == "timestamptz":
+		return true
+	case to == "variant":
+		return from != "variant"
+	case from == "variant":
+		return to == "string"
+	default:
+		return false
+	}
 }

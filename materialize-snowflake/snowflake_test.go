@@ -1,14 +1,23 @@
-package main
+package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/estuary/connectors/go/common"
 	"os/exec"
 	"regexp"
+	"strings"
 	"testing"
+	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/snowflakedb/gosnowflake/v2"
@@ -31,6 +40,8 @@ func mustGetCfg(t *testing.T) config {
 }
 
 func TestIntegration(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip()
 	}
@@ -42,6 +53,37 @@ func TestIntegration(t *testing.T) {
 			Delta:  delta,
 		}
 	}
+
+	t.Run("apply-drain", func(t *testing.T) {
+		cfg := mustGetCfg(t)
+		tableName := fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+		res := makeResourceFn(tableName, false).WithDefaults(cfg)
+
+		seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+			// A staged transaction is a query persisted in the connector
+			// state, keyed by the binding's state key, along with the staged
+			// directory holding its files. The directory is cleaned up after
+			// the query executes; a directory with no files under the
+			// connector's flow_v1 stage (created by Setup during the base
+			// Apply) stands in for one whose files were already consumed.
+			query := sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "PARSE_JSON('{}')")
+			state, err := json.Marshal(map[string]any{
+				appliedSpec.Bindings[0].StateKey: map[string]any{
+					"Table":     tableName,
+					"Query":     query,
+					"StagedDir": fmt.Sprintf("@flow_v1/applydrain-%s", uuid.NewString()),
+				},
+			})
+			require.NoError(t, err)
+			return state
+		}
+
+		verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+			require.Len(t, rows, 1, "the staged transaction's row must have been committed")
+		}
+
+		sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
+	})
 
 	actionDescSanitizers := []func(string) string{
 		func(s string) string {
@@ -92,18 +134,80 @@ func TestIntegration(t *testing.T) {
 		func(s string) string {
 			return regexp.MustCompile(`"upload_duration_ms":\s*\d+`).ReplaceAllString(s, `"upload_duration_ms": "<upload_duration_ms>"`)
 		},
+		// The stream offset tokens are prefixed with a hash of the runtime
+		// checkpoint (see buildDriverCheckpoint), so they differ per transaction
+		// and per run. Their deterministic ":N" suffix is left intact.
+		sql.SanitizeCheckpointHashes(`"offset_token":"([0-9a-f]{16}):\d+"`, "offset-token"),
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newSnowflakeDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+		// MERGE INTO and COPY INTO bindings report exact row stats, but the
+		// fixture's delta binding uses Snowpipe Streaming, which reports none,
+		// and a round's fidelity is the lowest of its bindings. Mismatches on
+		// the exact bindings still fail the suite.
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+	})
+
+	t.Run("materialize-no-flow-document", func(t *testing.T) {
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone,
+				ConfigOverrides: map[string]any{"advanced.no_flow_document": true}})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		if testutil.RuntimeV1() {
+			t.Skip("backfill signals require runtime-next")
+		}
+		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
+			dsn, err := cfg.toURI(true, taskName)
+			require.NoError(t, err)
+			db, err := stdsql.Open("snowflake", dsn)
+			require.NoError(t, err)
+			defer db.Close()
+
+			testutil.RunFlowctl(t, "raw", "preview-next",
+				"--name", task.Name,
+				"--source", task.SourcePath,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "10m",
+			)
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the standard table with a flow_published_at column
+			// loses the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_delta":           {1, 1, 2, 3},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				rows, err := db.QueryContext(ctx, "SELECT id FROM "+task.Resource(t, table)+" ORDER BY id;")
+				require.NoError(t, err)
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					require.NoError(t, rows.Scan(&id))
+					ids = append(ids, id)
+				}
+				require.NoError(t, rows.Err())
+				require.NoError(t, rows.Close())
+				require.Equal(t, want, ids, table)
+			}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		sql.RunApplyTest(t, newSnowflakeDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+		sql.RunApplyTest(t, NewDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newSnowflakeDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
+	t.Run("key-change-migrate", func(t *testing.T) {
+		sql.RunKeyChangeMigrationTest(t, NewDriver(), "testdata/key-change.flow.yaml", makeResourceFn, nil)
 	})
 }
 
@@ -152,7 +256,58 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(context.Background(), *tt.cfg(cfg)).Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), *tt.cfg(cfg), common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{})).Unwrap())
 		})
 	}
+}
+
+// NewEndpoint runs before the prerequisite checks, so a login failure must be
+// reported as a connection failure rather than as the first query it runs.
+func TestNewEndpointConnectError(t *testing.T) {
+	cfg := mustGetCfg(t)
+	cfg.Credentials.User = "wrong" + cfg.Credentials.User
+
+	_, err := NewDriver().NewEndpoint(context.Background(), cfg, common.ResolveFlagDefaults(featureFlagDefaults, common.CreatedAt{}))
+	require.ErrorContains(t, err, "unable to connect to database: JWT token is invalid")
+
+	var userErr *cerrors.UserError
+	require.ErrorAs(t, err, &userErr)
+}
+
+func TestQueryCurrentClusterBy(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
+	ctx := context.Background()
+	cfg := mustGetCfg(t)
+
+	dsn, err := cfg.toURI(true, "")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	defer db.Close()
+
+	const schema = "ESTUARY_SCHEMA"
+	// The decoy differs from the target only at the underscore position, and
+	// its "A" sorts before "_" so an unescaped LIKE pattern returns it first.
+	base := fmt.Sprintf("CLUSTERBY_%s", strings.ToUpper(uuid.NewString()[:8]))
+	target := base + "_T"
+	decoy := base + "AT"
+
+	for _, name := range []string{target, decoy} {
+		_, err := db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s.%s (ID INTEGER);`, schema, name))
+		require.NoError(t, err)
+		t.Cleanup(func() { db.ExecContext(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s.%s;`, schema, name)) })
+	}
+	_, err = db.ExecContext(ctx, fmt.Sprintf(`ALTER TABLE %s.%s CLUSTER BY (ID);`, schema, decoy))
+	require.NoError(t, err)
+
+	got, err := queryCurrentClusterBy(ctx, db, schema, target)
+	require.NoError(t, err)
+	require.Equal(t, "", got)
+
+	got, err = queryCurrentClusterBy(ctx, db, schema, decoy)
+	require.NoError(t, err)
+	require.Equal(t, "LINEAR(ID)", got)
 }

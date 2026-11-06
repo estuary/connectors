@@ -1,0 +1,14 @@
+import:
+  - ../integration/collections.key-change.flow.yaml
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/change
+        resource: { table: key_change }
+        fields:
+          recommended: true

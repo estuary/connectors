@@ -1,6 +1,7 @@
-package main
+package connector
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
@@ -39,10 +40,9 @@ var clickHouseClampDate = sql.StringCastConverter(func(str string) (interface{},
 // year 0, since ClickHouse's DateTime type has a minimum value of 1925-01-01. It also returns a
 // time.Time rather than a string, as required by the ClickHouse driver.
 var clickHouseClampDatetime = sql.StringCastConverter(func(str string) (interface{}, error) {
-	str = strings.ToUpper(str)
-	parsed, err := time.Parse(time.RFC3339Nano, str)
+	parsed, _, err := sql.ParseRFC3339Nano(str)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
+		return nil, err
 	}
 	if parsed.Year() < 1925 {
 		parsed, _ = time.Parse(time.RFC3339Nano, clickhouseMinimumDatetime)
@@ -261,15 +261,27 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		TypeMapper:          mapper,
 		MaxColumnCharLength: 256,
 		MigratableTypes: sql.MigrationSpecs{
-			"int64":                {sql.NewMigrationSpec([]string{"float64", "int128", "int256", "string"})},
-			"int128":               {sql.NewMigrationSpec([]string{"float64", "int256", "string"})},
-			"int256":               {sql.NewMigrationSpec([]string{"float64", "string"})},
+			"int64": {
+				sql.NewMigrationSpec([]string{"float64", "int128", "int256"}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
+			"int128": {
+				sql.NewMigrationSpec([]string{"float64", "int256"}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
+			"int256": {
+				sql.NewMigrationSpec([]string{"float64"}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
 			"float64":              {sql.NewMigrationSpec([]string{"string"})},
 			"bool":                 {sql.NewMigrationSpec([]string{"string"})},
 			"date32":               {sql.NewMigrationSpec([]string{"string"})},
 			"datetime64(6, 'utc')": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"*":                    {sql.NewMigrationSpec([]string{"string"})},
 		},
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s SETTINGS mutations_sync = 1", table.Identifier, m.Identifier, m.NullableDDL)
+		}),
 	}
 }
 
@@ -281,16 +293,32 @@ type templates struct {
 	alterTargetMigrateDropColumn     *template.Template
 	alterTargetMigrateRenameColumn   *template.Template
 	createLoadTable                  *template.Template
+	truncateLoadTable                *template.Template
+	countLoadKeys                    *template.Template
 	insertLoadTable                  *template.Template
 	queryLoadTable                   *template.Template
 	queryLoadTableNoFlowDocument     *template.Template
 	dropLoadTable                    *template.Template
 	createStoreTable                 *template.Template
+	truncateStoreTable               *template.Template
 	insertStoreTable                 *template.Template
 	queryStoreParts                  *template.Template
 	moveStorePartition               *template.Template
-	existsStoreTable                 *template.Template
 	dropStoreTable                   *template.Template
+}
+
+// partitionExpr extracts the trimmed partition_by expression from a binding's
+// raw resource config. Empty or absent yields "", which renders no PARTITION
+// BY clause.
+func partitionExpr(rawResourceConfig json.RawMessage) (string, error) {
+	if len(rawResourceConfig) == 0 {
+		return "", nil
+	}
+	var rc tableConfig
+	if err := json.Unmarshal(rawResourceConfig, &rc); err != nil {
+		return "", fmt.Errorf("parsing resource config for partition_by: %w", err)
+	}
+	return strings.TrimSpace(rc.PartitionBy), nil
 }
 
 func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
@@ -347,6 +375,9 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ENGINE = MergeTree
 {{ else -}}
 ENGINE = ReplacingMergeTree(flow_published_at`+isDeletedEngineArg+`)
+{{ end -}}
+{{ with PartitionExpr $.ResourceConfigJson -}}
+PARTITION BY ({{ . }})
 {{ end -}}
 ORDER BY (
 	{{- range $ind, $key := $.Keys }}
@@ -427,22 +458,29 @@ SETTINGS mutations_sync = 1;
 
 -- Load tables stage the keys of documents the connector needs to look up during a
 -- transaction's load phase. The connector inserts keys into the staging load table,
--- then joins the target table (using FINAL for deduplication) against the staging
--- table to retrieve the current version of documents for those keys.
+-- then selects from the target table (using FINAL for deduplication) restricted to
+-- those keys, to retrieve the current version of their documents.
 --
 -- Load tables use the MergeTree engine so that large key sets are spilled to disk
 -- rather than held entirely in memory, avoiding server memory limit issues.
 --
--- CREATE OR REPLACE TABLE is used so that the table is reset on connector restart,
--- discarding any stale state from a previous run. The table is dropped when the
--- connector shuts down.
+-- Like store tables, load tables are PERSISTENT: created once (IF NOT EXISTS) at
+-- session start and truncated -- never re-created -- between load rounds, keeping
+-- the name->UUID mapping stable so that key inserts and the load query resolve the
+-- same object from any replica of a clustered deployment. The load query and the
+-- key-count check preceding it run with select_sequential_consistency = 1 so they
+-- observe both the keys just inserted and target-table rows committed by prior
+-- transactions' partition moves. Load tables hold nothing durable (only the current
+-- round's lookup keys), so they are safe to truncate at any time. Like store
+-- tables, they are dropped + re-created only when their schema has drifted from
+-- the target's.
 
 {{ define "loadTableName" -}}
 {{ printf "flow_temp_load_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
 {{- end }}
 
 {{ define "createLoadTable" }}
-CREATE OR REPLACE TABLE {{ template "loadTableName" . }} (
+CREATE TABLE IF NOT EXISTS {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -457,6 +495,22 @@ ORDER BY (
 );
 {{ end }}
 
+{{/*
+Every truncate and drop of a staging table carries SYNC. Without it ClickHouse
+executes the statement asynchronously on a replicated table -- which on
+ClickHouse Cloud is every table, since MergeTree is transparently
+SharedMergeTree -- so a queued truncate can execute after subsequent INSERTs
+and drop the rows they just staged.
+*/}}
+{{ define "truncateLoadTable" }}
+TRUNCATE TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
+{{ end }}
+
+{{ define "countLoadKeys" }}
+SELECT count() FROM {{ template "loadTableName" . }}
+SETTINGS select_sequential_consistency = 1;
+{{ end }}
+
 {{ define "insertLoadTable" }}
 INSERT INTO {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
@@ -466,15 +520,38 @@ INSERT INTO {{ template "loadTableName" . }} (
 )
 {{ end }}
 
+{{/*
+Restricting the target to the staged keys with a tuple IN, rather than joining
+against the load table, is what keeps the load query affordable on a large
+target. The key tuple is exactly the target's ORDER BY (see createTargetTable),
+so ClickHouse resolves the set through the primary key index and reads only the
+mark ranges that can contain those keys. Joining instead makes the load table
+the build side and streams every row of the target -- including the whole
+flow_document column -- through the hash probe, at a cost that scales with the
+size of the table rather than with the number of keys being loaded.
+
+Keys are never null in a Flow collection, so the NULL-unsafe semantics of IN
+(transform_null_in = 0) cannot exclude a key that the target actually holds.
+*/}}
+{{ define "loadKeyPredicate" -}}
+({{ range $ind, $key := $.Keys }}{{ if $ind }}, {{ end }}r.{{ $key.Identifier }}{{ end }}) IN (
+		SELECT {{ range $ind, $key := $.Keys }}{{ if $ind }}, {{ end }}{{ $key.Identifier }}{{ end }}
+		FROM {{ template "loadTableName" . }}
+	)
+{{- end }}
+
+{{/*
+The load queries (queryLoadTable and queryLoadTableNoFlowDocument) each carry
+SETTINGS select_sequential_consistency = 1 so that a query observes both the
+just-inserted keys and target-table rows committed by prior transactions'
+partition moves, from any replica.
+*/}}
 {{ define "queryLoadTable" }}
 {{ if $.Document -}}
-SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
+SELECT r.{{$.Document.Identifier}}
 	FROM {{$.Identifier}} AS r FINAL
-	JOIN {{ template "loadTableName" . }} AS l
-	{{- range $ind, $key := $.Keys }}
-		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{$key.Identifier}} = r.{{$key.Identifier}}
-	{{- end }}
+	WHERE {{ template "loadKeyPredicate" . }}
+SETTINGS select_sequential_consistency = 1;
 {{ end -}}
 {{ end }}
 
@@ -506,26 +583,23 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 
 {{ define "queryLoadTableNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
-SELECT {{ $.Binding }}::Int32,
+SELECT
 concat('{',
-{{- range $i, $col := $.RootLevelColumns -}}
+{{- range $i, $col := $.RootPropertyColumns -}}
 	{{- if $i }}, ',',{{ end }}
-	'"{{ $col.Field }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
+	toJSONString({{ Literal $col.RootProperty }}), ':', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
 , '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
-	JOIN {{ template "loadTableName" . }} AS l
-	{{- range $ind, $key := $.Keys }}
-		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{$key.Identifier}} = r.{{$key.Identifier}}
-	{{- end }}
+	WHERE {{ template "loadKeyPredicate" . }}
+SETTINGS select_sequential_consistency = 1;
 {{ else -}}
-SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
+SELECT ''::String LIMIT 0
 {{ end -}}
 {{ end }}
 
 {{ define "dropLoadTable" }}
-DROP TABLE IF EXISTS {{ template "loadTableName" . }};
+DROP TABLE IF EXISTS {{ template "loadTableName" . }} SYNC;
 {{ end }}
 
 ---- Store tables
@@ -535,21 +609,35 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- (ReplacingMergeTree), so that their on-disk parts are partition-compatible with the
 -- target table.
 --
+-- Store tables are PERSISTENT: created once (IF NOT EXISTS) at the start of a
+-- session and never dropped or re-created between transactions. This keeps the
+-- table's name->UUID mapping stable, which matters on clustered deployments
+-- (e.g. ClickHouse Cloud): every pooled connection, regardless of which replica
+-- serves it, resolves the table name to the same object. Re-creating the table
+-- per transaction gives it a new UUID each time, and a replica with stale DDL
+-- metadata resolves the name to the previous incarnation -- reporting zero rows
+-- for freshly staged data and silently losing it at commit.
+--
 -- Documents are inserted into the store table during the store phase. On commit, the
--- connector enumerates the store table's parts via system.parts and moves each
--- partition to the target table using ALTER TABLE ... MOVE PARTITION. Moving a
--- partition is a metadata-only operation (it relinks existing parts rather than
--- copying data), so the commit phase is very low latency regardless of transaction
--- size. This is significantly faster than INSERT ... SELECT or other bulk-copy
--- methods that would rewrite data.
+-- connector enumerates the store table's partitions by reading the table itself
+-- (the _partition_id virtual column) with select_sequential_consistency = 1, which
+-- on SharedMergeTree forces a fetch of the latest committed metadata from Keeper --
+-- an authoritative read from any replica. It then moves each partition to the
+-- target table using ALTER TABLE ... MOVE PARTITION. Moving a partition is a
+-- metadata-only operation (it relinks existing parts rather than copying data), so
+-- the commit phase is very low latency regardless of transaction size. Moving every
+-- partition leaves the store table empty; nothing is dropped or truncated on the
+-- happy path.
 --
 -- The commit is not atomic across bindings: partitions are moved one at a time and a
 -- failure mid-commit will leave some partitions moved and others not. This is safe
 -- because the target table uses ReplacingMergeTree, which deduplicates by ORDER BY
 -- key and flow_published_at version — re-applying a partial commit is idempotent.
 --
--- CREATE OR REPLACE TABLE resets the store table on connector restart. The table is
--- truncated between transactions and dropped when the connector shuts down.
+-- At session start, once any pending commit has been recovered, the store table is
+-- truncated, discarding rows staged by a transaction that never committed. It is
+-- dropped and re-created only when its schema has drifted from the target's (a
+-- migration ran in a prior session).
 
 {{ define "storeTableNameIdentifier" -}}
 {{ printf "flow_temp_store_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
@@ -560,7 +648,7 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 {{- end }}
 
 {{ define "createStoreTable" }}
-CREATE OR REPLACE TABLE {{ template "storeTableNameIdentifier" . }}
+CREATE TABLE IF NOT EXISTS {{ template "storeTableNameIdentifier" . }}
 AS {{$.Identifier}};
 {{ end }}
 
@@ -575,9 +663,9 @@ INSERT INTO {{ template "storeTableNameIdentifier" . }} (
 {{ end }}
 
 {{ define "queryStoreParts" }}
-SELECT DISTINCT partition_id FROM system.parts
-WHERE table = {{ template "storeTableNameString" . }}
-  AND database = ? AND active;
+SELECT _partition_id, count() FROM {{ template "storeTableNameIdentifier" . }}
+GROUP BY _partition_id
+SETTINGS select_sequential_consistency = 1;
 {{ end }}
 
 {{ define "moveStorePartition" }}
@@ -586,16 +674,14 @@ MOVE PARTITION ID ?
 TO TABLE {{ $.Identifier }};
 {{ end }}
 
-{{ define "existsStoreTable" }}
-SELECT count() FROM system.tables
-WHERE database = currentDatabase()
-  AND name = {{ template "storeTableNameString" . }};
+{{ define "truncateStoreTable" }}
+TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
 {{ end }}
 
 {{ define "dropStoreTable" }}
-DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
+DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
 {{ end }}
-`)
+`, template.FuncMap{"PartitionExpr": partitionExpr})
 
 	return templates{
 		createTargetTable:                tplAll.Lookup("createTargetTable"),
@@ -605,17 +691,30 @@ DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 		alterTargetMigrateDropColumn:     tplAll.Lookup("alterTargetMigrateDropColumn"),
 		alterTargetMigrateRenameColumn:   tplAll.Lookup("alterTargetMigrateRenameColumn"),
 		createLoadTable:                  tplAll.Lookup("createLoadTable"),
+		truncateLoadTable:                tplAll.Lookup("truncateLoadTable"),
+		countLoadKeys:                    tplAll.Lookup("countLoadKeys"),
 		insertLoadTable:                  tplAll.Lookup("insertLoadTable"),
 		queryLoadTable:                   tplAll.Lookup("queryLoadTable"),
 		queryLoadTableNoFlowDocument:     tplAll.Lookup("queryLoadTableNoFlowDocument"),
 		dropLoadTable:                    tplAll.Lookup("dropLoadTable"),
 		createStoreTable:                 tplAll.Lookup("createStoreTable"),
+		truncateStoreTable:               tplAll.Lookup("truncateStoreTable"),
 		insertStoreTable:                 tplAll.Lookup("insertStoreTable"),
 		queryStoreParts:                  tplAll.Lookup("queryStoreParts"),
 		moveStorePartition:               tplAll.Lookup("moveStorePartition"),
-		existsStoreTable:                 tplAll.Lookup("existsStoreTable"),
 		dropStoreTable:                   tplAll.Lookup("dropStoreTable"),
 	}
+}
+
+// loadTableName and storeTableName produce the unquoted names of a binding's
+// persistent temp tables. They must agree with the loadTableName /
+// storeTableNameIdentifier template definitions above.
+func loadTableName(table sql.Table, rangeKey uint32) string {
+	return fmt.Sprintf("flow_temp_load_%s_%s", strconv.FormatInt(int64(rangeKey), 16), table.Path[0])
+}
+
+func storeTableName(table sql.Table, rangeKey uint32) string {
+	return fmt.Sprintf("flow_temp_store_%s_%s", strconv.FormatInt(int64(rangeKey), 16), table.Path[0])
 }
 
 func renderTableAndRangeKey(table sql.Table, rangeKey uint32, tpl *template.Template) (rendered string, err error) {

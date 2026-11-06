@@ -1,0 +1,198 @@
+info:
+  name: nested bare
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{graphql_url}}"
+  body:
+    type: json
+    data: |-
+      {
+        "query": "query PubHistoryNested($prefix: Prefix!) {\n  liveSpecs(by: { prefix: $prefix }, first: 5) {\n    pageInfo { hasNextPage endCursor }\n    edges { node {\n      catalogName\n      publicationHistory(first: 3) {\n        pageInfo { hasNextPage endCursor }\n        edges { cursor node { publicationId catalogType publishedAt userId userEmail userFullName detail } }\n      }\n    } }\n  }\n}",
+        "variables": {
+          "prefix": "{{test_prefix}}"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Pin the spec with the most history on this page for the boundary probes.
+        const edges = res.getBody()?.data?.liveSpecs?.edges ?? [];
+        let best = null;
+        for (const e of edges) {
+          const n = e.node.publicationHistory?.edges?.length ?? 0;
+          if (!best || n > best.n) best = { name: e.node.catalogName, n };
+        }
+        if (best) bru.setVar('ph_spec', best.name);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 — nested history first:3 per ref (first 3 refs; user fields REDACTED)"
+    request:
+      url: "{{graphql_url}}"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "liveSpecs": {
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "Jonathan_Wihl/my_first_capture/branches"
+                },
+                "edges": [
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gen_ai_demo_1/blocks",
+                      "publicationHistory": {
+                        "pageInfo": {
+                          "hasNextPage": false,
+                          "endCursor": "2024-04-10T12:36:23.756450+00:00"
+                        },
+                        "edges": [
+                          {
+                            "cursor": "2024-04-10T12:36:23.756450+00:00",
+                            "node": {
+                              "publicationId": "0d2049ef35507000",
+                              "catalogType": "collection",
+                              "publishedAt": "2024-04-10T12:36:23.756450+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": "REDACTED",
+                              "detail": null
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/gpt-notion",
+                      "publicationHistory": {
+                        "pageInfo": {
+                          "hasNextPage": true,
+                          "endCursor": "2024-07-31T19:08:12.106771+00:00"
+                        },
+                        "edges": [
+                          {
+                            "cursor": "2024-04-04T13:56:57.454633+00:00",
+                            "node": {
+                              "publicationId": "0d10fbbedc3f8c00",
+                              "catalogType": "collection",
+                              "publishedAt": "2024-04-04T13:56:57.454633+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": "REDACTED",
+                              "detail": "Published via flowctl"
+                            }
+                          },
+                          {
+                            "cursor": "2024-06-27T14:23:35.129414+00:00",
+                            "node": {
+                              "publicationId": "0de94a31eb8001cd",
+                              "catalogType": "collection",
+                              "publishedAt": "2024-06-27T14:23:35.129414+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": null,
+                              "detail": "in response to publication of one or more depencencies"
+                            }
+                          },
+                          {
+                            "cursor": "2024-07-31T19:08:12.106771+00:00",
+                            "node": {
+                              "publicationId": "0e415851f28003d8",
+                              "catalogType": "collection",
+                              "publishedAt": "2024-07-31T19:08:12.106771+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": null,
+                              "detail": "in response to publication of one or more depencencies"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "catalogName": "Jonathan_Wihl/motherduck/materialize-motherduck",
+                      "publicationHistory": {
+                        "pageInfo": {
+                          "hasNextPage": false,
+                          "endCursor": "2026-04-30T21:53:53.667377+00:00"
+                        },
+                        "edges": [
+                          {
+                            "cursor": "2026-04-20T22:35:53.416852+00:00",
+                            "node": {
+                              "publicationId": "1492cd3fa580028f",
+                              "catalogType": "materialization",
+                              "publishedAt": "2026-04-20T22:35:53.416852+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": "REDACTED",
+                              "detail": "Published via flowctl\n- updated resource /_meta of 1 bindings"
+                            }
+                          },
+                          {
+                            "cursor": "2026-04-20T22:36:41.881198+00:00",
+                            "node": {
+                              "publicationId": "1492cdacec0001d6",
+                              "catalogType": "materialization",
+                              "publishedAt": "2026-04-20T22:36:41.881198+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": "REDACTED",
+                              "detail": ""
+                            }
+                          },
+                          {
+                            "cursor": "2026-04-30T21:53:53.667377+00:00",
+                            "node": {
+                              "publicationId": "14ac79e3a08003c6",
+                              "catalogType": "materialization",
+                              "publishedAt": "2026-04-30T21:53:53.667377+00:00",
+                              "userId": "REDACTED",
+                              "userEmail": "REDACTED",
+                              "userFullName": "REDACTED",
+                              "detail": "Published via flowctl (v0.6.5)"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [publicationHistory resolver](https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/publication_history.rs)
+
+  **WHY:** Proves that `publicationHistory` can be nested inside a `liveSpecs`
+  page, resolved per ref in one request. This is how the connector fetches
+  history for a whole page of specs per round trip. It also shows the item shape:
+  the item does **not** carry the parent `catalogName`, so the connector stamps it
+  from the enclosing ref.
+
+  **VERIFIED (2026-10-07):** `publicationHistory` resolves per ref inside one `liveSpecs` page. Items carry no `catalogName`, so the connector stamps it from the enclosing ref. `gpt-notion` shows `hasNextPage: true` with `endCursor` = the third item's `publishedAt` (the nested connection paginates independently). Auto-publications are authored by the `support@estuary.dev` system user with `userFullName: null`. `detail` is nullable.

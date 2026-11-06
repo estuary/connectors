@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ const (
 	MAX_OBJECT_BYTES = 64 * 1024 * 1024 // 64MiB
 )
 
-func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
+func createDuckDialect(featureFlags map[string]bool, isDuckLake bool) sql.Dialect {
 	// Define base date/time mappings without primary key wrapper
 	primaryKeyTextType := sql.MapStatic("VARCHAR")
 	dateMapping := sql.MapStatic("DATE")
@@ -73,19 +73,35 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
+	// A DuckLake database tracks columns by field id and never rewrites existing
+	// data files, so its in-place ALTER COLUMN ... TYPE accepts only lossless
+	// widening type promotions. Withholding the direct cast leaves those migrations
+	// on the multi-step rename path, which both database formats support.
+	var directCast = sql.WithDirectCast()
+	if isDuckLake {
+		directCast = func(*sql.MigrationSpec) {}
+	}
+
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"double":                   {sql.NewMigrationSpec([]string{"varchar"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"double", "hugeint", "varchar"})},
-			"hugeint":                  {sql.NewMigrationSpec([]string{"double", "varchar"})},
-			"date":                     {sql.NewMigrationSpec([]string{"varchar"})},
-			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
-			"time":                     {sql.NewMigrationSpec([]string{"varchar"})},
-			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"})},
-			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, sql.WithCastSQL(stringToBlobCast))},
-			"blob":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(blobToStringCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"double":                   {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
+			"bigint":                   {sql.NewMigrationSpec([]string{"double", "hugeint", "varchar"}, directCast)},
+			"hugeint":                  {sql.NewMigrationSpec([]string{"double", "varchar"}, directCast)},
+			"date":                     {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, directCast, sql.WithCastSQL(datetimeToStringCast))},
+			"time":                     {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
+			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
+			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, directCast, sql.WithCastSQL(stringToBlobCast))},
+			"blob":                     {sql.NewMigrationSpec([]string{"varchar"}, directCast, sql.WithCastSQL(blobToStringCast))},
+			// DuckDB's CAST(JSON AS VARCHAR) yields the JSON text, used when
+			// reverting object/array fields from JSON storage back to varchar.
+			"json": {sql.NewMigrationSpec([]string{"varchar"}, directCast)},
+			"*":    {sql.NewMigrationSpec([]string{"json"}, directCast, sql.WithCastSQL(toJsonCast))},
 		},
+		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
+				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
+		}),
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),
@@ -281,9 +297,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ else -}}                                                                                                                                                        
 SELECT {{ $.Binding }} AS binding,                                                                                                                                 
 json_object(                                                                                                                                                       
-{{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
+{{- range $i, $col := $.RootPropertyColumns}}                                                                                                                         
        {{- if $i}}, {{end}}                                                                                                                                        
-       '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
+       {{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       

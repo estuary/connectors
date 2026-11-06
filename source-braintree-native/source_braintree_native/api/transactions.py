@@ -13,6 +13,7 @@ from .common import (
     TRANSACTION_SEARCH_LIMIT,
     braintree_xml_to_dict,
     bisect_window,
+    request_with_search_timeout_retries,
 )
 from ..models import (
     IncrementalResource,
@@ -104,6 +105,7 @@ async def fetch_transactions_updated_between(
     start: datetime,
     end: datetime,
     gateway: BraintreeGateway,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     ids = await _fetch_unique_updated_transaction_ids(
@@ -122,6 +124,7 @@ async def fetch_transactions_updated_between(
         ids,
         gateway,
         braintree.Transaction,
+        concurrency,
         log,
     ):
         yield doc
@@ -133,6 +136,7 @@ async def fetch_transactions_created_between(
     start: datetime,
     end: datetime,
     gateway: BraintreeGateway,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     ids = await fetch_searchable_resource_ids_by_field_between(
@@ -155,6 +159,7 @@ async def fetch_transactions_created_between(
         ids,
         gateway,
         braintree.Transaction,
+        concurrency,
         log,
     ):
         yield doc
@@ -246,7 +251,10 @@ async def _fetch_transaction_ids_disbursed_between(
 
     response = IdSearchResponse.model_validate(
         braintree_xml_to_dict(
-            await http.request(log, url, "POST", json=body, headers=HEADERS)
+            await request_with_search_timeout_retries(
+                log,
+                lambda: http.request(log, url, "POST", json=body, headers=HEADERS),
+            )
         )
     )
 
@@ -259,6 +267,7 @@ async def fetch_transactions_disbursed_between(
     start: datetime,
     end: datetime,
     gateway: BraintreeGateway,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -289,6 +298,7 @@ async def fetch_transactions_disbursed_between(
             ids,
             gateway,
             braintree.Transaction,
+            concurrency,
             log,
         ):
             yield doc
@@ -323,7 +333,10 @@ async def _fetch_transaction_ids_disputed_between(
 
     response = IdSearchResponse.model_validate(
         braintree_xml_to_dict(
-            await http.request(log, url, "POST", json=body, headers=HEADERS)
+            await request_with_search_timeout_retries(
+                log,
+                lambda: http.request(log, url, "POST", json=body, headers=HEADERS),
+            )
         )
     )
 
@@ -336,6 +349,7 @@ async def fetch_transactions_disputed_between(
     start: datetime,
     end: datetime,
     gateway: BraintreeGateway,
+    concurrency: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -366,6 +380,7 @@ async def fetch_transactions_disputed_between(
             ids,
             gateway,
             braintree.Transaction,
+            concurrency,
             log,
         ):
             yield doc

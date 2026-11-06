@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-smartsheet:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_smartsheet
+        config: config.yaml
+    bindings: []

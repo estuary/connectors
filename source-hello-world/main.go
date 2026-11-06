@@ -20,7 +20,7 @@ func main() {
 }
 
 type config struct {
-	Rate float32 `json:"rate" jsonschema:"title=Message Rate,description=Message rate in documents per second,default=1"`
+	Rate float32 `json:"rate" jsonschema:"title=Message Rate,description=Message rate in documents per second,default=1" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -133,6 +133,8 @@ func (d driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_
 
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
+
+	log.WithField("observable", true).Info("a pass-through connector log")
 
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &cfg); err != nil {

@@ -1,0 +1,53 @@
+info:
+  name: per_page limits probe
+  type: http
+  seq: 3
+http:
+  method: GET
+  url: '{{base_url_v2}}/users?per_page=51'
+  params:
+  - name: per_page
+    value: '51'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-users-v2
+    **WHY:** v2 is a separate API surface — confirm it shares v1's per_page ceiling/enforcement rather than assuming.
+
+    **VERIFIED (2026-09-28):** `per_page=51` → 200 with `meta.per_page: 50`. Silent clamp, not rejection. Same on v1 (`_top-level / per_page limits probe`).
+  type: text/markdown
+examples:
+- name: 200 - per_page 51 clamped to 50 (projection)
+  request:
+    url: '{{base_url_v2}}/users?per_page=51'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "users": [
+            {
+              "id": 2078847
+            }
+          ],
+          "meta": {
+            "count": 1,
+            "total": 1,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

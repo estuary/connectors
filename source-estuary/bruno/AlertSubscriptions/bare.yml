@@ -1,0 +1,86 @@
+info:
+  name: bare
+  type: graphql
+  seq: 1
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query AlertSubscriptions($prefix: Prefix!) {
+        alertSubscriptions(by: { prefix: $prefix }) { catalogPrefix alertTypes createdAt updatedAt detail email destination }
+      }
+    variables: |-
+      {
+        "prefix": "{{test_prefix_nested}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/alert_subscriptions.rs
+
+  **WHY:** Unpaginated list; admin-only. Confirms shape, that nested prefixes are
+  included (`starts_with`), and the identity candidates (`catalogPrefix`,
+  `destination`). Emails / destination are redacted in the saved example.
+
+  **VERIFIED (2026-10-07):** An unpaginated array. One subscription under `Artificial-Industries/` with `alertTypes` as an enum list and `email`/`destination` (redacted; destination is `mailto:` URI). Empty array under `Jonathan_Wihl/`. Identity = (`catalogPrefix`, `destination`).
+
+examples:
+  - name: 200 - one subscription under Artificial-Industries
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alertSubscriptions": [
+                {
+                  "catalogPrefix": "Artificial-Industries/",
+                  "alertTypes": [
+                    "free_trial",
+                    "free_trial_ending",
+                    "free_trial_stalled",
+                    "missing_payment_method",
+                    "data_movement_stalled"
+                  ],
+                  "createdAt": "2026-03-20T14:23:05.971199+00:00",
+                  "updatedAt": "2026-08-06T16:21:36.729905+00:00",
+                  "detail": null,
+                  "email": "REDACTED",
+                  "destination": "REDACTED"
+                }
+              ]
+            }
+          }
+  - name: 200 - empty under Jonathan_Wihl (prefix var was test_prefix)
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "alertSubscriptions": []
+            }
+          }

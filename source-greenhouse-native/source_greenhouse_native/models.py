@@ -82,11 +82,14 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class GreenhouseResource(BaseDocument, extra="allow"):
+class GreenhouseSnapshotResource(BaseDocument, extra="allow"):
     name: ClassVar[str]
     path: ClassVar[str]
 
     id: int
+
+
+class GreenhouseResource(GreenhouseSnapshotResource):
     created_at: AwareDatetime
     updated_at: AwareDatetime
 
@@ -172,7 +175,7 @@ class DemographicAnswers(GreenhouseResource):
     path: ClassVar[str] = "demographic_answers"
 
 
-class DemographicQuestions(GreenhouseResource):
+class DemographicQuestions(GreenhouseSnapshotResource):
     name: ClassVar[str] = "demographic_questions"
     path: ClassVar[str] = "demographic_questions"
 
@@ -312,6 +315,11 @@ class Users(GreenhouseResource):
     path: ClassVar[str] = "users"
 
 
+SNAPSHOT_RESOURCES: list[type[GreenhouseSnapshotResource]] = [
+    DemographicQuestions,
+]
+
+
 INCREMENTAL_RESOURCES: list[type[GreenhouseResource]] = [
     Applications,
     ApplicationStages,
@@ -329,7 +337,6 @@ INCREMENTAL_RESOURCES: list[type[GreenhouseResource]] = [
     CustomFields,
     CustomFieldOptions,
     DemographicAnswers,
-    DemographicQuestions,
     DemographicQuestionSets,
     Departments,
     EEOC,

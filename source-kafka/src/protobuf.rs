@@ -1,11 +1,7 @@
 use anyhow::{Context, Result};
-use doc::{
-    shape::{schema::to_schema, ObjProperty},
-    Shape,
-};
+use doc::{shape::ObjProperty, Shape};
 use json::schema::{self as JsonSchema, types};
 use prost_reflect::{DescriptorPool, DynamicMessage, Kind, MessageDescriptor};
-use schemars::schema::RootSchema;
 
 /// Parse Confluent Schema Registry Protobuf wire format message indexes.
 /// Wire format after magic byte (0) + schema ID (4 bytes):
@@ -149,6 +145,7 @@ pub fn proto_descriptor_to_shape(descriptor: &MessageDescriptor) -> Shape {
             let field_shape = proto_field_to_shape(&field);
             ObjProperty {
                 name: field.name().into(),
+                is_property: true,
                 is_required: false, // Proto3 fields are all optional
                 shape: field_shape,
             }
@@ -293,6 +290,7 @@ pub fn protobuf_key_schema_to_shape(descriptor: &MessageDescriptor) -> Shape {
             let field_shape = proto_key_field_to_shape(&field)?;
             Some(ObjProperty {
                 name: field.name().into(),
+                is_property: true,
                 is_required: true, // Keys should be required
                 shape: field_shape,
             })
@@ -348,12 +346,6 @@ fn proto_key_field_to_shape(field: &prost_reflect::FieldDescriptor) -> Option<Sh
     }
 
     Some(shape)
-}
-
-/// Convert a protobuf descriptor to a JSON Schema RootSchema.
-pub fn proto_descriptor_to_json_schema(descriptor: &MessageDescriptor) -> RootSchema {
-    let shape = proto_descriptor_to_shape(descriptor);
-    to_schema(shape)
 }
 
 #[cfg(test)]

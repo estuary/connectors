@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"fmt"
@@ -34,22 +34,52 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		binaryMapping = sql.MapStatic("BYTEA", sql.UsingConverter(sql.Base64Decoder))
 	}
 
+	// Fields originating from a PostgreSQL JSONB column carry this
+	// (non-standard, vendor-tree) contentMediaType so they can be recreated
+	// as JSONB at the destination instead of collapsing onto JSON. Anything
+	// without the annotation defaults to JSON, preserving the historical
+	// behavior for existing materializations and non-Postgres sources.
+	//
+	// Gated behind the "jsonb" feature flag: when disabled the
+	// contentMediaType is ignored entirely and everything maps to JSON, exactly
+	// as it did before JSONB support was introduced.
+	jsonbContentMediaType := "application/vnd.estuary.postgresql.jsonb+json"
+	jsonOrJsonb := func(jsonMapper, jsonbMapper sql.MapProjectionFn) sql.MapProjectionFn {
+		if !featureFlags["jsonb"] {
+			return jsonMapper
+		}
+		return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
+			if p.Inference.ContentMediaType == jsonbContentMediaType {
+				return jsonbMapper(p)
+			}
+			return jsonMapper(p)
+		}
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
 				sql.MapStatic("NUMERIC"),
 			),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON"),
-			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         binaryMapping,
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.NUMBER:  sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:  jsonOrJsonb(sql.MapStatic("JSON"), sql.MapStatic("JSONB")),
+			sql.ARRAY:   jsonOrJsonb(sql.MapStatic("JSON"), sql.MapStatic("JSONB")),
+			sql.BINARY:  binaryMapping,
+			sql.MULTIPLE: jsonOrJsonb(
+				sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+				sql.MapStatic("JSONB", sql.UsingConverter(sql.ToJsonBytes)),
+			),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: primaryKeyTextType,
+				Fallback: func() sql.MapProjectionFn {
+					if featureFlags["enum"] {
+						return MapEnum(primaryKeyTextType)
+					}
+					return primaryKeyTextType
+				}(),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      dateMapping,
 					"date-time": datetimeMapping,
@@ -71,16 +101,45 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"numeric":                  {sql.NewMigrationSpec([]string{"double precision", "text"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"double precision", "numeric", "text"})},
-			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
-			"date":                     {sql.NewMigrationSpec([]string{"text"})},
-			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
-			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
-			"text":                     {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
-			"character varying":        {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
-			"bytea":                    {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"numeric":                  {sql.NewMigrationSpec([]string{"double precision", "text"}, sql.WithDirectCast())},
+			"bigint":                   {sql.NewMigrationSpec([]string{"double precision", "numeric", "text"}, sql.WithDirectCast())},
+			"double precision":         {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast())},
+			"date":                     {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast())},
+			"time without time zone":   {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast())},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast(), sql.WithCastSQL(datetimeToStringCast))},
+			// text/character varying → enum: create type + direct ALTER COLUMN TYPE ... USING col::enum_type.
+			"text": {
+				sql.NewMigrationSpec([]string{"bytea"}, sql.WithDirectCast(), sql.WithCastSQL(stringToByteaCast)),
+				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
+			},
+			"character varying": {
+				sql.NewMigrationSpec([]string{"bytea"}, sql.WithDirectCast(), sql.WithCastSQL(stringToByteaCast)),
+				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
+			},
+			// user-defined (PG ENUM) → text: migrate incompatible USER-DEFINED columns via a
+			// direct ALTER COLUMN TYPE (no rename needed — PG supports USING col::text).
+			// Value expansion for compatible enum columns is handled separately in
+			// client.AlterTable by checking all existing PgEnum columns.
+			"user-defined": {sql.NewMigrationSpec([]string{"text"},
+				sql.WithDirectCast(),
+				sql.WithCastSQL(func(m sql.ColumnTypeMigration) string {
+					return fmt.Sprintf("%s::text", m.Identifier)
+				}),
+			)},
+			"bytea": {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast(), sql.WithCastSQL(byteaToStringCast))},
+			"json":  {sql.NewMigrationSpec([]string{"jsonb", "text"}, sql.WithDirectCast())},
+			"jsonb": {sql.NewMigrationSpec([]string{"json", "text"}, sql.WithDirectCast())},
+			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
+		},
+		// Postgres rewrites the table for each statement that changes a column's
+		// type, so every column changes in one statement and the table is
+		// rewritten once.
+		DirectCastSQL: func(table sql.Table, migrations []sql.ColumnTypeMigration) []string {
+			clauses := make([]string, len(migrations))
+			for i, m := range migrations {
+				clauses[i] = fmt.Sprintf("ALTER COLUMN %s TYPE %s USING %s", m.Identifier, m.BareDDL, m.CastSQL(m))
+			}
+			return []string{fmt.Sprintf("ALTER TABLE %s\n\t%s", table.Identifier, strings.Join(clauses, ",\n\t"))}
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -107,6 +166,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		}),
 		TypeMapper:             mapper,
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
+		MaxColumns:             1600,
 		CaseInsensitiveColumns: false,
 	}
 }
@@ -278,13 +338,13 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }},
 (
-{{- $chunks := ChunkColumns $.RootLevelColumns 49 -}}
+{{- $chunks := ChunkColumns $.RootPropertyColumns 49 -}}
 {{- range $chunkIdx, $chunk := $chunks }}
 	{{- if $chunkIdx }} || {{ end -}}
 	JSONB_BUILD_OBJECT(
 	{{- range $i, $col := $chunk}}
 		{{- if $i}},{{end}}
-		{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{Literal $col.RootProperty}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 	{{- end}}
 	)
 {{- end}}
@@ -383,20 +443,19 @@ limit 1
 ;
 {{ end }}
 
-{{ define "updateFence" }}
-DO $$
-BEGIN
-	UPDATE {{ Identifier $.TablePath }}
-		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-		WHERE materialization = {{ Literal $.Materialization.String }}
-		AND   key_begin = {{ $.KeyBegin }}
-		AND   key_end   = {{ $.KeyEnd }}
-		AND   fence     = {{ $.Fence }};
+-- Update the fence checkpoint. The bind parameters ($1..$5) are supplied by
+-- fenceUpdateArgs. This must stay parameterized rather than inlining the
+-- checkpoint as a literal, so that pg_stat_statements collapses every commit
+-- into a single normalized entry instead of one per checkpoint. The fenced-off
+-- check is performed in Go via the reported RowsAffected.
 
-	IF NOT FOUND THEN
-		RAISE 'This instance was fenced off by another';
-	END IF;
-END $$;
+{{ define "updateFence" }}
+UPDATE {{ Identifier $.TablePath }}
+	SET   checkpoint = $1
+	WHERE materialization = $2
+	AND   key_begin = $3
+	AND   key_end   = $4
+	AND   fence     = $5;
 {{ end }}
 `)
 

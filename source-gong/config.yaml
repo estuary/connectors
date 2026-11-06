@@ -1,0 +1,15 @@
+credentials:
+    credentials_title: API Key
+    access_key_sops: ENC[AES256_GCM,data:iei2aKhrje4yHItirm2L9c0kICZchZgOhBnZiY/gtcM=,iv:c3UBa6ZIIxc93cn6Z8lW0aTiHFhLIFGmHhDZ+8yQW4s=,tag:lJzZPf7WW1xRk0Iw5oUJDg==,type:str]
+    access_key_secret_sops: ENC[AES256_GCM,data:/TrlhZs3Kd314MgPEQhbchX48u52RTs67ZE0Memn29Ya6EbmLBa73j4ts4LSuBj6+zIpTFz1eeS9t1k01ZKM8L2gxpWESqZArNKm9TpQ7uaCpHG5dmBYd2ERt8Mhrar/La5xGPhtO7KsExIcuwOGLir/Nuu8hDCIWMtbPqy8yd3o/qIoxdNXZ7iMfkQboaVd33BCV3U5l30=,iv:0rWV+12DE0DHk1k3A/M4H+Lq+8i/HVx3H5xpoCZKlrg=,tag:i1Qr9H2MOrTRbJeKy4audA==,type:str]
+region: us02-16381
+start_date: "2026-08-01T00:00:00Z"
+sops:
+    encrypted_suffix: _sops
+    gcp_kms:
+        - created_at: "2026-09-16T17:02:14Z"
+          enc: CiUAdmEdwtXiEoRtbQbP2FVWj06QKQfHo4AhAXQs2I+E1EEkVUKuEkkAvE+nk/oS6/DcqXQdIcqBW3iqjab6Ug2bFQylbvP3IsgGhwC+Soh7VGWyXgdAI2Bl2a23RbVVM6Ka/L9x54pyGAQK8tlLXvAb
+          resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+    lastmodified: "2026-09-16T17:02:16Z"
+    mac: ENC[AES256_GCM,data:FVC02+bqymPodsofzHyvf/Xq4myEXDLdrOvV/BEv6bc3VDd1Q6S104g9YR6hlb4CglfByYIl0SPRNbcoP+N7dgdVjbQisanx2EkoJKisHkxogPcjQfQ2zOGBe1oqx+YlGh2XNrvr7idtMfZNiXhg0uKJERaHz4JztQBSSLYtkbo=,iv:0iddiRMdQPe4cfrQq4gYlSlg9spjCKoNkpwVtwc3qeA=,tag:wGwp3XkI6GVHCDTE92gtMA==,type:str]
+    version: 3.13.2

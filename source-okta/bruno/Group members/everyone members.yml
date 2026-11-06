@@ -1,0 +1,77 @@
+info:
+  name: everyone members
+  type: http
+  seq: 11
+
+http:
+  method: GET
+  url: "{{base_url}}/groups/{{everyone_group_id}}/users?limit=1000"
+  params:
+    - name: limit
+      value: "1000"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Group/#tag/Group/operation/listGroupUsers
+
+  **WHY:** Everyone logs no `group.user_membership.*` events, so the event-driven Group_members
+  derives its membership from `user.lifecycle.create` / `user.lifecycle.delete.completed`. This
+  checks that every non-deleted user, including STAGED and DEPROVISIONED ones, is listed in
+  Everyone, and that the hard-deleted User C is not (`everyone_group_id` is pinned to this
+  tenant's Everyone group).
+
+  **VERIFIED (2026-10-09):** Everyone lists every non-deleted user — ACTIVE, STAGED and
+  DEPROVISIONED alike — and not the hard-deleted User C.
+
+examples:
+  - name: "200 \u2014 Everyone lists STAGED and DEPROVISIONED users; hard-deleted User C absent (projection: id/status/login)"
+    request:
+      url: "{{base_url}}/groups/00g176zmw9j1Wyxqf698/users?limit=1000"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: link
+          value: "<https://okta-domain/api/v1/groups/00g176zmw9j1Wyxqf698/users?limit=1000>; rel=\"self\""
+        - name: x-rate-limit-limit
+          value: "250"
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "00u176zmwbsJ1Uak8698",
+              "status": "ACTIVE",
+              "profile.login": "<non-fixture user>"
+            },
+            {
+              "id": "00u18gupu552EU005698",
+              "status": "STAGED",
+              "profile.login": "estuary-members-a@example.com"
+            },
+            {
+              "id": "00u18gut4epTYtsK2698",
+              "status": "DEPROVISIONED",
+              "profile.login": "estuary-members-b@example.com"
+            },
+            {
+              "id": "00u18gzxz10URexK9698",
+              "status": "DEPROVISIONED",
+              "profile.login": "<non-fixture user>"
+            },
+            {
+              "id": "00u18h00o173Yc9fV698",
+              "status": "STAGED",
+              "profile.login": "<non-fixture user>"
+            }
+          ]

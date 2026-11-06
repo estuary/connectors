@@ -62,11 +62,19 @@ class SourceHubspot(AbstractSource):
             error_msg = repr(error)
         return alive, error_msg
 
-    def get_granted_scopes(self, authenticator):
+    def get_granted_scopes(self, authenticator, credentials):
         try:
             access_token = authenticator.get_access_token()
-            url = f"https://api.hubapi.com/oauth/v1/access-tokens/{access_token}"
-            response = requests.get(url=url)
+            url = "https://api.hubapi.com/oauth/2026-09/token/introspect"
+            response = requests.post(
+                url=url,
+                data={
+                    "client_id": credentials["client_id"],
+                    "client_secret": credentials["client_secret"],
+                    "token": access_token,
+                    "token_type_hint": "access_token",
+                },
+            )
             response.raise_for_status()
             response_json = response.json()
             granted_scopes = response_json["scopes"]
@@ -121,7 +129,7 @@ class SourceHubspot(AbstractSource):
         api = API(credentials=credentials)
         if api.is_oauth2():
             authenticator = api.get_authenticator()
-            granted_scopes = self.get_granted_scopes(authenticator)
+            granted_scopes = self.get_granted_scopes(authenticator, credentials)
             self.logger.info(f"The following scopes were granted: {granted_scopes}")
 
             available_streams = [stream for stream in streams if stream.scope_is_granted(granted_scopes)]

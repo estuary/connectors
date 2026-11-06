@@ -879,3 +879,73 @@ func TestBackfillPriority(t *testing.T) {
 	tc.Run("Backfill 3 (Low Priority)", transactionCountBaseline+1)  // Run until everything else is backfilled
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
+
+// TestLinkedCollections exercises the indirect "linked collections" form of the
+// capture protocol, in which every binding leaves its collection unset and
+// instead references an entry of the spec's linked_collections table by index.
+// Two tables with identical shapes are captured into a single shared output
+// collection, which is the fan-in pattern this protocol feature exists for.
+func TestLinkedCollections(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (1, 'one'), (2, 'two')`)
+	db.Exec(t, `INSERT INTO <NAME>_b VALUES (3, 'three'), (4, 'four')`)
+	tc.Discover("Discover Tables")
+
+	// Repoint the second binding at the first binding's collection so both
+	// tables feed into it, drop the now-unused second collection, and set the
+	// indirect-specs flag so the built spec and its Validate / Open requests
+	// carry the shared collection in a linked_collections table.
+	var unused = tc.Capture.BindingTarget(1)
+	require.NoError(t, tc.Capture.EditBinding(1, "target", tc.Capture.BindingTarget(0)))
+	require.NoError(t, tc.Capture.DeleteCollection(unused))
+	require.NoError(t, tc.Capture.EditCapture("shards.flags.indirect-specs", "true"))
+
+	// Since both tables feed the same collection the transcript can't group
+	// their documents by collection name, so give the first table a higher
+	// backfill priority to make the document ordering deterministic.
+	require.NoError(t, tc.Capture.EditBinding(0, "resource.priority", 10))
+
+	tc.Run("Initial Backfill", transactionCountBaseline+2)
+
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (5, 'five'), (6, 'six')`)
+	db.Exec(t, `INSERT INTO <NAME>_b VALUES (7, 'seven'), (8, 'eight')`)
+	tc.Run("Replication", transactionCountBaseline)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+// TestActivateStreamsBeforeCatchup re-backfills a binding with a backfill filter after
+// rows outside the filter were modified while the capture was stopped. Without the flag
+// those modifications are lost, since the re-backfilled binding is only activated after
+// the catch-up stream. With it they are replicated.
+func TestActivateStreamsBeforeCatchup(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		flags string
+	}{
+		{"Disabled", ""},
+		{"Enabled", "activate_streams_before_catchup"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var db, tc2 = blackboxTestSetup(t)
+			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+			db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')`)
+			require.NoError(t, tc2.Capture.EditConfig("advanced.feature_flags", tc.flags))
+			tc2.Discover("Discover Tables")
+			tc2.Run("Initial Backfill", transactionCountBaseline+1)
+
+			// Changes to rows both inside and outside the upcoming backfill filter
+			db.Exec(t, `UPDATE <NAME> SET data = 'one-updated' WHERE id = 1`)
+			db.Exec(t, `UPDATE <NAME> SET data = 'three-updated' WHERE id = 3`)
+			db.Exec(t, `INSERT INTO <NAME> VALUES (5, 'five'), (6, 'six')`)
+			db.Exec(t, `DELETE FROM <NAME> WHERE id = 4`)
+
+			// Re-backfill with a filter, which gives the binding a new state key
+			require.NoError(t, tc2.Capture.EditBinding(0, "resource.advanced.additional_backfill_filter", "id <= 2"))
+			require.NoError(t, tc2.Capture.EditBinding(0, "backfill", 1))
+			tc2.Run("Filtered Re-Backfill", transactionCountBaseline+1)
+			cupaloy.SnapshotT(t, tc2.Transcript.String())
+		})
+	}
+}

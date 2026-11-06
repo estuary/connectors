@@ -1,0 +1,32 @@
+info:
+  name: B2 - Add Tagged Member 2
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/lists/{{list_id}}/members"
+  body:
+    type: json
+    data: |-
+      {
+        "email_address": "nicolas+estuary-test-2@estuary.dev",
+        "status": "subscribed",
+        "tags": ["estuary-test-tag", "estuary-other-tag"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-members/add-member-to-list/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** second member with a second tag: gives tag-search >= 2 tags to return
+  and gives the segment-members offset probe (count=1&offset=1) >= 2 members to
+  page over.

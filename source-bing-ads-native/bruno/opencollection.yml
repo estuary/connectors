@@ -1,0 +1,131 @@
+opencollection: 1.0.0
+
+info:
+  name: Bing Ads
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Microsoft identity platform OAuth via the connector's sops-encrypted
+        // config.yaml. Every request decrypts the config and refreshes an access
+        // token; the token lives only on `req`, never in a var or env file.
+        // Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Sandbox --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        // Modeled on source-mailchimp-native/bruno/opencollection.yml.
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd: the GUI's
+        // cwd is wherever Bruno was launched from.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const config = JSON.parse(execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        ));
+        // Raw `sops -d` keeps the `_sops` suffix on key names (Flow strips it at
+        // runtime, sops doesn't), so accept both spellings.
+        const pick = (obj, key) => obj?.[key] ?? obj?.[`${key}_sops`];
+        const creds = config?.credentials;
+        const clientId = pick(creds, 'client_id');
+        const clientSecret = pick(creds, 'client_secret');
+        const refreshToken = pick(creds, 'refresh_token');
+        const developerToken = pick(creds, 'developer_token');
+        if (!clientId || !clientSecret || !refreshToken || !developerToken) {
+          throw new Error(
+            'config is missing credentials.{client_id,client_secret,refresh_token,developer_token}',
+          );
+        }
+
+        // Same token endpoint and tenant as the connector (models.py). The scope
+        // comes from the environment: the sandbox only accepts tokens for
+        // si.ads.microsoft.com, production for ads.microsoft.com.
+        const scope = bru.getEnvVar('oauth_scope');
+        if (!scope) throw new Error('oauth_scope env var is not set');
+        const resp = await bru.sendRequest({
+          method: 'POST',
+          url: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          data:
+            'grant_type=refresh_token' +
+            `&client_id=${encodeURIComponent(clientId)}` +
+            `&client_secret=${encodeURIComponent(clientSecret)}` +
+            `&refresh_token=${encodeURIComponent(refreshToken)}` +
+            `&scope=${encodeURIComponent(scope)}`,
+        }).catch((err) => err?.response ?? { data: String(err) });
+        const accessToken = resp?.data?.access_token;
+        if (!accessToken) {
+          // Surface only Microsoft's error fields, never the request or a token.
+          const { error, error_description, error_codes } = resp?.data ?? {};
+          const detail = error
+            ? JSON.stringify({ error, error_codes, error_description })
+            : `HTTP ${resp?.status}`;
+          throw new Error(`token refresh failed: ${detail}`);
+        }
+        req.setHeader('Authorization', `Bearer ${accessToken}`);
+        req.setHeader('DeveloperToken', developerToken);
+    - type: after-response
+      code: |-
+        // Redact fields so a saved Response Example is clean without a manual
+        // edit. tests/test_snapshots.py redacts nothing yet, so this list doesn't
+        // mirror it: `ContactInfo` is the sandbox user's sign-up contact details,
+        // and `AuthenticationToken` is a credential field on the User object.
+        // Keep the list minimal, since it also hides these from `bru run` output.
+        const REDACTED_FIELDS = ['ContactInfo', 'AuthenticationToken'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    Probes for source-bing-ads-native against the Microsoft Advertising
+    sandbox. Conventions: `.claude/skills/bruno-probe-endpoint`.
+
+    ## Running
+
+    From this directory:
+    `bru run "Customer Management/user query.yml" --env Sandbox --sandbox developer`.
+    Credentials come from `../config.yaml` (sops-encrypted; edit it with
+    `sops edit ../config.yaml`). The sandbox user is
+    `estuary-connectors-dev@outlook.com`, signed in to Estuary's Microsoft OAuth
+    app; the developer token is the public sandbox token `BBD37VB98`.
+
+    ## API constraints (account-wide)
+
+    - **Auth:** every request carries `Authorization: Bearer <access token>` and
+      `DeveloperToken`. Access tokens come from
+      `https://login.microsoftonline.com/common/oauth2/v2.0/token` with
+      `grant_type=refresh_token` and scope
+      `https://ads.microsoft.com/msads.manage offline_access` —
+      https://learn.microsoft.com/en-us/advertising/guides/authentication-oauth-get-tokens?view=bingads-13
+      (DOCUMENTED 2026-10-29). The same page says refresh tokens have no
+      specified lifetime and the server MAY issue a new one on refresh.
+    - **Token refresh (VERIFIED 2026-10-29, `Auth / refresh token rotation`):**
+      each refresh returns a new refresh token; access tokens last 3599 s.
+    - **Sandbox hosts** insert `.sandbox` into the production hostname, e.g.
+      `clientcenter.api.sandbox.bingads.microsoft.com` (`_host` in `api.py`).
+    - **Rate limits:** not yet surveyed.
+
+    - **Fault shapes:** auth failures come back as `{"Errors": [...], "Type":
+      "AdApiFaultDetail"}`, request faults as `{"OperationErrors": [...],
+      "Type": "ApiFault"}` (VERIFIED 2026-10-29). `errors.py` reads both.
+
+    ## LIMITATION index
+
+    - `Accounts / page size 1001`: `Accounts/Search` pages max out at 1,000;
+      1,001 is rejected with code 3032.
+    - `Campaigns / all types space`: over REST, multiple `CampaignType`
+      values must be comma-joined; the docs' space-delimited form is rejected.

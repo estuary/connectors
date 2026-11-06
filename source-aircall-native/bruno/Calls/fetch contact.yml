@@ -1,0 +1,63 @@
+info:
+  name: fetch contact
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: "{{base_url}}/calls?per_page=50&fetch_contact=true"
+  auth: inherit
+
+examples:
+  - name: 200 - contact embedded after K5 seeded a matching contact (trimmed to contact and meta)
+    request:
+      url: "{{base_url}}/calls?per_page=50&fetch_contact=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "calls": [
+              {
+                "id": 4186780376,
+                "raw_digits": "+1 617-610-5413",
+                "contact": {
+                  "id": 523993310,
+                  "direct_link": "https://api.aircall.io/v1/contacts/523993310",
+                  "first_name": "Estuary",
+                  "last_name": "Seed Delta",
+                  "company_name": "",
+                  "information": "estuary connector test seed",
+                  "is_shared": true,
+                  "created_at": 1791907337,
+                  "updated_at": 1791907337,
+                  "emails": [],
+                  "phone_numbers": [{"id": 2226592641, "label": "Work", "value": "+16176105413", "new_contacts_service_id": null}]
+                }
+              }
+            ],
+            "meta": {"count": 3, "total": 3, "current_page": 1, "per_page": 50, "next_page_link": null, "previous_page_link": null}
+          }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-calls
+
+    **WHY:** Without `fetch_contact`, `contact` is always null, so calls can't be linked to the contacts stream. The connector sends `fetch_contact=true` and keeps only the contact's `id`.
+
+    **VERIFIED (2026-10-13):** with no matching contact, `contact` stays `null` even with the flag. After `Seeding / K5` created a contact with the calls' number, all 3 calls embed the full Contact object, including `id`. Response time was unchanged (273 ms vs 280 ms).
+
+    **LIMITATION (VERIFIED 2026-10-13):** the contact is matched by phone number when the call is read, not when it was placed: K5's contact, created weeks after the calls, appears on them. A call's `contact` reflects contacts that existed at its last read.
+  type: text/markdown

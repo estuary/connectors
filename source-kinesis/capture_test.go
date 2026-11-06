@@ -75,6 +75,11 @@ func TestDiscover(t *testing.T) {
 	cleanup()
 	t.Cleanup(cleanup)
 
+	// Wait for the streams to be fully deleted if they existed
+	for _, s := range testStreams {
+		awaitStreamDeleted(t, ctx, client, s)
+	}
+
 	for _, s := range testStreams {
 		s := s
 		_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
@@ -109,6 +114,11 @@ func TestCapture(t *testing.T) {
 	}
 	cleanup()
 	t.Cleanup(cleanup)
+
+	// Wait for the streams to be fully deleted if they existed
+	for _, s := range testStreams {
+		awaitStreamDeleted(t, ctx, client, s)
+	}
 
 	for _, s := range testStreams {
 		s := s
@@ -200,6 +210,9 @@ func TestCaptureParsing(t *testing.T) {
 	}
 	cleanup()
 	t.Cleanup(cleanup)
+
+	// Wait for stream to be fully deleted if it existed
+	awaitStreamDeleted(t, ctx, client, testStream)
 
 	_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
 		StreamName: aws.String(testStream),
@@ -559,6 +572,14 @@ func buildGlueHeader(t *testing.T, schemaVersionId string) []byte {
 }
 
 func advanceCapture(t testing.TB, cs *st.CaptureSpec) {
+	// 100ms is enough for the LocalStack emulator, but not for real Kinesis.
+	// The harness counts the checkpoint that pruneShards always emits as data
+	// received, so the shutdown countdown starts before any records have been
+	// read.
+	if useRealAWS() {
+		advanceCaptureWithTimeout(t, cs, 10*time.Second)
+		return
+	}
 	advanceCaptureWithTimeout(t, cs, 100*time.Millisecond)
 }
 

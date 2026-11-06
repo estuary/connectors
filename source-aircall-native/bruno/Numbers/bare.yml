@@ -1,0 +1,75 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+http:
+  method: GET
+  url: '{{base_url}}/numbers?per_page=50'
+  params:
+  - name: per_page
+    value: '50'
+    type: query
+  auth: inherit
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#list-all-numbers
+    **WHY:** the `numbers` stream; confirms envelope and key set (volatile `availability_status`/`open` that change without a cursor).
+
+    **VERIFIED (2026-09-28):** envelope `{numbers:[…], meta:{full meta}}`. Item keys match the docs: `id`, `direct_link`, `name`, `digits`, `country`, `time_zone`, `open`, `availability_status`, `is_ivr`, `live_recording_activated`, `priority`, `messages`, `created_at`. `open`/`availability_status`/`messages` change with no update cursor, which is why this is a snapshot and not Airbyte's created_at incremental.
+  type: text/markdown
+examples:
+- name: 200 - populated list (1 number)
+  request:
+    url: '{{base_url}}/numbers?per_page=50'
+    method: GET
+  response:
+    status: 200
+    statusText: OK
+    headers:
+    - name: content-type
+      value: application/json
+    body:
+      type: json
+      data: |-
+        {
+          "numbers": [
+            {
+              "id": 1389850,
+              "digits": "+1 984-314-0278",
+              "direct_link": "https://api.aircall.io/v1/numbers/1389850",
+              "name": "Jonathan Wihl Number - 1790590903483",
+              "country": "US",
+              "time_zone": "America/Chicago",
+              "availability_status": "open",
+              "is_ivr": false,
+              "live_recording_activated": true,
+              "priority": 0,
+              "messages": {
+                "welcome": null,
+                "waiting": "https://media-web.aircall.io/tracks/library/bensound-retrosoul-normalized.mp3",
+                "ivr": null,
+                "voicemail": null,
+                "closed": "https://media-web.aircall.io/tracks/tts/languages/en/voices/Joanna/e5bc465c2b0595ade98a98500aa6851cb557a663.mp3",
+                "callback_later": "https://media-web.aircall.io/tts/languages/en/voices/Joanna/a04a676e475a50791cccbea7faa349dab88c4f05.mp3",
+                "unanswered_call": "https://media-web.aircall.io/tracks/tts/languages/en/voices/Joanna/74ce97ac9772be646ccf5583b92be7248930af18.mp3",
+                "after_hours": null,
+                "ringing_tone": null
+              },
+              "created_at": "2026-09-28T10:21:51.000Z",
+              "open": true
+            }
+          ],
+          "meta": {
+            "count": 1,
+            "total": 1,
+            "current_page": 1,
+            "per_page": 50,
+            "next_page_link": null,
+            "previous_page_link": null
+          }
+        }

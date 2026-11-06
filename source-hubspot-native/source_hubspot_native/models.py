@@ -9,6 +9,7 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    NamedTuple,
     Self,
     TypeVar,
 )
@@ -19,6 +20,7 @@ from estuary_cdk.capture.common import (
     BaseOAuth2Credentials,
     CRON_REGEX,
     OAuth2Spec,
+    PageCursor,
     ReductionStrategy,
     ResourceConfigWithSchedule,
     ResourceState,
@@ -40,9 +42,6 @@ scopes = [
     "crm.schemas.companies.read",
     "crm.schemas.contacts.read",
     "crm.schemas.deals.read",
-    "e-commerce",
-    "forms",
-    "tickets",
 ]
 
 optional_scopes = [
@@ -51,9 +50,14 @@ optional_scopes = [
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
+    "crm.objects.leads.read",
+    "crm.objects.marketing_events.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
+    "e-commerce",
+    "forms",
     "marketing.campaigns.read",
+    "tickets",
 ]
 
 # TODO(johnny): Lift this string building into higher-order helpers.
@@ -69,7 +73,7 @@ OAUTH2_SPEC = OAuth2Spec(
         + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         r"&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
     ),
-    accessTokenUrlTemplate="https://api.hubapi.com/oauth/v1/token",
+    accessTokenUrlTemplate="https://api.hubapi.com/oauth/2026-09/token",
     accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
     accessTokenBody=(
         "grant_type=authorization_code"
@@ -94,7 +98,8 @@ class HubspotResourceConfigWithSchedule(ResourceConfigWithSchedule):
         default="",
         title="Calculated Property Refresh Schedule",
         description="Schedule to automatically refresh calculated properties. Accepts a cron expression.",
-        pattern=CRON_REGEX
+        pattern=CRON_REGEX,
+        json_schema_extra={"nonsensitive": True},
     )
 
 
@@ -107,12 +112,13 @@ class EndpointConfig(BaseModel):
         title="Capture Property History",
         description="Include historical data for changes to properties of HubSpot objects in captured documents.",
         default=False,
+        json_schema_extra={"nonsensitive": True},
     )
     useLegacyNamingForCustomObjects: bool = Field(
         title="Use Legacy Naming for Custom Objects",
         description="If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
         default=False,
-        json_schema_extra={"x-hidden-field": True},
+        json_schema_extra={"nonsensitive": True, "x-hidden-field": True},
     )
 
     # In order to publish this connector in the HubSpot marketplace, HubSpot requires
@@ -178,12 +184,14 @@ class Names(StrEnum):
     orders = auto()
     carts = auto()
     partner_clients = auto()
-    marketing_event = auto()
+    marketing_events = auto()
+    marketing_event_participants = auto()
     marketing_emails = auto()
     contact_lists = auto()
     contact_list_memberships = auto()
     feedback_submissions = auto()
     goals = auto()
+    leads = auto()
     workflows = auto()
     campaigns = auto()
 
@@ -228,6 +236,7 @@ class Owner(BaseDocument, extra="allow"):
 
 class Form(BaseDocument, extra="allow"):
     id: str
+    formType: str
     createdAt: AwareDatetime | None
     updatedAt: AwareDatetime | None
 
@@ -287,7 +296,12 @@ class BaseCRMObject(BaseDocument, extra="allow"):
         dict[str, list[History]] | None,
         # The merge reduction strategy is only allowed for objects and arrays. Since propertiesWithHistory can be null,
         # we use a conditional to only apply the reduce annotation when the field is an object.
-        Field(json_schema_extra={"if": {"type": "object"}, "then": {"reduce": {"strategy": ReductionStrategy.MERGE}}}),
+        Field(
+            json_schema_extra={
+                "if": {"type": "object"},
+                "then": {"reduce": {"strategy": ReductionStrategy.MERGE}},
+            }
+        ),
     ] = None
 
     class InlineAssociations(BaseModel):
@@ -318,7 +332,9 @@ class BaseCRMObject(BaseDocument, extra="allow"):
         # needles: null is ignored by format inference, and null overwrites the LHS value
         # per the merge reduction strategy specified in the read schmea so cleared properties
         # propagate correctly.
-        self.properties = {k: (None if v == "" else v) for k, v in self.properties.items()}
+        self.properties = {
+            k: (None if v == "" else v) for k, v in self.properties.items()
+        }
         if self.propertiesWithHistory:
             self.propertiesWithHistory = {
                 k: v for k, v in self.propertiesWithHistory.items() if len(v)
@@ -333,48 +349,38 @@ class BaseCRMObject(BaseDocument, extra="allow"):
         delattr(self, "associations")
         return self
 
-
     # sourced_schema builds a schema to be included in a SourcedSchema response to
     # the runtime. This ultimately tells Flow what each field's type is & causes resulting columns
     # to be included in materializations even when we haven't seen data for that field yet.
     # Emitting SourcedSchema responses also increased the inferred schema's complexity limit
     # from 1,000 to 10,000, which helps when CRMObjects have enough custom properties that the total
-    # property count exceeds the default complexity limit. 
+    # property count exceeds the default complexity limit.
     @classmethod
     def sourced_schema(cls, properties: list[Property]) -> dict[str, Any]:
         schema = {
             "additionalProperties": False,
             "type": "object",
             "properties": {
-                "archived": {
-                    "type": "boolean"
-                },
+                "archived": {"type": "boolean"},
                 "createdAt": {
                     "format": "date-time",
                     "maxLength": 32,
                     "minLength": 16,
-                    "type": "string"
+                    "type": "string",
                 },
                 "id": {
                     "maximum": 100000000000,
                     "minimum": 10000000000,
                     "title": "Id",
-                    "type": "integer"
+                    "type": "integer",
                 },
                 "updatedAt": {
                     "format": "date-time",
                     "maxLength": 32,
                     "minLength": 16,
-                    "type": "string"
+                    "type": "string",
                 },
             },
-            "required": [
-                "archived",
-                "createdAt",
-                "id",
-                "properties",
-                "updatedAt",
-            ]
         }
 
         properties_schema = {
@@ -382,8 +388,6 @@ class BaseCRMObject(BaseDocument, extra="allow"):
             "type": "object",
             "properties": {},
         }
-
-        required_properties: list[str] = []
 
         for prop in properties:
             property_schema: dict[str, Any] = {
@@ -398,11 +402,11 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                 case (
                     # HubSpot represents bool fields as strings. These fields are
                     # usually one of "Yes", "No", "True", or "False".
-                    PropertyTypes.bool |
-                    PropertyTypes.enumeration |
-                    PropertyTypes.string |
-                    PropertyTypes.object_coordinates |
-                    PropertyTypes.json
+                    PropertyTypes.bool
+                    | PropertyTypes.enumeration
+                    | PropertyTypes.string
+                    | PropertyTypes.object_coordinates
+                    | PropertyTypes.json
                 ):
                     pass
                 case PropertyTypes.number:
@@ -421,15 +425,44 @@ class BaseCRMObject(BaseDocument, extra="allow"):
                     continue
 
             properties_schema["properties"][prop.name] = property_schema
-            required_properties.append(prop.name)
 
         schema["properties"]["properties"] = properties_schema
-        schema["properties"]["properties"]["required"] = required_properties
         return schema
 
 
 # CRMObject is a generic, concrete subclass of BaseCRMObject.
 CRMObject = TypeVar("CRMObject", bound=BaseCRMObject)
+
+
+class TimestampedId(NamedTuple):
+    """An object's id paired with its last-modified timestamp. The unit that the
+    ID fetchers return and that flows through the batch-read chunking layer."""
+
+    ts: datetime
+    id: str
+
+
+class IdChunk(NamedTuple):
+    """One page of TimestampedIds yielded by _fetch_id_chunks, plus the
+    underlying fetcher's cursor for the page after it, falsy when none remains."""
+
+    ids: list[TimestampedId]
+    next_page: PageCursor
+
+
+# The document type carried by a TimestampedObject. Its bound is intentionally
+# open: object_with_associations specializes it to CRMObject, while the
+# FetchRecentFn/FetchDelayedFn aliases in api/shared.py use TimestampedObject[Any].
+Doc = TypeVar("Doc")
+
+
+class TimestampedObject(NamedTuple, Generic[Doc]):
+    """A fetched document with its last-modified timestamp and id. The id doubles
+    as the emitted-changes cache key."""
+
+    ts: datetime
+    id: str
+    doc: Doc
 
 
 class Company(BaseCRMObject):
@@ -466,10 +499,9 @@ class Engagement(BaseCRMObject):
         Names.notes,
         Names.tasks,
         Names.content,
-        Names.orders,
         Names.carts,
         Names.partner_clients,
-        Names.marketing_event,
+        Names.marketing_events,
     ]
 
     contacts: list[int] = []
@@ -483,11 +515,9 @@ class Engagement(BaseCRMObject):
     meetings: list[int] = []
     notes: list[int] = []
     tasks: list[int] = []
-    content: list[int] = []
-    orders: list[int] = []
     carts: list[int] = []
     partner_clients: list[int] = []
-    marketing_event: list[int] = []
+    marketing_events: list[int] = []
 
 
 class Ticket(BaseCRMObject):
@@ -527,6 +557,18 @@ class FeedbackSubmission(BaseCRMObject):
 
 class Goals(BaseCRMObject):
     ASSOCIATED_ENTITIES = []
+
+
+class Lead(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [
+        Names.contacts,
+        Names.companies,
+        Names.deals,
+    ]
+
+    contacts: list[int] = []
+    companies: list[int] = []
+    deals: list[int] = []
 
 
 # An Association, as returned by the v4 associations API.
@@ -687,6 +729,12 @@ class OldRecentEngagements(BaseModel):
     total: int
 
 
+class EngagementsModifiedAfter(BaseModel):
+    results: list[OldRecentEngagements.Item]
+    hasMore: bool
+    after: str | None = None
+
+
 class OldRecentTicket(BaseModel):
     timestamp: int
     objectId: int
@@ -790,6 +838,7 @@ class ContactList(BaseDocument, extra="allow"):
     listId: int
     objectTypeId: ContactTypeId
     updatedAt: AwareDatetime
+    processingType: str
     additionalProperties: dict[str, Any]
 
     def get_cursor_value(self) -> datetime:
@@ -822,13 +871,13 @@ class ContactListMembershipResponse(BaseModel, extra="allow"):
     @model_validator(mode="before")
     @classmethod
     def _set_membership_list_ids(cls, values: dict[str, Any], info: ValidationInfo):
-        if not info.context or not isinstance(info.context, ContactList):
+        if not isinstance(info.context, int):
             raise RuntimeError(
-                f"Validation context is not set or is not of type ContactList: {info.context}"
+                f"Validation context is not a contact list id: {info.context}"
             )
 
         for membership in values["results"]:
-            membership["listId"] = info.context.listId
+            membership["listId"] = info.context
 
         return values
 
@@ -874,3 +923,11 @@ class Order(BaseCRMObject):
 class Campaign(BaseDocument, extra="allow"):
     id: str
     updatedAt: AwareDatetime
+
+
+class MarketingEvent(BaseDocument, extra="allow"):
+    objectId: str
+
+
+class MarketingEventParticipant(BaseDocument, extra="allow"):
+    pass

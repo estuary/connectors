@@ -1,0 +1,134 @@
+meta {
+  name: 04 - OrderBy Direction Probe
+  type: graphql
+  seq: 4
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query OrderByDirectionProbe {
+    byUpdated: users(first: 10, orderBy: updatedAt) { nodes { name updatedAt } }
+    byCreated: users(first: 10, orderBy: createdAt) { nodes { name createdAt } }
+    noOrderBy: users(first: 10) { nodes { name createdAt } }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  THE decisive probe for this cluster. `PaginationOrderBy` carries no direction modifier,
+  and request `02 - Introspect Pagination Args` showed both enum members have a NULL
+  description — so sort direction is undocumented in the prose docs AND absent from the
+  schema. Direction dictates the entire cursor design:
+
+  - ASCENDING would let a `filter.updatedAt.gt` sweep checkpoint after EVERY page, since
+    everything before the last-seen `updatedAt` is known-read.
+  - DESCENDING means the newest change arrives on page 1 and the oldest on the last page.
+    Per-page checkpointing would then advance the cursor PAST records not yet read, and a
+    crash mid-sweep would permanently skip everything between the old cursor and the
+    last-emitted page.
+
+  **Why `users` and not one of the four cluster streams:** this workspace was bulk-seeded,
+  so all 4 issues and all 3 labels share the byte-identical `updatedAt`
+  `2026-07-30T21:35:03.808Z`. With every sort key tied, ascending and descending responses
+  are indistinguishable — verified: `issues(sort: [{updatedAt: {order: Ascending}}])` and
+  its `Descending` twin returned the exact same node order. `users` is the only collection
+  in this workspace with DISTINCT timestamps (two members, seeded ~3s apart), which makes
+  it the only available oracle. Direction is a property of the shared `PaginationOrderBy`
+  enum, not of any one root field, so the result generalizes to all four cluster streams.
+
+  **Limitation / observed finding:** `orderBy` sorts **DESCENDING** (newest first), for
+  both enum members. Confirmed 2026-07-30 — see the saved example: `byUpdated` returns
+  Jonathan Wihl (`...07.083Z`) before Linear (`...04.497Z`), and `byCreated` returns Linear
+  (`...04.399Z`) before Jonathan (`...03.808Z`). `noOrderBy` is byte-identical to
+  `byCreated`, confirming the documented default of `createdAt` — also descending.
+
+  Consequence for the connector: any stream that can only use `orderBy` (i.e. `issueLabels`,
+  which rejects the `sort` argument — see `42 - Labels Sort Rejected`) is restricted to
+  END-OF-SWEEP checkpointing. Streams that accept `sort` should use
+  `sort: [{updatedAt: {order: Ascending}}]` instead and may checkpoint per page.
+}
+
+example {
+  name: 200 — DESCENDING confirmed (newest first)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query OrderByDirectionProbe {
+        byUpdated: users(first: 10, orderBy: updatedAt) { nodes { name updatedAt } }
+        byCreated: users(first: 10, orderBy: createdAt) { nodes { name createdAt } }
+        noOrderBy: users(first: 10) { nodes { name createdAt } }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 36
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2496
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999930
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "byUpdated": {
+              "nodes": [
+                {
+                  "name": "Jonathan Wihl",
+                  "updatedAt": "2026-07-30T21:35:07.083Z"
+                },
+                {
+                  "name": "Linear",
+                  "updatedAt": "2026-07-30T21:35:04.497Z"
+                }
+              ]
+            },
+            "byCreated": {
+              "nodes": [
+                {
+                  "name": "Linear",
+                  "createdAt": "2026-07-30T21:35:04.399Z"
+                },
+                {
+                  "name": "Jonathan Wihl",
+                  "createdAt": "2026-07-30T21:35:03.808Z"
+                }
+              ]
+            },
+            "noOrderBy": {
+              "nodes": [
+                {
+                  "name": "Linear",
+                  "createdAt": "2026-07-30T21:35:04.399Z"
+                },
+                {
+                  "name": "Jonathan Wihl",
+                  "createdAt": "2026-07-30T21:35:03.808Z"
+                }
+              ]
+            }
+          }
+        }
+      '''
+    }
+  }
+}

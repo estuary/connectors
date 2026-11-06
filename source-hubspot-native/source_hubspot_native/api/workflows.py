@@ -11,6 +11,7 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.http import HTTPSession
 
 from ..models import (
+    TimestampedObject,
     Workflow,
     WorkflowsResponse,
 )
@@ -24,7 +25,7 @@ async def _fetch_workflows_updated_between(
     http: HTTPSession,
     start: datetime,
     end: datetime | None = None,
-) -> AsyncGenerator[tuple[datetime, str, Workflow], None]:
+) -> AsyncGenerator[TimestampedObject[Workflow], None]:
     if not end:
         end = datetime.now(tz=UTC)
 
@@ -38,7 +39,7 @@ async def _fetch_workflows_updated_between(
 
     for workflow in response.workflows:
         if start <= workflow.updatedAt <= end:
-            yield (workflow.updatedAt, str(workflow.id), workflow)
+            yield TimestampedObject(workflow.updatedAt, str(workflow.id), workflow)
 
 
 async def fetch_workflows_page(
@@ -67,7 +68,7 @@ def fetch_recent_workflows(
     _: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, Workflow], None]:
+) -> AsyncGenerator[TimestampedObject[Workflow], None]:
     return _fetch_workflows_updated_between(log, http, since, until)
 
 
@@ -77,5 +78,5 @@ def fetch_delayed_workflows(
     _: bool,
     since: datetime,
     until: datetime,
-) -> AsyncGenerator[tuple[datetime, str, Workflow], None]:
+) -> AsyncGenerator[TimestampedObject[Workflow], None]:
     return _fetch_workflows_updated_between(log, http, since, until)

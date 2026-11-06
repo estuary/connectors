@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/dateandtimetypes_307398": 13 Documents
+# Collection "acmeCo/test/test/dateandtimetypes_307398": 15 Documents
 # ================================
 {
   "type": "object",
@@ -368,8 +368,48 @@
   "tstz_col": "0000-01-01T00:00:00Z",
   "txid": 999999
 }
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 12,
+    "row_id": 12,
+    "source": {
+      "resource": "test_dateandtimetypes_307398",
+      "schema": "test",
+      "table": "dateandtimetypes_307398"
+    }
+  },
+  "date_col": "9999-12-31T23:59:59Z",
+  "id": 12,
+  "interval_col": null,
+  "time_col": null,
+  "timetz_col": null,
+  "ts_col": "9999-12-31T23:59:59Z",
+  "tstz_col": "9999-12-31T23:59:59Z",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 13,
+    "row_id": 13,
+    "source": {
+      "resource": "test_dateandtimetypes_307398",
+      "schema": "test",
+      "table": "dateandtimetypes_307398"
+    }
+  },
+  "date_col": "0000-01-01T00:00:00Z",
+  "id": 13,
+  "interval_col": null,
+  "time_col": null,
+  "timetz_col": null,
+  "ts_col": "0000-01-01T00:00:00Z",
+  "tstz_col": "0000-01-01T00:00:00Z",
+  "txid": 999999
+}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_dateandtimetypes_307398":{"BaseXID":999999,"CursorNames":["txid"],"DocumentCount":12,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)","NextXID":0,"ScanTID":""}}}
+{"bindingStateV1":{"test_dateandtimetypes_307398":{"BaseXID":999999,"CursorNames":["txid"],"DocumentCount":14,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)","NextXID":0,"ScanTID":""}}}
 

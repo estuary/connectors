@@ -1,15 +1,16 @@
-package main
+package connector
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -19,25 +20,29 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/uuid"
+	"github.com/invopop/jsonschema"
 	iso8601 "github.com/senseyeio/duration"
+	log "github.com/sirupsen/logrus"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 
 	// An alternate naming style for the Iceberg table data.  By default (when
 	// false), the naming is:
 	//   <base_location>/<namespace>/<table>_<hash>
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
-	"nested_dot_hash_location_style": false,
+	"nested_dot_hash_location_style": common.FlagDisabled,
 }
 
 type catalogType string
@@ -47,24 +52,42 @@ const (
 	catalogTypeRest catalogType = "Iceberg REST Server"
 )
 
-// There is an equivalent pydantic model in iceberg-ctl, and the config schema is generated from
-// that. The fields of this struct must be compatible with that model.
+// Field ordering preserves the original schema layout
+// (legacy aws_* keys first, bucket/prefix/region/namespace next) so existing
+// users do not see fields rearranged on next view.
+//
+// TODO: AWSAccessKeyID, AWSSecretAccessKey, Advanced, and
+// advancedConfig.FeatureFlags are pointers so the generated schema emits a
+// null branch (oneOf: [original, {type: null}]) for backwards-compatibility
+// with any prod config that stores literal null in these fields. Convert back
+// to plain value types + `omitempty` (the convention used by
+// materialize-bigquery / materialize-snowflake / etc.) once we are confident
+// no live config depends on the union-with-null shape, and remove the deref /
+// nil-check sites in Validate / s3StoreConfig / FeatureFlags / catalog.go.
 type config struct {
-	Bucket             string                      `json:"bucket"`
-	AWSAccessKeyID     string                      `json:"aws_access_key_id,omitempty"`
-	AWSSecretAccessKey string                      `json:"aws_secret_access_key,omitempty"`
-	Credentials        *filesink.CredentialsConfig `json:"credentials,omitempty"`
-	Namespace          string                      `json:"namespace"`
-	Region             string                      `json:"region"`
-	UploadInterval     string                      `json:"upload_interval"`
-	Prefix             string                      `json:"prefix,omitempty"`
-	S3Endpoint         string                      `json:"s3_endpoint,omitempty"`
-	Catalog            catalogConfig               `json:"catalog"`
-	Advanced           advancedConfig              `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	AWSAccessKeyID     *string                     `json:"aws_access_key_id,omitempty" jsonschema:"title=AWS Access Key ID,description=Access Key ID for accessing AWS services (legacy).,nullable" jsonschema_extras:"order=0,x-hidden-field=true"`
+	AWSSecretAccessKey *string                     `json:"aws_secret_access_key,omitempty" jsonschema:"title=AWS Secret Access Key,description=Secret Access Key for accessing AWS services (legacy).,nullable" jsonschema_extras:"order=1,secret=true,x-hidden-field=true"`
+	Credentials        *filesink.CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true"`
+	Bucket             string                      `json:"bucket" jsonschema:"title=Bucket,description=The S3 bucket to write data files to." jsonschema_extras:"order=3"`
+	Prefix             string                      `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=4"`
+	Region             string                      `json:"region" jsonschema:"title=Region,description=AWS region." jsonschema_extras:"order=5"`
+	Namespace          string                      `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=6,pattern=^[^.]*$"`
+	UploadInterval     string                      `json:"upload_interval,omitempty" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.,default=PT5M,format=duration" jsonschema_extras:"order=7,nonsensitive=true"`
+	S3Endpoint         string                      `json:"s3_endpoint,omitempty" jsonschema:"title=S3 Endpoint,description=Custom S3 endpoint URL. The default AWS S3 endpoint for the specified region is used if not provided." jsonschema_extras:"order=8"`
+	Catalog            catalogConfig               `json:"catalog" jsonschema:"title=Catalog" jsonschema_extras:"order=9"`
+	Advanced           *advancedConfig             `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these.,nullable" jsonschema_extras:"advanced=true,order=10"`
+}
+
+// strVal dereferences an optional string config field, returning "" when nil.
+func strVal(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 type catalogConfig struct {
-	CatalogType catalogType `json:"catalog_type"`
+	CatalogType catalogType `json:"catalog_type" jsonschema_extras:"nonsensitive=true"`
 
 	// Glue catalog configuration.
 	GlueID string `json:"glue_id,omitempty"`
@@ -77,8 +100,37 @@ type catalogConfig struct {
 	Scope      string `json:"scope,omitempty"`
 }
 
+// restCatalogProps and glueCatalogProps drive ONLY schema generation via
+// catalogConfig.JSONSchema. JSON-decoded REST/Glue config values land in
+// catalogConfig (above), so the optional *string fields here only affect the
+// emitted JSON Schema (they preserve the prior ["string","null"] type union).
+// See the TODO on `config` above.
+type restCatalogProps struct {
+	URI        string  `json:"uri" jsonschema:"title=URI,description=URI identifying the REST catalog. Format: 'https://yourserver.com/catalog'." jsonschema_extras:"order=1"`
+	Credential *string `json:"credential,omitempty" jsonschema:"title=Credential,description=Credential for connecting to the catalog.,nullable" jsonschema_extras:"order=2,secret=true"`
+	Token      *string `json:"token,omitempty" jsonschema:"title=Token,description=Token for connecting to the catalog.,nullable" jsonschema_extras:"order=3,secret=true"`
+	Warehouse  string  `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to." jsonschema_extras:"order=4"`
+	Scope      *string `json:"scope,omitempty" jsonschema:"title=Scope,description=Desired scope of the requested security token.,nullable" jsonschema_extras:"order=5"`
+}
+
+type glueCatalogProps struct {
+	GlueID *string `json:"glue_id,omitempty" jsonschema:"title=Glue Catalog ID,description=Glue Catalog ID to use. Defaults to the account ID of the configured credentials when not set.,nullable" jsonschema_extras:"order=1"`
+}
+
+// JSONSchema returns the catalog discriminator schema. Struct tags on
+// catalogConfig itself are NOT consulted — the schema is built entirely from
+// restCatalogProps and glueCatalogProps via OneOfSchema.
+func (catalogConfig) JSONSchema() *jsonschema.Schema {
+	return schemagen.OneOfSchema("Catalog", "", "catalog_type", string(catalogTypeRest),
+		schemagen.OneOfSubSchema("REST", restCatalogProps{}, string(catalogTypeRest)),
+		schemagen.OneOfSubSchema("AWS Glue", glueCatalogProps{}, string(catalogTypeGlue)),
+	)
+}
+
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable" jsonschema_extras:"nonsensitive=true"`
+	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false" jsonschema_extras:"nonsensitive=true"`
+	VariantColumns       bool    `json:"variant_columns,omitempty" jsonschema:"title=Variant Columns,description=Use the Iceberg variant column type (format v3) for object/array/multi-type fields and the root document instead of JSON strings. Toggling this on an existing materialization applies to data going forward: existing rows read as null for converted columns unless the binding is explicitly backfilled.,default=false" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -94,11 +146,43 @@ func (c config) s3StoreConfig() filesink.S3StoreConfig {
 	if c.Credentials != nil {
 		cfg.Credentials = c.Credentials
 	} else {
-		cfg.AWSAccessKeyID = c.AWSAccessKeyID
-		cfg.AWSSecretAccessKey = c.AWSSecretAccessKey
+		cfg.AWSAccessKeyID = strVal(c.AWSAccessKeyID)
+		cfg.AWSSecretAccessKey = strVal(c.AWSSecretAccessKey)
 	}
 
 	return cfg
+}
+
+// normalizeCredentials folds legacy top-level aws_access_key_id/
+// aws_secret_access_key into cfg.Credentials as an AWSAccessKey credential,
+// mirroring the removed Python `transform_legacy_credentials`. Downstream code
+// then reads only cfg.Credentials, so the REST and Glue catalog paths treat
+// legacy and modern configs identically. When both are supplied, the explicit
+// credentials win and the legacy keys are ignored.
+func (c *config) normalizeCredentials() {
+	legacyAccessKey := strVal(c.AWSAccessKeyID)
+	legacySecretKey := strVal(c.AWSSecretAccessKey)
+	c.AWSAccessKeyID = nil
+	c.AWSSecretAccessKey = nil
+
+	if c.Credentials != nil {
+		if legacyAccessKey != "" || legacySecretKey != "" {
+			log.Warn("both legacy aws_access_key_id/aws_secret_access_key and credentials are set; the former will be ignored in favour of the latter")
+		}
+		return
+	}
+
+	if legacyAccessKey == "" && legacySecretKey == "" {
+		return
+	}
+
+	c.Credentials = &filesink.CredentialsConfig{
+		AuthType: filesink.AWSAccessKey,
+		AccessKeyCredentials: filesink.AccessKeyCredentials{
+			AWSAccessKeyID:     legacyAccessKey,
+			AWSSecretAccessKey: legacySecretKey,
+		},
+	}
 }
 
 func (c config) Validate() error {
@@ -114,22 +198,22 @@ func (c config) Validate() error {
 		}
 	}
 
-	hasLegacy := c.AWSAccessKeyID != "" || c.AWSSecretAccessKey != ""
-	hasNew := c.Credentials != nil
+	legacyAccessKey := strVal(c.AWSAccessKeyID)
+	legacySecretKey := strVal(c.AWSSecretAccessKey)
 
-	if hasLegacy && hasNew {
-		return fmt.Errorf("cannot specify both top-level aws_access_key_id/aws_secret_access_key and credentials")
-	} else if !hasLegacy && !hasNew {
-		return fmt.Errorf("must provide either credentials or aws_access_key_id/aws_secret_access_key")
-	} else if hasLegacy {
-		if c.AWSAccessKeyID == "" {
+	if c.Credentials != nil {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
+	} else if legacyAccessKey != "" || legacySecretKey != "" {
+		if legacyAccessKey == "" {
 			return fmt.Errorf("missing 'aws_access_key_id'")
 		}
-		if c.AWSSecretAccessKey == "" {
+		if legacySecretKey == "" {
 			return fmt.Errorf("missing 'aws_secret_access_key'")
 		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
+	} else {
+		return fmt.Errorf("must provide credentials")
 	}
 
 	if c.Catalog.CatalogType == "" {
@@ -154,10 +238,8 @@ func (c config) Validate() error {
 		return err
 	}
 
-	if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
-		}
+	if err := blob.ValidateBucketPath(c.Prefix); err != nil {
+		return fmt.Errorf("prefix %w", err)
 	}
 
 	return nil
@@ -167,8 +249,19 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
-	return c.Advanced.FeatureFlags, featureFlagDefaults
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	if c.Advanced == nil {
+		return "", featureFlagDefaults
+	}
+	return strVal(c.Advanced.FeatureFlags), featureFlagDefaults
+}
+
+func (c config) nanosecondTimestamps() bool {
+	return c.Advanced != nil && c.Advanced.NanosecondTimestamps
+}
+
+func (c config) variantColumns() bool {
+	return c.Advanced != nil && c.Advanced.VariantColumns
 }
 
 func parse8601(in string) (time.Duration, error) {
@@ -192,7 +285,7 @@ func parse8601(in string) (time.Duration, error) {
 type resource struct {
 	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative namespace for this table (optional)."`
-	Delta                     *bool             `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
+	Delta                     *bool             `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates." jsonschema_extras:"nonsensitive=true"`
 	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
 }
 
@@ -236,8 +329,14 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
+
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := runIcebergctl(ctx, nil, "print-config-schema")
+	endpointSchemaObj := schemagen.GenerateSchema("EndpointConfig", &config{})
+	collapseNullableScalars(endpointSchemaObj)
+	endpointSchema, err := endpointSchemaObj.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -251,15 +350,15 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -269,7 +368,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	if strings.Contains(cfg.Catalog.URI, "r2.cloudflarestorage.com") {
 		if !strings.HasPrefix(cfg.Prefix, "__r2_data_catalog/") {
 			cfg.Prefix = "__r2_data_catalog/" + cfg.Prefix
@@ -280,7 +379,10 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		locationStyle = NestedDotHashLocationStyle
 	}
 
-	catalog := newCatalog(cfg, locationStyle)
+	catalog, err := newCatalog(ctx, cfg, locationStyle)
+	if err != nil {
+		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
+	}
 
 	return &materialization{
 		cfg:     cfg,
@@ -311,14 +413,6 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 }
 
 func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
-	ns, err := d.catalog.listNamespaces(ctx)
-	if err != nil {
-		return fmt.Errorf("listing namespaces: %w", err)
-	}
-	for _, namespace := range ns {
-		is.PushNamespace(namespace)
-	}
-
 	return d.catalog.populateInfoSchema(ctx, is, resourcePaths)
 }
 
@@ -332,15 +426,16 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 	}
 
 	s3client := s3store.Client()
-	testKey := path.Join(d.cfg.Prefix, uuid.NewString())
+	// Overwriting a fixed key on each check leaves no object behind without
+	// requiring s3:DeleteObject.
+	testKey := path.Join(d.cfg.Prefix, ".estuary-prerequisites-check")
 
-	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
-		if errors.As(err, &awsErr) {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok {
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
 				err = fmt.Errorf("bucket %q does not exist", d.cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
@@ -352,16 +447,8 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
+		if awsErr, ok := errors.AsType[*awsHttp.ResponseError](err); ok && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to read from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
-		}
-		errs.Err(err)
-	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(d.cfg.Bucket),
-		Key:    aws.String(testKey),
-	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 		}
 		errs.Err(err)
 	}
@@ -411,16 +498,27 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc)
+	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg)
 	if err != nil {
-		return mappedType{}, nil
+		// The only error here is ignoreStringFormat being set on a non-string
+		// field, where it is a no-op. Map by the field's native type rather
+		// than returning a zero mappedType, whose nil iceberg.Type would panic
+		// in String/Compatible. The misconfiguration still surfaces with a
+		// clear error at table creation (parquetSchema).
+		s, _ = projectionToParquetSchemaElement(p.Projection, fieldConfig{}, d.cfg)
 	}
 
+	// Clamp date and timestamp values before they reach the writer: microsecond
+	// timestamps and dates to years 1-9999 (see clampDate/clampTimestamp for the
+	// bound's origin), nanosecond timestamps to the int64-ns band. The converters
+	// also normalize near-RFC3339 variants that the writer's strict parse rejects.
 	var elementConverter boilerplate.ElementConverter
-	switch parquetTypeToIcebergType(s.DataType) {
-	case icebergTypeTimestamptz:
+	switch s.DataType {
+	case writer.LogicalTypeTimestamp:
 		elementConverter = clampTimestamp
-	case icebergTypeDate:
+	case writer.LogicalTypeTimestampNanos:
+		elementConverter = clampTimestampNanos
+	case writer.LogicalTypeDate:
 		elementConverter = clampDate
 	}
 
@@ -467,12 +565,16 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	var resourcePaths [][]string
 	var bindings []binding
 
 	for i := range mappedBindings {
 		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -486,13 +588,28 @@ func (d *materialization) NewTransactor(
 		})
 	}
 
-	tablePaths, err := d.catalog.tablePaths(ctx, resourcePaths)
+	tableInfos, err := d.catalog.tableInfos(ctx, resourcePaths)
 	if err != nil {
-		return nil, fmt.Errorf("looking up table paths: %w", err)
+		return nil, fmt.Errorf("looking up tables: %w", err)
 	}
 
 	for idx := range bindings {
-		bindings[idx].catalogTablePath = tablePaths[idx]
+		b := &bindings[idx]
+		b.catalogTablePath = tableInfos[idx].location
+
+		// Embed the table's field IDs in written parquet files so they are
+		// self-describing: readers then never consult the table's name mapping
+		// for them, which is what allows a schema-evolved column (new field ID,
+		// same name) to read correctly from new files while old ID-less files
+		// resolve to null.
+		for i := range b.pqSchema {
+			id, ok := tableInfos[idx].fieldIDs[b.pqSchema[i].Name]
+			if !ok {
+				return nil, fmt.Errorf("selected field %q has no column in table %q", b.pqSchema[i].Name, pathToFQN(b.path))
+			}
+			fieldID := int32(id)
+			b.pqSchema[i].FieldId = &fieldID
+		}
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
@@ -507,6 +624,7 @@ func (d *materialization) NewTransactor(
 		bucket:          d.cfg.Bucket,
 		prefix:          d.cfg.Prefix,
 		store:           s3store,
+		be:              be,
 	}, nil
 }
 
@@ -519,27 +637,12 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	namespace := path[0]
-	table := path[1]
-
-	// Use iceberg-ctl's table-paths to find the data location.
-	fqn := namespace + "." + table
-	tableNamesJson, err := json.Marshal([]string{fqn})
+	tablePaths, err := d.catalog.tablePaths(ctx, [][]string{path})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("getting table path for %s.%s: %w", path[0], path[1], err)
 	}
 
-	b, err := runIcebergctl(ctx, &d.cfg, "table-paths", string(tableNamesJson))
-	if err != nil {
-		return nil, nil, fmt.Errorf("getting table path for %s: %w", fqn, err)
-	}
-
-	fqnToPath := make(map[string]string)
-	if err := json.Unmarshal(b, &fqnToPath); err != nil {
-		return nil, nil, fmt.Errorf("parsing table paths: %w", err)
-	}
-
-	tableLocation := fqnToPath[fqn]
+	tableLocation := tablePaths[0]
 	if tableLocation == "" {
 		return nil, nil, nil
 	}
@@ -576,7 +679,10 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 	sort.Strings(parquetKeys)
 
-	// Read parquet files using duckdb.
+	// Read parquet files using the in-process DuckDB pinned in go.mod rather
+	// than a host CLI: snapshot content must not depend on whichever duckdb
+	// version a contributor or CI happens to have installed, and variant
+	// columns are only readable from DuckDB 1.5.3 on.
 	var allRows []map[string]any
 	for _, key := range parquetKeys {
 		getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
@@ -593,29 +699,9 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 			return nil, nil, fmt.Errorf("reading object %s: %w", key, err)
 		}
 
-		tmpFile, err := os.CreateTemp("", "iceberg-test-*.parquet")
+		rows, err := duckdbReadParquet(ctx, data)
 		if err != nil {
-			return nil, nil, err
-		}
-		tmpPath := tmpFile.Name()
-		if _, err := tmpFile.Write(data); err != nil {
-			tmpFile.Close()
-			os.Remove(tmpPath)
-			return nil, nil, err
-		}
-		tmpFile.Close()
-
-		out, err := exec.CommandContext(ctx, "duckdb", "-json", ":memory:",
-			fmt.Sprintf("SET timezone TO 'UTC'; SELECT * FROM '%s' ORDER BY flow_published_at;", tmpPath),
-		).Output()
-		os.Remove(tmpPath)
-		if err != nil {
-			return nil, nil, fmt.Errorf("running duckdb on %s: %w", key, err)
-		}
-
-		var rows []map[string]any
-		if err := json.Unmarshal(out, &rows); err != nil {
-			return nil, nil, fmt.Errorf("parsing duckdb output: %w", err)
+			return nil, nil, fmt.Errorf("reading %s with duckdb: %w", key, err)
 		}
 		allRows = append(allRows, rows...)
 	}
@@ -662,6 +748,106 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 	return columns, result, nil
 }
 
-func (d *materialization) Close(ctx context.Context) {}
+// duckdbReadParquet runs the in-process DuckDB over a parquet file's bytes and
+// returns its rows. The file is staged in a temp directory that is removed
+// before returning rather than accumulating across a caller's loop.
+func duckdbReadParquet(ctx context.Context, data []byte) ([]map[string]any, error) {
+	tmpDir, err := os.MkdirTemp("", "iceberg-test-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating temporary directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
 
-func main() { boilerplate.RunMain(driver{}) }
+	var tmpPath = filepath.Join(tmpDir, "data.parquet")
+	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+		return nil, fmt.Errorf("writing %s: %w", tmpPath, err)
+	}
+
+	db, err := sql.Open("duckdb", "") // opens an in-memory database
+	if err != nil {
+		return nil, fmt.Errorf("opening duckdb: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := db.ExecContext(ctx, "SET timezone TO 'UTC'"); err != nil {
+		return nil, fmt.Errorf("setting duckdb timezone: %w", err)
+	}
+
+	selectList, err := duckdbSelectList(ctx, db, tmpPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var outPath = filepath.Join(tmpDir, "out.json")
+	if _, err := db.ExecContext(ctx, fmt.Sprintf(
+		"COPY (SELECT %s FROM '%s' ORDER BY flow_published_at) TO '%s' (FORMAT JSON, ARRAY true)",
+		selectList, tmpPath, outPath,
+	)); err != nil {
+		return nil, fmt.Errorf("running duckdb copy: %w", err)
+	}
+
+	out, err := os.ReadFile(outPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading duckdb output: %w", err)
+	}
+
+	var rows []map[string]any
+	if err := json.Unmarshal(out, &rows); err != nil {
+		return nil, fmt.Errorf("parsing duckdb output: %w", err)
+	}
+
+	return rows, nil
+}
+
+// duckdbSelectList builds the projection for reading a parquet file, casting
+// VARIANT columns to JSON. Without the cast a variant column is serialized
+// using DuckDB's display form (`{'k': v}`, values unquoted) rather than as
+// JSON, which is neither valid JSON nor comparable to the JSON string columns
+// the same field produces without variant_columns enabled.
+func duckdbSelectList(ctx context.Context, db *sql.DB, path string) (string, error) {
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("DESCRIBE SELECT * FROM '%s'", path))
+	if err != nil {
+		return "", fmt.Errorf("describing %s: %w", path, err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return "", fmt.Errorf("getting DESCRIBE columns: %w", err)
+	}
+
+	var out []string
+	for rows.Next() {
+		var vals = make([]any, len(cols))
+		for i := range vals {
+			vals[i] = new(sql.NullString)
+		}
+		if err := rows.Scan(vals...); err != nil {
+			return "", fmt.Errorf("scanning DESCRIBE row: %w", err)
+		}
+
+		var name, typ string
+		for i, c := range cols {
+			switch c {
+			case "column_name":
+				name = vals[i].(*sql.NullString).String
+			case "column_type":
+				typ = vals[i].(*sql.NullString).String
+			}
+		}
+
+		var quoted = fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
+		if typ == "VARIANT" {
+			out = append(out, fmt.Sprintf("%s::JSON AS %s", quoted, quoted))
+		} else {
+			out = append(out, quoted)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("iterating DESCRIBE rows: %w", err)
+	}
+
+	return strings.Join(out, ", "), nil
+}
+
+func (d *materialization) Close(ctx context.Context) {}

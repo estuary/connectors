@@ -6,11 +6,13 @@
 
 (How does one use this feature, and how has it changed)
 
-**Documentation links affected:**
-
-(list any [documentation links](https://docs.google.com/document/d/1SRC9VS9zyCzWl3n4HXHbc4wPB1eLxJHkA2rtu9ZNokM/edit?usp=sharing) that you created, or existing ones that you've identified as needing updates, along with a brief description)
-
 **Notes for reviewers:**
 
 (anything that might help someone review this PR)
 
+**Checklist:**
+
+- [ ] If fixing a regression, I have linked the PR that introduced the regression: [insert link]
+- [ ] No user-facing changes (skip the items below)
+- [ ] Documentation updated in `docs/` or estuary/docs (see [CONTRIBUTING.md](../CONTRIBUTING.md#documentation-updates)), or the docs PR or issue is linked here: [insert link]
+- [ ] `CHANGELOG.md` updated (see [CONTRIBUTING.md](../CONTRIBUTING.md#changelog-entries))

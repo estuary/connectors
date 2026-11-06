@@ -1,6 +1,3 @@
-import estuary_cdk.pydantic_polyfill  # Must be first.
-import estuary_cdk.requests_session_send_patch # Must be second.
-
 import asyncio
 import urllib
 from estuary_cdk import shim_airbyte_cdk, flow
@@ -46,7 +43,7 @@ asyncio.run(
                 + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
                 r"&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
             ),
-            accessTokenUrlTemplate="https://api.hubapi.com/oauth/v1/token",
+            accessTokenUrlTemplate="https://api.hubapi.com/oauth/2026-09/token",
             accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
             accessTokenBody=(
                 "grant_type=authorization_code"

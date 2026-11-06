@@ -1,8 +1,8 @@
-ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
+FROM --platform=linux/amd64 golang:1.27-trixie AS builder
 
 WORKDIR /builder
 
@@ -31,6 +31,9 @@ COPY --from=builder /builder/connector /connector/materialize-google-pubsub
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
+
+ARG CONNECTOR_VERSION=dev
+ENV CONNECTOR_VERSION="${CONNECTOR_VERSION}"
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 

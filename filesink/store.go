@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	storage "cloud.google.com/go/storage"
@@ -37,9 +36,9 @@ type GCSStoreConfig struct {
 	Bucket          string `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store materialized objects." jsonschema_extras:"order=0"`
 	CredentialsJSON string `json:"credentialsJson" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=2"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=2,nonsensitive=true"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=3"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=4"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=4,nonsensitive=true"`
 }
 
 func (c GCSStoreConfig) Validate() error {
@@ -59,8 +58,8 @@ func (c GCSStoreConfig) Validate() error {
 	} else if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		if err := blob.ValidateBucketPath(c.Prefix); err != nil {
+			return fmt.Errorf("prefix %w", err)
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)
@@ -122,9 +121,9 @@ type AzureBlobConfig struct {
 	StorageAccountKey  string `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that files will be written to." jsonschema_extras:"order=1,secret=true"`
 	ContainerName      string `json:"containerName" jsonschema:"title=Storage Account Container Name,description=Name of the container in the storage account where files will be written." jsonschema_extras:"order=2"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=3"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=3,nonsensitive=true"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=4"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=5"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=5,nonsensitive=true"`
 }
 
 func (c AzureBlobConfig) Validate() error {
@@ -142,8 +141,8 @@ func (c AzureBlobConfig) Validate() error {
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
 		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
 	} else if c.Prefix != "" {
-		if strings.HasPrefix(c.Prefix, "/") {
-			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		if err := blob.ValidateBucketPath(c.Prefix); err != nil {
+			return fmt.Errorf("prefix %w", err)
 		}
 	} else if c.FileSizeLimit < 0 {
 		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)

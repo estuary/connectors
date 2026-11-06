@@ -1,0 +1,56 @@
+info:
+  name: by id
+  type: http
+  seq: 13
+
+http:
+  method: GET
+  url: "{{base_url}}/contacts/{{contact_id}}"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - Charlie after C5 (projection)"
+    request:
+      url: "{{base_url}}/contacts/{{contact_id}}"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json; charset=utf-8
+      body:
+        type: json
+        data: |-
+          {
+            "contact": {
+              "id": 518778695,
+              "created_at": 1790603982,
+              "updated_at": 1790603982,
+              "is_shared": true,
+              "emails": []
+            }
+          }
+
+docs:
+  content: |-
+    **REFERENCE:** https://developers.aircall.io/api-references#retrieve-a-contact
+
+    **WHY:** Did `Seeding / C5 - Add Email to Contact Charlie` land, and did it bump
+    the contact's `updated_at`?
+
+    **VERIFIED (2026-09-28):** `emails: []` and `updated_at` unchanged (1790603982) —
+    C5 returned 404 `{"message":"Not Found"}` on the documented
+    `POST /v1/contacts/:id/emails` route (URL interpolation confirmed working).
+
+    **UNOBSERVABLE:** whether phone/email sub-resource edits bump the parent
+    `updated_at` — the documented write route 404s for us. Assumption: they do
+    (Aircall treats them as part of the contact). Fallback if wrong: the plan's
+    optional scheduled re-backfill recovers them.
+  type: text/markdown

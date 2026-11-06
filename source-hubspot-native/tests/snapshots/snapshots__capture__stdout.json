@@ -39,6 +39,9 @@
         "first_deal_created_date": null,
         "founded_year": null,
         "googleplus_page": null,
+        "hs_active_contracts_arr": null,
+        "hs_active_contracts_mrr": null,
+        "hs_active_contracts_tcv": null,
         "hs_additional_domains": null,
         "hs_all_accessible_team_ids": null,
         "hs_all_assigned_business_unit_ids": null,
@@ -76,29 +79,21 @@
         "hs_csm_sentiment": null,
         "hs_current_customer": null,
         "hs_customer_success_ticket_sentiment": null,
-        "hs_date_entered_customer": "redacted",
-        "hs_date_entered_evangelist": "redacted",
-        "hs_date_entered_lead": "redacted",
-        "hs_date_entered_marketingqualifiedlead": "redacted",
-        "hs_date_entered_opportunity": "redacted",
-        "hs_date_entered_other": "redacted",
-        "hs_date_entered_salesqualifiedlead": "redacted",
-        "hs_date_entered_subscriber": "redacted",
-        "hs_date_exited_customer": "redacted",
-        "hs_date_exited_evangelist": "redacted",
-        "hs_date_exited_lead": "redacted",
-        "hs_date_exited_marketingqualifiedlead": "redacted",
-        "hs_date_exited_opportunity": "redacted",
-        "hs_date_exited_other": "redacted",
-        "hs_date_exited_salesqualifiedlead": "redacted",
-        "hs_date_exited_subscriber": "redacted",
+        "hs_domain_status": null,
         "hs_employee_range": null,
         "hs_excluded_from_cross_account_data_mirroring": null,
+        "hs_geohash_1": null,
+        "hs_geohash_2": null,
+        "hs_geohash_3": null,
+        "hs_geohash_4": null,
+        "hs_geohash_5": null,
+        "hs_geohash_6": null,
         "hs_gps_error": null,
         "hs_gps_latitude": null,
         "hs_gps_longitude": null,
         "hs_ideal_customer_profile": null,
         "hs_industry_group": null,
+        "hs_inferred_domain": null,
         "hs_intent_page_views_last_30_days": null,
         "hs_intent_paid_up_to_date": null,
         "hs_intent_signals_enabled": null,
@@ -115,11 +110,14 @@
         "hs_last_sales_activity_date": null,
         "hs_last_sales_activity_timestamp": null,
         "hs_last_sales_activity_type": null,
-        "hs_lastmodifieddate": "2025-01-18T21:49:41.259Z",
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_createdate_of_active_subscriptions": null,
+        "hs_latest_intent_signal_occurred_at": null,
         "hs_latest_intent_signal_timestamp": null,
         "hs_latest_meeting_activity": null,
         "hs_latest_prospecting_agent_monitoring_date": null,
+        "hs_latest_suggested_contact_date": null,
+        "hs_latest_suggested_contact_timestamp": null,
         "hs_latitude": null,
         "hs_lead_status": null,
         "hs_linkedin_handle": null,
@@ -129,9 +127,11 @@
         "hs_max_recommendation_score": null,
         "hs_merged_object_ids": null,
         "hs_most_recent_de_anonymized_visit": null,
+        "hs_next_renewal_date": null,
         "hs_notes_last_activity": null,
         "hs_notes_next_activity": null,
         "hs_notes_next_activity_type": null,
+        "hs_num_active_contracts": null,
         "hs_num_blockers": "0",
         "hs_num_child_companies": "0",
         "hs_num_contacts_with_buying_roles": "0",
@@ -157,6 +157,8 @@
         "hs_read_only": null,
         "hs_reason_to_reach_out": null,
         "hs_recent_intent_signals": null,
+        "hs_redirect_domain": null,
+        "hs_redirect_url": null,
         "hs_research_agent_execution_id": null,
         "hs_research_agent_id": null,
         "hs_revenue_range": null,
@@ -175,18 +177,11 @@
         "hs_target_account_recommendation_state": null,
         "hs_task_label": "HubSpot",
         "hs_tax_id": null,
-        "hs_time_in_customer": "redacted",
-        "hs_time_in_evangelist": "redacted",
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_marketingqualifiedlead": "redacted",
-        "hs_time_in_opportunity": "redacted",
-        "hs_time_in_other": "redacted",
-        "hs_time_in_salesqualifiedlead": "redacted",
-        "hs_time_in_subscriber": "redacted",
         "hs_total_deal_value": null,
         "hs_unique_creation_key": null,
         "hs_updated_by_user_id": null,
         "hs_user_ids_of_all_notification_followers": null,
+        "hs_user_ids_of_all_notification_recipients": null,
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": null,
         "hs_v2_cumulative_time_in_customer": null,
@@ -376,51 +371,7 @@
             "value": "sample-contact"
           }
         ],
-        "hs_date_entered_lead": "redacted",
-        "hs_lastmodifieddate": [
-          {
-            "sourceType": "DATA_ENRICHMENT",
-            "timestamp": "2025-01-18T21:49:41.259000Z",
-            "value": "2025-01-18T21:49:41.259Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:23.486000Z",
-            "value": "2024-10-28T16:39:23.486Z"
-          },
-          {
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:21.729000Z",
-            "value": "2024-10-28T16:39:21.729Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:18.872000Z",
-            "value": "2024-10-28T16:39:18.872Z"
-          },
-          {
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:06.146000Z",
-            "value": "2024-10-28T16:39:06.146Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.248000Z",
-            "value": "2024-10-28T16:39:02.248Z"
-          },
-          {
-            "sourceId": "RecordSourceDetailsWriterWorker",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:01.568000Z",
-            "value": "2024-10-28T16:39:01.568Z"
-          },
-          {
-            "sourceId": "FetchAssociatedCompanyIdStep",
-            "sourceType": "COMPANIES",
-            "timestamp": "2024-10-28T16:39:01.173000Z",
-            "value": "2024-10-28T16:39:01.173Z"
-          }
-        ],
+        "hs_lastmodifieddate": "redacted",
         "hs_logo_url": [
           {
             "sourceType": "DATA_ENRICHMENT",
@@ -536,7 +487,6 @@
             "value": "HubSpot"
           }
         ],
-        "hs_time_in_lead": "redacted",
         "hs_v2_date_entered_current_stage": [
           {
             "sourceId": "RecalculateCalculatedPropertiesHelper",
@@ -607,7 +557,7 @@
           }
         ]
       },
-      "updatedAt": "2025-01-18T21:49:41.259000Z",
+      "updatedAt": "redacted",
       "url": "redacted"
     }
   ],
@@ -653,6 +603,9 @@
         "followercount": null,
         "gender": null,
         "graduation_date": null,
+        "hs_active_contracts_arr": null,
+        "hs_active_contracts_mrr": null,
+        "hs_active_contracts_tcv": null,
         "hs_additional_emails": null,
         "hs_all_accessible_team_ids": null,
         "hs_all_assigned_business_unit_ids": null,
@@ -693,8 +646,10 @@
         "hs_chat_assistant_iql_date": null,
         "hs_chat_assistant_source": null,
         "hs_chat_assistant_summary": null,
+        "hs_chatgpt_ad_clicked": null,
+        "hs_chatgpt_click_id": null,
         "hs_clicked_linkedin_ad": null,
-        "hs_contact_creation_legal_basis_source_instance_id": null,
+        "hs_consent_to_email_tracking": null,
         "hs_contact_enrichment_opt_out": null,
         "hs_contact_enrichment_opt_out_timestamp": null,
         "hs_content_membership_email": null,
@@ -722,9 +677,12 @@
         "hs_email_bad_address": null,
         "hs_email_bounce": null,
         "hs_email_click": null,
+        "hs_email_communication_subscriptions_opted_in": null,
+        "hs_email_communication_subscriptions_opted_out": null,
         "hs_email_customer_quarantined_reason": null,
         "hs_email_delivered": null,
         "hs_email_domain": "hubspot.com",
+        "hs_email_engagement_likelihood_category": null,
         "hs_email_first_click_date": null,
         "hs_email_first_open_date": null,
         "hs_email_first_reply_date": null,
@@ -752,6 +710,7 @@
         "hs_email_type": null,
         "hs_emailconfirmationstatus": null,
         "hs_employment_change_detected_date": null,
+        "hs_enforce_double_opt_in": null,
         "hs_enriched_email_bounce_detected": null,
         "hs_excluded_from_cross_account_data_mirroring": null,
         "hs_facebook_ad_clicked": null,
@@ -786,12 +745,16 @@
         "hs_gps_latitude": null,
         "hs_gps_longitude": null,
         "hs_has_active_subscription": null,
+        "hs_inbound_agent_inquiry_type": null,
+        "hs_inbound_agent_last_conversation_date": null,
+        "hs_inbound_agent_qualification_status": null,
         "hs_inferred_language_codes": null,
         "hs_intent_paid_up_to_date": null,
         "hs_intent_signals_enabled": null,
         "hs_ip_timezone": null,
         "hs_is_contact": "true",
         "hs_is_enriched": null,
+        "hs_is_mass_marketing_activation_disallowed": null,
         "hs_is_merge_revertible": null,
         "hs_is_unworked": "true",
         "hs_job_change_detected_date": null,
@@ -803,7 +766,7 @@
         "hs_last_sales_activity_type": null,
         "hs_last_sms_send_date": null,
         "hs_last_sms_send_name": null,
-        "hs_lastmodifieddate": null,
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_disqualified_lead_date": null,
         "hs_latest_meeting_activity": null,
         "hs_latest_open_lead_date": null,
@@ -838,9 +801,12 @@
         "hs_merged_object_ids": null,
         "hs_messaging_engagement_score": null,
         "hs_mobile_sdk_push_tokens": null,
+        "hs_next_renewal_date": null,
         "hs_notes_last_activity": null,
         "hs_notes_next_activity": null,
         "hs_notes_next_activity_type": null,
+        "hs_num_active_contracts": null,
+        "hs_num_associated_open_deals": null,
         "hs_object_id": "72810357568",
         "hs_object_source": "API",
         "hs_object_source_detail_1": null,
@@ -857,12 +823,19 @@
         "hs_predictivecontactscore_v2": null,
         "hs_predictivecontactscorebucket": null,
         "hs_predictivescoringtier": null,
+        "hs_prospecting_agent_activation_email_id": null,
+        "hs_prospecting_agent_activation_status": null,
         "hs_prospecting_agent_actively_enrolled_count": "0",
+        "hs_prospecting_agent_enrollment_status": null,
+        "hs_prospecting_agent_enrollment_status_raw": null,
         "hs_prospecting_agent_last_enrolled": null,
+        "hs_prospecting_agent_sender": null,
         "hs_prospecting_agent_total_enrolled_count": null,
         "hs_quarantined_emails": null,
         "hs_read_only": null,
         "hs_recent_closed_order_date": null,
+        "hs_reddit_ad_clicked": null,
+        "hs_reddit_click_id": null,
         "hs_registered_member": "0",
         "hs_registration_method": null,
         "hs_returning_to_office_detected_date": null,
@@ -891,9 +864,9 @@
         "hs_social_twitter_clicks": "0",
         "hs_source_object_id": null,
         "hs_source_portal_id": null,
+        "hs_sourced_contact_origin": null,
         "hs_state_code": null,
         "hs_sub_role": null,
-        "hs_testpurge": null,
         "hs_testrollback": null,
         "hs_tiktok_ad_clicked": null,
         "hs_tiktok_click_id": null,
@@ -910,6 +883,7 @@
         "hs_unique_creation_key": null,
         "hs_updated_by_user_id": null,
         "hs_user_ids_of_all_notification_followers": null,
+        "hs_user_ids_of_all_notification_recipients": null,
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": null,
         "hs_v2_cumulative_time_in_customer": null,
@@ -947,11 +921,12 @@
         "hs_v2_latest_time_in_subscriber": null,
         "hs_v2_time_in_current_stage": "2024-10-28T16:39:00.612Z",
         "hs_was_imported": null,
+        "hs_whatsapp_bsuids": null,
         "hs_whatsapp_phone_number": null,
+        "hs_why_this_contact": null,
         "hubspot_owner_assigneddate": null,
         "hubspot_owner_id": null,
         "hubspot_team_id": null,
-        "hubspotscore": null,
         "industry": null,
         "ip_city": null,
         "ip_country": null,
@@ -963,7 +938,7 @@
         "job_function": null,
         "jobtitle": "Salesperson",
         "kloutscoregeneral": null,
-        "lastmodifieddate": "2024-10-28T16:40:17.996Z",
+        "lastmodifieddate": "redacted",
         "lastname": "Johnson (Sample Contact)",
         "lifecyclestage": "lead",
         "linkedinbio": null,
@@ -981,7 +956,6 @@
         "num_notes": null,
         "num_unique_conversion_events": "0",
         "numemployees": null,
-        "owneremail": null,
         "ownername": null,
         "phone": null,
         "photo": null,
@@ -1388,35 +1362,7 @@
             "value": "Salesperson"
           }
         ],
-        "lastmodifieddate": [
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:40:17.996000Z",
-            "value": "2024-10-28T16:40:17.996Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:10.630000Z",
-            "value": "2024-10-28T16:39:10.630Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.522000Z",
-            "value": "2024-10-28T16:39:01.522Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.010000Z",
-            "value": "2024-10-28T16:39:01.010Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:00.846000Z",
-            "value": "2024-10-28T16:39:00.846Z"
-          }
-        ],
+        "lastmodifieddate": "redacted",
         "lastname": [
           {
             "sourceId": "sample-contact",
@@ -1456,856 +1402,7 @@
           }
         ]
       },
-      "updatedAt": "2024-10-28T16:40:17.996000Z",
-      "url": "redacted"
-    }
-  ],
-  [
-    "acmeCo/contacts",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "archived": false,
-      "companies": [
-        25177527565,
-        25177527565
-      ],
-      "createdAt": "2024-10-28T16:39:01.326000Z",
-      "id": 72811506244,
-      "properties": {
-        "address": null,
-        "annualrevenue": null,
-        "associatedcompanyid": "25177527565",
-        "associatedcompanylastupdated": null,
-        "city": "Cambridge",
-        "closedate": null,
-        "company": "HubSpot",
-        "company_size": null,
-        "country": null,
-        "createdate": "2024-10-28T16:39:01.326Z",
-        "currentlyinworkflow": null,
-        "date_of_birth": null,
-        "days_to_close": null,
-        "degree": null,
-        "email": "bh@hubspot.com",
-        "engagements_last_meeting_booked": null,
-        "engagements_last_meeting_booked_campaign": null,
-        "engagements_last_meeting_booked_medium": null,
-        "engagements_last_meeting_booked_source": null,
-        "fax": null,
-        "field_of_study": null,
-        "first_conversion_date": null,
-        "first_conversion_event_name": null,
-        "first_deal_created_date": null,
-        "firstname": "Brian",
-        "followercount": null,
-        "gender": null,
-        "graduation_date": null,
-        "hs_additional_emails": null,
-        "hs_all_accessible_team_ids": null,
-        "hs_all_assigned_business_unit_ids": null,
-        "hs_all_contact_vids": "72811506244",
-        "hs_all_owner_ids": null,
-        "hs_all_team_ids": null,
-        "hs_analytics_average_page_views": "0",
-        "hs_analytics_first_referrer": null,
-        "hs_analytics_first_timestamp": "2024-10-28T16:39:01.246Z",
-        "hs_analytics_first_touch_converting_campaign": null,
-        "hs_analytics_first_url": null,
-        "hs_analytics_first_visit_timestamp": null,
-        "hs_analytics_last_referrer": null,
-        "hs_analytics_last_timestamp": null,
-        "hs_analytics_last_touch_converting_campaign": null,
-        "hs_analytics_last_url": null,
-        "hs_analytics_last_visit_timestamp": null,
-        "hs_analytics_num_event_completions": "0",
-        "hs_analytics_num_page_views": "0",
-        "hs_analytics_num_visits": "0",
-        "hs_analytics_revenue": "0.0",
-        "hs_analytics_source": "OFFLINE",
-        "hs_analytics_source_composite_data": null,
-        "hs_analytics_source_data_1": "API",
-        "hs_analytics_source_data_2": "sample-contact",
-        "hs_associated_target_accounts": "0",
-        "hs_avatar_filemanager_key": null,
-        "hs_bing_ad_clicked": null,
-        "hs_bing_click_id": null,
-        "hs_buying_role": null,
-        "hs_calculated_form_submissions": null,
-        "hs_calculated_merged_vids": null,
-        "hs_calculated_mobile_number": null,
-        "hs_calculated_phone_number": null,
-        "hs_calculated_phone_number_area_code": null,
-        "hs_calculated_phone_number_country_code": null,
-        "hs_calculated_phone_number_region_code": null,
-        "hs_chat_assistant_iql_date": null,
-        "hs_chat_assistant_source": null,
-        "hs_chat_assistant_summary": null,
-        "hs_clicked_linkedin_ad": null,
-        "hs_contact_creation_legal_basis_source_instance_id": null,
-        "hs_contact_enrichment_opt_out": null,
-        "hs_contact_enrichment_opt_out_timestamp": null,
-        "hs_content_membership_email": null,
-        "hs_content_membership_email_confirmed": null,
-        "hs_content_membership_follow_up_enqueued_at": null,
-        "hs_content_membership_notes": null,
-        "hs_content_membership_registered_at": null,
-        "hs_content_membership_registration_domain_sent_to": null,
-        "hs_content_membership_registration_email_sent_at": null,
-        "hs_content_membership_status": null,
-        "hs_conversations_visitor_email": null,
-        "hs_count_is_unworked": null,
-        "hs_count_is_worked": null,
-        "hs_country_region_code": null,
-        "hs_created_by_conversations": null,
-        "hs_created_by_user_id": null,
-        "hs_createdate": null,
-        "hs_cross_account_note": null,
-        "hs_cross_sell_opportunity": null,
-        "hs_current_customer": null,
-        "hs_currently_enrolled_in_prospecting_agent": "false",
-        "hs_customer_agent_lead_status": null,
-        "hs_data_privacy_ads_consent": null,
-        "hs_document_last_revisited": null,
-        "hs_email_bad_address": null,
-        "hs_email_bounce": null,
-        "hs_email_click": null,
-        "hs_email_customer_quarantined_reason": null,
-        "hs_email_delivered": null,
-        "hs_email_domain": "hubspot.com",
-        "hs_email_first_click_date": null,
-        "hs_email_first_open_date": null,
-        "hs_email_first_reply_date": null,
-        "hs_email_first_send_date": null,
-        "hs_email_hard_bounce_reason": null,
-        "hs_email_hard_bounce_reason_enum": null,
-        "hs_email_is_ineligible": null,
-        "hs_email_last_click_date": null,
-        "hs_email_last_email_name": null,
-        "hs_email_last_open_date": null,
-        "hs_email_last_reply_date": null,
-        "hs_email_last_send_date": null,
-        "hs_email_live_sourcing_restricted": null,
-        "hs_email_open": null,
-        "hs_email_optimal_send_day_of_week": null,
-        "hs_email_optimal_send_time_of_day": null,
-        "hs_email_optout": null,
-        "hs_email_optout_453651751": null,
-        "hs_email_optout_453651753": null,
-        "hs_email_quarantined": null,
-        "hs_email_quarantined_reason": null,
-        "hs_email_recipient_fatigue_recovery_time": null,
-        "hs_email_replied": null,
-        "hs_email_sends_since_last_engagement": null,
-        "hs_email_type": null,
-        "hs_emailconfirmationstatus": null,
-        "hs_employment_change_detected_date": null,
-        "hs_enriched_email_bounce_detected": null,
-        "hs_excluded_from_cross_account_data_mirroring": null,
-        "hs_facebook_ad_clicked": null,
-        "hs_facebook_click_id": null,
-        "hs_facebookid": null,
-        "hs_feedback_last_ces_survey_date": null,
-        "hs_feedback_last_ces_survey_follow_up": null,
-        "hs_feedback_last_ces_survey_rating": null,
-        "hs_feedback_last_csat_survey_date": null,
-        "hs_feedback_last_csat_survey_follow_up": null,
-        "hs_feedback_last_csat_survey_rating": null,
-        "hs_feedback_last_nps_follow_up": null,
-        "hs_feedback_last_nps_rating": null,
-        "hs_feedback_last_nps_rating_number": null,
-        "hs_feedback_last_survey_date": null,
-        "hs_feedback_show_nps_web_survey": null,
-        "hs_first_closed_order_id": null,
-        "hs_first_engagement_object_id": null,
-        "hs_first_order_closed_date": null,
-        "hs_first_outreach_date": null,
-        "hs_first_subscription_create_date": null,
-        "hs_full_name_or_email": "Brian Halligan (Sample Contact)",
-        "hs_geohash_1": null,
-        "hs_geohash_2": null,
-        "hs_geohash_3": null,
-        "hs_geohash_4": null,
-        "hs_geohash_5": null,
-        "hs_geohash_6": null,
-        "hs_google_click_id": null,
-        "hs_googleplusid": null,
-        "hs_gps_error": null,
-        "hs_gps_latitude": null,
-        "hs_gps_longitude": null,
-        "hs_has_active_subscription": null,
-        "hs_inferred_language_codes": null,
-        "hs_intent_paid_up_to_date": null,
-        "hs_intent_signals_enabled": null,
-        "hs_ip_timezone": null,
-        "hs_is_contact": "true",
-        "hs_is_enriched": null,
-        "hs_is_merge_revertible": null,
-        "hs_is_unworked": "true",
-        "hs_job_change_detected_date": null,
-        "hs_journey_stage": null,
-        "hs_language": null,
-        "hs_last_metered_enrichment_timestamp": null,
-        "hs_last_sales_activity_date": null,
-        "hs_last_sales_activity_timestamp": null,
-        "hs_last_sales_activity_type": null,
-        "hs_last_sms_send_date": null,
-        "hs_last_sms_send_name": null,
-        "hs_lastmodifieddate": null,
-        "hs_latest_disqualified_lead_date": null,
-        "hs_latest_meeting_activity": null,
-        "hs_latest_open_lead_date": null,
-        "hs_latest_qualified_lead_date": null,
-        "hs_latest_sequence_ended_date": null,
-        "hs_latest_sequence_enrolled": null,
-        "hs_latest_sequence_enrolled_date": null,
-        "hs_latest_sequence_finished_date": null,
-        "hs_latest_sequence_unenrolled_date": null,
-        "hs_latest_source": "OFFLINE",
-        "hs_latest_source_composite_data": null,
-        "hs_latest_source_data_1": "API",
-        "hs_latest_source_data_2": "sample-contact",
-        "hs_latest_source_timestamp": "2024-10-28T16:39:01.246Z",
-        "hs_latest_subscription_create_date": null,
-        "hs_latitude": null,
-        "hs_lead_status": null,
-        "hs_legal_basis": null,
-        "hs_linkedin_ad_clicked": null,
-        "hs_linkedin_click_id": null,
-        "hs_linkedin_url": null,
-        "hs_linkedinid": null,
-        "hs_live_enrichment_deadline": null,
-        "hs_longitude": null,
-        "hs_manual_campaign_ids": null,
-        "hs_marketable_reason_id": "Sample Contact",
-        "hs_marketable_reason_type": "SAMPLE_CONTACT",
-        "hs_marketable_status": "true",
-        "hs_marketable_until_renewal": "true",
-        "hs_membership_has_accessed_private_content": "0",
-        "hs_membership_last_private_content_access_date": null,
-        "hs_merged_object_ids": null,
-        "hs_messaging_engagement_score": null,
-        "hs_mobile_sdk_push_tokens": null,
-        "hs_notes_last_activity": null,
-        "hs_notes_next_activity": null,
-        "hs_notes_next_activity_type": null,
-        "hs_object_id": "72811506244",
-        "hs_object_source": "API",
-        "hs_object_source_detail_1": null,
-        "hs_object_source_detail_2": null,
-        "hs_object_source_detail_3": null,
-        "hs_object_source_id": "sample-contact",
-        "hs_object_source_label": "INTERNAL_PROCESSING",
-        "hs_object_source_user_id": null,
-        "hs_owning_teams": null,
-        "hs_persona": null,
-        "hs_pinned_engagement_id": null,
-        "hs_pipeline": "contacts-lifecycle-pipeline",
-        "hs_predictivecontactscore": null,
-        "hs_predictivecontactscore_v2": null,
-        "hs_predictivecontactscorebucket": null,
-        "hs_predictivescoringtier": null,
-        "hs_prospecting_agent_actively_enrolled_count": "0",
-        "hs_prospecting_agent_last_enrolled": null,
-        "hs_prospecting_agent_total_enrolled_count": null,
-        "hs_quarantined_emails": null,
-        "hs_read_only": null,
-        "hs_recent_closed_order_date": null,
-        "hs_registered_member": "0",
-        "hs_registration_method": null,
-        "hs_returning_to_office_detected_date": null,
-        "hs_role": null,
-        "hs_sa_first_engagement_date": null,
-        "hs_sa_first_engagement_descr": null,
-        "hs_sa_first_engagement_object_type": null,
-        "hs_sales_email_last_clicked": null,
-        "hs_sales_email_last_opened": null,
-        "hs_sales_email_last_replied": null,
-        "hs_searchable_calculated_international_mobile_number": null,
-        "hs_searchable_calculated_international_phone_number": null,
-        "hs_searchable_calculated_mobile_number": null,
-        "hs_searchable_calculated_phone_number": null,
-        "hs_seniority": null,
-        "hs_sequences_actively_enrolled_count": "0",
-        "hs_sequences_enrolled_count": null,
-        "hs_sequences_is_enrolled": null,
-        "hs_shared_team_ids": null,
-        "hs_shared_user_ids": null,
-        "hs_social_facebook_clicks": "0",
-        "hs_social_google_plus_clicks": "0",
-        "hs_social_last_engagement": null,
-        "hs_social_linkedin_clicks": "0",
-        "hs_social_num_broadcast_clicks": "0",
-        "hs_social_twitter_clicks": "0",
-        "hs_source_object_id": null,
-        "hs_source_portal_id": null,
-        "hs_state_code": null,
-        "hs_sub_role": null,
-        "hs_testpurge": null,
-        "hs_testrollback": null,
-        "hs_tiktok_ad_clicked": null,
-        "hs_tiktok_click_id": null,
-        "hs_time_between_contact_creation_and_deal_close": null,
-        "hs_time_between_contact_creation_and_deal_creation": null,
-        "hs_time_to_first_engagement": null,
-        "hs_time_to_move_from_lead_to_customer": null,
-        "hs_time_to_move_from_marketingqualifiedlead_to_customer": null,
-        "hs_time_to_move_from_opportunity_to_customer": null,
-        "hs_time_to_move_from_salesqualifiedlead_to_customer": null,
-        "hs_time_to_move_from_subscriber_to_customer": null,
-        "hs_timezone": null,
-        "hs_twitterid": null,
-        "hs_unique_creation_key": null,
-        "hs_updated_by_user_id": null,
-        "hs_user_ids_of_all_notification_followers": null,
-        "hs_user_ids_of_all_notification_unfollowers": null,
-        "hs_user_ids_of_all_owners": null,
-        "hs_v2_cumulative_time_in_customer": null,
-        "hs_v2_cumulative_time_in_evangelist": null,
-        "hs_v2_cumulative_time_in_lead": null,
-        "hs_v2_cumulative_time_in_marketingqualifiedlead": null,
-        "hs_v2_cumulative_time_in_opportunity": null,
-        "hs_v2_cumulative_time_in_other": null,
-        "hs_v2_cumulative_time_in_salesqualifiedlead": null,
-        "hs_v2_cumulative_time_in_subscriber": null,
-        "hs_v2_date_entered_current_stage": null,
-        "hs_v2_date_entered_customer": null,
-        "hs_v2_date_entered_evangelist": null,
-        "hs_v2_date_entered_lead": "2024-10-28T16:39:01.326Z",
-        "hs_v2_date_entered_marketingqualifiedlead": null,
-        "hs_v2_date_entered_opportunity": null,
-        "hs_v2_date_entered_other": null,
-        "hs_v2_date_entered_salesqualifiedlead": null,
-        "hs_v2_date_entered_subscriber": null,
-        "hs_v2_date_exited_customer": null,
-        "hs_v2_date_exited_evangelist": null,
-        "hs_v2_date_exited_lead": null,
-        "hs_v2_date_exited_marketingqualifiedlead": null,
-        "hs_v2_date_exited_opportunity": null,
-        "hs_v2_date_exited_other": null,
-        "hs_v2_date_exited_salesqualifiedlead": null,
-        "hs_v2_date_exited_subscriber": null,
-        "hs_v2_latest_time_in_customer": null,
-        "hs_v2_latest_time_in_evangelist": null,
-        "hs_v2_latest_time_in_lead": null,
-        "hs_v2_latest_time_in_marketingqualifiedlead": null,
-        "hs_v2_latest_time_in_opportunity": null,
-        "hs_v2_latest_time_in_other": null,
-        "hs_v2_latest_time_in_salesqualifiedlead": null,
-        "hs_v2_latest_time_in_subscriber": null,
-        "hs_v2_time_in_current_stage": null,
-        "hs_was_imported": null,
-        "hs_whatsapp_phone_number": null,
-        "hubspot_owner_assigneddate": null,
-        "hubspot_owner_id": null,
-        "hubspot_team_id": null,
-        "hubspotscore": null,
-        "industry": null,
-        "ip_city": null,
-        "ip_country": null,
-        "ip_country_code": null,
-        "ip_latlon": null,
-        "ip_state": null,
-        "ip_state_code": null,
-        "ip_zipcode": null,
-        "job_function": null,
-        "jobtitle": "Executive Chairperson",
-        "kloutscoregeneral": null,
-        "lastmodifieddate": "2024-10-28T16:40:20.553Z",
-        "lastname": "Halligan (Sample Contact)",
-        "lifecyclestage": "lead",
-        "linkedinbio": null,
-        "linkedinconnections": null,
-        "marital_status": null,
-        "message": null,
-        "military_status": null,
-        "mobilephone": null,
-        "notes_last_contacted": null,
-        "notes_last_updated": null,
-        "notes_next_activity_date": null,
-        "num_associated_deals": null,
-        "num_contacted_notes": null,
-        "num_conversion_events": "0",
-        "num_notes": null,
-        "num_unique_conversion_events": "0",
-        "numemployees": null,
-        "owneremail": null,
-        "ownername": null,
-        "phone": null,
-        "photo": null,
-        "recent_conversion_date": null,
-        "recent_conversion_event_name": null,
-        "recent_deal_amount": null,
-        "recent_deal_close_date": null,
-        "relationship_status": null,
-        "salutation": null,
-        "school": null,
-        "seniority": null,
-        "start_date": null,
-        "state": null,
-        "surveymonkeyeventlastupdated": null,
-        "total_revenue": null,
-        "twitterbio": null,
-        "twitterhandle": "bhalligan",
-        "twitterprofilephoto": "https://pbs.twimg.com/profile_images/3491742741/212e42c07d3348251da10872e85aa6b0.jpeg",
-        "webinareventlastupdated": null,
-        "website": "http://www.HubSpot.com",
-        "work_email": null,
-        "zip": null
-      },
-      "propertiesWithHistory": {
-        "associatedcompanyid": [
-          {
-            "sourceId": "RollupProperties",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.268000Z",
-            "value": "25177527565"
-          }
-        ],
-        "city": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "Cambridge"
-          }
-        ],
-        "company": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "HubSpot"
-          }
-        ],
-        "createdate": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "2024-10-28T16:39:01.326Z"
-          }
-        ],
-        "email": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "bh@hubspot.com"
-          }
-        ],
-        "firstname": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "Brian"
-          }
-        ],
-        "hs_all_contact_vids": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "72811506244"
-          }
-        ],
-        "hs_analytics_average_page_views": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_first_timestamp": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "2024-10-28T16:39:01.246Z"
-          }
-        ],
-        "hs_analytics_num_event_completions": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_num_page_views": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_num_visits": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_analytics_revenue": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0.0"
-          }
-        ],
-        "hs_analytics_source": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "OFFLINE"
-          }
-        ],
-        "hs_analytics_source_data_1": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "API"
-          }
-        ],
-        "hs_analytics_source_data_2": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "sample-contact"
-          }
-        ],
-        "hs_associated_target_accounts": [
-          {
-            "sourceId": "RollupProperties",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.266000Z",
-            "value": "0"
-          }
-        ],
-        "hs_currently_enrolled_in_prospecting_agent": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "false"
-          }
-        ],
-        "hs_email_domain": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "hubspot.com"
-          }
-        ],
-        "hs_full_name_or_email": [
-          {
-            "sourceId": "RecalculateCalculatedPropertiesHelper",
-            "sourceType": "MIGRATION",
-            "timestamp": "2025-03-30T11:31:00Z",
-            "value": "Brian Halligan (Sample Contact)"
-          }
-        ],
-        "hs_is_contact": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "true"
-          }
-        ],
-        "hs_is_unworked": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "true"
-          }
-        ],
-        "hs_latest_source": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "OFFLINE"
-          }
-        ],
-        "hs_latest_source_data_1": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "API"
-          }
-        ],
-        "hs_latest_source_data_2": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "sample-contact"
-          }
-        ],
-        "hs_latest_source_timestamp": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "2024-10-28T16:39:01.246Z"
-          }
-        ],
-        "hs_marketable_reason_id": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.442000Z",
-            "value": "Sample Contact"
-          }
-        ],
-        "hs_marketable_reason_type": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.442000Z",
-            "value": "SAMPLE_CONTACT"
-          }
-        ],
-        "hs_marketable_status": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.442000Z",
-            "value": "true"
-          }
-        ],
-        "hs_marketable_until_renewal": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.442000Z",
-            "value": "true"
-          }
-        ],
-        "hs_membership_has_accessed_private_content": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "0"
-          }
-        ],
-        "hs_object_id": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "72811506244"
-          }
-        ],
-        "hs_object_source": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "API"
-          }
-        ],
-        "hs_object_source_id": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "sample-contact"
-          }
-        ],
-        "hs_object_source_label": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "INTERNAL_PROCESSING"
-          }
-        ],
-        "hs_pipeline": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "contacts-lifecycle-pipeline"
-          }
-        ],
-        "hs_prospecting_agent_actively_enrolled_count": [
-          {
-            "sourceId": "RollupProperties",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.266000Z",
-            "value": "0"
-          }
-        ],
-        "hs_registered_member": [
-          {
-            "sourceId": "CalculatedPropertyComputer",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "0"
-          }
-        ],
-        "hs_sequences_actively_enrolled_count": [
-          {
-            "sourceId": "RollupProperties",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.266000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_facebook_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_google_plus_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_linkedin_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_num_broadcast_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_social_twitter_clicks": [
-          {
-            "sourceId": "WebAnalyticsPropertyCalculation",
-            "sourceType": "ANALYTICS",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "0"
-          }
-        ],
-        "hs_v2_date_entered_lead": [
-          {
-            "sourceId": "StageCalculatedPropertiesRollup",
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "2024-10-28T16:39:01.326Z"
-          }
-        ],
-        "jobtitle": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "Executive Chairperson"
-          }
-        ],
-        "lastmodifieddate": [
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:40:20.553000Z",
-            "value": "2024-10-28T16:40:20.553Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:14.522000Z",
-            "value": "2024-10-28T16:39:14.522Z"
-          },
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:02.286000Z",
-            "value": "2024-10-28T16:39:02.286Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.442000Z",
-            "value": "2024-10-28T16:39:01.442Z"
-          },
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "2024-10-28T16:39:01.326Z"
-          }
-        ],
-        "lastname": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "Halligan (Sample Contact)"
-          }
-        ],
-        "lifecyclestage": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-10-28T16:39:01.326000Z",
-            "value": "lead"
-          }
-        ],
-        "num_conversion_events": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.716000Z",
-            "value": "0"
-          }
-        ],
-        "num_unique_conversion_events": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-10-28T16:39:01.716000Z",
-            "value": "0"
-          }
-        ],
-        "twitterhandle": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "bhalligan"
-          }
-        ],
-        "twitterprofilephoto": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "https://pbs.twimg.com/profile_images/3491742741/212e42c07d3348251da10872e85aa6b0.jpeg"
-          }
-        ],
-        "website": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-10-28T16:39:00.612000Z",
-            "value": "http://www.HubSpot.com"
-          }
-        ]
-      },
-      "updatedAt": "2024-10-28T16:40:20.553000Z",
+      "updatedAt": "redacted",
       "url": "redacted"
     }
   ],
@@ -2401,11 +1498,13 @@
         "hs_is_stalled_after_timestamp": null,
         "hs_last_call_id_with_followups": null,
         "hs_last_conversation_with_followups_object_coordinates": null,
+        "hs_last_email_with_followups_object_coordinates": null,
+        "hs_last_followup_timestamp": null,
         "hs_last_gs_shared_message": null,
         "hs_last_meeting_id_with_followups": null,
         "hs_last_partner_shared_message_date": null,
         "hs_last_shared_message_create_date": null,
-        "hs_lastmodifieddate": "2025-04-03T12:59:43.469Z",
+        "hs_lastmodifieddate": "redacted",
         "hs_latest_approval_status": null,
         "hs_latest_approval_status_approval_id": null,
         "hs_latest_marketing_email_click_date": null,
@@ -2416,7 +1515,6 @@
         "hs_latest_sales_email_open_date": null,
         "hs_latest_sales_email_reply_date": null,
         "hs_likelihood_to_close": null,
-        "hs_line_item_context_id": null,
         "hs_line_item_global_term_hs_discount_percentage": null,
         "hs_line_item_global_term_hs_discount_percentage_enabled": null,
         "hs_line_item_global_term_hs_recurring_billing_period": null,
@@ -2463,6 +1561,7 @@
         "hs_pinned_engagement_id": null,
         "hs_predicted_amount": null,
         "hs_predicted_amount_in_home_currency": null,
+        "hs_price_book_reassignment_status": null,
         "hs_primary_associated_company": null,
         "hs_primary_quote_data_updated_at": null,
         "hs_priority": null,
@@ -2480,6 +1579,7 @@
         "hs_unique_creation_key": null,
         "hs_updated_by_user_id": "73074756",
         "hs_user_ids_of_all_notification_followers": null,
+        "hs_user_ids_of_all_notification_recipients": "73074756",
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": "73074756",
         "hs_v2_cumulative_time_in_appointmentscheduled": null,
@@ -2749,32 +1849,7 @@
             "value": "1"
           }
         ],
-        "hs_lastmodifieddate": [
-          {
-            "sourceId": "DealStageProbabilityHandler",
-            "sourceType": "CALCULATED",
-            "timestamp": "2025-04-03T12:59:43.469000Z",
-            "value": "2025-04-03T12:59:43.469Z"
-          },
-          {
-            "sourceType": "API",
-            "timestamp": "2025-04-03T12:59:19.747000Z",
-            "value": "2025-04-03T12:59:19.747Z"
-          },
-          {
-            "sourceId": "DealStageProcessor:userId:Optional.empty",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2025-04-03T12:59:11.666000Z",
-            "value": "2025-04-03T12:59:11.666Z"
-          },
-          {
-            "sourceId": "userId:73074756",
-            "sourceType": "CRM_UI",
-            "timestamp": "2025-04-03T12:59:10.726000Z",
-            "updatedByUserId": 73074756,
-            "value": "2025-04-03T12:59:10.726Z"
-          }
-        ],
+        "hs_lastmodifieddate": "redacted",
         "hs_num_associated_active_deal_registrations": [
           {
             "sourceId": "InitialRollupProperties",
@@ -2948,6 +2023,14 @@
             "value": "73074756"
           }
         ],
+        "hs_user_ids_of_all_notification_recipients": [
+          {
+            "sourceId": "com.hubspot.crm.notifications.data.property.NotificationRecipientsUpdater",
+            "sourceType": "CALCULATED",
+            "timestamp": "2026-07-16T20:55:20.476000Z",
+            "value": "73074756"
+          }
+        ],
         "hs_user_ids_of_all_owners": [
           {
             "sourceId": "userId:73074756",
@@ -3035,7 +2118,7 @@
           }
         ]
       },
-      "updatedAt": "2025-04-03T12:59:43.469000Z",
+      "updatedAt": "redacted",
       "url": "redacted"
     }
   ],
@@ -3141,7 +2224,7 @@
           "updatedAt": 1743685150749
         }
       ],
-      "updatedAt": "2025-04-03T12:59:10.749000Z"
+      "updatedAt": "redacted"
     }
   ],
   [
@@ -3153,35 +2236,143 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "archived": false,
-      "createdAt": "2025-09-30T12:48:28.771000Z",
-      "email": "nicolas@estuary.dev",
-      "firstName": "Nicolas",
-      "id": "83700335",
-      "lastName": "Lazo",
+      "createdAt": "2026-08-17T22:37:32.256000Z",
+      "email": "dave@estuary.dev",
+      "firstName": "David",
+      "id": "12236123",
+      "lastName": "Yaffe",
       "type": "PERSON",
-      "updatedAt": "2025-10-20T15:18:28.094000Z",
-      "userId": 83700335,
-      "userIdIncludingInactive": 83700335
+      "updatedAt": "redacted",
+      "userId": 12236123,
+      "userIdIncludingInactive": 12236123
     }
   ],
   [
-    "acmeCo/owners",
+    "acmeCo/marketing_events",
     {
       "_meta": {
         "op": "c",
-        "row_id": 1,
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "archived": false,
-      "createdAt": "2024-10-28T16:38:58.288000Z",
-      "email": "alexb@estuary.dev",
-      "firstName": "Alexander",
-      "id": "904875188",
-      "lastName": "Bair",
-      "type": "PERSON",
-      "updatedAt": "2024-12-18T20:19:29.405000Z",
-      "userId": 73074756,
-      "userIdIncludingInactive": 73074756
+      "appInfo": null,
+      "attendees": 1,
+      "cancellations": null,
+      "createdAt": "2026-05-29T14:27:36.562Z",
+      "customProperties": [],
+      "endDateTime": "2026-06-02T16:00:00Z",
+      "eventCancelled": false,
+      "eventCompleted": false,
+      "eventDescription": "My description",
+      "eventName": "Test Marketing Event",
+      "eventOrganizer": "Nicolas Lazo",
+      "eventStatus": "PAST",
+      "eventStatusV2": "completed",
+      "eventType": "Test Event",
+      "eventUrl": null,
+      "externalEventId": null,
+      "noShows": -1,
+      "objectId": "559722810694",
+      "registrants": null,
+      "startDateTime": "2026-05-29T14:27:26.867Z",
+      "updatedAt": "redacted"
+    }
+  ],
+  [
+    "acmeCo/marketing_event_participants",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "associations": {
+        "contact": {
+          "contactId": "225877317544",
+          "email": "test@test.com",
+          "firstname": "John",
+          "lastname": "Doe"
+        },
+        "marketingEvent": {
+          "externalAccountId": null,
+          "externalEventId": null,
+          "marketingEventId": "559722810694",
+          "name": "Test Marketing Event"
+        }
+      },
+      "createdAt": "2026-06-02T17:29:25.619Z",
+      "id": "560628475813",
+      "properties": {
+        "attendanceDurationSeconds": 2422800,
+        "attendancePercentage": null,
+        "attendanceState": "ATTENDED",
+        "occurredAt": 1780282800000
+      }
+    }
+  ],
+  [
+    "acmeCo/contact_lists",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "additionalProperties": {
+        "hs_classic_list_id": "1",
+        "hs_created_at": "1793040156183",
+        "hs_created_by_user_id": "73074756",
+        "hs_createdate": "1793040157468",
+        "hs_definition_updated_at": "1793040156183",
+        "hs_description": "Used to determine whether GET https://api.hubapi.com/crm/v3/lists/{listId}/memberships/join-order orders joins in ascending or descending order",
+        "hs_filter_source": "FILTER_BRANCH",
+        "hs_generated_by_ai": "false",
+        "hs_is_active_list": "false",
+        "hs_is_limit_exempt": "false",
+        "hs_is_lookalike_list": "false",
+        "hs_is_public": "true",
+        "hs_is_read_only": "false",
+        "hs_last_record_added_at": "1793040308469",
+        "hs_lastmodifieddate": "redacted",
+        "hs_list_access_level": "EVERYONE_EDIT",
+        "hs_list_id": "6",
+        "hs_list_name": "Join Order Test",
+        "hs_list_reference_count": "0",
+        "hs_list_size": "3",
+        "hs_list_version": "1",
+        "hs_num_references_blocking_delete": "0",
+        "hs_object_id": "600418691680",
+        "hs_object_source": "CRM_UI",
+        "hs_object_source_id": "CrmObjectListUpdater",
+        "hs_object_source_label": "CRM_UI",
+        "hs_object_source_user_id": "73074756",
+        "hs_object_type_id": "0-1",
+        "hs_processing_status": "COMPLETE",
+        "hs_processing_type": "MANUAL",
+        "hs_total_size_calculated_at": "redacted",
+        "hs_updated_at": "1793040156183",
+        "hs_updated_by_user_id": "73074756"
+      },
+      "createdAt": "2026-10-26T18:42:36.183Z",
+      "createdById": "73074756",
+      "filtersUpdatedAt": "2026-10-26T18:42:36.183Z",
+      "listId": 6,
+      "listVersion": 1,
+      "name": "Join Order Test",
+      "objectTypeId": "0-1",
+      "processingStatus": "COMPLETE",
+      "processingType": "MANUAL",
+      "updatedAt": "redacted",
+      "updatedById": "73074756"
+    }
+  ],
+  [
+    "acmeCo/contact_list_memberships",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "listId": 6,
+      "membershipTimestamp": "2026-10-26T18:45:08.469000Z",
+      "recordId": "225877317544"
     }
   ],
   [
@@ -3240,7 +2431,7 @@
         "hs_is_canceled": "false",
         "hs_is_closed": "true",
         "hs_landing_site": null,
-        "hs_lastmodifieddate": "2026-01-14T19:18:04.972Z",
+        "hs_lastmodifieddate": "redacted",
         "hs_merged_object_ids": null,
         "hs_object_id": "520214166401",
         "hs_object_source": "CRM_UI",
@@ -3254,6 +2445,7 @@
         "hs_order_discount": null,
         "hs_order_name": "Test Order",
         "hs_order_note": null,
+        "hs_order_type": null,
         "hs_owning_teams": null,
         "hs_payment_processing_method": null,
         "hs_payment_status": null,
@@ -3279,6 +2471,7 @@
         "hs_source_id": null,
         "hs_source_store": null,
         "hs_subtotal_price": null,
+        "hs_tag_ids": null,
         "hs_tags": null,
         "hs_tax": null,
         "hs_time_in_3725360f_519b_4b18_a593_494d60a29c9f_69491685": "redacted",
@@ -3291,6 +2484,7 @@
         "hs_unique_creation_key": null,
         "hs_updated_by_user_id": "73074756",
         "hs_user_ids_of_all_notification_followers": null,
+        "hs_user_ids_of_all_notification_recipients": null,
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": null,
         "hs_was_imported": null,
@@ -3367,15 +2561,7 @@
             "value": "true"
           }
         ],
-        "hs_lastmodifieddate": [
-          {
-            "sourceId": "userId:73074756",
-            "sourceType": "CRM_UI",
-            "timestamp": "2026-01-14T19:18:04.972000Z",
-            "updatedByUserId": 73074756,
-            "value": "2026-01-14T19:18:04.972Z"
-          }
-        ],
+        "hs_lastmodifieddate": "redacted",
         "hs_object_id": [
           {
             "sourceId": "userId:73074756",
@@ -3461,7 +2647,7 @@
           }
         ]
       },
-      "updatedAt": "2026-01-14T19:18:04.972000Z",
+      "updatedAt": "redacted",
       "url": "redacted"
     }
   ]

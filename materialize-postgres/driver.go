@@ -1,7 +1,8 @@
-package main
+package connector
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	iam "github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
@@ -49,14 +51,28 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
-	"native_binary_column_type":        true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"native_binary_column_type":        common.FlagEnabled,
+	"enum":                             common.FlagEnabled,
+	"jsonb":                            common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
+}
+
+// ctxWithIdleQueryTimeout is ctxWithQueryTimeout for a query that streams its
+// results: calling touch restarts the timeout, so a query that is slow but still
+// returning rows is never cancelled.
+func ctxWithIdleQueryTimeout(ctx context.Context, timeout time.Duration) (_ context.Context, touch func(), cancel func()) {
+	ctx, cancelCause := context.WithCancelCause(ctx)
+	var timer = time.AfterFunc(timeout, func() {
+		cancelCause(fmt.Errorf("no query results for %s", timeout))
+	})
+	return ctx, func() { timer.Reset(timeout) }, func() { timer.Stop(); cancelCause(context.Canceled) }
 }
 
 type sshForwarding struct {
@@ -105,8 +121,8 @@ type config struct {
 	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password,omitempty" jsonschema:"-"`
 	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=2"`
-	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=3"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table" jsonschema_extras:"order=3"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
 
 	Credentials *credentialConfig `json:"credentials" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://ossrdbms-aad.database.windows.net/.default,order=5"`
 
@@ -119,15 +135,15 @@ type config struct {
 
 type advancedConfig struct {
 	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) DefaultNamespace() string {
 	return c.Schema
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -260,7 +276,7 @@ type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
 }
 
 func (c tableConfig) WithDefaults(cfg config) tableConfig {
@@ -288,7 +304,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, c.Delta, nil
 }
 
-func newPostgresDriver() *sql.Driver[config, tableConfig] {
+func NewDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		StartTunnel: func(ctx context.Context, cfg config) error {
@@ -370,6 +386,12 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func newTransactor(
@@ -383,12 +405,21 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var cfg = ep.Config
 
 	// Create templates using the dialect from the endpoint (which already has feature flags)
 	templates := renderTemplates(ep.Dialect)
 
-	var d = &transactor{cfg: cfg, templates: templates, be: be}
+	var d = &transactor{
+		cfg:                   cfg,
+		templates:             templates,
+		be:                    be,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
+	}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -436,13 +467,14 @@ type binding struct {
 	storeInsertSQL    string
 	deleteQuerySQL    string
 	loadQuerySQL      string
+	truncateSQL       string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Choose the appropriate load query template based on configuration
@@ -467,6 +499,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
 		}
+	}
+
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < $1;", target.Identifier, col.Identifier)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -495,8 +531,34 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.store.fence.Checkpoint, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -531,7 +593,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
-			if err := sendBatch(ctx, txn, &batch); err != nil {
+			if _, err := sendBatch(ctx, txn, &batch); err != nil {
 				return fmt.Errorf("sending load batch: %w", err)
 			}
 			batchBytes = 0
@@ -545,25 +607,26 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Send any remaining keys for this load.
 	if batch.Len() > 0 {
-		if err := sendBatch(ctx, txn, &batch); err != nil {
+		if _, err := sendBatch(ctx, txn, &batch); err != nil {
 			return fmt.Errorf("sending final load batch: %w", err)
 		}
 	}
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
-	loadCtx, cancel := ctxWithQueryTimeout(ctx)
+	loadCtx, touch, cancel := ctxWithIdleQueryTimeout(ctx, queryTimeout)
 	defer cancel()
 
 	d.be.StartedEvaluatingLoads()
 	rows, err := txn.Query(loadCtx, d.load.unionSQL)
 	if err != nil {
-		return fmt.Errorf("querying Load documents: %w", err)
+		return fmt.Errorf("querying Load documents: %w", errors.Join(err, context.Cause(loadCtx)))
 	}
 	defer rows.Close()
 	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
+		touch()
 		var binding int
 		var document json.RawMessage
 
@@ -582,7 +645,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return fmt.Errorf("querying Loads: %w", err)
+		return fmt.Errorf("querying Loads: %w", errors.Join(err, context.Cause(loadCtx)))
 	} else if err = txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing Load transaction: %w", err)
 	}
@@ -627,10 +690,25 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer defuser.MaybeRollback()
 
 	var batch pgx.Batch
+	var batchBindings []int // Binding of each queued statement, parallel to batch.
 	batchBytes := 0
+
+	var round = it.Round
+	var truncations = d.truncations
+	var rowsAffected = make([]int64, len(d.bindings))
+	var stored = make([]bool, len(d.bindings))
+	countRows := func(rows []int64) {
+		for i, n := range rows {
+			rowsAffected[batchBindings[i]] += n
+		}
+		batchBindings = batchBindings[:0]
+	}
+
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
+		batchBindings = append(batchBindings, it.Binding)
+		stored[it.Binding] = true
 
 		if it.Delete && d.cfg.HardDelete {
 			if converted, err := b.target.ConvertKey(it.Key); err != nil {
@@ -655,8 +733,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 
 		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
-			if err := sendBatch(ctx, txn, &batch); err != nil {
+			if rows, err := sendBatch(ctx, txn, &batch); err != nil {
 				return nil, fmt.Errorf("sending store batch: %w", err)
+			} else {
+				countRows(rows)
 			}
 			batchBytes = 0
 		}
@@ -664,47 +744,95 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	defuser.Defuse()
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			defer txn.Rollback(ctx)
+		defer txn.Rollback(ctx)
 
-			var err error
-			if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+		var err error
+		if d.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
+
+		var fenceUpdate strings.Builder
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
+		}
+
+		// Add the update to the fence as the last statement in the batch. It is
+		// parameterized so that Postgres' pg_stat_statements collapses every
+		// commit into a single normalized entry rather than one per checkpoint.
+		batch.Queue(fenceUpdate.String(), fenceUpdateArgs(d.store.fence)...)
+
+		results := txn.SendBatch(ctx, &batch)
+
+		// Execute all remaining doc inserts & updates.
+		for i := 0; i < batch.Len()-1; i++ {
+			if tag, err := results.Exec(); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("store at index %d: %w", i, err))
+			} else {
+				rowsAffected[batchBindings[i]] += tag.RowsAffected()
 			}
+		}
 
-			var fenceUpdate strings.Builder
-			if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
+		// The fence update is always the last operation in the batch. A single
+		// affected row confirms this instance still owns the fence; anything
+		// else means we were fenced off by another instance.
+		if tag, err := results.Exec(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
+		} else if tag.RowsAffected() != 1 {
+			return nil, m.FinishedOperation(fmt.Errorf("this instance was fenced off by another"))
+		} else if err = results.Close(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("results.Close(): %w", err))
+		}
+
+		// Truncations run after the stores, because a store of an existing row
+		// is an UPDATE that would match nothing if its row were already
+		// deleted.
+		var truncated = make(map[int]int64, len(truncations))
+		for binding, boundary := range truncations {
+			var b = d.bindings[binding]
+			if tag, err := txn.Exec(ctx, b.truncateSQL, boundary); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+			} else {
+				truncated[binding] = tag.RowsAffected()
+				log.WithFields(log.Fields{
+					"table":    b.target.Identifier,
+					"boundary": boundary,
+					"deleted":  tag.RowsAffected(),
+				}).Info("truncated rows published before the backfill")
 			}
+		}
 
-			// Add the update to the fence as the last statement in the batch.
-			batch.Queue(fenceUpdate.String())
-
-			results := txn.SendBatch(ctx, &batch)
-
-			// Execute all remaining doc inserts & updates.
-			for i := 0; i < batch.Len()-1; i++ {
-				if _, err := results.Exec(); err != nil {
-					return fmt.Errorf("store at index %d: %w", i, err)
-				}
+		for i, b := range d.bindings {
+			var stats = m.TotalRowStats(rowsAffected[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if !stored[i] {
+				continue
 			}
+			d.be.ReportRowStats(round, b.target.Path, stats)
+		}
 
-			// The fence update is always the last operation in the batch.
-			if _, err := results.Exec(); err != nil {
-				return fmt.Errorf("updating flow checkpoint: %w", err)
-			} else if err = results.Close(); err != nil {
-				return fmt.Errorf("results.Close(): %w", err)
-			}
+		commitCtx, cancel := ctxWithQueryTimeout(ctx)
+		defer cancel()
+		if err := txn.Commit(commitCtx); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("committing Store transaction: %w", err))
+		}
 
-			commitCtx, cancel := ctxWithQueryTimeout(ctx)
-			defer cancel()
-			if err := txn.Commit(commitCtx); err != nil {
-				return fmt.Errorf("committing Store transaction: %w", err)
-			}
-
-			return nil
-		})
+		return nil, nil
 	}, nil
+}
+
+// fenceUpdateArgs returns the positional bind parameters ($1..$5) for the
+// parameterized updateFence statement, in the order the template references
+// them. The checkpoint is stored as standard base64 text, matching how
+// installFence writes it.
+func fenceUpdateArgs(fence sql.Fence) []any {
+	return []any{
+		base64.StdEncoding.EncodeToString(fence.Checkpoint),
+		fence.Materialization.String(),
+		fence.KeyBegin,
+		fence.KeyEnd,
+		fence.Fence,
+	}
 }
 
 func (d *transactor) Destroy() {
@@ -712,28 +840,27 @@ func (d *transactor) Destroy() {
 	d.store.conn.Close(context.Background())
 }
 
-func main() {
-	boilerplate.RunMain(newPostgresDriver())
-}
-
-// Send a single batch of queries with the given transaction, discarding any results. The batch is
-// zero'd upon completion.
-func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
+// Send a single batch of queries with the given transaction, returning the rows affected by each
+// statement in order. The batch is zero'd upon completion.
+func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) ([]int64, error) {
 	ctx, cancel := ctxWithQueryTimeout(ctx)
 	defer cancel()
 
 	results := txn.SendBatch(ctx, batch)
+	rows := make([]int64, 0, batch.Len())
 	for i := range batch.Len() {
-		if _, err := results.Exec(); err != nil {
-			return fmt.Errorf("exec at index %d: %w", i, err)
+		if tag, err := results.Exec(); err != nil {
+			return nil, fmt.Errorf("exec at index %d: %w", i, err)
+		} else {
+			rows = append(rows, tag.RowsAffected())
 		}
 	}
 	if err := results.Close(); err != nil {
-		return fmt.Errorf("closing batch: %w", err)
+		return nil, fmt.Errorf("closing batch: %w", err)
 	}
 
 	var newBatch pgx.Batch
 	*batch = newBatch
 
-	return nil
+	return rows, nil
 }

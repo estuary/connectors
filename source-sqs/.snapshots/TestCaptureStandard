@@ -1,0 +1,32 @@
+# ================================
+# Collection "": 24 Documents
+# ================================
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"body":"42"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"body":"[1, 2, 3]"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"body":"plain text message"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":0,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":1,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":10,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":11,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":12,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":13,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":14,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":15,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":16,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":17,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":18,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":19,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":2,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":3,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":4,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":5,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":6,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":7,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":8,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":9,"kind":"json-object"}
+{"_meta":{"queueUrl":"https://sqs.test.example/123456789012/test-capture-standard","messageId":"<MESSAGE_ID>","sentTimestamp":"<TIMESTAMP>","approximateReceiveCount":1},"idx":99}
+# ================================
+# Final State Checkpoint
+# ================================
+{}
+

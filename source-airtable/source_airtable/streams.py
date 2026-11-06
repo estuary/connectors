@@ -45,7 +45,7 @@ class AirtableBases(HttpStream):
             raise AirbyteTracedException(message=error_message, failure_type=FailureType.config_error)
         if response.status_code == 403 or response.status_code == 422:
             self.logger.error(f"Stream {self.name}: permission denied or entity is unprocessable. Skipping.")
-            setattr(self, "raise_on_http_errors", False)
+            self.raise_on_http_errors = False
             return False
         return super().should_retry(response)
 
@@ -131,7 +131,7 @@ class AirtableStream(HttpStream, ABC):
     def should_retry(self, response: requests.Response) -> bool:
         if response.status_code == 403 or response.status_code == 422:
             self.logger.error(f"Stream {self.name}: permission denied or entity is unprocessable. Skipping.")
-            setattr(self, "raise_on_http_errors", False)
+            self.raise_on_http_errors = False
             return False
         return super().should_retry(response)
 

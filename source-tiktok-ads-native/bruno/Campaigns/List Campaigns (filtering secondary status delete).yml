@@ -1,0 +1,27 @@
+info:
+  name: List Campaigns (filtering secondary status delete)
+  type: http
+  seq: 15
+
+http:
+  method: GET
+  url: '{{base_url}}/campaign/get/?advertiser_id={{advertiser_id}}&page=1&page_size=1000&filtering={"secondary_status":"CAMPAIGN_STATUS_DELETE"}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Get campaigns"
+  (`GET /open_api/v1.3/campaign/get/`).
+
+  **WHY:** deleted and paused campaigns are indistinguishable in the response, so this checks whether a deleted-only status filter exists; it should return only the seeded deleted campaign.
+
+  **VERIFIED (2026-10-12, sandbox):** `total_number 1`: returns **only** the
+  deleted seed campaign. A deleted-only query exists, so deleted campaigns can
+  be identified even though their documents look like paused ones. The deleted
+  campaign's `modify_time` (23:08:18) is its deletion time, 12 s after its
+  `create_time` (23:08:06): deletion stamps `modify_time`.

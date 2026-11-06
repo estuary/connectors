@@ -31,7 +31,9 @@ type Driver[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] s
 	// connector, to as much of an extent as possible. The returned PrereqErr
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
-	PreReqs func(ctx context.Context, cfg EC) *cerrors.PrereqErr
+	// featureFlags are the flags resolved for the task from its spec, so that a
+	// check which varies by flag uses the same values as the rest of the RPC.
+	PreReqs func(ctx context.Context, cfg EC, featureFlags map[string]bool) *cerrors.PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver[boilerplate.EndpointConfiger, Resource]{}
@@ -67,15 +69,16 @@ func (d *Driver[EC, RC]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Re
 }
 
 func (d *Driver[EC, RC]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, d.newMaterialization)
+	return boilerplate.RunValidate(ctx, req, d.NewMaterializer)
 }
 
 func (d *Driver[EC, RC]) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, d.newMaterialization)
+	return boilerplate.RunApply(ctx, req, d.NewMaterializer)
 }
 
 func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, d.newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, d.NewMaterializer,
+		boilerplate.WithConfigUpdates([]string{"advanced", "feature_flags"}))
 }
 
 type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] struct {
@@ -86,7 +89,13 @@ type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resource
 	client              Client
 }
 
-func (d *Driver[EC, RC]) newMaterialization(ctx context.Context, materializationName string, cfg EC, featureFlags map[string]bool) (boilerplate.Materializer[EC, FieldConfig, RC, MappedType], error) {
+// NewMaterializer connects to the endpoint and returns a Materializer for it. It
+// is exported so that a caller outside of the connector — an integration test, or
+// a test harness importing the connector's package — can reach the Materializer
+// without reproducing the order this establishes: a network tunnel is started
+// before anything connects through it, and the endpoint is built before the
+// client that talks to it.
+func (d *Driver[EC, RC]) NewMaterializer(ctx context.Context, materializationName string, cfg EC, featureFlags map[string]bool) (boilerplate.Materializer[EC, FieldConfig, RC, MappedType], error) {
 	if err := d.StartTunnel(ctx, cfg); err != nil {
 		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	}
@@ -118,7 +127,7 @@ var _ boilerplate.Materializer[
 ] = &sqlMaterialization[boilerplate.EndpointConfiger, Resource]{}
 
 func (s *sqlMaterialization[EC, RC]) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	return s.driver.PreReqs(ctx, s.endpoint.Config)
+	return s.driver.PreReqs(ctx, s.endpoint.Config, s.featureFlags)
 }
 
 func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
@@ -132,6 +141,7 @@ func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
 		CaseInsensitiveFields:    s.endpoint.Dialect.CaseInsensitiveColumns,
 		CaseInsensitiveResources: s.endpoint.Dialect.CaseInsensitiveResources,
 		ConcurrentApply:          s.endpoint.ConcurrentApply,
+		KeyChangeInPlace:         s.endpoint.KeyChangeInPlace,
 		NoCreateNamespaces:       !doCreateSchemas,
 		SerPolicy:                s.endpoint.SerPolicy,
 		MaterializeOptions:       s.endpoint.Options,
@@ -150,6 +160,16 @@ func (s *sqlMaterialization[EC, RC]) CreateNamespace(ctx context.Context, ns str
 func (s *sqlMaterialization[EC, RC]) CreateResource(ctx context.Context, binding boilerplate.MappedBinding[EC, RC, MappedType]) (string, boilerplate.ActionApplyFn, error) {
 	table, err := getTable(s.endpoint, s.materializationName, binding)
 	if err != nil {
+		return "", nil, err
+	}
+
+	if p, ok := s.client.(TablePreparer); ok {
+		if err := p.PrepareTable(&table); err != nil {
+			return "", nil, fmt.Errorf("preparing table: %w", err)
+		}
+	}
+
+	if err := checkColumnLimit(s.endpoint.Dialect, table, 0, len(table.Columns())); err != nil {
 		return "", nil, err
 	}
 
@@ -294,6 +314,12 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 		return "", nil, err
 	}
 
+	if p, ok := s.client.(TablePreparer); ok {
+		if err := p.PrepareTable(&table); err != nil {
+			return "", nil, fmt.Errorf("preparing table: %w", err)
+		}
+	}
+
 	getColumn := func(field string) (Column, error) {
 		for _, c := range table.Columns() {
 			if field == c.Field {
@@ -350,7 +376,29 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 		return "", nil, nil
 	}
 
+	if err := checkColumnLimit(s.endpoint.Dialect, table, len(existingResource.AllFields()), len(alter.AddColumns)); err != nil {
+		return "", nil, err
+	}
+
 	return s.client.AlterTable(ctx, alter)
+}
+
+// checkColumnLimit fails a table that would exceed the dialect's column limit.
+// It runs while Apply actions are planned, before any binding's table changes.
+func checkColumnLimit(dialect Dialect, table Table, existing, added int) error {
+	if dialect.MaxColumns == 0 || added == 0 || existing+added <= dialect.MaxColumns {
+		return nil
+	}
+
+	var count = fmt.Sprintf("%d columns", existing+added)
+	if existing > 0 {
+		count += fmt.Sprintf(" (%d existing and %d new)", existing, added)
+	}
+
+	return cerrors.NewUserError(nil, fmt.Sprintf(
+		"table %s for collection %q would have %s, which exceeds the destination's limit of %d columns per table: exclude fields from this binding to reduce the number of columns",
+		table.Identifier, table.Source, count, dialect.MaxColumns,
+	))
 }
 
 func (s *sqlMaterialization[EC, RC]) NewTransactor(
@@ -366,7 +414,6 @@ func (s *sqlMaterialization[EC, RC]) NewTransactor(
 		if err != nil {
 			return nil, fmt.Errorf("getting table for binding %d: %w", binding.Index, err)
 		}
-		table.StateKey = binding.StateKey
 		tables = append(tables, table)
 	}
 
@@ -433,7 +480,13 @@ func getTable[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]]
 		return Table{}, fmt.Errorf("getting parameters for binding %d: %w", binding.Index, err)
 	}
 	tableShape := BuildTableShape(materializationName, &binding.MaterializationSpec_Binding, binding.Index, path, delta)
-	return ResolveTable(tableShape, endpoint.Dialect)
+	table, err := ResolveTable(tableShape, endpoint.Dialect)
+	if err != nil {
+		return Table{}, err
+	}
+	table.StateKey = binding.StateKey
+
+	return table, nil
 }
 
 // TxDefuser.MaybeRollback calls Rollback on a Tx, unless Defuse has previously

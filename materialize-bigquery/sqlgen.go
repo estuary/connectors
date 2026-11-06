@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"encoding/json"
@@ -135,6 +135,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
 			"bytes":      {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
+			"json":       {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(jsonToStringCast))},
 			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -169,7 +170,26 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
+	// Object and array fields stored as text hold serialized JSON (e.g. after
+	// objects_and_arrays_as_json was disabled, or the historical string
+	// behavior), so PARSE_JSON restores their structure when migrating back to a
+	// JSON column. SAFE.PARSE_JSON maps the empty-string representation of a null
+	// object/array to NULL rather than erroring. Scalar values widened to JSON
+	// are wrapped as-is with TO_JSON.
+	if slices.ContainsFunc(migration.Inference.Types, func(t string) bool {
+		return t == "object" || t == "array"
+	}) {
+		return fmt.Sprintf(`SAFE.PARSE_JSON(%s)`, migration.Identifier)
+	}
 	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+}
+
+// jsonToStringCast serializes a JSON column to its textual representation. Used
+// when reverting object/array fields from native JSON storage back to STRING,
+// e.g. when the objects_and_arrays_as_json feature flag is disabled or a
+// collection field that was an object/array becomes a plain string.
+func jsonToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_JSON_STRING(%s)`, migration.Identifier)
 }
 
 func toBigNumericCast(m sql.ColumnTypeMigration) string {
@@ -210,6 +230,8 @@ flow_temp_table_{{ $.Binding }}
 
 -- Templated creation of a materialized table definition and comments.
 -- Note: BigQuery only allows a maximum of 4 columns for clustering.
+-- The PARTITION BY expression comes verbatim from the binding's partition_by
+-- resource config, and is omitted when that is empty.
 
 {{ define "createTargetTable" -}}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
@@ -218,6 +240,9 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
 )
+{{ with PartitionExpr $.ResourceConfigJson -}}
+PARTITION BY {{ . }}
+{{ end -}}
 CLUSTER BY {{ range $ind, $key := $.Keys }}
 	{{- if lt $ind 4 -}}
 		{{- if $ind }}, {{end -}}
@@ -293,9 +318,9 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 {{ define "loadQueryNoFlowDocument" -}}
 SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
-{{- range $i, $col := $.RootLevelColumns}}
+{{- range $i, $col := $.RootPropertyColumns}}
 	{{- if $i}}, {{end}}
-	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ QuoteAlias $col.RootProperty }}
 {{- end}}
 )) as flow_document
 FROM {{ $.Identifier }} AS l
@@ -427,7 +452,10 @@ UPDATE {{ Identifier $.TablePath }}
 	AND key_end={{ $.KeyEnd }}
 	AND fence={{ $.Fence }};
 {{ end }}
-`)
+`, template.FuncMap{
+		"PartitionExpr": partitionExpr,
+		"QuoteAlias":    sql.QuoteTransformEscapedBackslash("`", "\\`"),
+	})
 
 	return templates{
 		tempTableName:           tplAll.Lookup("tempTableName"),

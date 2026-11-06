@@ -1,0 +1,42 @@
+$schema: http://json-schema.org/draft-07/schema#
+type: object
+required:
+- campaign_label.resource_name
+properties:
+  campaign.resource_name:
+    type:
+    - 'null'
+    - string
+  campaign_label.resource_name:
+    type:
+    - string
+  label.name:
+    type:
+    - 'null'
+    - string
+  label.resource_name:
+    type:
+    - 'null'
+    - string
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+    - row_id
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

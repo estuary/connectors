@@ -1,0 +1,1018 @@
+info:
+  name: per ticket
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets/{{metric_ticket_id}}/metric_events"
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - ticket 1, grouped by metric (projection)"
+    request:
+      url: "{{base_url}}/tickets/1/metric_events"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "691"
+        - name: "ratelimit-remaining"
+          value: "691"
+        - name: "ratelimit-reset"
+          value: "2"
+      body:
+        type: json
+        data: |-
+          {
+            "resolution_time": [
+              {
+                "id": 28835704026644,
+                "ticket_id": 1,
+                "metric": "resolution_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 28835704027412,
+                "ticket_id": 1,
+                "metric": "resolution_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              }
+            ],
+            "requester_wait_time": [
+              {
+                "id": 28835704020628,
+                "ticket_id": 1,
+                "metric": "requester_wait_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 28835729596436,
+                "ticket_id": 1,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 29008499422612,
+                "ticket_id": 1,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "apply_sla",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false,
+                "sla": {
+                  "target": 160,
+                  "business_hours": false,
+                  "policy": {
+                    "id": 29006807867284,
+                    "title": "Test SLA Policy",
+                    "description": "Details copied form Zendesk API code sample. For urgent incidents, we will respond to tickets in 10 minutes"
+                  },
+                  "target_in_seconds": 9600
+                }
+              },
+              {
+                "id": 29008499423508,
+                "ticket_id": 1,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "breach",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false
+              }
+            ],
+            "agent_work_time": [
+              {
+                "id": 28835729589652,
+                "ticket_id": 1,
+                "metric": "agent_work_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 28835704018964,
+                "ticket_id": 1,
+                "metric": "agent_work_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              }
+            ],
+            "reply_time": [
+              {
+                "id": 28835729597716,
+                "ticket_id": 1,
+                "metric": "reply_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 28835729599124,
+                "ticket_id": 1,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 29008499425428,
+                "ticket_id": 1,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "fulfill",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false
+              },
+              {
+                "id": 29008499425556,
+                "ticket_id": 1,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "update_status",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false,
+                "status": {
+                  "business": 1864,
+                  "calendar": 8584
+                }
+              }
+            ],
+            "periodic_update_time": [
+              {
+                "id": 28835704028692,
+                "ticket_id": 1,
+                "metric": "periodic_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 29008546078100,
+                "ticket_id": 1,
+                "metric": "periodic_update_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false
+              }
+            ],
+            "pausable_update_time": [
+              {
+                "id": 28835704020372,
+                "ticket_id": 1,
+                "metric": "pausable_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2024-07-26T15:41:04Z",
+                "deleted": false
+              },
+              {
+                "id": 29008499418132,
+                "ticket_id": 1,
+                "metric": "pausable_update_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false
+              }
+            ],
+            "group_ownership_time": [
+              {
+                "id": 29008546080404,
+                "ticket_id": 1,
+                "metric": "group_ownership_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2024-08-01T14:45:47Z",
+                "deleted": false
+              }
+            ]
+          }
+  - name: "200 - ticket 49 with breach after updated_at (projection)"
+    request:
+      url: "{{base_url}}/tickets/49/metric_events"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "19"
+      body:
+        type: json
+        data: |-
+          {
+            "agent_work_time": [
+              {
+                "id": 54337653206804,
+                "ticket_id": 49,
+                "metric": "agent_work_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              },
+              {
+                "id": 54337653206932,
+                "ticket_id": 49,
+                "metric": "agent_work_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              }
+            ],
+            "group_ownership_time": [
+              {
+                "id": 54337653221652,
+                "ticket_id": 49,
+                "metric": "group_ownership_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              },
+              {
+                "id": 54337653222036,
+                "ticket_id": 49,
+                "metric": "group_ownership_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              }
+            ],
+            "pausable_update_time": [
+              {
+                "id": 54337639366036,
+                "ticket_id": 49,
+                "metric": "pausable_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              }
+            ],
+            "periodic_update_time": [
+              {
+                "id": 54337639378580,
+                "ticket_id": 49,
+                "metric": "periodic_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              }
+            ],
+            "reply_time": [
+              {
+                "id": 54337639370132,
+                "ticket_id": 49,
+                "metric": "reply_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              },
+              {
+                "id": 54337653211412,
+                "ticket_id": 49,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              },
+              {
+                "id": 54337653215252,
+                "ticket_id": 49,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "apply_sla",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false,
+                "sla": {
+                  "target": 1,
+                  "business_hours": false,
+                  "policy": {
+                    "id": 54337621815700,
+                    "title": "Bruno probe V8",
+                    "description": null
+                  },
+                  "target_in_seconds": 60
+                }
+              },
+              {
+                "id": 54337639376404,
+                "ticket_id": 49,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "breach",
+                "time": "2026-10-07T15:56:19Z",
+                "deleted": false
+              }
+            ],
+            "requester_wait_time": [
+              {
+                "id": 54337653208596,
+                "ticket_id": 49,
+                "metric": "requester_wait_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              },
+              {
+                "id": 54337639368724,
+                "ticket_id": 49,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              }
+            ],
+            "resolution_time": [
+              {
+                "id": 54337639376788,
+                "ticket_id": 49,
+                "metric": "resolution_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              },
+              {
+                "id": 54337639377940,
+                "ticket_id": 49,
+                "metric": "resolution_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T15:55:19Z",
+                "deleted": false
+              }
+            ]
+          }
+  - name: "200 - ticket 52 at 20:28:26, before its 20:29:14 breach: breach event already present (projection)"
+    request:
+      url: "{{base_url}}/tickets/52/metric_events"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "697"
+        - name: "ratelimit-remaining"
+          value: "697"
+        - name: "ratelimit-reset"
+          value: "35"
+      body:
+        type: json
+        data: |-
+          {
+            "agent_work_time": [
+              {
+                "id": 54349608104980,
+                "ticket_id": 52,
+                "metric": "agent_work_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608105492,
+                "ticket_id": 52,
+                "metric": "agent_work_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "group_ownership_time": [
+              {
+                "id": 54349608118164,
+                "ticket_id": 52,
+                "metric": "group_ownership_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349623870740,
+                "ticket_id": 52,
+                "metric": "group_ownership_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "pausable_update_time": [
+              {
+                "id": 54349608106772,
+                "ticket_id": 52,
+                "metric": "pausable_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "periodic_update_time": [
+              {
+                "id": 54349623869332,
+                "ticket_id": 52,
+                "metric": "periodic_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "reply_time": [
+              {
+                "id": 54349623861780,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608109588,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608111252,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "apply_sla",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false,
+                "sla": {
+                  "target": 1,
+                  "business_hours": false,
+                  "policy": {
+                    "id": 54349623730068,
+                    "title": "Bruno probe V8",
+                    "description": null
+                  },
+                  "target_in_seconds": 60
+                }
+              },
+              {
+                "id": 54349623867668,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "breach",
+                "time": "2026-10-07T20:29:14Z",
+                "deleted": false
+              }
+            ],
+            "requester_wait_time": [
+              {
+                "id": 54349623860756,
+                "ticket_id": 52,
+                "metric": "requester_wait_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608107156,
+                "ticket_id": 52,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "resolution_time": [
+              {
+                "id": 54349623868052,
+                "ticket_id": 52,
+                "metric": "resolution_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349623868436,
+                "ticket_id": 52,
+                "metric": "resolution_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ]
+          }
+  - name: "200 - ticket 52 at 20:29:28, after the breach: unchanged (projection)"
+    request:
+      url: "{{base_url}}/tickets/52/metric_events"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "33"
+      body:
+        type: json
+        data: |-
+          {
+            "agent_work_time": [
+              {
+                "id": 54349608104980,
+                "ticket_id": 52,
+                "metric": "agent_work_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608105492,
+                "ticket_id": 52,
+                "metric": "agent_work_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "group_ownership_time": [
+              {
+                "id": 54349608118164,
+                "ticket_id": 52,
+                "metric": "group_ownership_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349623870740,
+                "ticket_id": 52,
+                "metric": "group_ownership_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "pausable_update_time": [
+              {
+                "id": 54349608106772,
+                "ticket_id": 52,
+                "metric": "pausable_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "periodic_update_time": [
+              {
+                "id": 54349623869332,
+                "ticket_id": 52,
+                "metric": "periodic_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "reply_time": [
+              {
+                "id": 54349623861780,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608109588,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608111252,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "apply_sla",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false,
+                "sla": {
+                  "target": 1,
+                  "business_hours": false,
+                  "policy": {
+                    "id": 54349623730068,
+                    "title": "Bruno probe V8",
+                    "description": null
+                  },
+                  "target_in_seconds": 60
+                }
+              },
+              {
+                "id": 54349623867668,
+                "ticket_id": 52,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "breach",
+                "time": "2026-10-07T20:29:14Z",
+                "deleted": false
+              }
+            ],
+            "requester_wait_time": [
+              {
+                "id": 54349623860756,
+                "ticket_id": 52,
+                "metric": "requester_wait_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349608107156,
+                "ticket_id": 52,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ],
+            "resolution_time": [
+              {
+                "id": 54349623868052,
+                "ticket_id": 52,
+                "metric": "resolution_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              },
+              {
+                "id": 54349623868436,
+                "ticket_id": 52,
+                "metric": "resolution_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:28:14Z",
+                "deleted": false
+              }
+            ]
+          }
+  - name: "200 - ticket 53 at 20:50:21, 11 minutes after its last change: no events yet"
+    request:
+      url: "{{base_url}}/tickets/53/metric_events"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "41"
+      body:
+        type: json
+        data: |-
+          {}
+  - name: "200 - ticket 53 at 20:52:17: events appear; SLA fulfilled, no breach event (projection)"
+    request:
+      url: "{{base_url}}/tickets/53/metric_events"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "699"
+        - name: "ratelimit-remaining"
+          value: "699"
+        - name: "ratelimit-reset"
+          value: "44"
+      body:
+        type: json
+        data: |-
+          {
+            "reply_time": [
+              {
+                "id": 54350415438100,
+                "ticket_id": 53,
+                "metric": "reply_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350384531476,
+                "ticket_id": 53,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350384534548,
+                "ticket_id": 53,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "apply_sla",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false,
+                "sla": {
+                  "target": 1,
+                  "business_hours": false,
+                  "policy": {
+                    "id": 54350009576980,
+                    "title": "Bruno probe V8",
+                    "description": null
+                  },
+                  "target_in_seconds": 60
+                }
+              },
+              {
+                "id": 54350384596372,
+                "ticket_id": 53,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "fulfill",
+                "time": "2026-10-07T20:39:11Z",
+                "deleted": false
+              },
+              {
+                "id": 54350384596628,
+                "ticket_id": 53,
+                "metric": "reply_time",
+                "instance_id": 1,
+                "type": "update_status",
+                "time": "2026-10-07T20:39:11Z",
+                "deleted": false,
+                "status": {
+                  "calendar": 0,
+                  "business": 0
+                }
+              }
+            ],
+            "resolution_time": [
+              {
+                "id": 54350384538132,
+                "ticket_id": 53,
+                "metric": "resolution_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350415443220,
+                "ticket_id": 53,
+                "metric": "resolution_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              }
+            ],
+            "requester_wait_time": [
+              {
+                "id": 54350415435284,
+                "ticket_id": 53,
+                "metric": "requester_wait_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350384529556,
+                "ticket_id": 53,
+                "metric": "requester_wait_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              }
+            ],
+            "agent_work_time": [
+              {
+                "id": 54350415429780,
+                "ticket_id": 53,
+                "metric": "agent_work_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350415433364,
+                "ticket_id": 53,
+                "metric": "agent_work_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              }
+            ],
+            "periodic_update_time": [
+              {
+                "id": 54350384541588,
+                "ticket_id": 53,
+                "metric": "periodic_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350415502868,
+                "ticket_id": 53,
+                "metric": "periodic_update_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:11Z",
+                "deleted": false
+              }
+            ],
+            "pausable_update_time": [
+              {
+                "id": 54350384527892,
+                "ticket_id": 53,
+                "metric": "pausable_update_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350415500948,
+                "ticket_id": 53,
+                "metric": "pausable_update_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:11Z",
+                "deleted": false
+              }
+            ],
+            "group_ownership_time": [
+              {
+                "id": 54350384541844,
+                "ticket_id": 53,
+                "metric": "group_ownership_time",
+                "instance_id": 0,
+                "type": "measure",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              },
+              {
+                "id": 54350384542484,
+                "ticket_id": 53,
+                "metric": "group_ownership_time",
+                "instance_id": 1,
+                "type": "activate",
+                "time": "2026-10-07T20:39:10Z",
+                "deleted": false
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [List Ticket Metric Events by Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metric_events/)
+
+  **WHY:** A4. Response shape of the per-ticket alternative for `ticket_metric_events`
+  (grouped by metric name), compared with the same ticket's events in the
+  incremental export.
+
+  **VERIFIED (2026-10-07):** returns an object keyed by metric name, each holding that metric's
+  events. For ticket 1 the 17 events match the incremental export exactly: same ids,
+  same fields (including `sla` on `apply_sla`).
+
+  **LIMITATION (VERIFIED 2026-10-07):** SLA breach events occur without updating the ticket.
+  Ticket 49's `reply_time` `breach` event has `time` 15:56:19, while the ticket's
+  `updated_at` stayed at 15:55:19 (`Tickets / show probe ticket`). A per-ticket refetch
+  triggered by ticket changes would never re-read this ticket after the breach.
+
+  **VERIFIED (2026-10-07):** breach events are written in advance. Ticket 52 (SLA
+  applied 20:28:14, 1-minute target) already had its `reply_time` `breach` event, with
+  the future `time` 20:29:14, when read at 20:28:26. A read at 20:29:28, after the
+  breach, returned the same event (same id, `deleted: false`) and no new events. A
+  per-ticket refetch triggered by ticket changes captures breach events when the SLA
+  is applied, so the gap described in the LIMITATION above does not lose events.
+
+  **VERIFIED (2026-10-07):** when the SLA is fulfilled before its breach time, no
+  breach event appears. Ticket 53 (`Seeding / C2`, then `Seeding / G1 - Reply to SLA
+  ticket` one second later) ends with `reply_time` `activate`, `apply_sla`, `fulfill`,
+  and `update_status` events, and no `breach`. Whether a breach event was written and
+  then removed can't be observed, because no events were visible before the reply was
+  processed.
+
+  **LIMITATION (VERIFIED 2026-10-07):** metric events can be written long after the
+  ticket change that produced them. Ticket 53 last changed at 20:39:11; it had no
+  events at 20:50:21, and all 17 appeared by 20:52:17, 11 to 13 minutes later, stamped
+  with their original 20:39:10 to 20:39:11 times. The incremental export didn't have
+  them at about 20:50 either. Ticket 52's events appeared within 12 seconds, so the
+  delay varies. A per-ticket refetch done `INCREMENTAL_LAG` (5 minutes) after a ticket
+  change misses events written later, if the ticket doesn't change again. Today's
+  export-based stream has the same exposure: it reads by event time with the same
+  5-minute horizon (`fetch_incremental_cursor_paginated_resources`).

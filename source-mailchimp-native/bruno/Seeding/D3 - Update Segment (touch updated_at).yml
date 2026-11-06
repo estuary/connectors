@@ -1,0 +1,34 @@
+info:
+  name: D3 - Update Segment (touch updated_at)
+  type: http
+  seq: 16
+
+http:
+  method: PATCH
+  url: "{{base_url}}/lists/{{list_id}}/segments/{{segment_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "estuary-test-segment (cursor probe)"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/list-segments/update-segment/)
+
+  SEEDING REQUEST — only the user runs this; never the assistant.
+
+  **WHY:** renames a segment so its `updated_at` advances, proving the segments
+  incremental cursor moves on update and that `since_updated_at` picks it back
+  up. {{segment_id}} is captured by "B3 - Create Static Segment"'s post-response
+  script — run that first in the same session (or pin the env var from
+  `Segments / bare` for out-of-order runs). Targeting the static segment leaves
+  the saved segment's updated_at stale, giving `Segments / since_updated_at`
+  one included and one excluded row.

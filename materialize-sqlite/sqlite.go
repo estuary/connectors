@@ -8,7 +8,9 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -23,8 +25,23 @@ import (
 
 const databasePath = "/tmp/sqlite.db"
 
+// publishedAtLayout is the form of flow_published_at values, which are stored
+// as TEXT. It is fixed-width at nanosecond precision, so values in this form
+// compare lexicographically in temporal order.
+const publishedAtLayout = "2006-01-02T15:04:05.000000000Z"
+
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"truncate_after_backfill": common.FlagEnabled,
+}
+
 type config struct {
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
 	path string
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -35,8 +52,8 @@ func (c config) DefaultNamespace() string {
 	return ""
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
-	return "", make(map[string]bool)
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 type tableConfig struct {
@@ -85,6 +102,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 			return &sql.Endpoint[config]{
 				Config:              config{path: path},
 				Dialect:             sqliteDialect,
+				SerPolicy:           boilerplate.SerPolicyStd,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
@@ -92,7 +110,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 				ConcurrentApply:     false,
 			}, nil
 		},
-		PreReqs: func(context.Context, config) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
+		PreReqs: func(context.Context, config, map[string]bool) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
 	}
 }
 
@@ -169,10 +187,16 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	_ *m.BindingEvents,
+	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	var d = &transactor{
-		dialect: &sqliteDialect,
+		dialect:               &sqliteDialect,
+		be:                    be,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 	d.store.fence = &fence
 
@@ -240,6 +264,13 @@ type transactor struct {
 		fence *sql.Fence
 	}
 	bindings []*binding
+	be       *m.BindingEvents
+	// truncateAfterBackfill permits deleting the rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 type binding struct {
@@ -252,8 +283,9 @@ type binding struct {
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		insertSQL string
-		updateSQL string
+		insertSQL   string
+		updateSQL   string
+		truncateSQL string
 	}
 }
 
@@ -285,6 +317,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		return fmt.Errorf("storeUpdate template: %w", err)
 	}
 
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.store.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?1;", target.Identifier, col.Identifier)
+	}
+
 	// Create a binding-scoped temporary table for staged keys to load.
 	if _, err = t.load.conn.ExecContext(ctx, keyCreateSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", keyCreateSQL, err)
@@ -301,8 +337,34 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return nil, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.store.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 func (d *transactor) Load(
 	it *m.LoadIterator,
@@ -365,33 +427,68 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("conn.BeginTx: %w", err)
 	}
 
+	var round = it.Round
+	var truncations = d.truncations
+	var rowsAffected = make([]int64, len(d.bindings))
+	var stored = make([]bool, len(d.bindings))
+
 	for it.Next(false) {
 		var ctx = it.Context()
 		var b = d.bindings[it.Binding]
+		stored[it.Binding] = true
 
+		var res stdsql.Result
 		if it.Exists {
 			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 				return nil, fmt.Errorf("converting update store key: %w", err)
-			} else if _, err = txn.ExecContext(ctx, b.store.updateSQL, converted...); err != nil {
+			} else if res, err = txn.ExecContext(ctx, b.store.updateSQL, converted...); err != nil {
 				return nil, fmt.Errorf("updating store: %w", err)
 			}
 		} else {
 			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 				return nil, fmt.Errorf("converting update store key: %w", err)
-			} else if _, err = txn.ExecContext(ctx, b.store.insertSQL, converted...); err != nil {
+			} else if res, err = txn.ExecContext(ctx, b.store.insertSQL, converted...); err != nil {
 				return nil, fmt.Errorf("updating store: %w", err)
 			}
 		}
+		if n, err := res.RowsAffected(); err == nil {
+			rowsAffected[it.Binding] += n
+		}
+	}
+
+	// Truncations run after the stores, because a store of an existing row
+	// is an UPDATE that would match nothing if its row were already deleted.
+	var truncated = make(map[int]int64, len(truncations))
+	for binding, boundary := range truncations {
+		var b = d.bindings[binding]
+		var res, err = txn.ExecContext(it.Context(), b.store.truncateSQL, boundary.UTC().Format(publishedAtLayout))
+		if err != nil {
+			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+		}
+		var n, _ = res.RowsAffected()
+		truncated[binding] = n
+		log.WithFields(log.Fields{
+			"table":    b.target.Identifier,
+			"boundary": boundary,
+			"deleted":  n,
+		}).Info("truncated rows published before the backfill")
+	}
+
+	if err := txn.Commit(); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			if err = txn.Commit(); err != nil {
-				return fmt.Errorf("commit transaction: %w", err)
+		for i, b := range d.bindings {
+			var stats = m.TotalRowStats(rowsAffected[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if !stored[i] {
+				continue
 			}
-
-			return nil
-		})
+			d.be.ReportRowStats(round, b.target.Path, stats)
+		}
+		return nil, nil
 	}, nil
 }
 

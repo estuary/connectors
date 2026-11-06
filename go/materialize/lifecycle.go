@@ -107,11 +107,20 @@ type StoreIterator struct {
 	PackedValues []byte          // PackedValues of the document to store.
 	RawJSON      json.RawMessage // Document to store.
 	Total        int             // Total number of iterated stores.
+	// Round is the zero-based transaction round these stores belong to, to
+	// pass to BindingEvents.ReportRowStats when the commit's result is in hand.
+	Round int
 
 	stream  Stream
 	request *pm.Request // Request read into.
 	err     error       // Terminal error.
 	ctx     context.Context
+	health  *healthTracker
+}
+
+// NewStoreIterator creates a new StoreIterator.
+func NewStoreIterator(ctx context.Context, stream Stream, request *pm.Request) *StoreIterator {
+	return &StoreIterator{stream: stream, request: request, ctx: ctx}
 }
 
 // Context returns the Context of this StoreIterator.
@@ -131,6 +140,9 @@ func (it *StoreIterator) Context() context.Context { return it.ctx }
 //	}
 func (it *StoreIterator) Next(skipDeleteNotExist bool) bool {
 	for it.next() {
+		if it.health != nil {
+			it.health.observeStore(it.Round, it.Binding, it.Exists, it.Delete, skipDeleteNotExist)
+		}
 		if skipDeleteNotExist && it.Delete && !it.Exists {
 			continue
 		}

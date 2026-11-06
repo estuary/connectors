@@ -1,0 +1,49 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-aircall-native:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_aircall_native
+        config: config.yaml
+    bindings:
+    - resource:
+        name: calls
+        interval: PT5M
+      target: acmeCo/calls
+    - resource:
+        name: contacts
+        interval: PT5M
+        schedule: 0 0 * * *
+      target: acmeCo/contacts
+    - resource:
+        name: users
+        interval: PT5M
+      target: acmeCo/users
+    - resource:
+        name: user_availability
+        interval: PT5M
+      target: acmeCo/user_availability
+    - resource:
+        name: teams
+        interval: PT5M
+      target: acmeCo/teams
+    - resource:
+        name: numbers
+        interval: PT5M
+      target: acmeCo/numbers
+    - resource:
+        name: tags
+        interval: PT5M
+      target: acmeCo/tags
+    - resource:
+        name: webhooks
+        interval: PT5M
+      target: acmeCo/webhooks
+    - resource:
+        name: company
+        interval: PT5M
+      target: acmeCo/company

@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
 )
@@ -103,6 +104,75 @@ func TestCapture(t *testing.T) {
 	updateData(ctx, t, client, database2, col3, binaryPkVals(1), "forthColumn_new")
 	updateData(ctx, t, client, database1, batchCol1, stringPkVals(1), "batchColDb1_new")
 	updateData(ctx, t, client, database2, batchCol2, stringPkVals(1), "batchColDb2_new")
+
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// An interrupted backfill of a collection whose _id values span multiple BSON types
+// must resume across the type boundaries rather than silently dropping every
+// document of a later-sorting type.
+func TestCaptureMixedIdTypeBackfillResumption(t *testing.T) {
+	database := "testDb"
+	collection := "mixedIdCollection"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Seed a collection whose _id values span four BSON types. In canonical BSON sort order these
+	// sort number < string < binData < objectId, so the _id-ordered backfill scan emits them in that
+	// order. Resuming from a checkpoint partway through the numbers has to cross three
+	// type boundaries.
+	col := client.Database(database).Collection(collection)
+	const perType = 30
+	for idx := 0; idx < perType; idx++ {
+		uuid := make([]byte, 16)
+		uuid[15] = byte(idx)
+		oid, err := primitive.ObjectIDFromHex(fmt.Sprintf("%024x", idx))
+		require.NoError(t, err)
+		for _, id := range []any{
+			idx,                          // number
+			fmt.Sprintf("str-%04d", idx), // string
+			primitive.Binary{Subtype: 0x04, Data: uuid}, // binData (UUID)
+			oid, // objectId
+		} {
+			_, err := col.InsertOne(ctx, bson.M{"_id": id, "value": idx})
+			require.NoError(t, err)
+		}
+	}
+
+	binding := makeBinding(t, database, collection, captureModeChangeStream, "")
+
+	// Start from a checkpoint representing a backfill interrupted partway through the numbers. The
+	// resume must capture the remaining numbers plus the entire string, binData, and objectId
+	// cohorts.
+	resumeState := captureState{
+		Resources: map[boilerplate.StateKey]resourceState{
+			boilerplate.StateKey(binding.StateKey): {Backfill: backfillState{
+				Done:            makePtr(false),
+				LastCursorValue: rawValue(t, int64(14)),
+				BackfilledDocs:  15,
+			}},
+		},
+	}
+	checkpoint, err := json.Marshal(resumeState)
+	require.NoError(t, err)
+
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   checkpoint,
+		Validator:    &st.SortedCaptureValidator{NormalizeJSON: true},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{binding},
+	}
 
 	advanceCapture(ctx, t, cs)
 
@@ -399,6 +469,110 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 	addTestTableData(ctx, t, client, database2, col3, 5, 5, binaryPkVals, "firstColumn", "secondColumn", "thirdColumn")
 
 	// Read change stream documents.
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// A collection named by the `skipBackfills` advanced option must capture only
+// its change events, while its unnamed siblings are backfilled as usual.
+func TestCaptureSkipBackfills(t *testing.T) {
+	database := "testDb"
+	skippedCol := "skippedCollection"
+	backfilledCol := "backfilledCollection"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	cfg.Advanced.SkipBackfills = database + ":" + skippedCol
+
+	// Pre-existing data
+	addTestTableData(ctx, t, client, database, skippedCol, 5, 0, stringPkVals, "onlyColumn")
+	addTestTableData(ctx, t, client, database, backfilledCol, 5, 0, stringPkVals, "onlyColumn")
+
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    &st.SortedCaptureValidator{NormalizeJSON: true},
+		Sanitizers:   commonSanitizers(),
+		Bindings: []*flow.CaptureSpec_Binding{
+			makeBinding(t, database, skippedCol, captureModeChangeStream, ""),
+			makeBinding(t, database, backfilledCol, captureModeChangeStream, ""),
+		},
+	}
+
+	advanceCapture(ctx, t, cs)
+
+	// Both collections capture their change events from here on.
+	addTestTableData(ctx, t, client, database, skippedCol, 5, 5, stringPkVals, "onlyColumn")
+	addTestTableData(ctx, t, client, database, backfilledCol, 5, 5, stringPkVals, "onlyColumn")
+
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// A backfill which is already partway through must be abandoned when the
+// collection is added to `skipBackfills` and the capture restarted.
+func TestCaptureSkipBackfillsMidBackfill(t *testing.T) {
+	database := "testDb"
+	collection := "largeCollection"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	addTestTableData(ctx, t, client, database, collection, 10, 0, stringPkVals, "onlyColumn")
+
+	binding := makeBinding(t, database, collection, captureModeChangeStream, "")
+	sk := boilerplate.StateKey(binding.StateKey)
+
+	// Start from a checkpoint representing a backfill which is halfway through.
+	resumeState := captureState{
+		Resources: map[boilerplate.StateKey]resourceState{
+			sk: {Backfill: backfillState{
+				Done:            makePtr(false),
+				LastCursorValue: rawValue(t, stringPkVals(4)),
+				BackfilledDocs:  5,
+			}},
+		},
+	}
+	checkpoint, err := json.Marshal(resumeState)
+	require.NoError(t, err)
+
+	// Skip the rest of the backfill
+	cfg.Advanced.SkipBackfills = database + ":" + collection
+
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   checkpoint,
+		Validator:    &st.SortedCaptureValidator{NormalizeJSON: true},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{binding},
+	}
+
+	advanceCapture(ctx, t, cs)
+
+	var state captureState
+	require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+	require.True(t, state.Resources[sk].Backfill.done())
+	require.Nil(t, state.Resources[sk].Backfill.LastCursorValue)
+
+	// Change events are still captured
+	addTestTableData(ctx, t, client, database, collection, 5, 10, stringPkVals, "onlyColumn")
 	advanceCapture(ctx, t, cs)
 
 	cupaloy.SnapshotT(t, cs.Summary())

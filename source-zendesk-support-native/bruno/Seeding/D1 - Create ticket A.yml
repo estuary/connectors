@@ -1,0 +1,50 @@
+info:
+  name: D1 - Create ticket A
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{base_url}}/tickets"
+  body:
+    type: json
+    data: |-
+      {
+        "ticket": {
+          "subject": "Bruno probe deletion order A",
+          "comment": {
+            "body": "Created to verify deleted-ticket ordering."
+          }
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Seeding / D4 - Delete ticket A` consumes this id as {{seed_ticket_a_id}}.
+        // Runtime var only (a resource id, not a credential).
+        if (res.status >= 200 && res.status < 300 && res.body?.ticket?.id) {
+          bru.setVar('seed_ticket_a_id', res.body.ticket?.id);
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create Ticket](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#create-ticket)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** Deletion ordering for `/deleted_tickets` under `sort=updated_at`. D1 and D2
+  create tickets A then B; D3 deletes B, then D4 deletes A at least a second later.
+  Creation order, id order (A < B), and deletion order (B before A) then disagree, so
+  `Keyset Cursors / deleted_tickets crafted seek` can show which order
+  `/deleted_tickets` follows, and whether each deletion stamps `updated_at` with the
+  deletion time.
+
+  **Outcome:** Ran 2026-10-07 (A = ticket 50, B = ticket 51; B deleted 19:57:21, A 19:57:24); VERIFIED in `Keyset Cursors / deleted_tickets crafted seek`.

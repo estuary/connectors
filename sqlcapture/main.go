@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -27,6 +29,8 @@ type Resource struct {
 
 	Priority int `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."`
 
+	Advanced *AdvancedResourceOptions `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
 	// PrimaryKey allows the user to override the "scan key" columns which will be used
 	// to perform backfill queries and merge replicated changes. If left unset we default
 	// to the collection's key, which is basically always what the user wants, so we omit
@@ -35,6 +39,20 @@ type Resource struct {
 	PrimaryKey []string `json:"primary_key,omitempty" jsonschema:"-"`
 
 	DeprecatedSyncMode string `json:"syncMode,omitempty" jsonschema:"-"` // Unused, only supported to avoid breaking existing captures
+}
+
+// AdvancedResourceOptions holds the rarely-used per-binding settings.
+type AdvancedResourceOptions struct {
+	AdditionalBackfillFilter string `json:"additional_backfill_filter,omitempty" jsonschema:"title=Additional Backfill Filter,description=Optional filter clause which will be applied to all backfill queries for this binding. Contact Estuary support for assistance before using this option."`
+}
+
+// BackfillFilter returns the user-configured backfill filter expression, or an
+// empty string when no filter is set.
+func (r Resource) BackfillFilter() string {
+	if r.Advanced == nil {
+		return ""
+	}
+	return r.Advanced.AdditionalBackfillFilter
 }
 
 // BackfillMode represents different ways we might want to backfill the preexisting contents of a table.
@@ -68,6 +86,20 @@ func (r Resource) Validate() error {
 	if !slices.Contains([]BackfillMode{BackfillModeAutomatic, BackfillModeNormal, BackfillModePrecise, BackfillModeOnlyChanges, BackfillModeWithoutKey}, r.Mode) {
 		return fmt.Errorf("invalid backfill mode %q", r.Mode)
 	}
+	// Forbid backfill filters which are non-empty but contain only whitespace. This is
+	// always a mistake (typically a failed attempt to clear the field), and if it counted
+	// as a set filter the resulting errors would guide the user into an unnecessary and
+	// irreversible backfill.
+	if filter := r.BackfillFilter(); filter != "" && strings.TrimSpace(filter) == "" {
+		return fmt.Errorf("invalid backfill filter %q: must be empty or contain a filter expression", filter)
+	}
+	// Precise backfills drop replication events for rows beyond the backfill cursor, on
+	// the assumption that the backfill will observe those rows later. A backfill filter
+	// could violate that assumption for the rows it excludes, in which case changes to
+	// those rows might be lost entirely. Better to require unfiltered mode instead.
+	if r.Mode == BackfillModePrecise && r.BackfillFilter() != "" {
+		return fmt.Errorf("backfill filters cannot be used in the %q backfill mode", BackfillModePrecise)
+	}
 	if r.Namespace == "" {
 		return fmt.Errorf("table namespace unspecified")
 	}
@@ -97,6 +129,9 @@ type Driver struct {
 	DocumentationURL string
 
 	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
+
+	// Optional: if set, Pull waits a random time up to the returned duration before connecting.
+	MaxStartupDelay func(cfg json.RawMessage) (time.Duration, error)
 }
 
 type prerequisitesError struct {
@@ -164,34 +199,7 @@ func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_S
 
 // Apply applies a new or updated capture to the store.
 func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
-	// If there are no bindings in the request, then it may represent the deletion of the capture,
-	// or it may also be that the all of the bindings were deleted but the capture remains.
-	if len(req.Capture.Bindings) > 0 {
-		var db, err = d.Connect(ctx, string(req.Capture.Name), req.Capture.ConfigJson)
-		if err != nil {
-			return nil, fmt.Errorf("error connecting to database: %w", err)
-		}
-		defer db.Close(ctx)
-
-		discoveredTables, err := db.DiscoverTables(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, binding := range req.Capture.Bindings {
-			var res Resource
-			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-				return nil, fmt.Errorf("error parsing resource config: %w", err)
-			}
-			res.SetDefaults()
-
-			var streamID = JoinStreamID(res.Namespace, res.Stream)
-
-			if _, ok := discoveredTables[streamID]; !ok {
-				return nil, fmt.Errorf("could not find or access table %q", streamID)
-			}
-		}
-	}
+	// SQL captures have nothing to apply.
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
@@ -202,10 +210,6 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close(ctx)
-
-	if _, err := DiscoverCatalog(ctx, db); err != nil {
-		return nil, err
-	}
 
 	// Extract information about the previous state of various table bindings, so that we
 	// can more easily compare to the incoming to-be-validated state.
@@ -248,7 +252,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 		// When performing a keyed backfill, it's an error for the collection key to be the fallback key. It has to be one or more top-level properties.
 		if (res.Mode == BackfillModeAutomatic || res.Mode == BackfillModeNormal || res.Mode == BackfillModePrecise) && len(res.PrimaryKey) == 0 {
-			if slices.Equal(binding.Collection.Key, db.FallbackCollectionKey()) {
+			if slices.Equal(req.BindingCollection(binding).Key, db.FallbackCollectionKey()) {
 				var err = fmt.Errorf("output collection for stream %q has the fallback key, which can't be used for a backfill", streamID)
 				log.WithError(err).Debug("prerequisite error")
 				errs = append(errs, err)
@@ -259,6 +263,16 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		// a corresponding backfill counter increment, that's an error.
 		if prevBinding, ok := previousBindings[streamID]; ok && res.Mode != prevBinding.Resource.Mode && binding.Backfill <= prevBinding.Backfill {
 			var err = fmt.Errorf("must re-backfill when changing backfill mode: table %q changed from %q to %q", streamID, prevBinding.Resource.Mode, res.Mode)
+			log.WithError(err).Debug("prerequisite error")
+			errs = append(errs, err)
+		}
+
+		// Setting or changing the backfill filter requires a corresponding backfill
+		// counter increment, while clearing it doesn't (so a stale filter can be removed
+		// after a backfill completes). It's not entirely clear that changes need to be
+		// forbidden here, but doing so removes one source of possible user error.
+		if prevBinding, ok := previousBindings[streamID]; ok && res.BackfillFilter() != prevBinding.Resource.BackfillFilter() && res.BackfillFilter() != "" && binding.Backfill <= prevBinding.Backfill {
+			var err = fmt.Errorf("must re-backfill when changing the backfill filter: table %q changed from %q to %q", streamID, prevBinding.Resource.BackfillFilter(), res.BackfillFilter())
 			log.WithError(err).Debug("prerequisite error")
 			errs = append(errs, err)
 		}
@@ -360,6 +374,30 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var ctx = stream.Context()
+
+	// Notify Flow that we're ready and would like to receive acknowledgements. This comes before
+	// the startup delay and connecting because Flow can't move the task to a newly published spec
+	// until the connector is ready.
+	if err := stream.Ready(true); err != nil {
+		return err
+	}
+
+	// Wait a random time before connecting, so that captures which start together spread out.
+	if d.MaxStartupDelay != nil {
+		var maxDelay, err = d.MaxStartupDelay(open.Capture.ConfigJson)
+		if err != nil {
+			return fmt.Errorf("error parsing max startup delay: %w", err)
+		}
+		if maxDelay > 0 {
+			var delay = time.Duration(rand.Int63n(int64(maxDelay)))
+			log.WithField("eventType", "connectorStatus").Infof("Waiting %s before connecting to database", delay.Round(time.Second))
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
 	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
 	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
@@ -383,13 +421,14 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 		res.SetDefaults()
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
+		var collection = open.Capture.BindingCollection(binding)
 
 		tables = append(tables, TableID{Schema: res.Namespace, Table: res.Stream})
 
 		// TODO: Remove the whole 'Enable TxIDs' thing and instead include them unconditionally
 		// at some point in the future once automatic schema updates are a thing and the
 		// number of captures which would be broken by the change is acceptably small.
-		for _, projection := range binding.Collection.Projections {
+		for _, projection := range collection.Projections {
 			if projection.Ptr == "/_meta/source/txid" {
 				db.RequestTxIDs(res.Namespace, res.Stream)
 			}
@@ -400,7 +439,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			StreamID:      streamID,
 			StateKey:      boilerplate.StateKey(binding.StateKey),
 			Resource:      res,
-			CollectionKey: binding.Collection.Key,
+			CollectionKey: collection.Key,
 		}
 	}
 
@@ -417,15 +456,11 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var c = Capture{
+		Name:     string(open.Capture.Name),
 		Bindings: bindings,
 		State:    &state,
-		Output:   &boilerplate.PullOutput{Connector_CaptureServer: stream},
+		Output:   stream,
 		Database: db,
-	}
-
-	// Notify Flow that we're ready and would like to receive acknowledgements.
-	if err := c.Output.Ready(true); err != nil {
-		return err
 	}
 
 	err = c.Run(ctx)

@@ -144,6 +144,7 @@
       "created_at": 1731600573.116,
       "custom_fields": {},
       "id": "cnv_1dwxv53y",
+      "is_closed": false,
       "is_private": false,
       "links": [],
       "metadata": {},
@@ -173,6 +174,7 @@
         }
       ],
       "ticket_ids": [],
+      "type": "discussion",
       "updated_at": 1731618543.11,
       "waiting_since": 1731600573.113
     }

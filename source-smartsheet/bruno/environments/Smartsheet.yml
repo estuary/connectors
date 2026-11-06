@@ -1,0 +1,9 @@
+variables:
+  - name: base_url
+    value: https://api.smartsheet.eu/2.0
+  - name: config_path
+    value: ../config.yaml
+  - name: PIN_SHEET_ID
+    value: "4312824539121540"
+  - name: PIN_REPORT_ID
+    value: "7840186690045828"

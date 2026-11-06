@@ -1,0 +1,47 @@
+info:
+  name: E1 - Create user to delete later
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{base_url}}/users"
+  body:
+    type: json
+    data: |-
+      {
+        "user": {
+          "name": "Bruno probe deletion time user",
+          "email": "bruno-probe-deletion-time-user@example.com"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: `Seeding / E2 - Delete user after 5 seconds` consumes this id as {{seed_user_e_id}}.
+        // Runtime var only (a resource id, not a credential).
+        if (res.status >= 200 && res.status < 300 && res.body?.user?.id) {
+          bru.setVar('seed_user_e_id', res.body.user?.id);
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create User](https://developer.zendesk.com/api-reference/ticketing/users/users/#create-user)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** Whether a deleted user's `updated_at` is its deletion time. E1 creates a
+  user; E2 waits 5 seconds and then deletes it, so creation and deletion times are
+  distinguishable. The `users` deletion subtask filters `/deleted_users` on
+  `updated_at`, because that endpoint only sorts by id. Afterwards re-run
+  `Deleted / deleted_users`.
+
+  **Outcome:** Ran 2026-10-07 (user 54348627179924, created 20:04:09); VERIFIED in `Deleted / deleted_users`.

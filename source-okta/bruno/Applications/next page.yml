@@ -1,0 +1,67 @@
+info:
+  name: next page
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: '{{base_url}}/apps?limit=2&after={{apps_after}}'
+  params:
+    - name: limit
+      value: '2'
+      type: query
+    - name: after
+      value: '{{apps_after}}'
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('apps_after')) await bru.runRequest('Applications/limit 2 page');
+
+examples:
+  - name: "200 - page 2 continues with no gap or duplicate (projection)"
+    request:
+      url: "{{base_url}}/apps?limit=2&after=0oa176zmw8iMaksJz698"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "50"
+        - name: link
+          value: "<https://integrator-9297012.okta.com/api/v1/apps?after=0oa176zmw8iMaksJz698&limit=2>; rel=\"self\", <https://integrator-9297012.okta.com/api/v1/apps?after=0oa176zrvqhR5udPy698&limit=2>; rel=\"next\""
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "0oa176zmwamcqJF5N698",
+              "name": "okta_browser_plugin"
+            },
+            {
+              "id": "0oa176zrvqhR5udPy698",
+              "name": "okta_oin_submission_tester_app"
+            }
+          ]
+
+docs: |-
+  **REFERENCE:** [List all applications](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Application/#tag/Application/operation/listApplications)
+
+  **WHY:** second page of the `limit=2` walk. Proves the `after` token from the next link
+  advances without gap or duplicate against `Applications / bare`.
+
+  **VERIFIED (2026-10-07):** page 2 returns the 3rd and 4th apps of `Applications / bare`'s
+  order: no gap, no duplicate. It again carries a `rel="next"` link with `after` = its
+  own last id.

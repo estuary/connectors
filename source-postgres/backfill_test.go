@@ -16,6 +16,7 @@ func TestBackfillQueryGeneration(t *testing.T) {
 		schemaName     string
 		tableName      string
 		minBackfillXID string
+		backfillFilter string
 	}{
 		{
 			name:        "integer_key_precise",
@@ -58,6 +59,25 @@ func TestBackfillQueryGeneration(t *testing.T) {
 			schemaName:  "public",
 			tableName:   "special_users",
 		},
+		{
+			name:           "integer_key_with_backfill_filter",
+			isPrecise:      true,
+			keyColumns:     []string{"id"},
+			columnTypes:    map[string]interface{}{"id": "integer"},
+			schemaName:     "public",
+			tableName:      "users",
+			backfillFilter: "created_at > '2025-01-01' OR updated_at > '2025-01-01'",
+		},
+		{
+			name:           "backfill_filter_with_min_xid",
+			isPrecise:      false,
+			keyColumns:     []string{"name"},
+			columnTypes:    map[string]interface{}{"name": "text"},
+			schemaName:     "public",
+			tableName:      "users",
+			minBackfillXID: "12345",
+			backfillFilter: "id > 123",
+		},
 	}
 
 	var result = new(strings.Builder)
@@ -70,8 +90,8 @@ func TestBackfillQueryGeneration(t *testing.T) {
 				},
 			},
 		}
-		var startQuery = db.buildScanQuery(true, tc.isPrecise, tc.keyColumns, tc.columnTypes, tc.schemaName, tc.tableName)
-		var subsequentQuery = db.buildScanQuery(false, tc.isPrecise, tc.keyColumns, tc.columnTypes, tc.schemaName, tc.tableName)
+		var startQuery = db.buildScanQuery(true, tc.isPrecise, tc.keyColumns, tc.columnTypes, tc.schemaName, tc.tableName, tc.backfillFilter)
+		var subsequentQuery = db.buildScanQuery(false, tc.isPrecise, tc.keyColumns, tc.columnTypes, tc.schemaName, tc.tableName, tc.backfillFilter)
 
 		// Add to cumulative result string
 		result.WriteString("--- " + tc.name + " ---\n")
@@ -85,6 +105,7 @@ func TestKeylessBackfillQueryGeneration(t *testing.T) {
 	var testCases = []struct {
 		name           string
 		minBackfillXID string
+		backfillFilter string
 	}{
 		{
 			name: "no_xid_filtering",
@@ -92,6 +113,15 @@ func TestKeylessBackfillQueryGeneration(t *testing.T) {
 		{
 			name:           "with_xid_filtering",
 			minBackfillXID: "12345",
+		},
+		{
+			name:           "with_backfill_filter",
+			backfillFilter: "id > 123",
+		},
+		{
+			name:           "with_xid_filtering_and_backfill_filter",
+			minBackfillXID: "12345",
+			backfillFilter: "id > 123",
 		},
 	}
 
@@ -105,7 +135,7 @@ func TestKeylessBackfillQueryGeneration(t *testing.T) {
 				},
 			},
 		}
-		var query = db.keylessScanQuery(nil, "public", "users")
+		var query = db.keylessScanQuery(nil, "public", "users", tc.backfillFilter)
 		result.WriteString("--- " + tc.name + " ---\n")
 		result.WriteString(query + "\n\n")
 	}

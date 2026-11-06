@@ -3,7 +3,8 @@
     "recommendedName": "add_ons",
     "resourceConfig": {
       "name": "add_ons",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -40,10 +41,36 @@
       },
       "title": "FullRefreshResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "add_ons"
     ]
   },
   {
@@ -51,7 +78,8 @@
     "resourceConfig": {
       "name": "credit_card_verifications",
       "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "schedule": "0 20 * * 5",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -107,10 +135,36 @@
       ],
       "title": "IncrementalResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "credit_card_verifications"
     ]
   },
   {
@@ -118,7 +172,8 @@
     "resourceConfig": {
       "name": "customers",
       "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "schedule": "0 20 * * 5",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -174,17 +229,44 @@
       ],
       "title": "IncrementalResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "customers"
     ]
   },
   {
     "recommendedName": "discounts",
     "resourceConfig": {
       "name": "discounts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -221,17 +303,44 @@
       },
       "title": "FullRefreshResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "discounts"
     ]
   },
   {
     "recommendedName": "disputes",
     "resourceConfig": {
       "name": "disputes",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 5
     },
     "documentSchema": {
       "$defs": {
@@ -287,17 +396,44 @@
       ],
       "title": "IncrementalResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "disputes"
     ]
   },
   {
     "recommendedName": "merchant_accounts",
     "resourceConfig": {
       "name": "merchant_accounts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -334,17 +470,44 @@
       },
       "title": "FullRefreshResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "merchant_accounts"
     ]
   },
   {
     "recommendedName": "plans",
     "resourceConfig": {
       "name": "plans",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 1
     },
     "documentSchema": {
       "$defs": {
@@ -381,10 +544,36 @@
       },
       "title": "FullRefreshResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "plans"
     ]
   },
   {
@@ -392,7 +581,8 @@
     "resourceConfig": {
       "name": "subscriptions",
       "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "schedule": "0 20 * * 5",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -448,17 +638,44 @@
       ],
       "title": "IncrementalResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "subscriptions"
     ]
   },
   {
     "recommendedName": "transactions",
     "resourceConfig": {
       "name": "transactions",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "concurrency": 20
     },
     "documentSchema": {
       "$defs": {
@@ -514,10 +731,36 @@
       ],
       "title": "IncrementalResource",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
+    ],
+    "resourcePath": [
+      "transactions"
     ]
   }
 ]

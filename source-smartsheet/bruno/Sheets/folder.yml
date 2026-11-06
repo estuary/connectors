@@ -1,0 +1,11 @@
+info:
+  name: Sheets
+  type: folder
+  seq: 2
+
+docs: |-
+  Read-only probes for the Sheets cluster — the `sheets` (catalog metadata)
+  and `sheet_rows` (row data) streams: `GET /sheets` list semantics
+  (`modifiedSince`, pagination clamp), `GET /sheets/{id}` detail/row
+  pagination (`rowsModifiedSince`, the blank-row gap, the silent clamp), and
+  the dedicated `GET /sheets/{id}/version` endpoint.

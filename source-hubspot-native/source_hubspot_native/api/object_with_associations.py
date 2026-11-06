@@ -1,6 +1,6 @@
 import asyncio
 import itertools
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import Logger
 from typing import (
     Any,
@@ -15,33 +15,107 @@ from estuary_cdk.capture.common import (
     LogCursor,
     PageCursor,
 )
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from ..models import (
     Association,
     BatchResult,
     CRMObject,
+    IdChunk,
     PageResult,
+    TimestampedId,
+    TimestampedObject,
 )
 from .properties import fetch_properties
 from .shared import (
     chunk_props,
     HUB,
+    is_missing_scope_error,
+    str_to_dt,
 )
 
 
 _FetchIdsFn = Callable[
     [PageCursor, int],
-    Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
+    Awaitable[tuple[Iterable[TimestampedId], PageCursor]],
 ]
 """
-Returns a stream of object IDs that can be used to fetch the full object details
-along with its associations. Used in `fetch_changes_with_associations`.
+Returns a page of object IDs that can be used to fetch the full object details
+along with its associations, plus a PageCursor for the next page (or a falsy
+value, e.g. None, when no more pages remain). Used by
+`fetch_changes_with_associations`.
 
-IDs may be returned in any order, but iteration will be stopped upon seeing an
-entry that's as-old or older than the datetime cursor. Entries newer than the
-until datetime will be discarded.
+IDs may be returned in any order. The fetcher is responsible for signaling
+completion via a falsy next_page: fetchers that page newest-first should do so
+once they reach an entry as-old-or-older than `since`, and window-bounded
+fetchers do so when their window is exhausted.
 """
+
+
+# An alias of _FetchIdsFn, identical to the type checker. The distinct name and
+# docstring document the stronger contract that fetch_chunked_changes_with_associations
+# relies on. They are not enforced, so it's on each fetcher to honor it.
+_OrderedFetchIdsFn = _FetchIdsFn
+"""
+A _FetchIdsFn whose next_page, when present, is a timestamp string naming the
+first millisecond its pages so far do not cover: every record the fetcher's
+window holds before that instant is in this page or an earlier one, and
+successive pages advance in time. This is what lets
+fetch_chunked_changes_with_associations treat the millisecond before next_page
+as a safe intermediate checkpoint. Order within a page is not part of the
+contract.
+"""
+
+
+# HubSpot grants scopes when the app is installed, so a token's answer cannot
+# change while the connector runs.
+readable_associations_cache: dict[str, tuple[str, ...]] = {}
+
+
+async def probe_associations(
+    log: Logger,
+    cls: type[CRMObject],
+    http: HTTPSession,
+    object_name: str,
+) -> tuple[str, ...]:
+    """Entities absent from the result are never populated on emitted documents."""
+    if object_name in readable_associations_cache:
+        return readable_associations_cache[object_name]
+
+    async def probe(associated_entity: str) -> bool:
+        url = f"{HUB}/crm/v4/associations/{object_name}/{associated_entity}/batch/read"
+
+        try:
+            # A well-formed read for an ID that won't exist, so the probe reaches
+            # HubSpot's scope check without depending on the account holding any
+            # particular record.
+            await http.request(log, url, method="POST", json={"inputs": [{"id": "0"}]})
+        except HTTPError as err:
+            if not is_missing_scope_error(log, err):
+                raise
+
+            return False
+
+        return True
+
+    results = await asyncio.gather(
+        *(probe(entity) for entity in cls.ASSOCIATED_ENTITIES)
+    )
+    readable = tuple(
+        entity
+        for entity, is_readable in zip(cls.ASSOCIATED_ENTITIES, results)
+        if is_readable
+    )
+
+    blocked = [e for e in cls.ASSOCIATED_ENTITIES if e not in readable]
+    if blocked:
+        log.debug("Omitting associated entities the token cannot read.", {
+            "object": object_name,
+            "associated_entities": blocked,
+        })
+
+    readable_associations_cache[object_name] = readable
+    return readable
 
 
 async def fetch_page_with_associations(
@@ -62,6 +136,7 @@ async def fetch_page_with_associations(
     url = f"{HUB}/crm/v3/objects/{object_name}"
     output: list[CRMObject] = []
     properties = await fetch_properties(log, http, object_name)
+    associations = await probe_associations(log, cls, http, object_name)
 
     # On connector initiated backfills, only capture calculated properties and rely
     # on the merge reduction strategies to merge in partial documents containing
@@ -100,8 +175,8 @@ async def fetch_page_with_associations(
         if with_history:
             input["propertiesWithHistory"] = property_names
             input["limit"] = 50
-        if len(cls.ASSOCIATED_ENTITIES) > 0:
-            input["associations"] = ",".join(cls.ASSOCIATED_ENTITIES)
+        if associations:
+            input["associations"] = ",".join(associations)
         if page:
             input["after"] = page
 
@@ -176,13 +251,31 @@ async def fetch_association(
     object_name: str,
     ids: Iterable[str],
     associated_entity: str,
-) -> BatchResult[Association]:
+) -> BatchResult[Association] | None:
+    """None if the token wasn't granted a scope covering associated_entity."""
     url = f"{HUB}/crm/v4/associations/{object_name}/{associated_entity}/batch/read"
     input = {"inputs": [{"id": id} for id in ids]}
 
-    return BatchResult[Association].model_validate_json(
-        await http.request(log, url, method="POST", json=input)
-    )
+    try:
+        response = await http.request(log, url, method="POST", json=input)
+    except HTTPError as err:
+        if not is_missing_scope_error(log, err):
+            raise
+
+        # Reading one associated entity must not fail the whole batch.
+        cached = readable_associations_cache.get(object_name)
+        if cached is not None and associated_entity in cached:
+            readable_associations_cache[object_name] = tuple(
+                e for e in cached if e != associated_entity
+            )
+            log.debug("Omitting an associated entity the token cannot read.", {
+                "object": object_name,
+                "associated_entity": associated_entity,
+            })
+
+        return None
+
+    return BatchResult[Association].model_validate_json(response)
 
 
 async def fetch_batch_with_associations(
@@ -194,19 +287,24 @@ async def fetch_batch_with_associations(
     ids: list[str],
 ) -> BatchResult[CRMObject]:
 
+    associations = await probe_associations(log, cls, http, object_name)
+
     batch, all_associated = await asyncio.gather(
         _fetch_batch(log, cls, http, with_history, object_name, ids),
         asyncio.gather(
             *(
                 fetch_association(log, cls, http, object_name, ids, e)
-                for e in cls.ASSOCIATED_ENTITIES
+                for e in associations
             )
         ),
     )
     # Index CRM records so we can attach associations.
     index = {r.id: r for r in batch.results}
 
-    for associated_entity, associated in zip(cls.ASSOCIATED_ENTITIES, all_associated):
+    for associated_entity, associated in zip(associations, all_associated):
+        if associated is None:
+            continue
+
         for result in associated.results:
             setattr(
                 index[result.from_.id],
@@ -215,6 +313,96 @@ async def fetch_batch_with_associations(
             )
 
     return batch
+
+
+async def _fetch_id_chunks(
+    fetcher: _FetchIdsFn,
+) -> AsyncGenerator[IdChunk, None]:
+    # Walk pages of IDs until the fetcher reports no more pages remain via a falsy
+    # next_page. Each fetcher page is yielded as its own chunk, along with the
+    # cursor for the page after it. Consumers apply their own window filtering.
+    next_page: PageCursor = None
+    count = 0
+
+    while True:
+        ids, next_page = await fetcher(next_page, count)
+        chunk = list(ids)
+        count += len(chunk)
+
+        yield IdChunk(chunk, next_page)
+
+        if not next_page:
+            break
+
+
+async def _fetch_batch_with_retries(
+    log: Logger,
+    cls: type[CRMObject],
+    http: HTTPSession,
+    with_history: bool,
+    object_name: str,
+    batch: list[TimestampedId],
+) -> Iterable[TimestampedObject[CRMObject]]:
+    # Enable lookup of datetimes for IDs from the result batch.
+    dts = {id: dt for dt, id in batch}
+
+    attempt = 1
+    while True:
+        try:
+            documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
+                log, cls, http, with_history, object_name, [id for _, id in batch]
+            )
+            break
+        except Exception as e:
+            if attempt == 5:
+                raise
+            log.warning(
+                "failed to fetch batch with associations (will retry)",
+                {"error": str(e), "attempt": attempt},
+            )
+            await asyncio.sleep(attempt * 2)
+            attempt += 1
+
+    return (
+        TimestampedObject(dts[str(doc.id)], str(doc.id), doc)
+        for doc in documents.results
+    )
+
+
+async def _emit_batches(
+    log: Logger,
+    cls: type[CRMObject],
+    http: HTTPSession,
+    with_history: bool,
+    object_name: str,
+    recent: list[TimestampedId],
+) -> AsyncGenerator[TimestampedObject[CRMObject], None]:
+    recent.sort()  # Oldest updates first.
+
+    async def _batches_gen() -> (
+        AsyncGenerator[Awaitable[Iterable[TimestampedObject[CRMObject]]], None]
+    ):
+        for batch_it in itertools.batched(recent, 50 if with_history else 100):
+            yield _fetch_batch_with_retries(
+                log, cls, http, with_history, object_name, list(batch_it)
+            )
+
+    total = len(recent)
+    if total >= 10_000:
+        log.info(
+            "will process large batch of changes with associations", {"total": total}
+        )
+
+    count = 0
+    async for res in buffer_ordered(_batches_gen(), 3):
+        for obj in res:
+            count += 1
+            if count > 0 and count % 10_000 == 0:
+                log.info(
+                    "fetching changes with associations",
+                    {"count": count, "total": total},
+                )
+            yield obj
 
 
 async def fetch_changes_with_associations(
@@ -226,22 +414,17 @@ async def fetch_changes_with_associations(
     with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
+) -> AsyncGenerator[TimestampedObject[CRMObject], None]:
 
-    # Walk pages of recent IDs until we see one which is as-old
-    # as `since`, or no pages remain.
-    recent: list[tuple[datetime, str]] = []
-    next_page: PageCursor = None
-    count = 0
-
-    while True:
-        iter, next_page = await fetcher(next_page, count)
-
-        for ts, id in iter:
-            count += 1
-            if until and ts > until:
+    # The realtime fetchers can't all bound their results server-side: the
+    # legacy "recents" endpoints page newest-first and overrun `since` on their
+    # last page, so the window is applied here.
+    recent: list[TimestampedId] = []
+    async for chunk in _fetch_id_chunks(fetcher):
+        for entry in chunk.ids:
+            if until and entry.ts > until:
                 continue
-            elif ts > since:
+            elif entry.ts > since:
                 # TODO(whb): It may be worth consulting the emitted changes
                 # cache here to see if we have already emitted a more recent
                 # change event before we do all the associations fetching work.
@@ -249,59 +432,39 @@ async def fetch_changes_with_associations(
                 # top-level filtering works in production. Since the delayed
                 # changes stream only runs every 5 minutes or so it shouldn't be
                 # a huge load on the connector.
-                recent.append((ts, id))
-            else:
-                next_page = None
+                recent.append(entry)
 
-        if not next_page:
-            break
+    async for res in _emit_batches(log, cls, http, with_history, object_name, recent):
+        yield res
 
-    recent.sort()  # Oldest updates first.
 
-    async def _do_batch_fetch(
-        batch: list[tuple[datetime, str]],
-    ) -> Iterable[tuple[datetime, str, CRMObject]]:
-        # Enable lookup of datetimes for IDs from the result batch.
-        dts = {id: dt for dt, id in batch}
+async def fetch_chunked_changes_with_associations(
+    object_name: str,
+    cls: type[CRMObject],
+    fetcher: _OrderedFetchIdsFn,
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+) -> AsyncGenerator[TimestampedObject[CRMObject] | datetime, None]:
+    """
+    Like fetch_changes_with_associations, but emits each fetcher page's documents
+    as its own chunk and then yields the page's resume boundary as an intermediate
+    checkpoint. This lets a delayed stream checkpoint progress within a large
+    window instead of processing the whole window as one atomic, un-checkpointed unit.
 
-        attempt = 1
-        while True:
-            try:
-                documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-                    log, cls, http, with_history, object_name, [id for _, id in batch]
-                )
-                break
-            except Exception as e:
-                if attempt == 5:
-                    raise
-                log.warning(
-                    "failed to fetch batch with associations (will retry)",
-                    {"error": str(e), "attempt": attempt},
-                )
-                await asyncio.sleep(attempt * 2)
-                attempt += 1
+    Every id the fetcher returns is emitted, whatever timestamp it carries: the
+    fetcher's server-side window decides membership. The checkpoint after a page
+    is the millisecond before its next_page cursor, which the _OrderedFetchIdsFn
+    contract makes the newest instant the pages so far fully cover.
+    """
+    async for chunk in _fetch_id_chunks(fetcher):
+        async for res in _emit_batches(
+            log, cls, http, with_history, object_name, chunk.ids
+        ):
+            yield res
 
-        return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
-
-    async def _batches_gen() -> (
-        AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]
-    ):
-        for batch_it in itertools.batched(recent, 50 if with_history else 100):
-            yield _do_batch_fetch(list(batch_it))
-
-    total = len(recent)
-    if total >= 10_000:
-        log.info(
-            "will process large batch of changes with associations", {"total": total}
-        )
-
-    count = 0
-    async for res in buffer_ordered(_batches_gen(), 3):
-        for ts, id, doc in res:
-            count += 1
-            if count > 0 and count % 10_000 == 0:
-                log.info(
-                    "fetching changes with associations",
-                    {"count": count, "total": total},
-                )
-            yield ts, id, doc
+        # Emit an intermediate checkpoint. fetch_delayed_changes handles emitting
+        # the final checkpoint once all chunks have been read.
+        if chunk.next_page:
+            assert isinstance(chunk.next_page, str)
+            yield str_to_dt(chunk.next_page) - timedelta(milliseconds=1)

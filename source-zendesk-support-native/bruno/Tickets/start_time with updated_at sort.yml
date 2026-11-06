@@ -1,0 +1,211 @@
+info:
+  name: start_time with updated_at sort
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/tickets?start_time={{tickets_start_time}}&sort=updated_at&page[size]=100"
+  params:
+    - name: "start_time"
+      value: "{{tickets_start_time}}"
+      type: query
+    - name: "sort"
+      value: "updated_at"
+      type: query
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - start_time=0, 42 tickets (projection)"
+    request:
+      url: "{{base_url}}/tickets?start_time=0&sort=updated_at&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "698"
+        - name: "ratelimit-remaining"
+          value: "698"
+        - name: "ratelimit-reset"
+          value: "44"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99998; resets=44"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 14,
+                "updated_at": "2024-07-26T15:42:06Z",
+                "status": "open"
+              },
+              {
+                "id": 15,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 16,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 18,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 17,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 19,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 20,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 21,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 22,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 23,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              }
+            ],
+            "tickets_total": 42,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkpPdEdvQUFBQUFhUlFURFRyL01BQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTTdEbzJZQUFBQUFhWlJidnRrNUdnQUEifQ=="
+            }
+          }
+  - name: "200 - start_time=1778249324 ignored, same 42 tickets (projection)"
+    request:
+      url: "{{base_url}}/tickets?start_time=1778249324&sort=updated_at&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "696"
+        - name: "ratelimit-remaining"
+          value: "696"
+        - name: "ratelimit-reset"
+          value: "40"
+        - name: "zendesk-ratelimit-tickets-index"
+          value: "total=100000; remaining=99996; resets=40"
+      body:
+        type: json
+        data: |-
+          {
+            "tickets": [
+              {
+                "id": 14,
+                "updated_at": "2024-07-26T15:42:06Z",
+                "status": "open"
+              },
+              {
+                "id": 15,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 16,
+                "updated_at": "2024-07-26T15:42:07Z",
+                "status": "open"
+              },
+              {
+                "id": 18,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 17,
+                "updated_at": "2024-07-26T15:42:08Z",
+                "status": "open"
+              },
+              {
+                "id": 19,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 20,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 21,
+                "updated_at": "2024-07-26T15:42:09Z",
+                "status": "open"
+              },
+              {
+                "id": 22,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              },
+              {
+                "id": 23,
+                "updated_at": "2024-07-26T15:42:10Z",
+                "status": "open"
+              }
+            ],
+            "tickets_total": 42,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTkpPdEdvQUFBQUFhUlFURFRyL01BQUEifQ==",
+              "before_cursor": "eyJvIjoidXBkYXRlZF9hdCxpZCIsInYiOiJaTTdEbzJZQUFBQUFhWlJidnRrNUdnQUEifQ=="
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Tickets](https://developer.zendesk.com/api-reference/ticketing/tickets/tickets/#list-tickets)
+
+  **WHY:** V1. Proves whether `start_time` and cursor `sort=updated_at` combine on
+  `/tickets`: the filter must narrow the result and the order must be ascending
+  `updated_at`. This is the candidate replacement (A1) for the incremental ticket export.
+
+  **LIMITATION (VERIFIED 2026-10-07):** `start_time` is silently ignored. `start_time=0` and
+  `start_time=1778249324` (after all but 3 tickets' `updated_at`) both return the same
+  42 tickets. `sort=updated_at` itself works: ascending order, cursor decodes to
+  keyset `{"o":"updated_at,id",...}`. The OpenAPI spec documents `start_time` on this
+  endpoint, but it has no effect. `/tickets` has no server-side time filter, so A1 in the
+  plan is not viable.

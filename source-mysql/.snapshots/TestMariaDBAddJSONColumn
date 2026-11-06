@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbaddjsoncolumn_31415926": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBAddJSONColumn_31415926","cursor":"backfill:0"}},"data":"before","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","table":"MariaDBAddJSONColumn_31415926","cursor":"binlog.000123:56789:123"}},"data":"obj","id":2,"j":"{\"bucket_id\": 1, \"id\": 1}"}
+{"_meta":{"op":"c","source":{"schema":"test","table":"MariaDBAddJSONColumn_31415926","cursor":"binlog.000123:56789:123"}},"data":"arr","id":3,"j":"[{\"bucket_id\": 1, \"id\": 1}]"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBAddJSONColumn_31415926":{"backfilled":1,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data","j"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"},"j":{"charset":"utf8mb4","type":"longtext"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

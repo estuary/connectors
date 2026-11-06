@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -13,6 +14,7 @@ import (
 
 type fieldConfig struct {
 	CastToString_ bool `json:"castToString"`
+	Nullable      bool `json:"nullable"`
 }
 
 func (fc fieldConfig) Validate() error { return nil }
@@ -25,7 +27,13 @@ type mapped struct {
 	// name, depending on the materialization configuration. This is exported so
 	// it can be used in templates.
 	Name string
+	// Nullable overrides the field's inferred nullability, forcing it to be
+	// nullable even if the collection schema says it's always present and
+	// non-null. Primary key fields are always required regardless of this flag.
+	Nullable bool
 }
+
+func (m mapped) isVariant() bool { return m.type_.Equals(iceberg.VariantType{}) }
 
 func (m mapped) String() string {
 	return m.type_.String()
@@ -43,48 +51,30 @@ var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
 	"long":                      {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
 	"decimal(38, 0)":            {iceberg.Float64Type{}},
 	"string":                    {iceberg.BinaryType{}},
-	boilerplate.AnyExistingType: {iceberg.StringType{}},
+	boilerplate.AnyExistingType: {iceberg.StringType{}, iceberg.VariantType{}},
+}
+
+func jsonColumnType(variant bool) iceberg.Type {
+	if variant {
+		return iceberg.VariantType{}
+	}
+	return iceberg.StringType{}
 }
 
 var migrateFieldSuffix = "_flow_tmp"
 
-func mapProjection(p boilerplate.Projection, lowercaseColumnNames bool) (mapped, boilerplate.ElementConverter) {
+func mapProjection(p boilerplate.Projection, translateField boilerplate.TranslateFieldFn, variantColumns bool) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
 
-	m.Name = p.Field
-	if lowercaseColumnNames {
-		m.Name = strings.ToLower(m.Name)
-	}
+	m.Name = translateField(p.Field)
+	useVariant := variantColumns && !p.IsPrimaryKey
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:
-		if len(ft.ItemTypesWithoutNull) == 1 {
-			// NB: ElementID must be populated when creating/updating a table
-			// with a column that has a ListType.
-			switch ft.ItemTypesWithoutNull[0] {
-			case "integer":
-				m.type_ = &iceberg.ListType{Element: iceberg.Int64Type{}, ElementRequired: !ft.NullableItems}
-			case "number":
-				m.type_ = &iceberg.ListType{Element: iceberg.Float64Type{}, ElementRequired: !ft.NullableItems}
-			case "boolean":
-				m.type_ = &iceberg.ListType{Element: iceberg.BooleanType{}, ElementRequired: !ft.NullableItems}
-			case "string":
-				m.type_ = &iceberg.ListType{Element: iceberg.StringType{}, ElementRequired: !ft.NullableItems}
-			default:
-				m.type_ = iceberg.StringType{}
-			}
-		} else {
-			m.type_ = iceberg.StringType{}
-		}
-
-		// TODO(whb): If we want to support arrays with a single element type as
-		// Iceberg lists, remove this line which unconditionally makes them
-		// strings. I'm not doing that right now since it is a big pain reading
-		// from CSV as strings and then parsing to the specific list type in the
-		// queries. V3 of the Iceberg spec includes a VARIANT type which is
-		// probably what we'll use for all arrays when that is widely supported.
-		m.type_ = iceberg.StringType{}
+		// Arrays are always JSON text (or variant): reading typed lists out
+		// of the staged CSV files would need per-type parsing in the queries.
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeBinary:
 		m.type_ = iceberg.BinaryType{}
 	case boilerplate.FlatTypeBoolean:
@@ -96,11 +86,11 @@ func mapProjection(p boilerplate.Projection, lowercaseColumnNames bool) (mapped,
 			m.type_ = iceberg.Int64Type{}
 		}
 	case boilerplate.FlatTypeMultiple:
-		m.type_ = iceberg.StringType{}
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeNumber:
 		m.type_ = iceberg.Float64Type{}
 	case boilerplate.FlatTypeObject:
-		m.type_ = iceberg.StringType{}
+		m.type_ = jsonColumnType(useVariant)
 	case boilerplate.FlatTypeString:
 		switch ft.InferenceString.Format {
 		case "date":
@@ -130,17 +120,28 @@ func mapProjection(p boilerplate.Projection, lowercaseColumnNames bool) (mapped,
 		panic(fmt.Sprintf("unhandled flat type: %T", p.FlatType))
 	}
 
+	if m.isVariant() {
+		converter = variantConverter
+	}
+
 	return m, converter
+}
+
+func variantConverter(te tuple.TupleElement) (any, error) {
+	if s, ok := te.(string); ok {
+		return json.Marshal(s)
+	}
+	return te, nil
 }
 
 func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, mapped]) *iceberg.Schema {
 	var fields []iceberg.NestedField
 
 	// In Iceberg terms, identifier fields are the "keys" of a table.
-	identifierFields, lastId := appendProjectionsAsFields(&fields, res.Keys, 0)
-	_, lastId = appendProjectionsAsFields(&fields, res.Values, lastId)
+	identifierFields, lastId := appendProjectionsAsFields(&fields, res.Keys, 0, false)
+	_, lastId = appendProjectionsAsFields(&fields, res.Values, lastId, false)
 	if p := res.Document; p != nil {
-		appendProjectionsAsFields(&fields, []boilerplate.MappedProjection[mapped]{*p}, lastId)
+		appendProjectionsAsFields(&fields, []boilerplate.MappedProjection[mapped]{*p}, lastId, false)
 	}
 
 	if res.DeltaUpdates {
@@ -183,8 +184,15 @@ func computeSchemaForUpdatedTable(
 		tempMigrateProjections = append(tempMigrateProjections, temp)
 	}
 
-	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID)
-	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId)
+	// S3 Tables' REST catalog rejects an add-schema update that introduces a
+	// brand-new required column, even with initial-default/write-default set.
+	// Columns newly appended to an existing table - ordinary new projections
+	// and migration temp columns alike - are therefore always created
+	// optional, matching how materialize-sql treats newly-added columns as
+	// nullable regardless of MustExist and only enforces required-ness at
+	// fresh table creation.
+	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID, true)
+	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId, true)
 
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
@@ -225,7 +233,7 @@ func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrat
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
 
-func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.MappedProjection[mapped], startID int) ([]int, int) {
+func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.MappedProjection[mapped], startID int, forceOptional bool) ([]int, int) {
 	id := startID
 	var ids []int
 
@@ -236,11 +244,13 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 			id += 1
 		}
 
+		required := !forceOptional && ((p.MustExist && !p.Mapped.Nullable) || p.IsPrimaryKey)
+
 		*dst = append(*dst, iceberg.NestedField{
 			ID:       id,
 			Name:     p.Mapped.Name,
 			Type:     p.Mapped.type_,
-			Required: p.MustExist || p.IsPrimaryKey,
+			Required: required,
 			Doc:      strings.ReplaceAll(p.Comment, "\n", " - "), // Glue catalogs don't support newlines in field comments
 		})
 		ids = append(ids, id)

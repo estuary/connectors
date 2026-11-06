@@ -1,0 +1,201 @@
+meta {
+  name: 11 - Issues Ascending Sweep
+  type: graphql
+  seq: 11
+}
+
+post {
+  url: {{base_url}}
+  body: graphql
+  auth: inherit
+}
+
+body:graphql {
+  query IssuesAscendingSweep {
+    titleAsc:  issues(first: 4, sort: [{title: {order: Ascending}}])  { nodes { title updatedAt } }
+    titleDesc: issues(first: 4, sort: [{title: {order: Descending}}]) { nodes { title updatedAt } }
+    updatedAsc: issues(
+      first: 250
+      includeArchived: true
+      sort: [{updatedAt: {order: Ascending}}]
+      filter: {updatedAt: {gt: "2020-01-01T00:00:00Z"}}
+    ) {
+      nodes { id updatedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}
+
+docs {
+  Reference: https://linear.app/developers/pagination
+
+  Establishes the ASCENDING sweep that rescues per-page checkpointing for this stream.
+
+  `04 - OrderBy Direction Probe` proved `orderBy` is descending-only, which would force
+  end-of-sweep checkpointing everywhere. But `02 - Introspect Pagination Args` found a
+  second, richer ordering argument on `issues` / `projects` / `initiatives`:
+  `sort: [IssueSortInput!]`, whose `updatedAt` member is an `UpdatedAtSort` with an
+  explicit `order: PaginationSortOrder` enum of `{Ascending, Descending}` (plus a `nulls`
+  placement control). This is the escape hatch — it gives an explicitly ASCENDING
+  `updatedAt` sweep, so the connector can safely checkpoint after every page.
+
+  **Round 1 (2026-07-30) — mechanism only, via a non-tied key.** Every `updatedAt` in the
+  workspace was identical then, so `sort: [{updatedAt: {order: Ascending}}]` and its
+  `Descending` twin returned the same node order — inconclusive, not evidence of a broken
+  argument. The `titleAsc` / `titleDesc` aliases use `title`, which IS distinct, and showed
+  an exact reversal. That proved `PaginationSortOrder` is genuinely applied, but left the
+  actual question open.
+
+  **Round 2 (2026-08-04) — ASCENDING `updatedAt` CONFIRMED.** `Seeding/D1` bumped EST-1's
+  `updatedAt` from `2026-07-30T21:35:03.808Z` to `2026-08-04T18:12:51.985Z`, breaking the
+  workspace-wide tie. `updatedAsc` now returns EST-1 **last**, after the three rows still
+  carrying the bulk-seed timestamp — newest last, i.e. genuinely ascending. Cross-checked
+  against `orderBy: updatedAt` (descending), which puts EST-1 first.
+
+  **This is the evidence per-page checkpointing rests on** for Issues, Projects and
+  Initiatives: in ascending order an updated row's `updatedAt` only increases, so it moves
+  LATER in the sweep and can never slip behind the read position. Labels cannot use `sort`
+  (`42 - Labels Sort Rejected`) and therefore cannot have this guarantee.
+
+  Round 2 also confirmed ordinary field mutations DO bump `updatedAt` — it is specifically
+  ARCHIVAL that does not (`14 - Issues Include Archived`).
+
+  **Incidental finding in the saved example: `titleAsc` / `titleDesc` return only 3 rows,
+  not 4.** They deliberately omit `includeArchived: true`, so the archived EST-2 ("Connect
+  your tools") silently drops out — an unplanned but clean re-demonstration that the default
+  hides the archived partition, visible right next to the 4-row `updatedAsc` alias that does
+  pass the flag.
+
+  `updatedAsc` is the exact sweep query the connector will issue for backfill and for
+  incremental (only the `filter.updatedAt` bound differs; the plan uses `gte`, not the `gt`
+  shown here — see `07 - Cursor Filter Boundary` for why).
+
+  **Second observed finding — `sort` and `orderBy` return DIFFERENT cursor encodings.**
+  Under `orderBy` the `endCursor` is the raw node UUID (see `12 - Issues Pagination Walk`);
+  under `sort` it becomes a base64 blob. From this run's saved example:
+
+      endCursor = "eyJrZXkiOiJhZGJjN2RlYi02NjA3LTRmMzktYWRlMi1jMjMyNjhkYzNlYzciLCJncm91cHMiOlsiIiwiIl19"
+
+  which base64-decodes to:
+
+      {"key":"adbc7deb-6607-4f39-ade2-c23268dc3ec7","groups":["",""]}
+
+  **This is not an opaque server-issued token, and the distinction matters.** The decoded
+  payload is composed entirely of values derived from the document itself — `key` is the
+  last node's `id`, `groups` holds that node's sort-key values. There is no server-side
+  continuation state, no session handle, and nothing with a wall-clock lifetime, so it is
+  exempt from the opaque-token durability burden (no TTL to expire, nothing for unrelated
+  provider-side writes to invalidate). It is a keyset cursor wearing a base64 coat.
+
+  Regardless, the connector must NOT checkpoint this value across sync cycles. `after` is
+  used only WITHIN a single sweep; what gets persisted between cycles is `updatedAt`. That
+  keeps the design independent of Linear's cursor encoding, which — as this finding shows
+  — silently changes shape depending on which ordering argument you pass.
+}
+
+example {
+  name: 200 — ASCENDING updatedAt CONFIRMED (newest last, post-seed)
+
+  request: {
+    url: https://api.linear.app/graphql
+    method: POST
+    mode: graphql
+
+    body:graphql: {
+      query IssuesAscendingSweep {
+        titleAsc:  issues(first: 4, sort: [{title: {order: Ascending}}])  { nodes { title updatedAt } }
+        titleDesc: issues(first: 4, sort: [{title: {order: Descending}}]) { nodes { title updatedAt } }
+        updatedAsc: issues(
+          first: 250
+          includeArchived: true
+          sort: [{updatedAt: {order: Ascending}}]
+          filter: {updatedAt: {gt: "2020-01-01T00:00:00Z"}}
+        ) {
+          nodes { id updatedAt }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      x-complexity: 8
+      x-ratelimit-requests-limit: 2500
+      x-ratelimit-requests-remaining: 2490
+      x-ratelimit-complexity-limit: 3000000
+      x-ratelimit-complexity-remaining: 2999992
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "data": {
+            "titleAsc": {
+              "nodes": [
+                {
+                  "title": "Get familiar with Linear",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                },
+                {
+                  "title": "Import your data",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "title": "Set up your teams",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                }
+              ]
+            },
+            "titleDesc": {
+              "nodes": [
+                {
+                  "title": "Set up your teams",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "title": "Import your data",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "title": "Get familiar with Linear",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                }
+              ]
+            },
+            "updatedAsc": {
+              "nodes": [
+                {
+                  "id": "431c9f95-fe23-44cb-9391-f4880c51bede",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "86eeb50c-332c-46a7-bebf-a0b67dc346bf",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "adbc7deb-6607-4f39-ade2-c23268dc3ec7",
+                  "updatedAt": "2026-07-30T21:35:03.808Z"
+                },
+                {
+                  "id": "4937bc7e-6bda-4612-9a80-3fbaaec872d9",
+                  "updatedAt": "2026-08-04T18:12:51.985Z"
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false,
+                "endCursor": "eyJrZXkiOiI0OTM3YmM3ZS02YmRhLTQ2MTItOWE4MC0zZmJhYWVjODcyZDkiLCJncm91cHMiOlsiIiwiIl19"
+              }
+            }
+          }
+        }
+      '''
+    }
+  }
+}

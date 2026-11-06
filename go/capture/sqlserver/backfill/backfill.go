@@ -3,6 +3,7 @@ package backfill
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
@@ -16,13 +17,14 @@ func BuildBackfillQuery(
 	schema, table string,
 	columnTypes map[string]any,
 	chunkSize int,
+	backfillFilter string,
 ) (string, []any, error) {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	var keyColumns = state.KeyColumns
 
 	switch state.Mode {
 	case sqlcapture.TableStateKeylessBackfill:
-		var query = keylessScanQuery(schema, table, chunkSize)
+		var query = keylessScanQuery(schema, table, chunkSize, backfillFilter)
 		var args = []any{state.BackfilledCount}
 		return query, args, nil
 
@@ -35,10 +37,17 @@ func BuildBackfillQuery(
 			if len(resumeKey) != len(keyColumns) {
 				return "", nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
-			var query = buildScanQuery(false, keyColumns, columnTypes, schema, table, chunkSize)
+			for idx, colName := range keyColumns {
+				var retyped, err = retypeResumeKey(resumeKey[idx], columnTypes[colName])
+				if err != nil {
+					return "", nil, fmt.Errorf("error preparing resume key for %q: %w", streamID, err)
+				}
+				resumeKey[idx] = retyped
+			}
+			var query = buildScanQuery(false, keyColumns, columnTypes, schema, table, chunkSize, backfillFilter)
 			return query, resumeKey, nil
 		}
-		var query = buildScanQuery(true, keyColumns, columnTypes, schema, table, chunkSize)
+		var query = buildScanQuery(true, keyColumns, columnTypes, schema, table, chunkSize, backfillFilter)
 		return query, nil, nil
 
 	default:
@@ -46,11 +55,65 @@ func BuildBackfillQuery(
 	}
 }
 
+// retypeResumeKey converts a resume key value back into a Go type which the driver will
+// bind as the column's own SQL type.
+//
+// EncodeKeyFDB formats datetime values with time.Format so that serialized row keys sort
+// correctly as FDB tuples. Binding that string straight back into a chunk query
+// leaves SQL Server comparing a datetime column against an nvarchar parameter. The
+// disjunctive shape of the resume predicate combined with that implicit conversion
+// stops the optimizer from recognizing that `k1 > @p1` and `k1 = @p1 AND k2 > @p2`
+// share a lower bound. Unable to derive a seek range, it scans from the start of the
+// index instead, and every chunk re-reads the already backfilled portion of the table.
+// So, we use retypeResumeKey to convert the resume key so SQL Server does not perform
+// an implicit conversion and the optimizer decides to seek instead of scan.
+//
+// DATETIME and TIME are deliberately excluded:
+//
+//   - DATETIME is a lossy-encoding problem. DatetimeKeyEncoding keeps only three
+//     fractional digits and Go truncates them, but the column resolves to
+//     1/300s, so a stored .003333 is persisted as .003.
+//
+//   - TIME is a parameter-type problem. A Go time.Time is always a date as well as a
+//     time, so the driver can only send it as DATETIMEOFFSET, and SQL Server has no
+//     implicit conversion between TIME and DATETIMEOFFSET.
+func retypeResumeKey(value any, columnType any) (any, error) {
+	var text, isText = value.(string)
+	if !isText {
+		return value, nil
+	}
+
+	var layout string
+	switch columnType {
+	case "smalldatetime":
+		layout = datatypes.DatetimeKeyEncoding
+	case "datetime2", "datetimeoffset", "date":
+		layout = datatypes.SortableRFC3339Nano
+	default:
+		return value, nil
+	}
+
+	var parsed, err = time.Parse(layout, text)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing %v resume key %q: %w", columnType, text, err)
+	}
+	return parsed, nil
+}
+
 // keylessScanQuery builds a query for scanning a table without a primary key.
 // It uses %%physloc%% ordering and OFFSET/FETCH for pagination.
-func keylessScanQuery(schemaName, tableName string, chunkSize int) string {
+func keylessScanQuery(schemaName, tableName string, chunkSize int, backfillFilter string) string {
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
+	}
 	fmt.Fprintf(query, " ORDER BY %%%%physloc%%%%")
 	fmt.Fprintf(query, " OFFSET @p1 ROWS FETCH FIRST %d ROWS ONLY;", chunkSize)
 	return query.String()
@@ -59,7 +122,7 @@ func keylessScanQuery(schemaName, tableName string, chunkSize int) string {
 // buildScanQuery builds a query for scanning a table with a primary key.
 // If start is true, scans from the beginning; otherwise resumes after the given key values.
 // The columnTypes map is used to determine which columns need special text collation handling.
-func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any, schemaName, tableName string, chunkSize int) string {
+func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any, schemaName, tableName string, chunkSize int, backfillFilter string) string {
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
@@ -72,6 +135,29 @@ func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any,
 		pkey = append(pkey, quotedName)
 	}
 
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses []string
+	if !start {
+		var predicate = new(strings.Builder)
+		for i := range len(pkey) {
+			if i == 0 {
+				predicate.WriteString("(")
+			} else {
+				predicate.WriteString(") OR (")
+			}
+
+			for j := 0; j < i; j++ {
+				fmt.Fprintf(predicate, "%s = %s AND ", pkey[j], args[j])
+			}
+			fmt.Fprintf(predicate, "%s > %s", pkey[i], args[i])
+		}
+		predicate.WriteString(")")
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", predicate.String()))
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	var query = new(strings.Builder)
 	fmt.Fprintf(query, "BEGIN ")
 	if !start {
@@ -82,20 +168,8 @@ func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any,
 		}
 	}
 	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
-	if !start {
-		for i := range len(pkey) {
-			if i == 0 {
-				fmt.Fprintf(query, " WHERE (")
-			} else {
-				fmt.Fprintf(query, ") OR (")
-			}
-
-			for j := 0; j < i; j++ {
-				fmt.Fprintf(query, "%s = %s AND ", pkey[j], args[j])
-			}
-			fmt.Fprintf(query, "%s > %s", pkey[i], args[i])
-		}
-		fmt.Fprintf(query, ")")
+	if len(whereClauses) > 0 {
+		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
 	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
 	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", chunkSize)

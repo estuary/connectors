@@ -1,0 +1,212 @@
+info:
+  name: schema by type
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: '{{base_url}}/meta/schemas/user/{{user_schema_id}}'
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('user_schema_id')) await bru.runRequest('User Custom Profile/user types');
+
+examples:
+  - name: "200 - default type via concrete osc id: identical to the `default` alias (base elided)"
+    request:
+      url: "{{base_url}}/meta/schemas/user/osc176zmw9ti8gVdP698"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "500"
+      body:
+        type: json
+        data: |-
+          {
+            "id": "https://integrator-9297012.okta.com/meta/schemas/user/default",
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "name": "user",
+            "title": "User",
+            "description": "Okta user profile template with default permission settings",
+            "lastUpdated": "2026-09-03T19:36:27.000Z",
+            "created": "2026-09-03T19:36:27.000Z",
+            "definitions": {
+              "custom": {
+                "id": "#custom",
+                "type": "object",
+                "properties": {}
+              },
+              "base": {
+                "id": "#base",
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "title": "Primary email",
+                    "type": "string",
+                    "required": true,
+                    "format": "email",
+                    "mutability": "READ_WRITE",
+                    "scope": "NONE",
+                    "permissions": [
+                      {
+                        "principal": "SELF",
+                        "action": "READ_WRITE"
+                      }
+                    ],
+                    "master": {
+                      "type": "PROFILE_MASTER"
+                    }
+                  },
+                  "…": "30 more base properties elided"
+                },
+                "required": [
+                  "login",
+                  "firstName",
+                  "lastName",
+                  "email"
+                ]
+              }
+            },
+            "type": "object",
+            "properties": {
+              "profile": {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/custom"
+                  },
+                  {
+                    "$ref": "#/definitions/base"
+                  }
+                ]
+              }
+            },
+            "_links": {
+              "self": {
+                "rel": "self",
+                "href": "https://integrator-9297012.okta.com/api/v1/meta/schemas/user/osc176zmw9ti8gVdP698",
+                "method": "GET"
+              },
+              "type": {
+                "rel": "type",
+                "href": "https://integrator-9297012.okta.com/api/v1/meta/types/user/oty176zmw9ti8gVdP698",
+                "method": "GET"
+              }
+            }
+          }
+  - name: "200 - non-default type estuarySeedContractor: own id, empty custom (base elided)"
+    request:
+      url: "{{base_url}}/meta/schemas/user/osc18gusqxw7j8TeA698"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-rate-limit-limit
+          value: "500"
+      body:
+        type: json
+        data: |-
+          {
+            "id": "https://integrator-9297012.okta.com/meta/schemas/user/osc18gusqxw7j8TeA698",
+            "$schema": "http://json-schema.org/draft-04/schema#",
+            "name": "estuarySeedContractor",
+            "title": "Estuary Seed Contractor",
+            "description": "Seeded by the source-okta Bruno collection: a second user type, with its own profile schema.",
+            "lastUpdated": "2026-10-07T14:36:59.000Z",
+            "created": "2026-10-07T14:36:59.000Z",
+            "definitions": {
+              "custom": {
+                "id": "#custom",
+                "type": "object",
+                "properties": {}
+              },
+              "base": {
+                "id": "#base",
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "title": "Primary email",
+                    "type": "string",
+                    "required": true,
+                    "format": "email",
+                    "mutability": "READ_WRITE",
+                    "scope": "NONE",
+                    "permissions": [
+                      {
+                        "principal": "SELF",
+                        "action": "READ_WRITE"
+                      }
+                    ],
+                    "master": {
+                      "type": "PROFILE_MASTER"
+                    }
+                  },
+                  "…": "30 more base properties elided"
+                },
+                "required": [
+                  "login",
+                  "firstName",
+                  "lastName",
+                  "email"
+                ]
+              }
+            },
+            "type": "object",
+            "properties": {
+              "profile": {
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/custom"
+                  },
+                  {
+                    "$ref": "#/definitions/base"
+                  }
+                ]
+              }
+            },
+            "_links": {
+              "self": {
+                "rel": "self",
+                "href": "https://integrator-9297012.okta.com/api/v1/meta/schemas/user/osc18gusqxw7j8TeA698",
+                "method": "GET"
+              },
+              "type": {
+                "rel": "type",
+                "href": "https://integrator-9297012.okta.com/api/v1/meta/types/user/oty18gusqxw7j8TeA698",
+                "method": "GET"
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve a user schema](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/Schema/#tag/Schema/operation/getUserSchema)
+
+  **WHY:** reads a schema through a user type's `_links.schema.href`, the path a per-type
+  iteration follows. Proves the href's last segment is a valid `schemaId` and whether the
+  `default` alias and the default type's concrete id return the same object.
+
+  **VERIFIED (2026-10-07):** the href's last segment works as `schemaId`. The default type's
+  concrete id returns the same object as `/default` (same `id` alias URL).
+
+  **VERIFIED (2026-10-07):** a non-default type (`Seeding / Create User Type`) has its own schema
+  whose `id` is its concrete URL `…/meta/schemas/user/osc18gusqxw7j8TeA698`, its own
+  `name`/`title` (the type's), and its **own** `definitions.custom` — empty here even
+  though the default type has `estuarySeedCostCode`. Custom attributes are per user type,
+  so reading only `/default` would miss every non-default type's attributes: the stream
+  must iterate types.

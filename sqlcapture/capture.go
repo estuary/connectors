@@ -1,6 +1,7 @@
 package sqlcapture
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,9 +9,12 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/segmentio/encoding/json"
@@ -57,7 +61,7 @@ func (ps *PersistentState) Validate() error {
 	return nil
 }
 
-// BindingsInState returns all the bindings having a particular persisted state, in sorted order for
+// BindingsInState returns all the bindings having a particular persisted state in sorted order for
 // reproducibility.
 func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
 	var bindings []*Binding
@@ -66,7 +70,9 @@ func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
 			bindings = append(bindings, binding)
 		}
 	}
-	slices.SortFunc(bindings, func(a, b *Binding) int { return strings.Compare(a.StreamID.String(), b.StreamID.String()) })
+	slices.SortFunc(bindings, func(a, b *Binding) int {
+		return a.StreamID.Compare(b.StreamID)
+	})
 	return bindings
 }
 
@@ -75,9 +81,51 @@ func (c *Capture) BindingsCurrentlyActive() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill, TableStateActive)
 }
 
-// BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
-func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
-	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
+// bindingTableIDs returns a TableID for every binding configured on this capture,
+// suitable for passing to Database.DiscoverTableDetails.
+func (c *Capture) bindingTableIDs() []TableID {
+	var ids = make([]TableID, 0, len(c.Bindings))
+	for _, binding := range c.Bindings {
+		ids = append(ids, TableID{Schema: binding.Resource.Namespace, Table: binding.Resource.Stream})
+	}
+	// Sort so the returned results are in a stable order. Most notably, this
+	// helps increase query plan cache hit rates for discovery implementations
+	// that chunk the list into multiple discovery queries.
+	slices.SortFunc(ids, func(a, b TableID) int {
+		if n := strings.Compare(a.Schema, b.Schema); n != 0 {
+			return n
+		}
+		return strings.Compare(a.Table, b.Table)
+	})
+	return ids
+}
+
+// bindingsCurrentlyBackfilling returns all the bindings undergoing some sort
+// of backfill, in no particular order.
+func (c *Capture) bindingsCurrentlyBackfilling() []*Binding {
+	var bindings = make([]*Binding, 0, len(c.backfillingStreams))
+	for stateKey := range c.backfillingStreams {
+		bindings = append(bindings, c.bindingForStateKey(stateKey))
+	}
+	return bindings
+}
+
+// AnyBindingsCurrentlyBackfilling reports whether any binding is undergoing
+// some sort of backfill.
+func (c *Capture) AnyBindingsCurrentlyBackfilling() bool {
+	return len(c.backfillingStreams) > 0
+}
+
+// bindingForStateKey returns the binding with the given state key, building the
+// state key index on first use.
+func (c *Capture) bindingForStateKey(stateKey boilerplate.StateKey) *Binding {
+	if c.bindingsByStateKey == nil {
+		c.bindingsByStateKey = make(map[boilerplate.StateKey]*Binding, len(c.Bindings))
+		for _, binding := range c.Bindings {
+			c.bindingsByStateKey[binding.StateKey] = binding
+		}
+	}
+	return c.bindingsByStateKey[stateKey]
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -99,9 +147,6 @@ type TableState struct {
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// BackfilledCount is a counter of the number of rows backfilled.
 	BackfilledCount int `json:"backfilled"`
-	// dirty is set whenever the table state changes, and cleared whenever
-	// a state update is emitted. It should never be serialized itself.
-	dirty bool
 }
 
 const (
@@ -139,12 +184,33 @@ const (
 // via replication, backfilling preexisting table contents, and emitting records/state
 // updates. It uses the `Database` interface to interact with a specific database.
 type Capture struct {
+	Name     string                  // The catalog task name of this capture, used for observability logging
 	Bindings map[StreamID]*Binding   // Map from fully-qualified stream IDs to the corresponding binding information
 	State    *PersistentState        // State read from `state.json` and emitted as updates
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
+	replStream          ReplicationStream           // The replication stream from which the main capture loop reads change events
+	lastDiscovery       map[StreamID]*DiscoveryInfo // The most recent table discovery results, refreshed on every rediscovery
+	rediscoverAfter     time.Time                   // When the next table rediscovery should occur
+	periodicChecksAfter time.Time                   // When the next periodic database checks should occur
+	statusUpdateAfter   time.Time                   // When the next backfilling status update should occur
+
 	lastStatus string // Last connectorStatus update. Used to suppress exact duplicates to reduce log noise.
+
+	// dirtyStreams is the set of stream state keys changed since the last checkpoint.
+	dirtyStreams map[boilerplate.StateKey]struct{}
+
+	// backfillingStreams is the set of stream state keys currently in one of the backfill
+	// modes. It is seeded from the persisted state during startup and maintained by
+	// setStreamState after that, so per-chunk logic can avoid scanning every binding.
+	backfillingStreams map[boilerplate.StateKey]struct{}
+
+	backfillRun backfillRun // Progress of the current backfill run, for status updates.
+
+	// bindingsByStateKey indexes the capture's bindings by state key. It is built on
+	// first use, which is safe because bindings never change during a capture run.
+	bindingsByStateKey map[boilerplate.StateKey]*Binding
 
 	reused struct {
 		emitChangeBuf []byte               // A reusable buffer used for serialized JSON documents in emitChange(). Note that this is not thread-safe, but since the capture is single-threaded we're okay for now.
@@ -162,28 +228,116 @@ type Capture struct {
 }
 
 const (
-	automatedDiagnosticsTimeout = 5 * time.Minute  // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
-	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
-	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
-	rediscoverInterval          = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
-	periodicChecksInterval      = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
+	rediscoverInterval        = 15 * time.Minute // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
+	periodicChecksInterval    = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
+	streamingProgressInterval = 5 * time.Minute  // How often to log progress and diagnostics during a long-running streaming cycle.
+	statusUpdateInterval      = 10 * time.Second // How often the backfilling status update may be recomputed, since it can be expensive on large captures.
 )
 
 var (
 	ErrFenceNotReached = fmt.Errorf("replication stream closed before reaching fence")
 )
 
+// nextRediscovery returns the time at which a capture should next re-run discovery.
+//
+// The delay is jittered across an interval-wide window rather than being exactly
+// rediscoverInterval.
+func (c *Capture) nextRediscovery() time.Time {
+	var interval = c.rediscoveryInterval()
+	return time.Now().Add(interval/2 + time.Duration(rand.Int63n(int64(interval))))
+}
+
+// rediscoveryInterval returns how long this capture waits between rediscoveries.
+func (c *Capture) rediscoveryInterval() time.Duration {
+	if interval := c.Database.RediscoveryInterval(); interval > 0 {
+		return interval
+	}
+	return rediscoverInterval
+}
+
+const (
+	// minRediscoveryInterval and maxRediscoveryInterval bound a user-configured rediscovery
+	// interval. A year already means "effectively never rediscover", and staying far below the
+	// point where the jittered delay (which reaches 1.5x the interval) would overflow an int64
+	// duration keeps an absurdly large value from wrapping negative and thereby inverting into
+	// rediscovery on every pass of the capture loop.
+	minRediscoveryInterval = 1 * time.Minute
+	maxRediscoveryInterval = 365 * 24 * time.Hour
+)
+
+// ValidateRediscoveryInterval checks a connector's 'rediscovery_interval' config setting.
+// An empty value means "use the default interval" and is always valid.
+func ValidateRediscoveryInterval(interval string) error {
+	if interval == "" {
+		return nil
+	}
+	var parsed, err = time.ParseDuration(interval)
+	if err != nil {
+		return fmt.Errorf("invalid 'rediscovery_interval' configuration %q: %w", interval, err)
+	} else if parsed < minRediscoveryInterval {
+		return fmt.Errorf("invalid 'rediscovery_interval' configuration %q: must be at least %s", interval, minRediscoveryInterval)
+	} else if parsed > maxRediscoveryInterval {
+		return fmt.Errorf("invalid 'rediscovery_interval' configuration %q: must not exceed %s", interval, maxRediscoveryInterval)
+	}
+	return nil
+}
+
+// ParseRediscoveryInterval converts a 'rediscovery_interval' config setting into a duration
+// for connectors to implement Database.RediscoveryInterval with. Empty values yield zero,
+// meaning the default interval applies, and so do unparseable ones since a config which got
+// this far has already been accepted by ValidateRediscoveryInterval.
+func ParseRediscoveryInterval(interval string) time.Duration {
+	var parsed, err = time.ParseDuration(interval)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+// ParseMaxStartupDelay parses a connector's 'max_startup_delay' config setting.
+// An empty value means "no delay".
+func ParseMaxStartupDelay(delay string) (time.Duration, error) {
+	if delay == "" {
+		return 0, nil
+	}
+	var parsed, err = time.ParseDuration(delay)
+	if err != nil {
+		return 0, fmt.Errorf("invalid 'max_startup_delay' configuration %q: %w", delay, err)
+	} else if parsed < 0 {
+		return 0, fmt.Errorf("invalid 'max_startup_delay' configuration %q: must not be negative", delay)
+	}
+	return parsed, nil
+}
+
+// streamingDiagnosticsThreshold returns how long a single streaming cycle must run before it's
+// considered to have gone on for an unexpectedly long time and replication diagnostics are
+// collected.
+//
+// Diagnostics are more expensive than the progress logging they're interleaved with, since
+// for some connectors they query server-wide metadata, so they mustn't fire on cycles which are
+// slow due to their configuration. A polling connector can't complete a cycle any faster than one
+// polling period, so the threshold is that period plus a fixed grace interval rather than a
+// fixed duration on its own.
+func (c *Capture) streamingDiagnosticsThreshold() time.Duration {
+	if interval := c.Database.ReplicationPollingInterval(); interval > 0 {
+		return streamingProgressInterval + interval
+	}
+	return streamingProgressInterval
+}
+
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
-	// Perform discovery and log the full results for convenience. This info
-	// will be needed when activating all currently-active bindings below.
-	discovery, err := c.Database.DiscoverTables(ctx)
+	// Fetch detailed schema info for the tables that this capture's bindings
+	// reference. We don't need details for every table in the database here.
+	c.lastDiscovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
-	} else if err := c.emitSourcedSchemas(discovery); err != nil {
+	} else if err := c.emitSourcedSchemas(); err != nil {
+		return err
+	} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
 		return err
 	}
-	for streamID, discoveryInfo := range discovery {
+	for streamID, discoveryInfo := range c.lastDiscovery {
 		log.WithFields(log.Fields{
 			"table":     streamID,
 			"discovery": discoveryInfo,
@@ -194,22 +348,27 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
-	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
+	c.replStream, err = c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
 	}
 	for _, binding := range c.BindingsCurrentlyActive() {
 		var state = c.State.Streams[binding.StateKey]
 		var streamID = binding.StreamID
-		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, discovery[streamID], state.Metadata); err != nil {
+		if err := c.replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.lastDiscovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
-	if err := replStream.StartReplication(ctx, discovery); err != nil {
+	if c.Database.ActivateStreamsBeforeCatchup() {
+		if err := c.activatePendingStreams(ctx); err != nil {
+			return fmt.Errorf("error activating pending streams before catch-up: %w", err)
+		}
+	}
+	if err := c.replStream.StartReplication(ctx, c.lastDiscovery); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
 	defer func() {
-		if streamErr := replStream.Close(ctx); streamErr != nil && errors.Is(err, ErrFenceNotReached) {
+		if streamErr := c.replStream.Close(ctx); streamErr != nil && errors.Is(err, ErrFenceNotReached) {
 			err = streamErr
 		}
 	}()
@@ -218,7 +377,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// and relay them to the replication stream acknowledgement.
 	var acknowledgeWorkerCtx, cancelAcknowledgeWorkerCtx = context.WithCancel(ctx)
 	go func() {
-		if err := c.acknowledgeWorker(acknowledgeWorkerCtx, c.Output, replStream); err != nil {
+		if err := c.acknowledgeWorker(acknowledgeWorkerCtx, c.Output, c.replStream); err != nil {
 			log.WithField("err", err).Fatal("error relaying acknowledgements from stdin")
 		}
 	}()
@@ -231,78 +390,105 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// making it easier to know exactly how many transactions are expected from a capture.
 	c.statusUpdate("Catching up on CDC history")
 	if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
-		if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
+		if err := c.streamToFence(ctx, 0, false); err != nil {
 			return fmt.Errorf("error streaming until fence: %w", err)
 		} else if err := c.emitState(); err != nil {
 			return fmt.Errorf("error emitting state after catch-up: %w", err)
 		}
-	} else if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
+	} else if err := c.streamToFence(ctx, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 
-	var rediscoverAfter time.Time
-	var periodicChecksAfter time.Time
+	// Activate any pending streams using the schema information already fetched during
+	// startup, then schedule the first rediscovery a full interval out.
+	if err := c.activatePendingStreams(ctx); err != nil {
+		return fmt.Errorf("error initializing pending streams: %w", err)
+	}
+	c.rediscoverAfter = c.nextRediscovery()
 	for ctx.Err() == nil {
-		if time.Now().After(rediscoverAfter) {
-			log.Debug("rediscovering database tables")
-			discovery, err = c.Database.DiscoverTables(ctx)
-			if err != nil {
-				return fmt.Errorf("error discovering database tables: %w", err)
-			} else if err := c.emitSourcedSchemas(discovery); err != nil {
-				return err
-			} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
-				return err
-			}
-			// If any streams are currently pending, initialize them so they can start backfilling.
-			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
-				return fmt.Errorf("error initializing pending streams: %w", err)
-			}
-			rediscoverAfter = time.Now().Add(rediscoverInterval)
-		}
-
-		if time.Now().After(periodicChecksAfter) {
-			if err := c.Database.PeriodicChecks(ctx); err != nil {
-				log.WithError(err).Warn("error running periodic checks")
-			}
-			periodicChecksAfter = time.Now().Add(periodicChecksInterval)
-		}
-
-		// If any tables are currently backfilling, go perform another backfill iteration.
-		if c.BindingsCurrentlyBackfilling() != nil {
-			c.statusUpdate("Backfilling Tables")
-			if err := c.backfillStreams(ctx, discovery); err != nil {
-				return fmt.Errorf("error performing backfill: %w", err)
-			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
-				return fmt.Errorf("error streaming until fence: %w", err)
-			} else if err := c.emitState(); err != nil {
-				return err
-			}
-
-			if TestShutdownAfterBackfill {
-				log.Info("Shutting down after backfill due to TestShutdownAfterBackfill")
-				return nil // In tests we sometimes want to shut down here
-			}
-			continue // Repeat the main loop from the top
-		}
-
-		// We often want to shut down at this point in tests. Before doing so, we emit
-		// a state checkpoint to ensure that streams reliably transition into the Active
-		// state during tests even if there is no backfill work to do.
-		if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
-			log.Info("Shutting down due to SHUTDOWN_AFTER_POLLING=yes")
-			if bs, err := json.Marshal(c.State); err == nil {
-				FinalStateCheckpoint = bs // Set final state checkpoint
-			}
-			return c.emitState()
-		}
-
-		// Finally, since there's no other work to do right now, we just stream changes for a period of time.
-		c.statusUpdate("Streaming CDC Events")
-		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
+		if done, err := c.mainLoopIteration(ctx); err != nil {
 			return err
+		} else if done {
+			return nil
 		}
 	}
 	return ctx.Err()
+}
+
+// mainLoopIteration executes a single iteration of the capture's main loop:
+// rediscovery and periodic checks when their next scheduled time has arrived,
+// then either one backfill iteration or one streaming cycle. It returns done
+// as true when the capture should shut down cleanly, which currently happens
+// only via the test/polling shutdown behavior flags.
+func (c *Capture) mainLoopIteration(ctx context.Context) (done bool, err error) {
+	if time.Now().After(c.rediscoverAfter) {
+		log.Debug("rediscovering database tables")
+		c.lastDiscovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
+		if err != nil {
+			return false, fmt.Errorf("error discovering database tables: %w", err)
+		}
+		if err := c.emitSourcedSchemas(); err != nil {
+			return false, err
+		} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
+			return false, err
+		}
+		// If any streams are currently pending, initialize them so they can start backfilling.
+		if err := c.activatePendingStreams(ctx); err != nil {
+			return false, fmt.Errorf("error initializing pending streams: %w", err)
+		}
+		c.rediscoverAfter = c.nextRediscovery()
+	}
+
+	if time.Now().After(c.periodicChecksAfter) {
+		if err := c.Database.PeriodicChecks(ctx); err != nil {
+			log.WithError(err).Warn("error running periodic checks")
+		}
+		c.periodicChecksAfter = time.Now().Add(periodicChecksInterval)
+	}
+
+	// If any tables are currently backfilling, go perform another backfill iteration.
+	if c.AnyBindingsCurrentlyBackfilling() {
+		// Computing backfill progress is expensive on captures with many bindings
+		// and this runs once per backfill chunk, so it's throttled to at most once
+		// per interval. The other status updates are already amortized over whole
+		// streaming cycles and don't need this.
+		if time.Now().After(c.statusUpdateAfter) {
+			c.statusUpdate("Backfilling Tables")
+			c.statusUpdateAfter = time.Now().Add(statusUpdateInterval)
+		}
+		c.backfillRun.rate.update(time.Now())
+		if err := c.backfillStreams(ctx); err != nil {
+			return false, fmt.Errorf("error performing backfill: %w", err)
+		} else if err := c.streamToFence(ctx, 0, false); err != nil {
+			return false, fmt.Errorf("error streaming until fence: %w", err)
+		} else if err := c.emitState(); err != nil {
+			return false, err
+		}
+
+		if TestShutdownAfterBackfill {
+			log.Info("Shutting down after backfill due to TestShutdownAfterBackfill")
+			return true, nil // In tests we sometimes want to shut down here
+		}
+		return false, nil // Repeat the main loop from the top
+	}
+
+	// We often want to shut down at this point in tests. Before doing so, we emit
+	// a state checkpoint to ensure that streams reliably transition into the Active
+	// state during tests even if there is no backfill work to do.
+	if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
+		log.Info("Shutting down due to SHUTDOWN_AFTER_POLLING=yes")
+		if bs, err := json.Marshal(c.State); err == nil {
+			FinalStateCheckpoint = bs // Set final state checkpoint
+		}
+		return true, c.emitState()
+	}
+
+	// Finally, since there's no other work to do right now, we just stream changes for a period of time.
+	c.statusUpdate("Streaming CDC Events")
+	if err := c.streamToFence(ctx, StreamingFenceInterval, true); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 // reconcileStateWithBindings updates the capture's state to reflect any added or removed bindings.
@@ -325,29 +511,24 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		}
 
 		log.WithField("stateKey", stateKey).Info("binding added to capture")
-		c.State.Streams[stateKey] = &TableState{Mode: TableStatePending, dirty: true}
+		c.setStreamState(stateKey, &TableState{Mode: TableStatePending})
 	}
 
 	// When a binding is removed we change the table state to "Ignore". The way our dirty-
 	// flag update logic works makes a JSON-patch deletion of the whole thing tricky, but
 	// we could theoretically change this someday if "excessive size of state checkpoints
 	// due to deleted bindings" ever becomes an actual issue in practice.
-	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
-		for _, b := range c.Bindings {
-			if b.StateKey == sk {
-				return true
-			}
-		}
-		return false
+	var stateKeysInCatalog = make(map[boilerplate.StateKey]bool, len(c.Bindings))
+	for _, b := range c.Bindings {
+		stateKeysInCatalog[b.StateKey] = true
 	}
 	for stateKey, state := range c.State.Streams {
-		if state.Mode != TableStateIgnore && !streamExistsInCatalog(stateKey) {
+		if state.Mode != TableStateIgnore && !stateKeysInCatalog[stateKey] {
 			log.WithField("stateKey", stateKey).Info("binding removed from capture")
-			c.State.Streams[stateKey] = &TableState{
+			c.setStreamState(stateKey, &TableState{
 				Mode:     TableStateIgnore,
 				Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
-				dirty:    true,
-			}
+			})
 		}
 	}
 
@@ -367,7 +548,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 				state.KeyColumns = binding.Resource.PrimaryKey
 			}
 			log.WithField("stateKey", binding.StateKey).WithField("key", state.KeyColumns).Info("initialized missing KeyColumns state for only-changes binding")
-			state.dirty = true
+			c.setStreamState(binding.StateKey, state)
 		}
 	}
 
@@ -376,12 +557,22 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	// interest when the replication stream jumps ahead, and doing this allows the user an easy
 	// recovery path after WAL deletion, just hit the "Backfill Everything" button in the UI.
 	if allStreamsAreNew {
-		if len(c.Bindings) > 0 {
-			log.Info("all bindings are new, resetting replication cursor")
-		} else {
+		if len(c.Bindings) == 0 {
 			log.Info("capture has no bindings, resetting replication cursor")
+			c.State.Cursor = nil
+		} else if c.Database.ActivateStreamsBeforeCatchup() && len(c.State.Cursor) > 0 {
+			log.Info("all bindings are new, preserving replication cursor for early activation")
+		} else {
+			log.Info("all bindings are new, resetting replication cursor")
+			c.State.Cursor = nil
 		}
-		c.State.Cursor = nil
+	}
+
+	// Seed the backfilling-streams set from the reconciled state. Stream states
+	// loaded from a persisted checkpoint don't pass through setStreamState, which
+	// maintains the set for all changes after this point.
+	for stateKey, state := range c.State.Streams {
+		c.updateBackfillSet(stateKey, state.Mode)
 	}
 
 	// Emit the new state to stdout. This isn't strictly necessary but it helps to make
@@ -390,11 +581,11 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 }
 
 // activatePendingStreams transitions streams from a "Pending" state to being captured once they're eligible.
-func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo, replStream ReplicationStream) error {
+func (c *Capture) activatePendingStreams(ctx context.Context) error {
 	// See if any missing tables have since reappeared, and if so mark them as pending again.
 	for _, binding := range c.BindingsInState(TableStateMissing) {
-		if _, ok := discovery[binding.StreamID]; ok {
-			c.State.Streams[binding.StateKey] = &TableState{Mode: TableStatePending, dirty: true}
+		if _, ok := c.lastDiscovery[binding.StreamID]; ok {
+			c.setStreamState(binding.StateKey, &TableState{Mode: TableStatePending})
 		}
 	}
 
@@ -403,11 +594,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		var streamID = binding.StreamID
 		var stateKey = binding.StateKey
 
-		// Look up the stream state and mark it dirty since we intend to update it immediately.
-		var state = c.State.Streams[stateKey]
-		state.dirty = true
+		// Copy the stream state. The rest of this loop body updates the copy and
+		// writes it back via setStreamState once its final mode is decided, so the
+		// stored state never holds an intermediate value.
+		var state = *c.State.Streams[stateKey]
 
-		var discoveryInfo = discovery[streamID]
+		var discoveryInfo = c.lastDiscovery[streamID]
 		if discoveryInfo == nil {
 			return fmt.Errorf("stream %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
 		}
@@ -424,6 +616,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		if !discoveryInfo.BaseTable {
 			log.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
 			state.Mode = TableStateIgnore
+			c.setStreamState(stateKey, &state)
 			continue
 		}
 
@@ -443,6 +636,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			state.KeyColumns = binding.Resource.PrimaryKey
 		}
 
+		// Log when a user-provided backfill filter is set, since it's an expert
+		// feature whose presence is important context when anything goes wrong.
+		if filter := binding.Resource.BackfillFilter(); filter != "" {
+			log.WithFields(log.Fields{"stream": streamID, "filter": filter}).Info("user-provided backfill filter is set")
+		}
+
 		// Select the appropriate state transition depending on the backfill mode in the resource config.
 		log.WithFields(log.Fields{
 			"stream":   streamID,
@@ -453,6 +652,12 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		case BackfillModeAutomatic:
 			if discoveryInfo.UnpredictableKeyOrdering {
 				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
+				state.Mode = TableStateUnfilteredBackfill
+			} else if binding.Resource.BackfillFilter() != "" {
+				// Precise backfills could lose changes to filter-excluded rows beyond the
+				// backfill cursor, since those replication events are dropped on the
+				// assumption that the backfill will observe the row later.
+				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (backfill filter is set)")
 				state.Mode = TableStateUnfilteredBackfill
 			} else {
 				log.WithField("stream", streamID).Info("autoselected precise backfill mode")
@@ -475,6 +680,22 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
 
+		// Emit an observable log whenever a stream enters a backfilling state.
+		// This only runs for streams currently in the Pending state, so it fires
+		// once when a backfill begins — both for newly-added streams and for
+		// streams whose state was reset to re-trigger a backfill. Observable logs
+		// are otherwise-normal log lines carrying "observable": true, used for
+		// fleet-wide aggregation of backfill activity.
+		switch state.Mode {
+		case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
+			log.WithFields(log.Fields{
+				"observable":        true,
+				"catalog_task_name": c.Name,
+				"stream":            streamID.String(),
+				"mode":              string(binding.Resource.Mode),
+			}).Info("backfill triggered")
+		}
+
 		// Log an informational notice if the key we'll be using for a backfill differs from
 		// the discovered primary key of a table.
 		if state.Mode == TableStatePreciseBackfill || state.Mode == TableStateUnfilteredBackfill {
@@ -488,9 +709,10 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			}
 		}
 
-		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, discoveryInfo, state.Metadata); err != nil {
+		if err := c.replStream.ActivateTable(ctx, streamID, state.KeyColumns, discoveryInfo, state.Metadata); err != nil {
 			return fmt.Errorf("error activating replication for table %q: %w", streamID, err)
 		}
+		c.setStreamState(stateKey, &state)
 	}
 
 	// Transition streams from "Backfill" to "Active" if we're supposed to skip
@@ -507,17 +729,18 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 	// configuration logic, but that would make that logic more complex and I would like
 	// to deprecate the whole 'SkipBackfills' configuration property in the near future
 	// so I have left this little blob of logic nicely self-contained here.
-	for _, binding := range c.BindingsCurrentlyBackfilling() {
+	// This iterates a materialized list rather than the backfilling-streams set
+	// itself, because setStreamState removes entries from the set mid-loop.
+	for _, binding := range c.bindingsCurrentlyBackfilling() {
 		if !c.Database.ShouldBackfill(binding.StreamID) {
-			var state = c.State.Streams[binding.StateKey]
+			var state = *c.State.Streams[binding.StateKey]
 			log.WithFields(log.Fields{
 				"stream":  binding.StreamID,
 				"scanned": state.Scanned,
 			}).Info("skipping backfill for stream")
 			state.Mode = TableStateActive
 			state.Scanned = nil
-			state.dirty = true
-			c.State.Streams[binding.StateKey] = state
+			c.setStreamState(binding.StateKey, &state)
 		}
 	}
 	return nil
@@ -532,41 +755,84 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 //
 // The fenceAfter argument is passed to the underlying replication stream, so that
 // it can make sure to stream changes for at least that length of time.
-func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
+func (c *Capture) streamToFence(ctx context.Context, fenceAfter time.Duration, reportFlush bool) error {
 	log.WithField("fenceAfter", fenceAfter.String()).Debug("streaming to fence")
 
-	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
-	var diagnosticsTimeout = time.AfterFunc(fenceAfter+automatedDiagnosticsTimeout, func() {
-		log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
-		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
-			log.WithField("err", err).Error("replication diagnostics error")
+	// Counters and an interval-start timestamp shared between the deferred final
+	// log and the periodic ticker. Each log call swaps the counters back to zero
+	// and resets the interval timer, so reported counts and rates always reflect
+	// the slice of time since the previous log. This keeps long-running cycles
+	// observable without inviting double-counting when reading consecutive lines.
+	var intervalStarted = time.Now()
+	var flushCount atomic.Int64
+	var changeCount atomic.Int64
+	var otherCount atomic.Int64
+	var changeBytes atomic.Int64
+	var logProgress = func(msg string) {
+		var intervalTime = time.Since(intervalStarted)
+		intervalStarted = time.Now()
+		var bytes = changeBytes.Swap(0)
+		var throughputMBps = float64(bytes) / (1000000 * intervalTime.Seconds())
+		log.WithFields(log.Fields{
+			"change":   changeCount.Swap(0),
+			"flush":    flushCount.Swap(0),
+			"other":    otherCount.Swap(0),
+			"duration": intervalTime.String(),
+			"rate":     fmt.Sprintf("%.02f MBps", throughputMBps),
+		}).Info(msg)
+	}
+
+	// Periodically log progress so that we retain some observability even when a
+	// streaming cycle takes much longer than expected. The WaitGroup ensures the
+	// ticker goroutine is no longer running before the deferred final log fires,
+	// so the two callers of logProgress never overlap on the shared interval state.
+	var progressDone = make(chan struct{})
+	var progressWG sync.WaitGroup
+	var cycleStarted = time.Now()
+	var diagnosticTicks int
+	progressWG.Go(func() {
+		var ticker = time.NewTicker(streamingProgressInterval)
+		defer ticker.Stop()
+		// Diagnostics are gated on a separate, generally longer threshold than progress
+		// logging, and repeat less often than it once a cycle exceeds that threshold.
+		var diagnosticsAfter = c.streamingDiagnosticsThreshold()
+		for {
+			select {
+			case <-progressDone:
+				return
+			case <-ticker.C:
+				logProgress("processing replication events")
+				if time.Since(cycleStarted) < diagnosticsAfter {
+					continue
+				}
+				// Collect diagnostics and dump goroutine stacks on the first tick past the
+				// threshold and every fifth tick thereafter, to help with investigations
+				// into potentially stalled captures. The first report is the informative
+				// one and later ones mostly serve to show that a stalled capture is still
+				// stalled, so they don't need to be as frequent as progress logging.
+				var shouldRunDiagnostics = diagnosticTicks%5 == 0
+				diagnosticTicks++
+				if !shouldRunDiagnostics {
+					continue
+				}
+				log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+				dumpGoroutineStacks()
+				if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
+					log.WithField("err", err).Error("replication diagnostics error")
+				}
+			}
 		}
 	})
-	defer diagnosticsTimeout.Stop()
-
-	// When streaming completes (because we've either reached the fence or encountered an error),
-	// log the number of events which have been processed and some other statistics.
-	var streamingStarted = time.Now() // Time at which the current streaming cycle began
-	var flushCount int                // Flush events
-	var changeCount int               // Change events
-	var otherCount int                // All other events
-	var changeBytes int               // Count of change document bytes emitted
 	defer func() {
-		var streamingTime = time.Since(streamingStarted)
-		var throughputMBps = float64(changeBytes) / (1000000 * streamingTime.Seconds())
-		log.WithFields(log.Fields{
-			"change":   changeCount,
-			"flush":    flushCount,
-			"other":    otherCount,
-			"duration": streamingTime.String(),
-			"rate":     fmt.Sprintf("%.02f MBps", throughputMBps),
-		}).Info("processed replication events")
+		close(progressDone)
+		progressWG.Wait()
+		logProgress("processed replication events")
 	}()
 
-	if err := replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
+	if err := c.replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		// Commit events update the checkpoint cursor and may trigger a state update.
 		if event, ok := event.(CommitEvent); ok {
-			flushCount++
+			flushCount.Add(1)
 			var cursorJSON, err = event.AppendJSON(nil)
 			if err != nil {
 				return fmt.Errorf("error serializing commit cursor: %w", err)
@@ -583,15 +849,15 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		// The core event dispatch happens in handleReplicationEvent but it's useful to
 		// count changes separately from other stuff here.
 		if _, ok := event.(ChangeEvent); ok {
-			changeCount++
+			changeCount.Add(1)
 		} else {
-			otherCount++
+			otherCount.Add(1)
 		}
 
 		if size, err := c.handleReplicationEvent(event); err != nil {
 			return err
 		} else {
-			changeBytes += size
+			changeBytes.Add(int64(size))
 		}
 		return nil
 	}); err != nil {
@@ -599,6 +865,20 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	}
 
 	return nil
+}
+
+// dumpGoroutineStacks emits a full goroutine stack dump when a replication
+// streaming cycle has been running longer than expected.
+func dumpGoroutineStacks() {
+	var buf bytes.Buffer
+	if err := pprof.Lookup("goroutine").WriteTo(&buf, 2); err != nil {
+		log.WithField("err", err).Warn("failed to capture goroutine stack dump")
+		return
+	}
+	log.WithFields(log.Fields{
+		"goroutines": runtime.NumGoroutine(),
+		"stacks":     buf.String(),
+	}).Warn("goroutine stack dump for long-running replication streaming")
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
@@ -614,17 +894,16 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 			return 0, nil // Should be impossible, but safe to ignore
 		}
 		log.WithFields(log.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("marking table as missing")
-		c.State.Streams[binding.StateKey] = &TableState{
+		c.setStreamState(binding.StateKey, &TableState{
 			Mode:     TableStateMissing,
 			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
-			dirty:    true,
-		}
+		})
 		return 0, nil
 	}
 
-	// Metadata events update the per-table metadata and dirty flag.
-	// They have no other effect, the new metadata will only be written
-	// as part of a subsequent state checkpoint.
+	// Metadata events update the per-table metadata and add the table to the
+	// dirty set. They have no other effect, the new metadata will only be
+	// written as part of a subsequent state checkpoint.
 	if event, ok := event.(*MetadataEvent); ok {
 		var binding = c.Bindings[event.StreamID]
 		if binding == nil {
@@ -636,8 +915,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 		if state, ok := c.State.Streams[stateKey]; ok {
 			log.WithField("stateKey", stateKey).Trace("stream metadata updated")
 			state.Metadata = event.Metadata
-			state.dirty = true
-			c.State.Streams[stateKey] = state
+			c.setStreamState(stateKey, state)
 		}
 		return 0, nil
 	}
@@ -683,13 +961,13 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 	return 0, fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
 }
 
-func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
-	var bindings = c.BindingsCurrentlyBackfilling()
-	if len(bindings) == 0 {
+func (c *Capture) backfillStreams(ctx context.Context) error {
+	if !c.AnyBindingsCurrentlyBackfilling() {
 		return nil
 	}
 
-	// Make a list of stream IDs for the highest-priority active bindings.
+	// Make a list of stream IDs for the highest-priority backfilling bindings.
+	var bindings = c.bindingsCurrentlyBackfilling()
 	var streams = make([]StreamID, 0, len(bindings))
 	var priority = math.MinInt
 	for _, b := range bindings {
@@ -707,13 +985,13 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 	var streamID = streams[rand.Intn(len(streams))]
 
 	log.WithFields(log.Fields{
-		"total":      len(bindings), // Total number of active bindings
-		"atPriority": len(streams),  // Number of active bindings in the current priority band
-		"priority":   priority,      // Current priority band
+		"total":      len(c.backfillingStreams), // Total number of backfilling bindings
+		"atPriority": len(streams),              // Number of backfilling bindings in the current priority band
+		"priority":   priority,                  // Current priority band
 		"selected":   streamID,
 	}).Debug("backfilling streams")
 
-	var discoveryInfo, ok = discovery[streamID]
+	var discoveryInfo, ok = c.lastDiscovery[streamID]
 	if !ok {
 		return fmt.Errorf("table %q missing from latest autodiscovery", streamID)
 	}
@@ -731,7 +1009,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	var eventCount int
 	var backfillDocumentBytes = 0
 	var backfillChunkStarted = time.Now()
-	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
+	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, binding.Resource.BackfillFilter(), func(event ChangeEvent) error {
 		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
@@ -779,15 +1057,17 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	state.BackfilledCount += eventCount
+	c.backfillRun.rate.rows += eventCount
 	if backfillComplete {
 		log.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableStateActive
 		state.Scanned = nil
+		c.backfillRun.tablesFinished++
+		c.backfillRun.rowsFinished += state.BackfilledCount
 	} else {
 		state.Scanned = resumeCursor
 	}
-	state.dirty = true
-	c.State.Streams[stateKey] = state
+	c.setStreamState(stateKey, state)
 	return nil
 }
 
@@ -807,16 +1087,52 @@ func (c *Capture) emitChange(binding *Binding, event ChangeEvent) (int, error) {
 	return len(buf), c.Output.Send(&c.reused.emitChangeMsg)
 }
 
+// setStreamState records a stream's capture state and marks it for the next checkpoint.
+// Every change to a TableState must be followed by a call to this.
+func (c *Capture) setStreamState(stateKey boilerplate.StateKey, state *TableState) {
+	c.State.Streams[stateKey] = state
+	if c.dirtyStreams == nil {
+		c.dirtyStreams = make(map[boilerplate.StateKey]struct{})
+	}
+	c.dirtyStreams[stateKey] = struct{}{}
+	c.updateBackfillSet(stateKey, state.Mode)
+}
+
+// updateBackfillSet updates the backfilling-streams set to match a stream's current mode,
+// and ends the backfill run once no streams remain backfilling.
+func (c *Capture) updateBackfillSet(stateKey boilerplate.StateKey, mode string) {
+	switch mode {
+	case TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill:
+		if c.backfillingStreams == nil {
+			c.backfillingStreams = make(map[boilerplate.StateKey]struct{})
+		}
+		c.backfillingStreams[stateKey] = struct{}{}
+	default:
+		if _, ok := c.backfillingStreams[stateKey]; ok {
+			delete(c.backfillingStreams, stateKey)
+			if len(c.backfillingStreams) == 0 {
+				c.backfillRun = backfillRun{} // The backfill run is over.
+			}
+		}
+	}
+}
+
 func (c *Capture) emitState() error {
 	// Put together an update which includes only those streams which have changed
-	// since the last state output. At the same time, clear the dirty flags on all
-	// those tables.
-	var streams = make(map[boilerplate.StateKey]*TableState)
-	for stateKey, state := range c.State.Streams {
-		if state.dirty {
-			state.dirty = false
+	// since the last state output. At the same time, empty out the dirty set.
+	var streams map[boilerplate.StateKey]*TableState
+	if len(c.dirtyStreams) > 0 {
+		streams = make(map[boilerplate.StateKey]*TableState, len(c.dirtyStreams))
+		for stateKey := range c.dirtyStreams {
+			// A dirty stream must always have state, since setStreamState is the only
+			// thing which marks one and it writes both maps.
+			var state, ok = c.State.Streams[stateKey]
+			if !ok {
+				return fmt.Errorf("error emitting state: stream %q is dirty but has no capture state", stateKey)
+			}
 			streams[stateKey] = state
 		}
+		clear(c.dirtyStreams)
 	}
 	var msg = &PersistentState{
 		Cursor:  c.State.Cursor,
@@ -835,10 +1151,10 @@ func (c *Capture) emitState() error {
 }
 
 // emitSourcedSchemas outputs a SourcedSchema update for every capture binding
-// with corresponding discovery info in the provided map.
-func (c *Capture) emitSourcedSchemas(discovery map[StreamID]*DiscoveryInfo) error {
+// with corresponding discovery info in the latest discovery results.
+func (c *Capture) emitSourcedSchemas() error {
 	for _, binding := range c.Bindings {
-		var info, ok = discovery[binding.StreamID]
+		var info, ok = c.lastDiscovery[binding.StreamID]
 		if !ok {
 			continue // Only emit SourcedSchema updates for bindings present in discovery results
 		}
@@ -883,12 +1199,8 @@ func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.Pul
 func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStream ReplicationStream) error {
 	c.pending.Lock()
 	defer c.pending.Unlock()
-	if count == 0 {
-		// Originally the Acknowledge message implicitly meant acknowledging one checkpoint,
-		// so in the absence of a count we will continue to interpret it that way.
-		count = 1
-	}
-	if count > len(c.pending.cursors) {
+
+	if count <= 0 || count > len(c.pending.cursors) {
 		return fmt.Errorf("invalid acknowledgement count %d, only %d pending checkpoints", count, len(c.pending.cursors))
 	}
 
@@ -902,47 +1214,8 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 }
 
 func (c *Capture) statusUpdate(status string) {
-	// Add backfill information with percentage progress
-	var backfillingBindings = c.BindingsCurrentlyBackfilling()
-	if len(backfillingBindings) > 0 {
-		// Build list of tables to query for estimated row counts
-		var tables []TableID
-		for _, binding := range backfillingBindings {
-			tables = append(tables, TableID{
-				Schema: binding.Resource.Namespace,
-				Table:  binding.Resource.Stream,
-			})
-		}
-
-		// Query estimated row counts for all backfilling tables
-		estimatedCounts, err := c.Database.EstimatedRowCounts(context.Background(), tables)
-		if err != nil {
-			log.WithError(err).Warn("error querying estimated row counts for backfill progress")
-			status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
-		} else {
-			// Sum up backfilled and estimated counts
-			var totalBackfilled, totalEstimated int
-			var allCountsKnown = true
-			for _, binding := range backfillingBindings {
-				var state = c.State.Streams[binding.StateKey]
-				var tableID = TableID{binding.Resource.Namespace, binding.Resource.Stream}
-				if estimated, ok := estimatedCounts[tableID]; ok && estimated > 0 {
-					totalBackfilled += state.BackfilledCount
-					totalEstimated += estimated
-				} else {
-					allCountsKnown = false
-				}
-			}
-
-			if allCountsKnown {
-				// Calculate and display percentage, clamped to 99% since we're still backfilling.
-				var percentage = min(float64(totalBackfilled)/float64(totalEstimated)*100, 99)
-				status += fmt.Sprintf(" (backfilled %.0f%% of %d tables)", percentage, len(backfillingBindings))
-			} else {
-				// Fallback when some table sizes are unknown, to avoid giving bad data.
-				status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
-			}
-		}
+	if c.AnyBindingsCurrentlyBackfilling() {
+		status += " (" + c.backfillProgress() + ")"
 	}
 
 	// TODO(wgd): Add replication backlog metrics if available

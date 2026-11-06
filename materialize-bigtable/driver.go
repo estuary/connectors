@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -15,6 +15,7 @@ import (
 
 	"cloud.google.com/go/bigtable"
 	"github.com/estuary/connectors/go/auth/iam"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -30,7 +31,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]common.FlagDefault{}
 
 type AuthType string
 
@@ -79,15 +80,16 @@ func (c *CredentialsConfig) Validate() error {
 type config struct {
 	ProjectID   string             `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the Bigtable instance." jsonschema_extras:"order=0"`
 	InstanceID  string             `json:"instance_id" jsonschema:"title=Instance ID,description=Bigtable instance ID for the materialized tables." jsonschema_extras:"order=1"`
-	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=2"`
-	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+	AppProfile  string             `json:"app_profile,omitempty" jsonschema:"title=Application Profile,description=The Bigtable app profile ID to use for data operations. Leave blank to use the instance's default app profile." jsonschema_extras:"order=2"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=3"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
 	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=Bigtable Endpoint,description=The Bigtable endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by Google."`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (c config) Validate() error {
@@ -110,7 +112,7 @@ func (c config) Validate() error {
 
 func (c config) DefaultNamespace() string { return "" }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -153,7 +155,12 @@ func (c config) dataClient(ctx context.Context) (*bigtable.Client, error) {
 		return nil, err
 	}
 
-	cfg := bigtable.ClientConfig{MetricsProvider: bigtable.NoopMetricsProvider{}}
+	// AppProfile applies only to data operations; the admin client has no
+	// equivalent concept and routes through the instance directly.
+	cfg := bigtable.ClientConfig{
+		AppProfile:      c.AppProfile,
+		MetricsProvider: bigtable.NoopMetricsProvider{},
+	}
 	client, err := bigtable.NewClientWithConfig(ctx, c.ProjectID, c.InstanceID, cfg, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigtable data client: %w", err)
@@ -215,6 +222,10 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return driver{} }
+
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := schemagen.GenerateSchema("Materialize Bigtable Spec", &config{}).MarshalJSON()
 	if err != nil {
@@ -230,15 +241,15 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	return boilerplate.RunValidate(ctx, req, newMaterialization)
+	return boilerplate.RunValidate(ctx, req, NewMaterializer)
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	return boilerplate.RunApply(ctx, req, newMaterialization)
+	return boilerplate.RunApply(ctx, req, NewMaterializer)
 }
 
 func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
-	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+	return boilerplate.RunNewTransactor(ctx, req, be, NewMaterializer)
 }
 
 type materialization struct {
@@ -249,7 +260,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	admin, err := cfg.adminClient(ctx)
 	if err != nil {
 		return nil, err
@@ -404,10 +415,15 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
+	if err := boilerplate.RequireSingleShard(req); err != nil {
+		return nil, err
+	}
+
 	bindings := make([]binding, 0, len(mappedBindings))
 	for _, mb := range mappedBindings {
 		b := binding{
 			tableName: mb.ResourcePath[0],
+			path:      mb.ResourcePath,
 			table:     d.dataClient.Open(mb.ResourcePath[0]),
 			docField:  mb.FieldSelection.Document, // Usually "flow_document", but can be projected to a different field name
 		}
@@ -419,7 +435,7 @@ func (d *materialization) NewTransactor(
 		bindings = append(bindings, b)
 	}
 
-	return &transactor{bindings: bindings, hardDelete: d.cfg.HardDelete}, nil
+	return &transactor{bindings: bindings, hardDelete: d.cfg.HardDelete, be: be}, nil
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error)        { return nil, nil }
@@ -482,7 +498,7 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 		return "0x" + hex.EncodeToString(value)
 	}
 
-	colSet := map[string]struct{}{"_row_key": {}}
+	colSet := map[string]struct{}{"_row_key": {}, "_timestamp": {}}
 	for _, r := range rows {
 		for _, items := range r {
 			for _, it := range items {
@@ -502,6 +518,22 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 		for i, c := range columns {
 			if c == "_row_key" {
 				row[i] = renderBytes([]byte(r.Key()))
+				continue
+			}
+			if c == "_timestamp" {
+				// Surface the read-back cell timestamp (microseconds) so snapshots
+				// reflect the millisecond-granular versions actually stored. All
+				// cells of a row are written in one transaction with a single
+				// timestamp, so the latest version of every cell shares it.
+				var ts bigtable.Timestamp
+				for _, items := range r {
+					for _, it := range items {
+						if it.Timestamp > ts {
+							ts = it.Timestamp
+						}
+					}
+				}
+				row[i] = int64(ts)
 				continue
 			}
 			for _, items := range r {

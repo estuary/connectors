@@ -80,7 +80,7 @@ def test_streams(requests_mock, config):
 def test_check_credential_title_exception(config):
     config["credentials"].pop("credentials_title")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="No supported .credentials_title. specified"):
         SourceHubspot().check_connection(logger, config=config)
 
 
@@ -152,7 +152,7 @@ def test_stream_forbidden(requests_mock, config, caplog):
     requests_mock.get("https://api.hubapi.com/automation/v3/workflows", json=json, status_code=403)
     requests_mock.get("https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403)
 
-    catalog = ConfiguredAirbyteCatalog.parse_obj(
+    catalog = ConfiguredAirbyteCatalog.model_validate(
         {
             "streams": [
                 {
@@ -192,7 +192,7 @@ def test_parent_stream_forbidden(requests_mock, config, caplog, fake_properties_
     requests_mock.get("https://api.hubapi.com/properties/v2/form/properties", properties_response)
     requests_mock.get("https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403)
 
-    catalog = ConfiguredAirbyteCatalog.parse_obj(
+    catalog = ConfiguredAirbyteCatalog.model_validate(
         {
             "streams": [
                 {
@@ -370,7 +370,7 @@ def configured_catalog_fixture():
             }
         ]
     }
-    return ConfiguredAirbyteCatalog.parse_obj(configured_catalog)
+    return ConfiguredAirbyteCatalog.model_validate(configured_catalog)
 
 
 def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(requests_mock, common_params, fake_properties_list):

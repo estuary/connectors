@@ -4,7 +4,7 @@ This is a flow connector that reads from Kafka topics/partitions.
 
 ## Getting Started
 
-To get started using this connector with Estuary Flow, run `flowctl-go discover --image ghcr.io/estuary/source-kafka:TAG`.
+To get started using this connector with Estuary, run `flowctl-go discover --image ghcr.io/estuary/source-kafka:TAG`.
 
 The remainder of this README is geared toward developers who wish to contribute or integrate the connector in other projects.
 
@@ -146,11 +146,23 @@ First, make sure you've followed the [Developer Setup](#developer-setup) instruc
 
 #### Run the End to End Tests
 
-To verify everything is working correctly with [Flow](github.com/estuary/flow), you can run the connector repo tests.
+To verify everything is working correctly with [Flow](github.com/estuary/flow), start the test
+infrastructure and run the integration tests. These drive the connector under `flowctl raw
+preview-next` against the broker and schema registry, covering each supported topic encoding as well
+as capture resumption.
 
 ```bash
-cd path/to/estuary/connectors
-CONNECTOR=source-kafka VERSION=<<DOCKER_IMAGE_TAG>> ./tests/run.sh
+docker compose -f source-kafka/docker-compose.yaml up --wait --detach
+```
+
+```bash
+cargo test --locked --manifest-path source-kafka/Cargo.toml
+```
+
+A smoke test of the built image is also available:
+
+```bash
+CONNECTOR=source-kafka VERSION=<<DOCKER_IMAGE_TAG>> ./tests/smoke.sh
 ```
 
 #### Run the Connector Tests

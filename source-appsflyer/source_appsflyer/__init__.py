@@ -27,6 +27,8 @@ from .resources import (
 class Connector(
     BaseCaptureConnector[EndpointConfig, AnyResourceConfig, ConnectorState]
 ):
+    retain_projections = False
+
     def request_class(self):
         return Request[EndpointConfig, AnyResourceConfig, ConnectorState]
 

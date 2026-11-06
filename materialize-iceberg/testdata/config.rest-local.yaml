@@ -12,7 +12,10 @@ advanced:
     # Polaris enforces that tables live under the namespace's base location
     # (e.g. s3://warehouse/flow/), so the table location must start with
     # s3://warehouse/flow/ rather than s3://warehouse/flow_<table>_<hash>.
-    feature_flags: nested_dot_hash_location_style,allow_existing_tables_for_new_bindings
+    # no_variant_columns: this set runs Spark 3.5, which cannot write variant
+    # columns, so it covers the JSON-string path. See config.rest-local-spark4.yaml
+    # for the variant path.
+    feature_flags: nested_dot_hash_location_style,allow_existing_tables_for_new_bindings,no_variant_columns
 compute:
     compute_type: "Spark Standalone"
     aws_access_key_id: "flow"

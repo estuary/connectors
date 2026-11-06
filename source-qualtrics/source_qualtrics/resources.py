@@ -102,19 +102,15 @@ def full_refresh_resources(
         )
 
     return [
-        common.Resource(
+        common.SnapshotResource(
             name=resource.RESOURCE_NAME,
-            key=["/_meta/row_id"],
-            model=resource,
             open=functools.partial(
                 open,
                 fetch_snapshot_fn,
             ),
-            initial_state=common.ResourceState(),
             initial_config=common.ResourceConfig(
                 name=resource.RESOURCE_NAME, interval=timedelta(minutes=15)
             ),
-            schema_inference=True,
         )
         for resource, fetch_snapshot_fn in FULL_REFRESH_RESOURCES
     ]

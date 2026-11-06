@@ -1,0 +1,49 @@
+info:
+  name: Touch User Nickname
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{base_url}}/users/{{seed_user_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "profile": {
+          "nickName": "estuary-touch"
+        }
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('seed_user_id') && !bru.getEnvVar('seed_user_id')) {
+          await bru.runRequest('Seeding/Create Active User');
+        }
+        // Stamp the nickname so every run is a real change and moves lastUpdated.
+        const body = req.getBody();
+        body.profile.nickName = `estuary-touch-${new Date().toISOString()}`;
+        req.setBody(body);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Update a user (partial)](https://developer.okta.com/docs/api/openapi/okta-management/management/tag/User/#tag/User/operation/updateUser)
+
+  SEEDING REQUEST. Run by the assistant under `seeding: assistant`.
+
+  **WHY:** moves the fixture user's `lastUpdated` on demand, immediately before
+  `Users / search staleness probe`. That probe searches by the user's
+  *previous* `lastUpdated` to see whether the eventually consistent `search`
+  index serves a stale match, and if so, whether the object it returns is fresh
+  or stale. Run with `--env-var seed_user_id=<id>`.
+
+  **Outcome:** ran 2026-10-08 on `00u18h00o173Yc9fV698`, moving `lastUpdated`
+  from 12:29:33 to 17:47:24. The result is in `Users / search staleness probe`.

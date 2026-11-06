@@ -1,0 +1,49 @@
+Task: acmeCo/tests/materialize-databricks
+
+Base:
+Resource: some-schema.key_change_test
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS `some-schema`.key_change_test (\n  id LONG NOT NULL COMMENT 'auto-generated projection of JSON at: /id with inferred types: [integer]',\n  flow_published_at TIMESTAMP NOT NULL COMMENT 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]',\n  tenant STRING NOT NULL COMMENT 'auto-generated projection of JSON at: /tenant with inferred types: [string]',\n  value STRING COMMENT 'auto-generated projection of JSON at: /value with inferred types: [string]'\n) COMMENT 'Generated for materialization acmeCo/tests/materialize-databricks of collection key/change' TBLPROPERTIES ('delta.columnMapping.mode' = 'name');\n"]
+["applied.actionDescription", ""]
+
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"LONG"}
+{"Name":"tenant","Nullable":false,"Type":"STRING"}
+{"Name":"value","Nullable":true,"Type":"STRING"}
+
+Table Data:
+{"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Group-by changed with backfill:
+Resource: some-schema.key_change_test
+
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"LONG"}
+{"Name":"tenant","Nullable":false,"Type":"STRING"}
+{"Name":"value","Nullable":true,"Type":"STRING"}
+
+Table Data:
+{"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one"}
+{"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+
+Materialized under the new group-by:
+Resource: some-schema.key_change_test
+["applied.actionDescription", "\nALTER TABLE `some-schema`.key_change_test ADD COLUMN\n\tflow_document STRING;\n"]
+["applied.actionDescription", ""]
+
+{"Name":"flow_document","Nullable":true,"Type":"STRING"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"LONG"}
+{"Name":"tenant","Nullable":false,"Type":"STRING"}
+{"Name":"value","Nullable":true,"Type":"STRING"}
+
+Table Data:
+{"flow_document":{"_meta":{"uuid":"13814000-1dd2-11b2-8000-071353030311"},"id":1,"tenant":"a","value":"one-updated"},"flow_published_at":"1970-01-01T00:00:00Z","id":1,"tenant":"a","value":"one-updated"}
+{"flow_document":null,"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"a","value":"two"}
+{"flow_document":{"_meta":{"uuid":"1419d680-1dd2-11b2-8000-071353030311"},"id":2,"tenant":"c","value":"two-moved"},"flow_published_at":"1970-01-01T00:00:01Z","id":2,"tenant":"c","value":"two-moved"}
+{"flow_document":null,"flow_published_at":"1970-01-01T00:00:02Z","id":3,"tenant":"b","value":"three"}
+{"flow_document":{"_meta":{"uuid":"14b26d00-1dd2-11b2-8000-071353030311"},"id":4,"tenant":"b","value":"four"},"flow_published_at":"1970-01-01T00:00:02Z","id":4,"tenant":"b","value":"four"}
+
+

@@ -1,0 +1,68 @@
+info:
+  name: Upload Video
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/file/video/ad/upload/"
+  body:
+    type: multipart-form
+    data:
+      - name: advertiser_id
+        type: text
+        value: "{{advertiser_id}}"
+      - name: upload_type
+        type: text
+        value: UPLOAD_BY_FILE
+      - name: file_name
+        type: text
+        value: estuary-seed-video
+      - name: video_signature
+        type: text
+        value: "{{seed_video_signature}}"
+      - name: video_file
+        type: file
+        value:
+          - "{{seed_video_file}}"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // The video stays outside the repo; pass its absolute path at run time:
+        //   --env-var seed_video_file=/path/to/video.mov
+        const fs = require('fs');
+        const crypto = require('crypto');
+        const videoPath = bru.getEnvVar('seed_video_file');
+        if (!videoPath) throw new Error('pass the video path: --env-var seed_video_file=/absolute/path');
+        // TikTok requires the file's MD5 as `video_signature`.
+        const md5 = crypto.createHash('md5').update(fs.readFileSync(videoPath)).digest('hex');
+        bru.setVar('seed_video_signature', md5);
+    - type: after-response
+      code: |-
+        const data = res.getBody()?.data;
+        const item = Array.isArray(data) ? data[0] : data;
+        if (item?.video_id != null) bru.setVar('seed_video_id', String(item.video_id));
+        if (item?.video_cover_url != null) bru.setVar('seed_video_cover_url', String(item.video_cover_url));
+
+settings:
+  encodeUrl: true
+  timeout: 0
+
+docs: |-
+  **REFERENCE:** TikTok API for Business, "Upload a video" (`POST /open_api/v1.3/file/video/ad/upload/`).
+
+  **WHY:** the video creative every seeded ad needs. The cover URL it returns
+  feeds `Upload Cover Image`.
+
+  **Prerequisites:** a local video file, kept out of the repo, passed with
+  `--env-var seed_video_file=/absolute/path`.
+
+  **VERIFIED (2026-10-08, sandbox):** uploading by URL (`UPLOAD_BY_URL` with
+  Google's public sample MP4) failed with `code 40914` "Failed to fetch url
+  data", so the request uploads a local file instead.
+
+  **VERIFIED (2026-10-12, sandbox):** `code 0` with a 1.9 s 1080x1920 HEVC
+  `.MOV`; the response holds only `video_id` (no `video_cover_url`).
+  Outcome: ran 2026-10-12; video `v10033g50000db6j8l7og65p73f3fl9g`.

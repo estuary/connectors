@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"text/template"
@@ -41,12 +42,12 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
-	Timezone        string   `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank."`
-	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
-	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
-	SourceTag       string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered." jsonschema_extras:"nonsensitive=true"`
+	Timezone        string   `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"nonsensitive=true"`
+	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,nonsensitive=true"`
+	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
+	SourceTag       string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 
 	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
 	datetimeLocation   *time.Location  // Parsed location in which DATETIME column values will be interpreted.
@@ -107,14 +108,11 @@ func (c *Config) SetDefaults() {
 }
 
 // ToURI converts the Config to a DSN string.
+//
+// The DSN host is always the real server address, even when tunneling. We dial localhost (the
+// tunnel) via tunnelDialer, but advertise the real server address as the LOGIN7 ServerName and
+// TLS SNI for SQL Server instances that rely on those being accurate.
 func (c *Config) ToURI() string {
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost
-	// to the target via the bastion server, so we use the tunnel's address.
-	var address = c.Address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		address = "localhost:1433"
-	}
-
 	var params = make(url.Values)
 	params.Add("app name", "Flow Batch Connector")
 	params.Add("encrypt", "true")
@@ -123,10 +121,33 @@ func (c *Config) ToURI() string {
 	var connectURL = &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(c.User, c.Password),
-		Host:     address,
+		Host:     c.Address,
 		RawQuery: params.Encode(),
 	}
 	return connectURL.String()
+}
+
+// tunnelDialer redirects connections to the local end of the SSH tunnel while the driver keeps
+// the original hostname for its TLS SNI and TDS LOGIN7 ServerName fields, so that SQL Server
+// instances which route on the server name they receive see the real host, not "localhost".
+type tunnelDialer struct {
+	localAddr string // address of the tunnel's local listener, to which all dials are redirected
+	address   string // the server address being tunneled to
+}
+
+func (d *tunnelDialer) DialContext(ctx context.Context, network, _ string) (net.Conn, error) {
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, d.localAddr)
+}
+
+// HostName marks this as a mssqldb.HostDialer so the driver dials the configured host through
+// this dialer instead of resolving it locally, which keeps the real hostname in the LOGIN7
+// ServerName and TLS SNI.
+func (d *tunnelDialer) HostName() string {
+	if host, _, err := net.SplitHostPort(d.address); err == nil {
+		return host
+	}
+	return d.address
 }
 
 func connectSQLServer(ctx context.Context, cfg *Config) (*sql.DB, error) {
@@ -136,19 +157,23 @@ func connectSQLServer(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		"database": cfg.Database,
 	}).Info("connecting to database")
 
-	// If a network tunnel is configured, then try to start it before establishing connections.
+	connector, err := mssqldb.NewConnector(cfg.ToURI())
+	if err != nil {
+		return nil, fmt.Errorf("error creating connector: %w", err)
+	}
+
+	// If a network tunnel is configured, then try to start it before establishing connections,
+	// and redirect the driver's TCP dial to the tunnel's local listener.
 	if cfg.NetworkTunnel.InUse() {
 		if _, err := cfg.NetworkTunnel.Start(ctx, cfg.Address, "1433"); err != nil {
 			return nil, err
 		}
+		connector.Dialer = &tunnelDialer{localAddr: "localhost:1433", address: cfg.Address}
 	}
 
-	var db, err = sql.Open("sqlserver", cfg.ToURI())
-	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
-		var mssqlErr mssqldb.Error
-		if errors.As(err, &mssqlErr) {
+	var db = sql.OpenDB(connector)
+	if err := db.PingContext(ctx); err != nil {
+		if mssqlErr, ok := errors.AsType[mssqldb.Error](err); ok {
 			switch mssqlErr.Number {
 			case 18456:
 				return nil, cerrors.NewUserError(err, "incorrect username or password")

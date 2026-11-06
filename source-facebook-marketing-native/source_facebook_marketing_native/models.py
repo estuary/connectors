@@ -188,7 +188,6 @@ FACEBOOK_INSIGHTS_TYPE_MAP: dict[str, type] = {
     F.GENDER: str,
     F.COUNTRY: str,
     F.REGION: str,
-    F.DMA: str,
     F.PUBLISHER_PLATFORM: str,
     F.PLATFORM_POSITION: str,
     F.DEVICE_PLATFORM: str,
@@ -432,6 +431,9 @@ class FacebookResource(BaseDocument, extra="allow"):
     cursor_field: ClassVar[str] = "updated_time"
     enable_deleted_filter: ClassVar[bool] = False
     entity_prefix: ClassVar[str] = ""  # Used for API filtering (e.g., "campaign", "ad")
+    # Edges without an entity_prefix do not support `filtering`. Time-paginated
+    # edges accept a `since` Unix timestamp.
+    supports_since_param: ClassVar[bool] = False
     fields: ClassVar[list[str]] = []
 
     @classmethod
@@ -957,6 +959,7 @@ class Activities(FacebookResource):
     name: ClassVar[str] = ResourceName.ACTIVITIES
     endpoint: ClassVar[str] = "activities"
     cursor_field: ClassVar[str] = CursorField.EVENT_TIME
+    supports_since_param: ClassVar[bool] = True
     primary_keys: ClassVar[list[str]] = [
         "/object_id",
         "/actor_id",
@@ -1263,11 +1266,13 @@ class AdsInsightsRegion(AdsInsights):
     region: str
 
 
-class AdsInsightsDma(AdsInsights):
-    name: ClassVar[str] = ResourceName.ADS_INSIGHTS_DMA
-    breakdowns: ClassVar[list[Breakdown]] = [Breakdown.DMA]
-    primary_keys: ClassVar[list[str]] = sorted(AdsInsights.primary_keys + ["/dma"])
-    dma: str
+class AdsInsightsComscoreMarket(AdsInsights):
+    name: ClassVar[str] = ResourceName.ADS_INSIGHTS_COMSCORE_MARKET
+    breakdowns: ClassVar[list[Breakdown]] = [Breakdown.COMSCORE_MARKET]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/comscore_market"]
+    )
+    comscore_market: str
 
 
 class AdsInsightsPlatformAndDevice(AdsInsights):
@@ -1395,16 +1400,16 @@ def build_custom_ads_insights_model(
     )
 
     # Set ClassVars for the model - set level first so level_specific_fields() works
-    setattr(model, "level", config.level)
-    setattr(model, "primary_keys", primary_keys)
-    setattr(model, "name", "custom" + config.name)
-    setattr(model, "breakdowns", breakdowns)
-    setattr(model, "action_breakdowns", action_breakdowns)
+    model.level = config.level
+    model.primary_keys = primary_keys
+    model.name = "custom" + config.name
+    model.breakdowns = breakdowns
+    model.action_breakdowns = action_breakdowns
 
     # Combine user fields with level-specific required fields
     level_fields = model.level_specific_fields()
     final_fields = list(dict.fromkeys(fields + level_fields))
 
-    setattr(model, "fields", final_fields)
+    model.fields = final_fields
 
     return model

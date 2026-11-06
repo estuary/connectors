@@ -39,6 +39,13 @@
         "maximum": 576000,
         "type": "integer",
         "order": 4
+      },
+      "sync_subaccounts": {
+        "title": "Capture Subaccount Data",
+        "description": "Whether to capture data belonging to subaccounts in addition to the authenticated account. Disable this if you authenticate with an API Key (SID and Secret) instead of an Auth Token, since Twilio denies API Key access to subaccount resources. Requires a Main API Key or an Auth Token; Standard API Keys cannot list accounts.",
+        "default": true,
+        "type": "boolean",
+        "order": 5
       }
     }
   },

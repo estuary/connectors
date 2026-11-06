@@ -5,7 +5,7 @@ import functools
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import Resource, LogCursor, PageCursor, open_binding, ResourceConfig, ResourceState
+from estuary_cdk.capture.common import Resource, SnapshotResource, LogCursor, PageCursor, open_binding, ResourceConfig, ResourceState
 from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 
 from .api import (
@@ -82,7 +82,7 @@ async def all_resources(
 
 
 def base_object(
-    cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Base Object is the standard object for source-impact-native
     """
@@ -120,7 +120,7 @@ def base_object(
 
 
 def action_object(
-    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Action Object is the standard method for Actions and ActionsInquires streams.
     Actions endpoints require a really specific set of parameters to work, and also requires
@@ -159,7 +159,7 @@ def action_object(
     )
 
 def snapshot_object(
-    cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Snapshot Object handles the stream cases were we dont have any valid replication keys
     to use. Some streams have valid Ids being returned by the API, others depend on flow's _meta/id
@@ -181,18 +181,16 @@ def snapshot_object(
             tombstone=cls(_meta=cls.Meta(op="d")),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=cls.NAME,
         key=[cls.PRIMARY_KEY],
         model=cls,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
-        schema_inference=True,
     )
 
 def child_object(
-    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid
+    cls_parent, cls, http: HTTPSession, stop_date: datetime, account_sid: str
 ) -> Resource:
     """Child Object handles the default parent/child streams. As of now, the only possible parent stream to exist is the
     Campaigns stream.
@@ -253,12 +251,10 @@ def media_groups_object(
             tombstone=cls(_meta=cls.Meta(op="d")),
         )
 
-    return Resource(
+    return SnapshotResource(
         name=cls.NAME,
         key=[cls.PRIMARY_KEY],
         model=cls,
         open=open,
-        initial_state=ResourceState(),
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
-        schema_inference=True,
     )

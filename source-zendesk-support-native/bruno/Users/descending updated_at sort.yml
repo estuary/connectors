@@ -1,0 +1,101 @@
+info:
+  name: descending updated_at sort
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/users?sort=-updated_at&page[size]=100"
+  params:
+    - name: "sort"
+      value: "-updated_at"
+      type: query
+    - name: "page[size]"
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - descending updated_at (projection)"
+    request:
+      url: "{{base_url}}/users?sort=-updated_at&page[size]=100"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: "content-type"
+          value: "application/json; charset=utf-8"
+        - name: "x-rate-limit"
+          value: "700"
+        - name: "ratelimit-limit"
+          value: "700"
+        - name: "x-rate-limit-remaining"
+          value: "693"
+        - name: "ratelimit-remaining"
+          value: "693"
+        - name: "ratelimit-reset"
+          value: "53"
+      body:
+        type: json
+        data: |-
+          {
+            "users": [
+              {
+                "id": 53872733500820,
+                "name": "Caller +1 (313) 261-1323",
+                "updated_at": "2026-09-23T22:12:31Z",
+                "active": true,
+                "email": null
+              },
+              {
+                "id": 52737674253844,
+                "name": "Caller +1 (680) 260-1211",
+                "updated_at": "2026-08-20T21:36:33Z",
+                "active": true,
+                "email": null
+              },
+              {
+                "id": 51347836736404,
+                "name": "Caller +1 (386) 293-0826",
+                "updated_at": "2026-07-14T22:31:05Z",
+                "active": true,
+                "email": null
+              },
+              {
+                "id": 50242805272724,
+                "name": "Caller +1 (484) 202-5932",
+                "updated_at": "2026-06-12T22:40:10Z",
+                "active": true,
+                "email": null
+              },
+              {
+                "id": 28835702984212,
+                "name": "Alex Bair",
+                "updated_at": "2026-06-04T04:15:52Z",
+                "active": true,
+                "email": "alexb@estuary.dev"
+              }
+            ],
+            "users_total": 31,
+            "meta": {
+              "has_more": false,
+              "after_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpKRERvMllBQUFBQWFSUlVHOWc1R2dBQSJ9",
+              "before_cursor": "eyJvIjoiLXVwZGF0ZWRfYXQsLWlkIiwidiI6IlpNOU90R29BQUFBQWFaUzFKRG4vTUFBQSJ9"
+            }
+          }
+
+docs: |-
+  **REFERENCE:** [List Users](https://developer.zendesk.com/api-reference/ticketing/users/users/#list-users)
+
+  **WHY:** V5 / A2. Whether `/users` accepts `sort=-updated_at` (newest-first), which
+  the stop-at-cursor sweep needs.
+
+  **VERIFIED (2026-10-07):** accepted and honored: newest-first, cursor decodes to keyset
+  `{"o":"-updated_at,-id",...}`. A2 is viable for users.

@@ -1,4 +1,4 @@
-package main
+package connector
 
 // https://dev.mysql.com/doc/refman/8.0/en/keywords.html
 var SINGLESTORE_RESERVED_WORDS = []string{

@@ -1,0 +1,80 @@
+$defs:
+  Meta:
+    additionalProperties: true
+    description: The recipient-row envelope the flattening dissolves.
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+      campaign_id:
+        title: Campaign Id
+        type: string
+      email_id:
+        title: Email Id
+        type: string
+    required:
+    - campaign_id
+    - email_id
+    title: Meta
+    type: object
+additionalProperties: true
+description: |-
+  Flattened activity-event engagement document: the raw event plus the
+  member envelope in `_meta` and the stream's identity.
+
+  Subclasses `MailchimpChildEntity` rather than
+  `MailchimpIncrementalChildEntity`: the email-activity endpoint has no
+  before-style upper-bound param, so it can't ride the generic list-children
+  fetchers; `SINCE_PARAM` is declared directly.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  action:
+    title: Action
+    type: string
+  timestamp:
+    format: date-time
+    title: Timestamp
+    type: string
+  type:
+    anyOf:
+    - const: hard
+      type: string
+    - const: soft
+      type: string
+    - type: 'null'
+    default: null
+    title: Type
+required:
+- _meta
+- action
+- timestamp
+title: EmailActivityEvent
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true

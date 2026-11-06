@@ -73,14 +73,44 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "accepted_payment_instrument_logos": [
+        {
+          "alt_text": "American Express",
+          "icon_name": "american_express.png"
+        },
+        {
+          "alt_text": "Discover",
+          "icon_name": "discover.png"
+        },
+        {
+          "alt_text": "JCB",
+          "icon_name": "jcb.png"
+        },
+        {
+          "alt_text": "MasterCard",
+          "icon_name": "mastercard.png"
+        },
+        {
+          "alt_text": "Visa",
+          "icon_name": "visa.png"
+        },
+        {
+          "alt_text": "PayPal Account",
+          "icon_name": "paypal_account.png"
+        },
+        {
+          "alt_text": "Local Payment",
+          "icon_name": "local_payment.png"
+        }
+      ],
       "accepted_payment_methods": [
         "AMERICAN_EXPRESS",
         "DISCOVER",
         "JCB",
+        "LOCAL_PAYMENT",
         "MASTERCARD",
-        "VISA",
         "PAYPAL_ACCOUNT",
-        "LOCAL_PAYMENT"
+        "VISA"
       ],
       "bank_account": "",
       "business_details": {
@@ -89,6 +119,7 @@
       "currency_iso_code": "USD",
       "default": true,
       "funding_details": {},
+      "has_active_processor_connections": true,
       "id": "redacted",
       "individual_details": {
         "address_details": {}
@@ -96,6 +127,7 @@
       "paypal_account": "",
       "status": "active",
       "sub_merchant_account": false,
+      "supports_public_descriptors": false,
       "three_d_secure": {
         "v1": {
           "card_types": [],
@@ -105,14 +137,14 @@
           "card_types": [
             "AMERICAN_EXPRESS",
             "DISCOVER",
-            "JCB",
             "MASTERCARD",
             "VISA"
           ],
           "enabled": true
         }
       },
-      "type": "MERCHANT_ACCOUNT"
+      "type": "MERCHANT_ACCOUNT",
+      "unique_identifier": "d79qgm3"
     }
   ],
   [
@@ -129,7 +161,7 @@
       "add_ons": [],
       "additional_processor_response": null,
       "amount": "11.00",
-      "amount_requested": null,
+      "amount_requested": "11.00",
       "ani_first_name_response_code": "U",
       "ani_last_name_response_code": "U",
       "authorization_adjustments": [],

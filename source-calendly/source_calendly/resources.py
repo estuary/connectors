@@ -11,6 +11,7 @@ from estuary_cdk.capture.common import (
     Resource,
     ResourceConfig,
     ResourceState,
+    SnapshotResource,
     open_binding,  # pyright: ignore[reportUnknownVariableType]
 )
 from estuary_cdk.flow import CaptureBinding
@@ -37,6 +38,8 @@ from .models import (
 )
 
 CalendlyResource = Resource[CalendlyEntity, ResourceConfig, ResourceState]
+
+CalendlySnapshotResource = SnapshotResource[CalendlyEntity, ResourceConfig]
 ScheduledEventFetchFn = Callable[
     [str, int, int, HTTPSession, Logger, LogCursor],
     AsyncGenerator[CalendlyEntity | LogCursor, None],
@@ -52,7 +55,10 @@ async def validate_credentials(
 
 
 def _incremental_resources(
-    http: HTTPMixin, config: EndpointConfig, org_uri: str
+    http: HTTPMixin,
+    config: EndpointConfig,
+    org_uri: str,
+    streams: list[type[CalendlyEntity]],
 ) -> list[CalendlyResource]:
     cutoff = datetime.now(tz=UTC)
 
@@ -91,11 +97,15 @@ def _incremental_resources(
             ),
             schema_inference=True,
         )
-        for entity_cls in INCREMENTAL_STREAMS
+        for entity_cls in streams
     ]
 
 
-def _snapshot_resources(http: HTTPMixin, org_uri: str) -> list[CalendlyResource]:
+def _snapshot_resources(
+    http: HTTPMixin,
+    org_uri: str,
+    streams: list[type[CalendlyEntity]],
+) -> list[CalendlyResource]:
     def open(
         entity_cls: type[CalendlyEntity],
         binding: CaptureBinding[ResourceConfig],
@@ -120,19 +130,15 @@ def _snapshot_resources(http: HTTPMixin, org_uri: str) -> list[CalendlyResource]
         )
 
     return [
-        Resource(
+        CalendlySnapshotResource(
             name=entity_cls.name,
-            key=["/_meta/row_id"],
-            model=entity_cls,
             open=functools.partial(open, entity_cls),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=entity_cls.name,
                 interval=timedelta(minutes=5),
             ),
-            schema_inference=True,
         )
-        for entity_cls in SNAPSHOT_STREAMS
+        for entity_cls in streams
     ]
 
 
@@ -193,26 +199,22 @@ def _scheduled_event_resources(
     ]
 
 
-async def _filter_available_resources(
+def _available_streams(
     log: Logger,
-    http: HTTPMixin,
-    org_uri: str,
-    resources: list[CalendlyResource],
-) -> list[CalendlyResource]:
-    if await is_teams_account(org_uri, http, log):
-        return resources
+    has_teams_access: bool,
+    streams: list[type[CalendlyEntity]],
+) -> list[type[CalendlyEntity]]:
+    if has_teams_access:
+        return streams
 
-    filtered: list[CalendlyResource] = []
-    for resource in resources:
-        model = resource.model
-        assert isinstance(model, type) and issubclass(model, CalendlyEntity)
-
-        if model.teams_only:
-            log.info(f"Skipping {resource.name}: requires a teams account")
+    available: list[type[CalendlyEntity]] = []
+    for entity_cls in streams:
+        if entity_cls.teams_only:
+            log.info(f"Skipping {entity_cls.name}: requires a teams account")
         else:
-            filtered.append(resource)
+            available.append(entity_cls)
 
-    return filtered
+    return available
 
 
 async def all_resources(
@@ -225,11 +227,17 @@ async def all_resources(
 
     user_info = await fetch_user_info(http, log)
     org_uri = user_info.current_organization
+    has_teams_access = await is_teams_account(org_uri, http, log)
 
-    resources = [
-        *_incremental_resources(http, config, org_uri),
+    return [
+        *_incremental_resources(
+            http,
+            config,
+            org_uri,
+            _available_streams(log, has_teams_access, INCREMENTAL_STREAMS),
+        ),
         *_scheduled_event_resources(http, config, org_uri),
-        *_snapshot_resources(http, org_uri),
+        *_snapshot_resources(
+            http, org_uri, _available_streams(log, has_teams_access, SNAPSHOT_STREAMS)
+        ),
     ]
-
-    return await _filter_available_resources(log, http, org_uri, resources)

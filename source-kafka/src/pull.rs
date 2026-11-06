@@ -1,7 +1,8 @@
 use crate::{
     configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
+    document::MergeSerializer,
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
-    write_capture_response,
+    write_captured,
 };
 use anyhow::{anyhow, Context, Result};
 use apache_avro::{types::Value as AvroValue, Schema as AvroSchema};
@@ -12,15 +13,13 @@ use hex::decode;
 use highway::{HighwayHash, HighwayHasher, Key};
 use lazy_static::lazy_static;
 use proto_flow::{
-    capture::{
-        request::Open,
-        response::{self, Checkpoint},
-        Response,
-    },
-    flow::{capture_spec::Binding, ConnectorState, RangeSpec},
+    capture::request::Open,
+    flow::{capture_spec::Binding, RangeSpec},
 };
+use prost_reflect::DynamicMessage;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
+    error::{KafkaError, RDKafkaErrorCode},
     message::Headers,
     metadata::MetadataPartition,
     Message, Offset, Timestamp, TopicPartitionList,
@@ -28,6 +27,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map};
 use std::collections::{hash_map::Entry, HashMap};
+use std::io::{BufWriter, Stdout, Write};
 use time::{format_description, OffsetDateTime};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -37,6 +37,9 @@ struct CaptureState {
 }
 
 impl CaptureState {
+    /// The checkpoint `write_checkpoint` writes, as a struct. Used by the tests
+    /// as the oracle for the raw bytes.
+    #[cfg(test)]
     fn state_slice(state_key: &str, partition: i32, offset: i64) -> Self {
         let mut partitions = HashMap::new();
         partitions.insert(partition, offset);
@@ -54,6 +57,10 @@ struct ResourceState {
 struct BindingInfo {
     binding_index: u32,
     state_key: String,
+    // The topic's partition count when `setup_consumer` assigned partitions.
+    // Partitions added to the topic later aren't assigned until the connector
+    // restarts.
+    partition_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -73,7 +80,28 @@ enum MetaTimestamp {
     LogAppendTime(String),
 }
 
-pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
+/// The result of parsing a message payload or key. Protobuf payloads are kept
+/// as a `DynamicMessage` so they can be streamed straight to output without an
+/// intermediate `serde_json::Value` DOM; everything else is parsed to a `Value`.
+enum Parsed {
+    Message(DynamicMessage),
+    Value(serde_json::Value),
+}
+
+// With no timeout, `poll` returns only for a message or an error. So the
+// loop can't run between messages while every assigned partition is idle.
+// rdkafka already wakes up once a second while it waits, so a one-second
+// timeout adds no wake-ups.
+const POLL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+
+// How often the poll loop checks the bound topics for partitions added since
+// startup. Each check is one metadata request for every topic in the cluster,
+// and it blocks the polling thread, so it's kept infrequent.
+const PARTITION_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+// Bounds how long an unresponsive broker can hold up a partition check.
+const PARTITION_CHECK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+pub async fn do_pull(req: Open, mut stdout: BufWriter<Stdout>) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
     let state = if req.state_json == "{}" {
@@ -96,24 +124,83 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
 
     let topics_to_bindings =
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
+    let mut next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
 
     loop {
-        let msg = consumer
-            .poll(None)
-            .expect("polling without a timeout should always produce a message")
-            .context("receiving next message")?;
+        if std::time::Instant::now() >= next_partition_check {
+            next_partition_check = std::time::Instant::now() + PARTITION_CHECK_INTERVAL;
+
+            match consumer.fetch_metadata(None, PARTITION_CHECK_TIMEOUT) {
+                Ok(metadata) => {
+                    for topic in metadata.topics() {
+                        let Some(binding) = topics_to_bindings.get(topic.name()) else {
+                            continue;
+                        };
+                        let partitions = topic.partitions().len();
+                        if partitions > binding.partition_count {
+                            // A clean exit makes the runtime start a new
+                            // session, and `setup_consumer` then assigns the
+                            // added partitions. Every shard restarts, which
+                            // leaves `setup_consumer` as the only place that
+                            // decides ownership. Checking here before the next
+                            // poll means the previous message's checkpoint has
+                            // already been written.
+                            tracing::info!(
+                                eventType = "connectorStatus",
+                                topic = topic.name(),
+                                partitions_at_startup = binding.partition_count,
+                                partitions,
+                                "Restarting to capture new partitions of topic {}",
+                                topic.name(),
+                            );
+                            return Ok(());
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "couldn't fetch metadata to check for added partitions");
+                }
+            }
+        }
+
+        let Some(result) = consumer.poll(POLL_TIMEOUT) else {
+            continue;
+        };
+        let msg = match result {
+            Ok(msg) => msg,
+            // The Kafka client reconnects on its own after a broker connection
+            // drops, so the connector keeps polling. We can't assume other
+            // non-fatal errors are safe to skip because some of them stop the
+            // client from fetching a partition.
+            Err(KafkaError::MessageConsumption(RDKafkaErrorCode::BrokerTransportFailure)) => {
+                continue;
+            }
+            Err(err) => return Err(err).context("receiving next message"),
+        };
 
         let mut op = "u";
-        let mut doc = match msg.payload() {
+        let payload = match msg.payload() {
             Some(bytes) => parse_datum(bytes, false, &mut schema_cache, schema_client.as_ref())
                 .await
-                .with_context(|| format!("parsing message payload for topic {}", msg.topic()))?,
+                .with_context(|| {
+                    // The first 64 bytes are enough to inspect the schema
+                    // registry framing (magic byte, schema ID, and protobuf
+                    // message indexes) of an unparseable message.
+                    format!(
+                        "parsing message payload for topic {} (partition {}, offset {}, payload length {}, first bytes {})",
+                        msg.topic(),
+                        msg.partition(),
+                        msg.offset(),
+                        bytes.len(),
+                        hex::encode(&bytes[..bytes.len().min(64)]),
+                    )
+                })?,
             None => {
                 // We interpret an absent message payload as a deletion
                 // tombstone. The captured document will otherwise be empty
                 // except for the _meta field and the message key (if present).
                 op = "d";
-                json!({})
+                Parsed::Value(json!({}))
             }
         };
 
@@ -156,54 +243,94 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
             }
         };
 
-        let captured = doc.as_object_mut().unwrap();
-        captured.insert("_meta".to_string(), serde_json::to_value(meta).unwrap());
-
-        if let Some(key_bytes) = msg.key() {
-            let mut key_parsed =
-                parse_datum(key_bytes, true, &mut schema_cache, schema_client.as_ref())
+        // Parse the message key into a map so its fields can be merged
+        // over the payload.
+        let key_fields: Option<Map<String, serde_json::Value>> = match msg.key() {
+            Some(key_bytes) => {
+                let parsed = parse_datum(key_bytes, true, &mut schema_cache, schema_client.as_ref())
                     .await
                     .with_context(|| format!("parsing message key for topic {}", msg.topic()))?;
+                match parsed {
+                    Parsed::Value(serde_json::Value::Object(map)) => Some(map),
+                    Parsed::Value(other) => anyhow::bail!(
+                        "message key for topic {} did not parse to a JSON object: {}",
+                        msg.topic(),
+                        other
+                    ),
+                    Parsed::Message(_) => unreachable!("keys are parsed with is_key = true"),
+                }
+            }
+            None => None,
+        };
 
-            // Add key/val pairs from the "key" to root of the captured
-            // document, which will clobber any collisions with keys from
-            // the parsed payload.
-            captured.append(key_parsed.as_object_mut().unwrap());
-        }
+        // Build the captured document's JSON bytes. Protobuf payloads are
+        // streamed straight into the buffer with the key and _meta merged in.
+        // Other payloads are already a Value.
+        let doc_bytes: Vec<u8> = match payload {
+            Parsed::Message(message) => {
+                let mut buf = Vec::new();
+                {
+                    let mut ser = serde_json::Serializer::new(&mut buf);
+                    message
+                        .serialize_with_options(
+                            MergeSerializer::new(&mut ser, key_fields.as_ref(), &meta),
+                            &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
+                        )
+                        .context("serializing protobuf message")?;
+                }
+                buf
+            }
+            Parsed::Value(mut doc) => {
+                let captured = doc
+                    .as_object_mut()
+                    .context("captured document must be a JSON object")?;
+                captured.insert("_meta".to_string(), serde_json::to_value(&meta)?);
+                if let Some(mut key_fields) = key_fields {
+                    // Add key/val pairs from the "key" to root of the captured
+                    // document, which will clobber any collisions with keys from
+                    // the parsed payload.
+                    captured.append(&mut key_fields);
+                }
+                serde_json::to_vec(&doc)?
+            }
+        };
 
         let binding_info = topics_to_bindings
             .get(msg.topic())
             .with_context(|| format!("got a message for unknown topic {}", msg.topic()))?;
 
-        let message = response::Captured {
-            binding: binding_info.binding_index,
-            doc_json: serde_json::to_string(&captured)?.into(),
-        };
-
-        let checkpoint =
-            CaptureState::state_slice(&binding_info.state_key, msg.partition(), msg.offset());
-
-        write_capture_response(
-            Response {
-                captured: Some(message),
-                ..Default::default()
-            },
-            &mut stdout,
-        )?;
-
-        write_capture_response(
-            Response {
-                checkpoint: Some(Checkpoint {
-                    state: Some(ConnectorState {
-                        updated_json: serde_json::to_string(&checkpoint)?.into(),
-                        merge_patch: true,
-                    }),
-                }),
-                ..Default::default()
-            },
+        write_captured(binding_info.binding_index, &doc_bytes, &mut stdout)?;
+        write_checkpoint(
+            &binding_info.state_key,
+            msg.partition(),
+            msg.offset(),
             &mut stdout,
         )?;
     }
+}
+
+/// Write the merge-patch `Checkpoint` response that records `offset` for one
+/// partition, as raw bytes. Byte-identical to serializing a `CaptureState`
+/// slice through `Response`, which built two maps and serialized the state
+/// twice per message. Flushes, pushing the buffered documents to the runtime.
+pub fn write_checkpoint<W: Write>(
+    state_key: &str,
+    partition: i32,
+    offset: i64,
+    out: &mut W,
+) -> Result<()> {
+    use serde_json::ser::{CompactFormatter, Formatter};
+
+    out.write_all(b"{\"checkpoint\":{\"state\":{\"updated\":{\"bindingStateV1\":{")?;
+    serde_json::to_writer(&mut *out, state_key).context("writing checkpoint state key")?;
+    // Map keys are strings in JSON, so the partition number is quoted.
+    out.write_all(b":{\"partitions\":{\"")?;
+    CompactFormatter.write_i32(out, partition)?;
+    out.write_all(b"\":")?;
+    CompactFormatter.write_i64(out, offset)?;
+    out.write_all(b"}}}},\"mergePatch\":true}}}\n")
+        .context("writing checkpoint response")?;
+    out.flush().context("flushing output")
 }
 
 fn unix_millis_to_rfc3339(millis: i64) -> Result<String> {
@@ -259,6 +386,7 @@ async fn setup_consumer(
             BindingInfo {
                 binding_index: idx as u32,
                 state_key: state_key.to_string(),
+                partition_count: partition_info.len(),
             },
         );
     }
@@ -297,12 +425,21 @@ fn responsible_for_partition(range: &Option<RangeSpec>, topic: &str, partition: 
         Some(r) => r,
     };
 
-    let mut hasher = HighwayHasher::new(bytes_to_key(&HIGHWAY_HASH_KEY));
-    hasher.append(topic.as_bytes());
-    hasher.append(&partition.to_le_bytes());
-    let hash = (hasher.finalize64() >> 32) as u32;
+    let hash = partition_key(topic, partition);
 
     hash >= range.key_begin && hash <= range.key_end
+}
+
+// Reversing the partition number's bits gives both halves of every midpoint
+// split the same number of a topic's partitions, give or take one. The topic's
+// hash keeps different topics from favoring the same shards. A partition's key
+// depends only on its topic and number, so adding partitions never moves
+// existing ones.
+fn partition_key(topic: &str, partition: i32) -> u32 {
+    let mut hasher = HighwayHasher::new(bytes_to_key(&HIGHWAY_HASH_KEY));
+    hasher.append(topic.as_bytes());
+    let topic_hash = (hasher.finalize64() >> 32) as u32;
+    topic_hash ^ (partition as u32).reverse_bits()
 }
 
 async fn parse_datum(
@@ -310,7 +447,7 @@ async fn parse_datum(
     is_key: bool,
     schema_cache: &mut HashMap<u32, RegisteredSchema>,
     schema_client: Option<&SchemaRegistryClient>,
-) -> Result<serde_json::Value> {
+) -> Result<Parsed> {
     match (schema_client, datum[0]) {
         (Some(schema_client), 0) => {
             // Schema registry is available, and this message was encoded with a
@@ -332,12 +469,14 @@ async fn parse_datum(
                         // Handle cases where there is an Avro schema, but it's
                         // not a record type. I'm not sure how common this is in
                         // practice but it's the first thing I tried to do.
-                        Ok(serde_json::Map::from_iter([("_key".to_string(), json_value)]).into())
+                        Ok(Parsed::Value(
+                            serde_json::Map::from_iter([("_key".to_string(), json_value)]).into(),
+                        ))
                     } else {
-                        Ok(json_value)
+                        Ok(Parsed::Value(json_value))
                     }
                 }
-                RegisteredSchema::Json(_) => Ok(serde_json::from_slice(&datum[5..])?),
+                RegisteredSchema::Json(_) => Ok(Parsed::Value(serde_json::from_slice(&datum[5..])?)),
                 RegisteredSchema::Protobuf(proto_schema) => {
                     // Parse message indexes (bytes after schema ID)
                     let (indexes, payload_offset) = crate::protobuf::parse_message_indexes(&datum[5..])?;
@@ -352,22 +491,26 @@ async fn parse_datum(
                     // Decode to DynamicMessage
                     let message = crate::protobuf::decode_protobuf_message(&descriptor, &datum[5 + payload_offset..])?;
 
-                    // Convert to JSON using proto field names (snake_case) to match discovered schemas
-                    let json_value: serde_json::Value = {
-                        let mut buf = Vec::new();
-                        let mut serializer = serde_json::Serializer::new(&mut buf);
-                        message.serialize_with_options(
-                            &mut serializer,
+                    if is_key {
+                        // Convert to JSON using proto field names to match discovered schemas.
+                        let json_value: serde_json::Value = message.serialize_with_options(
+                            serde_json::value::Serializer,
                             &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
                         )?;
-                        serde_json::from_slice(&buf)?
-                    };
 
-                    // For keys that are not objects, wrap in a synthetic _key field
-                    if is_key && !json_value.is_object() {
-                        Ok(serde_json::Map::from_iter([("_key".to_string(), json_value)]).into())
+                        // For keys that are not objects, wrap in a synthetic _key field
+                        if json_value.is_object() {
+                            Ok(Parsed::Value(json_value))
+                        } else {
+                            Ok(Parsed::Value(
+                                serde_json::Map::from_iter([("_key".to_string(), json_value)])
+                                    .into(),
+                            ))
+                        }
                     } else {
-                        Ok(json_value)
+                        // Payloads are streamed straight to output by do_pull,
+                        // so keep the decoded message rather than build a DOM.
+                        Ok(Parsed::Message(message))
                     }
                 }
             }
@@ -376,9 +519,9 @@ async fn parse_datum(
             // Schema registry is not available, but the data was encoded with a
             // schema. We might as well try to see if the data is a valid JSON
             // document.
-            Ok(serde_json::from_slice(&datum[5..]).context(
+            Ok(Parsed::Value(serde_json::from_slice(&datum[5..]).context(
                 "received a message with a schema magic byte, but schema registry is not configured and the message is not valid JSON"
-            )?)
+            )?))
         }
         (_, _) => {
             // If there is no schema information available for how to parse the
@@ -388,12 +531,12 @@ async fn parse_datum(
             // thing to do for a "payload" is to try to parse it as a JSON
             // document.
             if is_key {
-                Ok(
+                Ok(Parsed::Value(
                     serde_json::Map::from_iter([("_key".to_string(), base64.encode(datum).into())])
                         .into(),
-                )
+                ))
             } else {
-                Ok(serde_json::from_slice(datum)?)
+                Ok(Parsed::Value(serde_json::from_slice(datum)?))
             }
         }
     }
@@ -587,6 +730,12 @@ mod tests {
     use std::{collections::HashMap, i64};
 
     use super::*;
+    use crate::write_capture_response;
+    use proto_flow::capture::{
+        response::{self, Checkpoint},
+        Response,
+    };
+    use proto_flow::flow::ConnectorState;
     use apache_avro::{
         types::{Record, Value as AvroValue},
         Days, Decimal, Duration, Millis, Months,
@@ -739,5 +888,239 @@ mod tests {
                 want
             )
         }
+    }
+
+    #[derive(Default)]
+    struct FlushCountingWriter {
+        buf: Vec<u8>,
+        flushes: usize,
+    }
+
+    impl std::io::Write for FlushCountingWriter {
+        fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+            self.buf.extend_from_slice(data);
+            Ok(data.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            self.flushes += 1;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_write_capture_response_buffering() {
+        let mut out = FlushCountingWriter::default();
+
+        // A captured document is buffered (not flushed) and written as exactly
+        // one newline-terminated line.
+        write_capture_response(
+            Response {
+                captured: Some(response::Captured {
+                    binding: 0,
+                    doc_json: r#"{"a":1}"#.to_string().into(),
+                }),
+                ..Default::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        assert_eq!(out.flushes, 0, "captured documents must not flush");
+        let text = String::from_utf8(out.buf.clone()).unwrap();
+        assert_eq!(text.matches('\n').count(), 1);
+        assert!(text.ends_with('\n'));
+
+        // A checkpoint flushes, pushing itself and all preceding buffered
+        // documents to the runtime.
+        write_capture_response(
+            Response {
+                checkpoint: Some(Checkpoint {
+                    state: Some(ConnectorState {
+                        updated_json: "{}".to_string().into(),
+                        merge_patch: true,
+                    }),
+                }),
+                ..Default::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        assert_eq!(out.flushes, 1, "a checkpoint must flush");
+    }
+
+    fn checkpoint_via_response(state_key: &str, partition: i32, offset: i64) -> Vec<u8> {
+        let state = CaptureState::state_slice(state_key, partition, offset);
+        let mut out = Vec::new();
+        write_capture_response(
+            Response {
+                checkpoint: Some(Checkpoint {
+                    state: Some(ConnectorState {
+                        updated_json: serde_json::to_string(&state).unwrap().into(),
+                        merge_patch: true,
+                    }),
+                }),
+                ..Default::default()
+            },
+            &mut out,
+        )
+        .unwrap();
+        out
+    }
+
+    fn checkpoint_via_raw(state_key: &str, partition: i32, offset: i64) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_checkpoint(state_key, partition, offset, &mut out).unwrap();
+        out
+    }
+
+    const STATE_KEYS: &[&str] = &[
+        "topic",
+        "",
+        "näme/with \"quotes\" and \\ and a\u{0}control\ttab",
+        "☃ 🦀",
+    ];
+
+    #[test]
+    fn checkpoint_matches_response_serialization() {
+        for state_key in STATE_KEYS {
+            for partition in [0, 11, i32::MAX, -1] {
+                for offset in [0i64, 1_234_567_890, i64::MAX, -1] {
+                    assert_eq!(
+                        String::from_utf8_lossy(&checkpoint_via_raw(state_key, partition, offset)),
+                        String::from_utf8_lossy(&checkpoint_via_response(
+                            state_key, partition, offset
+                        )),
+                        "{state_key:?} {partition} {offset}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The runtime's own decoder must read back exactly what was written.
+    #[test]
+    fn checkpoint_round_trips_through_the_response_decoder() {
+        for state_key in STATE_KEYS {
+            let line = checkpoint_via_raw(state_key, 7, 99);
+            let response: Response = serde_json::from_slice(&line).unwrap();
+            let state = response.checkpoint.unwrap().state.unwrap();
+            assert!(state.merge_patch);
+            let parsed: CaptureState = serde_json::from_slice(&state.updated_json).unwrap();
+            assert_eq!(parsed.resources.len(), 1);
+            assert_eq!(
+                parsed.resources[*state_key].partitions,
+                HashMap::from([(7, 99)])
+            );
+        }
+    }
+
+    #[test]
+    fn checkpoint_flushes() {
+        let mut out = FlushCountingWriter::default();
+        write_checkpoint("t", 0, 0, &mut out).unwrap();
+        assert_eq!(out.flushes, 1, "a checkpoint must flush");
+    }
+
+    fn full_range() -> RangeSpec {
+        RangeSpec {
+            key_begin: 0,
+            key_end: u32::MAX,
+            r_clock_begin: 0,
+            r_clock_end: u32::MAX,
+        }
+    }
+
+    // Flow splits a shard's key range at this midpoint (`map_shard_to_split`
+    // in Flow's activate crate). The tests must match it to model real splits.
+    fn split(range: &RangeSpec) -> (RangeSpec, RangeSpec) {
+        let pivot = (range.key_begin as u64 + range.key_end as u64).div_ceil(2) as u32;
+        (
+            RangeSpec {
+                key_end: pivot - 1,
+                ..*range
+            },
+            RangeSpec {
+                key_begin: pivot,
+                ..*range
+            },
+        )
+    }
+
+    fn equal_shards(count: usize) -> Vec<RangeSpec> {
+        let mut shards = vec![full_range()];
+        while shards.len() < count {
+            shards = shards
+                .iter()
+                .flat_map(|range| {
+                    let (lhs, rhs) = split(range);
+                    [lhs, rhs]
+                })
+                .collect();
+        }
+        shards
+    }
+
+    fn partitions_per_shard(topic: &str, partitions: i32, shards: &[RangeSpec]) -> Vec<usize> {
+        shards
+            .iter()
+            .map(|range| {
+                (0..partitions)
+                    .filter(|p| responsible_for_partition(&Some(*range), topic, *p))
+                    .count()
+            })
+            .collect()
+    }
+
+    // Changing a partition's key moves it to a different shard once a capture
+    // has been split, so the keys must never change by accident.
+    #[test]
+    fn partition_key_placement() {
+        let mut out = String::new();
+        for partition in 0..16 {
+            out.push_str(&format!(
+                "partition {partition:>2}: {:08x}\n",
+                partition_key("orders", partition)
+            ));
+        }
+        for count in [2, 4, 8] {
+            out.push_str(&format!(
+                "{count} shards: {:?}\n",
+                partitions_per_shard("orders", 16, &equal_shards(count))
+            ));
+        }
+        insta::assert_snapshot!(out);
+    }
+
+    #[test]
+    fn partition_key_balance() {
+        for topic in ["orders", "events", "a", ""] {
+            for partitions in 1..=40 {
+                for count in [2, 4, 8, 16] {
+                    let per_shard = partitions_per_shard(topic, partitions, &equal_shards(count));
+                    let floor = partitions as usize / count;
+                    assert!(
+                        per_shard.iter().all(|&n| n == floor || n == floor + 1),
+                        "topic {topic:?}, {partitions} partitions, {count} shards: {per_shard:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    // A key on the edge of a shard's range must belong to that shard. An
+    // exclusive bound would leave the partition with no owner, or give it two.
+    #[test]
+    fn key_range_bounds_are_inclusive() {
+        let key = partition_key("orders", 0);
+        let owns = |key_begin, key_end| {
+            let range = RangeSpec {
+                key_begin,
+                key_end,
+                ..full_range()
+            };
+            responsible_for_partition(&Some(range), "orders", 0)
+        };
+        assert!(owns(key, key));
+        assert!(!owns(0, key - 1));
+        assert!(!owns(key + 1, u32::MAX));
     }
 }

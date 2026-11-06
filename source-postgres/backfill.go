@@ -18,7 +18,7 @@ import (
 var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -78,7 +78,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		untilCTID.OffsetNumber = 0
 
 		logEntry.WithField("after", afterCTID).WithField("until", untilCTID).Debug("scanning keyless table chunk")
-		query = db.keylessScanQuery(info, schema, table)
+		query = db.keylessScanQuery(info, schema, table, backfillFilter)
 		args = []any{afterCTID, untilCTID}
 		usingCTID = true
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
@@ -95,11 +95,11 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
 			}).Debug("scanning subsequent table chunk")
-			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(false, isPrecise, keyColumns, columnTypes, schema, table, backfillFilter)
 			args = resumeKey
 		} else {
 			logEntry.WithField("keyColumns", keyColumns).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
+			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table, backfillFilter)
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
@@ -163,13 +163,13 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			var resultIndex = slices.Index(resultColumnNames, colName)
 			if resultIndex < 0 {
 				return false, nil, fmt.Errorf(
-				"key column %q not found in result columns for %q (got columns: [%s]):"+
-					" the backfill query uses SELECT * which must return all key columns."+
-					" Common causes: (1) the capture user lacks table-level SELECT and only has"+
-					" column-level grants that don't include this column,"+
-					" (2) row-level security (RLS) policies are restricting query results",
-				colName, streamID, strings.Join(resultColumnNames, ", "),
-			)
+					"key column %q not found in result columns for %q (got columns: [%s]):"+
+						" the backfill query uses SELECT * which must return all key columns."+
+						" Common causes: (1) the capture user lacks table-level SELECT and only has"+
+						" column-level grants that don't include this column,"+
+						" (2) row-level security (RLS) policies are restricting query results",
+					colName, streamID, strings.Join(resultColumnNames, ", "),
+				)
 			}
 			keyIndices[idx] = resultIndex
 		}
@@ -344,25 +344,31 @@ func (db *postgresDatabase) backfillQueryFilterXMIN() string {
 	return ""
 }
 
-func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName, backfillFilter string) string {
+	// Generate a list of individual WHERE clauses which should be ANDed together
+	var whereClauses = []string{"ctid > $1", "ctid <= $2"}
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
+	if xidFiltered {
+		whereClauses = append(whereClauses, db.backfillQueryFilterXMIN())
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
+	}
+
 	var query = new(strings.Builder)
 
 	// Include xmin when using XID filtering
-	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	if xidFiltered {
 		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
 	} else {
 		fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
 	}
 
-	fmt.Fprintf(query, ` WHERE ctid > $1 AND ctid <= $2`)
-	if xidFiltered {
-		fmt.Fprintf(query, ` AND %s`, db.backfillQueryFilterXMIN())
-	}
+	fmt.Fprintf(query, ` WHERE %s`, strings.Join(whereClauses, " AND "))
 	return query.String()
 }
 
-func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
+func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName, backfillFilter string) string {
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	var args []string
@@ -387,6 +393,9 @@ func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []s
 	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	if xidFiltered {
 		whereClauses = append(whereClauses, db.backfillQueryFilterXMIN())
+	}
+	if backfillFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("(%s)", backfillFilter))
 	}
 
 	// Construct the query itself

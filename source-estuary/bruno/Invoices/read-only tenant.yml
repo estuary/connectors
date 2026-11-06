@@ -1,0 +1,55 @@
+info:
+  name: read-only tenant
+  type: graphql
+  seq: 4
+graphql:
+  method: POST
+  url: "{{base_url}}/api/graphql"
+  body:
+    query: |-
+      query Invoices($tenant: String!) {
+        tenant(name: $tenant) {
+          name
+          billing { invoices(first: 1) { edges { node { dateStart } } } }
+        }
+      }
+    variables: |-
+      {
+        "tenant": "{{readonly_tenant}}"
+      }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: false
+  maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: |-
+  **REFERENCE:** https://github.com/estuary/flow/blob/master/crates/control-plane-api/src/server/public/graphql/billing/tenant.rs
+
+  **WHY:** Billing needs ViewBilling (legacy admin) on the tenant. This shows what
+  a read-only tenant returns — a partial response (`tenant` present, `billing`
+  error) or a 307 provisional-authz redirect — which is what the connector's
+  skip-with-warning path must recognize if pre-filtering ever misses.
+  Set `readonly_tenant` from `_Scopes / prefixes with capabilities`.
+
+  **LIMITATION (VERIFIED 2026-10-07):** On a tenant where the key only has read (`demo/`), selecting `billing` gets **HTTP 307** provisional `PermissionDenied … required capability ViewBilling` for the *whole* request, not a partial response with `billing` nulled. Invoices therefore run per tenant, only for tenants whose exact tenant prefix holds `ViewBilling`.
+
+examples:
+  - name: 307 - provisional PermissionDenied ViewBilling on demo
+    request:
+      url: "{{base_url}}/api/graphql"
+      method: POST
+    response:
+      status: 307
+      statusText: Temporary Redirect
+      headers:
+        - name: retry-after
+          value: "Wed, 7 Oct 2026 22:06:04 +0000"
+        - name: location
+          value: "/api/graphql?started=2026-10-07T22:05:46.581Z&retryAfter=2026-10-07T22:06:04.362Z"
+      body:
+        type: json
+        data: |-
+          "provisional PermissionDenied error: REDACTED_EMAIL is not authorized to access prefix or name 'demo/' with required capability ViewBilling"

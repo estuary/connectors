@@ -1,10 +1,32 @@
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from estuary_cdk.utils import compare_capture_records
+
+
+FIELDS_TO_REDACT = [
+    "updated_at",
+    "last_login_at",
+    "assignee_updated_at",
+    "generated_timestamp",
+    "fields",
+    "custom_fields",
+]
+
+def _redact_fields(rec: list | dict[str, Any]) -> None:
+    if isinstance(rec, list):
+        for element in rec:
+            _redact_fields(element)
+    elif isinstance(rec, dict):
+        for key, value in rec.items():
+            if key in FIELDS_TO_REDACT:
+                rec[key] = "redacted"
+            else:
+                _redact_fields(value)
 
 
 def test_capture(request, snapshot):
@@ -19,13 +41,14 @@ def test_capture(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
-            "preview",
+            "raw",
+            "preview-next",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
             "1",
             "--delay",
-            "100s",
+            "180s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -33,23 +56,26 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    unique_stream_lines = []
-    seen = set()
+    # Some streams emit in no particular order, so the snapshotted record for each
+    # stream is the one with the lowest id. Streams without ids keep their first record.
+    selected_by_stream: dict[str, list] = {}
 
     for line in lines:
-        stream = line[0]
-        if stream not in seen and stream not in OMITTED_STREAMS:
-            unique_stream_lines.append(line)
-            seen.add(stream)
+        stream, rec = line[0], line[1]
+        if stream in OMITTED_STREAMS:
+            continue
+
+        selected = selected_by_stream.get(stream)
+        if selected is None or ("id" in rec and rec["id"] < selected[1]["id"]):
+            selected_by_stream[stream] = line
+
+    unique_stream_lines = list(selected_by_stream.values())
 
     for l in unique_stream_lines:
         stream, rec = l[0], l[1]
 
         rec['_meta']['row_id'] = 0
-        if "updated_at" in rec:
-            rec["updated_at"] = "redacted"
-        if "last_login_at" in rec:
-            rec["last_login_at"] = "redacted"
+        _redact_fields(rec)
 
     # Sort lines to keep a consistent ordering of captured bindings.
     sorted_unique_lines = sorted(unique_stream_lines, key=lambda l: l[0])

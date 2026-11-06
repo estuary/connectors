@@ -494,3 +494,23 @@ class AuditLogsResponse(FullRefreshCursorPaginatedResponse):
 
 class PostCommentVotesResponse(PostVotesResponse):
     pass
+
+
+class SideConversation(FullRefreshResource):
+    # Zendesk side conversation IDs are UUID strings, not integers.
+    id: str
+
+
+class SideConversationsResponse(BaseModel, extra="allow"):
+    side_conversations: list[SideConversation]
+    next_page: str | None = None
+
+
+class AccountSettings(BaseModel, extra="allow"):
+    class Settings(BaseModel, extra="allow"):
+        class SideConversationsSettings(BaseModel, extra="allow"):
+            show_in_context_panel: bool = False
+
+        side_conversations: SideConversationsSettings = Field(default_factory=SideConversationsSettings)
+
+    settings: Settings

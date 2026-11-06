@@ -1,0 +1,23 @@
+variables:
+  - name: base_url
+    value: https://okta-domain/api/v1
+  - name: config_path
+    value: ../config.yaml
+  - name: logs_since
+    value: PIN_FROM_SYSTEM_LOG_BARE
+  - name: logs_until
+    value: PIN_FROM_SYSTEM_LOG_BARE
+  - name: logs_after
+    value: PIN_FROM_SYSTEM_LOG_POLLING_FIRST_PAGE
+  - name: logs_limit
+    value: "1000"
+  - name: seed_group_id
+    value: PIN_FROM_SEEDING_CREATE_GROUP
+  - name: member_user_id
+    value: 00u18gupu552EU005698
+  - name: everyone_group_id
+    value: 00g176zmw9j1Wyxqf698
+  - name: users_id_gt_bound
+    value: PIN_SEE_USERS_ID_GT_COLLATION_PROBE
+  - name: groups_id_gt_bound
+    value: PIN_SEE_GROUPS_ID_GT_COLLATION_PROBE

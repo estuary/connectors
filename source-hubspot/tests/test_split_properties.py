@@ -23,11 +23,11 @@ few_properties = ["firstname", "lastname", "age", "dob", "id"]
 )
 def test_split_properties(cls, properties, chunks_expected):
     chunked_properties = set()
-    index = 0
-    for index, chunk in enumerate(cls(properties).split()):
+    chunks = 0
+    for chunk in cls(properties).split():
+        chunks += 1
         chunked_properties |= set(chunk.properties)
         as_string = next(iter(chunk.as_url_param().values()))
         assert len(as_string) <= cls.PROPERTIES_PARAM_MAX_LENGTH
-    chunks = index + 1
     assert chunked_properties == set(properties)
     assert chunks == chunks_expected

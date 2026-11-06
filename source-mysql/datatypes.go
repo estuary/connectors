@@ -448,6 +448,14 @@ func encodeKeyFDB(key, ktype any) (tuple.TupleElement, error) {
 				// this is a viable placeholder solution.
 				return strconv.ParseFloat(string(val), 64)
 			}
+		case "date", "datetime", "time", "timestamp":
+			// Backfills return temporal values as []byte while binlog replication
+			// returns them as string. Normalize to the backfill representation so
+			// the same database key always has the same FDB tuple type. Retaining
+			// the []byte representation also keeps existing backfill cursors valid.
+			if val, ok := key.(string); ok {
+				return []byte(val), nil
+			}
 		}
 	}
 	return key, nil
@@ -563,18 +571,25 @@ type mysqlTextTranscoderReplication struct {
 }
 
 func (t *mysqlTextTranscoderReplication) TranscodeJSON(buf []byte, val any) ([]byte, error) {
-	if str, ok := val.(string); ok {
-		return json.AppendEscape(buf, str, 0), nil
-	} else if bs, ok := val.([]byte); ok {
-		var str, err = decodeBytesToString(t.Charset, bs)
-		if err != nil {
-			return nil, err
-		}
-		return json.AppendEscape(buf, str, 0), nil
-	} else if val == nil {
+	// CHAR/VARCHAR columns arrive from the binlog as a string while TEXT/BLOB columns
+	// arrive as []byte, but in both cases the bytes are in the column's declared charset
+	// and must be decoded before serialization.
+	var bs []byte
+	switch v := val.(type) {
+	case string:
+		bs = unsafe.Slice(unsafe.StringData(v), len(v))
+	case []byte:
+		bs = v
+	case nil:
 		return append(buf, `null`...), nil
+	default:
+		return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
 	}
-	return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
+	var str, err = decodeBytesToString(t.Charset, bs)
+	if err != nil {
+		return nil, err
+	}
+	return json.AppendEscape(buf, str, 0), nil
 }
 
 type mysqlBinaryTranscoder struct {

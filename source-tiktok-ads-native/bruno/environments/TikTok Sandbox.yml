@@ -1,0 +1,5 @@
+variables:
+  - name: base_url
+    value: https://sandbox-ads.tiktok.com/open_api/v1.3
+  - name: config_path
+    value: ../config.yaml

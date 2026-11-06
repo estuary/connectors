@@ -1,0 +1,19 @@
+credentials:
+    credentials_title: API Token
+    api_id_sops: ENC[AES256_GCM,data:RrW3EchVIvxt2BRs4kuP8bpGwaoq9ko/j29N6e3YKSY=,iv:N7H1Xb/W/4weOyg3TRBL23ixIikp4l5Y91961N7p0g0=,tag:AgsPo1V1imfb9AuG5U92PA==,type:str]
+    api_token_sops: ENC[AES256_GCM,data:vWdjLxg93v8kHcklVG/4PeISdrZuGuZuAso4NjOdCzE=,iv:HGS64D3/aaSzqlIfm841Jsni5hxGGm61uQeY615y/E4=,tag:MqP9brvzmEBmi7h4ovd7+g==,type:str]
+start_date: "2026-04-01T00:00:00Z"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-09-28T13:10:41Z"
+          enc: CiUAdmEdwuCdz2cRCUTzJJvmo+ZIO/RMw3tsUGlnCKMoS57j9tgNEkkAvE+nk3kIJCGby/f3dmFbgB76F2xE0IyoSMuZTEtJA9sK1Q2AoxwA6cyek75EVDvl0FfAAMyL3PPvW68Ha8u/JUHtIbobu3+h
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2026-09-28T13:10:41Z"
+    mac: ENC[AES256_GCM,data:4x9qHBRUEb7mAh4cFBURkmlvZF+Kl1sbk5uKHLjmg8MTmtTsPXgJCS4XRGmURWZWT0DmqvORy+8lDDTsU/yXay5TtniRLrtIoqjldCWTd2GUrolSj7jvOCR9qEnOJrjS+K8y6UkCxwr6PyUDTDfdEpkHTe7pgucxVjEW5Lg3fbI=,iv:PSpZ7jjUg8tynW5rBnkiS41C4BKXG7z9LBaa/gmlZ+c=,tag:i4ZPVXEbz91BEmX/n+VRnQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

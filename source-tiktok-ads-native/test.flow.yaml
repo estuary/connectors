@@ -1,0 +1,32 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-tiktok-ads-native:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_tiktok_ads_native
+        config: config.yaml
+    bindings:
+    - resource:
+        name: Advertisers
+        interval: PT12H
+      target: acmeCo/Advertisers
+    - resource:
+        name: Campaigns
+        interval: PT30M
+      target: acmeCo/Campaigns
+    - resource:
+        name: AdGroups
+        interval: PT30M
+      target: acmeCo/AdGroups
+    - resource:
+        name: Ads
+        interval: PT30M
+      target: acmeCo/Ads
+    - resource:
+        name: ad_report_daily
+        interval: PT12H
+      target: acmeCo/ad_report_daily

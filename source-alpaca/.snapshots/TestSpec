@@ -22,7 +22,8 @@
           "sip"
         ],
         "title": "Feed",
-        "description": "The feed to pull market data from."
+        "description": "The feed to pull market data from.",
+        "nonsensitive": true
       },
       "symbols": {
         "type": "string",
@@ -41,7 +42,8 @@
           "is_free_plan": {
             "type": "boolean",
             "title": "Free Plan",
-            "description": "Set this if you are using a free plan. Delays data by 15 minutes."
+            "description": "Set this if you are using a free plan. Delays data by 15 minutes.",
+            "nonsensitive": true
           },
           "stop_date": {
             "type": "string",
@@ -52,22 +54,26 @@
           "disable_real_time": {
             "type": "boolean",
             "title": "Disable Real-Time Streaming",
-            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism."
+            "description": "Disables real-time streaming via the websocket API. Data will only be collected via the backfill mechanism.",
+            "nonsensitive": true
           },
           "disable_backfill": {
             "type": "boolean",
             "title": "Disable Historical Data Backfill",
-            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming."
+            "description": "Disables historical data backfill via the historical data API. Data will only be collected via streaming.",
+            "nonsensitive": true
           },
           "max_backfill_interval": {
             "type": "string",
             "title": "Maximum Backfill Interval",
-            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string."
+            "description": "The largest time interval that will be requested for backfills. Using smaller intervals may be useful when tracking many symbols. Must be a valid Go duration string.",
+            "nonsensitive": true
           },
           "min_backfill_interval": {
             "type": "string",
             "title": "Minimum Backfill Interval",
-            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string."
+            "description": "The smallest time interval that will be requested for backfills after the initial backfill is complete. Must be a valid Go duration string.",
+            "nonsensitive": true
           }
         },
         "additionalProperties": false,

@@ -1,0 +1,54 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/automations"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - empty, feature accessible
+    request:
+      url: "{{base_url}}/automations"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "automations": [],
+            "total_items": 0,
+            "_links": "REDACTED"
+          }
+
+docs: |-
+  **REFERENCE:** [API reference](https://mailchimp.com/developer/marketing/api/automation/list-automations/)
+
+  **WHY:** classic-automations list. Three open questions this probe answers:
+  (1) does the account have the feature at all (403 / empty)?
+  (2) what is the PK field on each item — "id" or "workflow_id"?
+  (3) does the response include total_items, and is the whole set returned in
+  one shot (i.e. no pagination)?
+
+  **VERIFIED (2026-06-30):** the endpoint is accessible — `200` with an empty
+  `automations[]` and `total_items: 0`, not a `403`.
+
+  **UNOBSERVABLE:** the per-item shape (and so the PK question). Classic
+  automations are feature-gated and can only be *created* in the Mailchimp UI —
+  there is no create endpoint to seed one from this collection. The connector's
+  document shape is therefore docs-based rather than inferred, with a required
+  `id` so a missing/renamed PK fails loudly instead of silently dropping the
+  field.

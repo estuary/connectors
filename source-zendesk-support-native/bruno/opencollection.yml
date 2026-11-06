@@ -1,0 +1,115 @@
+opencollection: 1.0.0
+
+info:
+  name: Zendesk Support
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Zendesk auth via the connector's sops-encrypted config.yaml. The token is
+        // re-derived from sops on every request and lives only on `req`; it is never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Zendesk --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` suffix on encrypted key names; accept both.
+        const config = JSON.parse(decrypted);
+        const subdomain = config?.subdomain ?? config?.subdomain_sops;
+        const creds = config?.credentials;
+        const email = creds?.username ?? creds?.username_sops;
+        const token = creds?.password ?? creds?.password_sops;
+        if (!subdomain) throw new Error('subdomain(_sops) missing from decrypted config');
+        if (!email || !token) {
+          throw new Error('credentials.{username,password}(_sops) missing from decrypted config');
+        }
+
+        // Request URLs use a literal "subdomain" placeholder host; rewrite it here so
+        // the committed environment file never hardcodes the account.
+        const resolved = `https://${subdomain}.zendesk.com/api/v2`;
+        req.setUrl(
+          req.getUrl()
+            .replace('{{base_url}}', resolved)
+            .replace('https://subdomain.zendesk.com/api/v2', resolved),
+        );
+
+        // API token auth is HTTP Basic with "{email}/token" as the username, matching
+        // the connector's ApiToken model (models.py).
+        const basic = Buffer.from(`${email}/token:${token}`).toString('base64');
+        req.setHeader('Authorization', `Basic ${basic}`);
+
+docs:
+  content: |-
+    ## Purpose
+
+    Live verification for the plan to replace Zendesk's Incremental Export APIs,
+    which end for third-party developers in December 2026. See
+    `source-zendesk-support-native-incremental-api-plan.md` (items V1–V11).
+
+    ## API constraints (account-wide)
+
+    - **Base URL:** `https://{subdomain}.zendesk.com/api/v2`. The pre-request
+      script rewrites the `subdomain` placeholder host from the decrypted config.
+    - **Auth:** HTTP Basic, `{email}/token:{api_token}`.
+    - **Account-wide:** `x-rate-limit: 700` per minute on this account (plan-dependent).
+      VERIFIED 2026-10-07 from response headers.
+    - **Tighter buckets** (VERIFIED 2026-10-07 from response headers):
+      - Time-based incremental exports (`/incremental/organizations`,
+        `/incremental/tickets/cursor`): `zendesk-ratelimit-incremental-exports: total=10`
+      - Cursor incremental user export: `zendesk-ratelimit-incremental-exports-cursor: total=20`
+      - `/tickets` list: `zendesk-ratelimit-tickets-index: total=100000`
+      - `/deleted_tickets`: `zendesk-ratelimit-deleted-tickets-index: total=10`
+      - `/search/export`: no bucket header; DOCUMENTED (2026-09-29) as 100 per minute
+    - **Cursor pagination:** list cursors are keyset values (base64 JSON
+      `{"o": <order fields>, "v": <last values>}`), not session tokens.
+      Search export cursors are session-bound and DOCUMENTED to expire after one hour.
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions (`**WHY:**`
+    plus dated VERIFIED / PENDING / UNOBSERVABLE / DOCUMENTED findings, and
+    `**LIMITATION**` for endpoint constraints with connector consequences).
+
+    ### Per-endpoint limitations
+
+    - `Tickets / start_time with updated_at sort`: `start_time` is silently ignored;
+      `/tickets` has no time filter.
+    - `Tickets / page size 101`: page size over 100 is rejected with a 400.
+    - `Keyset Cursors / tickets crafted seek`: client-built `(updated_at, id)` cursors
+      work, but the ticket tie-break id is internal, so ticket seeks are per-second;
+      mid-second resume uses the id decoded from a returned cursor
+      (`Keyset Cursors / tickets mid-second resume`).
+    - List endpoints (`/tickets`, `/users`, `/organizations`) exclude archived tickets
+      and deleted records; search export includes archived tickets but excludes deleted
+      records. See `Tickets / start_time alone`, `Search Export / tickets updated window`.
+
+    ## Format
+
+    OpenCollection YAML; requires bru CLI >= 3.0.0. Run requests with:
+    `bru run "<Folder>/<request>.yml" --env Zendesk --sandbox developer`
+    When writing a JSON report, always pass `--reporter-skip-headers authorization`
+    so the Basic credential never lands in the report file.
+
+    ## Redaction
+
+    There is no after-response redaction script. The connector's snapshot tests
+    redact `updated_at` (`tests/test_snapshots.py`), which is the field these probes
+    exist to examine. Saved examples are instead projections of the
+    decision-relevant fields only.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

@@ -3,7 +3,7 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator
 
-from source_shopify_native.models import ShopifyGraphQLResource, SortKey
+from source_shopify_native.models import ShopifyGraphQLResource, SortKey, StoreCapabilities
 
 
 class ProductMedia(ShopifyGraphQLResource):
@@ -35,12 +35,14 @@ class ProductMedia(ShopifyGraphQLResource):
         end: datetime,
         first: int | None = None,
         after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
     ) -> str:
         return ProductMedia.build_query_with_fragment(
             start,
             end,
             first=first,
             after=after,
+            capabilities=capabilities,
         )
 
     @staticmethod

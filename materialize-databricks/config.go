@@ -1,19 +1,25 @@
-package main
+package connector
 
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/databricks/databricks-sdk-go"
+	dbConfig "github.com/databricks/databricks-sdk-go/config"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/invopop/jsonschema"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string":          true,
-	"retain_existing_data_on_backfill": false,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetime_keys_as_string":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"two_phase_loads":                  common.FlagDisabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 // config represents the endpoint configuration for sql server.
@@ -22,7 +28,7 @@ type config struct {
 	HTTPPath      string           `json:"http_path" jsonschema:"title=HTTP path,description=HTTP path of your SQL warehouse" jsonschema_extras:"order=1"`
 	CatalogName   string           `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog." jsonschema_extras:"order=2"`
 	SchemaName    string           `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default" jsonschema_extras:"order=3"`
-	HardDelete    bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
+	HardDelete    bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4,nonsensitive=true"`
 	Credentials   credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
 	Schedule      m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger dbt.JobConfig    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
@@ -31,8 +37,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 const (
@@ -175,7 +181,7 @@ func (c config) DefaultNamespace() string {
 	return c.SchemaName
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -191,6 +197,7 @@ func (c config) ToURI(materializationName string) string {
 	params.Add("schema", c.SchemaName)
 	// Connection attribute for Estuary application reporting.
 	params.Add(productParameterDSN.key, productParameterDSN.value)
+	params.Add("maxDownloadThreads", strconv.Itoa(maxDownloadThreads))
 	if materializationName != "" {
 		// Query tag for Estuary task reporting.
 		// https://docs.databricks.com/aws/en/dev-tools/go-sql-driver#optional-parameters
@@ -222,4 +229,25 @@ func (c config) ToURI(materializationName string) string {
 	}
 
 	return strings.TrimLeft(uri.String(), "/")
+}
+
+// workspaceConfig is the Databricks SDK configuration for this endpoint,
+// carrying the credentials selected by the configured auth type.
+func (c config) workspaceConfig() *databricks.Config {
+	host := fmt.Sprintf("%s/%s", c.Address, c.HTTPPath)
+	switch c.Credentials.AuthType {
+	case OAUTH_M2M_AUTH_TYPE:
+		return &databricks.Config{
+			Host:         host,
+			ClientID:     c.Credentials.ClientID,
+			ClientSecret: c.Credentials.ClientSecret,
+		}
+	default: // PAT_AUTH_TYPE
+		return &databricks.Config{
+			Host:  host,
+			Token: c.Credentials.PersonalAccessToken,
+			// Pin PAT so the SDK does not fall back to discovering credentials from the environment.
+			Credentials: dbConfig.PatCredentials{},
+		}
+	}
 }

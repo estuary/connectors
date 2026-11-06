@@ -1,0 +1,67 @@
+sql> CREATE TABLE dbo.Datatypes_ScanKeyTypes_Date_387616 (k DATE PRIMARY KEY, v TEXT)
+sql> INSERT INTO dbo.Datatypes_ScanKeyTypes_Date_387616 VALUES ('1991-08-31', 'Data 0'), ('1991-09-01', 'Data 1'), ('2000-01-01', 'Data 2')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/datatypes_scankeytypes_date_387616
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_date_387616",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Date_387616"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31",
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_date_387616",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Date_387616"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-09-01",
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_date_387616",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Date_387616"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "2000-01-01",
+    "v": "Data 2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_ScanKeyTypes_Date_387616": {
+      "backfilled": 3,
+      "key_columns": [
+        "k"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

@@ -20,6 +20,14 @@ func (s StreamID) String() string {
 	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
 }
 
+// Compare orders StreamIDs by schema and then by table name.
+func (s StreamID) Compare(other StreamID) int {
+	if n := strings.Compare(s.Schema, other.Schema); n != 0 {
+		return n
+	}
+	return strings.Compare(s.Table, other.Table)
+}
+
 // EncodeKey returns an unambiguous string representation of the StreamID
 // suitable for use as a map key in serialized cursors. The schema and table
 // components are encoded so that periods can be used as the separator.
@@ -140,8 +148,8 @@ type OldChangeEvent struct {
 	Operation ChangeOp
 	RowKey    []byte
 	Source    SourceMetadata
-	Before    map[string]interface{}
-	After     map[string]interface{}
+	Before    map[string]any
+	After     map[string]any
 }
 
 func (OldChangeEvent) IsDatabaseEvent() {}
@@ -278,10 +286,16 @@ type Database interface {
 
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `state.Scanned` cursor
 	// position if non-nil.
+	// The `backfillFilter` string, when non-empty, is a user-provided SQL expression which must be
+	// ANDed into the WHERE clause of the backfill query (parenthesized, so disjunctions work).
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event ChangeEvent) error) (backfillComplete bool, nextResumeCursor []byte, err error)
-	// DiscoverTables queries the database for the latest information about tables available for capture.
-	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, backfillFilter string, callback func(event ChangeEvent) error) (backfillComplete bool, nextResumeCursor []byte, err error)
+	// ListTables returns all tables visible for capture after the connector's
+	// configured discovery filters are applied.
+	ListTables(ctx context.Context) ([]TableID, error)
+	// DiscoverTableDetails fetches detailed schema info for the specified
+	// tables. Implementations may chunk internally.
+	DiscoverTableDetails(ctx context.Context, tables []TableID) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error)
 	// Returns the JSON schema of the source-specific metadata object
@@ -290,6 +304,25 @@ type Database interface {
 	ShouldBackfill(streamID StreamID) bool
 	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
 	HistoryMode() bool
+	// ActivateStreamsBeforeCatchup returns true if pending streams should be activated for
+	// replication before the initial catch-up stream rather than after it.
+	ActivateStreamsBeforeCatchup() bool
+
+	// RediscoveryInterval returns how long the capture should wait between mid-capture
+	// rediscovery passes, or zero to use the default interval. Rediscovery costs a handful of
+	// catalog queries per capture per interval, which is insignificant on its own but not when
+	// hundreds or thousands of captures share one source database, so connectors surface this
+	// as a config setting for those users to trade responsiveness to schema changes against
+	// load on their server. Implement it with ParseRediscoveryInterval.
+	RediscoveryInterval() time.Duration
+
+	// ReplicationPollingInterval returns how long a streaming cycle may legitimately spend
+	// waiting for the replication stream to deliver its next commit event, or zero for
+	// connectors whose replication events arrive continuously. A polling connector cannot
+	// finish a stream-to-fence cycle any faster than one polling period, so the threshold
+	// past which a long-running cycle is treated as anomalous scales with this value rather
+	// than being a fixed duration which a large polling interval would exceed every cycle.
+	ReplicationPollingInterval() time.Duration
 
 	// The collection key which should be suggested if discovery fails to find suitable
 	// primary key. This should be some property or combination of properties in the
@@ -386,12 +419,12 @@ type DiscoveryInfo struct {
 // database, and is used during discovery to automatically generate catalog
 // information.
 type ColumnInfo struct {
-	Name        string      // The name of the column.
-	Index       int         // The ordinal position of this column in a row.
-	TableName   string      // The name of the table to which this column belongs.
-	TableSchema string      // The schema of the table to which this column belongs.
-	IsNullable  bool        // True if the column can contain nulls.
-	DataType    interface{} // The datatype of this column. May be a string name or a more complex struct.
-	Description *string     // Stored description of the column, if any.
-	OmitColumn  bool        // True if the column should be omitted from discovery JSON schema generation.
+	Name        string  // The name of the column.
+	Index       int     // The ordinal position of this column in a row.
+	TableName   string  // The name of the table to which this column belongs.
+	TableSchema string  // The schema of the table to which this column belongs.
+	IsNullable  bool    // True if the column can contain nulls.
+	DataType    any     // The datatype of this column. May be a string name or a more complex struct.
+	Description *string // Stored description of the column, if any.
+	OmitColumn  bool    // True if the column should be omitted from discovery JSON schema generation.
 }

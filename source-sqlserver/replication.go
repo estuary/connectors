@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -121,6 +123,15 @@ type sqlserverReplicationStream struct {
 	// interval as a reasonable heuristic.
 	establishFenceTimeout time.Duration
 
+	// establishFenceRetryInterval is how long to wait before re-checking whether the CDC
+	// worker has completed a new log scan session, which is what a fence position is
+	// established from. There is no notification when a scan completes, so this is a poll,
+	// and because the first check always fails the interval quantizes every fence to a
+	// multiple of itself. One second is the right default against a CDC worker which scans
+	// no more often than once per second, and tests which drive scanning themselves lower it
+	// via ${TEST_FENCE_RETRY_INTERVAL}.
+	establishFenceRetryInterval time.Duration
+
 	tables struct {
 		sync.RWMutex
 		info map[sqlcapture.StreamID]*tableReplicationInfo
@@ -140,20 +151,10 @@ type tableReplicationInfo struct {
 }
 
 func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
-	var (
-		dbName     string
-		cdcEnabled bool
-	)
-	const query = `SELECT name, is_cdc_enabled FROM sys.databases WHERE name = db_name()`
-	if err := rs.conn.QueryRowContext(ctx, query).Scan(&dbName, &cdcEnabled); err != nil {
-		return fmt.Errorf("error querying cdc state: %w", err)
-	}
-	if !cdcEnabled {
-		return fmt.Errorf("CDC is not enabled on database %q", dbName)
-	}
+	// SetupPrerequisites already verified that CDC is enabled, so it isn't checked again here.
 
 	// Check replica status. Some operations work differently on replicas.
-	isReplica, err := isReplicaDatabase(ctx, rs.conn)
+	isReplica, err := rs.db.replicaStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("error determining if database is a replica: %w", err)
 	}
@@ -168,6 +169,19 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	rs.cdcPollingInterval = pollingInterval
 	rs.streamToFenceWatchdogTimeout = max(15*time.Minute, 3*pollingInterval)
 	rs.establishFenceTimeout = max(15*time.Minute, 3*pollingInterval)
+
+	// Test-only override, in the same spirit as ${SHUTDOWN_AFTER_POLLING}: the black-box
+	// tests run the connector as a subprocess, so an in-process test flag can't reach it.
+	// Unset, which is every production capture, this is one second.
+	rs.establishFenceRetryInterval = 1 * time.Second
+	if override := os.Getenv("TEST_FENCE_RETRY_INTERVAL"); override != "" {
+		if parsed, err := time.ParseDuration(override); err != nil {
+			log.WithFields(log.Fields{"value": override, "err": err}).Warn("ignoring unparseable ${TEST_FENCE_RETRY_INTERVAL}")
+		} else {
+			log.WithField("interval", parsed.String()).Info("overriding fence retry interval from ${TEST_FENCE_RETRY_INTERVAL}")
+			rs.establishFenceRetryInterval = parsed
+		}
+	}
 
 	rs.errCh = make(chan error)
 	rs.events = make(chan sqlcapture.DatabaseEvent)
@@ -411,7 +425,7 @@ func (rs *sqlserverReplicationStream) streamToPositionalFence(ctx context.Contex
 	// The behavior of 'establishFenceTimer' is a little bit complicated here. Initially it's
 	// set to the 'fenceAfter' duration so we'll run for at least that long before checking if
 	// we can establish a new fence position. After that initial duration is reached, we reset
-	// it to one second for each retry.
+	// it to 'establishFenceRetryInterval' for each retry.
 	var timedEventsSinceFlush int
 	var latestFlushLSN = rs.fenceLSN
 	var nextFenceLSN LSN
@@ -439,7 +453,7 @@ loop:
 				nextFenceLSN = lsn
 				break loop
 			} else {
-				establishFenceTimer.Reset(1 * time.Second)
+				establishFenceTimer.Reset(rs.establishFenceRetryInterval)
 				continue
 			}
 		case event, ok := <-rs.events:
@@ -1334,6 +1348,7 @@ type ddlHistoryEntry struct {
 func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]*ddlHistoryEntry, error) {
 	const query = `SELECT sch.name, tbl.name, hist.required_column_update, hist.ddl_command, hist.ddl_lsn, hist.ddl_time
 				     FROM cdc.ddl_history AS hist
+					 JOIN cdc.change_tables AS ct ON hist.object_id = ct.object_id
 					 JOIN sys.tables AS tbl ON hist.source_object_id = tbl.object_id
 					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id
 					 ORDER BY hist.ddl_lsn;`
@@ -1370,15 +1385,7 @@ func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamI
 // time. If we ever hit a scaling limit here we can implement chunking, but so far that doesn't
 // appear to be necessary.
 func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []string) (map[string]LSN, error) {
-	var subqueries []string
-	for idx, instanceName := range instanceNames {
-		// TODO(wgd): It would probably be a good idea to properly quote the CDC table name instead of just splatting
-		// the instance name into the query string. But currently we don't do that for backfills or for the actual
-		// replication polling query, so it would be premature to worry about it only here.
-		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].[%s_CT]", idx, instanceName)
-		subqueries = append(subqueries, subquery)
-	}
-	var query = strings.Join(subqueries, " UNION ALL ")
+	var query, sortedInstanceNames = cdcInstanceMaxLSNsQuery(instanceNames)
 
 	rows, err := conn.QueryContext(ctx, query)
 	if err != nil {
@@ -1393,10 +1400,10 @@ func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []st
 		if err := rows.Scan(&index, &instanceMaxLSN); err != nil {
 			return nil, fmt.Errorf("error scanning result: %w", err)
 		}
-		if index < 0 || index >= len(instanceNames) {
-			return nil, fmt.Errorf("internal error: result index %d out of range for instance list %q", index, len(instanceNames))
+		if index < 0 || index >= len(sortedInstanceNames) {
+			return nil, fmt.Errorf("internal error: result index %d out of range for instance list of length %d", index, len(sortedInstanceNames))
 		}
-		var instanceName = instanceNames[index]
+		var instanceName = sortedInstanceNames[index]
 		log.WithFields(log.Fields{
 			"instance": instanceName,
 			"lsn":      instanceMaxLSN,
@@ -1406,11 +1413,32 @@ func cdcGetInstanceMaxLSNs(ctx context.Context, conn *sql.DB, instanceNames []st
 	return results, rows.Err()
 }
 
+// cdcInstanceMaxLSNsQuery builds the union query used by cdcGetInstanceMaxLSNs, and returns it
+// along with the ordered instance names which the `idx` column of each result row indexes into.
+//
+// The instance names are sorted so that the generated query text is stable across polling cycles.
+func cdcInstanceMaxLSNsQuery(instanceNames []string) (string, []string) {
+	var sorted = slices.Clone(instanceNames)
+	slices.Sort(sorted)
+
+	var subqueries []string
+	for idx, instanceName := range sorted {
+		// TODO(wgd): It would probably be a good idea to properly quote the CDC table name instead of just splatting
+		// the instance name into the query string. But currently we don't do that for backfills or for the actual
+		// replication polling query, so it would be premature to worry about it only here.
+		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].[%s_CT]", idx, instanceName)
+		subqueries = append(subqueries, subquery)
+	}
+	return strings.Join(subqueries, " UNION ALL "), sorted
+}
+
 func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName string, belowLSN LSN) error {
 	log.WithFields(log.Fields{"instance": instanceName, "lsn": fmt.Sprintf("%X", belowLSN)}).Debug("cleaning change table")
 
-	var query = fmt.Sprintf("EXEC sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = 0x%X; ", belowLSN)
-	if _, err := conn.ExecContext(ctx, query, instanceName); err != nil {
+	// Bind the instance name and watermark as parameters to improve query plan cache
+	// hit rate when making cleanup queries.
+	const query = "EXEC sys.sp_cdc_cleanup_change_table @capture_instance = @p1, @low_water_mark = @p2;"
+	if _, err := conn.ExecContext(ctx, query, mssqldb.NVarCharMax(instanceName), belowLSN); err != nil {
 		return fmt.Errorf("error cleaning capture instance %q below LSN %X: %w", instanceName, belowLSN, err)
 	}
 	return nil
@@ -1531,6 +1559,21 @@ func isReplicaDatabase(ctx context.Context, conn *sql.DB) (bool, error) {
 		log.WithError(err).Warn("error determining replica status, assuming primary")
 		return false, nil
 	}
+	return isReplica, nil
+}
+
+// replicaStatus determines whether the current database connection is to a read-only replica.
+// The prerequisite checks and the replication stream both need this when a capture starts,
+// so the result of the first successful query is cached.
+func (db *sqlserverDatabase) replicaStatus(ctx context.Context) (bool, error) {
+	if db.isReplica != nil {
+		return *db.isReplica, nil
+	}
+	isReplica, err := isReplicaDatabase(ctx, db.conn)
+	if err != nil {
+		return false, err
+	}
+	db.isReplica = &isReplica
 	return isReplica, nil
 }
 

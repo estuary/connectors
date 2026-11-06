@@ -1,0 +1,4 @@
+sql> CREATE TABLE test.schemawhitelist_unionofboth_162969 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/schemawhitelist_unionofboth_162969
+

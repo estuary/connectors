@@ -1,4 +1,4 @@
-package main
+package connector
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	instancepb "cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -28,8 +29,10 @@ import (
 	"google.golang.org/api/option"
 )
 
-var featureFlagDefaults = map[string]bool{
-	"datetimes_as_string": true,
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"datetimes_as_string":              common.FlagEnabled,
+	"truncate_after_backfill":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 }
 
 // credentialConfig represents authentication options for Cloud Spanner
@@ -43,7 +46,7 @@ type config struct {
 	InstanceID string `json:"instance_id" jsonschema:"title=Instance ID,description=Cloud Spanner Instance ID" jsonschema_extras:"order=1"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Cloud Spanner Database name" jsonschema_extras:"order=2"`
 
-	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3,nonsensitive=true"`
 
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Credentials,description=Google Cloud authentication credentials" jsonschema_extras:"order=4"`
 
@@ -51,9 +54,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false"`
-	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate the configuration
@@ -71,7 +74,7 @@ func (c config) Validate() error {
 	return nil
 }
 
-func (c config) FeatureFlags() (string, map[string]bool) {
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
@@ -174,6 +177,18 @@ type driver struct{}
 
 var _ boilerplate.Connector = &driver{}
 
+// NewDriver builds the connector, and is its entry point: an importing
+// caller is handed the assembled connector rather than its pieces.
+func NewDriver() boilerplate.Connector { return &driver{} }
+
+// NewMaterializer opens a Materializer for the endpoint. Spanner wraps the
+// standard SQL driver to add its own validation, so this reaches through to the
+// wrapped driver's entry point, which is what establishes the initialization
+// order the driver's operations assume.
+func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, sql.FieldConfig, tableConfig, sql.MappedType], error) {
+	return sqlDriver.NewMaterializer(ctx, materializationName, cfg, featureFlags)
+}
+
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	return sqlDriver.Spec(ctx, req)
 }
@@ -203,17 +218,17 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			reqBinding := req.Bindings[idx]
 			for _, p := range reqBinding.Collection.Projections {
 				if p.IsPrimaryKey {
-					if binding.Constraints == nil {
-						binding.Constraints = make(map[string]*pm.Response_Validated_Constraint)
-					}
 					log.WithFields(log.Fields{
 						"binding": idx,
 						"field":   p.Field,
 					}).Info("adding INCOMPATIBLE constraint for key field due to key distribution optimization change")
-					binding.Constraints[p.Field] = &pm.Response_Validated_Constraint{
-						Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
-						Reason: "The 'disable_key_distribution_optimization' setting has changed. This changes the table's primary key structure (flow_key_hash column is added or removed) and requires re-creating all tables. Backfill all bindings to proceed.",
-					}
+					binding.ProjectionConstraints = append(binding.ProjectionConstraints, &pm.Response_Validated_ProjectionConstraint{
+						Field: p.Field,
+						Constraint: &pm.Response_Validated_Constraint{
+							Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
+							Reason: "The 'disable_key_distribution_optimization' setting has changed. This changes the table's primary key structure (flow_key_hash column is added or removed) and requires re-creating all tables. Backfill all bindings to proceed.",
+						},
+					})
 				}
 			}
 		}
@@ -265,6 +280,13 @@ type transactor struct {
 	fence         sql.Fence
 	be            *m.BindingEvents
 	numPartitions int // Number of partitions for key distribution (nodes × 10)
+
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 // spannerBinding represents a materialized binding with its configuration
@@ -277,6 +299,7 @@ type spannerBinding struct {
 	columnNames        []string // Column names in order for mutations
 	columnTypes        []string // DDL types for each column (e.g., "TIMESTAMP", "DATE", "INT64")
 	keyColumnIdxs      []int    // Indexes of key columns within columnNames
+	truncateSQL        string   // Deletes rows published before a backfill's boundary. Empty if the binding excludes flow_published_at.
 }
 
 // hashSingleValue computes FNV-1a 64-bit hash of a single value.
@@ -426,6 +449,10 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (_ m.Transactor, err error) {
+	if err := boilerplate.RequireSingleShard(open); err != nil {
+		return nil, err
+	}
+
 	cfg := ep.Config
 
 	// Create shared Spanner clients
@@ -462,14 +489,15 @@ func newTransactor(
 	}).Info("calculated partitions for parallel flushing")
 
 	t := &transactor{
-		client:        clients.dataClient,
-		adminClient:   clients.adminClient,
-		dbPath:        clients.dbPath,
-		cfg:           cfg,
-		templates:     templates,
-		fence:         fence,
-		be:            be,
-		numPartitions: numPartitions,
+		client:                clients.dataClient,
+		adminClient:           clients.adminClient,
+		dbPath:                clients.dbPath,
+		cfg:                   cfg,
+		templates:             templates,
+		fence:                 fence,
+		be:                    be,
+		numPartitions:         numPartitions,
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	// Setup bindings first to get the createLoadTableSQL for each
@@ -530,7 +558,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	b := &spannerBinding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {
-		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 	}
 
 	// Render createLoadTable template
@@ -561,6 +589,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 	b.dropLoadTableSQL = dropLoadTableSQL
 
+	if col, err := target.PublishedAtColumn(); err == nil {
+		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < @boundary", target.Identifier, col.Identifier)
+	}
+
 	// Build column names and types list for mutations
 	// Order: [flow_key_hash (optional)], keys, values, flow_document
 	if !t.cfg.Advanced.DisableKeyDistributionOptimization {
@@ -586,8 +618,34 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	return nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.truncateSQL == "" {
+			var _, reason = b.target.PublishedAtColumn()
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
+	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	return nil, nil
+}
 
 // timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
 func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {
@@ -821,6 +879,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	storeStart := time.Now()
 	var storeCount int
 	var storeBytes int
+	// stored counts the mutations applied per binding, for the transaction
+	// health report: Apply returns no counts, and partitions mix bindings.
+	stored := make([]int64, len(t.bindings))
+	round := it.Round
 
 	ctx := it.Context()
 
@@ -842,6 +904,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// Skip deleted, non-existent documents iff HardDelete is enabled.
 	for it.Next(t.cfg.HardDelete) {
 		storeCount++
+		stored[it.Binding]++
 		b := t.bindings[it.Binding]
 
 		var mutation *spanner.Mutation
@@ -966,7 +1029,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Route to partition based on hash
 			partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
-			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values), mutationSize); err != nil {
+			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerValues), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding store mutation: %w", err)
 			}
 
@@ -984,77 +1047,102 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	// Return the StartCommit function
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			commitStart := time.Now()
-			var commitDuration time.Duration
+		commitStart := time.Now()
+		var commitDuration time.Duration
 
-			defer func() {
-				storeDuration := time.Since(storeStart)
-				commitDuration = time.Since(commitStart)
+		defer func() {
+			storeDuration := time.Since(storeStart)
+			commitDuration = time.Since(commitStart)
 
-				log.WithFields(log.Fields{
-					"totalDuration":       storeDuration.Seconds(),
-					"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
-					"commitPhaseDuration": commitDuration.Seconds(),
-					"storeCount":          storeCount,
-					"storeBytes":          storeBytes,
-					"numBatches":          flusher.getBatchCount(),
-				}).Info("store: phase complete")
-			}()
+			log.WithFields(log.Fields{
+				"totalDuration":       storeDuration.Seconds(),
+				"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
+				"commitPhaseDuration": commitDuration.Seconds(),
+				"storeCount":          storeCount,
+				"storeBytes":          storeBytes,
+				"numBatches":          flusher.getBatchCount(),
+			}).Info("store: phase complete")
+		}()
 
-			// Marshal the checkpoint
-			checkpointBytes, err := runtimeCheckpoint.Marshal()
+		// Marshal the checkpoint
+		checkpointBytes, err := runtimeCheckpoint.Marshal()
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		}
+
+		// Update the fence checkpoint
+		t.fence.Checkpoint = checkpointBytes
+
+		// Add fence update mutation to the current batch
+		// Use the standard checkpoint table name
+		fenceValues := []interface{}{
+			t.fence.Materialization.String(),
+			int64(t.fence.KeyBegin), // Convert uint32 to int64
+			int64(t.fence.KeyEnd),   // Convert uint32 to int64
+			int64(t.fence.Fence),    // Convert uint64 to int64
+			base64.StdEncoding.EncodeToString(checkpointBytes),
+		}
+		fenceMutation := spanner.InsertOrUpdate(
+			sql.DefaultFlowCheckpoints,
+			[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
+			fenceValues,
+		)
+
+		// Flush all data partitions first (before fence)
+		nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
+		if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("flushing remaining partitions during commit: %w", err))
+		}
+
+		// Wait for all data flushes to complete
+		if err := flusher.wait(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("flushing data mutations: %w", err))
+		}
+
+		// Truncations run after the stores, because a store of an existing
+		// row is an InsertOrUpdate that would re-insert a fresh row if its
+		// old row were already deleted.
+		truncated := make(map[int]int64, len(t.truncations))
+		for binding, boundary := range t.truncations {
+			b := t.bindings[binding]
+			rowCount, err := t.client.PartitionedUpdate(ctx, spanner.Statement{
+				SQL:    b.truncateSQL,
+				Params: map[string]interface{}{"boundary": boundary},
+			})
 			if err != nil {
-				return fmt.Errorf("marshalling checkpoint: %w", err)
+				return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
 			}
+			truncated[binding] = rowCount
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+				"deleted":  rowCount,
+			}).Info("truncated rows published before the backfill")
+		}
 
-			// Update the fence checkpoint
-			t.fence.Checkpoint = checkpointBytes
+		// Apply fence mutation separately after all data succeeds
+		// This ensures data is never committed without the checkpoint update
+		if _, _, err := t.timedSpannerApply(ctx, []*spanner.Mutation{fenceMutation}, "store-fence"); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("applying fence checkpoint: %w", err))
+		}
 
-			// Add fence update mutation to the current batch
-			// Use the standard checkpoint table name
-			fenceValues := []interface{}{
-				t.fence.Materialization.String(),
-				int64(t.fence.KeyBegin), // Convert uint32 to int64
-				int64(t.fence.KeyEnd),   // Convert uint32 to int64
-				int64(t.fence.Fence),    // Convert uint64 to int64
-				base64.StdEncoding.EncodeToString(checkpointBytes),
+		for i, b := range t.bindings {
+			stats := m.TotalRowStats(stored[i])
+			if n, ok := truncated[i]; ok {
+				stats = stats.WithTruncated(n)
+			} else if stored[i] == 0 {
+				continue
 			}
-			fenceMutation := spanner.InsertOrUpdate(
-				sql.DefaultFlowCheckpoints,
-				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
-				fenceValues,
-			)
+			t.be.ReportRowStats(round, b.target.Path, stats)
+		}
 
-			// Flush all data partitions first (before fence)
-			nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
-			if err := flusher.flushPartitionsAsync(nonEmptyPartitions); err != nil {
-				return fmt.Errorf("flushing remaining partitions during commit: %w", err)
-			}
+		log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
 
-			// Wait for all data flushes to complete
-			if err := flusher.wait(); err != nil {
-				return fmt.Errorf("flushing data mutations: %w", err)
-			}
-
-			// Apply fence mutation separately after all data succeeds
-			// This ensures data is never committed without the checkpoint update
-			if _, _, err := t.timedSpannerApply(ctx, []*spanner.Mutation{fenceMutation}, "store-fence"); err != nil {
-				return fmt.Errorf("applying fence checkpoint: %w", err)
-			}
-
-			log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
-
-			return nil
-		})
+		return nil, nil
 	}, nil
 }
 
 func (t *transactor) Destroy() {
 	t.client.Close()
 	t.adminClient.Close()
-}
-
-func main() {
-	boilerplate.RunMain(&driver{})
 }

@@ -1,0 +1,13 @@
+credentials:
+    credentials_title: API Key
+    api_key_sops: ENC[AES256_GCM,data:cTcyaTt1OktNfGC9bwdnmHgLDXNJcJM9HwOFXhy5ITX2dKubmQ==,iv:liPFyFxqAmVWFYvnaBMG+bxhNcMXLmQRI1S8uCNQyNQ=,tag:9aaK4DecI0xPIPM/kJsrbA==,type:str]
+start_date: "2026-06-01T00:00:00Z"
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-06-10T14:19:50Z"
+          enc: CiUAdmEdwhyeIrs3zBwzciHcSN1Mj47sxFAhLtYYBN/4NkahZ40FEkkApbezqmrr72nmprzM61ElhbqDsP1yevQZxrydcr3MkSByOxDGv0EJf3EO93TTgMGM3DHbojt67oG4QLgupv8ZG7R6ib1PdfcA
+    lastmodified: "2026-06-10T14:19:51Z"
+    mac: ENC[AES256_GCM,data:cmxNjLjXsothk3DWve8lwTbqBC71lxyvibXxFZrtlwXi8H3l47kiUuKcrPzgB7+ZLTpv1ThY5Aua3Z2/92Jg/kDYHrJr1LVAisCJqp4CBGjslQJ6k3Wi/nJJ4w84iO3NDfBojZzeQq4XLmr4VE0nusMt/dhH3YlmaYm3ca7bXfQ=,iv:LnnWRj/Z73OF2VoyimGcEB3dQpamBsjaylh1rr9gN+o=,tag:tWPIFjtxKJ7r9rTwLVZjQw==,type:str]
+    encrypted_suffix: _sops
+    version: 3.10.2
