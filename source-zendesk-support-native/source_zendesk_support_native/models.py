@@ -1,7 +1,7 @@
 from datetime import datetime, UTC, timedelta
 from enum import StrEnum
 import json
-from typing import Annotated, Any, Literal, TYPE_CHECKING
+from typing import Annotated, Any, ClassVar, Literal, TYPE_CHECKING
 
 from estuary_cdk.capture.common import (
     BasicAuth,
@@ -331,6 +331,27 @@ INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, t
     ("ticket_skips", "skips", FilterParam.START_TIME, "updated_at", TicketSkipsResponse),
     ("ticket_metric_events", "incremental/ticket_metric_events", FilterParam.START_TIME, "time", TicketMetricEventsResponse),
     ("ticket_activities", "activities", FilterParam.START_TIME, "updated_at", TicketActivitiesResponse),
+]
+
+
+class IncrementalKeysetPaginatedResponse(BaseModel, extra="allow"):
+    PATH: ClassVar[str]
+    ITEMS_KEY: ClassVar[str]
+
+    meta: FullRefreshCursorPaginatedResponse.Meta
+
+
+class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
+    PATH: ClassVar[str] = "organizations"
+    ITEMS_KEY: ClassVar[str] = "organizations"
+
+    resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
+# Resources read by sweeping a list endpoint in ascending updated_at order.
+# Tuples contain the name and response model for each resource.
+INCREMENTAL_KEYSET_PAGINATED_RESOURCES: list[tuple[str, type[IncrementalKeysetPaginatedResponse]]] = [
+    ("organizations", OrganizationsListResponse),
 ]
 
 
