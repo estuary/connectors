@@ -110,15 +110,16 @@ jobs:
           key: go-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
           lookup-only: true
 
-      # A package that fails to compile here fails its own connector's job, so
-      # it must not keep everything else out of the cache.
+      # A package that fails to compile here (source-db2 needs IBM's headers)
+      # fails its own connector's job, so it must not keep everything else out
+      # of the cache, nor annotate this job with its errors.
       - name: Compile every package and test
         if: steps.cache.outputs.cache-hit != 'true'
         env:
           GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
         run: |
-          go build ./... || true
-          go test -count=1 -run '^$' ./... > /dev/null || true
+          go build ./... > /dev/null 2>&1 || true
+          go test -count=1 -run '^$' ./... > /dev/null 2>&1 || true
 
       - if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
