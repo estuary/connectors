@@ -169,7 +169,7 @@ jobs:
             KEY=$NAME-$GOV-${{ hashFiles('go.mod', 'go.sum') }}
             if docker buildx imagetools inspect $KEY > /dev/null 2>&1; then continue; fi
             docker buildx build --platform linux/amd64 --provenance=false \
-              --build-arg IMAGE=$image --build-arg TAGS=$tags --tag $KEY --tag $NAME-latest \
+              --build-arg IMAGE=$image --build-arg TAGS=${tags#default} --tag $KEY --tag $NAME-latest \
               --output type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true \
               -f - . <<'EOF'
           ARG IMAGE
@@ -178,7 +178,6 @@ jobs:
           WORKDIR /builder
           RUN --mount=type=bind,target=/builder go mod download
           RUN --mount=type=bind,target=/builder,rw \
-              [ "$TAGS" = default ] && TAGS=; \
               go build -tags "$TAGS" ./... > /dev/null 2>&1; \
               go test -tags "$TAGS" -count=1 -run '^$' ./... > /dev/null 2>&1; \
               du -sh /go/pkg/mod /root/.cache/go-build
@@ -198,6 +197,7 @@ jobs:
               and all($t[]; startswith("golang-"))
               and all($t[]; endswith("-latest") | not)) | .id' \
             | while read id; do
+              echo "Deleting version $id"
               gh api -X DELETE /orgs/estuary/packages/container/build-cache/versions/$id
             done
 
