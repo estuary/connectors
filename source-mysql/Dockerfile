@@ -9,8 +9,7 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go mod download
+RUN go mod download
 
 COPY go                  ./go
 COPY source-boilerplate  ./source-boilerplate
@@ -21,12 +20,10 @@ COPY source-mysql        ./source-mysql
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -short -failfast ./source-mysql/...
+RUN go test -short -failfast ./source-mysql/...
 
 # Build the connector.
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go build -o ./connector -v ./source-mysql/...
+RUN go build -o ./connector -v ./source-mysql/...
 
 
 # Runtime Stage

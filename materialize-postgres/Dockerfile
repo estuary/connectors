@@ -9,8 +9,7 @@ WORKDIR /builder
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go mod download
+RUN go mod download
 
 # Copy in the latest flowctl-go for usage by tests.
 COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
@@ -21,12 +20,9 @@ COPY materialize-postgres    ./materialize-postgres
 COPY materialize-sql         ./materialize-sql
 
 # Test and build the connector.
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -tags nozstd -v      ./materialize-sql/...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go test -tags nozstd -short -v ./materialize-postgres/...
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    go build -tags nozstd -v -o ./connector ./materialize-postgres/cmd/connector
+RUN go test -tags nozstd -v      ./materialize-sql/...
+RUN go test -tags nozstd -short -v ./materialize-postgres/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-postgres/cmd/connector
 
 # Runtime Stage
 ################################################################################
