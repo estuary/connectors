@@ -153,6 +153,7 @@ func TestAcknowledgeDrainsStagedWorkBesideStreamV2(t *testing.T) {
 	require.NoError(t, err)
 
 	var d = &transactor{
+		primary:  true,
 		bindings: []*binding{{target: sql.Table{TableShape: sql.TableShape{Path: []string{"a_table"}}, StateKey: "a_table.v1"}, streaming: true}},
 		be:       m.NewBindingEvents(),
 		snowpipeStreaming: &streamManager{

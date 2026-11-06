@@ -279,6 +279,9 @@ type transactor struct {
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
+	// primary is set for the shard whose key range begins at zero, which
+	// alone drains recovered staged work.
+	primary bool
 
 	// If this is still the recovery (first after startup) commit, where special
 	// handling may be needed for registering streaming files.
@@ -299,6 +302,16 @@ func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
+	}
+
+	if !d.primary {
+		for stateKey, item := range d.cp {
+			if item == nil || len(item.StreamV2) == 0 {
+				delete(d.cp, stateKey)
+			} else {
+				d.cp[stateKey] = &checkpointItem{Table: item.Table, StreamV2: item.StreamV2}
+			}
+		}
 	}
 
 	return nil
@@ -355,6 +368,7 @@ func newTransactor(
 		pipeClient:          pipeClient,
 		_range:              open.Range,
 		version:             open.Version,
+		primary:             open.Range.KeyBegin == 0,
 		be:                  be,
 		cp:                  make(checkpoint),
 		uploads:             newUploadLimiter(),
