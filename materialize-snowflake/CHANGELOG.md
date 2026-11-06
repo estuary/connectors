@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-11-06
+
+### Fixed
+- A task on more than one shard no longer writes Snowpipe Streaming blobs
+  left over from before a switch to `snowpipe_streaming_v2` once per shard.
+  Only the shard whose key range begins at zero now finishes them, so their
+  rows are written once.
+
 ## 2026-11-05
 
 ### Changed
