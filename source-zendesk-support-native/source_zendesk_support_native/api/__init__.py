@@ -26,6 +26,10 @@ from .time_exports import (
     fetch_incremental_time_export_resources,
     backfill_incremental_time_export_resources,
 )
+from .incremental_keyset_paginated import (
+    fetch_incremental_keyset_paginated_resources,
+    backfill_incremental_keyset_paginated_resources,
+)
 from .talk import (
     fetch_talk_incremental_export_resources,
     backfill_talk_incremental_export_resources,
@@ -56,6 +60,7 @@ __all__ = [
     "backfill_incremental_time_export_resources",
     "backfill_incremental_cursor_export_resources",
     "backfill_incremental_cursor_paginated_resources",
+    "backfill_incremental_keyset_paginated_resources",
     "backfill_satisfaction_ratings",
     "backfill_talk_incremental_export_resources",
     "backfill_side_conversations",
@@ -67,6 +72,7 @@ __all__ = [
     "fetch_incremental_time_export_resources",
     "fetch_incremental_cursor_export_resources",
     "fetch_incremental_cursor_paginated_resources",
+    "fetch_incremental_keyset_paginated_resources",
     "fetch_post_child_resources",
     "fetch_post_comment_votes",
     "fetch_satisfaction_ratings",

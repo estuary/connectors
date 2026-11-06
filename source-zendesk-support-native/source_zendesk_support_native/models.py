@@ -334,6 +334,21 @@ INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, t
 ]
 
 
+class IncrementalKeysetPaginatedResponse(BaseModel, extra="allow"):
+    meta: FullRefreshCursorPaginatedResponse.Meta
+
+
+class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="organizations")
+
+
+# Resources read by sweeping a list endpoint in ascending updated_at order.
+# Tuples contain the name, path, and response model for each resource.
+INCREMENTAL_KEYSET_PAGINATED_RESOURCES: list[tuple[str, str, type[IncrementalKeysetPaginatedResponse]]] = [
+    ("organizations", "organizations", OrganizationsListResponse),
+]
+
+
 class TicketChildResourceValidationContext:
     def __init__(self, ticket_id: int):
         self.ticket_id = ticket_id
