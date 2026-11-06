@@ -7,18 +7,23 @@ FROM --platform=linux/amd64 golang:1.27-trixie AS builder
 WORKDIR /builder
 
 COPY go.* ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
 
 COPY go                         ./go
 COPY filesink                   ./filesink
 COPY materialize-boilerplate    ./materialize-boilerplate
 COPY materialize-s3-parquet    ./materialize-s3-parquet
 
-RUN go test -v ./filesink/...
-RUN go test -v ./materialize-boilerplate/...
-RUN go test -short -v ./materialize-s3-parquet/...
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go test -v ./filesink/...
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go test -v ./materialize-boilerplate/...
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go test -short -v ./materialize-s3-parquet/...
 
-RUN go build -o ./connector -v ./materialize-s3-parquet/cmd/connector
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    go build -o ./connector -v ./materialize-s3-parquet/cmd/connector
 
 # Runtime Stage
 ################################################################################

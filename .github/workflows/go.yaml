@@ -134,6 +134,46 @@ jobs:
             ~/.cache/go-build
           key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
 
+      # The Dockerfiles compile in the golang image at /builder, where the
+      # runner's cache doesn't match, so they get their own cache, compiled
+      # there. It's keyed on the image's Go version rather than its digest,
+      # which moves with every Debian update.
+      - id: golang
+        run: |
+          GOV=$(docker buildx imagetools inspect golang:1.27-trixie \
+            --format '{{json (index .Image "linux/amd64").Config.Env}}' \
+            | jq -r '.[] | select(startswith("GOLANG_VERSION=")) | ltrimstr("GOLANG_VERSION=")')
+          echo "key=go-docker-cache-$GOV-${{ hashFiles('go.mod', 'go.sum') }}" >> $GITHUB_OUTPUT
+
+      - id: docker_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/docker-go
+          key: ${{ steps.golang.outputs.key }}
+          lookup-only: true
+
+      - name: Compile every package and test in the golang image
+        if: steps.docker_cache.outputs.cache-hit != 'true'
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+        run: |
+          mkdir -p ~/docker-go/mod ~/docker-go/build
+          docker run --rm --platform linux/amd64 -v "$PWD:/builder" -w /builder \
+            -v ~/docker-go/mod:/go/pkg/mod -v ~/docker-go/build:/root/.cache/go-build \
+            golang:1.27-trixie sh -c '
+              go mod download
+              for tags in "" nozstd; do
+                go build -tags "$tags" ./... > /dev/null 2>&1 || true
+                go test -tags "$tags" -count=1 -run "^$" ./... > /dev/null 2>&1 || true
+              done'
+          sudo du -sh ~/docker-go/mod ~/docker-go/build
+
+      - if: steps.docker_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/docker-go
+          key: ${{ steps.golang.outputs.key }}
+
   build_connectors:
     runs-on: ubuntu-24.04
     permissions:
@@ -307,6 +347,37 @@ jobs:
           # (which has LFS installed) will match the Docker builder we use (which doesn't)
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
+
+      # Dockerfiles that compile through cache mounts get the golang-image
+      # cache the warm_go_cache job compiled, injected into BuildKit's mounts.
+      - id: golang
+        run: |
+          if ! grep -q 'target=/root/.cache/go-build' ${{ matrix.connector.name }}/Dockerfile; then exit 0; fi
+          GOV=$(docker buildx imagetools inspect golang:1.27-trixie \
+            --format '{{json (index .Image "linux/amd64").Config.Env}}' \
+            | jq -r '.[] | select(startswith("GOLANG_VERSION=")) | ltrimstr("GOLANG_VERSION=")')
+          echo "prefix=go-docker-cache-$GOV-" >> $GITHUB_OUTPUT
+          echo "key=go-docker-cache-$GOV-${{ hashFiles('go.mod', 'go.sum') }}" >> $GITHUB_OUTPUT
+
+      - name: Restore golang-image Go cache
+        id: docker_cache
+        if: steps.golang.outputs.key
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/docker-go
+          key: ${{ steps.golang.outputs.key }}
+          restore-keys: ${{ steps.golang.outputs.prefix }}
+
+      - name: Inject golang-image Go cache into BuildKit
+        if: steps.docker_cache.outputs.cache-matched-key
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          cache-map: |
+            {
+              "/home/runner/docker-go/mod": "/go/pkg/mod",
+              "/home/runner/docker-go/build": "/root/.cache/go-build"
+            }
+          skip-extraction: true
 
       - name: Build ${{ matrix.connector.name }} Docker Image
         uses: docker/build-push-action@v6
