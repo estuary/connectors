@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -17,8 +18,57 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 	"resty.dev/v3"
 )
+
+func TestCheckpointSplitsExistingAndNewRows(t *testing.T) {
+	var staged = func(uuid string) *stagedFile {
+		return &stagedFile{uuid: uuid, started: true, finished: true, group: new(errgroup.Group)}
+	}
+	var newTransactor = func(merge, copy *stagedFile) *transactor {
+		var b = &binding{target: sql.Table{StateKey: "a_table", Identifier: "a_table"}}
+		b.store.mergeStage, b.store.copyStage = merge, copy
+		b.store.mergeBounds = sql.NewMergeBoundsBuilder(nil, nil)
+		return &transactor{bindings: []*binding{b}, cp: make(checkpoint), templates: testTemplates}
+	}
+
+	t.Run("existing and new rows", func(t *testing.T) {
+		var d = newTransactor(staged("merged"), staged("copied"))
+		_, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
+		require.NoError(t, err)
+
+		var item = d.cp["a_table"]
+		require.True(t, strings.HasPrefix(item.Query, "\nMERGE INTO"))
+		require.Contains(t, item.Query, "@flow_v1/merged")
+		require.Equal(t, "@flow_v1/merged", item.StagedDir)
+		require.True(t, strings.HasPrefix(item.CopyQuery, "\nCOPY INTO"))
+		require.Contains(t, item.CopyQuery, "@flow_v1/copied")
+		require.Equal(t, "@flow_v1/copied", item.CopyStagedDir)
+	})
+
+	t.Run("only new rows", func(t *testing.T) {
+		var d = newTransactor(newStagedFile("", nil), staged("copied"))
+		cpJSON, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
+		require.NoError(t, err)
+
+		var item = d.cp["a_table"]
+		require.True(t, strings.HasPrefix(item.Query, "\nCOPY INTO"))
+		require.Equal(t, "@flow_v1/copied", item.StagedDir)
+		require.NotContains(t, string(cpJSON), "CopyQuery")
+		require.NotContains(t, string(cpJSON), "CopyStagedDir")
+	})
+
+	t.Run("only existing rows", func(t *testing.T) {
+		var d = newTransactor(staged("merged"), newStagedFile("", nil))
+		_, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
+		require.NoError(t, err)
+
+		var item = d.cp["a_table"]
+		require.True(t, strings.HasPrefix(item.Query, "\nMERGE INTO"))
+		require.Empty(t, item.CopyQuery)
+	})
+}
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	d := &transactor{
