@@ -157,22 +157,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # zstd layers decompress several times faster than gzip, which is most
+      # of what pulling these costs.
+      - uses: docker/setup-buildx-action@v4
+
       - name: Publish golang images with a compiled Go cache
         env:
           GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
         run: |
           for tags in default nozstd; do
-            IMAGE=ghcr.io/estuary/build-cache:golang-$tags-${{ steps.golang.outputs.tag }}
+            IMAGE=ghcr.io/estuary/build-cache:golang-$tags-zstd-${{ steps.golang.outputs.tag }}
             if docker buildx imagetools inspect $IMAGE > /dev/null 2>&1; then continue; fi
-            docker run --name warm-$tags --platform linux/amd64 -e TAGS=$tags \
-              -v "$PWD:/builder" -w /builder golang:1.27-trixie sh -c '
-                [ "$TAGS" = default ] && TAGS=
-                go mod download
-                go build -tags "$TAGS" ./... > /dev/null 2>&1 || true
-                go test -tags "$TAGS" -count=1 -run "^$" ./... > /dev/null 2>&1 || true
-                du -sh /go/pkg/mod /root/.cache/go-build'
-            docker commit warm-$tags $IMAGE
-            docker push -q $IMAGE
+            docker buildx build --platform linux/amd64 --build-arg TAGS=$tags \
+              --output type=image,name=$IMAGE,push=true,oci-mediatypes=true,compression=zstd,force-compression=true \
+              -f - . <<'EOF'
+          FROM golang:1.27-trixie
+          ARG TAGS
+          WORKDIR /builder
+          RUN --mount=type=bind,target=/builder go mod download
+          RUN --mount=type=bind,target=/builder,rw \
+              [ "$TAGS" = default ] && TAGS=; \
+              go build -tags "$TAGS" ./... > /dev/null 2>&1; \
+              go test -tags "$TAGS" -count=1 -run '^$' ./... > /dev/null 2>&1; \
+              du -sh /go/pkg/mod /root/.cache/go-build
+          EOF
           done
 
   build_connectors:
@@ -358,7 +366,7 @@ jobs:
             | jq -r '.[] | select(startswith("GOLANG_VERSION=")) | ltrimstr("GOLANG_VERSION=")')
           TAGS=default
           grep -q nozstd ${{ matrix.connector.name }}/Dockerfile && TAGS=nozstd
-          IMAGE=ghcr.io/estuary/build-cache:golang-$TAGS-$GOV-${{ hashFiles('go.mod', 'go.sum') }}
+          IMAGE=ghcr.io/estuary/build-cache:golang-$TAGS-zstd-$GOV-${{ hashFiles('go.mod', 'go.sum') }}
           if docker buildx imagetools inspect $IMAGE > /dev/null 2>&1; then
             echo "context=golang:1.27-trixie=docker-image://$IMAGE" >> $GITHUB_OUTPUT
           fi
