@@ -53,6 +53,7 @@ members = [
     "source-linkedin-pages",
     "source-looker",
     "source-mailchimp-native",
+    "source-maxio-saasoptics",
     "source-mixpanel-native",
     "source-monday",
     "source-navan",
@@ -2428,6 +2429,21 @@ requires-dist = [
 name = "source-mailchimp-native"
 version = "0.1.0"
 source = { editable = "source-mailchimp-native" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-maxio-saasoptics"
+version = "0.1.0"
+source = { editable = "source-maxio-saasoptics" }
 dependencies = [
     { name = "estuary-cdk" },
     { name = "pydantic" },

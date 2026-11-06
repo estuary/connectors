@@ -66,6 +66,7 @@ members = [
     "source-linkedin-pages",
     "source-looker",
     "source-mailchimp-native",
+    "source-maxio-saasoptics",
     "source-mixpanel-native",
     "source-monday",
     "source-navan",
