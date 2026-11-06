@@ -82,6 +82,51 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+  # Saves the Go cache the build jobs restore. A cache key is written once, so a
+  # build job saving it would store only what its own connector compiled, and
+  # every other connector would compile the rest cold until go.sum next changed.
+  # This job compiles every package and test, and only main saves, so PRs share
+  # main's cache without each storing a copy.
+  warm_go_cache:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          lookup-only: true
+
+      # A package that fails to compile here fails its own connector's job, so
+      # it must not keep everything else out of the cache.
+      - name: Compile every package and test
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+        run: |
+          go build ./... || true
+          go test -count=1 -run '^$' ./... > /dev/null || true
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+
   build_connectors:
     runs-on: ubuntu-24.04
     permissions:
@@ -116,14 +161,25 @@ jobs:
           echo ::set-output name=variants::${VARIANTS}
 
       # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
-      # without this they fetch the module graph and compile it cold. Gate on the same
-      # condition as the helper package test step.
-      - name: Set up Go with module and build caching
+      # without a cache they fetch the module graph and compile it cold. Gate on the same
+      # condition as the helper package test step. The cache is restored only: the
+      # warm_go_cache job is its one writer.
+      - name: Set up Go
         if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache: false
+
+      - name: Restore Go module and build cache
+        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: go-${{ runner.os }}-
 
       # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
       # column types or keys drift from the spec.
