@@ -57,23 +57,33 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		return nil
 	}
 
-	schemas := make([]string, 0, len(resourcePaths))
+	// Only the tables that are referenced by this materialization's bindings
+	// are read.
+	//
+	// This differs from other implementations, where PopulateInfoSchema loads
+	// all tables in a schema.  However, due to eventual consistency this can
+	// report old or duplicate rows if another writer is concurrently operating
+	// in this same schema.  This most often comes up during testing, but we
+	// also don't want to prevent two tasks from using the same schema.
+	tablePairs := make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
 		loc := c.ep.Dialect.TableLocator(p)
-		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+		tablePairs = append(tablePairs, fmt.Sprintf(
+			"(table_schema = %s and table_name = %s)",
+			c.ep.Dialect.Literal(loc.TableSchema),
+			c.ep.Dialect.Literal(loc.TableName),
+		))
 	}
-
-	slices.Sort(schemas)
-	schemas = slices.Compact(schemas)
+	tableFilter := strings.Join(tablePairs, " or ")
 
 	tables, err := c.db.QueryContext(ctx, fmt.Sprintf(`
 		select table_schema, table_name
 		from INFORMATION_SCHEMA.TABLES
 		where table_catalog = %s
-		and table_schema in (%s);
+		and (%s);
 		`,
 		c.ep.Dialect.Literal(c.ep.Config.Warehouse),
-		strings.Join(schemas, ","),
+		tableFilter,
 	))
 	if err != nil {
 		return err
@@ -98,10 +108,10 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
 		from INFORMATION_SCHEMA.COLUMNS
 		where table_catalog = %s
-		and table_schema in (%s);
+		and (%s);
 		`,
 		c.ep.Dialect.Literal(c.ep.Config.Warehouse),
-		strings.Join(schemas, ","),
+		tableFilter,
 	))
 	if err != nil {
 		return err
