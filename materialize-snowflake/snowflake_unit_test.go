@@ -64,6 +64,24 @@ func TestAcknowledgeKeepsStreamV2Item(t *testing.T) {
 	require.Equal(t, int64(42), d.cp["a_table.v1"].StreamV2[fullKeyRange].Routed)
 }
 
+func TestNonPrimaryShardRecoversOnlyStreamV2State(t *testing.T) {
+	var state, err = json.Marshal(checkpoint{
+		"a_table.v1": {Table: "a_table", StreamBlobs: []*blobMetadata{{Path: "blob"}}, EncryptionKey: "key", StreamV2: streamV2Checkpoint{
+			fullKeyRange: {ChannelName: "chan", Routed: 7},
+		}},
+		"b_table.v1": {Table: "b_table", StreamBlobs: []*blobMetadata{{Path: "blob"}}, EncryptionKey: "key"},
+		"c_table.v1": {Table: "c_table", PipeName: "pipe", PipeFiles: []fileRecord{{Path: "file"}}},
+		"d_table.v1": {Table: "d_table", Query: "MERGE INTO d", StagedDir: "dir"},
+	})
+	require.NoError(t, err)
+
+	var d = &transactor{cp: make(checkpoint)}
+	require.NoError(t, d.UnmarshalState(state))
+	require.Equal(t, checkpoint{
+		"a_table.v1": {Table: "a_table", StreamV2: streamV2Checkpoint{fullKeyRange: {ChannelName: "chan", Routed: 7}}},
+	}, d.cp)
+}
+
 func TestSpecification(t *testing.T) {
 	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
