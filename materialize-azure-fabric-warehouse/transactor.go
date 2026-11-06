@@ -23,6 +23,11 @@ type binding struct {
 	nullFieldsToStrip []string
 	hasBinaryColumns  bool
 
+	// publishedAtColumn is the column that holds each document's publication
+	// time, used to delete rows published before a completed backfill. Nil
+	// if the binding excludes flow_published_at.
+	publishedAtColumn *sql.Column
+
 	load struct {
 		mergeBounds *sql.MergeBoundsBuilder
 	}
@@ -46,6 +51,13 @@ type transactor struct {
 	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
 	be         *m.BindingEvents
+
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func newTransactor(
@@ -77,12 +89,13 @@ func newTransactor(
 	templates := renderTemplates(ep.Dialect)
 
 	t := &transactor{
-		cfg:        cfg,
-		templates:  templates,
-		fence:      fence,
-		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
-		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
+		cfg:                   cfg,
+		templates:             templates,
+		fence:                 fence,
+		be:                    be,
+		loadFiles:             boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
+		storeFiles:            boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	for idx, target := range bindings {
@@ -100,6 +113,9 @@ func newTransactor(
 			target:           target,
 			hasBinaryColumns: hasBinaryColumns,
 		}
+		if col, err := target.PublishedAtColumn(); err == nil {
+			b.publishedAtColumn = col
+		}
 		if ep.Config.Advanced.NoFlowDocument {
 			b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		}
@@ -112,7 +128,27 @@ func newTransactor(
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.publishedAtColumn == nil {
+			var _, reason = b.target.PublishedAtColumn()
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -386,6 +422,34 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected-b.store.updates))
 			t.be.FinishedResourceCommit(b.target.Path)
 			b.store.mustMerge, b.store.updates = false, 0
+		}
+
+		// Truncations run after the stores, because a store of an existing
+		// row is a DELETE-then-INSERT that would match nothing if its old
+		// row were already deleted.
+		for binding, boundary := range t.truncations {
+			b := t.bindings[binding]
+
+			var query strings.Builder
+			if err := t.templates.truncateQuery.Execute(&query, truncateParams{
+				Table:             b.target,
+				PublishedAtColumn: b.publishedAtColumn.Identifier,
+				Boundary:          boundary.UTC().Format("2006-01-02T15:04:05.999999"),
+			}); err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("evaluating truncate query for %s: %w", b.target.Identifier, err))
+			}
+			res, err := txn.ExecContext(ctx, query.String())
+			if err != nil {
+				log.WithField("query", redactedQuery(query, t.cfg.StorageAccountKey)).Error("truncate query failed")
+				return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
+			}
+			deleted, _ := res.RowsAffected()
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+				"deleted":  deleted,
+			}).Info("truncated rows published before the backfill")
+			t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(0).WithTruncated(deleted))
 		}
 
 		if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
