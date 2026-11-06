@@ -62,4 +62,5 @@
 - name: materialize-spanner
 - name: materialize-sqlite
 - name: materialize-sqlserver
+- name: materialize-twenty
 - name: materialize-webhook
