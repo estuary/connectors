@@ -175,15 +175,78 @@ func TestIntegration(t *testing.T) {
 	materializeSpec := "testdata/materialize-rest-local.flow.yaml"
 	applySpec := "testdata/apply-rest-local.flow.yaml"
 	migrateSpec := "testdata/migrate-rest-local.flow.yaml"
+	truncateSpec := "testdata/truncate-rest-local.flow.yaml"
 	if all {
 		materializeSpec = "testdata/materialize.flow.yaml"
 		applySpec = "testdata/apply.flow.yaml"
 		migrateSpec = "testdata/migrate.flow.yaml"
+		truncateSpec = "testdata/truncate.flow.yaml"
 	}
 
 	t.Run("materialize", func(t *testing.T) {
 		boilerplate.RunMaterializationTestParallel(t, NewMaterializer, materializeSpec, makeResourceFn, actionDescSanitizers,
 			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal})
+	})
+
+	t.Run("truncate", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
+
+		boilerplate.RunTestAllTasks(t, truncateSpec, func(t *testing.T, _ []byte, taskName string, cfg config) {
+			ctx := context.Background()
+
+			flags := common.ResolveFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults, common.CreatedAt{})
+			mat, err := NewMaterializer(ctx, taskName, cfg, flags)
+			require.NoError(t, err)
+
+			boilerplate.RunFlowctl(t, "raw", "preview-next",
+				"--name", taskName,
+				"--source", truncateSpec,
+				"--fixture", "testdata/truncate.fixture.json",
+				"--shards", "1",
+				"--timeout", "5m",
+				"--network", "flow-test",
+			)
+
+			if cfg.Compute.ComputeType != computeTypeSparkStandalone {
+				// Row verification runs eager queries through the local spark
+				// daemon, which the cloud compute variants don't expose.
+				t.Skipf("truncate row verification only runs against the local spark stack, not %q", cfg.Compute.ComputeType)
+			}
+
+			// The fixture stores ids 1-3, then re-stores only id 1 during a
+			// backfill. Only the table with a flow_published_at column loses
+			// the rows published before the backfill.
+			for table, want := range map[string][]int64{
+				"truncate_standard":        {1},
+				"truncate_no_published_at": {1, 2, 3},
+			} {
+				res := resource{Table: table}.WithDefaults(cfg)
+				path, _, err := res.Parameters()
+				require.NoError(t, err)
+
+				cols, rows, err := mat.(*materialization).SnapshotTestResource(ctx, path)
+				require.NoError(t, err)
+
+				idIdx := -1
+				for i, c := range cols {
+					if c == "id" {
+						idIdx = i
+						break
+					}
+				}
+				require.NotEqual(t, -1, idIdx, "no id column for %s", table)
+
+				var ids []int64
+				for _, row := range rows {
+					raw, ok := row[idIdx].(json.RawMessage)
+					require.True(t, ok, "unexpected id value type %T for %s", row[idIdx], table)
+					var id int64
+					require.NoError(t, json.Unmarshal(raw, &id))
+					ids = append(ids, id)
+				}
+				require.Equal(t, want, ids, table)
+			}
+		})
 	})
 
 	t.Run("apply", func(t *testing.T) {

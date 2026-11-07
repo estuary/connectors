@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"iter"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/blob"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/python"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -31,6 +35,117 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, state)
 	require.NotNil(t, tr.cp["a_table.v1"])
+}
+
+// recordingComputeRunner records the input of the last job it ran, succeeding
+// every job without actually running anything.
+type recordingComputeRunner struct {
+	lastInput any
+}
+
+func (r *recordingComputeRunner) runJob(_ context.Context, job computeJob) error {
+	r.lastInput = job.Input
+	return nil
+}
+
+func (r *recordingComputeRunner) checkPrereqs(context.Context, *cerrors.PrereqErr) {}
+
+func (r *recordingComputeRunner) ensureSecret(context.Context, string) error { return nil }
+
+// noopBucket implements blob.Bucket with an always-empty listing: enough for
+// code paths that only list, delete, or name a prefix, never actually reading
+// or writing an object.
+type noopBucket struct{}
+
+func (noopBucket) NewReader(context.Context, string) (io.ReadCloser, error) {
+	panic("not implemented")
+}
+func (noopBucket) NewWriter(context.Context, string, ...blob.WriterOption) io.WriteCloser {
+	panic("not implemented")
+}
+func (noopBucket) Upload(context.Context, string, io.Reader, ...blob.WriterOption) error {
+	panic("not implemented")
+}
+func (noopBucket) URI(key string) string { return "s3://bucket/" + key }
+func (noopBucket) Delete(context.Context, []string) error { return nil }
+func (noopBucket) CheckPermissions(context.Context, blob.CheckPermissionsConfig) error {
+	panic("not implemented")
+}
+func (noopBucket) List(context.Context, blob.Query) iter.Seq2[blob.ObjectInfo, error] {
+	return func(yield func(blob.ObjectInfo, error) bool) {}
+}
+
+// TestAcknowledgeRecoveryTruncateOnly covers a crash-recovery Acknowledge for
+// a binding whose only pending work is a backfill truncation staged with no
+// merge files: the files-must-exist recovery gate predates truncation and
+// must not drop (or endlessly retry) an entry that was never supposed to have
+// files.
+func TestAcknowledgeRecoveryTruncateOnly(t *testing.T) {
+	compute := &recordingComputeRunner{}
+
+	tr := &transactor{
+		cp: map[string]*pendingMerge{
+			"a_table.v1": {MergeBinding: python.MergeBinding{Binding: 0, TruncateQuery: "DELETE FROM a WHERE x < '2026-01-01'"}},
+		},
+		bindings: []binding{{Mapped: &boilerplate.MappedBinding[config, resource, mapped]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{StateKey: "a_table.v1", ResourcePath: []string{"ns", "a_table"}},
+		}}},
+		recovery:   true,
+		compute:    compute,
+		bucket:     noopBucket{},
+		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, noopBucket{}, 0, "", true, true),
+	}
+
+	state, err := tr.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
+	require.NoError(t, err)
+	require.NotNil(t, state, "the checkpoint entry must be cleared once the truncation runs")
+	require.Nil(t, tr.cp["a_table.v1"])
+
+	mergeInput, ok := compute.lastInput.(python.MergeInput)
+	require.True(t, ok, "expected the job to run with a python.MergeInput, got %T", compute.lastInput)
+	require.Len(t, mergeInput.Bindings, 1)
+	require.Equal(t, "DELETE FROM a WHERE x < '2026-01-01'", mergeInput.Bindings[0].TruncateQuery)
+}
+
+// TestAcknowledgeRecoveryMergeFilesGoneWithPendingTruncate covers a
+// crash-recovery Acknowledge for a binding whose checkpoint carries both a
+// merge (now-deleted files) and a pending backfill truncation. The merge
+// already completed and its files were cleaned up before the crash, so its
+// Query must not be resubmitted against an empty Files list; the surviving
+// TruncateQuery must still run.
+func TestAcknowledgeRecoveryMergeFilesGoneWithPendingTruncate(t *testing.T) {
+	compute := &recordingComputeRunner{}
+
+	tr := &transactor{
+		cp: map[string]*pendingMerge{
+			"a_table.v1": {MergeBinding: python.MergeBinding{
+				Binding:       0,
+				Query:         "MERGE INTO a",
+				Columns:       []python.NestedField{{Name: "id", Type: "long"}},
+				Files:         []string{"s3://bucket/staged/a_table/file1.csv"},
+				TruncateQuery: "DELETE FROM a WHERE x < '2026-01-01'",
+			}},
+		},
+		bindings: []binding{{Mapped: &boilerplate.MappedBinding[config, resource, mapped]{
+			MaterializationSpec_Binding: pf.MaterializationSpec_Binding{StateKey: "a_table.v1", ResourcePath: []string{"ns", "a_table"}},
+		}}},
+		recovery:   true,
+		compute:    compute,
+		bucket:     noopBucket{},
+		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, noopBucket{}, 0, "", true, true),
+	}
+
+	state, err := tr.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
+	require.NoError(t, err)
+	require.NotNil(t, state, "the checkpoint entry must be cleared once the truncation runs")
+	require.Nil(t, tr.cp["a_table.v1"])
+
+	mergeInput, ok := compute.lastInput.(python.MergeInput)
+	require.True(t, ok, "expected the job to run with a python.MergeInput, got %T", compute.lastInput)
+	require.Len(t, mergeInput.Bindings, 1)
+	require.Empty(t, mergeInput.Bindings[0].Query, "a merge whose files are gone must not be resubmitted")
+	require.Empty(t, mergeInput.Bindings[0].Files)
+	require.Equal(t, "DELETE FROM a WHERE x < '2026-01-01'", mergeInput.Bindings[0].TruncateQuery)
 }
 
 func TestSpec(t *testing.T) {

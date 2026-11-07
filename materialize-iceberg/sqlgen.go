@@ -9,14 +9,23 @@ import (
 )
 
 type templates struct {
-	loadQuery    *template.Template
-	mergeQuery   *template.Template
-	migrateQuery *template.Template
+	loadQuery     *template.Template
+	mergeQuery    *template.Template
+	truncateQuery *template.Template
+	migrateQuery  *template.Template
 }
 
 type templateInput struct {
 	binding
 	Bounds []mergeBound
+}
+
+// truncateInput renders the DELETE that removes a binding's rows published
+// before a completed backfill's boundary.
+type truncateInput struct {
+	binding
+	PublishedAtColumn string
+	Boundary          string
 }
 
 type migrateColumn struct {
@@ -137,6 +146,11 @@ WHEN NOT MATCHED AND {{ DocumentAsJSON "r" $.Mapped.Document.Mapped }} != '"dele
 )
 {{ end }}
 
+{{ define "truncateQuery" -}}
+DELETE FROM {{ TableFQN $.Mapped.ResourcePath }}
+WHERE {{ QuoteIdentifier $.PublishedAtColumn }} < {{ $.Boundary }}
+{{ end }}
+
 {{ define "migrateQuery" -}}
 UPDATE {{ TableFQN $.ResourcePath }}
 SET
@@ -148,8 +162,9 @@ SET
 `))
 
 	return templates{
-		loadQuery:    parsed.Lookup("loadQuery"),
-		mergeQuery:   parsed.Lookup("mergeQuery"),
-		migrateQuery: parsed.Lookup("migrateQuery"),
+		loadQuery:     parsed.Lookup("loadQuery"),
+		mergeQuery:    parsed.Lookup("mergeQuery"),
+		truncateQuery: parsed.Lookup("truncateQuery"),
+		migrateQuery:  parsed.Lookup("migrateQuery"),
 	}
 }
