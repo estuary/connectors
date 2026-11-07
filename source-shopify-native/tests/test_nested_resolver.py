@@ -134,6 +134,27 @@ async def test_overflow_page_size_sets_drain_first(log):
     assert "first: 2" not in client.queries[0]
 
 
+@pytest.mark.asyncio
+async def test_extra_args_reach_inline_and_drain_queries(log):
+    """extra_args follow the paging arguments in both the inline block and the overflow re-query."""
+    connection = NestedConnection(
+        parent_path=[],
+        parent_typename="Order",
+        field_name="shippingLines",
+        node_selection="id",
+        page_size=2,
+        extra_args="includeRemovals: true",
+    )
+    client = _MockClient(
+        {"gid://shopify/Order/1": [_NodeResponse(node={"shippingLines": _inline([{"id": "a"}])})]}
+    )
+
+    await drain_connection(client, "gid://shopify/Order/1", connection, log, after="CUR0")
+
+    assert "shippingLines(first: 2, includeRemovals: true)" in connection.inline_block()
+    assert 'shippingLines(first: 2, after: "CUR0", includeRemovals: true)' in client.queries[0]
+
+
 # --- resolve_document: inline-first stitching -----------------------------------------------------
 
 

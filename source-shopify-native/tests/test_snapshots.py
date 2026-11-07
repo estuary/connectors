@@ -45,22 +45,21 @@ def test_capture(request, snapshot):
     lines = [json.loads(line) for line in result.stdout.splitlines()]
 
     # Keep one representative document per stream, preserving first-appearance order.
-    RETURNS_STREAM = "acmeCo/order_returns"
+    # Prefer the first order whose nested list isn't empty, so the snapshot shows its items.
+    NESTED_LIST_KEYS = {
+        "acmeCo/order_returns": "returns",
+        "acmeCo/order_shipping_lines": "shippingLines",
+    }
     chosen: dict[str, list] = {}
     order: list[str] = []
 
     for line in lines:
         stream, record = line[0], line[1]
+        list_key = NESTED_LIST_KEYS.get(stream)
         if stream not in chosen:
             chosen[stream] = line
             order.append(stream)
-        elif (
-            stream == RETURNS_STREAM
-            and not chosen[stream][1].get("returns")
-            and record.get("returns")
-        ):
-            # Prefer the first order that actually has returns so the snapshot
-            # covers the nested return reassembly.
+        elif list_key and not chosen[stream][1].get(list_key) and record.get(list_key):
             chosen[stream] = line
 
     unique_stream_lines = []
