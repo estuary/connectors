@@ -204,3 +204,93 @@ func TestStatementKind(t *testing.T) {
 	require.Equal(t, "copy", StatementKind("COPY INTO t FROM ..."))
 	require.Equal(t, "", StatementKind("  "))
 }
+
+type fakeDescriber struct {
+	fields log.Fields
+	err    error
+	calls  []int
+}
+
+func (d *fakeDescriber) DescribeTable(_ context.Context, binding int) (log.Fields, error) {
+	d.calls = append(d.calls, binding)
+	return d.fields, d.err
+}
+
+func TestQueryProfilerDescribe(t *testing.T) {
+	var now = time.Now()
+	var describing = func(d *fakeDescriber) (*QueryProfiler, *[]log.Fields) {
+		var p, _ = testProfiler(nil, 0)
+		var tables []log.Fields
+		p.describer = d
+		p.describeQueue = make(chan int, 1)
+		p.describedAt = make(map[int]time.Time)
+		p.emitTable = func(fields log.Fields) { tables = append(tables, fields) }
+		return p, &tables
+	}
+	var queued = func(p *QueryProfiler) []int {
+		var out []int
+		for len(p.describeQueue) > 0 {
+			out = append(out, <-p.describeQueue)
+		}
+		return out
+	}
+	var slow = func(binding int, finished time.Time) []*profiledQuery {
+		return []*profiledQuery{{id: "q", binding: binding, fields: log.Fields{}, finished: finished}}
+	}
+
+	t.Run("queues the table of a logged query once per interval", func(t *testing.T) {
+		var p, _ = describing(&fakeDescriber{})
+		p.fetch(context.Background(), slow(1, now), now)
+		require.Equal(t, []int{1}, queued(p))
+
+		p.fetch(context.Background(), slow(1, now), now.Add(tableDescribeInterval-time.Second))
+		require.Empty(t, queued(p))
+
+		p.fetch(context.Background(), slow(1, now), now.Add(tableDescribeInterval))
+		require.Equal(t, []int{1}, queued(p))
+	})
+
+	t.Run("doesn't queue an unknown binding or when the queue is full", func(t *testing.T) {
+		var p, _ = describing(&fakeDescriber{})
+		p.fetch(context.Background(), slow(-1, now), now)
+		p.fetch(context.Background(), slow(2, now), now)
+		require.Empty(t, queued(p))
+
+		p.fetch(context.Background(), slow(0, now), now)
+		p.fetch(context.Background(), slow(1, now), now)
+		require.Equal(t, []int{0}, queued(p))
+		// The dropped table is queued by its next slow query.
+		p.fetch(context.Background(), slow(1, now), now)
+		require.Equal(t, []int{1}, queued(p))
+	})
+
+	t.Run("doesn't queue without a describer", func(t *testing.T) {
+		var p, _ = testProfiler(nil, 0)
+		p.fetch(context.Background(), slow(0, now), now)
+		require.Empty(t, p.describeQueue)
+	})
+
+	t.Run("logs the description keyed by resource path", func(t *testing.T) {
+		var d = &fakeDescriber{fields: log.Fields{"numFiles": 3}}
+		var p, tables = describing(d)
+		p.describe(context.Background(), 1)
+		require.Equal(t, []int{1}, d.calls)
+		require.Equal(t, []log.Fields{{"resourcePath": []string{"c", "d"}, "numFiles": 3}}, *tables)
+	})
+
+	t.Run("logs a partial description and not a failed one", func(t *testing.T) {
+		var d = &fakeDescriber{fields: log.Fields{"numFiles": 3}, err: errors.New("history denied")}
+		var p, tables = describing(d)
+		p.describe(context.Background(), 0)
+		require.Equal(t, []log.Fields{{"resourcePath": []string{"a", "b"}, "numFiles": 3}}, *tables)
+
+		d.fields = nil
+		p.describe(context.Background(), 0)
+		require.Len(t, *tables, 1)
+	})
+}
+
+func TestQueryProfilerStop(t *testing.T) {
+	var p = NewQueryProfiler(nil, time.Hour, nil, nil, WithTableDescriber(&fakeDescriber{}))
+	p.Stop()
+}

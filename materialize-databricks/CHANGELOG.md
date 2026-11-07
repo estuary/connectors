@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-07
+### Added
+- When a query of a table runs slowly, the task logs, at most hourly per
+  table, the table's layout and maintenance: its file count and size,
+  clustering, features and selected properties, its deletion vectors and the
+  rows they delete, whether predictive optimization is enabled, and a summary
+  of the past 30 days of MERGEs, OPTIMIZEs and REORGs, including who ran them
+  and the deletion vectors they added or removed.
+
 ## 2026-11-06
 ### Changed
 - A binding's MERGE reads its staged files directly, instead of first copying

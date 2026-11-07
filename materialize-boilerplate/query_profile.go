@@ -24,6 +24,13 @@ const (
 	// QueryProfileMaxWait is how long a query waits for its history to be
 	// final before it's logged without it.
 	QueryProfileMaxWait = 10 * time.Minute
+	// tableDescribeInterval is how often a table may be described.
+	tableDescribeInterval = time.Hour
+	// tableDescribeTimeout bounds describing a table.
+	tableDescribeTimeout = time.Minute
+	// tableDescribeQueueSize bounds the tables awaiting their description. A
+	// table queued while it's full isn't described.
+	tableDescribeQueueSize = 16
 )
 
 // ErrQueryHistoryDenied is wrapped by a QueryHistory error when the
@@ -41,6 +48,24 @@ type QueryHistory interface {
 // the returned context to setID. The returned func, if not nil, is called
 // once the query finishes, before its ID is read.
 type QueryIDReporter func(ctx context.Context, setID func(string)) (context.Context, func())
+
+// TableDescriber reads what explains the performance of queries of a
+// binding's table, such as its layout and maintenance, beyond what query
+// history shows. It runs queries of its own, so it's called at most once per
+// tableDescribeInterval for each table with slow queries, and never on a
+// transaction's path.
+type TableDescriber interface {
+	DescribeTable(ctx context.Context, binding int) (log.Fields, error)
+}
+
+// QueryProfilerOption configures a QueryProfiler.
+type QueryProfilerOption func(*QueryProfiler)
+
+// WithTableDescriber has the profiler log a description of the table of a slow
+// query's binding alongside its profile.
+func WithTableDescriber(d TableDescriber) QueryProfilerOption {
+	return func(p *QueryProfiler) { p.describer = d }
+}
 
 // ProfileBounds are the key bounds a binding's queries are restricted to.
 type ProfileBounds interface {
@@ -61,12 +86,18 @@ type QueryProfiler struct {
 	emit          func(log.Fields)
 	warned        bool
 	cancel        context.CancelFunc
-	done          chan struct{}
+	done          sync.WaitGroup
+
+	describer     TableDescriber
+	describeQueue chan int
+	describedAt   map[int]time.Time
+	emitTable     func(log.Fields)
 }
 
 // profiledQuery is a finished query awaiting its history.
 type profiledQuery struct {
 	id       string
+	binding  int
 	fields   log.Fields
 	finished time.Time
 }
@@ -74,7 +105,7 @@ type profiledQuery struct {
 // NewQueryProfiler starts a profiler of the queries of bindings with the given
 // resource paths, which fetches the history of finished queries every
 // interval. A nil history logs queries without it.
-func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs QueryIDReporter, resourcePaths [][]string) *QueryProfiler {
+func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs QueryIDReporter, resourcePaths [][]string, opts ...QueryProfilerOption) *QueryProfiler {
 	var ctx, cancel = context.WithCancel(context.Background())
 	var p = &QueryProfiler{
 		history:       history,
@@ -85,16 +116,24 @@ func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs Qu
 		queue:         make(chan *profiledQuery, queryProfileQueueSize),
 		emit:          func(fields log.Fields) { log.WithFields(fields).Info("query profile") },
 		cancel:        cancel,
-		done:          make(chan struct{}),
+		describeQueue: make(chan int, tableDescribeQueueSize),
+		describedAt:   make(map[int]time.Time),
+		emitTable:     func(fields log.Fields) { log.WithFields(fields).Info("query profile table") },
 	}
-	go p.run(ctx)
+	for _, opt := range opts {
+		opt(p)
+	}
+	p.done.Go(func() { p.run(ctx) })
+	if p.describer != nil {
+		p.done.Go(func() { p.runDescribes(ctx) })
+	}
 	return p
 }
 
 // Stop ends the profiler, dropping the queries still awaiting their history.
 func (p *QueryProfiler) Stop() {
 	p.cancel()
-	<-p.done
+	p.done.Wait()
 }
 
 // QueryProfile collects what the connector learns of each binding over a phase
@@ -240,7 +279,7 @@ func (t *QueryTrace) Finish(err error) {
 		return
 	}
 
-	var q = &profiledQuery{id: *id, fields: t.profile.fields(t.binding), finished: time.Now()}
+	var q = &profiledQuery{id: *id, binding: t.binding, fields: t.profile.fields(t.binding), finished: time.Now()}
 	maps.Copy(q.fields, log.Fields{"query": t.kind, "queryId": *id, "took": took.String()})
 	if t.executeTook > 0 {
 		maps.Copy(q.fields, log.Fields{"executeTook": t.executeTook.String(), "docs": t.docs, "docBytes": t.docBytes})
@@ -256,7 +295,6 @@ func (t *QueryTrace) Finish(err error) {
 }
 
 func (p *QueryProfiler) run(ctx context.Context) {
-	defer close(p.done)
 	var ticker = time.NewTicker(p.interval)
 	defer ticker.Stop()
 
@@ -308,13 +346,59 @@ func (p *QueryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 			var out = maps.Clone(q.fields)
 			maps.Copy(out, fields)
 			p.emit(out)
+			p.requestDescribe(q.binding, now)
 		} else if p.history == nil || now.Sub(q.finished) >= QueryProfileMaxWait {
 			p.emit(q.fields)
+			p.requestDescribe(q.binding, now)
 		} else {
 			rest = append(rest, q)
 		}
 	}
 	return rest
+}
+
+// requestDescribe queues the binding's table to be described, unless it was
+// within tableDescribeInterval.
+func (p *QueryProfiler) requestDescribe(binding int, now time.Time) {
+	if p.describer == nil || binding < 0 || binding >= len(p.resourcePaths) {
+		return
+	} else if last, ok := p.describedAt[binding]; ok && now.Sub(last) < tableDescribeInterval {
+		return
+	}
+	select {
+	case p.describeQueue <- binding:
+		p.describedAt[binding] = now
+	default:
+	}
+}
+
+func (p *QueryProfiler) runDescribes(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case binding := <-p.describeQueue:
+			p.describe(ctx, binding)
+		}
+	}
+}
+
+// describe logs the description of the binding's table. A failure is logged
+// at debug level only: it's diagnostics, and must never trouble the task.
+func (p *QueryProfiler) describe(ctx context.Context, binding int) {
+	ctx, cancel := context.WithTimeout(ctx, tableDescribeTimeout)
+	defer cancel()
+
+	var path = p.resourcePaths[binding]
+	fields, err := p.describer.DescribeTable(ctx, binding)
+	if err != nil {
+		log.WithError(err).WithField("resourcePath", path).Debug("describing table for query profiles failed")
+	}
+	if len(fields) > 0 {
+		var out = log.Fields{"resourcePath": path}
+		maps.Copy(out, fields)
+		p.emitTable(out)
+	}
 }
 
 // StatementKind names a query by its leading keyword, such as "merge" or
