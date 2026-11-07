@@ -1,0 +1,251 @@
+info:
+  name: shipping lines
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query ShippingLines {
+        orders(first: 15, sortKey: UPDATED_AT, reverse: true) {
+          edges {
+            node {
+              id
+              name
+              createdAt
+              updatedAt
+              displayFulfillmentStatus
+              cancelledAt
+              closed
+              shippingLines(first: 5, includeRemovals: true) {
+                edges {
+                  node {
+                    __typename
+                    id
+                    title
+                    code
+                    source
+                    carrierIdentifier
+                    deliveryCategory
+                    custom
+                    isRemoved
+                    originalPriceSet { ...MoneyBagFields }
+                    discountedPriceSet { ...MoneyBagFields }
+                    currentDiscountedPriceSet { ...MoneyBagFields }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+
+      fragment MoneyBagFields on MoneyBag {
+        shopMoney { amount currencyCode }
+        presentmentMoney { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Hand `Orders / overflow page` the newest order with a shipping line and
+        // its inline page's end cursor. Runtime vars live in memory only.
+        const order = (res.getBody()?.data?.orders?.edges ?? [])
+          .map((edge) => edge.node)
+          .find((node) => node?.shippingLines?.edges?.length);
+        if (order) {
+          bru.setVar('overflow_order_id', order.id);
+          bru.setVar('overflow_after', order.shippingLines.pageInfo.endCursor);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Order.shippingLines](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/Order) and [ShippingLine](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShippingLine)
+
+  **WHY:** the shape a new `order_shipping_lines` stream would capture, with
+  the fields the plan picked (no `phone`, no `taxLines`, no
+  `discountAllocations`). Answers: do real lines carry an `id` (the schema
+  types it as nullable `ID`); does any order have more than one line, or a
+  removed one; and what an order with its lines costs, which sets the
+  stream's page sizes. Sorted newest first only so the probe sees recent
+  orders; the stream sorts ascending.
+
+  **DOCUMENTED (2026-10-29):** `includeRemovals` defaults to false: "Whether
+  results should contain removed shipping lines." `ShippingLine` implements no
+  interfaces, so it is not a `Node`.
+
+  **VERIFIED (2026-10-29):** the test store has 7 orders: 3 with one
+  shipping line ("International Shipping", source `shopify`), 4 with none, so
+  an order with no shipping is common and a per-order document would carry an
+  empty list. Every line has an `id` (`gid://shopify/ShippingLine/<n>`), none
+  is removed, none is custom, and `deliveryCategory` is null. No order has two
+  lines, and none will be seeded: the capture snapshot reads this store.
+  Lines pass through as Shopify returns them, and fetching past the inline 5
+  needs only the order's `id`, so a removed line or one without an `id` needs
+  no handling.
+
+  **VERIFIED (2026-10-29):** the requested cost doesn't grow linearly with
+  page size. 15 orders, each with `shippingLines(first: 5)` and three money
+  sets per line, request 32 points (actual 10). The breakdown prices each
+  order at 6 (1 for the order, 5 for its shipping-line connection) and the
+  money sets at 0, but the orders connection totals 32, not 15 × 6. See
+  `Orders / cost at full page` for 250 orders.
+
+examples:
+  - name: 200 - 1 of 7 orders, cost-bearing fields only (projection)
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "orders": {
+                "edges": [
+                  {
+                    "node": {
+                      "id": "gid://shopify/Order/5714631393325",
+                      "name": "#1003",
+                      "createdAt": "2025-04-10T17:55:25Z",
+                      "updatedAt": "2026-06-15T13:33:37Z",
+                      "displayFulfillmentStatus": "UNFULFILLED",
+                      "cancelledAt": null,
+                      "closed": false,
+                      "shippingLines": {
+                        "edges": [
+                          {
+                            "node": {
+                              "__typename": "ShippingLine",
+                              "id": "gid://shopify/ShippingLine/4692903526445",
+                              "title": "International Shipping",
+                              "code": "International Shipping",
+                              "source": "shopify",
+                              "carrierIdentifier": null,
+                              "deliveryCategory": null,
+                              "custom": false,
+                              "isRemoved": false,
+                              "originalPriceSet": {
+                                "shopMoney": {
+                                  "amount": "30.0",
+                                  "currencyCode": "USD"
+                                },
+                                "presentmentMoney": {
+                                  "amount": "30.0",
+                                  "currencyCode": "USD"
+                                }
+                              },
+                              "discountedPriceSet": {
+                                "shopMoney": {
+                                  "amount": "30.0",
+                                  "currencyCode": "USD"
+                                },
+                                "presentmentMoney": {
+                                  "amount": "30.0",
+                                  "currencyCode": "USD"
+                                }
+                              },
+                              "currentDiscountedPriceSet": {
+                                "shopMoney": {
+                                  "amount": "30.0",
+                                  "currencyCode": "USD"
+                                },
+                                "presentmentMoney": {
+                                  "amount": "30.0",
+                                  "currencyCode": "USD"
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "pageInfo": {
+                          "hasNextPage": false,
+                          "endCursor": "eyJsYXN0X2lkIjo0NjkyOTAzNTI2NDQ1LCJsYXN0X3ZhbHVlIjoiNDY5MjkwMzUyNjQ0NSJ9"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "pageInfo": {
+                  "hasNextPage": false,
+                  "endCursor": "eyJsYXN0X2lkIjo1NzE0NjE5ODU4OTg5LCJsYXN0X3ZhbHVlIjoiMjAyNS0wNC0xMCAxNzo1NDoyMy4xOTA4MTEifQ=="
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 32,
+                "actualQueryCost": 10,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1990,
+                  "restoreRate": 100
+                },
+                "fields": [
+                  {
+                    "path": [
+                      "orders",
+                      "edges",
+                      "node",
+                      "shippingLines",
+                      "edges",
+                      "node"
+                    ],
+                    "definedCost": 1,
+                    "requestedTotalCost": 1,
+                    "requestedChildrenCost": 0
+                  },
+                  {
+                    "path": [
+                      "orders",
+                      "edges",
+                      "node",
+                      "shippingLines"
+                    ],
+                    "definedCost": null,
+                    "requestedTotalCost": 5,
+                    "requestedChildrenCost": 1
+                  },
+                  {
+                    "path": [
+                      "orders",
+                      "edges",
+                      "node"
+                    ],
+                    "definedCost": 1,
+                    "requestedTotalCost": 6,
+                    "requestedChildrenCost": 5
+                  },
+                  {
+                    "path": [
+                      "orders"
+                    ],
+                    "definedCost": null,
+                    "requestedTotalCost": 32,
+                    "requestedChildrenCost": 6
+                  }
+                ]
+              }
+            }
+          }
