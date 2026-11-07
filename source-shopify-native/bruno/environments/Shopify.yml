@@ -1,0 +1,7 @@
+variables:
+  - name: base_url
+    value: https://STORE.myshopify.com/admin/api/2026-01
+  - name: config_path
+    value: ../config.yaml
+  - name: bulk_operation_id
+    value: gid://shopify/BulkOperation/8721679613997

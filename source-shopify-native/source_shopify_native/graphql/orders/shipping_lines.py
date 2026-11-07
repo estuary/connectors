@@ -48,7 +48,7 @@ class OrderShippingLines(ShopifyGraphQLResource):
             field_name="shippingLines",
             node_selection=_SHIPPING_LINE_SELECTION,
             # 250 orders with 5 inline lines each request 68 of the 1,000 points Shopify allows
-            # per query, so the default outer page size fits.
+            # per query (Bruno's `Orders / cost at full page`), so the default outer page size fits.
             page_size=5,
             overflow_page_size=250,
             # includeRemovals defaults to false, which drops shipping lines an order edit removed.

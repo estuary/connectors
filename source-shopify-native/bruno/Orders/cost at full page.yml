@@ -1,0 +1,150 @@
+info:
+  name: cost at full page
+  type: graphql
+  seq: 2
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query ShippingLinesFullPage {
+        orders(first: 250, sortKey: UPDATED_AT) {
+          edges {
+            node {
+              id
+              name
+              createdAt
+              updatedAt
+              displayFulfillmentStatus
+              cancelledAt
+              closed
+              shippingLines(first: 5, includeRemovals: true) {
+                edges {
+                  node {
+                    __typename
+                    id
+                    title
+                    code
+                    source
+                    carrierIdentifier
+                    deliveryCategory
+                    custom
+                    isRemoved
+                    originalPriceSet { ...MoneyBagFields }
+                    discountedPriceSet { ...MoneyBagFields }
+                    currentDiscountedPriceSet { ...MoneyBagFields }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+
+      fragment MoneyBagFields on MoneyBag {
+        shopMoney { amount currencyCode }
+        presentmentMoney { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits)
+
+  **WHY:** `Orders / shipping lines` is the same selection at 15 orders. This
+  one asks for Shopify's 250-per-page maximum, sorted ascending as a paged
+  stream would read, to see whether the 1,000-point ceiling forces a smaller
+  orders page (the `OUTER_PAGE_SIZE` that `markets` sets to 25).
+
+  **VERIFIED (2026-10-29):** `orders(first: 250)` with
+  `shippingLines(first: 5)` inline requests 68 points (actual 3 for the
+  store's 7 orders), under 7% of the 1,000-point ceiling. A paged stream
+  can read full 250-order pages; unlike `markets`, it needs no smaller
+  `OUTER_PAGE_SIZE`. The requested cost is computed from the query, not the
+  data, so it holds for a store of any size; the actual cost grows with the
+  lines returned.
+
+examples:
+  - name: "200 - requested 68 at 250 orders (projection: count and cost only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "orderCount": 7,
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 68,
+                "actualQueryCost": 3,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1997,
+                  "restoreRate": 100
+                },
+                "fields": [
+                  {
+                    "path": [
+                      "orders",
+                      "edges",
+                      "node",
+                      "shippingLines",
+                      "edges",
+                      "node"
+                    ],
+                    "definedCost": 1,
+                    "requestedTotalCost": 1,
+                    "requestedChildrenCost": 0
+                  },
+                  {
+                    "path": [
+                      "orders",
+                      "edges",
+                      "node",
+                      "shippingLines"
+                    ],
+                    "definedCost": null,
+                    "requestedTotalCost": 5,
+                    "requestedChildrenCost": 1
+                  },
+                  {
+                    "path": [
+                      "orders",
+                      "edges",
+                      "node"
+                    ],
+                    "definedCost": 1,
+                    "requestedTotalCost": 6,
+                    "requestedChildrenCost": 5
+                  },
+                  {
+                    "path": [
+                      "orders"
+                    ],
+                    "definedCost": null,
+                    "requestedTotalCost": 68,
+                    "requestedChildrenCost": 6
+                  }
+                ]
+              }
+            }
+          }
