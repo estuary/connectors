@@ -1,0 +1,121 @@
+info:
+  name: A1 - Run shipping lines bulk query
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      mutation ShippingLinesBulkProbe {
+        bulkOperationRunQuery(
+          groupObjects: true
+          query: """
+          # shipping-lines bulk probe
+          {
+            orders {
+              edges {
+                node {
+                  id
+                  updatedAt
+                  shippingLines(includeRemovals: true) {
+                    edges {
+                      node {
+                        __typename
+                        id
+                        title
+                        code
+                        source
+                        isRemoved
+                        originalPriceSet { shopMoney { amount currencyCode } }
+                        currentDiscountedPriceSet { shopMoney { amount currencyCode } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          """
+        ) {
+          bulkOperation { id status createdAt }
+          userErrors { field message code }
+        }
+      }
+    variables: |-
+      {}
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const id = res.getBody()?.data?.bulkOperationRunQuery?.bulkOperation?.id;
+        if (id) bru.setVar('bulk_operation_id', id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Perform bulk operations with the GraphQL Admin API](https://shopify.dev/docs/api/usage/bulk-operations/queries)
+
+  SEEDING REQUEST — only the user runs this; never the assistant. It changes
+  no store data, but `bulkOperationRunQuery` is a mutation: the job holds one
+  of the app's five bulk slots for this store until it ends. Don't run it
+  while a capture of this store is running, snapshot tests included: if the
+  capture then needs every slot, its next bulk query is refused and the task
+  fails.
+
+  **WHY:** settles whether a bulk stream is possible. `ShippingLine` isn't a
+  `Node`, and Shopify's bulk docs say connections must be. The orders bulk
+  query already reads `discountApplications`, also not a `Node`, so this
+  checks the same holds for `shippingLines`. Mirrors how the connector submits
+  (`groupObjects: true`, as in `graphql/bulk_job_manager.py`), without the
+  connector's marker comment so a restarting capture won't cancel it. Feeds
+  `Bulk / status` and `Bulk / result`. Bulk was rejected for the stream; see
+  `Bulk / status`.
+
+  Outcome: ran 2026-10-29 (job `gid://shopify/BulkOperation/8721679613997`).
+  Shopify accepted it: empty `userErrors`, status `CREATED`. Results VERIFIED
+  in `Bulk / status` and `Bulk / result`.
+
+examples:
+  - name: 200 - accepted, no userErrors
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "bulkOperationRunQuery": {
+                "bulkOperation": {
+                  "id": "gid://shopify/BulkOperation/8721679613997",
+                  "status": "CREATED",
+                  "createdAt": "2026-10-30T03:56:06Z"
+                },
+                "userErrors": []
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 10,
+                "actualQueryCost": 10,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1990,
+                  "restoreRate": 100
+                }
+              }
+            }
+          }
