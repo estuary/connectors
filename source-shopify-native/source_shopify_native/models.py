@@ -521,6 +521,9 @@ class NestedConnection:
     # cheaper than the outer query, so this can be raised to drain large parents in
     # fewer round trips.
     overflow_page_size: int | None = None
+    # Raw GraphQL spliced verbatim into the connection's argument list, in both the inline and
+    # overflow queries, for arguments other than paging (ex: `includeRemovals: true`).
+    extra_args: str = ""
     # Fragment definitions referenced by node_selection, appended to the query.
     fragments: list[str] = field(default_factory=list)
 
@@ -534,8 +537,9 @@ class NestedConnection:
 
     def inline_block(self) -> str:
         """The connection selection spliced into the outer query to fetch the first page inline."""
+        extra_args = f", {self.extra_args}" if self.extra_args else ""
         return (
-            f"{self.field_name}(first: {self.page_size}) {{\n"
+            f"{self.field_name}(first: {self.page_size}{extra_args}) {{\n"
             f"    edges {{ node {{ {self.node_selection} }} }}\n"
             f"    pageInfo {{ hasNextPage endCursor }}\n"
             f"}}"

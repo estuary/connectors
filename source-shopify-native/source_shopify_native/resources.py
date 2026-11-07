@@ -162,6 +162,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.OrderRefunds,
     gql.OrderReturns,
     gql.OrderRisks,
+    gql.OrderShippingLines,
     gql.InventoryItems,
     gql.InventoryLevels,
     gql.CustomCollections,
