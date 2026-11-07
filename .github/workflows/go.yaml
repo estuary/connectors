@@ -377,7 +377,8 @@ jobs:
 
       # Substitute the golang image with warm_go_cache's copy that has every
       # package compiled in it, when there's one for this Dockerfile.
-      - id: golang
+      - name: Find a cached golang image
+        id: golang
         run: |
           read image tags < <(.github/scripts/golang-cache-image.sh ${{ matrix.connector.name }}/Dockerfile) || true
           [ -n "$image" ] || exit 0
