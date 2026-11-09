@@ -232,7 +232,7 @@ func maxStartupDelay(cfg json.RawMessage) (time.Duration, error) {
 	return sqlcapture.ParseMaxStartupDelay(config.Advanced.MaxStartupDelay)
 }
 
-func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
+func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage, _ common.CreatedAt) (sqlcapture.Database, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
 		return nil, fmt.Errorf("error parsing config json: %w", err)
