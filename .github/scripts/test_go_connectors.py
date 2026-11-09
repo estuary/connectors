@@ -197,8 +197,8 @@ class TestRealGraph(unittest.TestCase):
         self.assertNotIn("source-postgres", got)
 
     def test_embedded_ca_bundles_build_the_mysql_captures(self):
-        # go/mysql/tls embeds them from its cloudcas/ subdirectory.
-        got = go_connectors(classify("go/mysql/tls/cloudcas/aws.pem", graph=self.graph))
+        # go/cloudcas embeds them, and go/mysql/tls imports go/cloudcas.
+        got = go_connectors(classify("go/cloudcas/aws.pem", graph=self.graph))
         self.assertEqual(got, ["source-mysql", "source-mysql-batch"])
 
     def test_connector_docs_build_only_that_connector(self):

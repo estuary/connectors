@@ -1,6 +1,6 @@
 name: MySQL cloud CA bundles
 
-# Keeps go/mysql/tls/cloudcas/ in step with what its update.sh fetches from
+# Keeps go/cloudcas/ in step with what its update.sh fetches from
 # Amazon and Google.
 #
 # Why this is needed. source-mysql and source-mysql-batch default to
@@ -32,7 +32,7 @@ on:
     - cron: "0 7 * * *"
   pull_request:
     paths:
-      - go/mysql/tls/cloudcas/**
+      - go/cloudcas/**
       - .github/scripts/cloudcas-diff-summary.sh
       - .github/workflows/mysql-cloud-cas.yaml
   workflow_dispatch:
@@ -41,7 +41,7 @@ permissions:
   contents: read
 
 env:
-  CLOUDCAS_DIR: go/mysql/tls/cloudcas
+  CLOUDCAS_DIR: go/cloudcas
   REFRESH_BRANCH: automation/mysql-cloud-cas
 
 jobs:
@@ -134,8 +134,8 @@ jobs:
           branch: ${{ env.REFRESH_BRANCH }}
           delete-branch: true
           add-paths: ${{ env.CLOUDCAS_DIR }}
-          commit-message: "go/mysql/tls: refresh managed-database CA bundles"
-          title: "go/mysql/tls: refresh managed-database CA bundles"
+          commit-message: "go/cloudcas: refresh managed-database CA bundles"
+          title: "go/cloudcas: refresh managed-database CA bundles"
           body-path: ${{ runner.temp }}/pr-body.md
 
       - name: Link the PR
