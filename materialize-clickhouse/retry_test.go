@@ -25,22 +25,22 @@ func TestClassify(t *testing.T) {
 			// underlying read error with %w.
 			name: "EOF reading first block packet",
 			err:  fmt.Errorf("query processing: failed to read first block packet from 1.2.3.4:9440 (conn_id=7): %w", io.EOF),
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "unexpected EOF",
 			err:  fmt.Errorf("read: %w", io.ErrUnexpectedEOF),
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "connection reset",
 			err:  &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET},
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "broken pipe",
 			err:  &net.OpError{Op: "write", Net: "tcp", Err: syscall.EPIPE},
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "connection refused on dial",
@@ -50,19 +50,19 @@ func TestClassify(t *testing.T) {
 		{
 			name: "i/o timeout",
 			err:  fmt.Errorf("read: %w", &net.OpError{Op: "read", Net: "tcp", Err: errors.New("i/o timeout")}),
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			// Lost Keeper sessions resolve on their own once the replica
 			// reconnects, but the statement may have been applied first.
 			name: "Keeper connection loss",
 			err:  fmt.Errorf("moving: %w", &clickhouseproto.Exception{Code: 999, Message: "Coordination::Exception: Connection loss"}),
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "Keeper session expired",
 			err:  &clickhouseproto.Exception{Code: 999, Message: "Coordination::Exception: Session expired (ZSESSIONEXPIRED)"},
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "server OOM kill exception is not retryable",
@@ -82,7 +82,7 @@ func TestClassify(t *testing.T) {
 		{
 			name: "operation deadline",
 			err:  fmt.Errorf("querying: %w", context.DeadlineExceeded),
-			want: retry.Ambiguous,
+			want: retry.Retryable,
 		},
 		{
 			name: "arbitrary error is not retryable",

@@ -20,7 +20,7 @@ func TestClassify(t *testing.T) {
 		want retry.Outcome
 	}{
 		{"rate limited", &StatusError{StatusCode: http.StatusTooManyRequests}, retry.Retryable},
-		{"internal error", fmt.Errorf("wrapped: %w", &StatusError{StatusCode: http.StatusInternalServerError}), retry.Ambiguous},
+		{"internal error", fmt.Errorf("wrapped: %w", &StatusError{StatusCode: http.StatusInternalServerError}), retry.Retryable},
 		{"bad gateway", &StatusError{StatusCode: http.StatusBadGateway}, retry.Fatal},
 		{"bad request", &StatusError{StatusCode: http.StatusBadRequest}, retry.Fatal},
 		{"transport error", errors.New("connection reset"), retry.Fatal},

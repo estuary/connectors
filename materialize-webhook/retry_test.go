@@ -21,10 +21,10 @@ func TestClassify(t *testing.T) {
 		want retry.Outcome
 	}{
 		{"rate limited", &statusError{code: http.StatusTooManyRequests}, retry.Retryable},
-		{"server error", &statusError{code: http.StatusBadGateway}, retry.Ambiguous},
-		{"client error", &statusError{code: http.StatusBadRequest}, retry.Ambiguous},
+		{"server error", &statusError{code: http.StatusBadGateway}, retry.Retryable},
+		{"client error", &statusError{code: http.StatusBadRequest}, retry.Retryable},
 		{"connection refused", &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}, retry.Retryable},
-		{"connection reset", &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}, retry.Ambiguous},
+		{"connection reset", &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}, retry.Retryable},
 		{"context cancelled", context.Canceled, retry.Fatal},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

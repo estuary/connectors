@@ -11,21 +11,19 @@ import (
 )
 
 // putRetry retries PUTs to the internal stage. A PUT run again writes the same
-// file to the same name with OVERWRITE=TRUE, so ambiguous failures are retried
-// too.
+// file to the same name with OVERWRITE=TRUE, so every failure is retried.
 var putRetry = retry.Policy{
 	Classify:       classifyPut,
-	RetryAmbiguous: true,
 	MaxAttempts:    4,
 	InitialBackoff: time.Second,
 	MaxBackoff:     4 * time.Second,
 	Jitter:         0.5,
 }
 
-// classifyPut treats every failure as possibly applied, because the driver
-// reports a failed upload only as a message.
+// classifyPut retries every failure, because the driver reports a failed
+// upload only as a message.
 func classifyPut(error) retry.Outcome {
-	return retry.Ambiguous
+	return retry.Retryable
 }
 
 // pipeVisibleRetry waits out the eventual consistency of CREATE PIPE.
@@ -46,8 +44,8 @@ func classifyPipeVisible(err error) retry.Outcome {
 	return retry.Fatal
 }
 
-// streamV2Retry retries Snowpipe Streaming requests, ambiguous failures
-// included. An append of rows or of a staged file presents the channel's
+// streamV2Retry retries Snowpipe Streaming requests, including failures that
+// may follow the request taking effect. An append of rows or of a staged file presents the channel's
 // continuation token, and Snowflake buffers a repeat of the same token and rows
 // once. Every other request reads state, mints a credential, or opens or drops
 // a channel, which a repeat does again to the same effect.
@@ -56,7 +54,6 @@ func classifyPipeVisible(err error) retry.Outcome {
 // may need all of it.
 var streamV2Retry = retry.Policy{
 	Classify:       classifyStreamV2,
-	RetryAmbiguous: true,
 	MaxAttempts:    6,
 	InitialBackoff: time.Second,
 	MaxBackoff:     30 * time.Second,
@@ -71,9 +68,11 @@ func classifyStreamV2(err error) retry.Outcome {
 	if apiErr, ok := errors.AsType[*streamV2APIError](err); ok {
 		return apiErr.outcome
 	} else if _, ok := errors.AsType[*streamV2ReadError](err); ok {
-		return retry.Ambiguous
+		return retry.Retryable
+	} else if retry.FailedToConnect(err) || retry.FailedAfterConnect(err) {
+		return retry.Retryable
 	}
-	return retry.Network(err)
+	return retry.Fatal
 }
 
 // streamV2Outcome classifies a failed response under Snowflake's retry policy.
@@ -84,10 +83,8 @@ func classifyStreamV2(err error) retry.Outcome {
 // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-error-handling#retry-policy
 func streamV2Outcome(res *http.Response, body []byte) retry.Outcome {
 	switch res.StatusCode {
-	case http.StatusRequestTimeout:
+	case http.StatusRequestTimeout, 499, http.StatusTooManyRequests:
 		return retry.Retryable
-	case 499:
-		return retry.Ambiguous
 	case http.StatusNotFound:
 		var mediaType, _, _ = mime.ParseMediaType(res.Header.Get("Content-Type"))
 		var e struct{ Code, Message string }
@@ -97,5 +94,8 @@ func streamV2Outcome(res *http.Response, body []byte) retry.Outcome {
 		}
 		return retry.Fatal
 	}
-	return retry.HTTPStatus(res.StatusCode)
+	if res.StatusCode >= 500 {
+		return retry.Retryable
+	}
+	return retry.Fatal
 }

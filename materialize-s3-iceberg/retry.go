@@ -12,7 +12,6 @@ import (
 // run again.
 var appendRetry = retry.Policy{
 	Classify:       classifyAppend,
-	RetryAmbiguous: true,
 	MaxAttempts:    3,
 	InitialBackoff: 2 * time.Second,
 	Jitter:         0.5,
@@ -21,4 +20,4 @@ var appendRetry = retry.Policy{
 // classifyAppend treats every error as possibly transient, since loading,
 // staging and committing all go to the catalog or object storage. Errors that
 // another attempt would repeat are marked retry.Permanent.
-func classifyAppend(error) retry.Outcome { return retry.Ambiguous }
+func classifyAppend(error) retry.Outcome { return retry.Retryable }

@@ -2,6 +2,7 @@ package hubspot
 
 import (
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/estuary/connectors/go/retry"
@@ -10,7 +11,7 @@ import (
 // requestRetry repeats requests that HubSpot refused for exceeding its rate
 // limit.
 var requestRetry = retry.Policy{
-	Classify:       classify,
+	Classify:       classifyRequest,
 	MaxAttempts:    7,
 	InitialBackoff: 2 * time.Second,
 	MaxBackoff:     time.Minute,
@@ -22,13 +23,20 @@ var requestRetry = retry.Policy{
 // result when repeated use it.
 var idempotentRetry = func() retry.Policy {
 	var p = requestRetry
-	p.RetryAmbiguous = true
+	p.Classify = classifyIdempotent
 	return p
 }()
 
-func classify(err error) retry.Outcome {
-	if apiErr, ok := errors.AsType[*APIError](err); ok {
-		return retry.HTTPStatus(apiErr.StatusCode)
+func classifyRequest(err error) retry.Outcome {
+	if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.StatusCode == http.StatusTooManyRequests {
+		return retry.Retryable
 	}
 	return retry.Fatal
+}
+
+func classifyIdempotent(err error) retry.Outcome {
+	if apiErr, ok := errors.AsType[*APIError](err); ok && apiErr.StatusCode >= 500 {
+		return retry.Retryable
+	}
+	return classifyRequest(err)
 }

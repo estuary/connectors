@@ -22,8 +22,7 @@ var commitQueryRetry = retry.Policy{
 // under low load. PUT ... OVERWRITE leaves the same file however often it
 // runs, so every failure is retried.
 var putRetry = retry.Policy{
-	Classify:       func(error) retry.Outcome { return retry.Ambiguous },
-	RetryAmbiguous: true,
+	Classify:       func(error) retry.Outcome { return retry.Retryable },
 	MaxAttempts:    4,
 	InitialBackoff: time.Second,
 	Jitter:         0.5,

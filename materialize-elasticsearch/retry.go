@@ -17,7 +17,6 @@ import (
 // so retrying the one request duplicates less than failing would.
 var requestRetry = retry.Policy{
 	Classify:       classify,
-	RetryAmbiguous: true,
 	MaxAttempts:    11,
 	InitialBackoff: 2 * time.Second,
 	MaxBackoff:     5 * time.Second,
@@ -58,20 +57,15 @@ func (e *bulkItemsError) Unwrap() error { return e.err }
 func classify(err error) retry.Outcome {
 	if e, ok := errors.AsType[*responseError](err); ok {
 		switch e.status {
-		case http.StatusTooManyRequests:
+		case http.StatusTooManyRequests, http.StatusBadGateway,
+			http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 			return retry.Retryable
-		case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-			return retry.Ambiguous
 		}
 		return retry.Fatal
 	} else if _, ok := errors.AsType[*bulkItemsError](err); ok {
 		return retry.Retryable
-	} else if _, ok := errors.AsType[*transportError](err); ok {
-		// The request may have been received, whatever the failure.
-		if outcome := retry.Network(err); outcome == retry.Retryable || errors.Is(err, context.Canceled) {
-			return outcome
-		}
-		return retry.Ambiguous
+	} else if _, ok := errors.AsType[*transportError](err); ok && !errors.Is(err, context.Canceled) {
+		return retry.Retryable
 	}
 	return retry.Fatal
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/estuary/connectors/go/retry"
@@ -11,7 +12,7 @@ import (
 // requestRetry repeats requests that the Sheets API refused for exceeding its
 // per-minute quota.
 var requestRetry = retry.Policy{
-	Classify:       classify,
+	Classify:       classifyRequest,
 	MaxElapsed:     10 * time.Minute,
 	InitialBackoff: 2 * time.Second,
 	MaxBackoff:     time.Minute,
@@ -23,13 +24,20 @@ var requestRetry = retry.Policy{
 // result when repeated use it.
 var idempotentRetry = func() retry.Policy {
 	var p = requestRetry
-	p.RetryAmbiguous = true
+	p.Classify = classifyIdempotent
 	return p
 }()
 
-func classify(err error) retry.Outcome {
-	if e, ok := errors.AsType[*googleapi.Error](err); ok {
-		return retry.HTTPStatus(e.Code)
+func classifyRequest(err error) retry.Outcome {
+	if e, ok := errors.AsType[*googleapi.Error](err); ok && e.Code == http.StatusTooManyRequests {
+		return retry.Retryable
 	}
 	return retry.Fatal
+}
+
+func classifyIdempotent(err error) retry.Outcome {
+	if e, ok := errors.AsType[*googleapi.Error](err); ok && e.Code >= 500 {
+		return retry.Retryable
+	}
+	return classifyRequest(err)
 }

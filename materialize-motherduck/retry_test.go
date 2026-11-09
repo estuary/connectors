@@ -327,15 +327,15 @@ func TestClassifyCommit(t *testing.T) {
 			// The transaction rolled back, so running it again is safe.
 			name: "connection error before COMMIT",
 			err:  fmt.Errorf("executing store query: %w", connectionErr),
-			ddl:  retry.Ambiguous,
+			ddl:  retry.Retryable,
 			txn:  retry.Retryable,
 		},
 		{
 			// The transaction may have committed.
 			name: "connection error at COMMIT",
 			err:  fmt.Errorf("committing store transaction: %w", &commitError{connectionErr}),
-			ddl:  retry.Ambiguous,
-			txn:  retry.Ambiguous,
+			ddl:  retry.Retryable,
+			txn:  retry.Fatal,
 		},
 		{
 			name: "catalog error",
@@ -355,5 +355,4 @@ func TestClassifyCommit(t *testing.T) {
 			require.Equal(t, tc.txn, classifyCommit(tc.err))
 		})
 	}
-	require.False(t, commitRetry.RetryAmbiguous)
 }

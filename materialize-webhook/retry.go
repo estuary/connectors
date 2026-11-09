@@ -3,7 +3,6 @@ package connector
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/estuary/connectors/go/retry"
@@ -14,7 +13,6 @@ import (
 // one request re-sends less than failing would.
 var sendRetry = retry.Policy{
 	Classify:       classify,
-	RetryAmbiguous: true,
 	MaxAttempts:    11,
 	InitialBackoff: 500 * time.Millisecond,
 	MaxBackoff:     10 * time.Second,
@@ -32,13 +30,10 @@ func (e *statusError) Error() string {
 }
 
 func classify(err error) retry.Outcome {
-	if e, ok := errors.AsType[*statusError](err); ok {
-		if e.code == http.StatusTooManyRequests {
-			return retry.Retryable
-		}
-		// The receiver may have acted on the request whatever status it
-		// returned.
-		return retry.Ambiguous
+	if _, ok := errors.AsType[*statusError](err); ok {
+		return retry.Retryable
+	} else if retry.FailedToConnect(err) || retry.FailedAfterConnect(err) {
+		return retry.Retryable
 	}
-	return retry.Network(err)
+	return retry.Fatal
 }

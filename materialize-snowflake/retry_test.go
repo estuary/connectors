@@ -32,8 +32,8 @@ func TestClassifyStreamV2(t *testing.T) {
 		{"408", apiErr(http.StatusRequestTimeout, "application/json", `{"code":"TIMEOUT","message":"m"}`), retry.Retryable},
 		{"429", apiErr(http.StatusTooManyRequests, "application/json", `{"code":"THROTTLED","message":"m"}`), retry.Retryable},
 		{"429 with Retry-After", fmt.Errorf("POST x: %w", retry.WithDelay(apiErr(http.StatusTooManyRequests, "", ""), time.Second)), retry.Retryable},
-		{"499", apiErr(499, "application/json", `{"code":"CLOSED","message":"m"}`), retry.Ambiguous},
-		{"503", apiErr(http.StatusServiceUnavailable, "text/html", `<html></html>`), retry.Ambiguous},
+		{"499", apiErr(499, "application/json", `{"code":"CLOSED","message":"m"}`), retry.Retryable},
+		{"503", apiErr(http.StatusServiceUnavailable, "text/html", `<html></html>`), retry.Retryable},
 		{"404 from a proxy", apiErr(http.StatusNotFound, "text/html; charset=utf-8", `<html>not found</html>`), retry.Retryable},
 		{"404 with an empty JSON error", apiErr(http.StatusNotFound, "application/json", `{"code":"","message":""}`), retry.Retryable},
 		{"404 from the API", apiErr(http.StatusNotFound, "application/json", `{"code":"ERR_TABLE_DOES_NOT_EXIST","message":"m"}`), retry.Fatal},
@@ -41,8 +41,8 @@ func TestClassifyStreamV2(t *testing.T) {
 		{"401", apiErr(http.StatusUnauthorized, "application/json", `{"code":"390186","message":"m"}`), retry.Fatal},
 		{"channel status error", &streamV2APIError{Code: "ERR_CHANNEL_DOES_NOT_EXIST"}, retry.Fatal},
 		{"refused connection", &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}, retry.Retryable},
-		{"reset connection", &net.OpError{Op: "read", Err: syscall.ECONNRESET}, retry.Ambiguous},
-		{"failed response read", &streamV2ReadError{errors.New("http2: stream closed")}, retry.Ambiguous},
+		{"reset connection", &net.OpError{Op: "read", Err: syscall.ECONNRESET}, retry.Retryable},
+		{"failed response read", &streamV2ReadError{errors.New("http2: stream closed")}, retry.Retryable},
 		{"cancelled", context.Canceled, retry.Fatal},
 	} {
 		require.Equal(t, tt.want, classifyStreamV2(tt.err), tt.name)

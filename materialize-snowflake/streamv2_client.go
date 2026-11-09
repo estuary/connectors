@@ -461,9 +461,9 @@ func (c *streamV2Client) channel(channelName string) (*streamV2OpenChannel, erro
 // compressed file exceeds streamV2MaxAppendBytes is appended through the pipe's
 // stage instead.
 //
-// A retry after an ambiguous failure resends the same continuation token and
-// the same rows, which Snowflake accepts as a duplicate of the first delivery
-// and buffers once. The same token with different rows is rejected.
+// A retry after a failure that may have followed delivery resends the same
+// continuation token and the same rows, which Snowflake accepts as a duplicate
+// of the first delivery and buffers once. The same token with different rows is rejected.
 //
 // https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-rest-api#append-rows-to-a-named-channel
 func (c *streamV2Client) AppendRows(ctx context.Context, channelName, startToken, endToken string, batch streamV2BatchFile) error {
