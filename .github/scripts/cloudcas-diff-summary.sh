@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prints a Markdown summary of how the CA bundles in go/cloudcas/
 # differ from HEAD, one line per certificate added or removed. Used by the
-# mysql-cloud-cas workflow, since a PEM diff is unreadable.
+# cloud-cas workflow, since a PEM diff is unreadable.
 set -euo pipefail
 DIR=go/cloudcas
 

@@ -1,14 +1,15 @@
-name: MySQL cloud CA bundles
+name: Cloud CA bundles
 
 # Keeps go/cloudcas/ in step with what its update.sh fetches from
 # Amazon and Google.
 #
 # Why this is needed. source-mysql and source-mysql-batch default to
 # 'verify_identity', and when 'ssl_server_ca' is empty they trust these bundled
-# CAs on top of the system roots. The providers rotate their CAs on their own
-# schedule: a CA that a provider adds and that we don't bundle breaks every new
-# instance it signs, and a CA it withdraws stays trusted here until someone
-# notices. The bundles are embedded at build time, so nothing refreshes them
+# CAs on top of the system roots. source-postgres and source-postgres-batch
+# trust them the same way under 'verify-ca' and 'verify-full'. The providers
+# rotate their CAs on their own schedule: a CA that a provider adds and that we
+# don't bundle breaks every new instance it signs, and a CA it withdraws stays
+# trusted here until someone notices. The bundles are embedded at build time, so nothing refreshes them
 # except a commit.
 #
 # What runs when.
@@ -34,7 +35,7 @@ on:
     paths:
       - go/cloudcas/**
       - .github/scripts/cloudcas-diff-summary.sh
-      - .github/workflows/mysql-cloud-cas.yaml
+      - .github/workflows/cloud-cas.yaml
   workflow_dispatch:
 
 permissions:
@@ -42,11 +43,11 @@ permissions:
 
 env:
   CLOUDCAS_DIR: go/cloudcas
-  REFRESH_BRANCH: automation/mysql-cloud-cas
+  REFRESH_BRANCH: automation/cloud-cas
 
 jobs:
   check:
-    name: MySQL cloud CA bundles
+    name: Cloud CA bundles
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
@@ -65,7 +66,7 @@ jobs:
             exit 0
           fi
           {
-            echo "### MySQL cloud CA bundles are out of date"
+            echo "### Cloud CA bundles are out of date"
             echo
             echo "Run \`$CLOUDCAS_DIR/update.sh\` and commit the result."
             echo
@@ -76,7 +77,7 @@ jobs:
           exit 1
 
   refresh:
-    name: Refresh MySQL cloud CA bundles
+    name: Refresh cloud CA bundles
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
@@ -113,7 +114,7 @@ jobs:
           fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
           {
-            echo "The managed-database CA bundles that source-mysql and source-mysql-batch trust under \`verify_identity\` changed upstream. This PR is the output of \`$CLOUDCAS_DIR/update.sh\`, opened by the [MySQL cloud CA bundles workflow]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+            echo "The managed-database CA bundles that source-mysql, source-mysql-batch, source-postgres and source-postgres-batch trust changed upstream. This PR is the output of \`$CLOUDCAS_DIR/update.sh\`, opened by the [Cloud CA bundles workflow]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
             echo
             echo "### Certificates added (+) and removed (-)"
             echo
@@ -121,7 +122,7 @@ jobs:
             echo "### Before merging"
             echo
             echo "- [ ] Check each added or removed CA against the provider's announcement. A removed CA breaks every server still using it."
-            echo "- [ ] Add CHANGELOG entries for source-mysql and source-mysql-batch. The workflow won't touch this branch while the PR is open, so commit them here."
+            echo "- [ ] Add CHANGELOG entries for source-mysql, source-mysql-batch, source-postgres and source-postgres-batch. The workflow won't touch this branch while the PR is open, so commit them here."
             echo "- [ ] Close and reopen this PR to start CI. GitHub doesn't run workflows for PRs opened by GitHub Actions."
           } > "$RUNNER_TEMP/pr-body.md"
           cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
