@@ -91,8 +91,8 @@ jobs:
   # pulling it is most of what it costs a build job.
   #
   # Every build trusts it, so only main publishes it. A PR whose tag doesn't
-  # exist builds on main's `dev` instead, and `go build` downloads the modules
-  # it's missing.
+  # exist builds on main's `dev` instead, or on the golang image itself while
+  # there's no `dev`, and `go build` downloads the modules it's missing.
   build_base_image_go:
     needs: classify_changes
     if: needs.classify_changes.outputs.run == 'true'
@@ -103,6 +103,7 @@ jobs:
     timeout-minutes: 60
     outputs:
       image: ${{ steps.image.outputs.image }}
+      image_nozstd: ${{ steps.image.outputs.image_nozstd }}
     env:
       REPO: ghcr.io/estuary/build-cache
       TAG_PREFIX: base-image-go-trial-
@@ -141,9 +142,13 @@ jobs:
                 --output type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true \
                 -f base-image-go/Dockerfile .
             done
-          else
+          elif docker buildx imagetools inspect $DEV-nozstd > /dev/null 2>&1; then
             echo "$TAG doesn't exist and only main publishes it, so builds use $DEV"
-            echo "image=$DEV" >> $GITHUB_OUTPUT
+            TAG=$DEV
+          else
+            echo "Neither $TAG nor $DEV exists, so builds use $GOLANG"
+            echo "image=$GOLANG" >> $GITHUB_OUTPUT
+            echo "image_nozstd=$GOLANG" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -152,9 +157,10 @@ jobs:
             docker buildx imagetools create --tag $DEV-nozstd $TAG-nozstd
           fi
           echo "image=$TAG" >> $GITHUB_OUTPUT
+          echo "image_nozstd=$TAG-nozstd" >> $GITHUB_OUTPUT
 
       # Builds use `dev` or the newest tag, so the versions they've moved off
-      # are deleted. Each holds about 2 GB.
+      # are deleted. Each holds about 1.5 GB.
       - name: Delete superseded images
         if: env.PUBLISH == 'true'
         continue-on-error: true
@@ -345,6 +351,7 @@ jobs:
           build-args: |
             BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
             BASE_IMAGE_GO=${{ needs.build_base_image_go.outputs.image }}
+            BASE_IMAGE_GO_NOZSTD=${{ needs.build_base_image_go.outputs.image_nozstd }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
           # Layers come from the connector's build-cache tag and only main writes

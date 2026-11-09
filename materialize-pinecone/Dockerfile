@@ -1,9 +1,9 @@
 ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
-ARG BASE_IMAGE_GO=ghcr.io/estuary/base-image-go:dev
+ARG BASE_IMAGE_GO_NOZSTD=ghcr.io/estuary/base-image-go:dev-nozstd
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 ${BASE_IMAGE_GO}-nozstd AS builder
+FROM --platform=linux/amd64 ${BASE_IMAGE_GO_NOZSTD} AS builder
 
 WORKDIR /builder
 

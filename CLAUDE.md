@@ -20,7 +20,7 @@ Go connector Dockerfiles build in `ghcr.io/estuary/base-image-go:dev` (or its `d
 docker buildx build --platform linux/amd64 -f base-image-go/Dockerfile --target default --load -t ghcr.io/estuary/base-image-go:dev .
 ```
 
-Use `--target nozstd` and the `dev-nozstd` tag for connectors built with `-tags nozstd`.
+Use `--target nozstd` and the `dev-nozstd` tag for connectors built with `-tags nozstd`. Without either, pass `--build-arg BASE_IMAGE_GO=golang:1.27-trixie` (or `BASE_IMAGE_GO_NOZSTD`) to build in the plain golang image.
 
 This is primarily a Go monorepo with YAML configs. When editing Go code, always run `go build ./...` and `go vet ./...` in the affected module after changes to catch import cycles, missing arguments, and unused imports before declaring a fix complete.
 
