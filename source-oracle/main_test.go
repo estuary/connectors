@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	_ "github.com/sijms/go-ora/v2"
@@ -88,7 +89,7 @@ func oracleTestBackend(t testing.TB) *testBackend {
 	config.Advanced.DictionaryMode = DictionaryModeOnline
 
 	// Open control connection
-	db, err := connectOracle(ctx, "test", configJSON)
+	db, err := connectOracle(ctx, "test", configJSON, common.CreatedAt{})
 	t.Logf("opening control connection: addr=%q, user=%q", config.Address, config.User)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close(ctx) })
