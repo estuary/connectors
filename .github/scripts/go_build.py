@@ -18,6 +18,7 @@ unchanged, so local builds still compile in Docker.
           ctx/      the `builder` stage stand-in: the binaries the Dockerfile
                     builds, at the paths its runtime stage copies them from
           tests/    a test binary per package of the connector with tests
+          tools/    programs its tests/<connector>/*.sh scripts `go run`
           go.txt    for `prebuilt-go/go`: which directory each binary and test
                     binary stands in for
           unit-tests.sh  the Dockerfile's `go test` runs of the connector's own
@@ -224,6 +225,13 @@ def cmd_build(args):
                 argv += ["-tags", p.tags]
             jobs.append((f"{p.connector}: build {name}", argv + [pkg]))
             lines.append(f"run {rel(dir)} {binary}")
+
+        # Programs the connector's test harness scripts `go run`.
+        for i, script in enumerate(sorted(Path("tests", p.connector).glob("*.sh"))):
+            for target in re.findall(r"\bgo run (\S+)", script.read_text()):
+                binary = dst / "tools" / f"{i}-{Path(target).stem}"
+                jobs.append((f"{p.connector}: build {target}", ["go", "build", "-o", str(binary), target]))
+                lines.append(f"run {rel(os.path.abspath(target))} {binary}")
 
         for src in p.copies:
             if src.startswith("/builder/"):
