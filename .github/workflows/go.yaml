@@ -267,9 +267,14 @@ jobs:
           MATRIX: ${{ needs.classify_changes.outputs.matrix }}
           SHARDS: ${{ needs.classify_changes.outputs.shards }}
         run: |
+          # The upload step's artifact client, installed meanwhile: upload-artifact
+          # uploads one artifact per step, and each test job downloads only its
+          # own connector's.
+          npm install --silent --no-save --prefix "$RUNNER_TEMP/artifact" @actions/artifact@2.3.2 &
           CONNECTORS=$(jq -r --argjson n "$(jq length <<< "$SHARDS")" --argjson s ${{ matrix.shard }} \
             'to_entries[] | select(.key % $n == $s) | .value.name' <<< "$MATRIX")
           python3 -I .github/scripts/go_build.py build --out .build/go $CONNECTORS
+          wait $!
 
       # zstd is several times faster than the artifact's own zip compression.
       - name: Pack each connector's binaries
@@ -281,11 +286,6 @@ jobs:
             tar -C .build/go -cf - $c | zstd -q -T0 -3 -o .build/bundles/$c.tar.zst
           done
           ls -lhS .build/bundles
-
-      # upload-artifact uploads one artifact per step, and each test job
-      # downloads only its own connector's.
-      - name: Install the artifact client
-        run: npm install --silent --no-save --prefix "$RUNNER_TEMP/artifact" @actions/artifact@2.3.2
 
       - name: Upload each connector's binaries
         uses: actions/github-script@v7
