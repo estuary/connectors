@@ -1,0 +1,181 @@
+#!/usr/bin/env -S python3 -I
+"""
+Stands in for `go` in go.yaml's test jobs, which have no Go toolchain, with the
+binaries the build job compiled for the job's connector (go_build.py build).
+
+    go run <pkg> [args]          runs the binary built from <pkg>
+    go build -o <out> <pkg>      copies it to <out>
+    go test [flags] <patterns>   runs the test binaries of the matching packages
+                                 in their directories, as `go test` does
+
+$PREBUILT_GO names the build's go.txt, whose paths are relative to
+$GITHUB_WORKSPACE. Anything it has no binary for is an error, so a test can't
+silently skip what it meant to run.
+"""
+
+import os
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
+MODULE = "github.com/estuary/connectors"
+
+ROOT = os.environ["GITHUB_WORKSPACE"]
+mains: dict[str, str] = {}
+tests: dict[str, str] = {}
+with open(os.environ["PREBUILT_GO"]) as f:
+    for line in f:
+        kind, dir, binary = line.split()
+        (mains if kind == "run" else tests)[dir] = os.path.join(ROOT, binary)
+connector_dir = os.path.relpath(os.path.dirname(os.environ["PREBUILT_GO"]), os.path.join(ROOT, ".build", "go"))
+
+
+def fail(msg: str):
+    print(f"prebuilt-go: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+def resolve(pattern: str) -> tuple[str, bool]:
+    """A package pattern as a directory relative to ROOT, and whether it ends in /..."""
+    recursive = pattern == "..." or pattern.endswith("/...")
+    if recursive:
+        pattern = pattern[:-3].rstrip("/") or "."
+    if pattern.startswith(MODULE):
+        path = os.path.join(ROOT, pattern[len(MODULE):].lstrip("/"))
+    else:
+        path = os.path.abspath(pattern)
+    return os.path.relpath(path, ROOT), recursive
+
+
+# Build flags that take a value, which `go run` and `go build` must skip.
+VALUE_FLAGS = {"-o", "-tags", "-ldflags", "-gcflags", "-asmflags", "-mod", "-p", "-modfile", "-overlay", "-pkgdir"}
+
+
+def split_build(argv: list[str]) -> tuple[dict[str, str], str, list[str]]:
+    flags, i = {}, 0
+    while i < len(argv) and argv[i].startswith("-"):
+        name, eq, value = argv[i].partition("=")
+        if not eq and name in VALUE_FLAGS:
+            value, i = argv[i + 1], i + 1
+        flags[name] = value
+        i += 1
+    if i == len(argv):
+        fail(f"no package in {argv}")
+    return flags, argv[i], argv[i + 1:]
+
+
+def main_binary(pkg: str) -> str:
+    dir, _ = resolve(pkg)
+    if dir not in mains:
+        fail(f"no prebuilt binary for {pkg} ({dir})")
+    return mains[dir]
+
+
+# `go test` flags, and the test binary flags they become.
+TEST_FLAGS = {"-v": "-test.v", "-short": "-test.short", "-failfast": "-test.failfast"}
+TEST_VALUE_FLAGS = {"-run": "-test.run", "-skip": "-test.skip", "-timeout": "-test.timeout",
+                    "-count": "-test.count", "-parallel": "-test.parallel", "-cpu": "-test.cpu"}
+IGNORED_VALUE_FLAGS = {"-p", "-tags", "-ldflags", "-gcflags", "-mod"}
+
+
+def go_test(argv: list[str]) -> int:
+    patterns, binary_args = [], []
+    timeout = "10m"
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        name, eq, value = a.partition("=")
+        if a in TEST_FLAGS:
+            binary_args.append(TEST_FLAGS[a])
+        elif name in TEST_VALUE_FLAGS or name in IGNORED_VALUE_FLAGS:
+            if not eq:
+                value, i = argv[i + 1], i + 1
+            if name == "-timeout":
+                timeout = value
+            elif name in TEST_VALUE_FLAGS:
+                binary_args.append(f"{TEST_VALUE_FLAGS[name]}={value}")
+        elif a.startswith("-"):
+            binary_args.append(a)  # a test binary flag
+        elif a.startswith((".", "/", MODULE)):
+            patterns.append(a)
+        else:
+            binary_args.append(a)  # the value of a test binary flag
+        i += 1
+    binary_args = [f"-test.timeout={timeout}", "-test.paniconexit0", *binary_args]
+
+    selected: list[str] = []
+    for p in patterns or ["."]:
+        dir, recursive = resolve(p)
+        if dir != connector_dir and not dir.startswith(connector_dir + "/") and not (
+                recursive and (dir == "." or connector_dir.startswith(dir + "/"))):
+            fail(f"{p} is outside {connector_dir}, which is all this job has test binaries for")
+        selected += [d for d in tests if d == dir or (recursive and (dir == "." or d.startswith(dir + "/")))]
+    selected = sorted(set(selected))
+    if not selected:
+        print(f"?   \t{' '.join(patterns)}\t[no test files]")
+        return 0
+
+    def run(dir: str, out) -> tuple[int, float]:
+        start = time.monotonic()
+        rc = subprocess.run([tests[dir], *binary_args], cwd=os.path.join(ROOT, dir),
+                            stdout=out, stderr=subprocess.STDOUT).returncode
+        return rc, time.monotonic() - start
+
+    def report(dir: str, rc: int, took: float):
+        status = "ok  " if rc == 0 else "FAIL"
+        print(f"{status}\t{MODULE}/{dir}\t{took:.3f}s", flush=True)
+
+    rc = 0
+    if len(selected) == 1:
+        sys.stdout.flush()
+        code, took = run(selected[0], None)
+        report(selected[0], code, took)
+        return 1 if code else 0
+
+    # Several packages run in parallel, each one's output printed when it ends.
+    results: dict[str, tuple[int, float, str]] = {}
+
+    def worker(dir: str):
+        with tempfile.TemporaryFile("w+") as out:
+            try:
+                code, took = run(dir, out)
+            except OSError as err:
+                print(err, file=out)
+                code, took = 1, 0.0
+            out.seek(0)
+            results[dir] = (code, took, out.read())
+
+    threads = [threading.Thread(target=worker, args=(d,)) for d in selected]
+    for t in threads:
+        t.start()
+    for d, t in zip(selected, threads):
+        t.join()
+        code, took, output = results[d]
+        sys.stdout.write(output)
+        report(d, code, took)
+        rc |= code
+    return 1 if rc else 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        fail("no command")
+    cmd, argv = sys.argv[1], sys.argv[2:]
+    if cmd == "run":
+        _, pkg, args = split_build(argv)
+        binary = main_binary(pkg)
+        os.execv(binary, [binary, *args])
+    elif cmd == "build":
+        flags, pkg, rest = split_build(argv)
+        if rest or "-o" not in flags:
+            fail(f"only `go build -o <out> <pkg>` is supported, not {argv}")
+        subprocess.run(["cp", main_binary(pkg), flags["-o"]], check=True)
+    elif cmd == "test":
+        sys.exit(go_test(argv))
+    else:
+        fail(f"`go {cmd}` isn't available in this job")
+
+
+main()

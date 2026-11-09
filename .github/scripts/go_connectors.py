@@ -40,6 +40,8 @@ ALL_PATHS = {
     ".github/scripts/test_classify_changed_paths.py",
     ".github/scripts/go_connectors.py",
     ".github/scripts/test_go_connectors.py",
+    ".github/scripts/go_build.py",
+    ".github/scripts/prebuilt-go/go",
     "go.mod",
     "go.sum",
 }

@@ -16,14 +16,13 @@ cd $ROOT_DIR/$CONNECTOR
 if [ -f Cargo.toml ]; then
   cargo test
 else
-  # Test common materialization packages. This is repeated for each
-  # materialization during CI runs which is quite redundant, but these tests are
-  # fast so it doesn't really matter. This should be optimized later with other CI
-  # improvements.
-
-  cd $ROOT_DIR/go && go test -v ./...
-  cd $ROOT_DIR/filesink && go test -v ./...
-  cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
+  # Test common materialization packages. CI tests them once for every
+  # connector instead, and skips them here.
+  if [ "${SKIP_SHARED_PACKAGE_TESTS:-}" != true ]; then
+    cd $ROOT_DIR/go && go test -v ./...
+    cd $ROOT_DIR/filesink && go test -v ./...
+    cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
+  fi
 
   TIMEOUT=20m
   if [ "$CONNECTOR" = "materialize-spanner" ]; then

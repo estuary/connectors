@@ -37,6 +37,7 @@ jobs:
     outputs:
       run: ${{ steps.matrix.outputs.run }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      shards: ${{ steps.shards.outputs.shards }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,6 +57,16 @@ jobs:
           list: .github/go-connectors.yaml
           connectors: ${{ steps.classify.outputs.go_connectors }}
 
+      # build_go_connectors compiles in up to four jobs, each a share of the
+      # connectors: what limits it is linking, one binary per core.
+      - id: shards
+        env:
+          MATRIX: ${{ steps.matrix.outputs.matrix }}
+        run: |
+          N=$(jq length <<< "$MATRIX")
+          S=$(( (N + 15) / 16 )); [ "$S" -le 4 ] || S=4; [ "$S" -ge 1 ] || S=1
+          echo "shards=$(jq -cn --argjson s "$S" '[range($s)]')" >> "$GITHUB_OUTPUT"
+
   fetch_flow:
     needs: classify_changes
     if: needs.classify_changes.outputs.run == 'true'
@@ -63,8 +74,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Only what the tests run: flowctl, flowctl-v1 for the runtime v1
+      # tests, sops for flowctl's and the tests' config decryption, and the
+      # binaries flowctl runs connectors with.
       - name: Fetch Flow binaries
         uses: ./.github/actions/fetch-flow-artifact
+        with:
+          paths: |
+            flow-bin/flowctl
+            flow-bin/flowctl-v1
+            flow-bin/sops
+            flow-bin/flow-connector-init
+            flow-bin/flow-parser
 
   build_base_image:
     needs: classify_changes
@@ -88,9 +109,10 @@ jobs:
   # Module zips are deleted before saving: builds read the extracted sources,
   # and the zips would add to what every build job downloads.
   #
-  # This job compiles every package and test, and saves only when no cache
-  # under the key exists. It doesn't run on PRs: their caches are visible only
-  # to the same PR, and each one could evict main's. A PR that changes go.sum
+  # This job compiles every package and test, and every package again with the
+  # `nozstd` tag most connector binaries build with, and saves only when no
+  # cache under the key exists. It doesn't run on PRs: their caches are visible
+  # only to the same PR, and each one could evict main's. A PR that changes go.sum
   # restores main's previous cache through restore-keys.
   warm_go_cache:
     needs: classify_changes
@@ -114,7 +136,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-v2-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
           lookup-only: true
 
       # A package that fails to compile here (source-db2 needs IBM's headers)
@@ -127,6 +149,7 @@ jobs:
         run: |
           go build ./... > /dev/null 2>&1 || true
           go test -count=1 -run '^$' ./... > /dev/null 2>&1 || true
+          go build -tags nozstd ./... > /dev/null 2>&1 || true
           find ~/go/pkg/mod/cache/download -name '*.zip' -delete
           du -sh ~/go/pkg/mod ~/.cache/go-build
 
@@ -136,7 +159,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-v2-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
 
       # Image builds compile in a golang image at /builder, where the runner's
       # cache doesn't match. So this also publishes each golang image that more
@@ -205,6 +228,137 @@ jobs:
               gh api -X DELETE /orgs/estuary/packages/container/build-cache/versions/$id
             done
 
+  # Compiles the connectors once, outside Docker, for the jobs below: each
+  # connector's binaries as its Dockerfile builds them and a test binary per
+  # package with tests, in one artifact per connector (see go_build.py). The
+  # jobs below have no Go toolchain; .github/scripts/prebuilt-go stands in for
+  # `go` with these binaries.
+  build_go_connectors:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    name: build_go_connectors (${{ matrix.shard }})
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.classify_changes.outputs.shards) }}
+    env:
+      GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Restore Go module and build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-cache-v2-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: go-cache-v2-${{ runner.os }}-
+
+      - name: Compile connectors and their tests
+        env:
+          MATRIX: ${{ needs.classify_changes.outputs.matrix }}
+          SHARDS: ${{ needs.classify_changes.outputs.shards }}
+        run: |
+          CONNECTORS=$(jq -r --argjson n "$(jq length <<< "$SHARDS")" --argjson s ${{ matrix.shard }} \
+            'to_entries[] | select(.key % $n == $s) | .value.name' <<< "$MATRIX")
+          python3 -I .github/scripts/go_build.py build --out .build/go $CONNECTORS
+
+      # zstd is several times faster than the artifact's own zip compression.
+      - name: Pack each connector's binaries
+        run: |
+          shopt -s nullglob
+          mkdir -p .build/bundles
+          for dir in .build/go/*/; do
+            c=$(basename $dir)
+            tar -C .build/go -cf - $c | zstd -q -T0 -3 -o .build/bundles/$c.tar.zst
+          done
+          ls -lhS .build/bundles
+
+      # upload-artifact uploads one artifact per step, and each test job
+      # downloads only its own connector's.
+      - name: Install the artifact client
+        run: npm install --silent --no-save --prefix "$RUNNER_TEMP/artifact" @actions/artifact@2.3.2
+
+      - name: Upload each connector's binaries
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { DefaultArtifactClient } = require(`${process.env.RUNNER_TEMP}/artifact/node_modules/@actions/artifact`);
+            const client = new DefaultArtifactClient();
+            const dir = path.resolve('.build/bundles');
+            await Promise.all(fs.readdirSync(dir).map(async (f) => {
+              const name = `go-${path.basename(f, '.tar.zst')}`;
+              await client.uploadArtifact(name, [path.join(dir, f)], dir,
+                { retentionDays: 1, compressionLevel: 0 });
+              core.info(`uploaded ${name}`);
+            }));
+
+  # Tests the in-repo packages the connectors depend on, each once, rather than
+  # in every connector's job (see go_build.py helper-tests).
+  test_go_packages:
+    needs: [classify_changes, fetch_flow]
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    timeout-minutes: 60
+    env:
+      GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Restore Go module and build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-cache-v2-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: go-cache-v2-${{ runner.os }}-
+
+      - name: Restore Flow binaries
+        uses: ./.github/actions/restore-flow-binaries
+
+      - name: Authenticate with GCloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: estuary-theatre
+          workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
+          service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
+
+      # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
+      # column types or keys drift from the spec.
+      - name: Verify generated table definitions for source-tpc-ds
+        if: contains(fromJSON(needs.classify_changes.outputs.matrix).*.name, 'source-tpc-ds')
+        run: |
+          go generate ./source-tpc-ds/...
+          git diff --exit-code -- source-tpc-ds
+
+      - name: Test shared Go packages
+        env:
+          MATRIX: ${{ needs.classify_changes.outputs.matrix }}
+        run: |
+          set -euo pipefail
+          python3 -I .github/scripts/go_build.py helper-tests $(jq -r '.[].name' <<< "$MATRIX") > "$RUNNER_TEMP/tests.sh"
+          cat "$RUNNER_TEMP/tests.sh"
+          bash -ex "$RUNNER_TEMP/tests.sh"
+
   build_connectors:
     runs-on: ubuntu-24.04
     permissions:
@@ -215,13 +369,16 @@ jobs:
     # Without this a wedged job runs to GitHub's six-hour default. The slowest
     # connector observed is ~25m.
     timeout-minutes: 60
-    needs: [classify_changes, build_base_image, fetch_flow]
+    needs: [classify_changes, build_base_image, fetch_flow, build_go_connectors, test_go_packages]
     if: needs.classify_changes.outputs.run == 'true'
     name: ${{ matrix.connector.name }}
     strategy:
       fail-fast: false
       matrix:
         connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
+    env:
+      DOCKER_BUILD_SUMMARY: false
+      DOCKER_BUILD_RECORD_UPLOAD: false
 
     steps:
       - uses: actions/checkout@v4
@@ -237,35 +394,22 @@ jobs:
           echo ::set-output name=version::${VERSION}
           VARIANTS="$(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
+          echo "mode=$(python3 -I .github/scripts/go_build.py mode ${{ matrix.connector.name }})" >> $GITHUB_OUTPUT
 
-      # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
-      # without a cache they fetch the module graph and compile it cold. Gate on the same
-      # condition as the helper package test step. The cache is restored only: the
-      # warm_go_cache job is its one writer.
-      - name: Set up Go
-        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
-        uses: actions/setup-go@v5
+      - name: Download ${{ matrix.connector.name }} binaries
+        if: steps.prep.outputs.mode == 'prebuilt'
+        uses: actions/download-artifact@v4
         with:
-          go-version-file: go.mod
-          cache: false
+          name: go-${{ matrix.connector.name }}
+          path: .build/bundles
 
-      - name: Restore Go module and build cache
-        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
-          restore-keys: go-cache-${{ runner.os }}-
-
-      # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
-      # column types or keys drift from the spec.
-      - name: Verify generated table definitions for ${{ matrix.connector.name }}
-        if: matrix.connector.name == 'source-tpc-ds'
+      - name: Put the prebuilt binaries in place of Go
+        if: steps.prep.outputs.mode == 'prebuilt'
         run: |
-          go generate ./source-tpc-ds/...
-          git diff --exit-code -- source-tpc-ds
+          mkdir -p .build/go
+          zstd -q -d -c .build/bundles/${{ matrix.connector.name }}.tar.zst | tar -C .build/go -xf -
+          echo "PREBUILT_GO=$PWD/.build/go/${{ matrix.connector.name }}/go.txt" >> $GITHUB_ENV
+          echo "$PWD/.github/scripts/prebuilt-go" >> $GITHUB_PATH
 
       - name: Restore Flow binaries
         uses: ./.github/actions/restore-flow-binaries
@@ -277,7 +421,9 @@ jobs:
           workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
           service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
 
+      # tests/source-gcs's setup and cleanup run gcloud.
       - name: Set up Cloud SDK
+        if: matrix.connector.name == 'source-gcs'
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: estuary-theatre
@@ -328,26 +474,58 @@ jobs:
         run: |
           bash source-mongodb/docker-compose-init.sh
 
-      # Run the tests of every in-repo helper package which this connector
-      # transitively depends on. This list is computed on the fly so that we
-      # don't have to keep an explicit list up-to-date. Likewise instead of
-      # having an explicit `contains()` clause governing Go connectors we'll
-      # just identify them as connectors whose subdirectory contains Go files.
-      - name: Test Go helper packages for ${{ matrix.connector.name }}
-        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
-        env:
-          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+      # A prebuilt connector's image is its Dockerfile's runtime stage, with the
+      # builder stage replaced by build_go_connectors' output. Any other
+      # connector compiles in Docker, in warm_go_cache's copy of the golang
+      # image with every package compiled in it when there's one.
+      - name: Find ${{ matrix.connector.name }}'s build contexts
+        id: contexts
         run: |
-          set -euo pipefail
-          DEPS=$(go list -deps -test \
-            -f '{{if and (not .ForTest) .Module (eq .Module.Path "github.com/estuary/connectors")}}{{.ImportPath}}{{end}}' \
-            './${{ matrix.connector.name }}/...')
-          PKGS=$(echo "$DEPS" \
-            | grep -v '\.test$' \
-            | grep -Ev '^github.com/estuary/connectors/${{ matrix.connector.name }}(/|$)' \
-            | sort -u || true)
-          [ -n "$PKGS" ] || exit 0
-          go test -short -count=1 $PKGS
+          if [ "${{ steps.prep.outputs.mode }}" = prebuilt ]; then
+            echo "context=builder=.build/go/${{ matrix.connector.name }}/ctx" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          read image tags < <(.github/scripts/golang-cache-image.sh ${{ matrix.connector.name }}/Dockerfile) || true
+          [ -n "$image" ] || exit 0
+          CACHE=ghcr.io/estuary/build-cache:golang-${image#golang:}-$tags-latest
+          if docker buildx imagetools inspect $CACHE > /dev/null 2>&1; then
+            echo "context=$image=docker-image://$CACHE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build ${{ matrix.connector.name }} Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.connector.name }}/Dockerfile
+          load: true
+          build-args: |
+            BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
+            CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
+          tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          build-contexts: ${{ steps.contexts.outputs.context }}
+          # Layers come from the connector's build-cache tag and only main writes
+          # it back, so PR builds can't overwrite each other's cache. The GitHub
+          # Actions cache is too small for every connector's builder stage.
+          cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
+
+      # Tools the Dockerfile's tests use, which its image carries.
+      - name: Put ${{ matrix.connector.name }}'s test tools on PATH
+        if: contains(fromJSON('["source-mongodb", "source-tpc-ds"]'), matrix.connector.name)
+        run: |
+          mkdir -p .build/tools
+          ID=$(docker create ghcr.io/estuary/${{ matrix.connector.name }}:local)
+          case ${{ matrix.connector.name }} in
+            source-mongodb) docker cp $ID:/usr/bin/bson-transcoder .build/tools/ ;;
+            source-tpc-ds) docker cp $ID:/connector/dsdgen .build/tools/; docker cp $ID:/connector/tpcds.idx .build/tools/ ;;
+          esac
+          docker rm $ID
+          echo "$PWD/.build/tools" >> $GITHUB_PATH
+
+      # The `go test` runs of the connector's own packages its Dockerfile makes.
+      - name: Go Connector ${{ matrix.connector.name }} Unit Tests
+        if: steps.prep.outputs.mode == 'prebuilt'
+        run: bash -x .build/go/${{ matrix.connector.name }}/unit-tests.sh
 
       # Go connector tests which aren't run as part of Dockerfile builds. Most Go connectors
       # run their tests as part of the Docker build, but running the tests outside of there
@@ -378,35 +556,6 @@ jobs:
           # (which has LFS installed) will match the Docker builder we use (which doesn't)
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
-
-      # Substitute the golang image with warm_go_cache's copy that has every
-      # package compiled in it, when there's one for this Dockerfile.
-      - name: Find a cached golang image
-        id: golang
-        run: |
-          read image tags < <(.github/scripts/golang-cache-image.sh ${{ matrix.connector.name }}/Dockerfile) || true
-          [ -n "$image" ] || exit 0
-          CACHE=ghcr.io/estuary/build-cache:golang-${image#golang:}-$tags-latest
-          if docker buildx imagetools inspect $CACHE > /dev/null 2>&1; then
-            echo "context=$image=docker-image://$CACHE" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build ${{ matrix.connector.name }} Docker Image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.connector.name }}/Dockerfile
-          load: true
-          build-args: |
-            BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
-            CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
-          tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
-          build-contexts: ${{ steps.golang.outputs.context }}
-          # Layers come from the connector's build-cache tag and only main writes
-          # it back, so PR builds can't overwrite each other's cache. The GitHub
-          # Actions cache is too small for every connector's builder stage.
-          cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
-          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
 
       # Fetch the spec from the built image, to catch images which are entirely
       # broken. This is the only image-level coverage for connectors whose real
@@ -480,6 +629,9 @@ jobs:
       - name: Materialization connector ${{ matrix.connector.name }} integration tests
         if: startsWith(matrix.connector.name, 'materialize-')
 
+        env:
+          # test_go_packages tested them.
+          SKIP_SHARED_PACKAGE_TESTS: true
         run: |
           CONNECTOR=${{ matrix.connector.name }} VERSION=local tests/materialize/run.sh;
 
@@ -543,7 +695,7 @@ jobs:
   # skipped job as passing a required check.
   go_gate:
     name: Go connectors gate # the check's name; keep it fixed
-    needs: [classify_changes, fetch_flow, build_base_image, build_connectors]
+    needs: [classify_changes, fetch_flow, build_base_image, build_go_connectors, test_go_packages, build_connectors]
     if: always()
     runs-on: ubuntu-24.04
     steps:
