@@ -119,20 +119,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v4
 
-      - name: TEMP delete trial images
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api --paginate /orgs/estuary/packages/container/build-cache/versions \
-            --jq '.[] | select(.metadata.container.tags | any(startswith("base-image-go-trial-"))) | "\(.id) \(.metadata.container.tags | join(","))"' \
-            | while read id tags; do
-              echo "Deleting version $id ($tags)"
-              gh api -X DELETE /orgs/estuary/packages/container/build-cache/versions/$id
-            done
-          echo "Remaining:"
-          gh api --paginate /orgs/estuary/packages/container/build-cache/versions \
-            --jq '.[] | select(.metadata.container.tags | any(startswith("base-image-go-trial-"))) | .id'
-
       - id: image
         env:
           GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
