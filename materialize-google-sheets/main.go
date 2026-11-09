@@ -232,7 +232,8 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		}
 	}
 
-	if err = batchRequestWithRetry(ctx, svc, cfg.spreadsheetID(), actions); err != nil {
+	// A repeated AddSheet fails, as the sheet already exists.
+	if err = batchUpdate(ctx, requestRetry, svc, cfg.spreadsheetID(), actions); err != nil {
 		return nil, fmt.Errorf("while updated sheets: %w", err)
 	}
 
