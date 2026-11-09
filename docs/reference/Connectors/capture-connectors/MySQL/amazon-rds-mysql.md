@@ -294,7 +294,7 @@ The connector handles most DDL on actively-captured tables automatically:
 
 If a column type change results in captured documents that don't match the existing collection schema, autodiscovery will update the schema on its next run. To apply the new schema immediately, edit the capture, click **Refresh**, and republish.
 
-Adding a value to an `ENUM` column needs an extra step before your application writes the new value. See [Adding values to an `ENUM` column](/reference/Connectors/capture-connectors/MySQL/#adding-values-to-an-enum-column).
+A new value added to an `ENUM` column can take up to 2 hours to be picked up by auto-discovery. To pick it up sooner, see [Adding values to an `ENUM` column](/reference/Connectors/capture-connectors/MySQL/#adding-values-to-an-enum-column).
 
 ### Data Manipulation Queries
 
