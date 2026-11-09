@@ -35,7 +35,7 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 		primary:               rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
 		rangeKey:              rangeKey,
 		be:                    &m.BindingEvents{},
-		profiler:              boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil),
+		profiler:              boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil, nil),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
