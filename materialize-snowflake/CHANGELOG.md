@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-11-06
+
+### Changed
+- A transaction's new rows are appended with COPY INTO, and only rows that
+  already exist in the table go through MERGE INTO. Commits that mix updates
+  with new rows are faster. The new rows are written in key order, so later
+  queries can often skip more of the table.
+
 ## 2026-11-05
 
 ### Changed
