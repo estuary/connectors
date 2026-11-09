@@ -55,7 +55,7 @@ jobs:
         uses: ./.github/actions/select-connectors
         with:
           list: .github/go-connectors.yaml
-          connectors: '["source-postgres"]'
+          connectors: ${{ steps.classify.outputs.go_connectors }}
 
       # build_go_connectors compiles in up to four jobs, each a share of the
       # connectors: what limits it is linking, one binary per core.
