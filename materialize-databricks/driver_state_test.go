@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -313,47 +314,49 @@ func TestMergePeerStatePatches(t *testing.T) {
 }
 
 func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
-	var origDelay = queryRetryDelay
-	queryRetryDelay = func(int) time.Duration { return 0 }
-	t.Cleanup(func() { queryRetryDelay = origDelay })
-
 	var conflict = fmt.Errorf("databricks: execution error: [%s] Duplicated files were committed in a concurrent COPY INTO operation. Please try again later.", retriableErrorClasses[0])
 	var d = testTransactor(fullRangeKey)
 
 	t.Run("succeeds once the concurrent copy has finished", func(t *testing.T) {
-		var db = recordingDB(t, conflict)
-		recording.failFirst = 2
+		synctest.Test(t, func(t *testing.T) {
+			var db = recordingDB(t, conflict)
+			recording.failFirst = 2
 
-		require.NoError(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
-		require.Equal(t, 3, recording.attempts)
-		require.Equal(t, []string{"COPY"}, recording.executed)
+			require.NoError(t, d.execQueries(t.Context(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
+			require.Equal(t, 3, recording.attempts)
+			require.Equal(t, []string{"COPY"}, recording.executed)
+		})
 	})
 
-	t.Run("gives up after the retry budget", func(t *testing.T) {
-		var db = recordingDB(t, conflict)
+	t.Run("waits minutes for the concurrent copy before giving up", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			var db = recordingDB(t, conflict)
 
-		var err = d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
-		require.ErrorIs(t, err, conflict)
-		require.Equal(t, maxQueryRetries+1, recording.attempts)
+			var start = time.Now()
+			var err = d.execQueries(t.Context(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
+			require.ErrorIs(t, err, conflict)
+			require.Equal(t, commitQueryRetry.MaxAttempts, recording.attempts)
+			require.Greater(t, time.Since(start), 3*time.Minute)
+		})
 	})
 
 	t.Run("other errors are not retried", func(t *testing.T) {
 		var db = recordingDB(t, fmt.Errorf("[DELTA_CONCURRENT_APPEND] something else"))
 
-		require.Error(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
+		require.Error(t, d.execQueries(t.Context(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
 		require.Equal(t, 1, recording.attempts)
 	})
 
 	t.Run("cancellation ends the wait", func(t *testing.T) {
-		queryRetryDelay = func(int) time.Duration { return time.Hour }
-		t.Cleanup(func() { queryRetryDelay = func(int) time.Duration { return 0 } })
-		var db = recordingDB(t, conflict)
-		var ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
-		defer cancel()
+		synctest.Test(t, func(t *testing.T) {
+			var db = recordingDB(t, conflict)
+			var ctx, cancel = context.WithCancel(t.Context())
+			time.AfterFunc(time.Second, cancel)
 
-		var err = d.execQueries(ctx, db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.Equal(t, 1, recording.attempts)
+			var err = d.execQueries(ctx, db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
+			require.ErrorIs(t, err, context.Canceled)
+			require.Equal(t, 1, recording.attempts)
+		})
 	})
 }
 
