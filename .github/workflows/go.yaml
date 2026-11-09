@@ -105,9 +105,9 @@ jobs:
       image: ${{ steps.image.outputs.image }}
       image_nozstd: ${{ steps.image.outputs.image_nozstd }}
     env:
-      REPO: ghcr.io/estuary/build-cache
-      TAG_PREFIX: base-image-go-trial-
-      PUBLISH: true
+      REPO: ghcr.io/estuary/base-image-go
+      TAG_PREFIX: ""
+      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
 
