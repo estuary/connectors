@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-09
+
+### Fixed
+- Merges failed or silently skipped rows when the first line break in a
+  transaction's staged data was a `\r\n` inside a string value. Affected
+  merges also rewrote `\r\n` in string values to `\n`.
+
 ## 2026-11-03
 
 ### Changed
