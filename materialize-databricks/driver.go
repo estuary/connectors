@@ -1437,58 +1437,21 @@ func isMissingError(err error) bool {
 	})
 }
 
-// retriableErrorClasses are the Databricks error classes of a commit query
-// which succeeds when re-run once the conflicting activity has finished.
-//
-// COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED: another COPY INTO into the same
-// table committed some of the same files, which usually means a previous
-// primary shard was killed mid-Acknowledge. We retry until that orphaned query
-// has finished, at which point our query skips the already-copied files.
-var retriableErrorClasses = []string{
-	"COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED",
-}
-
-const maxQueryRetries = 5
-
-// queryRetryDelay is the wait before retry number attempt+1: 15s, 30s, 1m,
-// 2m, 4m.
-var queryRetryDelay = func(attempt int) time.Duration {
-	return time.Duration(1<<attempt) * 15 * time.Second
-}
-
-func isRetriableError(err error) bool {
-	var text = err.Error()
-	return slices.ContainsFunc(retriableErrorClasses, func(class string) bool {
-		return strings.Contains(text, class)
-	})
-}
-
 // execQuery runs a commit query of the binding, profiled as the binding's, and
 // returns the row counts of its result row.
 func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile *boilerplate.QueryProfile, binding int, query string, args ...any) (m.RowStats, error) {
-	for attempt := 0; ; attempt++ {
+	var stats m.RowStats
+	var err = commitQueryRetry.Do(ctx, "commit query", func(ctx context.Context) error {
 		var queryCtx, trace = profile.Trace(ctx, binding, boilerplate.StatementKind(query))
 		var rows, err = db.QueryContext(queryCtx, query, args...)
 		trace.Finish(err)
-		if err == nil {
-			return scanRowStats(rows), nil
-		} else if !isRetriableError(err) || attempt >= maxQueryRetries {
-			return m.RowStats{}, err
+		if err != nil {
+			return err
 		}
-
-		var delay = queryRetryDelay(attempt)
-		log.WithFields(log.Fields{
-			"attempt": attempt + 1,
-			"delay":   delay.String(),
-			"err":     err,
-		}).Warn("query failed with a retriable error; retrying")
-
-		select {
-		case <-ctx.Done():
-			return m.RowStats{}, ctx.Err()
-		case <-time.After(delay):
-		}
-	}
+		stats = scanRowStats(rows)
+		return nil
+	})
+	return stats, err
 }
 
 // scanRowStats reads the result row of MERGE INTO (num_affected_rows,
