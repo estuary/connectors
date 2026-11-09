@@ -16,6 +16,7 @@ import (
 
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
+	pgtls "github.com/estuary/connectors/go/postgres/tls"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgio"
@@ -152,6 +153,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 	if err != nil {
 		return nil, err
 	}
+	pgtls.Configure(connConfig, db.config.Advanced.SSLMode)
 	if connConfig.ConnectTimeout == 0 {
 		connConfig.ConnectTimeout = 30 * time.Second
 	}

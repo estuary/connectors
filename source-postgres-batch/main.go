@@ -13,13 +13,15 @@ import (
 
 	"github.com/estuary/connectors/go/common"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	pgtls "github.com/estuary/connectors/go/postgres/tls"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -54,7 +56,7 @@ type advancedConfig struct {
 	DiscoverViews    bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered." jsonschema_extras:"nonsensitive=true"`
 	PollSchedule     string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,nonsensitive=true"`
 	DiscoverSchemas  []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
-	SSLMode          string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	SSLMode          string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter. 'verify-ca' and 'verify-full' trust public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA).,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 	SourceTag        string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document." jsonschema_extras:"nonsensitive=true"`
 	FeatureFlags     string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 	StatementTimeout string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout for queries.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default=" jsonschema_extras:"nonsensitive=true"`
@@ -155,10 +157,14 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		}
 	}
 
-	var db, err = sql.Open("pgx", cfg.ToURI())
+	connConfig, err := pgx.ParseConfig(cfg.ToURI())
 	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("error parsing database uri: %w", err)
+	}
+	pgtls.Configure(&connConfig.Config, cfg.Advanced.SSLMode)
+
+	var db = stdlib.OpenDB(*connConfig)
+	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("error pinging database: %w", err)
 	} else if _, err := db.ExecContext(ctx, "SELECT true;"); err != nil {
 		return nil, fmt.Errorf("error executing no-op query: %w", err)

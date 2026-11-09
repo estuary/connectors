@@ -470,7 +470,7 @@ these filters exclude will be deactivated the next time discovery runs.
 | `/advanced/skip_backfills` | Skip Backfills | A comma-separated list of fully-qualified table names which should not be backfilled. | string |  |
 | `/advanced/slotName` | Slot Name | The name of the PostgreSQL replication slot to replicate from. | string | `"flow_slot"` |
 | `/advanced/watermarksTable` | Watermarks Table | The name of the table used for watermark writes during backfills. Must be fully-qualified in `<schema>.<table>` form. | string  | `"public.flow_watermarks"` |
-| `/advanced/sslmode` | SSL Mode | Overrides SSL connection behavior by setting the 'sslmode' parameter. | string |  |
+| `/advanced/sslmode` | SSL Mode | Overrides SSL connection behavior by setting the 'sslmode' parameter. 'verify-ca' and 'verify-full' trust public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA). | string |  |
 | `/advanced/discover_schemas` | Discovery Schema Selection | If this is specified, only tables in the selected schema(s) will be automatically discovered. | string array |  |
 | `/advanced/min_backfill_xid` | Minimum Backfill XID | Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases. | string |  |
 | `/advanced/read_only_capture` | Read-Only Capture | When set, the capture will operate in [read-only mode](#read-only-captures) and avoid operations such as watermark writes. | boolean | `false` |

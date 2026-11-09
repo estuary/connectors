@@ -196,10 +196,10 @@ class TestRealGraph(unittest.TestCase):
         self.assertIn("materialize-postgres", got)
         self.assertNotIn("source-postgres", got)
 
-    def test_embedded_ca_bundles_build_the_mysql_captures(self):
-        # go/cloudcas embeds them, and go/mysql/tls imports go/cloudcas.
+    def test_embedded_ca_bundles_build_the_mysql_and_postgres_captures(self):
+        # go/cloudcas embeds them, and go/mysql/tls and go/postgres/tls import it.
         got = go_connectors(classify("go/cloudcas/aws.pem", graph=self.graph))
-        self.assertEqual(got, ["source-mysql", "source-mysql-batch"])
+        self.assertEqual(got, ["source-mysql", "source-mysql-batch", "source-postgres", "source-postgres-batch"])
 
     def test_connector_docs_build_only_that_connector(self):
         got = go_connectors(classify("source-postgres/CHANGELOG.md", graph=self.graph))

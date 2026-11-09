@@ -62,7 +62,7 @@
               "verify-full"
             ],
             "title": "SSL Mode",
-            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter. 'verify-ca' and 'verify-full' trust public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA)."
           },
           "source_tag": {
             "type": "string",
