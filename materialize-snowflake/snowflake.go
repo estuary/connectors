@@ -942,8 +942,10 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Round:     round,
 				Rows:      rows,
 			}
+			continue
+		}
 
-		} else if copyIntoQuery, err := renderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
+		if copyIntoQuery, err := renderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
 			return nil, fmt.Errorf("copyInto template: %w", err)
 		} else if item != nil {
 			item.CopyQuery = copyIntoQuery
