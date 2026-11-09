@@ -10,19 +10,23 @@ This connector captures data from Pendo into Estuary collections.
 
 The following data resources are supported through the Pendo API:
 
-* [Account](https://engageapi.pendo.io/#7e780ebc-5880-4af4-8e3b-6a61dd3e5148)
-* [Feature](https://engageapi.pendo.io/#75c6b443-eb07-4a0c-9e27-6c12ad3dbbc4)
-* [Guide](https://engageapi.pendo.io/#4f1e3ca1-fc41-4469-bf4b-da90ee8caf3d)
-* [Page](https://engageapi.pendo.io/#a53463f9-bdd3-443e-b22f-b6ea6c7376fb)
-* [Report](https://engageapi.pendo.io/#2ac0699a-b653-4082-be11-563e5c0c9410)
-* [Segment](https://engageapi.pendo.io/#92b4a527-1311-45be-bf36-cfcf91d1a47c)
-* [TrackType](https://engageapi.pendo.io/#9f83f648-4fe7-45db-b30d-963679af6304)
-* [Visitor](https://engageapi.pendo.io/#dd943e68-5bff-4a1a-9891-b55638ae2c3d)
-* [PageEvents](https://engageapi.pendo.io/#9af41daf-e6f2-4dc2-8031-836922aad09e)
-* [FeatureEvents](https://engageapi.pendo.io/#a26da609-62d0-43ea-814b-956551f2abeb)
-* [TrackEvents](https://engageapi.pendo.io/#97927543-0222-42b9-93a2-0775d2c62e1e)
-* [GuideEvents](https://engageapi.pendo.io/#7b6aa7b0-117d-478b-942b-c339196e636d)
-* [PollEvents](https://engageapi.pendo.io/#a6ff15d6-f989-4c11-b7a7-1de0f1577306)
+| Resource | Replication Mode |
+| --- | --- |
+| [Account](https://engageapi.pendo.io/#7e780ebc-5880-4af4-8e3b-6a61dd3e5148) | Incremental |
+| [AccountMetadata](https://engageapi.pendo.io/#a59ff30a-d29c-430c-b28a-fa64d199a9b9) | Snapshot |
+| [Feature](https://engageapi.pendo.io/#75c6b443-eb07-4a0c-9e27-6c12ad3dbbc4) | Snapshot |
+| [FeatureEvents](https://engageapi.pendo.io/#a26da609-62d0-43ea-814b-956551f2abeb) | Incremental |
+| [Guide](https://engageapi.pendo.io/#4f1e3ca1-fc41-4469-bf4b-da90ee8caf3d) | Snapshot |
+| [GuideEvents](https://engageapi.pendo.io/#7b6aa7b0-117d-478b-942b-c339196e636d) | Incremental |
+| [Page](https://engageapi.pendo.io/#a53463f9-bdd3-443e-b22f-b6ea6c7376fb) | Snapshot |
+| [PageEvents](https://engageapi.pendo.io/#9af41daf-e6f2-4dc2-8031-836922aad09e) | Incremental |
+| [PollEvents](https://engageapi.pendo.io/#a6ff15d6-f989-4c11-b7a7-1de0f1577306) | Incremental |
+| [Report](https://engageapi.pendo.io/#2ac0699a-b653-4082-be11-563e5c0c9410) | Snapshot |
+| [Segment](https://engageapi.pendo.io/#92b4a527-1311-45be-bf36-cfcf91d1a47c) | Snapshot |
+| [TrackEvents](https://engageapi.pendo.io/#97927543-0222-42b9-93a2-0775d2c62e1e) | Incremental |
+| [TrackType](https://engageapi.pendo.io/#9f83f648-4fe7-45db-b30d-963679af6304) | Incremental |
+| [Visitor](https://engageapi.pendo.io/#dd943e68-5bff-4a1a-9891-b55638ae2c3d) | Incremental |
+| [VisitorMetadata](https://engageapi.pendo.io/#a59ff30a-d29c-430c-b28a-fa64d199a9b9) | Snapshot |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

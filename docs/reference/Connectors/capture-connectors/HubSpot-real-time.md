@@ -10,31 +10,33 @@ This connector captures data from HubSpot into Estuary collections.
 
 The connector automatically discovers bindings for the following HubSpot resources:
 
-* [Campaigns](https://developers.hubspot.com/docs/api-reference/marketing-campaigns-public-api-v3/guide)
-* [Companies](https://developers.hubspot.com/docs/api/crm/companies)
-* [Contact List Memberships](https://developers.hubspot.com/docs/api-reference/crm-lists-v3/guide#manage-list-membership)
-* [Contact Lists](https://developers.hubspot.com/docs/api-reference/crm-lists-v3/guide)
-* [Contacts](https://developers.hubspot.com/docs/api/crm/contacts)
-* [Custom Objects](https://developers.hubspot.com/docs/api/crm/crm-custom-objects)
-* [Deal Pipelines](https://developers.hubspot.com/beta-docs/guides/api/crm/pipelines)
-* [Deals](https://developers.hubspot.com/docs/api/crm/deals)
-* [Email Events](https://developers.hubspot.com/docs/methods/email/get_events)
-* [Engagements](https://developers.hubspot.com/docs/api/crm/engagements)
-* [Feedback Submissions](https://developers.hubspot.com/docs/api/crm/feedback-submissions)
-* [Form Submissions](https://developers.hubspot.com/docs/reference/api/marketing/forms/v1)
-* [Forms](https://developers.hubspot.com/docs/reference/api/marketing/forms/v3)
-* [Goals](https://developers.hubspot.com/docs/api-reference/crm-goal-targets-v3/guide)
-* [Leads](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/leads/guide)
-* [Line Items](https://developers.hubspot.com/beta-docs/guides/api/crm/objects/line-items)
-* [Marketing Emails](https://developers.hubspot.com/docs/api-reference/marketing-marketing-emails-v3/marketing-emails/get-marketing-v3-emails-)
-* [Marketing Event Participants](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/participant-state/get-breakdown)
-* [Marketing Events](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/guide)
-* [Orders](https://developers.hubspot.com/docs/api-reference/crm-orders-v3/guide)
-* [Owners](https://developers.hubspot.com/beta-docs/reference/api/crm/owners/v2)
-* [Products](https://developers.hubspot.com/beta-docs/guides/api/crm/objects/products)
-* [Properties](https://developers.hubspot.com/docs/api/crm/properties)
-* [Tickets](https://developers.hubspot.com/docs/api/crm/tickets)
-* [Workflows](https://developers.hubspot.com/docs/api-reference/legacy/create-manage-workflows-v3/get-automation-v3-workflows)
+| Resource | Replication Mode |
+| --- | --- |
+| [Campaigns](https://developers.hubspot.com/docs/api-reference/marketing-campaigns-public-api-v3/guide) | Incremental |
+| [Companies](https://developers.hubspot.com/docs/api/crm/companies) | Incremental |
+| [Contact List Memberships](https://developers.hubspot.com/docs/api-reference/crm-lists-v3/guide#manage-list-membership) | Incremental |
+| [Contact Lists](https://developers.hubspot.com/docs/api-reference/crm-lists-v3/guide) | Incremental |
+| [Contacts](https://developers.hubspot.com/docs/api/crm/contacts) | Incremental |
+| [Custom Objects](https://developers.hubspot.com/docs/api/crm/crm-custom-objects) | Incremental |
+| [Deal Pipelines](https://developers.hubspot.com/beta-docs/guides/api/crm/pipelines) | Snapshot |
+| [Deals](https://developers.hubspot.com/docs/api/crm/deals) | Incremental |
+| [Email Events](https://developers.hubspot.com/docs/methods/email/get_events) | Incremental |
+| [Engagements](https://developers.hubspot.com/docs/api/crm/engagements) | Incremental |
+| [Feedback Submissions](https://developers.hubspot.com/docs/api/crm/feedback-submissions) | Incremental |
+| [Form Submissions](https://developers.hubspot.com/docs/reference/api/marketing/forms/v1) | Incremental |
+| [Forms](https://developers.hubspot.com/docs/reference/api/marketing/forms/v3) | Snapshot |
+| [Goals](https://developers.hubspot.com/docs/api-reference/crm-goal-targets-v3/guide) | Incremental |
+| [Leads](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/leads/guide) | Incremental |
+| [Line Items](https://developers.hubspot.com/beta-docs/guides/api/crm/objects/line-items) | Incremental |
+| [Marketing Emails](https://developers.hubspot.com/docs/api-reference/marketing-marketing-emails-v3/marketing-emails/get-marketing-v3-emails) | Incremental |
+| [Marketing Event Participants](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/participant-state/get-breakdown) | Snapshot |
+| [Marketing Events](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/guide) | Snapshot |
+| [Orders](https://developers.hubspot.com/docs/api-reference/crm-orders-v3/guide) | Incremental |
+| [Owners](https://developers.hubspot.com/beta-docs/reference/api/crm/owners/v2) | Snapshot |
+| [Products](https://developers.hubspot.com/beta-docs/guides/api/crm/objects/products) | Incremental |
+| [Properties](https://developers.hubspot.com/docs/api/crm/properties) | Snapshot |
+| [Tickets](https://developers.hubspot.com/docs/api/crm/tickets) | Incremental |
+| [Workflows](https://developers.hubspot.com/docs/api-reference/legacy/create-manage-workflows-v3/get-automation-v3-workflows) | Incremental |
 
 ## Prerequisites
 

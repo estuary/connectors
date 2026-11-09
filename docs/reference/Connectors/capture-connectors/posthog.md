@@ -12,16 +12,16 @@ The connector captures the following PostHog resources:
 
 **Snapshot resources** (full refresh each sync interval):
 
+- Annotations
+- Cohorts
 - Organizations
 - Projects
-- Persons
-- Cohorts
-- Annotations
 
 **Incremental resources** (cursor-based change tracking):
 
-- Feature Flags
 - Events
+- Feature Flags
+- Persons
 - Sessions
 
 :::info

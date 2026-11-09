@@ -10,11 +10,13 @@ This connector captures data from Sentry into Estuary collections.
 
 The following data resources are supported through the Sentry APIs:
 
-- [Environments](https://docs.sentry.io/api/environments/list-an-organizations-environments/)
-- [Teams](https://docs.sentry.io/api/teams/list-an-organizations-teams/)
-- [Projects](https://docs.sentry.io/api/organizations/list-an-organizations-projects/)
-- [Issues](https://docs.sentry.io/api/events/list-a-projects-issues/)
-- [Releases](https://docs.sentry.io/api/releases/list-an-organizations-releases/)
+| Resource | Replication Mode |
+| --- | --- |
+| [Environments](https://docs.sentry.io/api/environments/list-an-organizations-environments/) | Snapshot |
+| [Issues](https://docs.sentry.io/api/events/list-a-projects-issues/) | Incremental |
+| [Projects](https://docs.sentry.io/api/organizations/list-an-organizations-projects/) | Snapshot |
+| [Releases](https://docs.sentry.io/api/releases/list-an-organizations-releases/) | Snapshot |
+| [Teams](https://docs.sentry.io/api/teams/list-an-organizations-teams/) | Snapshot |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 
