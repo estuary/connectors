@@ -49,6 +49,7 @@ members = [
     "source-google-play",
     "source-google-sheets-native",
     "source-greenhouse-native",
+    "source-hibob",
     "source-hubspot",
     "source-hubspot-native",
     "source-impact-native",

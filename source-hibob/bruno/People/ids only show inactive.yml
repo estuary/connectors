@@ -1,0 +1,120 @@
+info:
+  name: ids only show inactive
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/people/search"
+  body:
+    type: json
+    data: |-
+      {
+        "fields": ["root.id"],
+        "showInactive": true
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain: the field-detail probes below filter to these ids. Runtime var only.
+        // Pins every id (small test tenants) up to 200 — the docs' recommended upper batch.
+        const emps = res.getBody()?.employees;
+        if (res.getStatus() === 200 && Array.isArray(emps)) {
+          const ids = emps.map((e) => e['/root/id']?.value ?? e.id).filter(Boolean);
+          bru.setVar('pin_employee_ids', JSON.stringify(ids.slice(0, 200)));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - before permission grant: empty"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": []
+          }
+  - name: "200 - projection: 2 of 45 employees (after permission grant)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "98"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": [
+              {
+                "/root/id": {
+                  "value": "4021630481756848861"
+                },
+                "id": "4021630481756848861"
+              },
+              {
+                "/root/id": {
+                  "value": "4021630535863370472"
+                },
+                "id": "4021630535863370472"
+              }
+            ]
+          }
+
+  - name: "200 - after H3 termination: 45 employees incl. terminated 4021630453151695573 (projection: count + membership)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "employee_count": 45,
+            "terminated_employee_present": true
+          }
+
+docs: |-
+  **REFERENCE:** [Search for employees](https://apidocs.hibob.com/reference/post_people-search.md)
+
+  Read-only search (POST verb, no side effects).
+
+  **WHY:** step 1 of the connector's two-phase read — enumerate every employee id incl.
+  terminated/hired/leave. The after-response script pins ids for the probes below.
+
+  **VERIFIED (2026-11-02):** 45 employees, same 45 as `People / ids only` — every
+  employee in this tenant is `employed`/`Active` (see `People / curated fields`).
+  Response order is **not** sorted by id.
+
+  **VERIFIED (2026-11-02):** after the user ran `Seeding / H3 - Terminate Employee`,
+  this request returns 45 incl. terminated 4021630453151695573, while
+  `People / ids only` returns 44 — `showInactive: true` is honored and the service
+  user's "Access data for" covers inactive employees.
