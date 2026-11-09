@@ -41,10 +41,12 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 // every job without actually running anything.
 type recordingComputeRunner struct {
 	lastInput any
+	jobsRun   int
 }
 
 func (r *recordingComputeRunner) runJob(_ context.Context, job computeJob) error {
 	r.lastInput = job.Input
+	r.jobsRun++
 	return nil
 }
 
@@ -66,7 +68,7 @@ func (noopBucket) NewWriter(context.Context, string, ...blob.WriterOption) io.Wr
 func (noopBucket) Upload(context.Context, string, io.Reader, ...blob.WriterOption) error {
 	panic("not implemented")
 }
-func (noopBucket) URI(key string) string { return "s3://bucket/" + key }
+func (noopBucket) URI(key string) string                  { return "s3://bucket/" + key }
 func (noopBucket) Delete(context.Context, []string) error { return nil }
 func (noopBucket) CheckPermissions(context.Context, blob.CheckPermissionsConfig) error {
 	panic("not implemented")
@@ -107,13 +109,14 @@ func TestAcknowledgeRecoveryTruncateOnly(t *testing.T) {
 	require.Equal(t, "DELETE FROM a WHERE x < '2026-01-01'", mergeInput.Bindings[0].TruncateQuery)
 }
 
-// TestAcknowledgeRecoveryMergeFilesGoneWithPendingTruncate covers a
+// TestAcknowledgeRecoveryMergeAndTruncateAlreadyCompleted covers a
 // crash-recovery Acknowledge for a binding whose checkpoint carries both a
-// merge (now-deleted files) and a pending backfill truncation. The merge
-// already completed and its files were cleaned up before the crash, so its
-// Query must not be resubmitted against an empty Files list; the surviving
-// TruncateQuery must still run.
-func TestAcknowledgeRecoveryMergeFilesGoneWithPendingTruncate(t *testing.T) {
+// merge and a pending backfill truncation, submitted together as one job.
+// The staged files are gone, which means that job already ran to completion
+// (and cleaned them up) before the crash: neither the merge nor the bundled
+// truncate may be resubmitted, but the checkpoint entry must still be
+// cleared so it isn't retried forever.
+func TestAcknowledgeRecoveryMergeAndTruncateAlreadyCompleted(t *testing.T) {
 	compute := &recordingComputeRunner{}
 
 	tr := &transactor{
@@ -137,15 +140,9 @@ func TestAcknowledgeRecoveryMergeFilesGoneWithPendingTruncate(t *testing.T) {
 
 	state, err := tr.Acknowledge(context.Background(), nil, []string{"a_table.v1"})
 	require.NoError(t, err)
-	require.NotNil(t, state, "the checkpoint entry must be cleared once the truncation runs")
+	require.NotNil(t, state, "the checkpoint entry must be cleared even though no job ran")
 	require.Nil(t, tr.cp["a_table.v1"])
-
-	mergeInput, ok := compute.lastInput.(python.MergeInput)
-	require.True(t, ok, "expected the job to run with a python.MergeInput, got %T", compute.lastInput)
-	require.Len(t, mergeInput.Bindings, 1)
-	require.Empty(t, mergeInput.Bindings[0].Query, "a merge whose files are gone must not be resubmitted")
-	require.Empty(t, mergeInput.Bindings[0].Files)
-	require.Equal(t, "DELETE FROM a WHERE x < '2026-01-01'", mergeInput.Bindings[0].TruncateQuery)
+	require.Zero(t, compute.jobsRun, "a merge whose files are gone already completed and must not be resubmitted")
 }
 
 func TestSpec(t *testing.T) {

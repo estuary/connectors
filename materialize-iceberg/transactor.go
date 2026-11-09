@@ -401,13 +401,17 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			return nil, fmt.Errorf("cleaning up generated job status file: %w", err)
 		} else if err := t.storeFiles.CleanupCheckpoint(ctx, allFileUris); err != nil {
 			return nil, fmt.Errorf("cleaning up store files: %w", err)
-		} else if cpUpdate, err := json.Marshal(checkpointClear); err != nil {
+		}
+	}
+
+	if len(checkpointClear) > 0 {
+		cpUpdate, err := json.Marshal(checkpointClear)
+		if err != nil {
 			return nil, fmt.Errorf("encoding checkpoint update: %w", err)
-		} else {
-			stateUpdate = &pf.ConnectorState{
-				UpdatedJson: cpUpdate,
-				MergePatch:  true,
-			}
+		}
+		stateUpdate = &pf.ConnectorState{
+			UpdatedJson: cpUpdate,
+			MergePatch:  true,
 		}
 	}
 
