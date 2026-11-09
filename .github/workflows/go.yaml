@@ -82,6 +82,97 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+  # base-image-go is what the Go connectors' Dockerfiles build in: the golang
+  # image with every module downloaded and every package and test compiled.
+  # It's tagged by its Go version and a hash of go.mod, go.sum and its
+  # Dockerfile, so it's rebuilt when one of those changes but not for the
+  # Debian updates that move the golang image's digest almost daily. Its
+  # layers are zstd, which decompresses several times faster than gzip:
+  # pulling it is most of what it costs a build job.
+  #
+  # Every build trusts it, so only main publishes it. A PR whose tag doesn't
+  # exist builds on main's `dev` instead, and `go build` downloads the modules
+  # it's missing.
+  build_base_image_go:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    timeout-minutes: 60
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    env:
+      REPO: ghcr.io/estuary/base-image-go
+      TAG_PREFIX: ""
+      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v4
+
+      - id: image
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+          HASH: ${{ hashFiles('go.mod', 'go.sum', 'base-image-go/Dockerfile') }}
+        run: |
+          set -euo pipefail
+          GOLANG=$(sed -n 's/^ARG GOLANG_IMAGE=//p' base-image-go/Dockerfile)
+          GOV=$(docker buildx imagetools inspect $GOLANG \
+            --format '{{json (index .Image "linux/amd64").Config.Env}}' \
+            | jq -r '.[] | select(startswith("GOLANG_VERSION=")) | ltrimstr("GOLANG_VERSION=")')
+          TAG=$REPO:${TAG_PREFIX}go$GOV-${HASH:0:16}
+          DEV=$REPO:${TAG_PREFIX}dev
+
+          if docker buildx imagetools inspect $TAG-nozstd > /dev/null 2>&1; then
+            echo "$TAG exists"
+          elif [ "$PUBLISH" = true ]; then
+            for target in default nozstd; do
+              suffix=${target#default}; suffix=${suffix:+-$suffix}
+              docker buildx build --platform linux/amd64 --provenance=false \
+                --target $target --tag $TAG$suffix \
+                --output type=image,push=true,oci-mediatypes=true,compression=zstd,force-compression=true \
+                -f base-image-go/Dockerfile .
+            done
+          else
+            echo "$TAG doesn't exist and only main publishes it, so builds use $DEV"
+            echo "image=$DEV" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "$PUBLISH" = true ]; then
+            docker buildx imagetools create --tag $DEV $TAG
+            docker buildx imagetools create --tag $DEV-nozstd $TAG-nozstd
+          fi
+          echo "image=$TAG" >> $GITHUB_OUTPUT
+
+      # Builds use `dev` or the newest tag, so the versions they've moved off
+      # are deleted. Each holds about 2 GB.
+      - name: Delete superseded images
+        if: env.PUBLISH == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CURRENT: ${{ steps.image.outputs.image }}
+        run: |
+          KEEP=${CURRENT#$REPO:}
+          gh api --paginate /orgs/estuary/packages/container/${REPO##*/}/versions \
+            --jq ".[] | select(.metadata.container.tags as \$t
+              | (\$t | length) > 0
+              and all(\$t[]; startswith(\"$TAG_PREFIX\"))
+              and all(\$t[]; startswith(\"$KEEP\") or startswith(\"${TAG_PREFIX}dev\") | not)) | .id" \
+            | while read id; do
+              echo "Deleting version $id"
+              gh api -X DELETE /orgs/estuary/packages/container/${REPO##*/}/versions/$id
+            done
+
   build_connectors:
     runs-on: ubuntu-24.04
     permissions:
@@ -92,7 +183,7 @@ jobs:
     # Without this a wedged job runs to GitHub's six-hour default. The slowest
     # connector observed is ~25m.
     timeout-minutes: 60
-    needs: [classify_changes, build_base_image, fetch_flow]
+    needs: [classify_changes, build_base_image, build_base_image_go, fetch_flow]
     if: needs.classify_changes.outputs.run == 'true'
     name: ${{ matrix.connector.name }}
     strategy:
@@ -253,6 +344,7 @@ jobs:
           load: true
           build-args: |
             BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
+            BASE_IMAGE_GO=${{ needs.build_base_image_go.outputs.image }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
           # Layers come from the connector's build-cache tag and only main writes
@@ -396,7 +488,7 @@ jobs:
   # skipped job as passing a required check.
   go_gate:
     name: Go connectors gate # the check's name; keep it fixed
-    needs: [classify_changes, fetch_flow, build_base_image, build_connectors]
+    needs: [classify_changes, fetch_flow, build_base_image, build_base_image_go, build_connectors]
     if: always()
     runs-on: ubuntu-24.04
     steps:

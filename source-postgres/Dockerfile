@@ -1,15 +1,13 @@
 ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
+ARG BASE_IMAGE_GO=ghcr.io/estuary/base-image-go:dev
 
 # Build Stage
 ################################################################################
-FROM golang:1.27-trixie AS builder
+FROM ${BASE_IMAGE_GO} AS builder
 
 WORKDIR /builder
 
-# Download & compile dependencies early. Doing this separately allows for layer
-# caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
 
 COPY go                  ./go
 COPY source-boilerplate  ./source-boilerplate
@@ -19,9 +17,7 @@ COPY source-postgres ./source-postgres
 ENV PATH="/builder/bin:$PATH"
 
 # Build the connector.
-RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
-    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
-    go build -o ./connector -v ./source-postgres/...
+RUN go build -o ./connector -v ./source-postgres/...
 
 
 # Runtime Stage

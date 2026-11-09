@@ -43,7 +43,7 @@ ALL_PATHS = {
     "go.mod",
     "go.sum",
 }
-ALL_PREFIXES = ("base-image/",)
+ALL_PREFIXES = ("base-image/", "base-image-go/")
 
 # Other CI files build no Go connector, and neither do the catalog
 # sanitization scripts, which people run by hand and no image or test reads.

@@ -1,15 +1,13 @@
 ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
+ARG BASE_IMAGE_GO=ghcr.io/estuary/base-image-go:dev
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.27-trixie AS builder
+FROM --platform=linux/amd64 ${BASE_IMAGE_GO}-nozstd AS builder
 
 WORKDIR /builder
 
-# Download & compile dependencies early. Doing this separately allows for layer
-# caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
 
 # Build the connector projects we depend on.
 COPY go                        ./go

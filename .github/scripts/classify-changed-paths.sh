@@ -54,8 +54,9 @@ rust_select() {
             rust_all=true; return ;;
         # Other workflows, CI scripts and connector lists build no Rust connector.
         .github/workflows/* | .github/scripts/* | .github/*-connectors.yaml) return ;;
-        # Go's module files, and the Rust crate only source-mongodb builds.
-        go.mod | go.sum | bson-transcoder/*) return ;;
+        # Go's module files and build image, and the Rust crate only
+        # source-mongodb builds.
+        go.mod | go.sum | base-image-go/* | bson-transcoder/*) return ;;
         # The catalog sanitization scripts, which people run by hand.
         scripts/obfuscation/*) return ;;
         # The shared materialization tests run for every materialize-* connector.

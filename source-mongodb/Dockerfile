@@ -1,3 +1,5 @@
+ARG BASE_IMAGE_GO=ghcr.io/estuary/base-image-go:dev
+
 # Rust Build Stage
 ################################################################################
 FROM rust:1-slim-trixie AS rust-builder
@@ -14,14 +16,11 @@ RUN cargo auditable build --release --manifest-path bson-transcoder/Cargo.toml
 
 # Go Build Stage
 ################################################################################
-FROM golang:1.27-trixie AS builder
+FROM ${BASE_IMAGE_GO} AS builder
 
 WORKDIR /builder
 
-# Download & compile dependencies early. Doing this separately allows for layer
-# caching opportunities when no dependencies are updated.
 COPY go.* ./
-RUN go mod download
 
 COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate

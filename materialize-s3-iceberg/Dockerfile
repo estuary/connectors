@@ -1,13 +1,13 @@
 ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
+ARG BASE_IMAGE_GO=ghcr.io/estuary/base-image-go:dev
 
 # Build Stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.27-trixie AS builder
+FROM --platform=linux/amd64 ${BASE_IMAGE_GO} AS builder
 
 WORKDIR /builder
 
 COPY go.*                       ./
-RUN go mod download
 
 COPY go                         ./go
 COPY filesink                   ./filesink

@@ -301,6 +301,7 @@ class TestRustConnectors(unittest.TestCase):
             "source-mysql/docker-compose.yaml",
             "go.mod",
             "go.sum",
+            "base-image-go/Dockerfile",
             "scripts/bulk-publish/main.go",
             "materialize-iceberg/python/foo.py",
         ]:

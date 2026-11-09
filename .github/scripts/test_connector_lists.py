@@ -21,7 +21,7 @@ RUST_LIST = REPO_ROOT / ".github" / "rust-connectors.yaml"
 NOT_CONNECTORS = {"estuary-cdk"}
 
 # Top-level directories with a Dockerfile that aren't connectors.
-NOT_DOCKER_CONNECTORS = {"base-image"}
+NOT_DOCKER_CONNECTORS = {"base-image", "base-image-go"}
 
 REQUIRED_KEYS = {"name", "type", "version", "usage_rate"}
 OPTIONAL_KEYS = {"variants"}

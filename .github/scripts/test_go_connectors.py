@@ -111,6 +111,7 @@ class TestRules(unittest.TestCase):
             "go.mod",
             "go.sum",
             "base-image/Dockerfile",
+            "base-image-go/Dockerfile",
             ".github/workflows/go.yaml",
             ".github/go-connectors.yaml",
             ".github/scripts/go_connectors.py",

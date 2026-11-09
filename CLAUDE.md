@@ -14,12 +14,13 @@ A `-native` suffix means a first-party CDK connector that replaces an existing t
 
 ### Go Connectors
 
-The quickest way to build a docker image of a connector is to edit its Dockerfile, comment out the `go test` and `go mod` lines in Dockerfile, in their place add `COPY vendor ./vendor`, and add `-mod=vendor` to `go build` and use the following set of commands to build the local image:
+Go connector Dockerfiles build in `ghcr.io/estuary/base-image-go:dev` (or its `dev-nozstd` tag), which has every module downloaded and every package compiled, so `./build-local.sh $connector` builds them directly. When go.mod has dependencies the published image lacks, `go build` downloads them. To build the image locally instead, from the repository root:
 
 ```bash
-go mod vendor
-./build-local.sh $connector
+docker buildx build --platform linux/amd64 -f base-image-go/Dockerfile --target default --load -t ghcr.io/estuary/base-image-go:dev .
 ```
+
+Use `--target nozstd` and the `dev-nozstd` tag for connectors built with `-tags nozstd`.
 
 This is primarily a Go monorepo with YAML configs. When editing Go code, always run `go build ./...` and `go vet ./...` in the affected module after changes to catch import cycles, missing arguments, and unused imports before declaring a fix complete.
 
