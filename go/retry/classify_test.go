@@ -18,96 +18,104 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNetwork(t *testing.T) {
+// The outcomes of a connection-level failure.
+const (
+	other = iota
+	toConnect
+	afterConnect
+)
+
+func TestConnectionFailures(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		err  error
-		want Outcome
+		want int
 	}{
 		{
 			name: "connection refused",
 			err:  &net.OpError{Op: "dial", Net: "tcp", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)},
-			want: Retryable,
+			want: toConnect,
 		},
 		{
 			name: "dial timeout",
 			err:  fmt.Errorf("connecting: %w", &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("i/o timeout")}),
-			want: Retryable,
+			want: toConnect,
 		},
 		{
 			name: "DNS lookup failure",
 			err:  &net.OpError{Op: "dial", Net: "tcp", Err: &net.DNSError{Err: "no such host", Name: "db.example.com"}},
-			want: Retryable,
+			want: toConnect,
 		},
 		{
 			name: "EOF reading a response",
 			err:  fmt.Errorf("failed to read first block packet: %w", io.EOF),
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "unexpected EOF",
 			err:  fmt.Errorf("read: %w", io.ErrUnexpectedEOF),
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "connection reset",
 			err:  &net.OpError{Op: "read", Net: "tcp", Err: os.NewSyscallError("read", syscall.ECONNRESET)},
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "broken pipe",
 			err:  &net.OpError{Op: "write", Net: "tcp", Err: syscall.EPIPE},
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "read timeout",
 			err:  &net.OpError{Op: "read", Net: "tcp", Err: errors.New("i/o timeout")},
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "HTTP request refused",
 			err:  &url.Error{Op: "Post", URL: "http://x", Err: &net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}},
-			want: Retryable,
+			want: toConnect,
 		},
 		{
 			name: "HTTP request reset",
 			err:  &url.Error{Op: "Post", URL: "http://x", Err: &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}},
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "HTTP request with an untrusted certificate",
 			err:  &url.Error{Op: "Post", URL: "https://x", Err: x509.UnknownAuthorityError{}},
-			want: Ambiguous,
+			want: afterConnect,
 		},
 		{
 			name: "HTTP request cancelled",
 			err:  &url.Error{Op: "Post", URL: "http://x", Err: context.Canceled},
-			want: Fatal,
+			want: other,
 		},
 		{
 			name: "context cancelled",
 			err:  fmt.Errorf("querying: %w", context.Canceled),
-			want: Fatal,
+			want: other,
 		},
 		{
 			name: "operation deadline",
 			err:  fmt.Errorf("querying: %w", context.DeadlineExceeded),
-			want: Ambiguous,
+			want: afterConnect,
 		},
 
 		{
 			name: "anything else",
 			err:  errors.New("syntax error"),
-			want: Fatal,
+			want: other,
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, Network(tt.err))
+			require.Equal(t, tt.want == toConnect, FailedToConnect(tt.err), "FailedToConnect")
+			require.Equal(t, tt.want == afterConnect, FailedAfterConnect(tt.err), "FailedAfterConnect")
 		})
 	}
 }
 
-func TestNetworkHTTPClientTimeout(t *testing.T) {
+func TestHTTPClientTimeout(t *testing.T) {
 	var server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()
 	}))
@@ -115,24 +123,7 @@ func TestNetworkHTTPClientTimeout(t *testing.T) {
 
 	var _, err = (&http.Client{Timeout: 10 * time.Millisecond}).Get(server.URL)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Equal(t, Ambiguous, Network(err))
-}
-
-func TestHTTPStatus(t *testing.T) {
-	for code, want := range map[int]Outcome{
-		http.StatusOK:                  Fatal,
-		http.StatusBadRequest:          Fatal,
-		http.StatusUnauthorized:        Fatal,
-		http.StatusNotFound:            Fatal,
-		http.StatusConflict:            Fatal,
-		http.StatusTooManyRequests:     Retryable,
-		http.StatusInternalServerError: Ambiguous,
-		http.StatusBadGateway:          Ambiguous,
-		http.StatusServiceUnavailable:  Ambiguous,
-		http.StatusGatewayTimeout:      Ambiguous,
-	} {
-		require.Equal(t, want, HTTPStatus(code), "status %d", code)
-	}
+	require.True(t, FailedAfterConnect(err))
 }
 
 func TestParseRetryAfter(t *testing.T) {
@@ -157,10 +148,4 @@ func TestParseRetryAfter(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func TestOutcomeString(t *testing.T) {
-	require.Equal(t, "fatal", Fatal.String())
-	require.Equal(t, "retryable", Retryable.String())
-	require.Equal(t, "ambiguous", Ambiguous.String())
 }

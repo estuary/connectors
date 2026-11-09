@@ -1,27 +1,21 @@
 // Package retry runs operations against a destination again when they fail
 // with errors that a retry can resolve.
 //
-// A Classifier sorts each error into one of three outcomes:
-//
-//   - Retryable: the operation failed without taking effect, so running it
-//     again is safe. Examples are a refused connection, a rate-limit
-//     rejection, or a transaction the destination aborted on a conflict.
-//   - Ambiguous: the operation may have taken effect before it failed. A
-//     timeout or dropped connection after the request was sent, or a 5xx
-//     response to a write, says nothing about whether the write happened.
-//   - Fatal: anything else, returned to the caller without retrying.
-//
-// A Policy retries Ambiguous errors only when its RetryAmbiguous field is set.
-// Retrying a non-idempotent write after an ambiguous failure can apply it
-// twice, which for an append is a permanent duplicate. A caller sets it for
-// idempotent operations, and for those whose failure would repeat them anyway:
+// A Classifier decides whether each error is Retryable or Fatal. Whether a
+// retry is safe depends on the operation as well as the error: a timeout or
+// dropped connection after a request was sent, or a 5xx response, says
+// nothing about whether the request took effect. Running an idempotent
+// operation again after such an error is safe, but running a non-idempotent
+// write again can apply it twice, which for an append is a permanent
+// duplicate. So a classifier is written for the operations that use it, and
+// retries errors that may follow the operation taking effect only when those
+// operations are idempotent, or when their failure would repeat them anyway:
 // a destination that keeps no checkpoint of its own has a failed transaction
 // replayed in full, so retrying the one request re-sends less.
 //
-// Classifiers for a destination's own errors live with its connector. This
-// package provides the retry loop and classifiers for errors that are the
-// same everywhere: Network for connection-level failures and HTTPStatus for
-// HTTP responses.
+// Classifiers live with their connector. This package provides the retry loop
+// and two predicates for connection-level failures, which are the same
+// everywhere: FailedToConnect and FailedAfterConnect.
 package retry
 
 import (
@@ -41,22 +35,9 @@ type Outcome int
 const (
 	// Fatal errors are returned without retrying.
 	Fatal Outcome = iota
-	// Retryable errors failed without taking effect.
+	// Retryable errors are retried.
 	Retryable
-	// Ambiguous errors may have been raised after the operation took effect.
-	Ambiguous
 )
-
-func (o Outcome) String() string {
-	switch o {
-	case Retryable:
-		return "retryable"
-	case Ambiguous:
-		return "ambiguous"
-	default:
-		return "fatal"
-	}
-}
 
 // Classifier reports the Outcome of a non-nil error.
 type Classifier func(error) Outcome
@@ -103,11 +84,6 @@ func (e *permanentError) Unwrap() error { return e.err }
 type Policy struct {
 	// Classify sorts errors into outcomes. Required.
 	Classify Classifier
-	// RetryAmbiguous retries errors classified Ambiguous. Set it only for
-	// operations that leave the same result when run again after they
-	// already took effect, or whose failure would make the caller repeat
-	// them anyway.
-	RetryAmbiguous bool
 
 	// MaxAttempts bounds the number of attempts, including the first. Zero
 	// means no bound on attempts.
@@ -133,8 +109,8 @@ type Policy struct {
 	QuietRetries int
 
 	// AttemptTimeout, if set, bounds each attempt with its own deadline
-	// rather than leaving one deadline to span every attempt. An attempt
-	// that runs out of time is Ambiguous, whatever Classify says. The
+	// rather than leaving one deadline to span every attempt. Classify sees
+	// the error of an attempt that ran out of time like any other. The
 	// context passed to the operation is cancelled when it returns, so the
 	// operation must not return anything bound to it, such as *sql.Rows.
 	AttemptTimeout time.Duration
@@ -163,17 +139,15 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 	var backoff = p.InitialBackoff
 
 	for attempt := 1; ; attempt++ {
-		var timedOut, err = p.attempt(ctx, fn)
+		var err = p.attempt(ctx, fn)
 		if err == nil {
 			return nil
 		} else if ctx.Err() != nil {
 			return err
 		}
 
-		var outcome = Ambiguous
-		if _, ok := errors.AsType[*permanentError](err); ok {
-			outcome = Fatal
-		} else if !timedOut {
+		var outcome = Fatal
+		if _, ok := errors.AsType[*permanentError](err); !ok {
 			outcome = p.Classify(err)
 		}
 		var giveUp = func() error {
@@ -183,7 +157,7 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 			return fmt.Errorf("after %d attempts: %w", attempt, err)
 		}
 
-		if outcome == Fatal || (outcome == Ambiguous && !p.RetryAmbiguous) {
+		if outcome == Fatal {
 			return giveUp()
 		} else if p.MaxAttempts > 0 && attempt >= p.MaxAttempts {
 			return giveUp()
@@ -204,7 +178,6 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 		log.WithFields(log.Fields{
 			"operation": operation,
 			"attempt":   attempt,
-			"outcome":   outcome.String(),
 			"delay":     delay.String(),
 		}).WithError(err).Log(level, "retrying failed operation")
 
@@ -227,16 +200,15 @@ func (p Policy) Do(ctx context.Context, operation string, fn func(ctx context.Co
 	}
 }
 
-// attempt runs fn once and reports whether its own AttemptTimeout ended it.
-func (p Policy) attempt(ctx context.Context, fn func(context.Context) error) (bool, error) {
+// attempt runs fn once, within its own AttemptTimeout if set.
+func (p Policy) attempt(ctx context.Context, fn func(context.Context) error) error {
 	if p.AttemptTimeout <= 0 {
-		return false, fn(ctx)
+		return fn(ctx)
 	}
 	var attemptCtx, cancel = context.WithTimeout(ctx, p.AttemptTimeout)
 	defer cancel()
 
-	var err = fn(attemptCtx)
-	return err != nil && attemptCtx.Err() != nil && ctx.Err() == nil, err
+	return fn(attemptCtx)
 }
 
 func (p Policy) delay(backoff time.Duration, err error) time.Duration {

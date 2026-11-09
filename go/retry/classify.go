@@ -11,54 +11,39 @@ import (
 	"time"
 )
 
-// Network classifies connection-level failures. A failure to connect is
-// Retryable, since nothing was sent. A connection that ends or times out
-// once open is Ambiguous: the request may already have been received. Context
-// cancellation, and every other error, is Fatal.
-//
-// context.DeadlineExceeded is a timeout, and Ambiguous. Do never retries once
-// its own context is done, so a deadline reaching the classifier is the
-// operation's own, such as an http.Client Timeout.
-//
-// A failed net/http request is an *url.Error, which is itself a net.Error, so
-// it is Ambiguous unless it failed to connect, even when its cause won't go
-// away on a retry, such as an untrusted TLS certificate.
-func Network(err error) Outcome {
+// FailedToConnect reports whether err is a failure to open a connection, which
+// sent nothing.
+func FailedToConnect(err error) bool {
 	if errors.Is(err, context.Canceled) {
-		return Fatal
+		return false
+	} else if errors.Is(err, syscall.ECONNREFUSED) {
+		return true
+	} else if _, ok := errors.AsType[*net.DNSError](err); ok {
+		return true
 	}
-	if errors.Is(err, syscall.ECONNREFUSED) {
-		return Retryable
-	}
-	if _, ok := errors.AsType[*net.DNSError](err); ok {
-		return Retryable
-	}
-	if opErr, ok := errors.AsType[*net.OpError](err); ok && opErr.Op == "dial" {
-		return Retryable
-	}
-	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
-		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
-		return Ambiguous
-	}
-	if _, ok := errors.AsType[net.Error](err); ok {
-		return Ambiguous
-	}
-	return Fatal
+	var opErr, ok = errors.AsType[*net.OpError](err)
+	return ok && opErr.Op == "dial"
 }
 
-// HTTPStatus classifies an HTTP response status. 429 Too Many Requests is
-// Retryable, since the server refused the request. A 5xx is Ambiguous, since
-// the server may have acted on the request before failing. Anything else is
-// Fatal.
-func HTTPStatus(code int) Outcome {
-	switch {
-	case code == http.StatusTooManyRequests:
-		return Retryable
-	case code >= 500 && code <= 599:
-		return Ambiguous
-	default:
-		return Fatal
+// FailedAfterConnect reports whether err ended or timed out a connection once
+// it was open, so the request may already have been received.
+//
+// context.DeadlineExceeded is such a timeout. Do never retries once its own
+// context is done, so a deadline reaching a classifier is the operation's own,
+// such as an http.Client Timeout or the Policy's AttemptTimeout.
+//
+// A failed net/http request is an *url.Error, which is itself a net.Error, so
+// it counts unless it failed to connect, even when its cause won't go away on
+// a retry, such as an untrusted TLS certificate.
+func FailedAfterConnect(err error) bool {
+	if errors.Is(err, context.Canceled) || FailedToConnect(err) {
+		return false
+	} else if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
+		return true
 	}
+	var _, ok = errors.AsType[net.Error](err)
+	return ok
 }
 
 // ParseRetryAfter parses a Retry-After header value, given either as seconds

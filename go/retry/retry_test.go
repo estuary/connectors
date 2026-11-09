@@ -15,19 +15,14 @@ import (
 
 var (
 	errRetryable = errors.New("retryable")
-	errAmbiguous = errors.New("ambiguous")
 	errFatal     = errors.New("fatal")
 )
 
 func classifyTestErr(err error) Outcome {
-	switch {
-	case errors.Is(err, errRetryable):
+	if errors.Is(err, errRetryable) {
 		return Retryable
-	case errors.Is(err, errAmbiguous):
-		return Ambiguous
-	default:
-		return Fatal
 	}
+	return Fatal
 }
 
 var testPolicy = Policy{
@@ -90,30 +85,10 @@ func TestDoOutcomes(t *testing.T) {
 			wantAt:  seconds(0),
 		},
 		{
-			name:    "ambiguous errors are not retried by default",
-			policy:  testPolicy,
-			errs:    []error{errAmbiguous},
-			wantErr: errAmbiguous,
-			wantAt:  seconds(0),
-		},
-		{
-			name:   "ambiguous errors are retried when the caller opts in",
-			policy: func() Policy { p := testPolicy; p.RetryAmbiguous = true; return p }(),
-			errs:   []error{errAmbiguous, errRetryable},
-			wantAt: seconds(0, 1, 3),
-		},
-		{
 			name:    "a fatal error after retries stops them",
 			policy:  testPolicy,
 			errs:    []error{errRetryable, errFatal},
 			wantErr: errFatal,
-			wantAt:  seconds(0, 1),
-		},
-		{
-			name:    "an ambiguous error after retries stops them",
-			policy:  testPolicy,
-			errs:    []error{errRetryable, errAmbiguous},
-			wantErr: errAmbiguous,
 			wantAt:  seconds(0, 1),
 		},
 		{
@@ -197,24 +172,10 @@ func TestDoErrorMessages(t *testing.T) {
 
 func TestDoPermanent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		var policy = testPolicy
-		policy.RetryAmbiguous = true
-
-		var err, at = run(t.Context(), policy, errRetryable, Permanent(errRetryable))
+		var err, at = run(t.Context(), testPolicy, errRetryable, Permanent(errRetryable))
 		require.Len(t, at, 2)
 		require.EqualError(t, err, "after 2 attempts: retryable")
 		require.ErrorIs(t, err, errRetryable)
-
-		// A Permanent error from an attempt that timed out is still Fatal.
-		policy.AttemptTimeout = time.Second
-		var calls int
-		err = policy.Do(t.Context(), "test op", func(ctx context.Context) error {
-			calls++
-			<-ctx.Done()
-			return Permanent(ctx.Err())
-		})
-		require.Equal(t, 1, calls)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
 
 		require.NoError(t, Permanent(nil))
 	})
@@ -318,16 +279,24 @@ func TestDoAttemptTimeout(t *testing.T) {
 		}
 	}
 	var policy = Policy{
-		Classify:       classifyTestErr, // Fatal for context errors.
+		Classify: func(err error) Outcome {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return Retryable
+			}
+			return Fatal
+		},
 		MaxAttempts:    3,
 		InitialBackoff: time.Second,
 		AttemptTimeout: 10 * time.Second,
 	}
 
-	t.Run("a timed-out attempt is ambiguous", func(t *testing.T) {
+	t.Run("a timed-out attempt is classified", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
+			var p = policy
+			p.Classify = classifyTestErr // Fatal for context errors.
+
 			var calls int
-			var err = policy.Do(t.Context(), "test op", hang(1, &calls))
+			var err = p.Do(t.Context(), "test op", hang(1, &calls))
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 			require.Equal(t, 1, calls)
 		})
@@ -335,12 +304,9 @@ func TestDoAttemptTimeout(t *testing.T) {
 
 	t.Run("each attempt gets its own deadline", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			var p = policy
-			p.RetryAmbiguous = true
-
 			var start = time.Now()
 			var calls int
-			require.NoError(t, p.Do(t.Context(), "test op", hang(2, &calls)))
+			require.NoError(t, policy.Do(t.Context(), "test op", hang(2, &calls)))
 			require.Equal(t, 3, calls)
 			// Two 10s timeouts plus backoffs of 1s and 2s.
 			require.Equal(t, 23*time.Second, time.Since(start))
@@ -349,14 +315,11 @@ func TestDoAttemptTimeout(t *testing.T) {
 
 	t.Run("the caller's own deadline is not an attempt timeout", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
-			var p = policy
-			p.RetryAmbiguous = true
-
 			var ctx, cancel = context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 
 			var calls int
-			var err = p.Do(ctx, "test op", hang(1, &calls))
+			var err = policy.Do(ctx, "test op", hang(1, &calls))
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 			require.Equal(t, 1, calls)
 		})
@@ -384,30 +347,27 @@ func TestDoAttemptTimeout(t *testing.T) {
 }
 
 func TestDoLogsEachRetry(t *testing.T) {
+	var wrappedRetryable = fmt.Errorf("wrapped: %w", errRetryable)
 	var hook = logtest.NewGlobal()
 	t.Cleanup(hook.Reset)
 
 	synctest.Test(t, func(t *testing.T) {
-		var p = testPolicy
-		p.RetryAmbiguous = true
-		var err, _ = run(t.Context(), p, errRetryable, errAmbiguous)
+		var err, _ = run(t.Context(), testPolicy, errRetryable, wrappedRetryable)
 		require.NoError(t, err)
 	})
 
 	var entries = hook.AllEntries()
 	require.Len(t, entries, 2)
 	for i, want := range []struct {
-		outcome string
-		err     error
-		delay   string
+		err   error
+		delay string
 	}{
-		{"retryable", errRetryable, "1s"},
-		{"ambiguous", errAmbiguous, "2s"},
+		{errRetryable, "1s"},
+		{wrappedRetryable, "2s"},
 	} {
 		require.Equal(t, log.WarnLevel, entries[i].Level)
 		require.Equal(t, "test op", entries[i].Data["operation"])
 		require.Equal(t, i+1, entries[i].Data["attempt"])
-		require.Equal(t, want.outcome, entries[i].Data["outcome"])
 		require.Equal(t, want.delay, entries[i].Data["delay"])
 		require.Equal(t, want.err, entries[i].Data[log.ErrorKey])
 	}
