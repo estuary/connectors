@@ -8,31 +8,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 
+	"github.com/estuary/connectors/go/retry"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
-// A request is retried up to streamV2MaxAttempts times, each bounded by
-// streamV2RequestTimeout. The request timeout is independent of the commit wait,
-// because one append carries megabytes and may take the whole timeout, while a
-// commit wait is a series of short status polls.
-const (
-	streamV2RequestTimeout     = 2 * time.Minute
-	streamV2CommitPollInterval = 5 * time.Second
-	streamV2MaxAttempts        = 6
-)
+const streamV2CommitPollInterval = 5 * time.Second
 
 // streamV2MaxAppendBytes is Snowflake's limit on the compressed body of one append
 // request. Snowflake refuses a larger body outright, whatever its encoding.
@@ -68,6 +59,8 @@ type streamV2APIError struct {
 	Status  int    `json:"-"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
+
+	outcome retry.Outcome
 }
 
 func (e *streamV2APIError) Error() string {
@@ -182,7 +175,7 @@ func newStreamV2Client(cfg *config, accountURL, account string) (*streamV2Client
 	var transport = http.DefaultTransport.(*http.Transport).Clone()
 	transport.MaxIdleConnsPerHost = 64
 	var c = &streamV2Client{
-		http:        &http.Client{Timeout: streamV2RequestTimeout, Transport: transport},
+		http:        &http.Client{Transport: transport},
 		accountURL:  accountURL,
 		key:         key,
 		user:        cfg.Credentials.User,
@@ -368,86 +361,64 @@ type streamV2Body interface {
 	Size() int64
 }
 
-// send performs one HTTP request, retrying transport errors and the responses
-// streamV2Retryable allows with exponential backoff, and returns the response body.
+// streamV2ReadError is a failure to read a response, which arrives only after
+// Snowflake received the request.
+type streamV2ReadError struct{ err error }
+
+func (e *streamV2ReadError) Error() string { return "reading the response: " + e.err.Error() }
+func (e *streamV2ReadError) Unwrap() error { return e.err }
+
+// send performs one HTTP request under streamV2Retry and returns the response body.
 func (c *streamV2Client) send(ctx context.Context, method, u string, body streamV2Body, headers http.Header) ([]byte, error) {
-	var delay = time.Second
-	for attempt := 1; ; attempt++ {
-		var req, err = http.NewRequestWithContext(ctx, method, u, nil)
+	var req, err = http.NewRequest(method, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil && body.Size() != 0 {
+		// Each attempt reads the body through its own reader, because the
+		// transport may still be reading an earlier attempt's after it returns.
+		req.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(io.NewSectionReader(body, 0, body.Size())), nil
+		}
+		req.ContentLength = body.Size()
+	}
+	for k, v := range headers {
+		req.Header[k] = v
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "EstuaryFlow/1.0")
+
+	var out []byte
+	err = streamV2Retry.Do(ctx, "snowpipe streaming "+method+" "+req.URL.Path, func(ctx context.Context) error {
+		var attempt = req.Clone(ctx)
+		if attempt.GetBody != nil {
+			attempt.Body, _ = attempt.GetBody()
+		}
+		res, err := c.http.Do(attempt)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		if body != nil && body.Size() != 0 {
-			// Each attempt reads the body through its own reader, because the
-			// transport may still be reading an earlier attempt's after it returns.
-			req.GetBody = func() (io.ReadCloser, error) {
-				return io.NopCloser(io.NewSectionReader(body, 0, body.Size())), nil
-			}
-			req.Body, _ = req.GetBody()
-			req.ContentLength = body.Size()
-		}
-		for k, v := range headers {
-			req.Header[k] = v
-		}
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "EstuaryFlow/1.0")
-
-		res, err := c.http.Do(req)
-		var apiErr *streamV2APIError
-		var retryable = true
-		var retryAfter time.Duration
-		if err == nil {
-			var out []byte
-			out, err = io.ReadAll(res.Body)
-			res.Body.Close()
-			if err == nil && res.StatusCode/100 == 2 {
-				return out, nil
-			} else if err == nil {
-				apiErr = &streamV2APIError{Status: res.StatusCode, Message: strings.TrimSpace(string(out))}
-				json.Unmarshal(out, apiErr)
-				if len(apiErr.Message) > streamV2MaxErrorMessageBytes {
-					apiErr.Message = strings.ToValidUTF8(apiErr.Message[:streamV2MaxErrorMessageBytes], "") + "…"
-				}
-				err = apiErr
-				retryable = streamV2Retryable(res, out)
-				// Retry-After is honored in its delay-seconds form.
-				if secs, err := strconv.Atoi(res.Header.Get("Retry-After")); err == nil {
-					retryAfter = min(time.Duration(secs)*time.Second, time.Minute)
-				}
-			}
+		defer res.Body.Close()
+		if out, err = io.ReadAll(res.Body); err != nil {
+			return &streamV2ReadError{err}
+		} else if res.StatusCode/100 == 2 {
+			return nil
 		}
 
-		if !retryable || attempt == streamV2MaxAttempts || ctx.Err() != nil {
-			return nil, fmt.Errorf("%s %s: %w", method, req.URL.Host+req.URL.Path, err)
+		var apiErr = &streamV2APIError{Status: res.StatusCode, Message: strings.TrimSpace(string(out)), outcome: streamV2Outcome(res, out)}
+		json.Unmarshal(out, apiErr)
+		if len(apiErr.Message) > streamV2MaxErrorMessageBytes {
+			apiErr.Message = strings.ToValidUTF8(apiErr.Message[:streamV2MaxErrorMessageBytes], "") + "…"
 		}
-		log.WithFields(log.Fields{"method": method, "path": req.URL.Path, "attempt": attempt, "error": err.Error()}).Warn("snowpipe streaming request failed; retrying")
-		select {
-		case <-time.After(max(delay, retryAfter)):
-		case <-ctx.Done():
-			return nil, ctx.Err()
+		if delay, ok := retry.ParseRetryAfter(res.Header.Get("Retry-After"), time.Now()); ok {
+			return retry.WithDelay(apiErr, min(delay, streamV2MaxRetryAfter))
 		}
-		delay = min(2*delay, 30*time.Second)
+		return apiErr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %w", method, req.URL.Host+req.URL.Path, err)
 	}
-}
-
-// streamV2Retryable reports whether Snowflake's retry policy allows retrying a
-// failed response. A 404 is retryable only when its body is not one of the API's
-// error responses, because then it came from a proxy rather than the API.
-//
-// https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-error-handling#retry-policy
-func streamV2Retryable(res *http.Response, body []byte) bool {
-	switch {
-	case res.StatusCode == http.StatusRequestTimeout, res.StatusCode == http.StatusTooManyRequests, res.StatusCode == 499, res.StatusCode >= 500:
-		return true
-	case res.StatusCode != http.StatusNotFound:
-		return false
-	}
-	var mediaType, _, _ = mime.ParseMediaType(res.Header.Get("Content-Type"))
-	if mediaType == "text/html" {
-		return true
-	}
-	var e struct{ Code, Message string }
-	return mediaType == "application/json" && json.Unmarshal(body, &e) == nil && e.Code == "" && e.Message == ""
+	return out, nil
 }
 
 // OpenChannel opens a channel by name on the default pipe of the table, including

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/writer"
@@ -254,7 +253,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		if err := f.uploads.Acquire(ctx, 1); err != nil {
 			return err
 		}
-		err := f.put(db, file)
+		err := f.put(ctx, db, file)
 		f.uploads.Release(1)
 		if err != nil {
 			return err
@@ -262,7 +261,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 	}
 }
 
-func (f *stagedFile) put(db *stdsql.DB, file string) error {
+func (f *stagedFile) put(ctx context.Context, db *stdsql.DB, file string) error {
 	query := fmt.Sprintf(
 		// OVERWRITE=TRUE is set here not because we intend to overwrite anything, but rather to
 		// avoid an extra LIST query that setting OVERWRITE=FALSE incurs.
@@ -276,26 +275,10 @@ func (f *stagedFile) put(db *stdsql.DB, file string) error {
 		MultiPartThreshold: uploadPartSize,
 	})
 	var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
-	var attempt int
-	// Retry a few times on errors since there are occasionally transient
-	// network errors when running PUT queries.
-	for attempt = 1; ; attempt++ {
-		ts := time.Now()
-		err := db.QueryRowContext(putCtx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
-		if err != nil && attempt > 3 {
-			return fmt.Errorf("putWorker PUT to stage: %w", err)
-		} else if err != nil {
-			delay := time.Duration(attempt) * time.Second
-			log.WithFields(log.Fields{
-				"attempt":         attempt,
-				"delay":           delay,
-				"requestDuration": time.Since(ts).String(),
-			}).WithError(err).Info("putWorker retrying PUT to stage")
-			time.Sleep(delay)
-			continue
-		}
-
-		break
+	if err := putRetry.Do(ctx, "PUT to stage", func(context.Context) error {
+		return db.QueryRowContext(putCtx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
+	}); err != nil {
+		return fmt.Errorf("putWorker PUT to stage: %w", err)
 	}
 
 	if !strings.EqualFold("uploaded", status) {
