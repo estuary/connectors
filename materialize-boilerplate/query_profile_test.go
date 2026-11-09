@@ -204,3 +204,58 @@ func TestStatementKind(t *testing.T) {
 	require.Equal(t, "copy", StatementKind("COPY INTO t FROM ..."))
 	require.Equal(t, "", StatementKind("  "))
 }
+
+func TestQueryProfilerTableContext(t *testing.T) {
+	var now = time.Now()
+	var slow = func(binding int) []*profiledQuery {
+		return []*profiledQuery{{id: "q", binding: binding, fields: log.Fields{"query": "merge"}, finished: now}}
+	}
+	var withContext = func(fields log.Fields, err error) (*QueryProfiler, *[]log.Fields, *[]int) {
+		var p, emitted = testProfiler(nil, 0)
+		var calls []int
+		p.tableContext = func(_ context.Context, binding int) (log.Fields, error) {
+			calls = append(calls, binding)
+			return fields, err
+		}
+		p.contextRead = make([]bool, len(p.resourcePaths))
+		return p, emitted, &calls
+	}
+
+	t.Run("adds a table's context to its first profile only", func(t *testing.T) {
+		var p, emitted, calls = withContext(log.Fields{"table": map[string]any{"numFiles": 3}}, nil)
+		p.fetch(context.Background(), slow(1), now)
+		p.fetch(context.Background(), slow(1), now)
+		p.fetch(context.Background(), slow(0), now)
+		require.Equal(t, []int{1, 0}, *calls)
+		require.Equal(t, []log.Fields{
+			{"query": "merge", "table": map[string]any{"numFiles": 3}},
+			{"query": "merge"},
+			{"query": "merge", "table": map[string]any{"numFiles": 3}},
+		}, *emitted)
+	})
+
+	t.Run("adds what was read despite an error, and doesn't retry", func(t *testing.T) {
+		var p, emitted, calls = withContext(log.Fields{"warehouse": "x"}, errors.New("history denied"))
+		p.fetch(context.Background(), slow(0), now)
+		p.fetch(context.Background(), slow(0), now)
+		require.Equal(t, []int{0}, *calls)
+		require.Equal(t, []log.Fields{{"query": "merge", "warehouse": "x"}, {"query": "merge"}}, *emitted)
+	})
+
+	t.Run("skips an unknown binding and a profiler without it", func(t *testing.T) {
+		var p, emitted, calls = withContext(log.Fields{"table": "x"}, nil)
+		p.fetch(context.Background(), slow(-1), now)
+		p.fetch(context.Background(), slow(2), now)
+		require.Empty(t, *calls)
+
+		var plain, plainEmitted = testProfiler(nil, 0)
+		plain.fetch(context.Background(), slow(0), now)
+		require.Equal(t, []log.Fields{{"query": "merge"}}, *plainEmitted)
+		require.Len(t, *emitted, 2)
+	})
+}
+
+func TestQueryProfilerStop(t *testing.T) {
+	var p = NewQueryProfiler(nil, time.Hour, nil, nil, nil)
+	p.Stop()
+}

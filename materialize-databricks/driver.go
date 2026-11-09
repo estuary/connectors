@@ -387,7 +387,7 @@ func newTransactor(
 	} else {
 		d.localStagingPath = tempDir
 	}
-	d.profiler = newQueryProfiler(wsClient.QueryHistory, d.bindings)
+	d.profiler = newQueryProfiler(wsClient.QueryHistory, wsClient.Warehouses, cfg.warehouseID(), d.bindings, d.openDB)
 
 	return d, nil
 }

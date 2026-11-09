@@ -258,8 +258,7 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 	}
 	defer db.Close()
 
-	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
-	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
+	var warehouseId = cfg.warehouseID()
 	var warehouseStopped = true
 	var warehouseErr error
 	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {

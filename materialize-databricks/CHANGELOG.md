@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-07
+### Added
+- The first slow query of each table in a run also logs, on its query
+  profile line, the table's file count and size, its deletion vectors and the
+  rows they delete, its statistics, clustering, Delta and Databricks table
+  properties, whether predictive optimization is enabled, and a summary of
+  the past 30 days of MERGEs, OPTIMIZEs and REORGs of the table, counted
+  separately for the task, predictive optimization, other jobs and users,
+  with the deletion vectors they added or removed. It also logs the SQL
+  warehouse's version, type, size, channel, Photon and serverless settings,
+  and cluster counts.
+
 ## 2026-11-06
 ### Changed
 - A binding's MERGE reads its staged files directly, instead of first copying
