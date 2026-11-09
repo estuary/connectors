@@ -66,6 +66,15 @@ GRANT SELECT ON ALL TABLES IN SCHEMA information_schema, pg_catalog TO flow_capt
 Replace `public` with the name of your schema, or grant permissions on multiple
 schemas as needed.
 
+### SSL Mode
+
+To verify the server's certificate, set the `sslmode` advanced option to one of:
+
+- `verify-full` checks that the server's certificate is signed by a trusted CA and is valid for the configured server address. Through an SSH tunnel, the certificate is still checked against the configured server address, not against the tunnel.
+- `verify-ca` checks only that the server's certificate is signed by a trusted CA, without checking the hostname. Use this when connecting by IP address, or when the certificate doesn't name the address you connect to.
+
+In both modes the connector trusts public certificate authorities, the CAs of Amazon RDS and Aurora, and Google Cloud SQL's shared CA. It doesn't trust other private CAs, such as Cloud SQL's default per-instance CA, so these modes can't verify servers that use them.
+
 ## How it works
 
 ### Capture Modes
