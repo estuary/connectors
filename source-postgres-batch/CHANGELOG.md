@@ -4,6 +4,7 @@
 
 ### Fixed
 - The `verify-ca` and `verify-full` SSL modes now work with Amazon RDS, Aurora, and Google Cloud SQL instances that use the shared CA.
+- The `verify-full` SSL mode now works through an SSH tunnel.
 
 ## 2026-11-02
 

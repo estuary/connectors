@@ -345,6 +345,21 @@ func (c *Config) SetDefaults() {
 	}
 }
 
+// tlsServerHost returns the name that 'verify-full' checks the server
+// certificate against, when pgx would check the wrong one. Through an SSH
+// tunnel pgx dials localhost, so the configured host is returned instead.
+// Without a tunnel it returns "", and pgx checks each host it parsed from the
+// address against that host's own name.
+func (c *Config) tlsServerHost() string {
+	if !(c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "") {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(c.Address); err == nil {
+		return host
+	}
+	return c.Address
+}
+
 // ToURI converts the Config to a DSN string.
 func (c *Config) ToURI(ctx context.Context) (string, error) {
 	var address = c.Address
@@ -469,7 +484,7 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error parsing database uri: %w", err)
 	}
-	pgtls.Configure(&config.ConnConfig.Config, db.config.Advanced.SSLMode)
+	pgtls.Configure(&config.ConnConfig.Config, db.config.Advanced.SSLMode, db.config.tlsServerHost())
 	if config.ConnConfig.ConnectTimeout == 0 {
 		config.ConnConfig.ConnectTimeout = 20 * time.Second
 	}

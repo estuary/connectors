@@ -125,17 +125,43 @@ func TestVerification(t *testing.T) {
 	}
 	t.Run("verify-ca checks the chain but not the name", func(t *testing.T) {
 		var cfg = parse(t, host, "verify-ca")
-		Configure(cfg, "verify-ca")
+		Configure(cfg, "verify-ca", "")
 		require.NoError(t, handshake(t, cfg, genuine))
 		require.NoError(t, handshake(t, cfg, wrongName))
 		require.Error(t, handshake(t, cfg, impostor))
 	})
 	t.Run("verify-full checks the chain and the name", func(t *testing.T) {
 		var cfg = parse(t, host, "verify-full")
-		Configure(cfg, "verify-full")
+		Configure(cfg, "verify-full", "")
 		require.NoError(t, handshake(t, cfg, genuine))
 		require.Error(t, handshake(t, cfg, wrongName))
 		require.Error(t, handshake(t, cfg, impostor))
+	})
+}
+
+func TestTunnelVerifiesServerHost(t *testing.T) {
+	var ca = newTestCA(t, "ca")
+	trustOnly(t, ca)
+	// With a tunnel the connectors dial localhost, but the certificate names
+	// the real server.
+	var addr = serve(t, ca.issue(t, "db.example.com"))
+
+	t.Run("checked against serverHost", func(t *testing.T) {
+		var cfg = parse(t, "localhost", "verify-full")
+		Configure(cfg, "verify-full", "db.example.com")
+		require.NoError(t, handshake(t, cfg, addr))
+	})
+	t.Run("checked against the dialed host without serverHost", func(t *testing.T) {
+		var cfg = parse(t, "localhost", "verify-full")
+		Configure(cfg, "verify-full", "")
+		require.ErrorContains(t, handshake(t, cfg, addr), "not localhost")
+	})
+	t.Run("verify-ca keeps the dialed host", func(t *testing.T) {
+		// verify-ca doesn't check the name, so ServerName is only SNI.
+		var cfg = parse(t, "localhost", "verify-ca")
+		Configure(cfg, "verify-ca", "db.example.com")
+		require.Equal(t, "localhost", cfg.TLSConfig.ServerName)
+		require.NoError(t, handshake(t, cfg, addr))
 	})
 }
 
@@ -146,23 +172,27 @@ func TestConfigure(t *testing.T) {
 	for _, mode := range []string{"verify-ca", "verify-full"} {
 		t.Run(mode, func(t *testing.T) {
 			var cfg = parse(t, "db.example.com", mode)
-			Configure(cfg, mode)
+			Configure(cfg, mode, "")
 			require.Same(t, defaultRoots(), cfg.TLSConfig.RootCAs)
 		})
 	}
 	t.Run("multiple hosts", func(t *testing.T) {
-		// Each host has its own fallback config, and each must be changed.
+		// Each host has its own fallback config. Each gets the default roots
+		// and keeps its own name, as the connectors pass no serverHost
+		// without a tunnel.
 		var cfg = parse(t, "a.example.com:5432,b.example.com", "verify-full")
 		require.Len(t, cfg.Fallbacks, 1)
-		Configure(cfg, "verify-full")
+		Configure(cfg, "verify-full", "")
 		require.Same(t, defaultRoots(), cfg.TLSConfig.RootCAs)
 		require.Same(t, defaultRoots(), cfg.Fallbacks[0].TLSConfig.RootCAs)
+		require.Equal(t, "a.example.com", cfg.TLSConfig.ServerName)
+		require.Equal(t, "b.example.com", cfg.Fallbacks[0].TLSConfig.ServerName)
 	})
 	for _, mode := range []string{"disable", "allow", "prefer", "require"} {
 		t.Run(mode+" is unchanged", func(t *testing.T) {
 			var cfg = parse(t, "db.example.com", mode)
 			var want = parse(t, "db.example.com", mode)
-			Configure(cfg, mode)
+			Configure(cfg, mode, "db.example.com")
 			for i, fb := range append([]*pgconn.FallbackConfig{{TLSConfig: cfg.TLSConfig}}, cfg.Fallbacks...) {
 				if fb.TLSConfig == nil {
 					continue

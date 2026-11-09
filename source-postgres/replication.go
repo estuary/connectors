@@ -153,7 +153,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 	if err != nil {
 		return nil, err
 	}
-	pgtls.Configure(connConfig, db.config.Advanced.SSLMode)
+	pgtls.Configure(connConfig, db.config.Advanced.SSLMode, db.config.tlsServerHost())
 	if connConfig.ConnectTimeout == 0 {
 		connConfig.ConnectTimeout = 30 * time.Second
 	}
