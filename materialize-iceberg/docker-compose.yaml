@@ -45,7 +45,7 @@ services:
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
 
   rustfs:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.4
     networks:
       materialize-iceberg:
     # Host ports are remapped into a 9800+ range so this stack can run
@@ -75,7 +75,7 @@ services:
     # No depends_on: curl retries every 100ms on connection failures, allowing
     # parallel boot with rustfs. Downstream services that need the bucket
     # (polaris, spark-daemon) gate on this container exiting 0.
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.4
     networks:
       materialize-iceberg:
     entrypoint: ["/bin/sh", "-c"]
