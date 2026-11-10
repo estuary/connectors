@@ -1,5 +1,13 @@
 # materialize-bigquery
 
+## 2026-11-10
+
+### Changed
+- Load and merge queries on tables with a `TIMESTAMP` key column bound it by
+  the transaction's exact key range, rather than whole days, and split that
+  range at wide gaps between the keys, so a few keys far from the rest no
+  longer widen the scan to everything in between.
+
 ## 2026-11-02
 
 ### Changed

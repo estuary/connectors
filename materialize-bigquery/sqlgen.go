@@ -289,12 +289,24 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	{{- range $ind, $bound := $.Bounds }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{ $bound.Identifier }} = r.c{{$ind}}
-		{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+		{{- template "boundCondition" $bound }}
 	{{- end }}
 {{- else -}}
 (SELECT -1, CAST(NULL AS {{ $.ObjectType }}) LIMIT 0) as nodoc
 {{- end }}
 {{ end }}
+
+-- The range condition on the target table's key column of a merge bound: one
+-- range of its lower and upper literals, or the union of its ranges.
+
+{{ define "boundCondition" -}}
+{{- if $.Ranges }} AND (
+	{{- range $i, $r := $.Ranges }}{{ if $i }} OR {{ end -}}
+	(l.{{ $.Identifier }} >= {{ $r.LiteralLower }} AND l.{{ $.Identifier }} <= {{ $r.LiteralUpper }})
+	{{- end }})
+{{- else if $.LiteralLower }} AND l.{{ $.Identifier }} >= {{ $.LiteralLower }} AND l.{{ $.Identifier }} <= {{ $.LiteralUpper }}
+{{- end }}
+{{- end }}
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
@@ -328,7 +340,7 @@ JOIN {{ template "tempTableName" . }} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON {{ end -}}
 	l.{{ $bound.Identifier }} = r.c{{$ind}}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" $bound }}
 {{- end }}
 {{ end }}
 
@@ -355,7 +367,7 @@ USING {{ template "tempTableName" . }} AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{end -}}
 	l.{{$bound.Identifier}} = r.c{{$ind}}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" $bound }}
 {{- end}}
 WHEN MATCHED AND r._flow_delete THEN
 	DELETE
