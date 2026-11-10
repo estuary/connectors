@@ -79,7 +79,6 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		tf := boundedQueryInput{
 			Table:  tbl,
 			File:   "test-file",
-			Files:  []string{"test-file"},
 			Bounds: bounds,
 		}
 
@@ -92,8 +91,8 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 		tbl := tables[0]
 		var testcase = tbl.Identifier + " mergeInto over two files"
 		tf := boundedQueryInput{
-			Table: tbl,
-			Files: []string{"test-file-a", "test-file-b"},
+			Table:   tbl,
+			Pattern: stagedDirsPattern([]string{"@flow_v1/test-file-a", "@flow_v1/test-file-b"}),
 			Bounds: []sql.MergeBound{
 				{
 					Column:       tbl.Keys[0],

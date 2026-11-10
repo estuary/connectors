@@ -182,10 +182,7 @@ WHEN NOT MATCHED AND r._flow_delete=false THEN
 MERGE INTO "a-schema".key_value AS l
 USING (
 	SELECT $1[0] AS key1, $1[1] AS key2, BASE64_DECODE_BINARY($1[2]) AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, BASE64_DECODE_BINARY($1[4]) AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt128Bit, $1[10] AS integerGt256Bit, $1[11] AS integerGt64Bit, $1[12] AS integerWithUserDDL, NULLIF($1[13], PARSE_JSON('null')) AS multiple, $1[14] AS "nonAsciiκόσμε", $1[15] AS number, $1[16] AS numberCastToString, NULLIF($1[17], PARSE_JSON('null')) AS object, $1[18] AS string, $1[19] AS stringInteger, $1[20] AS stringInteger18Chars, $1[21] AS stringInteger38Chars, $1[22] AS stringInteger39Chars, $1[23] AS stringInteger66Chars, $1[24] AS stringInteger77Chars, $1[25] AS stringNumber, $1[26] AS flow_document, $1[27] AS _flow_delete
-	FROM test-file-a
-	UNION ALL
-	SELECT $1[0] AS key1, $1[1] AS key2, BASE64_DECODE_BINARY($1[2]) AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, BASE64_DECODE_BINARY($1[4]) AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt128Bit, $1[10] AS integerGt256Bit, $1[11] AS integerGt64Bit, $1[12] AS integerWithUserDDL, NULLIF($1[13], PARSE_JSON('null')) AS multiple, $1[14] AS "nonAsciiκόσμε", $1[15] AS number, $1[16] AS numberCastToString, NULLIF($1[17], PARSE_JSON('null')) AS object, $1[18] AS string, $1[19] AS stringInteger, $1[20] AS stringInteger18Chars, $1[21] AS stringInteger38Chars, $1[22] AS stringInteger39Chars, $1[23] AS stringInteger66Chars, $1[24] AS stringInteger77Chars, $1[25] AS stringNumber, $1[26] AS flow_document, $1[27] AS _flow_delete
-	FROM test-file-b
+	FROM @flow_v1 (PATTERN => '.*(test-file-a|test-file-b)/.*')
 ) AS r
 ON 
 	l.key1 = r.key1 AND l.key1 >= LEAST(10::INTEGER, 200::INTEGER) AND l.key1 <= GREATEST(100::INTEGER, 300::INTEGER)

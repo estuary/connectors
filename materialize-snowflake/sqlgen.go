@@ -387,14 +387,11 @@ COPY INTO {{ $.Table.Identifier }} (
 {{ define "mergeInto" }}
 MERGE INTO {{ $.Table.Identifier }} AS l
 USING (
-{{- range $fi, $file := $.Files }}{{ if $fi }}
-	UNION ALL{{ end }}
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}, $1[{{ len $.Table.Columns }}] AS _flow_delete
-	FROM {{ $file }}
-{{- end }}
+	FROM {{ if $.Pattern }}@flow_v1 (PATTERN => '{{ $.Pattern }}'){{ else }}{{ $.File }}{{ end }}
 ) AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{ end -}}
@@ -482,6 +479,16 @@ type tableAndFile struct {
 	File  string
 }
 
+// stagedDirsPattern matches the files of every staged dir in dirs, each a
+// path of the flow_v1 stage.
+func stagedDirsPattern(dirs []string) string {
+	var names = make([]string, len(dirs))
+	for i, d := range dirs {
+		names[i] = regexp.QuoteMeta(strings.TrimPrefix(d, "@flow_v1/"))
+	}
+	return ".*(" + strings.Join(names, "|") + ")/.*"
+}
+
 func renderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &tableAndFile{Table: table, File: file}); err != nil {
@@ -517,11 +524,12 @@ func renderCopyHistoryTemplate(tableName string, files []string, tpl *template.T
 
 type boundedQueryInput struct {
 	Table sql.Table
-	// File is Files[0], for a template over a single staged path.
+	// File is the one staged path a template reads, unless Pattern is set.
 	File string
-	// Files are staged paths, whose union a template reads.
-	Files  []string
-	Bounds []sql.MergeBound
+	// Pattern matches the files of more than one staged path of the flow_v1
+	// stage, which a template reads in one scan.
+	Pattern string
+	Bounds  []sql.MergeBound
 }
 
 func renderBoundedQueryTemplate(tpl *template.Template, table sql.Table, file string, bounds []sql.MergeBound) (string, error) {
@@ -530,13 +538,12 @@ func renderBoundedQueryTemplate(tpl *template.Template, table sql.Table, file st
 
 // renderMergeQueryTemplate renders a bounded query over the union of files.
 func renderMergeQueryTemplate(tpl *template.Template, table sql.Table, files []string, bounds []sql.MergeBound) (string, error) {
+	var input = boundedQueryInput{Table: table, File: files[0], Bounds: bounds}
+	if len(files) > 1 {
+		input.Pattern = stagedDirsPattern(files)
+	}
 	var w strings.Builder
-	if err := tpl.Execute(&w, &boundedQueryInput{
-		Table:  table,
-		File:   files[0],
-		Files:  files,
-		Bounds: bounds,
-	}); err != nil {
+	if err := tpl.Execute(&w, &input); err != nil {
 		return "", err
 	}
 

@@ -364,9 +364,7 @@ func TestAcknowledgeCoalescesShardMerges(t *testing.T) {
 		}
 	}
 	require.Len(t, merges, 1, "one MERGE covers every shard's files: %v", statements)
-	require.Contains(t, merges[0], "FROM @flow_v1/al")
-	require.Contains(t, merges[0], "FROM @flow_v1/au")
-	require.Contains(t, merges[0], "UNION ALL")
+	require.Contains(t, merges[0], "FROM @flow_v1 (PATTERN => '.*(al|au)/.*')")
 	require.Contains(t, merges[0], "LEAST(")
 	require.Contains(t, merges[0], "GREATEST(")
 	require.ElementsMatch(t, []string{"REMOVE @flow_v1/al", "REMOVE @flow_v1/au"}, removes)
@@ -585,8 +583,7 @@ func TestTwoShardsApplyEveryEntryOnce(t *testing.T) {
 			}
 		}
 		require.Len(t, merges, 1, "transaction %d", txn)
-		require.Contains(t, merges[0], "FROM "+lowerDir)
-		require.Contains(t, merges[0], "FROM "+upperDir)
+		require.Contains(t, merges[0], "PATTERN => '"+stagedDirsPattern([]string{lowerDir, upperDir})+"'")
 		require.Len(t, truncations, map[bool]int{true: 1}[txn == 1], "transaction %d", txn)
 		require.ElementsMatch(t, []string{"REMOVE " + lowerDir, "REMOVE " + upperDir}, removes)
 
@@ -614,8 +611,7 @@ func TestAcknowledgeRunsLegacyEntryBeforeRangeEntries(t *testing.T) {
 	require.GreaterOrEqual(t, len(statements), 2)
 	require.Equal(t, legacy.Query, statements[0])
 	require.True(t, strings.HasPrefix(statements[1], "\nMERGE INTO"), statements[1])
-	require.Contains(t, statements[1], "FROM @flow_v1/al")
-	require.Contains(t, statements[1], "FROM @flow_v1/au")
+	require.Contains(t, statements[1], "FROM @flow_v1 (PATTERN => '.*(al|au)/.*')")
 	require.JSONEq(t, `{"a_table.v1":{}}`, reduce(t, persisted, update.UpdatedJson))
 }
 
