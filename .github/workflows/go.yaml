@@ -25,6 +25,11 @@ on:
     - cron: "0 8 * * *"
   workflow_dispatch:
 
+env:
+  # The Go release the Dockerfiles' golang images are on. Jobs use its latest
+  # patch, as those images do.
+  GO_VERSION: "1.27"
+
 jobs:
   # Which connectors did this change touch? This job classifies every changed
   # path, and the build jobs below gate on its answer.
@@ -101,9 +106,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - id: go
+        uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache: false
 
       - id: cache
@@ -112,7 +119,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-${{ runner.os }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
           lookup-only: true
 
       # Compile errors are ignored: source-db2-batch can't build without IBM's
@@ -135,7 +142,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-${{ runner.os }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
 
   build_connectors:
     runs-on: ubuntu-24.04
@@ -175,10 +182,12 @@ jobs:
           echo ::set-output name=variants::${VARIANTS}
 
       - name: Set up Go
+        id: go
         if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
           cache: false
 
       # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
@@ -191,7 +200,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          key: go-cache-${{ runner.os }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
           restore-keys: go-cache-${{ runner.os }}-
 
       # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
@@ -343,12 +352,18 @@ jobs:
                     -e 's/^(RUN)? +(go (test|build) )/\2/p' > "$RUNNER_TEMP/builder.sh"
           bash -ex "$RUNNER_TEMP/builder.sh"
 
-          # Copy each path the runtime stage takes from the builder stage to the
-          # same path under $CTX. The stage's /builder is this checkout; any
-          # other path is a system file, taken from the runner.
+          # Go stamps the binary with this commit, and marks it modified when
+          # the checkout had changes at build time.
+          if go version -m connector | grep vcs.modified=true; then
+            git status --porcelain
+            exit 1
+          fi
+
+          # Copy what the runtime stage takes from the builder stage to the same
+          # path under $CTX. The stage's /builder is this checkout.
           for SRC in $(awk '/^COPY --from=builder / { print $3 }' "$DOCKERFILE"); do
             mkdir -p "$(dirname "$CTX$SRC")"
-            cp -rL "${SRC/#\/builder/.}" "$CTX$SRC"
+            cp -r ".${SRC#/builder}" "$CTX$SRC"
           done
           echo "context=builder=$CTX" >> "$GITHUB_OUTPUT"
 
