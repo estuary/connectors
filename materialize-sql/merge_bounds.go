@@ -112,6 +112,8 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 				b.spans[idx] = &spanSet{limit: limit, scale: instantScale{}}
 			}
 		case ft != STRING || !b.stringRanges:
+		case isDateColumn(col):
+			b.spans[idx] = &spanSet{limit: limit, scale: instantScale{}, position: datePosition}
 		default:
 			b.spans[idx] = &spanSet{limit: limit, scale: new(byteAlphabet), position: stringPosition}
 		}
@@ -158,6 +160,11 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 			spans.observe(k)
 		}
 	}
+}
+
+func isDateColumn(col Column) bool {
+	var ft, _ = col.AsFlatType()
+	return ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date"
 }
 
 func isDatetimeColumn(col Column) bool {
@@ -360,6 +367,13 @@ func (instantScale) distance(x, y string) (float64, bool) {
 func stringPosition(key any) (string, bool) {
 	var s, ok = key.(string)
 	return s, ok
+}
+
+// datePosition is the position of a date key: that of its first instant.
+func datePosition(key any) (string, bool) {
+	var s, _ = key.(string)
+	var day, err = time.Parse(time.DateOnly, s)
+	return datetimePosition(day), err == nil
 }
 
 // spanSet is the observed keys of a key column as sorted, disjoint spans.

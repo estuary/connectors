@@ -460,6 +460,25 @@ func TestMergeBoundsBuilderStringRanges(t *testing.T) {
 		require.Nil(t, build(str, keys, WithStringRanges()).Ranges)
 	})
 
+	t.Run("dates are split by the days between them", func(t *testing.T) {
+		date := Column{Identifier: "d", Projection: Projection{Projection: pf.Projection{
+			Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date"}},
+		}}}
+		var days []string
+		for i, day := 0, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC); i < 400; i++ {
+			days = append(days, day.AddDate(0, 0, i).Format(time.DateOnly))
+		}
+		require.Nil(t, build(date, days, WithStringRanges()).Ranges)
+
+		got := build(date, append([]string{"2024-02-29"}, days...), WithStringRanges())
+		require.Equal(t, []MergeRange{
+			{literaler("2024-02-29"), literaler("2024-02-29")},
+			{literaler(days[0]), literaler(days[len(days)-1])},
+		}, got.Ranges)
+
+		require.Nil(t, build(date, append([]string{"2024-02-29", "not a date"}, days...), WithStringRanges()).Ranges)
+	})
+
 	t.Run("ranges need the option and a plain string column", func(t *testing.T) {
 		require.Nil(t, build(str, withOutliers).Ranges)
 		require.Nil(t, build(str, withOutliers, WithDatetimeRanges()).Ranges)
