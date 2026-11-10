@@ -27,6 +27,7 @@ import (
 
 var featureFlagDefaults = map[string]common.FlagDefault{
 	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 }
 
 type AuthType string
@@ -308,6 +309,9 @@ func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bi
 type materialization struct {
 	cfg    config
 	client *client
+	// truncateAfterBackfill permits deleting items published before a
+	// completed backfill.
+	truncateAfterBackfill bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
@@ -321,6 +325,10 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	return &materialization{
 		cfg:    cfg,
 		client: client,
+		// Retaining existing data on backfill forbids deleting the rows
+		// published before a completed backfill, since those rows are
+		// exactly the data being retained.
+		truncateAfterBackfill: featureFlags["truncate_after_backfill"] && !featureFlags["retain_existing_data_on_backfill"],
 	}, nil
 }
 
@@ -455,21 +463,61 @@ func (d *materialization) NewTransactor(
 			mappedFields = append(mappedFields, p.Mapped)
 		}
 
+		keyFields := make([]string, 0, len(b.Keys))
+		for _, k := range b.Keys {
+			keyFields = append(keyFields, k.Field)
+		}
+
+		pubField, pubErr := publishedAtField(&mappedBindings[idx])
+
 		tablesToBindings[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
-			tableName: b.ResourcePath[0],
-			path:      b.ResourcePath,
-			fields:    mappedFields,
-			docField:  b.Document.Field,
+			tableName:        b.ResourcePath[0],
+			path:             b.ResourcePath,
+			fields:           mappedFields,
+			docField:         b.Document.Field,
+			deltaUpdates:     b.DeltaUpdates,
+			keyFields:        keyFields,
+			publishedAtField: pubField,
+			publishedAtErr:   pubErr,
 		})
 	}
 
 	return &transactor{
-		client:           d.client,
-		bindings:         bindings,
-		be:               be,
-		tablesToBindings: tablesToBindings,
+		client:                d.client,
+		bindings:              bindings,
+		be:                    be,
+		tablesToBindings:      tablesToBindings,
+		truncateAfterBackfill: d.truncateAfterBackfill,
 	}, nil
+}
+
+// publishedAtField returns the name of the selected field that projects
+// /_meta/uuid as a date-time, used to find items published before a
+// completed backfill. The error is a clause stating why no field qualifies,
+// suited for an operator to act on.
+func publishedAtField(b *boilerplate.MappedBinding[config, resource, mappedType]) (string, error) {
+	var reason error
+	for _, p := range b.Values {
+		if p.Ptr != "/_meta/uuid" {
+			continue
+		}
+		if s := p.Inference.String_; s == nil {
+			if reason == nil {
+				reason = fmt.Errorf("field %s projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", p.Field)
+			}
+		} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
+			if reason == nil {
+				reason = fmt.Errorf("field %s projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", p.Field, s.Format, s.ContentEncoding)
+			}
+		} else {
+			return p.Field, nil
+		}
+	}
+	if reason == nil {
+		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+	}
+	return "", reason
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {
