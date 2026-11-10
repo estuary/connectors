@@ -447,9 +447,7 @@ If a column type change results in captured documents that don't match the exist
 
 #### Adding values to an `ENUM` column
 
-When the connector discovers a table, it writes the allowed values of each `ENUM` column into the collection's schema. If you add a new value to an `ENUM` column with `ALTER TABLE`, documents containing that value fail schema validation until the next discovery updates the collection schema, and the capture task fails in the meantime.
-
-With [auto-discovery](/concepts/captures/#automatically-update-captures) enabled, the next scheduled run picks up the new value. Runs happen every 2 hours by default, so this can take up to 2 hours. To pick up the new value right away instead of waiting, edit the capture, click **Refresh** in the **Target Collections** section, and click **Save and Publish**. You can do this right after the `ALTER TABLE`, or after the capture has already failed.
+When the connector discovers a table, it writes the allowed values of each `ENUM` column into the collection's schema. If you add a new value to an `ENUM` column with `ALTER TABLE`, documents containing that value fail schema validation until the next discovery updates the collection schema, and the capture task fails in the meantime. With auto-discovery enabled, the next scheduled run picks up the new value, within 2 hours by default. To pick it up right away, see [Capture failures after a source schema change](/guides/troubleshooting/capture-schema-validation-failures/).
 
 ### Data Manipulation Queries
 
