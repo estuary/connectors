@@ -259,3 +259,17 @@ func TestStreamingChannelQuotesSchema(t *testing.T) {
 		})
 	}
 }
+
+func TestExistingFieldCollation(t *testing.T) {
+	for _, tc := range []struct {
+		dataType string
+		want     string
+	}{
+		{dataType: `{"type":"TEXT","length":16777216,"byteLength":67108864,"nullable":true,"fixed":false,"collation":"en-ci"}`, want: "en-ci"},
+		{dataType: `{"type":"TEXT","length":16777216,"byteLength":67108864,"nullable":true,"fixed":false}`},
+	} {
+		field, err := showColumnsResult{ColumnName: "ID", DataType: tc.dataType}.existingField()
+		require.NoError(t, err)
+		require.Equal(t, existingColumn{Collation: tc.want}, field.Meta)
+	}
+}

@@ -444,6 +444,14 @@ type binding struct {
 	}
 }
 
+// existingColumn is what Snowflake reports of an existing column beyond its
+// type.
+type existingColumn struct {
+	// Collation is the column's collation specification, or empty if it has
+	// none.
+	Collation string
+}
+
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
 	var b = new(binding)
 	b.target = target
