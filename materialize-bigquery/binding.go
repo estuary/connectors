@@ -40,10 +40,14 @@ func timestampKeys(target sql.Table) []int {
 	return out
 }
 
-// newMergeBoundsBuilder bounds TIMESTAMP keys exactly, split into ranges at
-// gaps. Their keys must pass through boundsKey.
+// newMergeBoundsBuilder bounds TIMESTAMP keys exactly, and splits them and
+// string keys into ranges at gaps. TIMESTAMP keys must pass through boundsKey.
 func newMergeBoundsBuilder(target sql.Table, literal func(any) string) *sql.MergeBoundsBuilder {
-	return sql.NewMergeBoundsBuilder(target.Keys, literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+	return sql.NewMergeBoundsBuilder(target.Keys, literal,
+		sql.WithExactDatetimeBounds(isTimestampColumn),
+		sql.WithDatetimeRanges(maxBoundRanges),
+		sql.WithStringRanges(maxBoundRanges),
+	)
 }
 
 // boundsKey returns key with its TIMESTAMP values floored to microseconds, for

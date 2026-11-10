@@ -7,6 +7,10 @@
   the transaction's exact key range, rather than whole days, and split that
   range at wide gaps between the keys, so a few keys far from the rest no
   longer widen the scan to everything in between.
+- Load and merge queries also split the range of a string key column at wide
+  gaps between the transaction's keys. Ids that don't increase in byte order,
+  such as Klaviyo's, which step from `z` to `A`, no longer widen the scan to
+  most of the table when a transaction holds ids from both sides of a step.
 
 ## 2026-11-02
 

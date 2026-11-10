@@ -66,7 +66,7 @@ type mergeRangeLiterals struct {
 	Upper string
 }
 
-// maxBoundRanges is the most ranges a TIMESTAMP key's merge bound splits into.
+// maxBoundRanges is the most ranges a key's merge bound splits into.
 const maxBoundRanges = 8
 
 func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
