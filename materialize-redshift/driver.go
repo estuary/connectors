@@ -409,7 +409,7 @@ func prepareNewTransactor(
 		for _, b := range bindings {
 			stateKeys = append(stateKeys, b.StateKey)
 		}
-		d.state = newState(fence.KeyBegin, fence.KeyEnd, stateKeys)
+		d.state = boilerplate.NewShardedState[*stateItem](fence.KeyBegin, fence.KeyEnd, stateKeys)
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
 		if err != nil {
@@ -907,7 +907,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		// lastRuntimeCheckpoint's comment for the accepted downgrade gap this
 		// leaves open on a recovery Acknowledge.
 		var legacyCheckpoint []byte
-		if pending.Len() == d.state.Len() {
+		if pending.Len() == d.state.Pending().Len() {
 			legacyCheckpoint = d.lastRuntimeCheckpoint
 		}
 

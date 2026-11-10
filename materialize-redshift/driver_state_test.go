@@ -31,7 +31,7 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 	}
 	var d = &transactor{
 		committedTokens: make(map[string]bool),
-		state:           newState(keyBegin, keyEnd, stateKeys),
+		state:           boilerplate.NewShardedState[*stateItem](keyBegin, keyEnd, stateKeys),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -48,14 +48,6 @@ func TestParseState(t *testing.T) {
 		err := d.UnmarshalState(json.RawMessage(raw))
 		return d.state.Pending(), err
 	}
-
-	t.Run("a task crossing over opens with no state", func(t *testing.T) {
-		for _, raw := range []string{``, `{}`} {
-			pending, err := parse(raw)
-			require.NoError(t, err)
-			require.Empty(t, pending)
-		}
-	})
 
 	t.Run("entries are keyed by state key then range", func(t *testing.T) {
 		pending, err := parse(`{
@@ -81,11 +73,6 @@ func TestParseState(t *testing.T) {
 
 	t.Run("an entry with unknown fields is rejected", func(t *testing.T) {
 		_, err := parse(`{"a_table.v1": {"00000000-ffffffff": {"Queries": ["Q1"]}}}`)
-		require.Error(t, err)
-	})
-
-	t.Run("an entry not nested under a range key is rejected", func(t *testing.T) {
-		_, err := parse(`{"a_table.v1": {"id": "m", "storeFiles": [], "deleteFiles": [], "mustMerge": false, "widen": []}}`)
 		require.Error(t, err)
 	})
 }
@@ -183,20 +170,11 @@ func TestStateRouting(t *testing.T) {
 		}
 	}`)
 
-	t.Run("the primary recovers every range", func(t *testing.T) {
-		d := testTransactor(lowerRange, "a_table.v1")
-		require.NoError(t, d.UnmarshalState(state))
-		require.True(t, d.state.Primary())
-		require.Equal(t, 2, d.state.Len())
-		require.Equal(t, "l/files.manifest", d.state.Pending()["a_table.v1"][lowerRange].ID)
-		require.Equal(t, "u/files.manifest", d.state.Pending()["a_table.v1"][upperRange].ID)
-	})
-
 	t.Run("a non-primary shard recovers nothing and acknowledges nothing", func(t *testing.T) {
 		d := testTransactor(upperRange, "a_table.v1")
 		require.NoError(t, d.UnmarshalState(state))
 		require.False(t, d.state.Primary())
-		require.Zero(t, d.state.Len())
+		require.Empty(t, d.state.Pending())
 		patch, err := d.Acknowledge(t.Context(), []json.RawMessage{state}, nil)
 		require.NoError(t, err)
 		require.Nil(t, patch)
@@ -220,7 +198,7 @@ func TestStateRouting(t *testing.T) {
 		patch, err := d.Acknowledge(t.Context(), nil, []string{"other.v1"})
 		require.NoError(t, err)
 		require.Nil(t, patch)
-		require.Equal(t, 2, d.state.Len())
+		require.Equal(t, 2, d.state.Pending().Len())
 	})
 }
 

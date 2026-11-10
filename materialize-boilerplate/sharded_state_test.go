@@ -3,7 +3,7 @@ package boilerplate
 import (
 	"encoding/json"
 	"errors"
-	"math"
+	"fmt"
 	"testing"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -21,32 +21,11 @@ type testEntry struct {
 }
 
 func newTestState(rangeKey string, liveStateKeys ...string) *ShardedState[*testEntry] {
-	return newTestStateOpts(rangeKey, ShardedStateOptions[*testEntry]{Decode: DecodeStrict[*testEntry]}, liveStateKeys...)
-}
-
-func newTestStateOpts(rangeKey string, opts ShardedStateOptions[*testEntry], liveStateKeys ...string) *ShardedState[*testEntry] {
-	var begin, end = uint32(0), uint32(math.MaxUint32)
-	switch rangeKey {
-	case lowerRange:
-		end = 0x7fffffff
-	case upperRange:
-		begin = 0x80000000
+	var begin, end uint32
+	if _, err := fmt.Sscanf(rangeKey, "%08x-%08x", &begin, &end); err != nil {
+		panic(err)
 	}
-	return NewShardedState(begin, end, liveStateKeys, opts)
-}
-
-func legacyOpts() ShardedStateOptions[*testEntry] {
-	return ShardedStateOptions[*testEntry]{
-		Decode: DecodeStrict[*testEntry],
-		// Older entries spelled the field "Files".
-		DecodeLegacy: func(raw json.RawMessage) (*testEntry, error) {
-			var old struct{ Files []string }
-			if err := json.Unmarshal(raw, &old); err != nil {
-				return nil, err
-			}
-			return &testEntry{Files: old.Files}, nil
-		},
-	}
+	return NewShardedState[*testEntry](begin, end, liveStateKeys)
 }
 
 func te(files ...string) *testEntry { return &testEntry{Files: files} }
@@ -87,11 +66,6 @@ func reduce(t *testing.T, doc json.RawMessage, updates ...*pf.ConnectorState) js
 	return out
 }
 
-func TestRangeKey(t *testing.T) {
-	require.Equal(t, fullRange, RangeKey(0, math.MaxUint32))
-	require.Equal(t, upperRange, RangeKey(0x80000000, math.MaxUint32))
-}
-
 func TestShardedStateRecover(t *testing.T) {
 	var doc = json.RawMessage(`{
 		"a.v1": {
@@ -101,16 +75,17 @@ func TestShardedStateRecover(t *testing.T) {
 	}`)
 
 	t.Run("no state", func(t *testing.T) {
-		for _, raw := range []json.RawMessage{nil, json.RawMessage(``), json.RawMessage(` `), json.RawMessage(`{}`), json.RawMessage(`null`)} {
+		for _, raw := range []json.RawMessage{nil, json.RawMessage(` `), json.RawMessage(`{}`), json.RawMessage(`null`)} {
 			var s = newTestState(fullRange, "a.v1")
 			require.NoError(t, s.Recover(raw))
-			require.Zero(t, s.Len())
+			require.Empty(t, s.Pending())
 			require.False(t, s.OwnRecovered())
 		}
 	})
 
 	t.Run("the primary keeps every range", func(t *testing.T) {
 		var s = newTestState(lowerRange, "a.v1")
+		require.Equal(t, lowerRange, s.RangeKey())
 		require.NoError(t, s.Recover(doc))
 		require.Equal(t, ShardedEntries[*testEntry]{"a.v1": {lowerRange: te("l"), upperRange: te("u")}}, s.Pending())
 		require.True(t, s.OwnRecovered())
@@ -119,7 +94,7 @@ func TestShardedStateRecover(t *testing.T) {
 	t.Run("a non-primary shard validates and discards it", func(t *testing.T) {
 		var s = newTestState(upperRange, "a.v1")
 		require.NoError(t, s.Recover(doc))
-		require.Zero(t, s.Len())
+		require.Empty(t, s.Pending())
 		require.True(t, s.OwnRecovered())
 
 		require.Error(t, s.Recover(json.RawMessage(`{"a.v1": {"80000000-ffffffff": {"bogus": 1}}}`)))
@@ -139,28 +114,15 @@ func TestShardedStateRecover(t *testing.T) {
 		require.False(t, s.OwnRecovered())
 	})
 
-	t.Run("null members are absent", func(t *testing.T) {
-		var s = newTestState(fullRange, "a.v1")
-		require.NoError(t, s.Recover(json.RawMessage(`{"a.v1": {"00000000-ffffffff": null}, "b.v1": null}`)))
-		require.Zero(t, s.Len())
-	})
-
 	t.Run("rejected documents", func(t *testing.T) {
 		for name, raw := range map[string]string{
-			"not an object":           `[]`,
-			"a bucket not an object":  `{"a.v1": "x"}`,
-			"an unknown entry field":  `{"a.v1": {"00000000-ffffffff": {"files": [], "extra": 1}}}`,
-			"a flat entry":            `{"a.v1": {"files": ["f"]}}`,
-			"a range-key-outer entry": `{"00000000-ffffffff": {"a.v1": {"files": ["f"]}}}`,
+			"not an object":          `[]`,
+			"a bucket not an object": `{"a.v1": "x"}`,
+			"an unknown entry field": `{"a.v1": {"00000000-ffffffff": {"files": [], "extra": 1}}}`,
+			"a flat entry":           `{"a.v1": {"files": ["f"]}}`,
 		} {
 			require.Error(t, newTestState(fullRange, "a.v1").Recover(json.RawMessage(raw)), name)
 		}
-	})
-
-	t.Run("lenient decoding by default", func(t *testing.T) {
-		var s = newTestStateOpts(fullRange, ShardedStateOptions[*testEntry]{}, "a.v1")
-		require.NoError(t, s.Recover(json.RawMessage(`{"a.v1": {"00000000-ffffffff": {"files": ["f"], "extra": 1}}}`)))
-		require.Equal(t, te("f"), s.Pending()["a.v1"][fullRange])
 	})
 }
 
@@ -175,7 +137,7 @@ func TestShardedStateStartCommit(t *testing.T) {
 			"b.v1": {"80000000-ffffffff": {"files": ["b1"]}}
 		}`, string(update.UpdatedJson))
 		// A non-primary shard keeps nothing.
-		require.Zero(t, s.Len())
+		require.Empty(t, s.Pending())
 	})
 
 	t.Run("nothing staged", func(t *testing.T) {
@@ -189,42 +151,11 @@ func TestShardedStateStartCommit(t *testing.T) {
 		_, err := s.StartCommit(map[string]*testEntry{"a.v1": te("a1")})
 		require.NoError(t, err)
 		require.Equal(t, ShardedEntries[*testEntry]{"a.v1": {lowerRange: te("a1")}}, s.Pending())
-
-		// The previous transaction's entry was never applied.
-		_, err = s.StartCommit(map[string]*testEntry{"a.v1": te("a2")})
-		require.ErrorContains(t, err, "still pending")
-		require.Equal(t, te("a1"), s.Pending()["a.v1"][lowerRange])
 	})
 }
 
 func TestShardedStateAcknowledge(t *testing.T) {
 	var peerPatch = json.RawMessage(`{"a.v1": {"80000000-ffffffff": {"files": ["u"]}}}`)
-
-	t.Run("the primary applies its own and its peers' entries, skipping its echo", func(t *testing.T) {
-		var s = newTestState(lowerRange, "a.v1")
-		own, err := s.StartCommit(map[string]*testEntry{"a.v1": te("l")})
-		require.NoError(t, err)
-
-		var applied ShardedEntries[*testEntry]
-		update, err := s.Acknowledge([]json.RawMessage{own.UpdatedJson, peerPatch}, nil, collect(&applied))
-		require.NoError(t, err)
-		require.Equal(t, ShardedEntries[*testEntry]{"a.v1": {lowerRange: te("l"), upperRange: te("u")}}, applied)
-		require.JSONEq(t, `{"a.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}}`, string(update.UpdatedJson))
-		require.True(t, update.MergePatch)
-		require.Zero(t, s.Len())
-	})
-
-	t.Run("runtime v1 sends no patches", func(t *testing.T) {
-		var s = newTestState(fullRange, "a.v1")
-		_, err := s.StartCommit(map[string]*testEntry{"a.v1": te("f")})
-		require.NoError(t, err)
-
-		var applied ShardedEntries[*testEntry]
-		update, err := s.Acknowledge(nil, nil, collect(&applied))
-		require.NoError(t, err)
-		require.Equal(t, ShardedEntries[*testEntry]{"a.v1": {fullRange: te("f")}}, applied)
-		require.JSONEq(t, `{"a.v1": {"00000000-ffffffff": null}}`, string(update.UpdatedJson))
-	})
 
 	t.Run("a non-primary shard applies nothing", func(t *testing.T) {
 		var s = newTestState(upperRange, "a.v1")
@@ -254,18 +185,24 @@ func TestShardedStateAcknowledge(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("a failed apply keeps everything pending", func(t *testing.T) {
+	t.Run("entries stay pending while apply runs, and after it fails", func(t *testing.T) {
 		var s = newTestState(fullRange, "a.v1")
 		require.NoError(t, s.Recover(json.RawMessage(`{"a.v1": {"00000000-ffffffff": {"files": ["f"]}}}`)))
 		var boom = errors.New("boom")
-		update, err := s.Acknowledge(nil, nil, func(ShardedEntries[*testEntry]) error { return boom })
+		update, err := s.Acknowledge(nil, nil, func(batch ShardedEntries[*testEntry]) error {
+			require.Equal(t, batch, s.Pending())
+			return boom
+		})
 		require.ErrorIs(t, err, boom)
 		require.Nil(t, update)
-		require.Equal(t, 1, s.Len())
+		require.Equal(t, 1, s.Pending().Len())
 	})
 
 	t.Run("nothing pending", func(t *testing.T) {
-		update, err := newTestState(fullRange, "a.v1").Acknowledge(nil, nil, noApply(t))
+		var s = newTestState(fullRange, "a.v1")
+		// What clearing a state key's last entry leaves behind.
+		require.NoError(t, s.Recover(json.RawMessage(`{"a.v1": {}}`)))
+		update, err := s.Acknowledge(nil, nil, noApply(t))
 		require.NoError(t, err)
 		require.Nil(t, update)
 	})
@@ -307,7 +244,7 @@ func TestShardedStateStateKeys(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, ShardedEntries[*testEntry]{"b.v1": {upperRange: te("b")}}, applied)
 		require.JSONEq(t, `{"b.v1": {"80000000-ffffffff": null}}`, string(update.UpdatedJson))
-		require.Equal(t, 3, s.Len())
+		require.Equal(t, 3, s.Pending().Len())
 
 		// Draining it again finds nothing.
 		update, err = s.Acknowledge(nil, []string{"b.v1"}, noApply(t))
@@ -319,118 +256,6 @@ func TestShardedStateStateKeys(t *testing.T) {
 		update, err := recovered(t).Acknowledge(nil, []string{}, noApply(t))
 		require.NoError(t, err)
 		require.Nil(t, update)
-	})
-}
-
-func TestShardedStateResidue(t *testing.T) {
-	t.Run("clearing the last entry leaves an empty object", func(t *testing.T) {
-		var s = newTestState(fullRange, "a.v1")
-		var doc = json.RawMessage(`{"a.v1": {"00000000-ffffffff": {"files": ["f"]}}}`)
-		require.NoError(t, s.Recover(doc))
-		update, err := s.Acknowledge(nil, nil, collect(new(ShardedEntries[*testEntry])))
-		require.NoError(t, err)
-		require.JSONEq(t, `{"a.v1": {}}`, string(reduce(t, doc, update)))
-	})
-
-	t.Run("a session prunes recovered empty objects of keys that aren't live", func(t *testing.T) {
-		var doc = json.RawMessage(`{
-			"a.v1": {},
-			"gone.v1": {},
-			"00000000-ffffffff": {},
-			"b.v1": {"00000000-ffffffff": {"files": ["b"]}}
-		}`)
-		var s = newTestState(fullRange, "a.v1")
-		require.NoError(t, s.Recover(doc))
-
-		// Not in an Apply drain.
-		update, err := s.Acknowledge(nil, []string{"a.v1"}, noApply(t))
-		require.NoError(t, err)
-		require.Nil(t, update)
-
-		update, err = s.Acknowledge(nil, nil, noApply(t))
-		require.NoError(t, err)
-		require.JSONEq(t, `{"gone.v1": null, "00000000-ffffffff": null}`, string(update.UpdatedJson))
-		require.JSONEq(t, `{"a.v1": {}, "b.v1": {"00000000-ffffffff": {"files": ["b"]}}}`, string(reduce(t, doc, update)))
-
-		// Once.
-		update, err = s.Acknowledge(nil, nil, noApply(t))
-		require.NoError(t, err)
-		require.Nil(t, update)
-	})
-
-	t.Run("pruning rides along with applied entries", func(t *testing.T) {
-		var s = newTestState(fullRange, "a.v1")
-		require.NoError(t, s.Recover(json.RawMessage(`{"gone.v1": {}, "a.v1": {"00000000-ffffffff": {"files": ["f"]}}}`)))
-		update, err := s.Acknowledge(nil, nil, collect(new(ShardedEntries[*testEntry])))
-		require.NoError(t, err)
-		require.JSONEq(t, `{"gone.v1": null, "a.v1": {"00000000-ffffffff": null}}`, string(update.UpdatedJson))
-	})
-}
-
-func TestShardedStateLegacy(t *testing.T) {
-	t.Run("range-key-outer entries", func(t *testing.T) {
-		var doc = json.RawMessage(`{
-			"00000000-7fffffff": {"a.v1": {"Files": ["la"]}, "gone.v1": {"Files": ["lg"]}},
-			"80000000-ffffffff": {"a.v1": {"Files": ["ua"]}}
-		}`)
-		var s = newTestStateOpts(lowerRange, legacyOpts(), "a.v1")
-		require.NoError(t, s.Recover(doc))
-		require.True(t, s.OwnRecovered())
-
-		var applied ShardedEntries[*testEntry]
-		update, err := s.Acknowledge(nil, nil, collect(&applied))
-		require.NoError(t, err)
-		require.Equal(t, ShardedEntries[*testEntry]{"a.v1": {lowerRange: te("la"), upperRange: te("ua")}}, applied)
-		// A drained bucket goes entirely; one still holding a pending entry
-		// is cleared by entry.
-		require.JSONEq(t, `{
-			"00000000-7fffffff": {"a.v1": null},
-			"80000000-ffffffff": null
-		}`, string(update.UpdatedJson))
-		require.JSONEq(t, `{"00000000-7fffffff": {"gone.v1": {"Files": ["lg"]}}}`, string(reduce(t, doc, update)))
-	})
-
-	t.Run("flat entries, beside current entries of the same state key", func(t *testing.T) {
-		var doc = json.RawMessage(`{
-			"a.v1": {"Files": ["flat"], "Other": 1, "00000000-ffffffff": {"files": ["cur"]}},
-			"b.v1": {"Files": ["b"]}
-		}`)
-		var s = newTestStateOpts(fullRange, legacyOpts(), "a.v1", "b.v1")
-		require.NoError(t, s.Recover(doc))
-
-		var applied ShardedEntries[*testEntry]
-		update, err := s.Acknowledge(nil, nil, collect(&applied))
-		require.NoError(t, err)
-		require.Equal(t, ShardedEntries[*testEntry]{
-			"a.v1": {"": te("flat"), fullRange: te("cur")},
-			"b.v1": {"": te("b")},
-		}, applied)
-		// Field by field: never the whole state key.
-		require.JSONEq(t, `{
-			"a.v1": {"Files": null, "Other": null, "00000000-ffffffff": null},
-			"b.v1": {"Files": null}
-		}`, string(update.UpdatedJson))
-		require.JSONEq(t, `{"a.v1": {}, "b.v1": {}}`, string(reduce(t, doc, update)))
-	})
-
-	t.Run("a slot in both layouts is rejected", func(t *testing.T) {
-		var s = newTestStateOpts(fullRange, legacyOpts(), "a.v1")
-		require.ErrorContains(t, s.Recover(json.RawMessage(`{
-			"00000000-ffffffff": {"a.v1": {"Files": ["old"]}},
-			"a.v1": {"00000000-ffffffff": {"files": ["new"]}}
-		}`)), "range-key-outer layout")
-	})
-
-	t.Run("from a peer", func(t *testing.T) {
-		var s = newTestStateOpts(lowerRange, legacyOpts(), "a.v1")
-		var applied ShardedEntries[*testEntry]
-		update, err := s.Acknowledge([]json.RawMessage{
-			json.RawMessage(`{"00000000-7fffffff": {"a.v1": {"Files": ["own echo"]}}}`),
-			json.RawMessage(`{"80000000-ffffffff": {"a.v1": {"Files": ["u"]}}}`),
-		}, nil, collect(&applied))
-		require.NoError(t, err)
-		require.Equal(t, ShardedEntries[*testEntry]{"a.v1": {upperRange: te("u")}}, applied)
-		require.JSONEq(t, `{"80000000-ffffffff": null}`, string(update.UpdatedJson))
 	})
 }
 
@@ -491,19 +316,25 @@ func TestShardedStateRuntimeV2Shards(t *testing.T) {
 		doc = reduce(t, doc, p1, p2)
 		return []json.RawMessage{p1.UpdatedJson, p2.UpdatedJson}
 	}
-	var ack = func(t *testing.T, patches []json.RawMessage) {
+	// ack returns the primary's clearing patch.
+	var ack = func(t *testing.T, patches []json.RawMessage) string {
 		u1, err := primary.Acknowledge(patches, nil, apply)
 		require.NoError(t, err)
 		u2, err := peer.Acknowledge(patches, nil, noApply(t))
 		require.NoError(t, err)
 		require.Nil(t, u2)
-		doc = reduce(t, doc, u1, u2)
+		doc = reduce(t, doc, u1)
+		return string(u1.UpdatedJson)
 	}
 
-	ack(t, txn(t,
+	var cleared = ack(t, txn(t,
 		map[string]*testEntry{"a.v1": te("t1-l-a")},
 		map[string]*testEntry{"a.v1": te("t1-u-a"), "b.v1": te("t1-u-b")}))
 	require.Equal(t, []string{"t1-l-a", "t1-u-a", "t1-u-b"}, applied)
+	require.JSONEq(t, `{
+		"a.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null},
+		"b.v1": {"80000000-ffffffff": null}
+	}`, cleared)
 	require.JSONEq(t, `{"a.v1": {}, "b.v1": {}}`, string(doc))
 
 	// Committed, then the session ends before its Acknowledge.

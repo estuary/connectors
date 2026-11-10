@@ -48,13 +48,6 @@ func (e *stateItem) objects() []string {
 	return slices.Concat(e.StoreFiles, e.DeleteFiles)
 }
 
-// newState decodes entries strictly: a field this version doesn't know is an
-// error, never ignored.
-func newState(keyBegin, keyEnd uint32, stateKeys []string) *boilerplate.ShardedState[*stateItem] {
-	return boilerplate.NewShardedState(keyBegin, keyEnd, stateKeys,
-		boilerplate.ShardedStateOptions[*stateItem]{Decode: boilerplate.DecodeStrict[*stateItem]})
-}
-
 // checkpointTokensMap is what the checkpoints row holds once a task has
 // crossed over: the last applied transaction's ID by state key and staging
 // key range.
