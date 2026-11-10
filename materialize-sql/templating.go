@@ -58,12 +58,33 @@ func MustParseTemplate(dialect Dialect, name, body string, extraFuncs ...templat
 			return chunks
 		},
 	}
+	funcs["BoundOn"] = func(alias string, bound MergeBound) BoundOn { return BoundOn{Alias: alias, Bound: bound} }
 	for _, extra := range extraFuncs {
 		for k, v := range extra {
 			funcs[k] = v
 		}
 	}
-	return template.Must(template.New(name).Funcs(funcs).Parse(body))
+	return template.Must(template.Must(template.New(name).Funcs(funcs).Parse(boundConditionTemplate)).Parse(body))
+}
+
+// boundConditionTemplate defines "boundCondition", which renders the range
+// condition of a BoundOn as one range of its lower and upper literals, or as
+// the union of its ranges when it has them.
+const boundConditionTemplate = `
+{{ define "boundCondition" -}}
+{{- if $.Bound.Ranges }} AND (
+	{{- range $i, $r := $.Bound.Ranges }}{{ if $i }} OR {{ end -}}
+	({{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $r.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $r.LiteralUpper }})
+	{{- end }})
+{{- else if $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $.Bound.LiteralUpper }}
+{{- end }}
+{{- end }}
+`
+
+// BoundOn is a merge bound on a key column of the table under Alias.
+type BoundOn struct {
+	Alias string
+	Bound MergeBound
 }
 
 // RenderTableTemplate is a simple implementation of rendering a template with a Table
