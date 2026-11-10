@@ -1300,7 +1300,7 @@ func TestStreamingQuotedSchema(t *testing.T) {
 			ep:                &sql.Endpoint[config]{Dialect: testDialect},
 			snowpipeStreaming: sm,
 		}
-		require.NoError(t, d.addBinding(ctx, target, checkpointItem{}))
+		require.NoError(t, d.addBinding(ctx, target, checkpointItem{}, nil))
 		require.True(t, d.bindings[0].streaming, "the binding fell back from streaming")
 	})
 
