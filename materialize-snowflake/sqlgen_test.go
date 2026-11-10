@@ -63,6 +63,10 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 				Column:       tbl.Keys[0],
 				LiteralLower: testDialect.Literal(int64(10)),
 				LiteralUpper: testDialect.Literal(int64(100)),
+				Ranges: []sql.MergeRange{
+					{LiteralLower: testDialect.Literal(int64(10)), LiteralUpper: testDialect.Literal(int64(20))},
+					{LiteralLower: testDialect.Literal(int64(90)), LiteralUpper: testDialect.Literal(int64(100))},
+				},
 			},
 			{
 				Column: tbl.Keys[1],
@@ -73,6 +77,10 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 				Column:       tbl.Keys[2],
 				LiteralLower: testDialect.Literal("aGVsbG8K"),
 				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
+				Ranges: []sql.MergeRange{
+					{LiteralLower: testDialect.Literal("aGVsbG8K"), LiteralUpper: testDialect.Literal("b3RoZXIK")},
+					{LiteralLower: testDialect.Literal("d29ybGQK"), LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo=")},
+				},
 			},
 		}
 
