@@ -1,8 +1,13 @@
 package connector
 
 import (
+	"fmt"
+	"math/rand"
+	"slices"
+	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/common"
@@ -162,7 +167,73 @@ func TestDatetimeKeyRanges(t *testing.T) {
 			query, err := renderQueryTemplate(table, renderTemplates(dialect).loadQuery, b.loadMergeBounds.Build(), false)
 			require.NoError(t, err)
 			require.Contains(t, query, tc.wantBounds)
-			require.Contains(t, query, "l.id = r.c1 AND l.id >= 'a' AND l.id <= 'd'")
 		})
 	}
+}
+
+// TestStringKeyRanges renders the load query's bound of a time-ordered string
+// id whose alphabet runs 0-9, a-z, A-Z, as Klaviyo's do, for a round holding
+// both recent ids just past a "7z" to "7A" step and ids from a week earlier.
+func TestStringKeyRanges(t *testing.T) {
+	var shape = sql.TableShape{
+		Path:     sql.TablePath{"project", "dataset", "events"},
+		Keys:     []sql.Projection{{Projection: pf.Projection{Field: "id", Ptr: "/id", Inference: pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}}}},
+		Document: &sql.Projection{Projection: pf.Projection{Field: "flow_document", Ptr: "", Inference: pf.Inference{Types: []string{"object"}}}},
+	}
+	table, err := sql.ResolveTable(shape, testDialect)
+	require.NoError(t, err)
+	require.Equal(t, "STRING", table.Keys[0].BareDDL)
+
+	// An id's leading 8 digits count time, with its second digit stepping
+	// every 2.5 days, followed by 18 random digits.
+	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var rng = rand.New(rand.NewSource(1))
+	var step = 2.5 * 24 * time.Hour
+	var at = time.Duration(7*62+36) * step // The "7A" step.
+	var id = func(ts time.Duration) string {
+		var b []byte
+		var v = float64(ts) / float64(step) * 62 * 62 * 62 * 62 * 62 * 62
+		for i := 0; i < 8; i++ {
+			var w = 1.0
+			for j := i; j < 7; j++ {
+				w *= 62
+			}
+			var d = int(v / w)
+			b = append(b, alphabet[d%62])
+		}
+		for len(b) < 26 {
+			b = append(b, alphabet[rng.Intn(62)])
+		}
+		return string(b)
+	}
+
+	var b = newMergeBoundsBuilder(table, testDialect.Literal)
+	var recent, weekOld []string
+	for i := 0; i < 500; i++ {
+		recent = append(recent, id(at+time.Duration(rng.Int63n(int64(time.Hour)))))
+	}
+	for i := 0; i < 200; i++ {
+		weekOld = append(weekOld, id(at-7*24*time.Hour+time.Duration(rng.Int63n(int64(time.Hour)))))
+	}
+	for _, k := range append(append([]string{}, recent...), weekOld...) {
+		b.NextKey([]any{k})
+	}
+	require.True(t, strings.HasPrefix(slices.Min(recent), "7A") && strings.HasPrefix(slices.Min(weekOld), "7x"))
+
+	// No range spans the step, and every id lies within one.
+	var bounds = b.Build()
+	var ranges = bounds[0].Ranges
+	require.NotEmpty(t, ranges)
+	for _, r := range ranges {
+		require.Equal(t, r.LiteralLower[:3], r.LiteralUpper[:3], "range %v spans the step", r)
+	}
+	for _, k := range append(recent, weekOld...) {
+		require.True(t, slices.ContainsFunc(ranges, func(r sql.MergeRange) bool {
+			return testDialect.Literal(k) >= r.LiteralLower && testDialect.Literal(k) <= r.LiteralUpper
+		}), "%s is outside every range", k)
+	}
+
+	query, err := renderQueryTemplate(table, testTemplates.loadQuery, bounds, false)
+	require.NoError(t, err)
+	require.Contains(t, query, fmt.Sprintf("l.id = r.c0 AND ((l.id >= '%s' AND l.id <= '%s') OR ", slices.Min(recent), slices.Max(recent)))
 }
