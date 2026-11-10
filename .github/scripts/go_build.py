@@ -128,6 +128,8 @@ def plan(connector: str) -> Plan:
                 args[k.strip()] = v
         elif word == "RUN":
             argv = shlex.split(rest)
+            while argv and argv[0].startswith("--"):  # --mount=...
+                argv.pop(0)
             if argv[:2] == ["go", "build"]:
                 out = pkg = None
                 i = 2

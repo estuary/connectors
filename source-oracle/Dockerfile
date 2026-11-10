@@ -26,7 +26,9 @@ ENV CI_BUILD=yes
 RUN go test -short -failfast ./source-oracle/...
 
 # Build the connector.
-RUN go build -o ./connector -v ./source-oracle/...
+RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+    go build -o ./connector -v ./source-oracle/...
 
 
 # Runtime Stage

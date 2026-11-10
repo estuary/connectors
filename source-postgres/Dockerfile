@@ -19,7 +19,9 @@ COPY source-postgres ./source-postgres
 ENV PATH="/builder/bin:$PATH"
 
 # Build the connector.
-RUN go build -o ./connector -v ./source-postgres/...
+RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+    go build -o ./connector -v ./source-postgres/...
 
 
 # Runtime Stage
