@@ -443,11 +443,14 @@ The connector handles most DDL on actively-captured tables automatically:
 - `DROP TABLE`, `RENAME TABLE`, and `DROP DATABASE` deactivate the affected binding. If the table is later recreated, the connector automatically re-backfills it and resumes capturing.
 - `TRUNCATE TABLE` on an active table is ignored — truncated rows are not propagated to the destination as deletes. If you need the destination to reflect the truncate, trigger a backfill of the binding.
 
-If a column type change results in captured documents that don't match the existing collection schema, autodiscovery will update the schema on its next run. To apply the new schema immediately, edit the capture, click **Refresh**, and republish.
+#### Schema changes that fail validation
 
-#### Adding values to an `ENUM` column
+Discovery records each column's type, whether it allows `NULL`, and the allowed values of `ENUM` columns in the collection's write schema. If an `ALTER TABLE` lets a table hold values that schema doesn't allow, documents containing them fail schema validation, and the capture fails until a discovery updates the collection schema. For example:
 
-When the connector discovers a table, it writes the allowed values of each `ENUM` column into the collection's schema. If you add a new value to an `ENUM` column with `ALTER TABLE`, documents containing that value fail schema validation until the next discovery updates the collection schema, and the capture task fails in the meantime. With auto-discovery enabled, the next scheduled run picks up the new value, within 2 hours by default. To pick it up right away, see [Capture failures after a source schema change](/guides/troubleshooting/capture-schema-validation-failures/).
+- Making a `NOT NULL` column nullable, such as `ALTER TABLE orders MODIFY shipped_at DATETIME NULL`. Rows that store `NULL` in `shipped_at` fail until the schema allows `null`.
+- Adding a value to an `ENUM` column, such as `ALTER TABLE orders MODIFY status ENUM('pending', 'shipped', 'returned')`. Rows with `status = 'returned'` fail until the schema lists the new value.
+
+With auto-discovery enabled, the next scheduled run updates the schema, within 2 hours by default. To update it right away, see [Capture failures after a source schema change](/guides/troubleshooting/capture-schema-validation-failures/).
 
 ### Data Manipulation Queries
 
