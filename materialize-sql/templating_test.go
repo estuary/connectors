@@ -284,6 +284,11 @@ func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 	}
 }
 
+// withMaxRanges sets the most ranges a bound splits into.
+func withMaxRanges(n int) MergeBoundsOption {
+	return func(b *MergeBoundsBuilder) { b.maxRanges = n }
+}
+
 func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	literaler := ToLiteralFn(QuoteTransform("'", "''"))
 	datetime := Column{Identifier: "ts", Projection: Projection{Projection: pf.Projection{
@@ -311,7 +316,7 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	}
 
 	t.Run("outliers get ranges of their own", func(t *testing.T) {
-		got := build(withOutliers, exact, WithDatetimeRanges(8))
+		got := build(withOutliers, exact, WithDatetimeRanges())
 		require.Equal(t, literaler("2025-11-30T00:00:00Z"), got.LiteralLower)
 		require.Equal(t, literaler(band[len(band)-1]), got.LiteralUpper)
 		require.Equal(t, []MergeRange{
@@ -322,11 +327,11 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 	})
 
 	t.Run("evenly spread keys aren't split", func(t *testing.T) {
-		require.Nil(t, build(band, exact, WithDatetimeRanges(8)).Ranges)
+		require.Nil(t, build(band, exact, WithDatetimeRanges()).Ranges)
 	})
 
 	t.Run("a range limit merges the narrowest gaps", func(t *testing.T) {
-		got := build(withOutliers, exact, WithDatetimeRanges(2))
+		got := build(withOutliers, exact, WithDatetimeRanges(), withMaxRanges(2))
 		require.Equal(t, []MergeRange{
 			{literaler("2025-11-30T00:00:00Z"), literaler("2026-03-01T10:00:00+01:00")},
 			{literaler(band[0]), literaler(band[len(band)-1])},
@@ -335,16 +340,16 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 
 	t.Run("ranges need exact bounds and the option", func(t *testing.T) {
 		require.Nil(t, build(withOutliers, exact).Ranges)
-		require.Nil(t, build(withOutliers, declined, WithDatetimeRanges(8)).Ranges)
-		require.Nil(t, build(withOutliers, WithDatetimeRanges(8)).Ranges)
+		require.Nil(t, build(withOutliers, declined, WithDatetimeRanges()).Ranges)
+		require.Nil(t, build(withOutliers, WithDatetimeRanges()).Ranges)
 	})
 
 	t.Run("an unparseable value drops the ranges with the bound", func(t *testing.T) {
-		require.Equal(t, MergeBound{datetime, "", "", nil}, build(append(withOutliers, "nope"), exact, WithDatetimeRanges(8)))
+		require.Equal(t, MergeBound{datetime, "", "", nil}, build(append(withOutliers, "nope"), exact, WithDatetimeRanges()))
 	})
 
 	t.Run("the next transaction starts clean", func(t *testing.T) {
-		b := NewMergeBoundsBuilder([]Column{datetime}, literaler, exact, WithDatetimeRanges(8))
+		b := NewMergeBoundsBuilder([]Column{datetime}, literaler, exact, WithDatetimeRanges())
 		for _, k := range withOutliers {
 			b.NextKey([]any{k})
 		}
@@ -366,9 +371,12 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 					instants = append(instants, ts)
 				}
 			}
-			rng.Shuffle(len(keys), func(i, j int) { keys[i], keys[j] = keys[j], keys[i]; instants[i], instants[j] = instants[j], instants[i] })
+			rng.Shuffle(len(keys), func(i, j int) {
+				keys[i], keys[j] = keys[j], keys[i]
+				instants[i], instants[j] = instants[j], instants[i]
+			})
 
-			got := build(keys, exact, WithDatetimeRanges(4))
+			got := build(keys, exact, WithDatetimeRanges(), withMaxRanges(4))
 			require.LessOrEqual(t, len(got.Ranges), 4)
 			var parse = func(literal string) time.Time {
 				ts, err := time.Parse(time.RFC3339Nano, strings.Trim(literal, "'"))

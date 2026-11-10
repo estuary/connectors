@@ -27,6 +27,9 @@ type MergeBound struct {
 	Ranges []MergeRange
 }
 
+// maxBoundRanges is the most ranges a key's merge bound splits into.
+const maxBoundRanges = 8
+
 // MergeRange is one of the disjoint ranges of a MergeBound.
 type MergeRange struct {
 	LiteralLower string
@@ -41,8 +44,10 @@ type MergeBoundsBuilder struct {
 	// exactDatetime reports whether a date-time key column can be bounded by
 	// the observed values themselves rather than by whole dates.
 	exactDatetime func(Column) bool
-	// maxRanges is the most ranges an exact date-time bound splits into, and
-	// rangeColumns marks the key columns it applies to.
+	// datetimeRanges is whether an exact date-time bound splits into ranges.
+	datetimeRanges bool
+	// maxRanges is the most ranges a bound splits into, and rangeColumns
+	// marks the key columns whose bounds split.
 	maxRanges    int
 	rangeColumns []bool
 
@@ -66,22 +71,23 @@ func WithExactDatetimeBounds(fn func(Column) bool) MergeBoundsOption {
 	return func(b *MergeBoundsBuilder) { b.exactDatetime = fn }
 }
 
-// WithDatetimeRanges splits the exact bound of a date-time key into up to
-// maxRanges ranges at the widest gaps between its observed values, so that a
-// few outlying keys don't stretch the bound over everything in between.
-func WithDatetimeRanges(maxRanges int) MergeBoundsOption {
-	return func(b *MergeBoundsBuilder) { b.maxRanges = maxRanges }
+// WithDatetimeRanges splits the exact bound of a date-time key into ranges at
+// the widest gaps between its observed values, so that a few outlying keys
+// don't stretch the bound over everything in between.
+func WithDatetimeRanges() MergeBoundsOption {
+	return func(b *MergeBoundsBuilder) { b.datetimeRanges = true }
 }
 
 func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts ...MergeBoundsOption) *MergeBoundsBuilder {
 	var b = &MergeBoundsBuilder{
 		keyColumns: keyColumns,
 		literaler:  literaler,
+		maxRanges:  maxBoundRanges,
 	}
 	for _, o := range opts {
 		o(b)
 	}
-	if b.maxRanges > 1 && b.exactDatetime != nil {
+	if b.datetimeRanges && b.exactDatetime != nil {
 		b.rangeColumns = make([]bool, len(keyColumns))
 		for idx, col := range keyColumns {
 			b.rangeColumns[idx] = isDatetimeColumn(col) && b.exactDatetime(col)
