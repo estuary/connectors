@@ -9,7 +9,7 @@ SHOPIFY_PAYMENTS_ACCOUNT_SCOPES = {"read_shopify_payments_accounts", "read_shopi
 class BusinessEntities(BaseModel, extra="allow"):
     """The shop's business entities, each with its own Shopify Payments account if it has
     one. Shopify doesn't say whose account the shop-level shopifyPaymentsAccount is when
-    there are several.
+    there are several (`Payments / business entities` in the Bruno collection).
     """
 
     class BusinessEntity(BaseModel, extra="forbid"):

@@ -1,0 +1,122 @@
+info:
+  name: payouts
+  type: graphql
+  seq: 2
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query Payouts {
+        shopifyPaymentsAccount {
+          payouts(
+            first: 250
+            sortKey: ISSUED_AT
+            query: "issued_at:>='2016-01-01T00:00:00Z' AND issued_at:<='2026-11-09T00:00:00Z'"
+          ) {
+            edges {
+              node {
+                id
+                legacyResourceId
+                issuedAt
+                status
+                transactionType
+                externalTraceId
+                net { ...MoneyFields }
+                businessEntity { id }
+                summary {
+                  adjustmentsFee { ...MoneyFields }
+                  adjustmentsGross { ...MoneyFields }
+                  advanceFees { ...MoneyFields }
+                  advanceGross { ...MoneyFields }
+                  chargesFee { ...MoneyFields }
+                  chargesGross { ...MoneyFields }
+                  refundsFee { ...MoneyFields }
+                  refundsFeeGross { ...MoneyFields }
+                  reservedFundsFee { ...MoneyFields }
+                  reservedFundsGross { ...MoneyFields }
+                  retriedPayoutsFee { ...MoneyFields }
+                  retriedPayoutsGross { ...MoneyFields }
+                  usdcRebateCreditAmount { ...MoneyFields }
+                }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+
+      fragment MoneyFields on MoneyV2 {
+        amount
+        currencyCode
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ShopifyPaymentsAccount.payouts](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsAccount) and [ShopifyPaymentsPayout](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsPayout)
+
+  **WHY:** the `payouts` stream's query: a full page of 250, filtered on an
+  `issued_at` window, with every non-deprecated payout field (`gross` and
+  `bankAccount` are deprecated). The stream sends no sort key; `sortKey:
+  ISSUED_AT` checks that Shopify accepts one. Answers: does Shopify accept
+  the sort key and filter, and what does a full page request against the
+  1,000-point ceiling.
+
+  **DOCUMENTED (2026-11-09):** `payouts` filters on `issued_at`, `status`,
+  `id` (range) and `transaction_dates`, and sorts by `PayoutSortKeys`
+  (default `ISSUED_AT`). `ShopifyPaymentsPayout` is a `Node` with no
+  `updatedAt`. Its status is `SCHEDULED`, `PAID`, `FAILED` or `CANCELED`
+  (`IN_TRANSIT` is deprecated for `SCHEDULED`).
+
+  **VERIFIED (2026-11-09):** Shopify accepts the sort key and the
+  `issued_at` filter with no search warning. A full page requests 36 points
+  (actual 3), so the stream can use 250-payout pages. The list is empty
+  because the account isn't activated (`Payments / account`).
+
+  **UNOBSERVABLE:** real payouts, their status changes, and whether
+  `issuedAt` is set when the payout first appears. See `Payments / account`.
+
+examples:
+  - name: "200 - accepted, empty, requested 36 (projection: data and cost totals)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "shopifyPaymentsAccount": {
+                "payouts": {
+                  "edges": [],
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  }
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 36,
+                "actualQueryCost": 3
+              }
+            }
+          }
