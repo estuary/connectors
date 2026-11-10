@@ -1,5 +1,7 @@
+import asyncio
 import dataclasses
 import functools
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from logging import Logger
 
@@ -29,12 +31,34 @@ from .models import (
     TwentyRecord,
 )
 
+# Twenty marks these join objects as system objects, but they hold user data
+# (which records a note or task is linked to), so they are captured too.
+CAPTURED_SYSTEM_OBJECTS = {"noteTargets", "taskTargets"}
+# Discovery and validation read one row per object, a few objects at a time.
+PROBE_CONCURRENCY = 5
+
+
+def _set_token_source(http: HTTPMixin, config: EndpointConfig) -> None:
+    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+
+
+async def _gather_bounded[T](
+    names: list[str], probe: Callable[[str], Awaitable[T]]
+) -> list[T]:
+    semaphore = asyncio.Semaphore(PROBE_CONCURRENCY)
+
+    async def bounded(name: str) -> T:
+        async with semaphore:
+            return await probe(name)
+
+    return await asyncio.gather(*(bounded(name) for name in names))
+
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
     """
     Validates that the API key works against the configured Twenty server.
     """
-    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+    _set_token_source(http, config)
     url = f"{config.base_url.rstrip('/')}{ObjectMetadata.PATH}"
 
     try:
@@ -65,6 +89,12 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
                 f"First problem in the metadata response: {err.errors()[0]['loc']}: {err.errors()[0]['msg']}"
             ]
         ) from err
+    except (ClientError, TimeoutError) as err:
+        raise ValidationError(
+            [
+                f"Couldn't connect to Twenty at {config.base_url}. Please confirm the base URL.\n\n{err!r}"
+            ]
+        ) from err
 
 
 def _permission_denied(err: HTTPError) -> bool:
@@ -84,20 +114,30 @@ async def disable_unreadable_resources(
     resources: list[common.Resource],
 ) -> list[common.Resource]:
     """
-    Discovers objects the key's role can't read as disabled bindings. Leaving them out
+    Discovers objects that can't be read as disabled bindings. Leaving them out
     would make re-discovery remove an existing binding, and adding them enabled would
-    fail every auto-discover publish.
+    fail every auto-discover publish. Validation still names the error of a bound object.
     """
-    discovered: list[common.Resource] = []
-    for resource in resources:
+
+    async def probe(name: str) -> str | None:
         try:
-            await probe_object(log, http, config.base_url, resource.name)
+            await probe_object(log, http, config.base_url, name)
         except HTTPError as err:
-            if not _permission_denied(err):
-                raise
+            if _permission_denied(err):
+                return "The API key's role can't read this object."
+            return f"Reading this object failed with HTTP {err.code}."
+        except ValueError:
+            return "Reading this object returned an invalid Twenty API response."
+        except ClientError, TimeoutError:
+            return "The connection failed while reading this object."
+        return None
+
+    reasons = await _gather_bounded([r.name for r in resources], probe)
+    discovered: list[common.Resource] = []
+    for resource, reason in zip(resources, reasons):
+        if reason is not None:
             log.warning(
-                "The API key's role can't read this object, so it is discovered disabled.",
-                {"object": resource.name},
+                f"{reason} It is discovered disabled.", {"object": resource.name}
             )
             resource = dataclasses.replace(resource, disable=True)
         discovered.append(resource)
@@ -115,14 +155,10 @@ async def validate_bindings(
     Reads one record of each bound object, so a key that can't read an object fails at publish time.
     """
     names = {resource.name for resource in resources}
-    errors: list[str] = []
-    for binding in bindings:
-        name = binding.resourceConfig.name
+
+    async def probe(name: str) -> str | None:
         if name not in names:
-            errors.append(
-                f"Object '{name}': It was removed, deactivated or renamed in Twenty, or it is a system or remote object this connector doesn't capture. Re-discover the capture to update its bindings."
-            )
-            continue
+            return f"Object '{name}': It was removed, deactivated or renamed in Twenty, or it is a system or remote object this connector doesn't capture. Re-discover the capture to update its bindings."
 
         try:
             await probe_object(log, http, config.base_url, name)
@@ -133,17 +169,19 @@ async def validate_bindings(
                 reason = f"The API key's role can't read it. {err.message}"
             else:
                 reason = f"HTTP {err.code}: {err.message}"
-            errors.append(f"Object '{name}': {reason}")
+            return f"Object '{name}': {reason}"
         except ValueError as err:
-            errors.append(f"Object '{name}': Invalid Twenty API response. {err}")
+            return f"Object '{name}': Invalid Twenty API response. {err}"
         except (ClientError, TimeoutError) as err:
             # A streamed response can break mid-read; report it with the other objects.
-            errors.append(
-                f"Object '{name}': Connection failed while reading it. {err!r}"
-            )
+            return f"Object '{name}': Connection failed while reading it. {err!r}"
+        return None
 
-    if errors:
-        raise ValidationError(errors)
+    errors = await _gather_bounded(
+        [binding.resourceConfig.name for binding in bindings], probe
+    )
+    if any(errors):
+        raise ValidationError([error for error in errors if error is not None])
 
 
 def records_resource(
@@ -153,7 +191,7 @@ def records_resource(
     cutoff: datetime,
     is_active: bool = True,
 ) -> common.Resource:
-    """Scheduled backfills also refresh links cleared without changing updatedAt."""
+    """A per-binding schedule, if the user sets one, also refreshes links cleared without changing updatedAt."""
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -203,7 +241,7 @@ async def _active_object_names(
         async for obj in list_objects(log, http, base_url, should_retry)
         if obj.isActive
         and not obj.isRemote
-        and (not obj.isSystem or obj.namePlural in {"noteTargets", "taskTargets"})
+        and (not obj.isSystem or obj.namePlural in CAPTURED_SYSTEM_OBJECTS)
     }
 
 
@@ -211,7 +249,6 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     """Enumerate every stream the connector exposes."""
-    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     cutoff = capture_horizon()
     names = sorted(
         await _active_object_names(log, http, config.base_url, validation_should_retry)
@@ -226,7 +263,7 @@ async def enabled_resources(
     bindings: list[CaptureBinding[ResourceConfig]],
 ) -> list[common.Resource]:
     """Preserve binding order, including objects no longer in the workspace."""
-    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+    _set_token_source(http, config)
     cutoff = capture_horizon()
     # A running capture keeps the CDK's default retries, so a short outage doesn't fail it.
     active_names = await _active_object_names(log, http, config.base_url)

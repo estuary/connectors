@@ -222,6 +222,19 @@ def test_validate_credentials_rejects_non_api_responses(payload):
     assert "First problem in the metadata response:" in exc.value.errors[0]
 
 
+@pytest.mark.parametrize(
+    "error", [ClientPayloadError("connection reset"), TimeoutError("timed out")]
+)
+def test_validate_credentials_explains_connection_errors(error):
+    http = FakeHTTP([error])
+
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(resources.validate_credentials(LOG, http, config()))
+
+    assert f"Couldn't connect to Twenty at {BASE_URL}" in exc.value.errors[0]
+    assert "confirm the base URL" in exc.value.errors[0]
+
+
 def test_validate_credentials_accepts_metadata():
     http = FakeHTTP([response([object_metadata("people")])])
 
@@ -505,7 +518,6 @@ def test_discovery_filters_objects_and_registers_scheduled_resources():
         assert state.inc.cursor == state.backfill.cutoff == HORIZON
         assert state.backfill.next_page is None
 
-    assert http.token_source.credentials == config().credentials
     schema = common.discovered(discovered).bindings[0].documentSchema
     assert "searchVector" not in schema["properties"]
     assert "searchVector" not in schema["required"]
@@ -894,30 +906,67 @@ def test_discover_disables_objects_the_role_cannot_read(monkeypatch, status):
 
 
 @pytest.mark.parametrize(
-    "error",
+    "error, reason",
     [
-        HTTPError("Not found", 404),
-        twenty_error(400, "BAD_REQUEST"),
+        (HTTPError("Not found", 404), "failed with HTTP 404"),
+        (twenty_error(400, "BAD_REQUEST"), "failed with HTTP 400"),
         # The code only counts in Twenty's error body, not in the URL or message text.
-        twenty_error(400, "BAD_REQUEST", url=f"{BASE_URL}/rest/PERMISSION_DENIED"),
-        HTTPError("PERMISSION_DENIED", 400, b"<html>proxy error</html>"),
-        twenty_error(500, "PERMISSION_DENIED"),
+        (
+            twenty_error(400, "BAD_REQUEST", url=f"{BASE_URL}/rest/PERMISSION_DENIED"),
+            "failed with HTTP 400",
+        ),
+        (
+            HTTPError("PERMISSION_DENIED", 400, b"<html>proxy error</html>"),
+            "failed with HTTP 400",
+        ),
+        (twenty_error(500, "PERMISSION_DENIED"), "failed with HTTP 500"),
+        (b"<html>proxy error</html>", "invalid Twenty API response"),
+        (ClientPayloadError("connection reset"), "connection failed"),
     ],
 )
-def test_discover_fails_on_other_object_read_errors(monkeypatch, error):
+def test_discover_disables_an_object_whose_read_fails(
+    monkeypatch, caplog, error, reason
+):
+    # One broken object must not fail discovery of the rest of the workspace.
     http = FakeHTTP(
         [
             response([object_metadata("people")]),
-            response([object_metadata("people")]),
+            response([object_metadata("opportunities"), object_metadata("people")]),
             error,
+            records_response([], object_name="people"),
         ]
     )
     connector = patched_connector(monkeypatch, http)
 
-    with pytest.raises(HTTPError) as exc:
-        asyncio.run(connector.discover(LOG, discover_request()))
+    with caplog.at_level(logging.WARNING):
+        discovered = asyncio.run(connector.discover(LOG, discover_request()))
 
-    assert exc.value is error
+    assert [(b.resourceConfig.name, b.disable) for b in discovered.bindings] == [
+        ("opportunities", True),
+        ("people", False),
+    ]
+    warnings = [r for r in caplog.records if "discovered disabled" in r.getMessage()]
+    assert len(warnings) == 1
+    assert reason in warnings[0].getMessage()
+    assert warnings[0].args == {"object": "opportunities"}
+
+
+def test_object_probes_run_concurrently_up_to_the_limit():
+    active = peak = 0
+
+    async def probe(name):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0)
+        active -= 1
+        return name
+
+    names = [f"object{i}" for i in range(12)]
+    results = asyncio.run(resources._gather_bounded(names, probe))
+
+    assert results == names
+    assert peak == resources.PROBE_CONCURRENCY
 
 
 @pytest.mark.parametrize(

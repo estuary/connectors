@@ -1,4 +1,3 @@
-import abc
 from decimal import Decimal
 from typing import Any, ClassVar, Literal, Self
 
@@ -45,11 +44,6 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class IncrementalRecord(BaseDocument, abc.ABC, extra="allow"):
-    @abc.abstractmethod
-    def get_cursor(self) -> AwareDatetime: ...
-
-
 def _floats(value: Any) -> Any:
     if isinstance(value, Decimal):
         return float(value)
@@ -60,7 +54,7 @@ def _floats(value: Any) -> Any:
     return value
 
 
-class TwentyRecord(IncrementalRecord, extra="allow"):
+class TwentyRecord(BaseDocument, extra="allow"):
     PATH_TEMPLATE: ClassVar[str] = "/rest/{name_plural}"
     ITEMS_KEY: ClassVar[str] = "{name_plural}"
     SINCE_PARAM: ClassVar[str] = "updatedAt[gte]"

@@ -1,4 +1,13 @@
-base_url: http://localhost:3000
+base_url: https://api.twenty.com
 credentials:
-  credentials_title: API Key
-  access_token: PLACEHOLDER_REPLACE_WITH_REAL_TOKEN
+    credentials_title: API Key
+    access_token_sops: ENC[AES256_GCM,data:zI1j3QpzpEszoIXfirXJG8t9lajea16MARzErWMMY9MEoAYF/YmmNPUo2JxK9rqCAMprpbd65G0b/zG+HOitIef0tt1ja1j4/ohLqSTKHUi0r8FjFlmU4JP9nrKLZIbNvrlf2NBYtONHH0x6yD7qOuhffBWbXFApf2NC9/mbOj6yNe7JAoXCyR/IHwUn3JIy/pSpd4x8eoZGgRm0u3myqUPphfr1+Yegrw4PeUyTvUUl5Qzii7tguPXjwFYlWZGH9jnD9mFTHBxsN+SU4RmMxqsNBPxEIr4r8LAgbTWqz0bvrO8kIstsUGT1D7IEkH4sq1RF1DP3cTdrUYa46MtbF/C1o/751Ao5eIgWqNmEYvZ9ENRQPTVWzgytHP4A8Z7m0XV7+unP6V15o6nxUkn8fnGtXc0lREHvvtjM8Yp9/4Kram1EDJAYajDnLQcbhYDUZNTocR5sC6JtA+QjVo9tseVJxgWGPsh3sFZGEb4ta6HZBi72Ckn5NJxwSljef/qe65ly7IVEwJOpDbQ6KcGDBd8Uy/JMnQ7Se4+11shBVeFnfRNXI1ArlkOkGCSfvN8iejDxS1dYucys5PeM,iv:bhF/4bLvhIrChwRGgdMej0ju6JbpWS4btFHXCre670g=,tag:BhLNBdkyhyujmctY7mrSlw==,type:str]
+sops:
+    encrypted_suffix: _sops
+    gcp_kms:
+        - created_at: "2026-11-10T22:48:13Z"
+          enc: CiUAdmEdwugu1xUadIMOxsETuZOfniBiLMmHp8ws95HvYGnc8bIlEkkAvE+nk5DCBUUGLkXM/ktHtq+UBHeZue2WejZ310qIHWF70BAAH7E8Kz0FCpkBXrKhBC8Vk0m3YRG3tEg2xHbqU+BPk3s4W0zu
+          resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+    lastmodified: "2026-11-10T22:48:13Z"
+    mac: ENC[AES256_GCM,data:78YZF6cJSSKtDsusj7FIxF69zdOzthDR/doc2gGRmCZ2MiN+iVjHvfSm2TKjNH7sX4z4k4MZ3ex75S1q46zbNObVsnOwXvObxEiM7CrdcTKhD0V6AZeuGuqEZQ7BwTDR4G9rbQxy79775jEcxlLo3gZ6UbbiTSMsGpZta2e5Y9U=,iv:p2WJlSP4kRCGOzOILWVegksdkmvP3/f8dTtxu4LMyrg=,tag:nXwC5ylQXwJYcE0aWiM/BA==,type:str]
+    version: 3.13.3
