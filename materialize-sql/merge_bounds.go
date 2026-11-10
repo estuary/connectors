@@ -1,7 +1,9 @@
 package sql
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"time"
@@ -46,19 +48,19 @@ type MergeBoundsBuilder struct {
 	exactDatetime func(Column) bool
 	// datetimeRanges is whether an exact date-time bound splits into ranges.
 	datetimeRanges bool
-	// maxRanges is the most ranges a bound splits into, and rangeColumns
-	// marks the key columns whose bounds split.
-	maxRanges    int
-	rangeColumns []bool
+	// maxRanges is the most ranges a bound splits into.
+	maxRanges int
+	// datetime marks the date-time key columns.
+	datetime []bool
 
 	lower []any
 	upper []any
 	// unbounded marks key columns whose observed values can't be ordered,
 	// such as a date-time that doesn't parse.
 	unbounded []bool
-	// spans are the observed values of each of rangeColumns, as sorted,
-	// disjoint spans.
-	spans [][]datetimeSpan
+	// spans are the observed values of each key column whose bound splits
+	// into ranges, and nil for the others.
+	spans []*spanSet
 }
 
 type MergeBoundsOption func(*MergeBoundsBuilder)
@@ -87,10 +89,16 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 	for _, o := range opts {
 		o(b)
 	}
-	if b.datetimeRanges && b.exactDatetime != nil {
-		b.rangeColumns = make([]bool, len(keyColumns))
-		for idx, col := range keyColumns {
-			b.rangeColumns[idx] = isDatetimeColumn(col) && b.exactDatetime(col)
+	b.datetime = make([]bool, len(keyColumns))
+	b.spans = make([]*spanSet, len(keyColumns))
+	var limit = spansPerRange * b.maxRanges
+	for idx, col := range keyColumns {
+		if !isDatetimeColumn(col) {
+			continue
+		}
+		b.datetime[idx] = true
+		if b.datetimeRanges && b.exactDatetime != nil && b.exactDatetime(col) {
+			b.spans[idx] = &spanSet{limit: limit}
 		}
 	}
 	return b
@@ -112,17 +120,17 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
 		b.unbounded = make([]bool, len(key))
-		b.spans = make([][]datetimeSpan, len(key))
 	}
 
 	for idx, k := range key {
-		if isDatetimeColumn(b.keyColumns[idx]) {
+		var spans = b.spans[idx]
+		if b.datetime[idx] {
 			// Date-time strings order by their instant, which text order
 			// doesn't follow across offsets and precisions.
 			if lower, upper, ts, ok := MinMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
 				b.lower[idx], b.upper[idx] = lower, upper
-				if b.rangeColumns != nil && b.rangeColumns[idx] && !b.unbounded[idx] {
-					b.spans[idx] = addDatetimeSpan(b.spans[idx], ts, k, spansPerRange*b.maxRanges)
+				if spans != nil && !b.unbounded[idx] {
+					spans.add(datetimePosition(ts), k)
 				}
 			} else {
 				b.unbounded[idx] = true
@@ -238,7 +246,7 @@ func (b *MergeBoundsBuilder) Build() MergeBounds {
 			continue
 		} else if b.unbounded[idx] {
 			continue
-		} else if isDatetimeColumn(col) && (b.exactDatetime == nil || !b.exactDatetime(col)) {
+		} else if b.datetime[idx] && (b.exactDatetime == nil || !b.exactDatetime(col)) {
 			// Endpoints compare a date-time literal to a stored value with
 			// differing precision or, for text columns, as text, so the bound
 			// is widened to dates to be safe under either.
@@ -253,8 +261,8 @@ func (b *MergeBoundsBuilder) Build() MergeBounds {
 
 		conditions[idx].LiteralLower = b.literaler(b.lower[idx])
 		conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
-		if len(b.spans[idx]) > 1 {
-			conditions[idx].Ranges = b.rangesOf(b.spans[idx])
+		if spans := b.spans[idx]; spans != nil {
+			conditions[idx].Ranges = b.rangesOf(spans)
 		}
 	}
 
@@ -269,7 +277,11 @@ func (b *MergeBoundsBuilder) Reset() {
 	b.lower = nil
 	b.upper = nil
 	b.unbounded = nil
-	b.spans = nil
+	for _, spans := range b.spans {
+		if spans != nil {
+			spans.reset()
+		}
+	}
 }
 
 // spansPerRange is how many spans per output range a builder tracks. Past
@@ -280,31 +292,66 @@ const spansPerRange = 8
 // fraction of the bound's span: a narrower one excludes too little to matter.
 const minRangeGapDivisor = 100
 
-// datetimeSpan is a closed range of observed date-time keys, along with the
-// keys at its ends for rendering as literals.
-type datetimeSpan struct {
-	lo, hi       time.Time
+// keySpan is a closed range of observed keys, by their positions, along with
+// the keys at its ends for rendering as literals.
+type keySpan struct {
+	lo, hi       string
 	loKey, hiKey any
+	// gap is the log2 distance from hi to the lo of the next span, if any.
+	gap float64
 }
 
-// addDatetimeSpan adds the observed key ts to spans, which hold at most limit
-// spans.
-func addDatetimeSpan(spans []datetimeSpan, ts time.Time, key any, limit int) []datetimeSpan {
-	var i = sort.Search(len(spans), func(i int) bool { return !spans[i].hi.Before(ts) })
-	if i < len(spans) && !spans[i].lo.After(ts) {
-		return spans
-	}
-	spans = slices.Insert(spans, i, datetimeSpan{lo: ts, hi: ts, loKey: key, hiKey: key})
-	if len(spans) > limit {
-		spans = mergeNarrowestGap(spans)
-	}
-	return spans
+// datetimePosition is the position of a date-time key: its instant as
+// big-endian seconds followed by nanoseconds.
+func datetimePosition(ts time.Time) string {
+	var out [12]byte
+	binary.BigEndian.PutUint64(out[:8], uint64(ts.Unix())^(1<<63))
+	binary.BigEndian.PutUint32(out[8:], uint32(ts.Nanosecond()))
+	return string(out[:])
 }
 
-func mergeNarrowestGap(spans []datetimeSpan) []datetimeSpan {
+// instantDistance is the log2 of the time from the instant at position x to
+// the later instant at position y.
+func instantDistance(x, y string) float64 {
+	var seconds = binary.BigEndian.Uint64([]byte(y[:8])) - binary.BigEndian.Uint64([]byte(x[:8]))
+	var nanos = float64(binary.BigEndian.Uint32([]byte(y[8:]))) - float64(binary.BigEndian.Uint32([]byte(x[8:])))
+	return math.Log2(float64(seconds)*float64(time.Second) + nanos)
+}
+
+// spanSet is the observed keys of a key column as sorted, disjoint spans.
+type spanSet struct {
+	spans []keySpan
+	// limit is the most spans the set holds.
+	limit int
+}
+
+// reset empties the set.
+func (s *spanSet) reset() {
+	s.spans = nil
+}
+
+// add adds the key at position pos.
+func (s *spanSet) add(pos string, key any) {
+	var i = sort.Search(len(s.spans), func(i int) bool { return s.spans[i].hi >= pos })
+	if i < len(s.spans) && s.spans[i].lo <= pos {
+		return
+	}
+	s.spans = slices.Insert(s.spans, i, keySpan{lo: pos, hi: pos, loKey: key, hiKey: key})
+	if i > 0 {
+		s.spans[i-1].gap = instantDistance(s.spans[i-1].hi, pos)
+	}
+	if i+1 < len(s.spans) {
+		s.spans[i].gap = instantDistance(pos, s.spans[i+1].lo)
+	}
+	if len(s.spans) > s.limit {
+		s.spans = mergeNarrowestGap(s.spans)
+	}
+}
+
+func mergeNarrowestGap(spans []keySpan) []keySpan {
 	var at int
 	for i := 1; i+1 < len(spans); i++ {
-		if spans[i+1].lo.Sub(spans[i].hi) < spans[at+1].lo.Sub(spans[at].hi) {
+		if spans[i].gap < spans[at].gap {
 			at = i
 		}
 	}
@@ -312,20 +359,24 @@ func mergeNarrowestGap(spans []datetimeSpan) []datetimeSpan {
 }
 
 // mergeSpans merges spans[at+1] into spans[at].
-func mergeSpans(spans []datetimeSpan, at int) []datetimeSpan {
-	spans[at].hi, spans[at].hiKey = spans[at+1].hi, spans[at+1].hiKey
+func mergeSpans(spans []keySpan, at int) []keySpan {
+	spans[at].hi, spans[at].hiKey, spans[at].gap = spans[at+1].hi, spans[at+1].hiKey, spans[at+1].gap
 	return slices.Delete(spans, at+1, at+2)
 }
 
 // rangesOf renders spans as at most maxRanges ranges split at their widest
 // gaps, or nil if no gap is worth a split.
-func (b *MergeBoundsBuilder) rangesOf(spans []datetimeSpan) []MergeRange {
+func (b *MergeBoundsBuilder) rangesOf(set *spanSet) []MergeRange {
+	if len(set.spans) < 2 {
+		return nil
+	}
+	var spans = set.spans
 	for len(spans) > b.maxRanges {
 		spans = mergeNarrowestGap(spans)
 	}
-	var minGap = spans[len(spans)-1].hi.Sub(spans[0].lo) / minRangeGapDivisor
+	var minGap = instantDistance(spans[0].lo, spans[len(spans)-1].hi) - math.Log2(minRangeGapDivisor)
 	for i := 0; i+1 < len(spans); {
-		if spans[i+1].lo.Sub(spans[i].hi) < minGap {
+		if spans[i].gap < minGap {
 			spans = mergeSpans(spans, i)
 		} else {
 			i++

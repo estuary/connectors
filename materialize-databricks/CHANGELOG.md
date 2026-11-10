@@ -20,6 +20,9 @@
   transaction. A copy is quicker only while later bindings are still
   uploading. Commits of a single binding, or of small batches, now run two
   fewer queries per binding.
+- Date-time key ranges are now split at gaps measured the same way as other
+  key ranges, so when two gaps are equal in width, the split may differ from
+  before.
 
 ## 2026-11-02
 ### Fixed

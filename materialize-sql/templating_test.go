@@ -2,6 +2,7 @@ package sql
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"slices"
 	"strings"
@@ -393,6 +394,28 @@ func TestMergeBoundsBuilderDatetimeRanges(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestDatetimePositionOrdersInstants(t *testing.T) {
+	var instants = []time.Time{
+		time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(1969, 12, 31, 23, 59, 59, 999999999, time.UTC),
+		time.Unix(0, 0),
+		time.Unix(0, 1),
+		time.Unix(1, 0),
+		time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC),
+	}
+	for i := 1; i < len(instants); i++ {
+		require.Less(t, datetimePosition(instants[i-1]), datetimePosition(instants[i]))
+	}
+
+	// A gap is proportional to the time it spans, across second boundaries too.
+	var at = time.Date(2026, 10, 26, 12, 0, 0, 999999000, time.UTC)
+	var gap = func(d time.Duration) float64 {
+		return instantDistance(datetimePosition(at), datetimePosition(at.Add(d)))
+	}
+	require.InDelta(t, 1, gap(2*time.Microsecond)-gap(time.Microsecond), 1e-9)
+	require.InDelta(t, math.Log2(3600), gap(time.Hour)-gap(time.Second), 1e-9)
 }
 
 // TestDateBoundsEncloseEverySpelling checks the property the date widening
