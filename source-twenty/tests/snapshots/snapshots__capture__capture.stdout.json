@@ -7,134 +7,41 @@
       },
       "accountOwnerId": null,
       "address": {
-        "addressCity": "",
-        "addressCountry": "",
+        "addressCity": "Testville",
+        "addressCountry": "United States",
         "addressLat": null,
         "addressLng": null,
-        "addressPostcode": "",
-        "addressState": "",
-        "addressStreet1": "",
+        "addressPostcode": "00000",
+        "addressState": "CA",
+        "addressStreet1": "100 Test Ave",
         "addressStreet2": ""
       },
       "annualRevenue": {
         "amountMicros": null,
         "currencyCode": null
       },
-      "createdAt": "2026-11-03T17:14:32.280Z",
+      "createdAt": "2026-11-10T23:27:07.615Z",
       "createdBy": {
-        "context": {},
-        "name": "Dev tests",
-        "source": "API",
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
         "workspaceMemberId": null
       },
-      "d365AccountKey": "",
-      "d365CreditLimit": {
-        "amountMicros": null,
-        "currencyCode": null
-      },
-      "d365Deleted": false,
-      "d365DeletedAt": null,
-      "d365Id": "",
       "deletedAt": null,
       "domainName": {
         "primaryLinkLabel": "",
-        "primaryLinkUrl": "",
+        "primaryLinkUrl": "examplewidgets.example",
         "secondaryLinks": []
       },
-      "externalAccountKey": "",
-      "externalDeleted": null,
-      "externalDeletedAt": null,
-      "externalId": "ct-8d0b2d04-a",
-      "id": "00b53e43-7474-41a0-bf9b-9f985469fe2c",
+      "id": "06290608-8bf0-4806-99ae-a715a6a93fad",
       "linkedinLink": {
         "primaryLinkLabel": "",
         "primaryLinkUrl": "",
         "secondaryLinks": []
       },
-      "name": "Contract a",
-      "position": -93,
-      "updatedAt": "2026-11-03T17:14:36.756000Z",
-      "updatedBy": {
-        "context": {},
-        "name": "Dev tests",
-        "source": "API",
-        "workspaceMemberId": null
-      }
-    }
-  ],
-  [
-    "acmeCo/connectorTypeProbes",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "createdAt": "2026-11-03T06:21:20.338Z",
-      "createdBy": {
-        "context": {},
-        "name": "Dev tests",
-        "source": "API",
-        "workspaceMemberId": null
-      },
-      "deletedAt": null,
-      "externalId": "ct-87371182-a",
-      "id": "0e0b22d4-d6d8-44d6-a66d-06e9128cb476",
-      "name": "",
-      "pAddress": {
-        "addressCity": "",
-        "addressCountry": "",
-        "addressLat": null,
-        "addressLng": null,
-        "addressPostcode": "",
-        "addressState": "",
-        "addressStreet1": "",
-        "addressStreet2": ""
-      },
-      "pArray": [],
-      "pBoolean": null,
-      "pCompanyId": null,
-      "pCurrency": {
-        "amountMicros": null,
-        "currencyCode": null
-      },
-      "pDate": null,
-      "pDateTime": null,
-      "pEmails": {
-        "additionalEmails": [],
-        "primaryEmail": ""
-      },
-      "pFiles": null,
-      "pFullName": {
-        "firstName": "",
-        "lastName": ""
-      },
-      "pLinks": {
-        "primaryLinkLabel": "",
-        "primaryLinkUrl": "",
-        "secondaryLinks": []
-      },
-      "pMorphCompanyId": null,
-      "pMorphPersonId": null,
-      "pMultiSelect": [],
-      "pNumber": null,
-      "pParentId": null,
-      "pPhones": {
-        "additionalPhones": [],
-        "primaryPhoneCallingCode": "",
-        "primaryPhoneCountryCode": "",
-        "primaryPhoneNumber": ""
-      },
-      "pRating": null,
-      "pRawJson": null,
-      "pRichText": {
-        "blocknote": null,
-        "markdown": "",
-        "tiptap": null
-      },
-      "pSelect": null,
-      "pText": "",
-      "pUuid": null,
-      "position": -9,
-      "updatedAt": "2026-11-03T06:21:24.844000Z",
+      "name": "Example Widgets",
+      "position": 5,
+      "updatedAt": "2026-11-10T23:39:43.386000Z",
       "updatedBy": {
         "context": {},
         "name": "Dev tests",
@@ -149,7 +56,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "createdAt": "2026-10-29T07:47:29.427Z",
+      "createdAt": "2026-11-10T23:27:07.615Z",
       "createdBy": {
         "context": {},
         "name": "System",
@@ -158,10 +65,10 @@
       },
       "deletedAt": null,
       "id": "f31ecf3b-87d3-4e8a-a84b-b6f0f3f8c7e2",
-      "pageLayoutId": "961b946e-273f-472c-9565-a2a4f9db752c",
+      "pageLayoutId": "dabe3862-6d49-434c-9e6b-87985e2dcc9a",
       "position": 0,
       "title": "My First Dashboard",
-      "updatedAt": "2026-10-29T07:47:29.427000Z",
+      "updatedAt": "2026-11-10T23:27:07.615000Z",
       "updatedBy": {
         "context": {},
         "name": "System",
@@ -176,7 +83,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "createdAt": "2026-11-03T23:09:56.668Z",
+      "createdAt": "2026-11-10T23:40:09.917Z",
       "createdBy": {
         "context": {},
         "name": "Dev tests",
@@ -184,15 +91,13 @@
         "workspaceMemberId": null
       },
       "deletedAt": null,
-      "externalId": "ct-7b91b10a-l3",
-      "id": "12a9361f-51e3-4709-861e-078a29905290",
-      "noteId": "7579bf52-1f30-4a87-9756-03c01fc1acd0",
-      "position": -1,
+      "id": "2b8b8fb4-5719-42a3-8440-5e08d6962466",
+      "noteId": "9a16d41d-ca41-4fb6-a007-dbf5021d9107",
+      "position": 0,
       "targetCompanyId": null,
-      "targetConnectorTypeProbeId": null,
       "targetOpportunityId": null,
-      "targetPersonId": null,
-      "updatedAt": "2026-11-03T23:09:56.668000Z",
+      "targetPersonId": "7a93d1e5-3f74-4945-8a65-d7f996083f72",
+      "updatedAt": "2026-11-10T23:40:09.917000Z",
       "updatedBy": {
         "context": {},
         "name": "Dev tests",
@@ -212,7 +117,7 @@
         "markdown": "",
         "tiptap": null
       },
-      "createdAt": "2026-11-03T23:11:13.250Z",
+      "createdAt": "2026-11-10T23:39:55.057Z",
       "createdBy": {
         "context": {},
         "name": "Dev tests",
@@ -220,11 +125,10 @@
         "workspaceMemberId": null
       },
       "deletedAt": null,
-      "externalId": "ct-1d4bcb0c-n",
-      "id": "04372e3c-6074-49ec-9bda-cc5a847c6ae8",
-      "position": -6,
-      "title": "Renamed",
-      "updatedAt": "2026-11-03T23:11:27.009000Z",
+      "id": "9a16d41d-ca41-4fb6-a007-dbf5021d9107",
+      "position": 0,
+      "title": "Made-up kickoff note",
+      "updatedAt": "2026-11-10T23:39:55.057000Z",
       "updatedBy": {
         "context": {},
         "name": "Dev tests",
@@ -245,7 +149,7 @@
       },
       "closeDate": "2026-01-25T16:26:00.000Z",
       "companyId": "1f70157c-4ea5-4d81-bc49-e1401abfbb94",
-      "createdAt": "2026-10-29T07:47:29.427Z",
+      "createdAt": "2026-11-10T23:27:07.615Z",
       "createdBy": {
         "context": null,
         "name": "System",
@@ -255,11 +159,11 @@
       "deletedAt": null,
       "id": "2beb07b0-340c-41d7-be33-5aa91757f329",
       "name": "API Integration Deal",
-      "ownerId": "9658bad8-73c9-4908-a160-8e848c410185",
+      "ownerId": "57455b8d-68df-4844-b49f-2243ea351d46",
       "pointOfContactId": "edf6d445-13a7-4373-9a47-8f89e8c0a877",
       "position": 4,
       "stage": "SCREENING",
-      "updatedAt": "2026-10-29T07:47:29.427000Z",
+      "updatedAt": "2026-11-10T23:27:07.615000Z",
       "updatedBy": {
         "context": null,
         "name": "System",
@@ -276,45 +180,101 @@
       },
       "avatarFile": null,
       "avatarUrl": "",
-      "companyId": "afb84f43-b0ac-41dc-bd90-b285ef62666b",
-      "createdAt": "2026-11-03T05:15:02.498Z",
+      "companyId": "06290608-8bf0-4806-99ae-a715a6a93fad",
+      "createdAt": "2026-11-10T23:27:07.615Z",
       "createdBy": {
-        "context": {},
-        "name": "Dev tests",
-        "source": "API",
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
         "workspaceMemberId": null
       },
-      "d365CompanyKey": "",
-      "d365Deleted": false,
-      "d365DeletedAt": null,
-      "d365Id": "",
       "deletedAt": null,
       "emails": {
         "additionalEmails": [],
-        "primaryEmail": ""
+        "primaryEmail": "ada@example.com"
       },
-      "externalDeleted": null,
-      "externalDeletedAt": null,
-      "externalId": "ct-fb1222c6-p",
-      "id": "18bd0a81-0096-4e32-ac0e-552dac91dc7b",
-      "jobTitle": "Kept",
+      "id": "7a93d1e5-3f74-4945-8a65-d7f996083f72",
+      "jobTitle": "",
       "linkedinLink": {
         "primaryLinkLabel": "",
         "primaryLinkUrl": "",
         "secondaryLinks": []
       },
       "name": {
-        "firstName": "",
-        "lastName": ""
+        "firstName": "Ada",
+        "lastName": "Tester"
       },
       "phones": {
         "additionalPhones": [],
-        "primaryPhoneCallingCode": "",
-        "primaryPhoneCountryCode": "",
-        "primaryPhoneNumber": ""
+        "primaryPhoneCallingCode": "+1",
+        "primaryPhoneCountryCode": "US",
+        "primaryPhoneNumber": "2025550100"
       },
-      "position": -8,
-      "updatedAt": "2026-11-03T05:15:18.947000Z",
+      "position": 5,
+      "updatedAt": "2026-11-10T23:39:53.525000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/taskTargets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-11-10T23:40:10.197Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "d1287015-1ffc-41ca-9da2-459bc89371fd",
+      "position": 0,
+      "targetCompanyId": "06290608-8bf0-4806-99ae-a715a6a93fad",
+      "targetOpportunityId": null,
+      "targetPersonId": null,
+      "taskId": "4c532b2f-247a-4982-8b1b-0be9069d77dd",
+      "updatedAt": "2026-11-10T23:40:10.197000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assigneeId": null,
+      "bodyV2": {
+        "blocknote": null,
+        "markdown": "",
+        "tiptap": null
+      },
+      "createdAt": "2026-11-10T23:39:55.282Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "dueAt": null,
+      "id": "4c532b2f-247a-4982-8b1b-0be9069d77dd",
+      "position": 0,
+      "status": "TODO",
+      "title": "Made-up follow-up task",
+      "updatedAt": "2026-11-10T23:39:55.282000Z",
       "updatedBy": {
         "context": {},
         "name": "Dev tests",

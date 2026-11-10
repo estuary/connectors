@@ -3,10 +3,6 @@ collections:
     schema: companies.schema.yaml
     key:
     - /id
-  acmeCo/connectorTypeProbes:
-    schema: connectorTypeProbes.schema.yaml
-    key:
-    - /id
   acmeCo/dashboards:
     schema: dashboards.schema.yaml
     key:

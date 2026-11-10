@@ -15,10 +15,6 @@ captures:
         interval: PT5M
       target: acmeCo/companies
     - resource:
-        name: connectorTypeProbes
-        interval: PT5M
-      target: acmeCo/connectorTypeProbes
-    - resource:
         name: dashboards
         interval: PT5M
       target: acmeCo/dashboards

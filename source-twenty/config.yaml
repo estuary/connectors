@@ -1,13 +1,13 @@
 base_url: https://api.twenty.com
 credentials:
     credentials_title: API Key
-    access_token_sops: ENC[AES256_GCM,data:zI1j3QpzpEszoIXfirXJG8t9lajea16MARzErWMMY9MEoAYF/YmmNPUo2JxK9rqCAMprpbd65G0b/zG+HOitIef0tt1ja1j4/ohLqSTKHUi0r8FjFlmU4JP9nrKLZIbNvrlf2NBYtONHH0x6yD7qOuhffBWbXFApf2NC9/mbOj6yNe7JAoXCyR/IHwUn3JIy/pSpd4x8eoZGgRm0u3myqUPphfr1+Yegrw4PeUyTvUUl5Qzii7tguPXjwFYlWZGH9jnD9mFTHBxsN+SU4RmMxqsNBPxEIr4r8LAgbTWqz0bvrO8kIstsUGT1D7IEkH4sq1RF1DP3cTdrUYa46MtbF/C1o/751Ao5eIgWqNmEYvZ9ENRQPTVWzgytHP4A8Z7m0XV7+unP6V15o6nxUkn8fnGtXc0lREHvvtjM8Yp9/4Kram1EDJAYajDnLQcbhYDUZNTocR5sC6JtA+QjVo9tseVJxgWGPsh3sFZGEb4ta6HZBi72Ckn5NJxwSljef/qe65ly7IVEwJOpDbQ6KcGDBd8Uy/JMnQ7Se4+11shBVeFnfRNXI1ArlkOkGCSfvN8iejDxS1dYucys5PeM,iv:bhF/4bLvhIrChwRGgdMej0ju6JbpWS4btFHXCre670g=,tag:BhLNBdkyhyujmctY7mrSlw==,type:str]
+    access_token_sops: ENC[AES256_GCM,data:4AKXpYXlPN7r03XNobZYyzWvCNAkNaKwFJpPryyBR3b4hNl5wr02HT9zodfHQuYq+hAk9gtbuHeOrMhTp+T7JVa4KMv3iDptUyalKl3QQ4YdQ9sionKN140lhujQgTbAyPMFx2WFW7f4+gOPQjcEG5UJWQZ7QN+5GH/g2Wen92X08TPuOstnbb23Fqydjxu1rYSX8dCMpTSDY6vWBOrX8O4GKfGtjfMY1AfqYrqxlrKQ4ZtiL2TdMTzeN6iMzMvBwz9axdgiql4khPOlViEFwDyVIVnsuVwbqX+AWXk+BJAKhsPeWOUnMuL09lyN6ENpCubO3OHEWo+fNN5fxXdT8MduWG0rdzNSx6nNqIFB8L05l85AnZ8b3pMWRAOYU1Z8EKOuuFRpwSQYRj57oih/C9GBSqKj3sxSZ97EnfxLhOw0rXa2FEbjvV+5Hv5Fbv5q4D2nBoBsQxN2felfUix8qqyTuDa++sPreOeIjHiz6D30ansufsb+H51bhbSnhPGPJQdPCNtZX8n/3UAApBhLApmtGnbEmRFpGb3WWjZ2a6H/6GgEmBmzdgICWARmasAs09OPHN0K1FkFpUXO,iv:1mhA7kTEdk/IOMoet1NisxnnK3Fhfi0+Kt+RoQeIVig=,tag:Dpz0ZacY+NYchHR5HXNjMQ==,type:str]
 sops:
     encrypted_suffix: _sops
     gcp_kms:
-        - created_at: "2026-11-10T22:48:13Z"
-          enc: CiUAdmEdwugu1xUadIMOxsETuZOfniBiLMmHp8ws95HvYGnc8bIlEkkAvE+nk5DCBUUGLkXM/ktHtq+UBHeZue2WejZ310qIHWF70BAAH7E8Kz0FCpkBXrKhBC8Vk0m3YRG3tEg2xHbqU+BPk3s4W0zu
+        - created_at: "2026-11-10T23:38:35Z"
+          enc: CiUAdmEdwq33uDuqcq5tqEm7Q555qKw8Fi28QMeo8u8QIrUYuuH5EkkAvE+nk2jnRLQqOt7p+Z2SMKdZXfzFDVeb7F4jQ3EGse5c3LyUt5X5G/eSjoMBdl1BYLDzGF6vyjQ8RAnYzjVTkmy5sVemZB+5
           resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-    lastmodified: "2026-11-10T22:48:13Z"
-    mac: ENC[AES256_GCM,data:78YZF6cJSSKtDsusj7FIxF69zdOzthDR/doc2gGRmCZ2MiN+iVjHvfSm2TKjNH7sX4z4k4MZ3ex75S1q46zbNObVsnOwXvObxEiM7CrdcTKhD0V6AZeuGuqEZQ7BwTDR4G9rbQxy79775jEcxlLo3gZ6UbbiTSMsGpZta2e5Y9U=,iv:p2WJlSP4kRCGOzOILWVegksdkmvP3/f8dTtxu4LMyrg=,tag:nXwC5ylQXwJYcE0aWiM/BA==,type:str]
+    lastmodified: "2026-11-10T23:38:35Z"
+    mac: ENC[AES256_GCM,data:Fz9KlmzIpiMlrOzBG31F9Ux/wy3nBFeP6SjgWAqNG4j5TWFyCLn49k+V2Ws0FuNFn9E8Q8vwIMOMDwjKqjk1M2qQB5rxypuW3qEAFHrCsegSoawmwZJ5u9MfvU9RBWbiWckBZIfPgSa/xWy38Jbl9TNYl6rTtSHwr2VBpC4+3m8=,iv:Jfzkcf6DT8B/7C8mS5n2A67fln4fh374eVkQSlNkv40=,tag:1sszzo7vv1+thyuFwuVMew==,type:str]
     version: 3.13.3
