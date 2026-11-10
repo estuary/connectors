@@ -63,8 +63,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Only the binaries the connector jobs use. flowctl runs
+      # flow-connector-init, and the file source images copy flow-parser.
       - name: Fetch Flow binaries
         uses: ./.github/actions/fetch-flow-artifact
+        with:
+          paths: |
+            flow-bin/flowctl
+            flow-bin/flowctl-v1
+            flow-bin/sops
+            flow-bin/flow-connector-init
+            flow-bin/flow-parser
 
   build_base_image:
     needs: classify_changes
@@ -81,6 +90,52 @@ jobs:
         uses: ./.github/actions/build-base-image
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Saves the Go cache that the connector jobs restore. A cache key can only be
+  # saved once, so this one job compiles everything. Skipped on PRs.
+  warm_go_cache:
+    needs: classify_changes
+    if: needs.classify_changes.outputs.run == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          lookup-only: true
+
+      # Compile errors are ignored: source-db2-batch can't build without IBM's
+      # headers, and each connector's own job reports its errors.
+      - name: Compile every package and test
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+        run: |
+          go build ./... > /dev/null 2>&1 || true
+          go test -count=1 -run '^$' ./... > /dev/null 2>&1 || true
+          go build -tags nozstd ./... > /dev/null 2>&1 || true
+          # Builds read the extracted sources, so the zips only add download size.
+          find ~/go/pkg/mod/cache/download -name '*.zip' -delete
+          du -sh ~/go/pkg/mod ~/.cache/go-build
+
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
 
   build_connectors:
     runs-on: ubuntu-24.04
@@ -99,6 +154,10 @@ jobs:
       fail-fast: false
       matrix:
         connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
+    env:
+      # Skip buildx's job summary and the build record it uploads.
+      DOCKER_BUILD_SUMMARY: false
+      DOCKER_BUILD_RECORD_UPLOAD: false
 
     steps:
       - uses: actions/checkout@v4
@@ -115,15 +174,25 @@ jobs:
           VARIANTS="$(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
-      # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
-      # without this they fetch the module graph and compile it cold. Gate on the same
-      # condition as the helper package test step.
-      - name: Set up Go with module and build caching
+      - name: Set up Go
         if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache: false
+
+      # Several steps below run `go test` on the runner instead of inside a Dockerfile, and
+      # without this they fetch the module graph and compile it cold. Gate on the same
+      # condition as the helper package test step.
+      - name: Restore Go module and build cache
+        if: hashFiles(format('{0}/*.go', matrix.connector.name)) != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-cache-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: go-cache-${{ runner.os }}-
 
       # tables_gen.go is generated from the TPC-DS DDL; a stale copy would let
       # column types or keys drift from the spec.
@@ -143,7 +212,9 @@ jobs:
           workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
           service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
 
+      # tests/source-gcs's setup and cleanup run gcloud.
       - name: Set up Cloud SDK
+        if: matrix.connector.name == 'source-gcs'
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: estuary-theatre
@@ -245,6 +316,42 @@ jobs:
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
 
+      # Runs the `go test` and `go build` lines of the Dockerfile's builder stage
+      # on the runner, where the Go cache is warm. The image build below takes
+      # the output in place of that stage. Skipped connectors need more than Go.
+      - name: Test and compile ${{ matrix.connector.name }}
+        id: builder
+        if: |
+          !contains(fromJson('[
+            "source-db2-batch",
+            "source-mongodb",
+            "source-tpc-ds"
+            ]'), matrix.connector.name)
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
+        run: |
+          set -euo pipefail
+          DOCKERFILE=${{ matrix.connector.name }}/Dockerfile
+          CTX="$RUNNER_TEMP/builder"
+
+          # Turn the builder stage into a shell script and run it:
+          #   ARG X=y  or  ENV X=y   ->  export X=y
+          #   RUN go test ...        ->  go test ...     (likewise `go build`)
+          # Everything else in the stage is dropped.
+          sed -n '/ AS builder$/,/^FROM /p' "$DOCKERFILE" |
+            sed -nE -e 's/^(ARG|ENV) /export /p' \
+                    -e 's/^(RUN)? +(go (test|build) )/\2/p' > "$RUNNER_TEMP/builder.sh"
+          bash -ex "$RUNNER_TEMP/builder.sh"
+
+          # Copy each path the runtime stage takes from the builder stage to the
+          # same path under $CTX. The stage's /builder is this checkout; any
+          # other path is a system file, taken from the runner.
+          for SRC in $(awk '/^COPY --from=builder / { print $3 }' "$DOCKERFILE"); do
+            mkdir -p "$(dirname "$CTX$SRC")"
+            cp -rL "${SRC/#\/builder/.}" "$CTX$SRC"
+          done
+          echo "context=builder=$CTX" >> "$GITHUB_OUTPUT"
+
       - name: Build ${{ matrix.connector.name }} Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -255,6 +362,7 @@ jobs:
             BASE_IMAGE=ghcr.io/estuary/base-image:${{ needs.build_base_image.outputs.tag }}
             CONNECTOR_VERSION=${{ steps.prep.outputs.version }}-${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          build-contexts: ${{ steps.builder.outputs.context }}
           # Layers come from the connector's build-cache tag and only main writes
           # it back, so PR builds can't overwrite each other's cache. The GitHub
           # Actions cache is too small for every connector's builder stage.
