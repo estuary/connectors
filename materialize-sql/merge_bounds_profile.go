@@ -26,13 +26,17 @@ func (bounds MergeBounds) ProfileFields() map[string]any {
 		if len(b.Ranges) > 0 {
 			var ranges = make([][2]string, len(b.Ranges))
 			var covered time.Duration
+			var timed = true
 			for i, r := range b.Ranges {
 				ranges[i] = [2]string{r.LiteralLower, r.LiteralUpper}
-				span, _ := literalSpan(r.LiteralLower, r.LiteralUpper)
+				span, ok := literalSpan(r.LiteralLower, r.LiteralUpper)
 				covered += span
+				timed = timed && ok
 			}
 			bound["ranges"] = ranges
-			bound["rangesSpan"] = covered.String()
+			if timed {
+				bound["rangesSpan"] = covered.String()
+			}
 		}
 		out[b.Field] = bound
 	}

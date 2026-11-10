@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"math/bits"
 	"slices"
 	"sort"
 	"time"
@@ -25,7 +26,7 @@ type MergeBound struct {
 	LiteralUpper string
 	// Ranges, when set, split LiteralLower..LiteralUpper at gaps between the
 	// observed values: every observed value lies within one of them. See
-	// WithDatetimeRanges.
+	// WithDatetimeRanges and WithStringRanges.
 	Ranges []MergeRange
 }
 
@@ -46,8 +47,10 @@ type MergeBoundsBuilder struct {
 	// exactDatetime reports whether a date-time key column can be bounded by
 	// the observed values themselves rather than by whole dates.
 	exactDatetime func(Column) bool
-	// datetimeRanges is whether an exact date-time bound splits into ranges.
+	// datetimeRanges and stringRanges are whether an exact date-time bound
+	// and a string bound split into ranges.
 	datetimeRanges bool
+	stringRanges   bool
 	// maxRanges is the most ranges a bound splits into.
 	maxRanges int
 	// datetime marks the date-time key columns.
@@ -80,6 +83,14 @@ func WithDatetimeRanges() MergeBoundsOption {
 	return func(b *MergeBoundsBuilder) { b.datetimeRanges = true }
 }
 
+// WithStringRanges splits the bound of a string key other than a date-time
+// into ranges at the widest gaps between its observed values. The ranges order
+// values byte by byte, so they suit only an endpoint that compares the key
+// column's values the same way.
+func WithStringRanges() MergeBoundsOption {
+	return func(b *MergeBoundsBuilder) { b.stringRanges = true }
+}
+
 func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts ...MergeBoundsOption) *MergeBoundsBuilder {
 	var b = &MergeBoundsBuilder{
 		keyColumns: keyColumns,
@@ -93,12 +104,16 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 	b.spans = make([]*spanSet, len(keyColumns))
 	var limit = spansPerRange * b.maxRanges
 	for idx, col := range keyColumns {
-		if !isDatetimeColumn(col) {
-			continue
-		}
-		b.datetime[idx] = true
-		if b.datetimeRanges && b.exactDatetime != nil && b.exactDatetime(col) {
-			b.spans[idx] = &spanSet{limit: limit}
+		var ft, _ = col.AsFlatType()
+		switch {
+		case isDatetimeColumn(col):
+			b.datetime[idx] = true
+			if b.datetimeRanges && b.exactDatetime != nil && b.exactDatetime(col) {
+				b.spans[idx] = &spanSet{limit: limit, scale: instantScale{}}
+			}
+		case ft != STRING || !b.stringRanges:
+		default:
+			b.spans[idx] = &spanSet{limit: limit, scale: new(byteAlphabet), position: stringPosition}
 		}
 	}
 	return b
@@ -139,6 +154,9 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
+		if spans != nil {
+			spans.observe(k)
+		}
 	}
 }
 
@@ -293,7 +311,8 @@ const spansPerRange = 8
 const minRangeGapDivisor = 100
 
 // keySpan is a closed range of observed keys, by their positions, along with
-// the keys at its ends for rendering as literals.
+// the keys at its ends for rendering as literals. A string key is its own
+// position.
 type keySpan struct {
 	lo, hi       string
 	loKey, hiKey any
@@ -310,12 +329,37 @@ func datetimePosition(ts time.Time) string {
 	return string(out[:])
 }
 
-// instantDistance is the log2 of the time from the instant at position x to
-// the later instant at position y.
-func instantDistance(x, y string) float64 {
+// keyScale measures the distance between the positions of a column's keys.
+type keyScale interface {
+	// observe takes account of the key at pos, reporting whether that changes
+	// the distance between positions observed before it.
+	observe(pos string) bool
+	// distance is the log2 distance from position x to the greater position
+	// y, and whether float64 resolves it. An unresolved distance is no less
+	// than the true one.
+	distance(x, y string) (float64, bool)
+	// reset forgets the observed keys.
+	reset()
+}
+
+// instantScale measures the positions of datetimePosition by the time between
+// their instants.
+type instantScale struct{}
+
+func (instantScale) observe(string) bool { return false }
+
+func (instantScale) reset() {}
+
+func (instantScale) distance(x, y string) (float64, bool) {
 	var seconds = binary.BigEndian.Uint64([]byte(y[:8])) - binary.BigEndian.Uint64([]byte(x[:8]))
 	var nanos = float64(binary.BigEndian.Uint32([]byte(y[8:]))) - float64(binary.BigEndian.Uint32([]byte(x[8:])))
-	return math.Log2(float64(seconds)*float64(time.Second) + nanos)
+	return math.Log2(float64(seconds)*float64(time.Second) + nanos), true
+}
+
+// stringPosition is the position of a string key, which is the key itself.
+func stringPosition(key any) (string, bool) {
+	var s, ok = key.(string)
+	return s, ok
 }
 
 // spanSet is the observed keys of a key column as sorted, disjoint spans.
@@ -323,25 +367,163 @@ type spanSet struct {
 	spans []keySpan
 	// limit is the most spans the set holds.
 	limit int
+	// position is the position of a key, reporting false if it has none.
+	position func(key any) (string, bool)
+	// scale measures the distance between positions.
+	scale keyScale
+	// unmeasured marks a set missing an observed key, which had no position.
+	unmeasured bool
+}
+
+// alphabetPositions is how many leading positions of a string a byteAlphabet
+// tracks. Past them, every byte is a digit of its own.
+const alphabetPositions = 64
+
+// byteAlphabet is the symbols seen at each position of a set of strings,
+// where a symbol is a byte or the end of the string. Reading a string as a
+// number in which each position's base is the count of its symbols makes
+// distances disregard symbols no string uses there. It is the keyScale of
+// strings that are their own positions.
+type byteAlphabet struct {
+	positions []positionSymbols
+}
+
+// positionSymbols is the set of symbols seen at one position, where the end
+// of a string is symbol 0 and byte c is symbol c+1.
+type positionSymbols [5]uint64
+
+// mark adds sym to the set, reporting whether it is new.
+func (p *positionSymbols) mark(sym int) bool {
+	var w, b = sym / 64, uint64(1) << (sym % 64)
+	if p[w]&b != 0 {
+		return false
+	}
+	p[w] |= b
+	return true
+}
+
+// rank is the number of symbols in the set below sym.
+func (p *positionSymbols) rank(sym int) float64 {
+	var n int
+	for w := range sym / 64 {
+		n += bits.OnesCount64(p[w])
+	}
+	n += bits.OnesCount64(p[sym/64] & (uint64(1)<<(sym%64) - 1))
+	return float64(n)
+}
+
+// radix is the number of symbols in the set.
+func (p *positionSymbols) radix() float64 {
+	var n int
+	for _, w := range p {
+		n += bits.OnesCount64(w)
+	}
+	return float64(n)
+}
+
+func symbolAt(z string, i int) int {
+	if i >= len(z) {
+		return 0
+	}
+	return int(z[i]) + 1
+}
+
+// observe adds the symbols of s, reporting whether any are new.
+func (a *byteAlphabet) observe(s string) bool {
+	var grew bool
+	for i := 0; i <= len(s) && i < alphabetPositions; i++ {
+		if i == len(a.positions) {
+			a.positions = append(a.positions, positionSymbols{})
+		}
+		if a.positions[i].mark(symbolAt(s, i)) {
+			grew = true
+		}
+	}
+	return grew
+}
+
+func (a *byteAlphabet) reset() { a.positions = nil }
+
+// digit is the digit of z at position i, and that position's base.
+func (a *byteAlphabet) digit(z string, i int) (float64, float64) {
+	if i >= len(a.positions) {
+		return float64(symbolAt(z, i)), 257
+	}
+	var pos = &a.positions[i]
+	return pos.rank(symbolAt(z, i)), pos.radix()
+}
+
+// distance reads x and y as fractions whose digits are those of digit. An
+// unresolved distance is the least that resolves.
+func (a *byteAlphabet) distance(x, y string) (float64, bool) {
+	var p int
+	for p < len(x) && p < len(y) && x[p] == y[p] {
+		p++
+	}
+	var scale float64
+	for i := range p {
+		_, radix := a.digit(x, i)
+		scale += math.Log2(radix)
+	}
+	// Digits whose weight falls below 2^-60 are beneath float64 precision.
+	var v, w = 0.0, 1.0
+	// least is the smallest sum that later digits can leave of the first
+	// differing digit's term while keeping some of float64's precision.
+	var least float64
+	for i := p; i <= max(len(x), len(y)) && w > 0x1p-60; i++ {
+		dx, radix := a.digit(x, i)
+		dy, _ := a.digit(y, i)
+		w /= radix
+		v += (dy - dx) * w
+		if i == p {
+			least = v * 0x1p-40
+		}
+	}
+	if v <= least {
+		return math.Log2(least) - scale, false
+	}
+	return math.Log2(v) - scale, true
 }
 
 // reset empties the set.
 func (s *spanSet) reset() {
-	s.spans = nil
+	s.spans, s.unmeasured = nil, false
+	s.scale.reset()
+}
+
+// gap is the log2 distance from position x to the greater position y.
+func (s *spanSet) gap(x, y string) float64 {
+	var d, _ = s.scale.distance(x, y)
+	return d
+}
+
+// observe adds key at its position.
+func (s *spanSet) observe(key any) {
+	if pos, ok := s.position(key); ok {
+		s.add(pos, key)
+	} else {
+		s.unmeasured = true
+	}
 }
 
 // add adds the key at position pos.
 func (s *spanSet) add(pos string, key any) {
+	if s.scale.observe(pos) {
+		for i := 0; i+1 < len(s.spans); i++ {
+			s.spans[i].gap = s.gap(s.spans[i].hi, s.spans[i+1].lo)
+		}
+	}
+
 	var i = sort.Search(len(s.spans), func(i int) bool { return s.spans[i].hi >= pos })
 	if i < len(s.spans) && s.spans[i].lo <= pos {
 		return
 	}
 	s.spans = slices.Insert(s.spans, i, keySpan{lo: pos, hi: pos, loKey: key, hiKey: key})
 	if i > 0 {
-		s.spans[i-1].gap = instantDistance(s.spans[i-1].hi, pos)
+		s.spans[i-1].gap = s.gap(s.spans[i-1].hi, pos)
 	}
 	if i+1 < len(s.spans) {
-		s.spans[i].gap = instantDistance(pos, s.spans[i+1].lo)
+		s.spans[i].gap = s.gap(pos, s.spans[i+1].lo)
 	}
 	if len(s.spans) > s.limit {
 		s.spans = mergeNarrowestGap(s.spans)
@@ -367,14 +549,18 @@ func mergeSpans(spans []keySpan, at int) []keySpan {
 // rangesOf renders spans as at most maxRanges ranges split at their widest
 // gaps, or nil if no gap is worth a split.
 func (b *MergeBoundsBuilder) rangesOf(set *spanSet) []MergeRange {
-	if len(set.spans) < 2 {
+	if len(set.spans) < 2 || set.unmeasured {
 		return nil
 	}
 	var spans = set.spans
 	for len(spans) > b.maxRanges {
 		spans = mergeNarrowestGap(spans)
 	}
-	var minGap = instantDistance(spans[0].lo, spans[len(spans)-1].hi) - math.Log2(minRangeGapDivisor)
+	var whole, resolved = set.scale.distance(spans[0].lo, spans[len(spans)-1].hi)
+	if !resolved {
+		return nil
+	}
+	var minGap = whole - math.Log2(minRangeGapDivisor)
 	for i := 0; i+1 < len(spans); {
 		if spans[i].gap < minGap {
 			spans = mergeSpans(spans, i)
