@@ -91,33 +91,33 @@ func TestTimestampLiteralFloorsToMicroseconds(t *testing.T) {
 }
 
 func TestStartCommitState(t *testing.T) {
-	t.Run("an entry nests under this shard's range, then its state key", func(t *testing.T) {
+	t.Run("an entry nests under its state key, then this shard's range", func(t *testing.T) {
 		var tr = testTransactor(upperRangeKey, "a_table.v1")
 		tr.stage("a_table.v1", &checkpointItem{NeedsMerge: true, SourceURIs: []string{"gs://b/f1"}, JobPrefix: "jp", round: 3})
 
 		update, err := tr.startCommitState()
 		require.NoError(t, err)
 		require.True(t, update.MergePatch)
-		require.Equal(t, `{"80000000-ffffffff":{"a_table.v1":{"NeedsMerge":true,"SourceURIs":["gs://b/f1"],"JobPrefix":"jp"}}}`, string(update.UpdatedJson))
+		require.Equal(t, `{"a_table.v1":{"80000000-ffffffff":{"NeedsMerge":true,"SourceURIs":["gs://b/f1"],"JobPrefix":"jp"}}}`, string(update.UpdatedJson))
 	})
 
 	t.Run("the primary emits only its own entries", func(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
 		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
-			"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "state-first"}, "JobPrefix": "flat"},
-			"80000000-ffffffff": {"b_table.v1": {"JobPrefix": "peer"}}
+			"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "peer"}, "JobPrefix": "flat"},
+			"80000000-ffffffff": {"b_table.v1": {"JobPrefix": "range-first"}}
 		}`)))
 		tr.stage("b_table.v1", &checkpointItem{JobPrefix: "own"})
 
 		update, err := tr.startCommitState()
 		require.NoError(t, err)
-		require.Equal(t, `{"00000000-7fffffff":{"b_table.v1":{"JobPrefix":"own"}}}`, string(update.UpdatedJson))
+		require.Equal(t, `{"b_table.v1":{"00000000-7fffffff":{"JobPrefix":"own"}}}`, string(update.UpdatedJson))
 	})
 
 	t.Run("nothing staged", func(t *testing.T) {
 		update, err := testTransactor(fullRangeKey, "a_table.v1").startCommitState()
 		require.NoError(t, err)
-		require.Equal(t, `{"00000000-ffffffff":{}}`, string(update.UpdatedJson))
+		require.Equal(t, `{}`, string(update.UpdatedJson))
 	})
 }
 
@@ -215,7 +215,7 @@ func TestMergePeerStatePatches(t *testing.T) {
 
 	t.Run("no-op when non-primary", func(t *testing.T) {
 		var tr = testTransactor(upperRangeKey, "a_table.v1")
-		require.NoError(t, tr.mergePeerStatePatches(patches(`{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "p"}}}`)))
+		require.NoError(t, tr.mergePeerStatePatches(patches(`{"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "p"}}}`)))
 		require.Empty(t, tr.pendingItems("a_table.v1"))
 	})
 
@@ -223,23 +223,23 @@ func TestMergePeerStatePatches(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1")
 		tr.stage("a_table.v1", &checkpointItem{JobPrefix: "own", round: 2})
 		require.NoError(t, tr.mergePeerStatePatches(patches(
-			`{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "own"}}}`,
-			`{"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "peer"}}}`,
+			`{"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "own"}}}`,
+			`{"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "peer"}}}`,
 		)))
 		require.Equal(t, []string{"own", "peer"}, jobPrefixes(tr.pendingItems("a_table.v1")))
 		// The echo didn't replace the entry this session staged.
 		require.Equal(t, 2, tr.staged("a_table.v1").round)
 	})
 
-	t.Run("a peer's state-key-first patch is merged", func(t *testing.T) {
+	t.Run("a peer's range-first patch is merged", func(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1")
 		tr.stage("a_table.v1", &checkpointItem{JobPrefix: "own"})
 		require.NoError(t, tr.mergePeerStatePatches(patches(
-			`{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "own"}}}`,
-			`{"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "peer"}}}`,
+			`{"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "own"}}}`,
+			`{"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "peer"}}}`,
 		)))
-		require.Equal(t, []string{"peer", "own"}, jobPrefixes(tr.pendingItems("a_table.v1")))
-		require.Equal(t, "peer", tr.stateFirst["a_table.v1"][upperRangeKey].JobPrefix)
+		require.Equal(t, []string{"own", "peer"}, jobPrefixes(tr.pendingItems("a_table.v1")))
+		require.Equal(t, "peer", tr.rangeFirst[upperRangeKey]["a_table.v1"].JobPrefix)
 	})
 
 	t.Run("a flat patch is merged", func(t *testing.T) {
@@ -350,12 +350,12 @@ func TestSingleShardRoundTripWithoutStatePatches(t *testing.T) {
 	started, err := tr.startCommitState()
 	require.NoError(t, err)
 	var state = reduce(t, `{}`, started)
-	require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": {"JobPrefix": "own"}}}`, state)
+	require.JSONEq(t, `{"a_table.v1": {"00000000-ffffffff": {"JobPrefix": "own"}}}`, state)
 
 	acked, err := tr.Acknowledge(t.Context(), nil, nil)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": null}}`, string(acked.UpdatedJson))
-	require.JSONEq(t, `{"00000000-ffffffff": {}}`, reduce(t, state, acked))
+	require.JSONEq(t, `{"a_table.v1": {"00000000-ffffffff": null}}`, string(acked.UpdatedJson))
+	require.JSONEq(t, `{"a_table.v1": {}}`, reduce(t, state, acked))
 }
 
 // Runtime v2 with two shards: both stage, the primary applies and clears
@@ -377,8 +377,8 @@ func TestTwoShardRoundTrip(t *testing.T) {
 		statePatches = append(statePatches, started.UpdatedJson)
 	}
 	require.JSONEq(t, `{
-		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "lower-a"}},
-		"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "upper-a"}, "b_table.v1": {"JobPrefix": "upper-b"}}
+		"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "lower-a"}, "80000000-ffffffff": {"JobPrefix": "upper-a"}},
+		"b_table.v1": {"80000000-ffffffff": {"JobPrefix": "upper-b"}}
 	}`, state)
 
 	// A restart at this point recovers every entry on the primary alone.
@@ -400,39 +400,43 @@ func TestTwoShardRoundTrip(t *testing.T) {
 	acked, err = primary.Acknowledge(t.Context(), statePatches, nil)
 	require.NoError(t, err)
 	require.JSONEq(t, `{
-		"00000000-7fffffff": {"a_table.v1": null},
-		"80000000-ffffffff": {"a_table.v1": null, "b_table.v1": null}
+		"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null},
+		"b_table.v1": {"80000000-ffffffff": null}
 	}`, string(acked.UpdatedJson))
-	require.JSONEq(t, `{"00000000-7fffffff": {}, "80000000-ffffffff": {}}`, reduce(t, state, acked))
+	require.JSONEq(t, `{"a_table.v1": {}, "b_table.v1": {}}`, reduce(t, state, acked))
 	require.Empty(t, primary.pendingItems("a_table.v1"))
 	require.Empty(t, primary.pendingItems("b_table.v1"))
 }
 
-// A rollback from a version that writes the state-key-first layout: the
-// primary recovers both shards' entries, applies them in that version's order
-// and clears them where they were written.
-func TestRollbackFromStateFirstWriter(t *testing.T) {
-	var state = `{"a_table.v1": {
-		"00000000-7fffffff": {"JobPrefix": "lower"},
-		"80000000-ffffffff": {"JobPrefix": "upper"}
-	}}`
+// An upgrade from a version that wrote the range-first layout: the primary
+// recovers both shards' entries, applies them in that version's order and
+// clears them where they were written.
+func TestUpgradeFromRangeFirstWriter(t *testing.T) {
+	var state = `{
+		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "lower"}},
+		"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "upper"}}
+	}`
 	var primary = testTransactor(lowerRangeKey, "a_table.v1")
 	require.NoError(t, primary.UnmarshalState(json.RawMessage(state)))
 	require.Equal(t, []string{"lower", "upper"}, jobPrefixes(primary.pendingItems("a_table.v1")))
 
 	acked, err := primary.Acknowledge(t.Context(), nil, nil)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}}`, string(acked.UpdatedJson))
+	require.JSONEq(t, `{
+		"00000000-7fffffff": {"a_table.v1": null},
+		"80000000-ffffffff": {"a_table.v1": null}
+	}`, string(acked.UpdatedJson))
 	state = reduce(t, state, acked)
-	require.JSONEq(t, `{"a_table.v1": {}}`, state)
+	require.JSONEq(t, `{"00000000-7fffffff": {}, "80000000-ffffffff": {}}`, state)
 
 	// The next transaction stages in the layout this version writes.
 	primary.stage("a_table.v1", &checkpointItem{JobPrefix: "next"})
 	started, err := primary.startCommitState()
 	require.NoError(t, err)
 	require.JSONEq(t, `{
-		"a_table.v1": {},
-		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "next"}}
+		"00000000-7fffffff": {},
+		"80000000-ffffffff": {},
+		"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "next"}}
 	}`, reduce(t, state, started))
 }
 

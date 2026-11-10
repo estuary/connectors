@@ -141,13 +141,15 @@ type transactor struct {
 	// read from, which is the path it clears at. Only the primary shard holds
 	// entries other than those it staged.
 	//
-	// rangeFirst is {rangeKey: {stateKey: entry}}, the layout this version
+	// stateFirst is {stateKey: {rangeKey: entry}}, the layout this version
 	// writes. Range keys are disjoint across shards, so their StartedCommit
 	// merge patches commute when the runtime consolidates connector state.
-	rangeFirst checkpoints
-	// stateFirst is {stateKey: {rangeKey: entry}}, which a later version
-	// writes. Reading it here lets that version roll back to this one.
 	stateFirst checkpoints
+	// rangeFirst is {rangeKey: {stateKey: entry}}, which earlier versions
+	// wrote.
+	// TODO(#5681): remove three months after the release that stopped
+	// writing it has rolled out, which is no earlier than 2027-02-10.
+	rangeFirst checkpoints
 	flat       map[string]flatCheckpoint // TODO(#5681): remove with flatCheckpoint.
 
 	primaryShard bool
@@ -215,8 +217,8 @@ func prepareNewTransactor(
 			skipCleanup:           featureFlags["skip_cleanup"],
 			client:                client,
 			be:                    be,
-			rangeFirst:            make(checkpoints),
 			stateFirst:            make(checkpoints),
+			rangeFirst:            make(checkpoints),
 			flat:                  make(map[string]flatCheckpoint),
 			primaryShard:          primaryShard,
 			rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
@@ -382,6 +384,7 @@ func (t *transactor) absorbState(doc json.RawMessage, skipOwnRange bool) error {
 	}
 
 	for key, bucket := range raw {
+		// TODO(#5681): remove with rangeFirst.
 		if rangeKeyRe.MatchString(key) {
 			if skipOwnRange && key == t.rangeKey {
 				continue
@@ -621,27 +624,29 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // staged is the entry this shard holds for a state key under its own range
 // key: the one it staged, or on the primary one it recovered.
 func (t *transactor) staged(stateKey string) *checkpointItem {
-	return t.rangeFirst[t.rangeKey][stateKey]
+	return t.stateFirst[stateKey][t.rangeKey]
 }
 
 func (t *transactor) stage(stateKey string, item *checkpointItem) {
-	t.rangeFirst.add(t.rangeKey, stateKey, item)
+	t.stateFirst.add(stateKey, t.rangeKey, item)
 }
 
 func (t *transactor) unstage(stateKey string) {
-	delete(t.rangeFirst[t.rangeKey], stateKey)
+	delete(t.stateFirst[stateKey], t.rangeKey)
 }
 
 // startCommitState is the merge patch recording this shard's own entries,
-// nested under its range key. A single-shard task uses the same format, with
-// one range covering the full key space.
+// each under its state key and this shard's range key. A single-shard task
+// uses the same format, with one range covering the full key space.
 func (t *transactor) startCommitState() (*pf.ConnectorState, error) {
-	var own = t.rangeFirst[t.rangeKey]
-	if own == nil {
-		own = make(map[string]*checkpointItem)
+	var own = make(checkpoints)
+	for stateKey, bucket := range t.stateFirst {
+		if item := bucket[t.rangeKey]; item != nil {
+			own.add(stateKey, t.rangeKey, item)
+		}
 	}
 
-	var patch, err = json.Marshal(checkpoints{t.rangeKey: own})
+	var patch, err = json.Marshal(own)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint json: %w", err)
 	}
@@ -731,6 +736,7 @@ func (t *transactor) pendingItems(stateKey string) []*checkpointItem {
 	if flat, ok := t.flat[stateKey]; ok {
 		items = append(items, flat.item)
 	}
+	// TODO(#5681): remove with rangeFirst.
 	for _, rk := range slices.Sorted(maps.Keys(t.rangeFirst)) {
 		if item := t.rangeFirst[rk][stateKey]; item != nil {
 			items = append(items, item)
@@ -762,6 +768,7 @@ func (t *transactor) clearPending(stateKeys []string) map[string]map[string]any 
 		}
 		delete(t.flat, sk)
 
+		// TODO(#5681): remove with rangeFirst.
 		for rk, bucket := range t.rangeFirst {
 			if _, ok := bucket[sk]; ok {
 				clearAt(rk, sk)
