@@ -116,7 +116,7 @@ jobs:
   # restores main's previous cache through restore-keys.
   warm_go_cache:
     needs: classify_changes
-    if: needs.classify_changes.outputs.run == 'true'
+    if: needs.classify_changes.outputs.run == 'true' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
