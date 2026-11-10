@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -21,6 +22,44 @@ type binding struct {
 	mustMerge        bool
 	loadMergeBounds  *sql.MergeBoundsBuilder
 	storeMergeBounds *sql.MergeBoundsBuilder
+	// timestampKeys are the indices of the TIMESTAMP key columns.
+	timestampKeys []int
+}
+
+func isTimestampColumn(col sql.Column) bool {
+	return col.BareDDL == "TIMESTAMP"
+}
+
+func timestampKeys(target sql.Table) []int {
+	var out []int
+	for idx, key := range target.Keys {
+		if isTimestampColumn(key) {
+			out = append(out, idx)
+		}
+	}
+	return out
+}
+
+// newMergeBoundsBuilder bounds TIMESTAMP keys exactly, split into ranges at
+// gaps. Their keys must pass through boundsKey.
+func newMergeBoundsBuilder(target sql.Table, literal func(any) string) *sql.MergeBoundsBuilder {
+	return sql.NewMergeBoundsBuilder(target.Keys, literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges())
+}
+
+// boundsKey returns key with its TIMESTAMP values floored to microseconds, for
+// tracking merge bounds. BigQuery stores a timestamp floored to microseconds
+// and rejects a literal with finer precision.
+func (b *binding) boundsKey(key []any) []any {
+	if len(b.timestampKeys) == 0 {
+		return key
+	}
+	key = append([]any(nil), key...)
+	for _, idx := range b.timestampKeys {
+		if ts, ok := sql.ParseDatetime(key[idx]); ok {
+			key[idx] = ts.UTC().Truncate(time.Microsecond).Format("2006-01-02T15:04:05.000000Z")
+		}
+	}
+	return key
 }
 
 // errNullFlowDocument is returned when a load query reads a row whose

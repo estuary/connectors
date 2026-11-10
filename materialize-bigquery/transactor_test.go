@@ -63,6 +63,35 @@ func TestEntryWithoutTruncationOmitsIt(t *testing.T) {
 	require.NotContains(t, fields, "TruncateBefore")
 }
 
+func TestCombineBoundsUnionsRanges(t *testing.T) {
+	var keys = []sql.Column{{Identifier: "id", MappedType: sql.MappedType{BareDDL: "INTEGER"}}, {Identifier: "ts", MappedType: sql.MappedType{BareDDL: "TIMESTAMP"}}}
+	var bound = func(lower, upper string) mergeBoundLiterals { return mergeBoundLiterals{Lower: lower, Upper: upper} }
+	var split = bound("'2026-03-01T00:00:00Z'", "'2026-10-26T12:15:00Z'")
+	split.Ranges = []mergeRangeLiterals{
+		{"'2026-03-01T00:00:00Z'", "'2026-03-01T00:00:00Z'"},
+		{"'2026-10-26T12:00:00Z'", "'2026-10-26T12:15:00Z'"},
+	}
+	var items = []*checkpointItem{
+		{Bounds: []mergeBoundLiterals{bound("1", "10"), split}},
+		{Bounds: []mergeBoundLiterals{bound("5", "50"), bound("'2026-10-26T12:10:00Z'", "'2026-10-26T12:30:00Z'")}},
+		{Bounds: []mergeBoundLiterals{bound("5", "50"), split}},
+	}
+
+	// A recovered entry's ranges survive the persisted state.
+	var recovered checkpointItem
+	require.NoError(t, json.Unmarshal(mustMarshal(t, items[2]), &recovered))
+	items[2] = &recovered
+
+	var out = combineBounds(keys, items)
+	require.Nil(t, out[0].Ranges)
+	require.Equal(t, "GREATEST(CAST('2026-10-26T12:15:00Z' AS TIMESTAMP), CAST('2026-10-26T12:30:00Z' AS TIMESTAMP))", out[1].LiteralUpper)
+	require.Equal(t, []sql.MergeRange{
+		{LiteralLower: "'2026-03-01T00:00:00Z'", LiteralUpper: "'2026-03-01T00:00:00Z'"},
+		{LiteralLower: "'2026-10-26T12:00:00Z'", LiteralUpper: "'2026-10-26T12:15:00Z'"},
+		{LiteralLower: "'2026-10-26T12:10:00Z'", LiteralUpper: "'2026-10-26T12:30:00Z'"},
+	}, out[1].Ranges)
+}
+
 func TestTimestampLiteralFloorsToMicroseconds(t *testing.T) {
 	var ts = time.Date(2026, 9, 29, 12, 34, 56, 999_999_999, time.FixedZone("x", 3600))
 	require.Equal(t, "TIMESTAMP '2026-09-29 11:34:56.999999 UTC'", timestampLiteral(ts))
