@@ -385,13 +385,6 @@ func TestAcknowledgeRunsUncoalescibleEntriesIndividually(t *testing.T) {
 			own:  mergeEntry("a_table", "@flow_v1/al", "v1", "1", "5"),
 			peer: mergeEntry("a_table", "@flow_v1/au", "v0", "10", "20"),
 		},
-		{
-			// COPY INTO does not scan the target table, so nothing is gained
-			// from combining them.
-			name: "copies",
-			own:  copyEntry("a_table", "@flow_v1/al"),
-			peer: copyEntry("a_table", "@flow_v1/au"),
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var d = stagedTransactor(t, lowerRangeKey, "a_table.v1")
@@ -413,6 +406,32 @@ func TestAcknowledgeRunsUncoalescibleEntriesIndividually(t *testing.T) {
 			require.JSONEq(t, `{"a_table.v1":{}}`, reduce(t, string(patch), update.UpdatedJson))
 		})
 	}
+}
+
+func TestAcknowledgeCoalescesShardCopies(t *testing.T) {
+	var d = stagedTransactor(t, lowerRangeKey, "a_table.v1")
+	var own = copyEntry("a_table", "@flow_v1/al")
+	var peer = mergeEntry("a_table", "@flow_v1/au", "v1", "10", "20")
+	peer.CopyQuery, peer.CopyStagedDir = "\nCOPY INTO a_table FROM @flow_v1/auc", "@flow_v1/auc"
+	d.staged.add("a_table.v1", lowerRangeKey, own)
+	var patch = mustJSON(t, map[string]map[string]*checkpointItem{
+		"a_table.v1": {lowerRangeKey: own, upperRangeKey: peer},
+	})
+
+	update, err := d.Acknowledge(context.Background(), []json.RawMessage{patch}, nil)
+	require.NoError(t, err)
+
+	var queries []string
+	for _, s := range recordedStatements() {
+		if !strings.HasPrefix(s, "REMOVE ") {
+			queries = append(queries, s)
+		}
+	}
+	require.Len(t, queries, 2, "the peer's MERGE, then one COPY of every shard's new rows")
+	require.Equal(t, peer.Query, queries[0])
+	require.True(t, strings.HasPrefix(queries[1], "\nCOPY INTO a_table"), queries[1])
+	require.Contains(t, queries[1], "FROM @flow_v1\n) PATTERN = '.*(al|auc)/.*';")
+	require.JSONEq(t, `{"a_table.v1":{}}`, reduce(t, string(patch), update.UpdatedJson))
 }
 
 func TestAcknowledgeNonPrimaryExecutesNothing(t *testing.T) {

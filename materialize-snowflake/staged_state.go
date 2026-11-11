@@ -249,8 +249,10 @@ func (d *transactor) startCommitState() (json.RawMessage, error) {
 // files. legacy is the binding's entry without a range key, or nil, and runs
 // first. Entries of MERGE INTO that the binding's current spec staged
 // coalesce into one MERGE INTO over all of their files, because each MERGE
-// INTO scans the target table. Every other entry runs its own pre-rendered
-// query, since only that query matches the columns its files were staged with.
+// INTO scans the target table. The COPY INTO of new rows that the current
+// spec staged coalesce likewise, because Snowflake loads each staged file on
+// one thread. Every other query is the entry's own pre-rendered one, since
+// only that query matches the columns its files were staged with.
 //
 // A recovered entry may already have been applied before its clearing was
 // committed. Re-applying it is safe, because its MERGE INTO converges on the
@@ -273,9 +275,20 @@ func (d *transactor) commitStaged(ctx context.Context, b *binding, legacy *check
 		coalesce = nil
 	}
 
+	var copies []*checkpointItem
+	for _, item := range items {
+		var copiesNewRows = len(item.CopyQuery) > 0 || (len(item.Query) > 0 && !isMergeQuery(item.Query))
+		if copiesNewRows && item.Version == d.version && item != legacy {
+			copies = append(copies, item)
+		}
+	}
+	if len(copies) < 2 {
+		copies = nil
+	}
+
 	d.be.StartedResourceCommit(path)
 	for _, item := range items {
-		if len(item.Query) == 0 || slices.Contains(coalesce, item) {
+		if len(item.Query) == 0 || slices.Contains(coalesce, item) || (slices.Contains(copies, item) && !isMergeQuery(item.Query)) {
 			continue
 		}
 		d.commitProfile.SetBounds(b.target.Binding, profileBounds(b.target.Keys, item))
@@ -303,10 +316,28 @@ func (d *transactor) commitStaged(ctx context.Context, b *binding, legacy *check
 	// The COPYs run after the MERGEs so that a MERGE doesn't scan the rows a
 	// COPY appends.
 	for _, item := range items {
-		if len(item.CopyQuery) == 0 {
+		if len(item.CopyQuery) == 0 || slices.Contains(copies, item) {
 			continue
 		}
 		if err := d.runStoreQuery(ctx, b, item.CopyQuery, item.Round, 0); err != nil {
+			return err
+		}
+	}
+	if len(copies) > 0 {
+		var dirs []string
+		var rows int64
+		for _, item := range copies {
+			if len(item.CopyQuery) > 0 {
+				dirs = append(dirs, item.CopyStagedDir)
+			} else {
+				dirs, rows = append(dirs, item.StagedDir), rows+item.Rows
+			}
+		}
+		query, err := renderCopyOfDirs(b.target, dirs, d.templates.copyInto)
+		if err != nil {
+			return fmt.Errorf("copyInto template: %w", err)
+		}
+		if err := d.runStoreQuery(ctx, b, query, copies[0].Round, rows); err != nil {
 			return err
 		}
 	}

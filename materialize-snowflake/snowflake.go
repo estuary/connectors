@@ -980,6 +980,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Table:     b.target.Identifier,
 				Query:     copyIntoQuery,
 				StagedDir: dir,
+				Version:   d.version,
 				Round:     round,
 				Rows:      rows,
 			})

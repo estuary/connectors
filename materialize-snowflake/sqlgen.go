@@ -379,8 +379,8 @@ COPY INTO {{ $.Table.Identifier }} (
 	{{- if $ind }}, {{ end -}}
 	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
-	FROM {{ $.File }}
-);
+	FROM {{ if $.Pattern }}@flow_v1{{ else }}{{ $.File }}{{ end }}
+){{ if $.Pattern }} PATTERN = '{{ $.Pattern }}'{{ end }};
 {{ end }}
 
 
@@ -476,7 +476,11 @@ func renderTablePipeTemplate(table sql.Table, pipeName string, tpl *template.Tem
 
 type tableAndFile struct {
 	Table sql.Table
-	File  string
+	// File is the one staged path a template reads, unless Pattern is set.
+	File string
+	// Pattern matches the files of more than one staged path of the flow_v1
+	// stage, which a template reads in one scan.
+	Pattern string
 }
 
 // stagedDirsPattern matches the files of every staged dir in dirs, each a
@@ -487,6 +491,14 @@ func stagedDirsPattern(dirs []string) string {
 		names[i] = regexp.QuoteMeta(strings.TrimPrefix(d, "@flow_v1/"))
 	}
 	return ".*(" + strings.Join(names, "|") + ")/.*"
+}
+
+func renderCopyOfDirs(table sql.Table, dirs []string, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &tableAndFile{Table: table, Pattern: stagedDirsPattern(dirs)}); err != nil {
+		return "", err
+	}
+	return w.String(), nil
 }
 
 func renderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
