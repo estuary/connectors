@@ -103,6 +103,10 @@ func timestamptzLiteral(t time.Time) string {
 	return t.UTC().Truncate(time.Microsecond).Format("2006-01-02T15:04:05.000000Z07:00")
 }
 
+// quoteLiteral renders a transformed value as a single-quoted SQL string
+// literal, matching every other literal this package emits.
+var quoteLiteral = sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'"))
+
 func (b *mergeBoundsBuilder) build() []mergeBound {
 	conditions := make([]mergeBound, len(b.lower))
 

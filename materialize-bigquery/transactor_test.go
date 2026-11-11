@@ -9,7 +9,6 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	m "github.com/estuary/connectors/go/materialize"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -31,13 +30,11 @@ func TestLoadResultsTableName(t *testing.T) {
 
 func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 	var tr = &transactor{
-		rangeFirst:   make(checkpoints),
-		stateFirst:   make(checkpoints),
-		flat:         make(map[string]flatCheckpoint),
-		primaryShard: rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
-		rangeKey:     rangeKey,
-		be:           &m.BindingEvents{},
-		skipCleanup:  true,
+		cp:                    make(checkpoint),
+		peerShardsCheckpoints: make(rangeCheckpoints),
+		primaryShard:          rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
+		rangeKey:              rangeKey,
+		be:                    &m.BindingEvents{},
 	}
 	for _, sk := range stateKeys {
 		tr.bindings = append(tr.bindings, &binding{target: sql.Table{StateKey: sk}})
@@ -45,29 +42,10 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 	return tr
 }
 
-// reduce applies a connector state update to a state document, as the runtime
-// does.
-func reduce(t *testing.T, state string, update *pf.ConnectorState) string {
-	t.Helper()
-	require.True(t, update.MergePatch)
-	var doc, patch any
-	require.NoError(t, json.Unmarshal([]byte(state), &doc))
-	require.NoError(t, json.Unmarshal(update.UpdatedJson, &patch))
-	return string(mustMarshal(t, boilerplate.ApplyMergePatch(doc, patch)))
-}
-
-func jobPrefixes(items []*checkpointItem) []string {
-	var out []string
-	for _, item := range items {
-		out = append(out, item.JobPrefix)
-	}
-	return out
-}
-
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	tr := testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
-	tr.stage("a_table.v1", &checkpointItem{Query: "MERGE INTO a", JobPrefix: "jp"})
-	tr.stage("b_table.v1", &checkpointItem{Query: "MERGE INTO b", JobPrefix: "jp"})
+	tr.cp["a_table.v1"] = &checkpointItem{Query: "MERGE INTO a", JobPrefix: "jp"}
+	tr.cp["b_table.v1"] = &checkpointItem{Query: "MERGE INTO b", JobPrefix: "jp"}
 
 	// No staged entry's state key is requested: nothing may execute (the nil
 	// client would panic if a query ran) and no state update is returned, so
@@ -75,8 +53,8 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	state, err := tr.Acknowledge(context.Background(), nil, []string{"c_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
-	require.Len(t, tr.pendingItems("a_table.v1"), 1)
-	require.Len(t, tr.pendingItems("b_table.v1"), 1)
+	require.NotNil(t, tr.cp["a_table.v1"])
+	require.NotNil(t, tr.cp["b_table.v1"])
 }
 
 func TestEntryWithoutTruncationOmitsIt(t *testing.T) {
@@ -90,118 +68,79 @@ func TestTimestampLiteralFloorsToMicroseconds(t *testing.T) {
 	require.Equal(t, "TIMESTAMP '2026-09-29 11:34:56.999999 UTC'", timestampLiteral(ts))
 }
 
-func TestStartCommitState(t *testing.T) {
-	t.Run("an entry nests under this shard's range, then its state key", func(t *testing.T) {
-		var tr = testTransactor(upperRangeKey, "a_table.v1")
-		tr.stage("a_table.v1", &checkpointItem{NeedsMerge: true, SourceURIs: []string{"gs://b/f1"}, JobPrefix: "jp", round: 3})
+func TestUnmarshalStateRouting(t *testing.T) {
+	var mixedState = json.RawMessage(`{
+		"00000000-7fffffff": {"a_table.v1": {"Query": "QL", "JobPrefix": "pl"}},
+		"80000000-ffffffff": {"a_table.v1": {"Query": "QU", "JobPrefix": "pu"}},
+		"a_table.v1": {"Query": "Q0", "JobPrefix": "p0"}
+	}`)
 
-		update, err := tr.startCommitState()
-		require.NoError(t, err)
-		require.True(t, update.MergePatch)
-		require.Equal(t, `{"80000000-ffffffff":{"a_table.v1":{"NeedsMerge":true,"SourceURIs":["gs://b/f1"],"JobPrefix":"jp"}}}`, string(update.UpdatedJson))
-	})
-
-	t.Run("the primary emits only its own entries", func(t *testing.T) {
-		var tr = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
+	t.Run("legacy top-level entries route to the legacy bucket", func(t *testing.T) {
+		var tr = testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
 		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
-			"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "state-first"}, "JobPrefix": "flat"},
-			"80000000-ffffffff": {"b_table.v1": {"JobPrefix": "peer"}}
+			"a_table.v1": {"Query": "Q1", "JobPrefix": "p1"},
+			"b_table.v1": {"Query": "Q2", "JobPrefix": "p2"}
 		}`)))
-		tr.stage("b_table.v1", &checkpointItem{JobPrefix: "own"})
-
-		update, err := tr.startCommitState()
-		require.NoError(t, err)
-		require.Equal(t, `{"00000000-7fffffff":{"b_table.v1":{"JobPrefix":"own"}}}`, string(update.UpdatedJson))
+		require.Empty(t, tr.cp)
+		require.Len(t, tr.peerShardsCheckpoints[legacyRangeKey], 2)
+		require.Equal(t, "Q1", tr.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Query)
 	})
 
-	t.Run("nothing staged", func(t *testing.T) {
-		update, err := testTransactor(fullRangeKey, "a_table.v1").startCommitState()
-		require.NoError(t, err)
-		require.Equal(t, `{"00000000-ffffffff":{}}`, string(update.UpdatedJson))
+	t.Run("single shard routes own range to cp, others to peers", func(t *testing.T) {
+		var tr = testTransactor(fullRangeKey, "a_table.v1")
+		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
+			"00000000-ffffffff": {"a_table.v1": {"Query": "OWN", "JobPrefix": "po"}},
+			"00000000-7fffffff": {"a_table.v1": {"Query": "QL", "JobPrefix": "pl"}},
+			"a_table.v1": {"Query": "Q0", "JobPrefix": "p0"}
+		}`)))
+		require.Equal(t, "OWN", tr.cp["a_table.v1"].Query)
+		require.Equal(t, "QL", tr.peerShardsCheckpoints[lowerRangeKey]["a_table.v1"].Query)
+		require.Equal(t, "Q0", tr.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Query)
+	})
+
+	t.Run("multi-shard primary routes own range to cp", func(t *testing.T) {
+		var tr = testTransactor(lowerRangeKey, "a_table.v1")
+		require.NoError(t, tr.UnmarshalState(mixedState))
+		require.Equal(t, "QL", tr.cp["a_table.v1"].Query)
+		require.Equal(t, "QU", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Query)
+		require.Equal(t, "Q0", tr.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Query)
+	})
+
+	t.Run("non-primary discards everything", func(t *testing.T) {
+		var tr = testTransactor(upperRangeKey, "a_table.v1")
+		require.NoError(t, tr.UnmarshalState(mixedState))
+		require.Empty(t, tr.cp)
+		require.Empty(t, tr.peerShardsCheckpoints)
 	})
 }
 
-func TestUnmarshalState(t *testing.T) {
-	t.Run("range-first layout", func(t *testing.T) {
-		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
-			"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "peer"}},
-			"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "own"}}
-		}`)))
-		require.Equal(t, []string{"own", "peer"}, jobPrefixes(tr.pendingItems("a_table.v1")))
-		require.Equal(t, "own", tr.rangeFirst[lowerRangeKey]["a_table.v1"].JobPrefix)
-		require.Empty(t, tr.stateFirst)
-		require.Empty(t, tr.flat)
-	})
-
-	t.Run("state-key-first layout", func(t *testing.T) {
-		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{"a_table.v1": {
-			"80000000-ffffffff": {"JobPrefix": "peer"},
-			"00000000-7fffffff": {"JobPrefix": "own"}
-		}}`)))
-		require.Equal(t, []string{"own", "peer"}, jobPrefixes(tr.pendingItems("a_table.v1")))
-		require.Equal(t, "own", tr.stateFirst["a_table.v1"][lowerRangeKey].JobPrefix)
-		require.Empty(t, tr.rangeFirst)
-		require.Empty(t, tr.flat)
-	})
-
-	t.Run("flat layout", func(t *testing.T) {
-		var tr = testTransactor(fullRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{"a_table.v1": {
-			"Query": "MERGE INTO a", "SourceURIs": ["gs://b/f1"], "JobPrefix": "flat", "TempTableName": "tmp"
-		}}`)))
-		require.Equal(t,
-			[]*checkpointItem{{Query: "MERGE INTO a", SourceURIs: []string{"gs://b/f1"}, JobPrefix: "flat", TempTableName: "tmp"}},
-			tr.pendingItems("a_table.v1"))
-		require.Equal(t, []string{"JobPrefix", "Query", "SourceURIs", "TempTableName"}, tr.flat["a_table.v1"].fields)
-		require.Empty(t, tr.rangeFirst)
-		require.Empty(t, tr.stateFirst)
-	})
-
-	// The three layouts for one state key, as merge patches of different
-	// versions leave them.
-	var mixed = json.RawMessage(`{
+// A rollback from a version that writes {stateKey: {rangeKey: entry}}: its
+// entries are held like this version's own, and clear where they were found.
+func TestStateFirstEntriesConvertAndClear(t *testing.T) {
+	var tr = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
+	tr.skipCleanup = true
+	require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
+		"00000000-7fffffff": {},
+		"80000000-ffffffff": {"b_table.v1": {"JobPrefix": "b-upper"}},
 		"a_table.v1": {
-			"80000000-ffffffff": {"JobPrefix": "state-first-upper"},
-			"00000000-7fffffff": {"JobPrefix": "state-first-lower"},
-			"JobPrefix": "flat"
+			"00000000-7fffffff": {"JobPrefix": "a-lower"},
+			"80000000-ffffffff": {"JobPrefix": "a-upper"}
 		},
-		"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "range-first-upper"}},
-		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "range-first-lower"}}
-	}`)
+		"b_table.v1": {}
+	}`)))
+	require.Equal(t, "a-lower", tr.cp["a_table.v1"].JobPrefix)
+	require.Equal(t, "a-upper", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].JobPrefix)
+	require.Equal(t, "b-upper", tr.peerShardsCheckpoints[upperRangeKey]["b_table.v1"].JobPrefix)
+	require.Empty(t, tr.peerShardsCheckpoints[legacyRangeKey])
 
-	t.Run("entries apply by layout, then by range key", func(t *testing.T) {
-		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(mixed))
-		require.Equal(t,
-			[]string{"state-first-lower", "state-first-upper", "flat", "range-first-lower", "range-first-upper"},
-			jobPrefixes(tr.pendingItems("a_table.v1")))
-	})
-
-	t.Run("a non-primary shard recovers nothing", func(t *testing.T) {
-		var tr = testTransactor(upperRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(mixed))
-		require.Empty(t, tr.pendingItems("a_table.v1"))
-	})
-
-	t.Run("an unknown entry field is ignored", func(t *testing.T) {
-		var tr = testTransactor(fullRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
-			"00000000-ffffffff": {"a_table.v1": {"JobPrefix": "range-first", "Later": 1}},
-			"a_table.v1": {"00000000-ffffffff": {"JobPrefix": "state-first", "Later": 1}}
-		}`)))
-		require.Equal(t, []*checkpointItem{{JobPrefix: "state-first"}, {JobPrefix: "range-first"}}, tr.pendingItems("a_table.v1"))
-	})
-
-	t.Run("what clearing leaves behind holds no entry", func(t *testing.T) {
-		var tr = testTransactor(fullRangeKey, "a_table.v1")
-		require.NoError(t, tr.UnmarshalState(json.RawMessage(`{"a_table.v1": {}, "00000000-ffffffff": {}}`)))
-		require.Empty(t, tr.pendingItems("a_table.v1"))
-		require.Empty(t, tr.rangeFirst)
-		require.Empty(t, tr.stateFirst)
-		require.Empty(t, tr.flat)
-	})
+	update, err := tr.Acknowledge(context.Background(), nil, nil)
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"a_table.v1": null,
+		"80000000-ffffffff": {"b_table.v1": null}
+	}`, string(update.UpdatedJson))
+	require.Empty(t, tr.cp)
+	require.Empty(t, tr.peerShardsCheckpoints[upperRangeKey])
 }
 
 func TestMergePeerStatePatches(t *testing.T) {
@@ -214,226 +153,26 @@ func TestMergePeerStatePatches(t *testing.T) {
 	}
 
 	t.Run("no-op when non-primary", func(t *testing.T) {
-		var tr = testTransactor(upperRangeKey, "a_table.v1")
-		require.NoError(t, tr.mergePeerStatePatches(patches(`{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "p"}}}`)))
-		require.Empty(t, tr.pendingItems("a_table.v1"))
+		var tr = testTransactor(upperRangeKey)
+		require.NoError(t, tr.mergePeerStatePatches(patches(`{"00000000-7fffffff": {"a_table.v1": {"Query": "Q", "JobPrefix": "p"}}}`)))
+		require.Empty(t, tr.peerShardsCheckpoints)
 	})
 
 	t.Run("own contribution is skipped, peers merged", func(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		tr.stage("a_table.v1", &checkpointItem{JobPrefix: "own", round: 2})
 		require.NoError(t, tr.mergePeerStatePatches(patches(
-			`{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "own"}}}`,
-			`{"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "peer"}}}`,
+			`{"00000000-7fffffff": {"a_table.v1": {"Query": "OWN", "JobPrefix": "po"}}}`,
+			`{"80000000-ffffffff": {"a_table.v1": {"Query": "PEER", "JobPrefix": "pp"}}}`,
 		)))
-		require.Equal(t, []string{"own", "peer"}, jobPrefixes(tr.pendingItems("a_table.v1")))
-		// The echo didn't replace the entry this session staged.
-		require.Equal(t, 2, tr.staged("a_table.v1").round)
-	})
-
-	t.Run("a peer's state-key-first patch is merged", func(t *testing.T) {
-		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		tr.stage("a_table.v1", &checkpointItem{JobPrefix: "own"})
-		require.NoError(t, tr.mergePeerStatePatches(patches(
-			`{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "own"}}}`,
-			`{"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "peer"}}}`,
-		)))
-		require.Equal(t, []string{"peer", "own"}, jobPrefixes(tr.pendingItems("a_table.v1")))
-		require.Equal(t, "peer", tr.stateFirst["a_table.v1"][upperRangeKey].JobPrefix)
-	})
-
-	t.Run("a flat patch is merged", func(t *testing.T) {
-		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		require.NoError(t, tr.mergePeerStatePatches(patches(`{"a_table.v1": {"JobPrefix": "flat"}}`)))
-		require.Equal(t, []string{"flat"}, jobPrefixes(tr.pendingItems("a_table.v1")))
-		require.Equal(t, []string{"JobPrefix"}, tr.flat["a_table.v1"].fields)
+		require.Empty(t, tr.cp) // own patch is not folded back
+		require.Len(t, tr.peerShardsCheckpoints, 1)
+		require.Equal(t, "PEER", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Query)
 	})
 
 	t.Run("state reset patch errors", func(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1")
-		require.Error(t, tr.mergePeerStatePatches(patches(`null`, `{"a": {}}`)))
+		require.Error(t, tr.mergePeerStatePatches(patches(`null`, `{"a": 1}`)))
 	})
-}
-
-// Entries apply here without running a query, because none has staged files.
-func TestAcknowledgeClearsEachLayoutAtItsPath(t *testing.T) {
-	for _, tc := range []struct {
-		name, state, clear, after string
-	}{
-		{
-			name:  "range-first",
-			state: `{"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "own"}}, "80000000-ffffffff": {"a_table.v1": {"JobPrefix": "peer"}}}`,
-			clear: `{"00000000-7fffffff": {"a_table.v1": null}, "80000000-ffffffff": {"a_table.v1": null}}`,
-			after: `{"00000000-7fffffff": {}, "80000000-ffffffff": {}}`,
-		},
-		{
-			name:  "state-key-first",
-			state: `{"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "own"}, "80000000-ffffffff": {"JobPrefix": "peer"}}}`,
-			clear: `{"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}}`,
-			after: `{"a_table.v1": {}}`,
-		},
-		{
-			name:  "flat",
-			state: `{"a_table.v1": {"Query": "", "SourceURIs": null, "JobPrefix": "flat", "TempTableName": "tmp"}}`,
-			clear: `{"a_table.v1": {"Query": null, "SourceURIs": null, "JobPrefix": null, "TempTableName": null}}`,
-			after: `{"a_table.v1": {}}`,
-		},
-		{
-			name: "all three for one state key",
-			state: `{
-				"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "state-first"}, "JobPrefix": "flat", "TempTableName": "tmp"},
-				"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "range-first"}}
-			}`,
-			clear: `{
-				"a_table.v1": {"80000000-ffffffff": null, "JobPrefix": null, "TempTableName": null},
-				"00000000-7fffffff": {"a_table.v1": null}
-			}`,
-			after: `{"a_table.v1": {}, "00000000-7fffffff": {}}`,
-		},
-		{
-			name: "entries of an unbound state key stay",
-			state: `{
-				"a_table.v1": {"00000000-7fffffff": {"JobPrefix": "state-first"}},
-				"gone.v1": {"00000000-7fffffff": {"JobPrefix": "state-first"}, "JobPrefix": "flat"},
-				"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "range-first"}, "gone.v1": {"JobPrefix": "range-first"}}
-			}`,
-			clear: `{"a_table.v1": {"00000000-7fffffff": null}, "80000000-ffffffff": {"a_table.v1": null}}`,
-			after: `{
-				"a_table.v1": {},
-				"gone.v1": {"00000000-7fffffff": {"JobPrefix": "state-first"}, "JobPrefix": "flat"},
-				"80000000-ffffffff": {"gone.v1": {"JobPrefix": "range-first"}}
-			}`,
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var tr = testTransactor(lowerRangeKey, "a_table.v1")
-			require.NoError(t, tr.UnmarshalState(json.RawMessage(tc.state)))
-
-			update, err := tr.Acknowledge(t.Context(), nil, nil)
-			require.NoError(t, err)
-			require.JSONEq(t, tc.clear, string(update.UpdatedJson))
-			require.JSONEq(t, tc.after, reduce(t, tc.state, update))
-			require.Empty(t, tr.pendingItems("a_table.v1"))
-
-			// Nothing is left to apply, in memory or after a restart.
-			update, err = tr.Acknowledge(t.Context(), nil, nil)
-			require.NoError(t, err)
-			require.Nil(t, update)
-
-			var restarted = testTransactor(lowerRangeKey, "a_table.v1")
-			require.NoError(t, restarted.UnmarshalState(json.RawMessage(tc.after)))
-			update, err = restarted.Acknowledge(t.Context(), nil, nil)
-			require.NoError(t, err)
-			require.Nil(t, update)
-		})
-	}
-}
-
-// A flat entry clears by its fields, so that a state-key-first entry merged
-// onto the same state key meanwhile survives.
-func TestFlatEntryClearKeepsStateFirstEntry(t *testing.T) {
-	var tr = testTransactor(fullRangeKey, "a_table.v1")
-	require.NoError(t, tr.UnmarshalState(json.RawMessage(`{"a_table.v1": {"JobPrefix": "flat", "TempTableName": "tmp"}}`)))
-
-	update, err := tr.Acknowledge(t.Context(), nil, nil)
-	require.NoError(t, err)
-	require.JSONEq(t,
-		`{"a_table.v1": {"00000000-ffffffff": {"JobPrefix": "later"}}}`,
-		reduce(t, `{"a_table.v1": {"JobPrefix": "flat", "TempTableName": "tmp", "00000000-ffffffff": {"JobPrefix": "later"}}}`, update))
-}
-
-// Runtime v1 sends no statePatches: the shard applies what it staged itself.
-func TestSingleShardRoundTripWithoutStatePatches(t *testing.T) {
-	var tr = testTransactor(fullRangeKey, "a_table.v1")
-	tr.stage("a_table.v1", &checkpointItem{JobPrefix: "own"})
-
-	started, err := tr.startCommitState()
-	require.NoError(t, err)
-	var state = reduce(t, `{}`, started)
-	require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": {"JobPrefix": "own"}}}`, state)
-
-	acked, err := tr.Acknowledge(t.Context(), nil, nil)
-	require.NoError(t, err)
-	require.JSONEq(t, `{"00000000-ffffffff": {"a_table.v1": null}}`, string(acked.UpdatedJson))
-	require.JSONEq(t, `{"00000000-ffffffff": {}}`, reduce(t, state, acked))
-}
-
-// Runtime v2 with two shards: both stage, the primary applies and clears
-// both entries, and a restart before the clearing commits recovers both.
-func TestTwoShardRoundTrip(t *testing.T) {
-	var primary = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
-	var secondary = testTransactor(upperRangeKey, "a_table.v1", "b_table.v1")
-	primary.stage("a_table.v1", &checkpointItem{JobPrefix: "lower-a"})
-	secondary.stage("a_table.v1", &checkpointItem{JobPrefix: "upper-a"})
-	secondary.stage("b_table.v1", &checkpointItem{JobPrefix: "upper-b"})
-
-	// The shards' patches merge in either order.
-	var state = `{}`
-	var statePatches []json.RawMessage
-	for _, tr := range []*transactor{secondary, primary} {
-		started, err := tr.startCommitState()
-		require.NoError(t, err)
-		state = reduce(t, state, started)
-		statePatches = append(statePatches, started.UpdatedJson)
-	}
-	require.JSONEq(t, `{
-		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "lower-a"}},
-		"80000000-ffffffff": {"a_table.v1": {"JobPrefix": "upper-a"}, "b_table.v1": {"JobPrefix": "upper-b"}}
-	}`, state)
-
-	// A restart at this point recovers every entry on the primary alone.
-	var restarted = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
-	require.NoError(t, restarted.UnmarshalState(json.RawMessage(state)))
-	require.Equal(t, []string{"lower-a", "upper-a"}, jobPrefixes(restarted.pendingItems("a_table.v1")))
-	require.Equal(t, []string{"upper-b"}, jobPrefixes(restarted.pendingItems("b_table.v1")))
-
-	acked, err := secondary.Acknowledge(t.Context(), statePatches, nil)
-	require.NoError(t, err)
-	require.Nil(t, acked)
-	require.Empty(t, secondary.pendingItems("a_table.v1"))
-	require.Empty(t, secondary.pendingItems("b_table.v1"))
-
-	// The primary's own entry comes first, so it names the coalesced job.
-	require.NoError(t, primary.mergePeerStatePatches(statePatches))
-	require.Equal(t, []string{"lower-a", "upper-a"}, jobPrefixes(primary.pendingItems("a_table.v1")))
-
-	acked, err = primary.Acknowledge(t.Context(), statePatches, nil)
-	require.NoError(t, err)
-	require.JSONEq(t, `{
-		"00000000-7fffffff": {"a_table.v1": null},
-		"80000000-ffffffff": {"a_table.v1": null, "b_table.v1": null}
-	}`, string(acked.UpdatedJson))
-	require.JSONEq(t, `{"00000000-7fffffff": {}, "80000000-ffffffff": {}}`, reduce(t, state, acked))
-	require.Empty(t, primary.pendingItems("a_table.v1"))
-	require.Empty(t, primary.pendingItems("b_table.v1"))
-}
-
-// A rollback from a version that writes the state-key-first layout: the
-// primary recovers both shards' entries, applies them in that version's order
-// and clears them where they were written.
-func TestRollbackFromStateFirstWriter(t *testing.T) {
-	var state = `{"a_table.v1": {
-		"00000000-7fffffff": {"JobPrefix": "lower"},
-		"80000000-ffffffff": {"JobPrefix": "upper"}
-	}}`
-	var primary = testTransactor(lowerRangeKey, "a_table.v1")
-	require.NoError(t, primary.UnmarshalState(json.RawMessage(state)))
-	require.Equal(t, []string{"lower", "upper"}, jobPrefixes(primary.pendingItems("a_table.v1")))
-
-	acked, err := primary.Acknowledge(t.Context(), nil, nil)
-	require.NoError(t, err)
-	require.JSONEq(t, `{"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}}`, string(acked.UpdatedJson))
-	state = reduce(t, state, acked)
-	require.JSONEq(t, `{"a_table.v1": {}}`, state)
-
-	// The next transaction stages in the layout this version writes.
-	primary.stage("a_table.v1", &checkpointItem{JobPrefix: "next"})
-	started, err := primary.startCommitState()
-	require.NoError(t, err)
-	require.JSONEq(t, `{
-		"a_table.v1": {},
-		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "next"}}
-	}`, reduce(t, state, started))
 }
 
 func TestSchemaForColsStripsPolicyTags(t *testing.T) {
