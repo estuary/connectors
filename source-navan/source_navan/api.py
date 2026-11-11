@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from logging import Logger
 from typing import AsyncGenerator
 
@@ -11,6 +11,7 @@ from .utils import dt_to_str
 
 API_BASE_URL = "https://api.navan.com/v1"
 DEFAULT_PAGE_SIZE = 100
+NAVAN_FOUNDING_YEAR = 2015
 
 BookingsResponse = ApiResponse[Booking]
 
@@ -20,6 +21,8 @@ async def _fetch_bookings_request(
     log: Logger,
     page: int,
     page_size: int,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
     updated_from: datetime | None = None,
     updated_to: datetime | None = None,
 ) -> BookingsResponse:
@@ -29,6 +32,12 @@ async def _fetch_bookings_request(
         "page": page,
         "size": page_size,
     }
+
+    if created_from is not None:
+        params["createdFrom"] = int(created_from.timestamp())
+
+    if created_to is not None:
+        params["createdTo"] = int(created_to.timestamp())
 
     if updated_from is not None:
         params["updatedFrom"] = int(updated_from.timestamp())
@@ -58,12 +67,17 @@ async def fetch_bookings_page(
         f"Fetching bookings page {page} with cutoff: {dt_to_str(cutoff)})",
     )
 
+    # A booking's `created` never changes, so bounding by it means an update
+    # can't remove a booking from the results and shift later pages. Navan
+    # rejects `updatedTo` without `updatedFrom`, so we set both ends of the
+    # `created` range.
     response = await _fetch_bookings_request(
         http,
         log,
         page=page,
         page_size=DEFAULT_PAGE_SIZE,
-        updated_to=cutoff,
+        created_from=datetime(NAVAN_FOUNDING_YEAR, 1, 1, tzinfo=UTC),
+        created_to=cutoff,
     )
 
     for booking in response.data:
