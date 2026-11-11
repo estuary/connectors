@@ -975,7 +975,8 @@ func TestStoreUniqueConflictsFail(t *testing.T) {
 	h.fake.seed("companies", record{"externalId": "other", "domainName": map[string]any{"primaryLinkUrl": "acme.com"}})
 	err := h.store(h.doc(0, `{"id":"k1","domain":"acme.com"}`))
 	require.ErrorContains(t, err, `the domainName value of the document with key "k1" belongs to another record`)
-	require.Empty(t, h.fake.byKey("companies", "k1"))
+	// The value waits for the end of the transaction, so the record is written without it first.
+	require.Nil(t, fakeGet(h.only("companies", "k1"), "domainName.primaryLinkUrl"))
 }
 
 func TestStoreInvalidValues(t *testing.T) {
@@ -1849,14 +1850,15 @@ func TestStoreUniqueValueMoves(t *testing.T) {
 	require.Empty(t, fakeGet(h.only("companies", "d"), "domainName.primaryLinkUrl"))
 	require.Equal(t, "Delta", h.only("companies", "d")["name"])
 
-	// A swap can't be written in one go: each value is still held when the other is written.
+	// A swap: the records are written without the domains, then give them up, then take the other's.
 	h = newHarness(t, companies(""))
 	h.fake.seed("companies", record{"externalId": "a", "domainName": map[string]any{"primaryLinkUrl": "acme.com"}})
 	h.fake.seed("companies", record{"externalId": "b", "domainName": map[string]any{"primaryLinkUrl": "beta.com"}})
 	require.NoError(t, h.store(h.doc(0, `{"id":"a","domain":"beta.com"}`), h.doc(0, `{"id":"b","domain":"acme.com"}`)))
-	require.Equal(t, map[string]int{"domainName_held_by_another_record": 2}, h.stats("companies").skipped)
-	require.Equal(t, "acme.com", fakeGet(h.only("companies", "a"), "domainName.primaryLinkUrl"))
-	require.Equal(t, []int{2}, h.fake.batches, "a's held value leaves it nothing more to write")
+	require.Equal(t, stats{received: 2, updated: 2}, h.stats("companies"))
+	require.Equal(t, "beta.com", fakeGet(h.only("companies", "a"), "domainName.primaryLinkUrl"))
+	require.Equal(t, "acme.com", fakeGet(h.only("companies", "b"), "domainName.primaryLinkUrl"))
+	require.Equal(t, []int{2, 2, 2}, h.fake.batches)
 }
 
 func TestStoreCreateRefusedByExistingKey(t *testing.T) {

@@ -276,6 +276,72 @@ func runContract(t *testing.T, open func(t *testing.T) contractTwenty) {
 		require.Empty(t, rows)
 	})
 
+	t.Run("records may share an empty unique value, so a swap can clear both before writing them", func(t *testing.T) {
+		tw, key, domain := setup(t)
+		a := create(t, tw.c, "companies", record{"name": "a", "externalId": key("a"), "domainName": record{"primaryLinkUrl": domain("x")}})
+		b := create(t, tw.c, "companies", record{"name": "b", "externalId": key("b"), "domainName": record{"primaryLinkUrl": domain("y")}})
+		empty := record{"primaryLinkUrl": "", "primaryLinkLabel": nil, "secondaryLinks": nil}
+		_, err := tw.c.upsert(ctx, "companies", []record{
+			{"id": a["id"], "externalId": key("a"), "domainName": empty},
+			{"id": b["id"], "externalId": key("b"), "domainName": empty},
+		})
+		require.NoError(t, err)
+		_, err = tw.c.upsert(ctx, "companies", []record{
+			{"id": a["id"], "externalId": key("a"), "domainName": record{"primaryLinkUrl": domain("y")}},
+			{"id": b["id"], "externalId": key("b"), "domainName": record{"primaryLinkUrl": domain("x")}},
+		})
+		require.NoError(t, err)
+		require.Contains(t, read(t, tw.c, "companies", a["id"].(string))["domainName"].(map[string]any)["primaryLinkUrl"], "y")
+		require.Contains(t, read(t, tw.c, "companies", b["id"].(string))["domainName"].(map[string]any)["primaryLinkUrl"], "x")
+
+		p := create(t, tw.c, "people", record{"externalId": key("p"), "emails": record{"primaryEmail": key("p") + "@example.com"}})
+		q := create(t, tw.c, "people", record{"externalId": key("q"), "emails": record{"primaryEmail": key("q") + "@example.com"}})
+		_, err = tw.c.upsert(ctx, "people", []record{
+			{"id": p["id"], "externalId": key("p"), "emails": record{"primaryEmail": ""}},
+			{"id": q["id"], "externalId": key("q"), "emails": record{"primaryEmail": ""}},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("an empty link URL loses the label and promotes a secondary link, and a stand-in keeps both", func(t *testing.T) {
+		tw, key, domain := setup(t)
+		blog := []any{map[string]any{"url": "https://blog-" + tw.tag + ".example.com", "label": "Blog"}}
+		link := func(id string) map[string]any {
+			return read(t, tw.c, "companies", id)["domainName"].(map[string]any)
+		}
+		a := create(t, tw.c, "companies", record{"name": "a", "externalId": key("a"), "domainName": record{"primaryLinkUrl": domain("x"), "primaryLinkLabel": "A"}})
+		b := create(t, tw.c, "companies", record{"name": "b", "externalId": key("b"), "domainName": record{"primaryLinkUrl": domain("y"), "primaryLinkLabel": "B", "secondaryLinks": blog}})
+		_, err := tw.c.upsert(ctx, "companies", []record{
+			{"id": a["id"], "externalId": key("a"), "domainName": record{"primaryLinkUrl": "", "primaryLinkLabel": "A"}},
+			{"id": b["id"], "externalId": key("b"), "domainName": record{"primaryLinkUrl": "", "primaryLinkLabel": "B", "secondaryLinks": blog}},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "", link(a["id"].(string))["primaryLinkLabel"])
+		got := link(b["id"].(string))
+		require.Contains(t, got["primaryLinkUrl"], "blog-"+tw.tag)
+		require.Equal(t, "Blog", got["primaryLinkLabel"])
+
+		c := create(t, tw.c, "companies", record{"name": "c", "externalId": key("c"), "domainName": record{"primaryLinkUrl": domain("z"), "primaryLinkLabel": "C", "secondaryLinks": blog}})
+		stand := c["id"].(string) + ".invalid"
+		_, err = tw.c.upsert(ctx, "companies", []record{
+			{"id": c["id"], "externalId": key("c"), "domainName": record{"primaryLinkUrl": stand, "primaryLinkLabel": "C", "secondaryLinks": blog}},
+		})
+		require.NoError(t, err)
+		got = link(c["id"].(string))
+		require.Equal(t, stand, got["primaryLinkUrl"])
+		require.Equal(t, "C", got["primaryLinkLabel"])
+		require.Len(t, got["secondaryLinks"], 1)
+
+		// An empty primary email keeps the additional ones, without promoting any.
+		extra := []any{key("p2") + "@example.com"}
+		p := create(t, tw.c, "people", record{"externalId": key("p"), "emails": record{"primaryEmail": key("p") + "@example.com", "additionalEmails": extra}})
+		_, err = tw.c.upsert(ctx, "people", []record{{"id": p["id"], "externalId": key("p"), "emails": record{"primaryEmail": ""}}})
+		require.NoError(t, err)
+		emails := read(t, tw.c, "people", p["id"].(string))["emails"].(map[string]any)
+		require.Equal(t, "", emails["primaryEmail"])
+		require.Equal(t, extra, emails["additionalEmails"])
+	})
+
 	t.Run("a batch holding one unique value twice is rejected whole", func(t *testing.T) {
 		tw, key, domain := setup(t)
 		_, err := tw.c.create(ctx, "companies", []record{
@@ -914,6 +980,26 @@ func runContract(t *testing.T, open func(t *testing.T) contractTwenty) {
 		require.Equal(t, co["id"], rows[0]["pCompanyId"])
 	})
 
+	t.Run("two companies swap domains, each keeping its label and secondary links", func(t *testing.T) {
+		tw, key, domain := setup(t)
+		blog := []any{map[string]any{"url": "https://blog-" + tw.tag + ".example.com", "label": "Blog"}}
+		a := create(t, tw.c, "companies", record{"name": "a", "externalId": key("a"), "domainName": record{"primaryLinkUrl": domain("x"), "primaryLinkLabel": "A", "secondaryLinks": blog}})
+		b := create(t, tw.c, "companies", record{"name": "b", "externalId": key("b"), "domainName": record{"primaryLinkUrl": domain("y")}})
+		h := harnessFor(t, tw.c, companies(""))
+		doc := func(k, d string) storeItem {
+			raw, err := json.Marshal(map[string]any{"id": k, "domain": d})
+			require.NoError(t, err)
+			return h.doc(0, string(raw))
+		}
+		require.NoError(t, h.store(doc(key("a"), domain("y")), doc(key("b"), domain("x"))))
+		require.Equal(t, stats{received: 2, updated: 2}, h.stats("companies"))
+		got := read(t, tw.c, "companies", a["id"].(string))["domainName"].(map[string]any)
+		require.Contains(t, got["primaryLinkUrl"], domain("y"))
+		require.Equal(t, "A", got["primaryLinkLabel"])
+		require.Len(t, got["secondaryLinks"], 1)
+		require.Contains(t, read(t, tw.c, "companies", b["id"].(string))["domainName"].(map[string]any)["primaryLinkUrl"], domain("x"))
+	})
+
 	t.Run("filters match exactly and hide soft-deleted records unless asked", func(t *testing.T) {
 		tw, key, _ := setup(t)
 		a := create(t, tw.c, "companies", record{"name": "Contract a", "externalId": key("a")})
@@ -926,6 +1012,76 @@ func runContract(t *testing.T, open func(t *testing.T) contractTwenty) {
 		require.NoError(t, err)
 		require.Len(t, all, 1)
 		require.Equal(t, a["id"], all[0]["id"])
+	})
+
+	t.Run("a quoted filter value may hold commas, apostrophes, parentheses and brackets", func(t *testing.T) {
+		// Twenty v2.52 skips what is between a value's quotes when it counts parentheses and
+		// splits and(...) terms and [in] lists, so these values match like any other.
+		tw, key, _ := setup(t)
+		values := []string{"plain", "x,y", "O'Brien", "a(b", "a)b", "a[1]", "a],b", "'q,x'", "a, b", "a)("}
+		ids := map[string]string{}
+		var keys []string
+		for _, v := range values {
+			k := key(v)
+			keys = append(keys, k)
+			ids[k] = create(t, tw.c, "companies", record{"name": "Special " + v, "externalId": k})["id"].(string)
+		}
+		for _, k := range keys {
+			for _, deleted := range []bool{false, true} {
+				rows, err := tw.c.find(ctx, "companies", "externalId", []string{k}, deleted)
+				require.NoError(t, err, "%q", k)
+				require.Len(t, rows, 1, "%q", k)
+				require.Equal(t, ids[k], rows[0]["id"], "%q", k)
+			}
+		}
+		for _, deleted := range []bool{false, true} {
+			rows, err := tw.c.find(ctx, "companies", "externalId", keys, deleted)
+			require.NoError(t, err)
+			got := map[string]any{}
+			for _, r := range rows {
+				got[r["externalId"].(string)] = r["id"]
+			}
+			require.Len(t, got, len(keys))
+			for _, k := range keys {
+				require.Equal(t, ids[k], got[k], "%q", k)
+			}
+		}
+
+		// [eq] alone, inside and(...) and inside or(and(...)) as the transactor's writes use it.
+		for _, k := range keys {
+			rows, err := tw.c.findWhere(ctx, "companies", `externalId[eq]:"`+k+`"`)
+			require.NoError(t, err, "%q", k)
+			require.Len(t, rows, 1, "%q", k)
+			where, err := filterEq("externalId", k)
+			require.NoError(t, err)
+			rows, err = tw.c.update(ctx, "companies", []string{ids[k]}, record{"name": "Updated " + k}, where)
+			require.NoError(t, err, "%q", k)
+			require.Len(t, rows, 1, "%q", k)
+			where, err = pairFilter("externalId", []string{ids[k], ids[keys[0]]}, map[string]string{ids[k]: k, ids[keys[0]]: keys[0]})
+			require.NoError(t, err)
+			rows, err = tw.c.update(ctx, "companies", []string{ids[k]}, record{"name": "Paired " + k}, where)
+			require.NoError(t, err, "%q", k)
+			require.Len(t, rows, 1, "%q", k)
+		}
+		for _, k := range keys[1:] {
+			where, err := filterEq("externalId", k)
+			require.NoError(t, err)
+			rows, err := tw.c.remove(ctx, "companies", []string{ids[k]}, where, true)
+			require.NoError(t, err, "%q", k)
+			require.Len(t, rows, 1, "%q", k)
+		}
+
+		// A person's email, a composite subfield.
+		var emails []string
+		for _, local := range []string{"plain", "o'brien", "a(b)", "x,y"} {
+			emails = append(emails, strings.ToLower(local+"-"+tw.tag+"@example.com"))
+		}
+		for _, e := range emails[:2] {
+			create(t, tw.c, "people", record{"externalId": key(e), "emails": record{"primaryEmail": e}})
+		}
+		rows, err := tw.c.find(ctx, "people", "emails.primaryEmail", emails, false)
+		require.NoError(t, err)
+		require.Len(t, rows, 2)
 	})
 
 	t.Run("filtered update is a compare-and-set that never creates and skips soft-deleted records", func(t *testing.T) {

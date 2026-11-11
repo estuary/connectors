@@ -1061,6 +1061,9 @@ func (f *fakeTwenty) normalize(obj string, rec record) {
 			if more, _ := v["secondaryLinks"].([]any); fd.typ == "LINKS" && v["primaryLinkUrl"] == "" && len(more) > 0 {
 				first, _ := more[0].(map[string]any)
 				v["primaryLinkUrl"], v["primaryLinkLabel"], v["secondaryLinks"] = first["url"], first["label"], more[1:]
+			} else if fd.typ == "LINKS" && v["primaryLinkUrl"] == "" {
+				// A link without a URL loses its label too (v2.52).
+				v["primaryLinkLabel"] = ""
 			}
 		}
 	}
@@ -1213,7 +1216,8 @@ func twentyDomain(value string) (string, bool) {
 
 // fakeNode is a parsed Twenty REST filter: and(...), or(...), not(...), or field[op]:value, where
 // a value is a "quoted" string, a bare word (NULL, NOT_NULL, true, false, a uuid) or a [list] of
-// them. Like Twenty, it reads a quoted string as is: ü stays six characters.
+// them. Like Twenty, it reads a quoted string as is: ü stays six characters, and , ' ( ) [ ]
+// between the quotes are part of the value, not the filter's syntax (Twenty v2.52).
 type fakeNode struct {
 	op         string // "and", "or", "not" or "cmp"
 	items      []fakeNode

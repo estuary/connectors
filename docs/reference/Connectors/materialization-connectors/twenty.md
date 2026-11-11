@@ -207,8 +207,24 @@ The connector looks up unique values before writing. When another record holds o
 - `skip_field` (default) writes the record without that value and logs it.
 - `fail` stops the task.
 
-A value can move between records in one transaction if the record giving it up is written first.
-The connector writes in key order, 60 at a time.
+A value can move between records in one transaction, as when records swap values or a chain of
+records each take the next one's value. The records are written without the moving values, then
+the records giving values up hold a stand-in, then all take their new values. A stand-in is an
+empty value, or for a link with a label or secondary links, `<record id>.invalid`, which keeps
+them: Twenty drops a link's label, and makes its first secondary link the primary one, when its
+URL is empty. If the task stops between these writes, a record can show its stand-in until the
+transaction is replayed.
+
+A move goes through only if every record holding the value gives it up in the same transaction,
+so a swap or chain goes whole or not at all, and no record gives up its value without taking its
+new one. Records are written 60 at a time, and a value held by a record outside those 60 moves once
+the binding's documents are all written, before links to it are looked up. A value that still
+can't move is a conflict, so with `fail` the task stops after writing the transaction's other
+changes, and the record without that value. A record Twenty rejects takes none of its document's
+moved values, and the records it would have taken from keep theirs.
+
+A deleted record keeps its unique values when **Deletes** is `flag` or `trash`, or when someone
+moved it to Twenty's trash. Only `delete` frees them for another record.
 
 ### Matching existing records
 
@@ -270,8 +286,11 @@ and waits and retries when Twenty says the limit was reached.
   Twenty and deactivate it.
 - The connector looks up records before writing. A change someone makes in Twenty between the
   lookup and the write may be overwritten. The next change to the document usually corrects it.
-- Two records swapping a unique value, or a chain of moves, in one transaction is written only
-  in part. The rest follows **Unique Value Conflicts**.
+- A unique value stays with a record in Twenty's trash or flagged as deleted, so a document
+  recreated under a new key can't take it. See [Unique fields](#unique-fields).
+- A record giving up a unique value to another holds a stand-in, such as `<record id>.invalid`
+  for a domain with a label, for the moment between two writes, or until the transaction is
+  replayed if the task stops in between.
 
 ## Configuration
 

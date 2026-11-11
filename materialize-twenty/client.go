@@ -58,7 +58,9 @@ var (
 // filterable reports whether a value can go in a Twenty filter. Twenty reads a filter value as
 // the text between its quotes and decodes no escapes. So a quote, a backslash or a control
 // character can't be matched, and a quote would end the value and could add filter terms. A
-// longer value than maxValueBytes escaped would make the URL too long.
+// longer value than maxValueBytes escaped would make the URL too long. Other characters are fine:
+// Twenty skips what is between a value's quotes when it counts parentheses and splits and(...)
+// terms and [in] lists, so a value may hold , ' ( ) [ ] (v2.52, probed Nov 2026).
 func filterable(value string) bool {
 	return value != "" && !notFilterable.MatchString(value) && len(escape(value)) <= maxValueBytes
 }
