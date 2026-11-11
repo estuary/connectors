@@ -68,6 +68,11 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	// Captures without this setting will discover them as the catch-all type {} though
 	// the actual value will be a base64 string either way.
 	"discover_rowversion_as_bytes": common.FlagDisabled,
+
+	// When a table's key index is partitioned on a column other than its leading key
+	// column, backfill it one partition at a time, which SQL Server can do without sorting.
+	// Set `no_partition_aware_backfill` to backfill such tables in global key order instead.
+	"partition_aware_backfill": common.FlagEnabledForTasksCreatedAfter("2026-11-13"),
 }
 
 type AuthType string

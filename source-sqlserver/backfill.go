@@ -52,9 +52,47 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	return true
 }
 
-// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
+// ScanTableChunk fetches a chunk of rows from the specified table, resuming after the row key in `state.Scanned` if non-nil.
 func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var scan = db.newChunkScan(info, state, callback)
+
+	// A backfill never switches from key order to partition order. A fresh one goes by
+	// partition when the table can be backfilled that way, and one already underway goes
+	// by partition only if its state holds a partition. So a key-ordered backfill stays
+	// key-ordered even if partition-aware backfills are enabled while it is in progress,
+	// since its cursor has passed rows in every partition.
+	if state.Mode != sqlcapture.TableStateKeylessBackfill {
+		var metadata, err = decodeBackfillMetadata(state.Metadata)
+		if err != nil {
+			return false, nil, err
+		}
+
+		var partitionIndex, unusedReason = partitionedBackfillIndex(info, state)
+		var partitionOrdered = state.Scanned != nil && metadata.Partition != nil
+
+		// Warn once, on the first chunk of a backfill, when the table could have been
+		// backfilled by partition but its binding rules that out.
+		if unusedReason != "" && state.Scanned == nil {
+			log.WithFields(log.Fields{
+				"stream": scan.streamID,
+				"reason": unusedReason,
+			}).Warn("table could be backfilled one partition at a time but will be backfilled in key order, which sorts the whole table for every chunk")
+		}
+
+		switch {
+		case partitionIndex != nil && (state.Scanned == nil || partitionOrdered):
+			return db.scanPartitioned(ctx, scan, partitionIndex, metadata.Partition, backfillFilter)
+		case partitionOrdered:
+			// The resume key is a position within one partition, and in key order it
+			// would skip the rows of later partitions which sort below it. So the only
+			// safe way to continue in key order is from the beginning.
+			log.WithField("stream", scan.streamID).Warn("partition-ordered backfill can no longer continue by partition" +
+				" (partition-aware backfills disabled, or the table's key index is no longer partitioned on a non-leading key column)," +
+				" restarting its backfill in key order")
+			state.Scanned, state.Metadata = nil, clearedMetadata
+		}
+	}
+
 	query, args, err := backfill.BuildBackfillQuery(state, scan.schema, scan.table, scan.columnTypes, scan.chunkSize, backfillFilter)
 	if err != nil {
 		return false, nil, err
