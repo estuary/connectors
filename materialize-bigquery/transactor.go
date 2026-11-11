@@ -220,12 +220,7 @@ func prepareNewTransactor(
 				"schemaJson": schema,
 			}).Debug("bigquery schema for table")
 
-			fieldSchemas := make(map[string]*bigquery.FieldSchema)
-			for _, f := range schema {
-				fieldSchemas[strings.ToLower(f.Name)] = f
-			}
-
-			if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
+			if err = t.addBinding(binding, fieldSchemasByName(schema), &ep.Dialect); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -293,9 +288,18 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	return nil
 }
 
-// schemaForCols returns the temp/external table schema for cols. fieldSchemas
-// is keyed by lowercased column name, because BigQuery column names are
-// case-insensitive.
+// fieldSchemasByName indexes a table's field schemas by lowercased column
+// name, because BigQuery column names are case-insensitive.
+func fieldSchemasByName(schema bigquery.Schema) map[string]*bigquery.FieldSchema {
+	out := make(map[string]*bigquery.FieldSchema, len(schema))
+	for _, f := range schema {
+		out[strings.ToLower(f.Name)] = f
+	}
+	return out
+}
+
+// schemaForCols returns the temp/external table schema for cols, looking each
+// column up in fieldSchemas as built by fieldSchemasByName.
 func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSchema) ([]*bigquery.FieldSchema, error) {
 	s := make([]*bigquery.FieldSchema, 0, len(cols))
 
