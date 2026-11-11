@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import AsyncGenerator
 
@@ -108,7 +108,13 @@ async def fetch_bookings_changes(
     last_seen_modified = log_cursor
     cursor_timestamp = log_cursor
 
-    updated_to = datetime.now(tz=log_cursor.tzinfo)
+    # Navan may stamp `lastModified` in whole seconds. A booking modified later
+    # in the current second would then share the cursor's `lastModified`, and
+    # the `>` filter below would drop it. So polls stop at the last complete
+    # second.
+    updated_to = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if updated_to <= log_cursor:
+        return
 
     log.debug(
         f"Fetching bookings changes in range {dt_to_str(log_cursor)} to {dt_to_str(updated_to)}",
