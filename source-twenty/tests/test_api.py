@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import logging
+import traceback
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -9,10 +10,14 @@ from unittest.mock import AsyncMock
 import pytest
 from aiohttp import (
     ClientConnectorDNSError,
+    ClientOSError,
     ClientPayloadError,
     ClientRequest,
+    ClientResponseError,
+    ConnectionTimeoutError,
     InvalidURL,
     RequestInfo,
+    ServerDisconnectedError,
     TooManyRedirects,
 )
 from multidict import CIMultiDict, CIMultiDictProxy
@@ -209,9 +214,7 @@ def redirect_error():
     headers = CIMultiDictProxy(
         CIMultiDict({"Authorization": f"Bearer {config().credentials.access_token}"})
     )
-    return TooManyRedirects(
-        RequestInfo(url, "GET", headers, url), (), status=302, message="Too many"
-    )
+    return TooManyRedirects(RequestInfo(url, "GET", headers, url), ())
 
 
 class RoutedHTTP(FakeHTTP):
@@ -297,7 +300,7 @@ def test_connection_errors_never_show_the_api_key(monkeypatch):
         asyncio.run(
             resources.validate_credentials(LOG, FakeHTTP([redirect_error()]), config())
         )
-    assert "TooManyRedirects (HTTP 302)" in exc.value.errors[0]
+    assert exc.value.errors[0].endswith("\n\nTooManyRedirects")
     assert key not in exc.value.errors[0]
 
     http = FakeHTTP(
@@ -311,7 +314,7 @@ def test_connection_errors_never_show_the_api_key(monkeypatch):
     with pytest.raises(ConnectorValidationError) as exc:
         asyncio.run(connector.validate(LOG, validation_request("people")))
     assert exc.value.errors == [
-        "Object 'people': Connection failed while reading it. TooManyRedirects (HTTP 302)"
+        "Object 'people': Connection failed while reading it. TooManyRedirects"
     ]
 
 
@@ -328,7 +331,7 @@ def test_validate_reports_a_bad_url_as_a_connection_failure(monkeypatch):
     with pytest.raises(ConnectorValidationError) as exc:
         asyncio.run(connector.validate(LOG, validation_request("people")))
     assert exc.value.errors == [
-        "Object 'people': Connection failed while reading it. InvalidURL: not a url"
+        "Object 'people': Connection failed while reading it. InvalidURL"
     ]
 
 
@@ -1400,3 +1403,205 @@ def test_open_fails_when_every_bound_object_is_gone():
     ]
     with pytest.raises(RuntimeError, match="None of the capture's bound objects"):
         asyncio.run(resources.enabled_resources(LOG, http, config(), bindings))
+
+
+@pytest.mark.parametrize(
+    "companies, people",
+    [
+        (response({"records": []}), response({"records": []})),
+        (twenty_error(400, "BAD_REQUEST"), twenty_error(400, "BAD_REQUEST")),
+        (response({"records": []}), twenty_error(404, "NOT_FOUND")),
+    ],
+    ids=["invalid-response", "400", "mixed"],
+)
+def test_discover_fails_when_no_object_is_readable_even_with_one_permission_denied(
+    monkeypatch, companies, people
+):
+    # A key without the Workflows permission is refused workflows in most workspaces,
+    # so one PERMISSION_DENIED must not switch off the check for a workspace problem.
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response(
+                [
+                    object_metadata("companies"),
+                    object_metadata("people"),
+                    object_metadata("workflows"),
+                ]
+            ),
+            "/rest/companies": companies,
+            "/rest/people": people,
+            "/rest/workflows": twenty_error(400, "PERMISSION_DENIED"),
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
+
+    with pytest.raises((HTTPError, ValueError)) as exc:
+        asyncio.run(connector.discover(LOG, discover_request()))
+    assert "PERMISSION_DENIED" not in str(exc.value)
+
+
+def test_discover_with_no_objects_returns_no_bindings(monkeypatch):
+    http = RoutedHTTP({"/rest/metadata/objects": response([])})
+    connector = patched_connector(monkeypatch, http)
+
+    assert asyncio.run(connector.discover(LOG, discover_request())).bindings == []
+
+
+def key_request_info(path="rest/metadata/objects"):
+    url = URL(f"{BASE_URL}{path}")
+    headers = CIMultiDictProxy(
+        CIMultiDict({"Authorization": f"Bearer {config().credentials.access_token}"})
+    )
+    return RequestInfo(url, "GET", headers, url)
+
+
+def test_an_unparseable_reply_is_not_reported_as_an_http_status():
+    # aiohttp reports a reply it can't parse as a ClientResponseError with its
+    # parser's code 400; Twenty never sent that status.
+    error = ClientResponseError(
+        key_request_info(),
+        (),
+        status=400,
+        message="Bad status line:\n  Expected HTTP/:\n\n  b'SSH-2.0-OpenSSH_9.6'\n  ^",
+    )
+
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(resources.validate_credentials(LOG, FakeHTTP([error]), config()))
+
+    assert "HTTP 400" not in exc.value.errors[0]
+    assert "SSH" not in exc.value.errors[0]
+    assert config().credentials.access_token not in exc.value.errors[0]
+
+
+def test_a_connect_timeout_points_at_the_base_url():
+    # What aiohttp raises when a wrong host or port never answers.
+    error = ConnectionTimeoutError(
+        f"Connection timeout to host {BASE_URL}rest/metadata/objects?limit=1"
+    )
+
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(resources.validate_credentials(LOG, FakeHTTP([error]), config()))
+
+    assert "confirm the base URL" in exc.value.errors[0]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [ServerDisconnectedError(), ClientOSError(104, "Connection reset by peer")],
+    ids=["server-disconnected", "connection-reset"],
+)
+def test_a_dropped_connection_does_not_blame_the_base_url(error):
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(resources.validate_credentials(LOG, FakeHTTP([error]), config()))
+
+    assert "confirm the base URL" not in exc.value.errors[0]
+    assert "Please try again" in exc.value.errors[0]
+    assert exc.value.errors[0].endswith(type(error).__name__)
+
+
+def discover_failure_log(monkeypatch, error):
+    """Runs discover with one probe failing and returns what the CDK would log."""
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response(
+                [object_metadata("opportunities"), object_metadata("people")]
+            ),
+            "/rest/opportunities": error,
+            "/rest/people": records_response([], object_name="people"),
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
+    with pytest.raises(type(error)) as exc:
+        asyncio.run(connector.discover(LOG, discover_request()))
+    # The CDK logs an unhandled error with traceback.format_exception, which also
+    # prints the error's context.
+    return "".join(traceback.format_exception(exc.value))
+
+
+def test_a_failing_probe_is_logged_without_the_task_group(monkeypatch):
+    log = discover_failure_log(monkeypatch, twenty_error(401, "UNAUTHENTICATED"))
+
+    assert "ExceptionGroup" not in log
+
+
+def test_the_key_never_reaches_a_logged_discover_failure(monkeypatch):
+    error = TooManyRedirects(key_request_info("rest/opportunities"), ())
+    assert config().credentials.access_token in repr(error)
+
+    assert config().credentials.access_token not in discover_failure_log(
+        monkeypatch, error
+    )
+
+
+def echoed_key_error(status=403):
+    """An error body that repeats the Authorization header, as some proxies do."""
+    body = json.dumps(
+        {
+            "message": "Authorization header requires 'Credential' parameter. "
+            f"Authorization=Bearer {config().credentials.access_token}"
+        }
+    ).encode()
+    return HTTPError(
+        f"Encountered HTTP error status {status} which cannot be retried.\nURL: {BASE_URL}rest/people\nResponse:\n{body.decode()}",
+        status,
+        body,
+    )
+
+
+@pytest.mark.parametrize("step", ["credentials", "validate", "discover"])
+def test_error_messages_never_show_a_key_the_server_echoes(monkeypatch, caplog, step):
+    key = config().credentials.access_token
+    metadata = response([object_metadata("opportunities"), object_metadata("people")])
+
+    if step == "credentials":
+        with pytest.raises(ConnectorValidationError) as exc:
+            asyncio.run(
+                resources.validate_credentials(
+                    LOG, FakeHTTP([echoed_key_error()]), config()
+                )
+            )
+        shown = exc.value.errors
+    else:
+        http = RoutedHTTP(
+            {
+                "/rest/metadata/objects": metadata,
+                "/rest/opportunities": echoed_key_error(),
+                "/rest/people": records_response([], object_name="people"),
+            }
+        )
+        connector = patched_connector(monkeypatch, http)
+        if step == "validate":
+            with pytest.raises(ConnectorValidationError) as exc:
+                asyncio.run(
+                    connector.validate(
+                        LOG, validation_request("opportunities", "people")
+                    )
+                )
+            shown = exc.value.errors
+        else:
+            with caplog.at_level(logging.WARNING):
+                asyncio.run(connector.discover(LOG, discover_request()))
+            shown = [r.getMessage() for r in caplog.records]
+
+    assert shown
+    assert not [message for message in shown if key in message]
+
+
+@pytest.mark.parametrize("status", [401, 400, 500])
+def test_a_discover_failure_never_shows_a_key_the_server_echoes(monkeypatch, status):
+    # 401 and 500 fail discovery outright; a 400 on every object fails it as a
+    # workspace problem.
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response([object_metadata("people")]),
+            "/rest/people": echoed_key_error(status),
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
+
+    with pytest.raises(HTTPError) as exc:
+        asyncio.run(connector.discover(LOG, discover_request()))
+    shown = "".join(traceback.format_exception(exc.value))
+    assert exc.value.code == status
+    assert config().credentials.access_token not in shown
+    assert "<redacted>" in exc.value.message

@@ -5,7 +5,12 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from logging import Logger
 
-from aiohttp import ClientConnectorError, ClientError, ClientResponseError, InvalidURL
+from aiohttp import (
+    ClientConnectorError,
+    ClientError,
+    ConnectionTimeoutError,
+    InvalidURL,
+)
 
 from estuary_cdk.capture import Task, common, request
 from estuary_cdk.capture.common import ResourceState
@@ -52,12 +57,16 @@ async def _gather_bounded[T](
         async with semaphore:
             return await probe(name)
 
+    first_error: BaseException | None = None
     try:
         async with asyncio.TaskGroup() as group:
             tasks = [group.create_task(bounded(name)) for name in names]
     except BaseExceptionGroup as errors:
-        # The first failure cancels the other probes; raise it as itself.
-        raise errors.exceptions[0]
+        first_error = errors.exceptions[0]
+    if first_error is not None:
+        # The first failure cancels the other probes. Raised outside the except
+        # block, it is logged as itself rather than as part of the group.
+        raise first_error
     return [task.result() for task in tasks]
 
 
@@ -67,15 +76,34 @@ CONNECTION_ERRORS = (ClientError, TimeoutError, OSError)
 
 
 def _describe_connection_error(err: BaseException) -> str:
-    # Never use repr(): aiohttp's response errors include the request headers,
-    # which hold the API key.
-    if isinstance(err, ClientResponseError):
-        return f"{type(err).__name__} (HTTP {err.status})"
-    return f"{type(err).__name__}: {err}" if str(err) else type(err).__name__
+    # The class name only: aiohttp's repr() holds the request headers, so the API
+    # key, and some str() forms quote the raw reply. A ClientResponseError here is
+    # never a status Twenty sent, since the CDK turns those into HTTPError.
+    return type(err).__name__
+
+
+def _redact(text: str, config: EndpointConfig) -> str:
+    # A proxy can echo the request, Authorization header included, in its reply.
+    key = config.credentials.access_token
+    return text.replace(key, "<redacted>") if key else text
+
+
+def _redacted_error(err: HTTPError, config: EndpointConfig) -> HTTPError:
+    key = config.credentials.access_token
+    if not key or (key not in err.message and key.encode() not in (err.body or b"")):
+        return err
+    return HTTPError(
+        _redact(err.message, config),
+        err.code,
+        None
+        if err.body is None
+        else _redact(err.body.decode(errors="replace"), config).encode(),
+    )
 
 
 def _connection_hint(err: BaseException, base_url: str) -> str:
-    if isinstance(err, (ClientConnectorError, InvalidURL)):
+    # A connect timeout is the usual result of a wrong or firewalled address.
+    if isinstance(err, (ClientConnectorError, ConnectionTimeoutError, InvalidURL)):
         return f"Couldn't connect to Twenty at {base_url}. Please confirm the base URL."
     return f"The connection to Twenty at {base_url} failed. Please try again."
 
@@ -98,21 +126,25 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
             )
         )
     except HTTPError as err:
+        message = _redact(err.message, config)
         if err.code == 401:
-            msg = f"Invalid API key. Please confirm the provided API key is correct.\n\n{err.message}"
+            msg = f"Invalid API key. Please confirm the provided API key is correct.\n\n{message}"
         elif err.code == 403:
-            msg = f"The API key can't read Twenty's metadata. Please give the key a role with the Data Model settings permission and read access to every object you want to capture.\n\n{err.message}"
+            msg = f"The API key can't read Twenty's metadata. Please give the key a role with the Data Model settings permission and read access to every object you want to capture.\n\n{message}"
         elif err.code == 404:
-            msg = f"Incorrect base URL: Twenty's metadata endpoint was not found at {config.base_url}. Please confirm the base URL of your Twenty API.\n\n{err.message}"
+            msg = f"Incorrect base URL: Twenty's metadata endpoint was not found at {config.base_url}. Please confirm the base URL of your Twenty API.\n\n{message}"
         else:
-            msg = f"Encountered error validating API key.\n\n{err.message}"
+            msg = f"Encountered error validating API key.\n\n{message}"
 
         raise ValidationError([msg])
     except PydanticValidationError as err:
         raise ValidationError(
             [
                 f"This doesn't look like a Twenty API at {config.base_url}. Please confirm the base URL.\n\n"
-                f"First problem in the metadata response: {err.errors()[0]['loc']}: {err.errors()[0]['msg']}"
+                + _redact(
+                    f"First problem in the metadata response: {err.errors()[0]['loc']}: {err.errors()[0]['msg']}",
+                    config,
+                )
             ]
         ) from err
     except CONNECTION_ERRORS as err:
@@ -154,23 +186,29 @@ async def disable_unreadable_resources(
             raise
         except HTTPError as err:
             if err.code == 401 or err.code >= 500:
-                raise
+                raise _redacted_error(err, config) from None
             return err
         except ValueError as err:
             return err
         return None
 
     failures = await _gather_bounded([r.name for r in resources], probe)
-    if (
-        resources
-        and all(failure is not None for failure in failures)
-        and not any(
-            isinstance(failure, HTTPError) and _permission_denied(failure)
-            for failure in failures
+    if resources and all(failure is not None for failure in failures):
+        # No object could be read. Unless access was refused for every one, this is a
+        # workspace problem, even if a role lacks one permission (often Workflows).
+        other = next(
+            (
+                failure
+                for failure in failures
+                if not (isinstance(failure, HTTPError) and _permission_denied(failure))
+            ),
+            None,
         )
-    ):
-        # Every object failing for a reason other than access is a workspace problem.
-        raise failures[0]
+        if isinstance(other, HTTPError):
+            raise _redacted_error(other, config)
+        if other is not None:
+            text = _redact(str(other), config)
+            raise other if text == str(other) else ValueError(text)
 
     discovered: list[common.Resource] = []
     for resource, failure in zip(resources, failures):
@@ -178,9 +216,9 @@ async def disable_unreadable_resources(
             if isinstance(failure, HTTPError) and _permission_denied(failure):
                 reason = "The API key's role can't read this object."
             elif isinstance(failure, HTTPError):
-                reason = f"Reading this object failed with HTTP {failure.code}: {failure.message}"
+                reason = f"Reading this object failed with HTTP {failure.code}: {_redact(failure.message, config)}"
             else:
-                reason = f"Reading this object returned an invalid Twenty API response: {failure}"
+                reason = f"Reading this object returned an invalid Twenty API response: {_redact(str(failure), config)}"
             log.warning(
                 f"{reason} It is discovered disabled.", {"object": resource.name}
             )
@@ -211,15 +249,17 @@ async def validate_bindings(
             if _permission_denied(err):
                 reason = "The API key's role can't read it. Give the role read access to this object (for workflows, the Workflows permission), or disable its binding."
             elif err.code == 403:
-                reason = f"The API key's role can't read it. {err.message}"
+                reason = (
+                    f"The API key's role can't read it. {_redact(err.message, config)}"
+                )
             else:
-                reason = f"HTTP {err.code}: {err.message}"
+                reason = f"HTTP {err.code}: {_redact(err.message, config)}"
             return f"Object '{name}': {reason}"
         except CONNECTION_ERRORS as err:
             # A streamed response can break mid-read; report it with the other objects.
             return f"Object '{name}': Connection failed while reading it. {_describe_connection_error(err)}"
         except ValueError as err:
-            return f"Object '{name}': Invalid Twenty API response. {err}"
+            return f"Object '{name}': Invalid Twenty API response. {_redact(str(err), config)}"
         return None
 
     errors = await _gather_bounded(

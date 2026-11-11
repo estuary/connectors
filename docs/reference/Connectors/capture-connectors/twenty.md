@@ -50,7 +50,7 @@ To set up the Twenty source connector, you'll need:
 - A role for that key with the **Data Model** settings permission and read access to every object you want to capture. The connector needs Data Model to read the workspace's metadata. Reading workflows also needs the **Workflows** permission.
 - For self-hosted Twenty, your server's base URL.
 
-Objects the role can't read are discovered as disabled bindings, with a warning naming each one. So is an object whose test read fails with another error about that object, such as an invalid response. A bad key, a server error or a connection problem fails discovery instead, as does every object failing. After you give the role access, enable the binding yourself; re-discovery won't enable it. If the role later loses access to an enabled object, the capture fails and restarts on that object. Publishing also fails with an error naming it. Restore access or disable its binding to fix both. Discovery reads one record of each object, five objects at a time.
+Objects the role can't read are discovered as disabled bindings, with a warning naming each one. So is an object whose test read fails with another error about that object, such as an invalid response. A bad key, a server error or a connection problem fails discovery instead. So does a workspace where no object can be read, unless the role is refused every one. After you give the role access, enable the binding yourself; re-discovery won't enable it. If the role later loses access to an enabled object, the capture fails and restarts on that object. Publishing also fails with an error naming it. Restore access or disable its binding to fix both. Discovery reads one record of each object, five objects at a time.
 
 ## Rate limits
 
