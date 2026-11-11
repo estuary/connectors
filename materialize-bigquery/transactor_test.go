@@ -408,33 +408,32 @@ func TestTwoShardRoundTrip(t *testing.T) {
 	require.Empty(t, primary.pendingItems("b_table.v1"))
 }
 
-// A task whose shards run different versions: this one as the primary, and a
-// peer that writes the state-key-first layout. The primary applies the peer's
-// entry and clears it where the peer wrote it.
-func TestRoundTripWithStateFirstPeer(t *testing.T) {
+// A rollback from a version that writes the state-key-first layout: the
+// primary recovers both shards' entries, applies them in that version's order
+// and clears them where they were written.
+func TestRollbackFromStateFirstWriter(t *testing.T) {
+	var state = `{"a_table.v1": {
+		"00000000-7fffffff": {"JobPrefix": "lower"},
+		"80000000-ffffffff": {"JobPrefix": "upper"}
+	}}`
 	var primary = testTransactor(lowerRangeKey, "a_table.v1")
-	primary.stage("a_table.v1", &checkpointItem{JobPrefix: "lower"})
+	require.NoError(t, primary.UnmarshalState(json.RawMessage(state)))
+	require.Equal(t, []string{"lower", "upper"}, jobPrefixes(primary.pendingItems("a_table.v1")))
 
+	acked, err := primary.Acknowledge(t.Context(), nil, nil)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null}}`, string(acked.UpdatedJson))
+	state = reduce(t, state, acked)
+	require.JSONEq(t, `{"a_table.v1": {}}`, state)
+
+	// The next transaction stages in the layout this version writes.
+	primary.stage("a_table.v1", &checkpointItem{JobPrefix: "next"})
 	started, err := primary.startCommitState()
 	require.NoError(t, err)
-	var peerPatch = json.RawMessage(`{"a_table.v1": {"80000000-ffffffff": {"JobPrefix": "upper"}}}`)
-	var state = reduce(t, reduce(t, `{}`, started), &pf.ConnectorState{UpdatedJson: peerPatch, MergePatch: true})
-
-	// A restart applies the same entries in the same order.
-	var restarted = testTransactor(lowerRangeKey, "a_table.v1")
-	require.NoError(t, restarted.UnmarshalState(json.RawMessage(state)))
-	require.Equal(t, []string{"upper", "lower"}, jobPrefixes(restarted.pendingItems("a_table.v1")))
-
-	require.NoError(t, primary.mergePeerStatePatches([]json.RawMessage{started.UpdatedJson, peerPatch}))
-	require.Equal(t, []string{"upper", "lower"}, jobPrefixes(primary.pendingItems("a_table.v1")))
-
-	acked, err := primary.Acknowledge(t.Context(), []json.RawMessage{started.UpdatedJson, peerPatch}, nil)
-	require.NoError(t, err)
 	require.JSONEq(t, `{
-		"00000000-7fffffff": {"a_table.v1": null},
-		"a_table.v1": {"80000000-ffffffff": null}
-	}`, string(acked.UpdatedJson))
-	require.JSONEq(t, `{"00000000-7fffffff": {}, "a_table.v1": {}}`, reduce(t, state, acked))
+		"a_table.v1": {},
+		"00000000-7fffffff": {"a_table.v1": {"JobPrefix": "next"}}
+	}`, reduce(t, state, started))
 }
 
 func TestSchemaForColsStripsPolicyTags(t *testing.T) {

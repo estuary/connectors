@@ -146,8 +146,7 @@ type transactor struct {
 	// merge patches commute when the runtime consolidates connector state.
 	rangeFirst checkpoints
 	// stateFirst is {stateKey: {rangeKey: entry}}, which a later version
-	// writes. Reading it here lets that version roll out shard by shard, and
-	// roll back to this one.
+	// writes. Reading it here lets that version roll back to this one.
 	stateFirst checkpoints
 	flat       map[string]flatCheckpoint // TODO(#5681): remove with flatCheckpoint.
 
