@@ -74,6 +74,15 @@ class TwentyRecord(BaseDocument, extra="allow"):
 
     @model_validator(mode="before")
     @classmethod
+    def drop_record_meta(cls, data: Any) -> Any:
+        # _meta belongs to the connector, which sets op "d" from deletedAt. Taken from
+        # a reply, it could mark a live record deleted.
+        if isinstance(data, dict) and "_meta" in data:
+            return {key: value for key, value in data.items() if key != "_meta"}
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
     def restore_floats(cls, data: Any) -> Any:
         # The streaming parser reads fractional numbers as Decimal, which the CDK
         # would write out as strings; keep them numbers, as plain JSON parsing does.

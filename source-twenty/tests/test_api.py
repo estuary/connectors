@@ -824,6 +824,22 @@ def test_delete_restore_and_excluded_search_vector(backfill):
 
 
 @pytest.mark.parametrize("backfill", [True, False], ids=["backfill", "incremental"])
+@pytest.mark.parametrize("meta", [{"op": "d"}, "not an object"], ids=["delete", "bad"])
+def test_a_record_cannot_set_its_own_meta(backfill, meta):
+    # Only deletedAt marks a record deleted; a _meta in the reply is dropped.
+    http = FakeHTTP([records_response([record(1, _meta=meta)])])
+    docs = [
+        item
+        for item in collect(records_generator(http, backfill))
+        if isinstance(item, TwentyRecord)
+    ]
+
+    assert [doc.meta_.op for doc in docs] == ["u"]
+    emitted = docs[0].model_dump(mode="json", by_alias=True, exclude_unset=True)
+    assert emitted.get("_meta", {"op": "u"})["op"] == "u"
+
+
+@pytest.mark.parametrize("backfill", [True, False], ids=["backfill", "incremental"])
 def test_streamed_fractional_numbers_stay_numbers(backfill):
     http = FakeHTTP(
         [
@@ -1617,4 +1633,34 @@ def test_a_validation_error_chain_never_shows_a_key_the_server_echoes(status):
     # its cause and context.
     shown = "".join(traceback.format_exception(exc.value))
     assert "<redacted>" in shown
+    assert config().credentials.access_token not in shown
+
+
+@pytest.mark.parametrize("backfill", [True, False], ids=["backfill", "incremental"])
+def test_a_capture_error_never_shows_a_key_the_server_echoes(backfill):
+    http = FakeHTTP([echoed_key_error(400)])
+    if backfill:
+        records = resources._backfill_records(
+            http, config(), "people", LOG, None, HORIZON
+        )
+    else:
+        records = resources._fetch_records(http, config(), "people", LOG, CURSOR)
+
+    with pytest.raises(HTTPError) as exc:
+        collect(records)
+    # The CDK logs a failed binding with traceback.format_exception.
+    shown = "".join(traceback.format_exception(exc.value))
+    assert exc.value.code == 400
+    assert "<redacted>" in exc.value.message
+    assert config().credentials.access_token not in shown
+
+
+def test_opening_a_capture_never_shows_a_key_the_server_echoes():
+    with pytest.raises(HTTPError) as exc:
+        asyncio.run(
+            resources.enabled_resources(
+                LOG, FakeHTTP([echoed_key_error(400)]), config(), []
+            )
+        )
+    shown = "".join(traceback.format_exception(exc.value))
     assert config().credentials.access_token not in shown

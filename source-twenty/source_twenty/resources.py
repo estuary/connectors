@@ -1,7 +1,7 @@
 import asyncio
 import dataclasses
 import functools
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import datetime, timedelta
 from logging import Logger
 
@@ -13,7 +13,7 @@ from aiohttp import (
 )
 
 from estuary_cdk.capture import Task, common, request
-from estuary_cdk.capture.common import ResourceState
+from estuary_cdk.capture.common import LogCursor, PageCursor, ResourceState
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, ShouldRetryProtocol, TokenSource
 from pydantic import ValidationError as PydanticValidationError
@@ -270,9 +270,46 @@ async def validate_bindings(
         raise ValidationError([error for error in errors if error is not None])
 
 
+async def _redacted[T](
+    records: AsyncGenerator[T, None], config: EndpointConfig
+) -> AsyncGenerator[T, None]:
+    # A capture error is logged with its message, which can quote a reply that
+    # echoes the API key.
+    try:
+        async for item in records:
+            yield item
+    except HTTPError as err:
+        raise _redacted_error(err, config) from None
+
+
+def _backfill_records(
+    http: HTTPMixin,
+    config: EndpointConfig,
+    object_name: str,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[TwentyRecord | PageCursor, None]:
+    return _redacted(
+        backfill_records(http, config.base_url, object_name, log, page, cutoff), config
+    )
+
+
+def _fetch_records(
+    http: HTTPMixin,
+    config: EndpointConfig,
+    object_name: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TwentyRecord | LogCursor, None]:
+    return _redacted(
+        fetch_records(http, config.base_url, object_name, log, log_cursor), config
+    )
+
+
 def records_resource(
     http: HTTPMixin,
-    base_url: str,
+    config: EndpointConfig,
     object_name: str,
     cutoff: datetime,
     is_active: bool = True,
@@ -298,8 +335,8 @@ def records_resource(
             binding_index,
             state,
             task,
-            fetch_page=functools.partial(backfill_records, http, base_url, object_name),
-            fetch_changes=functools.partial(fetch_records, http, base_url, object_name),
+            fetch_page=functools.partial(_backfill_records, http, config, object_name),
+            fetch_changes=functools.partial(_fetch_records, http, config, object_name),
         )
 
     return common.Resource(
@@ -336,10 +373,15 @@ async def all_resources(
 ) -> list[common.Resource]:
     """Enumerate every stream the connector exposes."""
     cutoff = capture_horizon()
-    names = sorted(
-        await _active_object_names(log, http, config.base_url, validation_should_retry)
-    )
-    return [records_resource(http, config.base_url, name, cutoff) for name in names]
+    try:
+        names = sorted(
+            await _active_object_names(
+                log, http, config.base_url, validation_should_retry
+            )
+        )
+    except HTTPError as err:
+        raise _redacted_error(err, config) from None
+    return [records_resource(http, config, name, cutoff) for name in names]
 
 
 async def enabled_resources(
@@ -352,7 +394,10 @@ async def enabled_resources(
     _set_token_source(http, config)
     cutoff = capture_horizon()
     # A running capture keeps the CDK's default retries, so a short outage doesn't fail it.
-    active_names = await _active_object_names(log, http, config.base_url)
+    try:
+        active_names = await _active_object_names(log, http, config.base_url)
+    except HTTPError as err:
+        raise _redacted_error(err, config) from None
     if bindings and not any(b.resourceConfig.name in active_names for b in bindings):
         raise RuntimeError(
             "None of the capture's bound objects are in the Twenty workspace anymore. "
@@ -361,7 +406,7 @@ async def enabled_resources(
     return [
         records_resource(
             http,
-            config.base_url,
+            config,
             binding.resourceConfig.name,
             cutoff,
             is_active=binding.resourceConfig.name in active_names,
