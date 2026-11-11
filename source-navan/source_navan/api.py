@@ -27,7 +27,7 @@ async def _fetch_bookings_request(
 
     params: dict[str, int | str] = {
         "page": page,
-        "pageSize": page_size,
+        "size": page_size,
     }
 
     if updated_from:
@@ -52,7 +52,7 @@ async def fetch_bookings_page(
     )
     assert isinstance(cutoff, datetime), f"Expected datetime cutoff, got {type(cutoff)}"
 
-    page = page_cursor if page_cursor else 1
+    page = page_cursor or 0
     updated_to = dt_to_str(cutoff)
 
     log.debug(
@@ -70,7 +70,7 @@ async def fetch_bookings_page(
     for booking in response.data:
         yield booking
 
-    if response.page and page < response.page.totalPages:
+    if response.page and page + 1 < response.page.totalPages:
         next_page = page + 1
         log.debug(
             f"Page {page} of {response.page.totalPages} complete, continuing to next page",
@@ -102,10 +102,10 @@ async def fetch_bookings_changes(
         f"Fetching bookings changes in range {updated_from} to {dt_to_str(updated_to)}",
     )
 
-    current_page = 1
+    current_page = 0
     total_pages = 1
 
-    while current_page <= total_pages:
+    while current_page < total_pages:
         response = await _fetch_bookings_request(
             http,
             log,
