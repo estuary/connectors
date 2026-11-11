@@ -204,24 +204,31 @@ Twenty refuses a value for a unique field, like a company's domain, that another
 The connector looks up unique values before writing. When another record holds one,
 **Unique Value Conflicts** decides:
 
-- `skip_field` (default) writes the record without that value and logs it.
+- `skip_field` (default) writes the record without that value and logs it. For a record with no
+  link URL yet, it leaves out the whole link, since Twenty makes a link's first secondary link the
+  primary one when its URL is empty.
 - `fail` stops the task.
 
 A value can move between records in one transaction, as when records swap values or a chain of
 records each take the next one's value. The records are written without the moving values, then
-the records giving values up hold a stand-in, then all take their new values. A stand-in is an
-empty value, or for a link with a label or secondary links, `<record id>.invalid`, which keeps
-them: Twenty drops a link's label, and makes its first secondary link the primary one, when its
-URL is empty. If the task stops between these writes, a record can show its stand-in until the
-transaction is replayed.
+the records giving values up hold a stand-in, then all take their new values. A stand-in is
+`<old value>.<record id>.invalid`, which Twenty accepts as a domain, an email or text, and which
+keeps a link's label and secondary links. If the task stops between these writes, a record can
+show its stand-in until the task restarts: at its first transaction, and after one that fails,
+the connector finds stand-ins and writes their old values back.
 
 A move goes through only if every record holding the value gives it up in the same transaction,
 so a swap or chain goes whole or not at all, and no record gives up its value without taking its
-new one. Records are written 60 at a time, and a value held by a record outside those 60 moves once
-the binding's documents are all written, before links to it are looked up. A value that still
-can't move is a conflict, so with `fail` the task stops after writing the transaction's other
-changes, and the record without that value. A record Twenty rejects takes none of its document's
-moved values, and the records it would have taken from keep theirs.
+new one. If Twenty refuses the new values, the records take their old ones back, and a record
+whose old value someone else took meanwhile is left without one. Records are written 60 at a
+time, and a value held by a record outside those 60 moves once the binding's documents are all
+written. Links found by a value that moved in the transaction are looked up again after the
+moves, so they point at the record that holds the value now. A value that still can't move is a
+conflict, so with `fail` the task stops after writing the moves that can go through. A value held
+by a record with an empty ID Field, or in Twenty's trash while **Restore Records Deleted in
+Twenty** is off, can never move, so with `fail` the task stops before writing the record that
+wants it. A record Twenty rejects takes none of its document's moved values, and the records it
+would have taken from keep theirs.
 
 A deleted record keeps its unique values when **Deletes** is `flag` or `trash`, or when someone
 moved it to Twenty's trash. Only `delete` frees them for another record.

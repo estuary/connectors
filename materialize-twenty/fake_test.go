@@ -145,6 +145,7 @@ func fakeObjects() map[string]*fakeObject {
 			"externalAccountKey":   {typ: "TEXT"},
 			"people":               {typ: "RELATION", target: "people", many: true},
 			"accountOwner":         {typ: "RELATION", target: "workspaceMembers"},
+			"parentCompany":        {typ: "RELATION", target: "companies"},
 		})},
 		"workspaceMembers": {singular: "workspaceMember", fields: map[string]fakeField{
 			"userEmail": {typ: "TEXT", unique: true, system: true},
@@ -1337,8 +1338,29 @@ func (n fakeNode) matches(row record) bool {
 		return fakeEq(v, value)
 	case "neq":
 		return v != nil && !fakeEq(v, value)
+	case "like":
+		s, _ := v.(string)
+		pattern, _ := value.(string)
+		return v != nil && fakeLike(pattern).MatchString(s)
 	}
 	panic("fake: the operator " + n.cmp + " isn't modeled")
+}
+
+// fakeLike is a SQL LIKE pattern as a regular expression: % is any text, _ any one character, and
+// case counts, as in Postgres.
+func fakeLike(pattern string) *regexp.Regexp {
+	var re strings.Builder
+	for _, r := range pattern {
+		switch r {
+		case '%':
+			re.WriteString(".*")
+		case '_':
+			re.WriteString(".")
+		default:
+			re.WriteString(regexp.QuoteMeta(string(r)))
+		}
+	}
+	return regexp.MustCompile("(?s)^" + re.String() + "$")
 }
 
 func (n fakeNode) fieldsNamed() []string {

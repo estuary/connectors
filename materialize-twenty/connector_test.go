@@ -1831,7 +1831,7 @@ func TestStoreUniqueValueMoves(t *testing.T) {
 	require.Equal(t, []int{1, 1, 1}, h.fake.batches, "create c, update a, then c's values")
 
 	// A record whose own update is rejected doesn't take the value either, and a moved value
-	// Twenty rejects is left out without skipping the record it was moving to.
+	// Twenty rejects is left out as a conflict, without skipping the record it was moving to.
 	h = newHarness(t, companies(`,"rejected_records":"skip"`))
 	h.fake.reject = func(_ string, rec record) string {
 		if rec["name"] == "Bad!" || (rec["externalId"] == "d" && fakeGet(rec, "domainName.primaryLinkUrl") == "delta.com") {
@@ -1844,13 +1844,14 @@ func TestStoreUniqueValueMoves(t *testing.T) {
 	h.fake.seed("companies", record{"externalId": "c", "domainName": map[string]any{"primaryLinkUrl": "delta.com"}})
 	require.NoError(t, h.store(h.doc(0, `{"id":"a","domain":"beta.com"}`), h.doc(0, `{"id":"b","name":"Bad!","domain":"acme.com"}`),
 		h.doc(0, `{"id":"c","domain":"gamma.com"}`), h.doc(0, `{"id":"d","name":"Delta","domain":"delta.com"}`)))
-	require.Equal(t, stats{received: 4, created: 1, updated: 2, rejected: 1, skipped: map[string]int{"moved_value_rejected": 1}},
+	require.Equal(t, stats{received: 4, created: 1, updated: 2, rejected: 1, skipped: map[string]int{"domainName_held_by_another_record": 1}},
 		h.stats("companies"))
 	require.Empty(t, fakeGet(h.only("companies", "b"), "domainName.primaryLinkUrl"))
 	require.Empty(t, fakeGet(h.only("companies", "d"), "domainName.primaryLinkUrl"))
 	require.Equal(t, "Delta", h.only("companies", "d")["name"])
 
-	// A swap: the records are written without the domains, then give them up, then take the other's.
+	// A swap: the records are written without the domains, write them as they are, give them up,
+	// then take the other's.
 	h = newHarness(t, companies(""))
 	h.fake.seed("companies", record{"externalId": "a", "domainName": map[string]any{"primaryLinkUrl": "acme.com"}})
 	h.fake.seed("companies", record{"externalId": "b", "domainName": map[string]any{"primaryLinkUrl": "beta.com"}})
@@ -1858,7 +1859,7 @@ func TestStoreUniqueValueMoves(t *testing.T) {
 	require.Equal(t, stats{received: 2, updated: 2}, h.stats("companies"))
 	require.Equal(t, "beta.com", fakeGet(h.only("companies", "a"), "domainName.primaryLinkUrl"))
 	require.Equal(t, "acme.com", fakeGet(h.only("companies", "b"), "domainName.primaryLinkUrl"))
-	require.Equal(t, []int{2, 2, 2}, h.fake.batches)
+	require.Equal(t, []int{2, 2, 2, 2}, h.fake.batches)
 }
 
 func TestStoreCreateRefusedByExistingKey(t *testing.T) {

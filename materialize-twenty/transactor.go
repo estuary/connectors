@@ -53,8 +53,13 @@ type transactor struct {
 	// The found links of a background retry whose write Twenty rejected, under rejected_records
 	// fail. The next transaction tries them again and fails if they're still rejected.
 	rejected map[*binding][]linkSlot
-	members  *memberIndex // the workspace members, read once per round of writes when a link needs them
+	members  *memberIndex        // the workspace members, read once per round of writes when a link needs them
+	clean    bool                // the last Store finished, so no record holds a stand-in (see standIn)
+	moved    map[movedValue]bool // the unique values that moved in the transaction
 }
+
+// movedValue is a unique value that moved from one record to another in the transaction.
+type movedValue struct{ object, field, value string }
 
 // connectorState is what the connector keeps in Flow between transactions and restarts.
 type connectorState struct {
@@ -261,7 +266,8 @@ type stats struct {
 	replaced                                                           map[linkSlot]priorLink // the links the chunk's documents set, as they were before
 	linking                                                            bool                   // the writes are linkLater's, of records written already
 	postponed                                                          map[string]record      // unique values other records held, by key, for settleUnique
-	clearing                                                           bool                   // the writes are moveUnique's stand-ins
+	moving                                                             string                 // set for moveUnique's writes: what a record Twenty refuses couldn't do
+	resolved                                                           map[linkSlot]string    // links found by a unique value the task may move, to their keys
 }
 
 // linkSlot is a record's join column, by the record's key.
@@ -297,6 +303,13 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 		}
 	}
 	t.rejected = nil
+	// A task that stopped while moving unique values may have left records holding stand-ins.
+	if !t.clean {
+		if err := t.restoreStandIns(ctx); err != nil {
+			return nil, err
+		}
+	}
+	t.clean, t.moved = false, nil
 	var chunk []pending
 	current := -1
 	flush := func() error {
@@ -384,11 +397,14 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 		}
 	}
 	// After settleUnique, so that a link found by a unique value finds the record that holds it now.
+	// One found before the value moved is looked up again.
 	for i, b := range t.bindings {
+		t.relink(b, &all[i])
 		if err := t.linkLater(ctx, b, &all[i]); err != nil {
 			return nil, err
 		}
 	}
+	t.clean = true
 
 	for i, b := range t.bindings {
 		s := all[i]
@@ -505,6 +521,7 @@ func (t *transactor) applyDeletes(ctx context.Context, b *binding, deletes []pen
 					s.skip("link_dropped_record_deleted")
 				}
 				delete(s.waiting, slot)
+				delete(s.resolved, slot)
 				if saved {
 					delete(b.waiting, slot)
 					t.changed = true
@@ -716,6 +733,13 @@ func (t *transactor) upsert(ctx context.Context, b *binding, items []pending, s 
 	if err := t.writeBatch(ctx, b, updates, true, s); err != nil {
 		return err
 	}
+	for _, p := range updates {
+		for _, f := range b.unique {
+			if old := uniqueValue(p.held, f); !s.rejectedKeys[p.key] && old != "" && setsUnique(p.rec, f) && uniqueValue(p.rec, f) != old {
+				t.moved = put(t.moved, movedValue{b.object, f.Name, old}, true)
+			}
+		}
+	}
 	if err := t.moveUnique(ctx, b, moves, false, s); err != nil {
 		return err
 	}
@@ -733,6 +757,7 @@ func (t *transactor) upsert(ctx context.Context, b *binding, items []pending, s 
 		if !s.rejectedKeys[slot.key] {
 			continue
 		}
+		delete(s.resolved, slot)
 		if prior.inTransaction {
 			s.waiting[slot] = prior.waiting
 		} else {
@@ -880,6 +905,7 @@ func (t *transactor) resolveLinks(ctx context.Context, b *binding, items []pendi
 				s.replaced[slot] = prior
 			}
 			delete(s.waiting, slot)
+			delete(s.resolved, slot)
 			if _, saved := b.waiting[slot]; saved {
 				delete(b.waiting, slot)
 				t.changed = true
@@ -902,6 +928,9 @@ func (t *transactor) resolveLinks(ctx context.Context, b *binding, items []pendi
 			}
 			if id, found := ids[ref.key]; found && !(l.target == b.object && adoptedIDs[id]) {
 				p.rec[l.joinColumn] = id
+				if t.mayMove(l) {
+					s.resolved = put(s.resolved, linkSlot{p.key, l.joinColumn}, ref.key)
+				}
 				continue
 			}
 			delete(p.rec, l.joinColumn)
@@ -1056,6 +1085,35 @@ func normalizeMemberKey(key, field string) string {
 		return strings.Join(strings.Fields(key), " ")
 	}
 	return strings.TrimSpace(strings.ToLower(norm.NFC.String(key)))
+}
+
+// mayMove reports whether a link finds its records by a unique value that a binding writes, so
+// that the value may move from one record to another in a transaction.
+func (t *transactor) mayMove(l link) bool {
+	if l.match != matchText && l.match != matchUnique {
+		return false
+	}
+	return slices.ContainsFunc(t.bindings, func(b *binding) bool {
+		return b.object == l.target && slices.ContainsFunc(b.unique, func(f fieldMeta) bool { return f.Name == l.idField })
+	})
+}
+
+// relink hands to linkLater the links that resolveLinks found by a unique value that left its
+// record later in the transaction, so that they point at the record holding it now, if any.
+func (t *transactor) relink(b *binding, s *stats) {
+	for slot, key := range s.resolved {
+		i := slices.IndexFunc(b.links, func(l link) bool { return l.joinColumn == slot.column })
+		if i < 0 {
+			continue
+		}
+		l := b.links[i]
+		if v, ok := l.targetValue(key); ok && t.moved[movedValue{l.target, l.idField, v}] {
+			if _, waiting := s.waiting[slot]; !waiting {
+				s.waiting = put(s.waiting, slot, key)
+			}
+		}
+	}
+	clear(s.resolved)
 }
 
 // linkLater writes the links that resolveLinks left out, once every binding's documents are
@@ -1323,9 +1381,14 @@ func (t *transactor) guardUnique(ctx context.Context, b *binding, items []pendin
 			return nil, nil, nil, err
 		}
 		holders := make(map[string][]string) // value -> keys of the records that hold it ("" if none)
+		forever := make(map[string]bool)     // values held by a record that never gives them up
 		for _, r := range rows {
 			k, _ := r[b.res.IDField].(string)
 			holders[uniqueValue(r, f)] = append(holders[uniqueValue(r, f)], k)
+			// A record with no key has no documents, and one in the trash takes none of them.
+			if k == "" || r["deletedAt"] != nil && !b.res.RestoreDeleted {
+				forever[uniqueValue(r, f)] = true
+			}
 		}
 
 		claimed := make(map[string]string) // value -> key of the document in this chunk that writes it
@@ -1340,15 +1403,15 @@ func (t *transactor) guardUnique(ctx context.Context, b *binding, items []pendin
 				conflict = "can't be checked against other records"
 			case claimed[v] != "" && claimed[v] != p.key:
 				conflict = "is also in another document with key " + claimed[v]
+			case len(others) > 0 && forever[v]:
+				conflict = "belongs to another record"
 			case len(others) > 0 && !slices.ContainsFunc(others, func(k string) bool { return !givesUp(byKey[k], f, v) }):
 				claimed[v] = p.key
-				moves = addMove(moves, p.key, b.moveOf(p, f))
-				dropUnique(p.rec, f)
+				moves = addMove(moves, p.key, b.holdBack(p, f))
 				continue
 			case len(others) > 0:
 				// A later chunk of the transaction may move the value off the record holding it.
-				later = addMove(later, p.key, b.moveOf(p, f))
-				dropUnique(p.rec, f)
+				later = addMove(later, p.key, b.holdBack(p, f))
 				continue
 			default:
 				claimed[v] = p.key
@@ -1357,7 +1420,7 @@ func (t *transactor) guardUnique(ctx context.Context, b *binding, items []pendin
 			if err := t.uniqueConflict(b, p.key, f, conflict, s); err != nil {
 				return nil, nil, nil, err
 			}
-			dropUnique(p.rec, f)
+			b.holdBack(p, f)
 		}
 	}
 	return items, moves, later, nil
@@ -1389,12 +1452,17 @@ func setsUnique(rec record, f fieldMeta) bool {
 	return set
 }
 
-// moveOf is a record that writes a document's unique field to its record, and nothing else. The
-// subfields the document leaves out come from Twenty when it is written.
-func (b *binding) moveOf(p pending, f fieldMeta) record {
+// holdBack takes a document's unique value out of its record, so Twenty keeps the value it has,
+// and returns a record that writes it, and nothing else, when it may. The subfields the document
+// leaves out come from Twenty then. Twenty makes a link's first secondary link the primary one
+// when the primary is empty, so a record whose link is empty, like a new one, holds back all of it.
+func (b *binding) holdBack(p pending, f fieldMeta) record {
 	v := p.rec[f.Name]
-	if obj, ok := v.(map[string]any); ok {
-		v = maps.Clone(obj)
+	if obj, ok := v.(map[string]any); ok && !(f.Type == "LINKS" && uniqueValue(p.held, f) == "") {
+		v = map[string]any{primarySubfield[f.Type]: obj[primarySubfield[f.Type]]}
+		dropUnique(p.rec, f)
+	} else {
+		delete(p.rec, f.Name)
 	}
 	return record{b.res.IDField: p.key, f.Name: v}
 }
@@ -1468,26 +1536,27 @@ func (m *uniqueMoves) settle() {
 	}
 }
 
-// gives reports whether a record whose value moves gives up the value it holds to another record.
-func (m *uniqueMoves) gives(p pending) bool {
-	held := uniqueValue(p.held, m.f)
-	if held == "" || !m.in[p.key] {
-		return false
-	}
+// givers returns the records whose values move that give up the values they hold to others.
+func (m *uniqueMoves) givers(items []pending) map[string]bool {
+	taken := make(map[string]bool, len(m.in))
 	for k := range m.in {
-		if k != p.key && m.target[k] == held {
-			return true
+		taken[m.target[k]] = true
+	}
+	out := make(map[string]bool)
+	for _, p := range items {
+		if held := uniqueValue(p.held, m.f); held != "" && m.in[p.key] && taken[held] && m.target[p.key] != held {
+			out[p.key] = true
 		}
 	}
-	return false
+	return out
 }
 
 // moveUnique writes the unique values that other records held when guardUnique looked: a chunk's
 // moves, once the chunk is written, or when settling, the values postponed until the binding's
 // documents are all written. A value moves only if each record holding it is one here whose own
 // value moves (see settle). The records that give up their values to others first hold stand-ins,
-// then all take their new values in one more write, so a swap or a chain of moves goes through. A
-// value that can't move is postponed or, when settling, follows unique_conflict.
+// then all take their new values, so a swap or a chain of moves goes through. A value that can't
+// move is postponed or, when settling, follows unique_conflict once the others have moved.
 func (t *transactor) moveUnique(ctx context.Context, b *binding, moves []pending, settling bool, s *stats) error {
 	// A record the chunk didn't write, because it was rejected, stays so.
 	moves = slices.DeleteFunc(moves, func(p pending) bool { return s.rejectedKeys[p.key] })
@@ -1522,128 +1591,296 @@ func (t *transactor) moveUnique(ctx context.Context, b *binding, moves []pending
 		m     *uniqueMoves
 		value any
 	}
-	// cant handles a value that can't move, which its record went without.
-	cant := func(c stuck) error {
-		if !settling {
-			s.postpone(c.p.key, record{b.res.IDField: c.p.key, c.m.f.Name: c.value})
-			return nil
-		}
-		conflict := "belongs to another record"
-		if k := c.m.dup[c.p.key]; k != "" {
-			conflict = "is also in another document with key " + k
-		}
-		return t.uniqueConflict(b, c.p.key, c.m.f, conflict, s)
-	}
+	var later []stuck // the values that can't move, which their records go without
 	for _, m := range plans {
 		for _, p := range items {
 			if _, ok := m.target[p.key]; ok && !m.in[p.key] {
-				if err := cant(stuck{p, m, p.rec[m.f.Name]}); err != nil {
-					return err
-				}
+				later = append(later, stuck{p, m, p.rec[m.f.Name]})
 				delete(p.rec, m.f.Name)
 			}
 		}
 	}
-
-	// The records that give up their values to others hold stand-ins first.
-	var stands []pending
-	gave := make(map[*uniqueMoves]map[string]bool)
-	for _, p := range items {
-		rec := record{}
-		for _, m := range plans {
-			if m.gives(p) {
-				maps.Copy(rec, b.standIn(p, m.f))
-				gave[m] = put(gave[m], p.key, true)
-			}
-		}
-		if len(rec) > 0 {
-			rec["id"], rec[b.res.IDField] = p.id, p.key
-			stands = append(stands, pending{key: p.key, rec: rec, id: p.id})
-		}
-	}
-	clearing := stats{clearing: true}
-	if err := t.writeBatch(ctx, b, stands, true, &clearing); err != nil {
-		return err
-	}
-	// A record Twenty didn't let give up a value keeps all of its own, so the moves that needed
-	// them don't happen, and the records that gave up theirs for those take them back.
-	var later []stuck
-	if len(clearing.rejectedKeys) > 0 {
+	var gave map[*uniqueMoves]map[string]bool // the records holding stand-ins, by plan
+	back := make(map[*uniqueMoves][]pending)  // those of them to take their values back
+	// out takes records out of the moves and, after settle, the moves that needed their values.
+	out := func(keys map[string]bool, settle bool) {
 		for _, m := range plans {
 			before := maps.Clone(m.in)
-			for k := range clearing.rejectedKeys {
+			for k := range keys {
 				delete(m.in, k)
 			}
-			m.settle()
+			if settle {
+				m.settle()
+			}
 			for _, p := range items {
 				if !before[p.key] || m.in[p.key] {
 					continue
 				}
 				later = append(later, stuck{p, m, p.rec[m.f.Name]})
 				delete(p.rec, m.f.Name)
-				if gave[m][p.key] && !clearing.rejectedKeys[p.key] {
-					p.rec[m.f.Name] = p.held[m.f.Name]
+				if gave[m][p.key] {
+					back[m] = append(back[m], pending{key: p.key, id: p.id, rec: record{"id": p.id, b.res.IDField: p.key, m.f.Name: p.held[m.f.Name]}})
 				}
 			}
 		}
 	}
+	// give writes, for each record that gives up values to others, what fill returns for each.
+	// It returns the records by plan, and those Twenty refused, which keep their values.
+	give := func(doing string, fill func(p pending, f fieldMeta) record) (map[*uniqueMoves]map[string]bool, map[string]bool, error) {
+		givers := make(map[*uniqueMoves]map[string]bool, len(plans))
+		for _, m := range plans {
+			givers[m] = m.givers(items)
+		}
+		var writes []pending
+		for _, p := range items {
+			rec := record{}
+			for _, m := range plans {
+				if givers[m][p.key] {
+					maps.Copy(rec, fill(p, m.f))
+				}
+			}
+			if len(rec) > 0 {
+				rec["id"], rec[b.res.IDField] = p.id, p.key
+				writes = append(writes, pending{key: p.key, rec: rec, id: p.id})
+			}
+		}
+		ws := stats{moving: doing}
+		err := t.writeBatch(ctx, b, writes, true, &ws)
+		return givers, ws.rejectedKeys, err
+	}
 
-	var writes []pending
+	// Twenty may hold a links or emails value from before it checked such values, like a domain
+	// with an underscore, and refuse to take it back. So the records that give one up first write
+	// it as it is, and one Twenty refuses keeps its values.
+	_, refused, err := give("write the unique value it holds", func(p pending, f fieldMeta) record {
+		if f.Type == "TEXT" {
+			return nil
+		}
+		return record{f.Name: p.held[f.Name]}
+	})
+	if err != nil {
+		return err
+	}
+	out(refused, true)
+	// Then they hold stand-ins, so that their values are free to take.
+	if gave, refused, err = give("give up a unique value", b.standIn); err != nil {
+		return err
+	}
+	for _, m := range plans {
+		for k := range refused {
+			delete(gave[m], k)
+		}
+	}
+	out(refused, true)
+
+	// And all take their new values, a group of records that take one another's at a time.
+	group := make(map[string]string) // key -> a key of the same group, up to the group's own
+	root := func(k string) string {
+		for group[k] != "" && group[k] != k {
+			k = group[k]
+		}
+		return k
+	}
+	for _, m := range plans {
+		for k := range m.in {
+			for _, h := range m.holders[m.target[k]] {
+				if r, q := root(h), root(k); h != k && r != q {
+					group[r] = q
+				}
+			}
+		}
+	}
+	var groups [][]pending
+	index := make(map[string]int) // a group's own key -> its place in groups
 	for _, p := range items {
-		// A record left with only its key has nothing to write.
+		// A record left with only its key has nothing to take.
 		if len(p.rec) <= 1 {
 			continue
 		}
 		p.rec["id"] = p.id
 		b.keepSubfields(p.rec, p.held)
-		writes = append(writes, p)
+		i, ok := index[root(p.key)]
+		if !ok {
+			i = len(groups)
+			index[root(p.key)] = i
+			groups = append(groups, nil)
+		}
+		groups[i] = append(groups[i], p)
 	}
-	// The records are written already, so their values that moved aren't more records written,
-	// and one Twenty rejects is a value left out, not a record skipped.
-	var moved stats
-	err = t.writeBatch(ctx, b, writes, true, &moved)
-	for f, n := range moved.invalid {
-		s.invalid = addCount(s.invalid, f, n)
-	}
-	for range moved.rejected {
-		s.skip("moved_value_rejected")
-	}
-	if err != nil {
+	refused, alone := make(map[string]bool), make(map[string]bool)
+	if err := t.writeMoves(ctx, b, groups, refused, alone); err != nil {
 		return err
 	}
+	out(refused, true)
+	out(alone, false)
+	// A record that gave up a value for a move that didn't happen takes it back.
+	for _, m := range plans {
+		if err := t.takeBack(ctx, b, m.f, back[m]); err != nil {
+			return err
+		}
+	}
+	// The links found by a value that left its record are found again (see relink).
+	for _, p := range items {
+		for _, m := range plans {
+			if old := uniqueValue(p.held, m.f); m.in[p.key] && old != "" && old != m.target[p.key] {
+				t.moved = put(t.moved, movedValue{b.object, m.f.Name, old}, true)
+			}
+		}
+	}
+
 	for _, c := range later {
-		if err := cant(c); err != nil {
+		if !settling {
+			s.postpone(c.p.key, record{b.res.IDField: c.p.key, c.m.f.Name: c.value})
+			continue
+		}
+		conflict := "belongs to another record"
+		if k := c.m.dup[c.p.key]; k != "" {
+			conflict = "is also in another document with key " + k
+		}
+		// With unique_conflict fail, the task stops here, once the values that can move have.
+		if err := t.uniqueConflict(b, c.p.key, c.m.f, conflict, s); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// standIn is the value a record holds while it gives up a unique value to another record: empty
-// or, for a links field with a label or secondary links, "<the record's id>.invalid". Twenty
-// empties a link's label with its URL and makes its first secondary link the primary one, so a
-// stand-in keeps them should the task stop before the record takes its new value. Many records
-// may hold an empty value, and .invalid is a top-level domain that never resolves (v2.52, probed
-// Nov 2026).
-func (b *binding) standIn(p pending, f fieldMeta) record {
-	if f.Type == "TEXT" {
-		return record{f.Name: ""}
+// writeMoves writes the records that take unique values, by groups of records that take one
+// another's. Twenty writes a batch whole or not at all, so a batch it refuses is split by groups,
+// and a group it refuses alone moves no value: its keys go in refused. A group too big for one
+// batch is written in parts, and the keys Twenty refuses go in alone.
+func (t *transactor) writeMoves(ctx context.Context, b *binding, groups [][]pending, refused, alone map[string]bool) error {
+	var items []pending
+	for _, g := range groups {
+		items = append(items, g...)
 	}
-	obj := map[string]any{}
-	if v, ok := p.rec[f.Name].(map[string]any); ok {
-		obj = maps.Clone(v)
-	}
-	rec := record{f.Name: obj}
-	b.keepSubfields(rec, p.held)
-	obj[primarySubfield[f.Type]] = ""
-	if f.Type == "LINKS" {
-		if nonEmpty(obj["primaryLinkLabel"]) || hasItems(obj["secondaryLinks"]) {
-			obj["primaryLinkUrl"] = p.id + ".invalid"
-		} else {
-			obj["primaryLinkLabel"], obj["secondaryLinks"] = nil, nil
+	switch {
+	case len(items) == 0:
+		return nil
+	case len(groups) == 1 && len(items) > maxBatch:
+		parts := stats{moving: "take a unique value"}
+		err := t.writeBatch(ctx, b, items, true, &parts)
+		maps.Copy(alone, parts.rejectedKeys)
+		return err
+	case len(items) <= maxBatch:
+		recs := make([]record, len(items))
+		for i, p := range items {
+			recs[i] = p.rec
+		}
+		_, err := t.client.upsert(ctx, b.object, recs)
+		var rej *rejectedError
+		switch {
+		case err == nil:
+			return nil
+		case !errors.As(err, &rej):
+			return err
+		case len(groups) == 1:
+			keys := make([]string, len(items))
+			for i, p := range items {
+				keys[i] = p.key
+				refused[p.key] = true
+			}
+			log.WithFields(log.Fields{"object": b.object, "keys": keys, "reason": redact(rej.Error(), nil)}).
+				Warn("records couldn't take one another's unique values, and keep their own")
+			return nil
 		}
 	}
+	mid := len(groups) / 2
+	if err := t.writeMoves(ctx, b, groups[:mid], refused, alone); err != nil {
+		return err
+	}
+	return t.writeMoves(ctx, b, groups[mid:], refused, alone)
+}
+
+// standIn is what a record holds while it gives up a unique value to another record: the value,
+// then ".<the record's id>.invalid". No two records hold the same one, .invalid is a top-level
+// domain that never resolves, and Twenty v2.52 takes it as a domain, an email or text (probed Nov
+// 2026). A record still holding its own after the task stopped takes its value back (see
+// restoreStandIns). Twenty empties a link's label with its URL, and makes its first secondary
+// link the primary one, so a links stand-in keeps them.
+func (b *binding) standIn(p pending, f fieldMeta) record {
+	v := uniqueValue(p.held, f) + "." + p.id + ".invalid"
+	if f.Type == "TEXT" {
+		return record{f.Name: v}
+	}
+	rec := record{f.Name: map[string]any{primarySubfield[f.Type]: v}}
+	b.keepSubfields(rec, p.held)
 	return rec
+}
+
+// takeBack writes back the unique values that records gave up for stand-ins, each in its record's
+// rec. A record whose value another record took since holds none, so that no stand-in stays.
+func (t *transactor) takeBack(ctx context.Context, b *binding, f fieldMeta, items []pending) error {
+	back := stats{moving: "take back the unique value it gave up"}
+	if err := t.writeBatch(ctx, b, items, true, &back); err != nil {
+		return err
+	}
+	var empty []pending
+	for _, p := range items {
+		if back.rejectedKeys[p.key] {
+			p.rec[f.Name] = emptyUnique(f)
+			empty = append(empty, p)
+		}
+	}
+	return t.writeBatch(ctx, b, empty, true, &stats{moving: "empty its stand-in"})
+}
+
+// emptyUnique is an empty value of a unique field. An empty link has no secondary links either,
+// or Twenty would make the first of them the primary one.
+func emptyUnique(f fieldMeta) any {
+	switch f.Type {
+	case "LINKS":
+		return map[string]any{"primaryLinkUrl": "", "primaryLinkLabel": "", "secondaryLinks": nil}
+	case "EMAILS":
+		return map[string]any{"primaryEmail": ""}
+	}
+	return ""
+}
+
+// restoreStandIns gives records back the unique values they gave up for stand-ins when the task
+// stopped before they took their new ones, or none if another record took a value since. It runs
+// when the task starts and after a transaction that failed, with a read for each unique field.
+func (t *transactor) restoreStandIns(ctx context.Context) error {
+	done := make(map[string]bool)
+	for _, b := range t.bindings {
+		for _, f := range b.unique {
+			if done[b.object+"."+f.Name] {
+				continue
+			}
+			done[b.object+"."+f.Name] = true
+			// Live records only: a write would restore one in the trash.
+			like, err := quoted("%.invalid")
+			if err != nil {
+				return err
+			}
+			rows, err := t.client.findWhere(ctx, b.object, uniquePath(f)+"[like]:"+like)
+			if err != nil {
+				return err
+			}
+			var items []pending
+			for _, r := range rows {
+				id, _ := r["id"].(string)
+				v, ok := strings.CutSuffix(uniqueValue(r, f), "."+id+".invalid")
+				if id == "" || !ok || v == "" {
+					continue
+				}
+				rec := record{"id": id, f.Name: v}
+				if f.Type != "TEXT" {
+					rec[f.Name] = map[string]any{primarySubfield[f.Type]: v}
+					b.keepSubfields(rec, r)
+				}
+				items = append(items, pending{key: id, id: id, rec: rec})
+			}
+			if len(items) > 0 {
+				log.WithFields(log.Fields{"object": b.object, "field": f.Name, "count": len(items)}).
+					Warn("records held stand-ins for unique values they gave up, and take the values back")
+			}
+			if err := t.takeBack(ctx, b, f, items); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // hasItems reports whether a list, decoded or raw JSON, has any.
@@ -1761,8 +1998,8 @@ func (t *transactor) writeBatch(ctx context.Context, b *binding, items []pending
 	// One record, rejected. With rejected_records "skip", leave out the email, phone and link
 	// values Twenty calls invalid and try again. Each try leaves out at least one, so it ends.
 	p := items[0]
-	// A stand-in left out would leave the value with its record, so it is rejected whole.
-	if bad := rejectedFields(rej, p.rec); b.res.rejectedRecords() == rejectedSkip && !s.clearing && len(bad) > 0 {
+	// A unique value moveUnique writes is written whole or not at all.
+	if bad := rejectedFields(rej, p.rec); b.res.rejectedRecords() == rejectedSkip && s.moving == "" && len(bad) > 0 {
 		for _, f := range bad {
 			leaveOut(b, p, f, s)
 		}
@@ -1872,10 +2109,10 @@ type linkRejectedError struct{ error }
 // rejected_records is "skip": then it logs the key and reason and goes on. Store stops the task
 // after the transaction if it skipped too many.
 func (t *transactor) reject(b *binding, s *stats, key, reason string) error {
-	if s.clearing {
+	if s.moving != "" {
 		// The record keeps its values, and moveUnique undoes the moves that needed them.
 		s.rejectedKeys = put(s.rejectedKeys, key, true)
-		log.WithFields(log.Fields{"object": b.object, "key": key, "reason": reason}).Warn("a record couldn't give up a unique value")
+		log.WithFields(log.Fields{"object": b.object, "key": key, "reason": reason}).Warn("a record couldn't " + s.moving)
 		return nil
 	}
 	if b.res.rejectedRecords() == rejectedFail && s.linking {

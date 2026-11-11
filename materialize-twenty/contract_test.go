@@ -1000,6 +1000,51 @@ func runContract(t *testing.T, open func(t *testing.T) contractTwenty) {
 		require.Contains(t, read(t, tw.c, "companies", b["id"].(string))["domainName"].(map[string]any)["primaryLinkUrl"], domain("x"))
 	})
 
+	t.Run("a stand-in that ends in its record's id and .invalid is a valid domain, email and text, which a like filter finds", func(t *testing.T) {
+		tw, key, domain := setup(t)
+		blog := []any{map[string]any{"url": "https://blog-" + tw.tag + ".example.com", "label": "Blog"}}
+		a := create(t, tw.c, "companies", record{"name": "a", "externalId": key("a"), "domainName": record{"primaryLinkUrl": domain("x"), "primaryLinkLabel": "A", "secondaryLinks": blog}})
+		id := a["id"].(string)
+		stand := domain("x") + "." + id + ".invalid"
+		_, err := tw.c.upsert(ctx, "companies", []record{{"id": id, "domainName": record{"primaryLinkUrl": stand, "primaryLinkLabel": "A", "secondaryLinks": blog}}})
+		require.NoError(t, err)
+		got := read(t, tw.c, "companies", id)["domainName"].(map[string]any)
+		require.Equal(t, stand, got["primaryLinkUrl"])
+		require.Equal(t, "A", got["primaryLinkLabel"])
+		require.Len(t, got["secondaryLinks"], 1)
+		rows, err := tw.c.findWhere(ctx, "companies", `domainName.primaryLinkUrl[like]:"%-`+tw.tag+`.example.com.%.invalid"`)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		require.Equal(t, id, rows[0]["id"])
+
+		p := create(t, tw.c, "people", record{"externalId": key("p"), "emails": record{"primaryEmail": key("p") + "@example.com"}})
+		pid := p["id"].(string)
+		standEmail := key("p") + "@example.com." + pid + ".invalid"
+		_, err = tw.c.upsert(ctx, "people", []record{{"id": pid, "emails": record{"primaryEmail": standEmail}}})
+		require.NoError(t, err)
+		require.Equal(t, standEmail, read(t, tw.c, "people", pid)["emails"].(map[string]any)["primaryEmail"])
+		rows, err = tw.c.findWhere(ctx, "people", `emails.primaryEmail[like]:"`+key("p")+`@%.invalid"`)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+
+		// A unique text field takes an empty value on several records at once, so two can swap
+		// through it, and a stand-in like the others.
+		x := create(t, tw.c, "connectorTypeProbes", record{"name": "x", "externalId": key("x")})
+		y := create(t, tw.c, "connectorTypeProbes", record{"name": "y", "externalId": key("y")})
+		_, err = tw.c.upsert(ctx, "connectorTypeProbes", []record{{"id": x["id"], "externalId": ""}, {"id": y["id"], "externalId": ""}})
+		require.NoError(t, err)
+		_, err = tw.c.upsert(ctx, "connectorTypeProbes", []record{{"id": x["id"], "externalId": key("y")}, {"id": y["id"], "externalId": key("x")}})
+		require.NoError(t, err)
+		require.Equal(t, key("y"), read(t, tw.c, "connectorTypeProbes", x["id"].(string))["externalId"])
+		standText := key("y") + "." + x["id"].(string) + ".invalid"
+		_, err = tw.c.upsert(ctx, "connectorTypeProbes", []record{{"id": x["id"], "externalId": standText}})
+		require.NoError(t, err)
+		rows, err = tw.c.findWhere(ctx, "connectorTypeProbes", `externalId[like]:"`+key("")+`%.invalid"`)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		require.Equal(t, standText, rows[0]["externalId"])
+	})
+
 	t.Run("filters match exactly and hide soft-deleted records unless asked", func(t *testing.T) {
 		tw, key, _ := setup(t)
 		a := create(t, tw.c, "companies", record{"name": "Contract a", "externalId": key("a")})
