@@ -220,15 +220,19 @@ the connector finds stand-ins and writes their old values back.
 A move goes through only if every record holding the value gives it up in the same transaction,
 so a swap or chain goes whole or not at all, and no record gives up its value without taking its
 new one. If Twenty refuses the new values, the records take their old ones back, and a record
-whose old value someone else took meanwhile is left without one. Records are written 60 at a
-time, and a value held by a record outside those 60 moves once the binding's documents are all
-written. Links found by a value that moved in the transaction are looked up again after the
-moves, so they point at the record that holds the value now. A value that still can't move is a
+whose old value someone else took meanwhile is left without one. A new value Twenty refuses that
+no other record holds then, like a domain from before Twenty checked domains, follows **Rejected
+Records**, as it would if it had been free from the start. Records are written 60 at a time, and
+a value held by a record outside those 60 moves once the binding's documents are all written.
+Links found by a value that left its record in the transaction, by a move, a change, an emptying
+or a `delete`, are looked up again at the end, so they point at the record that holds the value
+now; if none does, the link is cleared and waits for one. A value that still can't move is a
 conflict, so with `fail` the task stops after writing the moves that can go through. A value held
-by a record with an empty ID Field, or in Twenty's trash while **Restore Records Deleted in
-Twenty** is off, can never move, so with `fail` the task stops before writing the record that
-wants it. A record Twenty rejects takes none of its document's moved values, and the records it
-would have taken from keep theirs.
+by a record with an empty ID Field, unless **Match Existing Records By** may adopt that record
+later in the transaction, or in Twenty's trash while **Restore Records Deleted in Twenty** is
+off, can never move, so with `fail` the task stops before writing the record that wants it. A
+record Twenty rejects takes none of its document's moved values, and the records it would have
+taken from keep theirs.
 
 A deleted record keeps its unique values when **Deletes** is `flag` or `trash`, or when someone
 moved it to Twenty's trash. Only `delete` frees them for another record.
@@ -298,6 +302,11 @@ and waits and retries when Twenty says the limit was reached.
 - A record giving up a unique value to another holds a stand-in, such as `<record id>.invalid`
   for a domain with a label, for the moment between two writes, or until the transaction is
   replayed if the task stops in between.
+- At task start, and after a transaction that fails, the search for stand-ins reads every value
+  of a unique field that ends in `.invalid`, including values people wrote, like scrubbed emails.
+  Many such values make that start slower.
+- If someone outside the connector changes a record's ID Field while the record holds a
+  stand-in, the stand-in can stay until the task restarts.
 
 ## Configuration
 

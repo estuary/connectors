@@ -749,6 +749,168 @@ func TestStoreUniqueLinksFoundAgain(t *testing.T) {
 	require.Equal(t, h.only("companies", "b")["id"], h.only("companies", "c")["parentCompanyId"])
 }
 
+func TestStoreUniqueLinksFoundAgainAfterRelease(t *testing.T) {
+	rel := people(`,"relations":[{"field":"company","id_field":"domainName"}]`)
+	// Jane's link finds z by y.com. z is deleted for good and a takes y.com, so her link finds a.
+	h := newHarness(t, rel, companies(`,"delete_mode":"delete"`))
+	h.clock()
+	seedDomain(h, "z", "y.com")
+	require.NoError(t, h.store(h.doc(0, `{"id":1,"first":"Jane","company":"y.com"}`),
+		h.doc(1, `{"id":"a","name":"A","domain":"y.com"}`), h.deletion(1, "z")))
+	require.Equal(t, "y.com", domainOf(h, "a"))
+	require.Equal(t, h.only("companies", "a")["id"], h.only("people", "1")["companyId"])
+
+	// z gives y.com up and no record takes it, so Jane's link leaves z and waits, as it does with
+	// the companies binding first.
+	h = newHarness(t, rel, companies(""))
+	h.clock()
+	seedDomain(h, "z", "y.com")
+	require.NoError(t, h.store(h.doc(0, `{"id":1,"first":"Jane","company":"y.com"}`), h.doc(1, `{"id":"z","domain":"free.com"}`)))
+	require.Nil(t, h.only("people", "1")["companyId"])
+	seedDomain(h, "n", "y.com")
+	h.now = h.now.Add(linkRetryEvery)
+	require.NoError(t, h.store(h.doc(1, `{"id":"w","name":"W"}`)))
+	require.Equal(t, h.only("companies", "n")["id"], h.only("people", "1")["companyId"])
+
+	// Someone takes x.com while a holds its stand-in, so a can't take it back and holds none.
+	// Jane's link, which found a by x.com, finds the record that holds it now.
+	h = newHarness(t, rel, companies(""))
+	h.clock()
+	seedDomain(h, "a", "x.com")
+	seedDomain(h, "b", "y.com")
+	var other string
+	posts := 0
+	h.fake.hook = func(r *http.Request) {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/rest/batch/companies") {
+			if posts++; posts == 4 {
+				other = h.fake.newID()
+				row := h.fake.blank("companies")
+				merge(row, record{"domainName": map[string]any{"primaryLinkUrl": "x.com"}})
+				row["id"] = other
+				h.fake.rows["companies"][other] = row
+			}
+		}
+	}
+	require.NoError(t, h.store(h.doc(0, `{"id":1,"first":"Jane","company":"x.com"}`),
+		h.doc(1, `{"id":"a","domain":"y.com"}`), h.doc(1, `{"id":"b","domain":"x.com"}`)))
+	require.Equal(t, []any{"", "y.com"}, domains(h, "a", "b"))
+	require.Equal(t, other, h.only("people", "1")["companyId"])
+}
+
+func TestStoreUniqueLinkOfRejectedDocument(t *testing.T) {
+	// Jane's link finds a by x.com in the first chunk. Her next document, in the second, is
+	// rejected, so the first one's link stands, and is found again when z takes x.com from a.
+	h := newHarness(t, people(`,"rejected_records":"skip","relations":[{"field":"company","id_field":"domainName"}]`), companies(""))
+	h.clock()
+	h.fake.reject = func(_ string, rec record) string {
+		if fakeGet(rec, "name.firstName") == "Bad!" {
+			return "Bad"
+		}
+		return ""
+	}
+	seedDomain(h, "a", "x.com")
+	var items []storeItem
+	for i := range maxBatch - 1 {
+		items = append(items, h.doc(0, fmt.Sprintf(`{"id":%d,"first":"Filler"}`, 100+i)))
+	}
+	items = append(items, h.doc(0, `{"id":1,"first":"Jane","company":"x.com"}`), h.doc(0, `{"id":1,"first":"Bad!","company":"x.com"}`),
+		h.doc(1, `{"id":"a","domain":"free.com"}`), h.doc(1, `{"id":"z","name":"Z","domain":"x.com"}`))
+	require.NoError(t, h.store(items...))
+	require.Equal(t, 1, h.stats("people").rejected)
+	require.Equal(t, []any{"free.com", "x.com"}, domains(h, "a", "z"))
+	require.Equal(t, h.only("companies", "z")["id"], h.only("people", "1")["companyId"])
+}
+
+func TestStoreUniqueKeylessHolderAdoptedLater(t *testing.T) {
+	// A record with no key still gives a value up when a later chunk's document adopts it and
+	// changes the value. So a takes K1, as when both documents are in one chunk.
+	for _, mode := range uniqueModes {
+		for _, between := range []int{0, maxBatch - 1} {
+			h := newHarness(t, companies(mode+`,"adopt_by":"domainName"`))
+			h.fake.seed("companies", record{"name": "Hand made", "accountCode": "K1", "domainName": map[string]any{"primaryLinkUrl": "acme.com"}})
+			items := append([]storeItem{h.doc(0, `{"id":"a","name":"A","code":"K1"}`)}, filler(h, "m", between)...)
+			items = append(items, h.doc(0, `{"id":"z","name":"Z","domain":"acme.com","code":"K2"}`))
+			require.NoError(t, h.store(items...), mode, between)
+			require.Equal(t, "K2", h.only("companies", "z")["accountCode"], mode, between)
+			require.Equal(t, "K1", h.only("companies", "a")["accountCode"], mode, between)
+		}
+	}
+}
+
+func TestStoreUniqueRefusedTake(t *testing.T) {
+	// b gives up a domain from before Twenty checked domains, and a takes it. Twenty refuses it as
+	// a's value, and no record holds it then, so a is a rejected record, as when the value was free
+	// to begin with: the task stops under rejected_records fail, and goes on under skip, even
+	// with unique_conflict fail.
+	for _, opts := range []string{"", `,"unique_conflict":"fail","rejected_records":"skip"`} {
+		h := newHarness(t, companies(opts))
+		seedDomain(h, "a", "x.com")
+		err := h.store(h.doc(0, `{"id":"a","domain":"bad_one.example"}`))
+		if opts == "" {
+			require.ErrorContains(t, err, `can't write the document with key "a"`)
+		} else {
+			require.NoError(t, err)
+		}
+
+		h = newHarness(t, companies(opts))
+		seedDomain(h, "a", "x.com")
+		seedDomain(h, "b", "y_com.example")
+		err = h.store(h.doc(0, `{"id":"a","domain":"y_com.example"}`), h.doc(0, `{"id":"b","domain":"free.com"}`))
+		if opts == "" {
+			require.ErrorContains(t, err, `can't write the document with key "a"`)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, map[string]int{"moved_value_rejected": 1}, h.stats("companies").skipped)
+		}
+		require.Equal(t, []any{"x.com", "free.com"}, domains(h, "a", "b"), opts)
+	}
+}
+
+func TestStoreUniqueRefusedTakeInLongChain(t *testing.T) {
+	// Each of more records than fit in a batch takes the next one's account code, and the last
+	// takes zz's, which zz gives up. They settle as one group, written in parts, and Twenty refuses
+	// the last one's value, which no record holds then: a rejected record, as above.
+	for _, opts := range []string{"", `,"unique_conflict":"fail","rejected_records":"skip"`} {
+		h := newHarness(t, companies(opts))
+		h.fake.reject = func(_ string, rec record) string {
+			if rec["accountCode"] == "C65" {
+				return "Bad"
+			}
+			return ""
+		}
+		n := maxBatch + 5
+		var items []storeItem
+		for i := range n {
+			h.fake.seed("companies", record{"externalId": fmt.Sprintf("k%02d", i), "accountCode": fmt.Sprintf("C%02d", i)})
+			items = append(items, h.doc(0, fmt.Sprintf(`{"id":"k%02d","code":"C%02d"}`, i, i+1)))
+		}
+		h.fake.seed("companies", record{"externalId": "zz", "accountCode": "C65"})
+		err := h.store(append(items, h.doc(0, `{"id":"zz","code":"Z1"}`))...)
+		if opts == "" {
+			require.ErrorContains(t, err, `can't write the document with key "k64"`)
+			continue
+		}
+		require.NoError(t, err)
+		require.Equal(t, map[string]int{"moved_value_rejected": 1}, h.stats("companies").skipped)
+		for i := range n - 1 {
+			require.Equal(t, fmt.Sprintf("C%02d", i+1), h.only("companies", fmt.Sprintf("k%02d", i))["accountCode"])
+		}
+	}
+}
+
+func TestStoreUniqueSweepReadsInvalidValues(t *testing.T) {
+	// The sweep for stand-ins reads every value that ends in ".invalid" at task start, like
+	// scrubbed emails: a page per pageSize of them (see Known limits in twenty.md).
+	h := newHarness(t, people(""))
+	for i := range 1000 {
+		h.fake.seed("people", record{"externalId": fmt.Sprint(1000 + i), "emails": map[string]any{"primaryEmail": fmt.Sprintf("user%d@example.invalid", i)}})
+	}
+	before := h.fake.count(http.MethodGet, "/rest/people")
+	require.NoError(t, h.store(h.doc(0, `{"id":1,"first":"Jane"}`)))
+	// The sweep's pages, and the lookup of the document's key.
+	require.Equal(t, 1000/pageSize+1, h.fake.count(http.MethodGet, "/rest/people")-before)
+}
+
 // TestStoreUniqueFuzz moves random domains and account codes between records in three chunks,
 // stops the task at each batch write in turn, replays it, and checks that each record ends with
 // its new value or its old one, and that a value is left out only when another record holds it.
