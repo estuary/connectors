@@ -68,6 +68,10 @@ def test_what_the_connector_declared_wins():
                 "_meta": own_meta,
                 "id": {"type": "string", "minLength": 15, "maxLength": 18},
                 "lat": {"type": "number", "minimum": -90, "maximum": 90},
+                "tags": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
             },
         }
     )
@@ -83,6 +87,11 @@ def test_what_the_connector_declared_wins():
     assert out["properties"]["id"]["maxLength"] == 18
     assert out["properties"]["lat"]["minimum"] == -90
     assert out["properties"]["lat"]["maximum"] == 90
+    assert out["properties"]["tags"]["additionalProperties"] == {
+        "type": "string",
+        "minLength": STRING_MIN,
+        "maxLength": STRING_MAX,
+    }
 
 
 def test_a_declared_meta_still_gets_the_runtime_owned_uuid():
@@ -198,6 +207,7 @@ def test_every_nested_location_is_reached():
             "properties": {
                 "nested": {"properties": {"deep": {"type": "string"}}},
                 "list": {"type": "array", "items": {"type": "string"}},
+                "bare": {"type": "object"},
                 "either": {"oneOf": [{"type": "string"}, {"type": "integer"}]},
             },
             "patternProperties": {"^x-": {"type": "string"}},
@@ -211,6 +221,7 @@ def test_every_nested_location_is_reached():
     assert nested["properties"]["deep"]["maxLength"] == STRING_MAX
 
     assert out["properties"]["list"]["items"]["maxLength"] == STRING_MAX
+    assert out["properties"]["bare"] == {"type": "object", "additionalProperties": False}
     assert out["properties"]["either"]["oneOf"][0]["maxLength"] == STRING_MAX
     assert out["properties"]["either"]["oneOf"][1]["maximum"] == NUMERIC_MAX
     assert out["patternProperties"]["^x-"]["maxLength"] == STRING_MAX
