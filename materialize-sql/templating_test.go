@@ -539,7 +539,7 @@ func TestMergeBoundsBuilderStringRanges(t *testing.T) {
 	})
 }
 
-func TestDatetimePositionOrdersInstants(t *testing.T) {
+func TestDatetimeSortKeyOrdersInstants(t *testing.T) {
 	var instants = []time.Time{
 		time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC),
 		time.Date(1969, 12, 31, 23, 59, 59, 999999999, time.UTC),
@@ -549,13 +549,13 @@ func TestDatetimePositionOrdersInstants(t *testing.T) {
 		time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC),
 	}
 	for i := 1; i < len(instants); i++ {
-		require.Less(t, datetimePosition(instants[i-1]), datetimePosition(instants[i]))
+		require.Less(t, datetimeSortKey(instants[i-1]), datetimeSortKey(instants[i]))
 	}
 
 	// A gap is proportional to the time it spans, across second boundaries too.
 	var at = time.Date(2026, 10, 26, 12, 0, 0, 999999000, time.UTC)
 	var gap = func(d time.Duration) float64 {
-		var gap, _ = instantScale{}.distance(datetimePosition(at), datetimePosition(at.Add(d)))
+		var gap, _ = instantScale{}.distance(datetimeSortKey(at), datetimeSortKey(at.Add(d)))
 		return gap
 	}
 	require.InDelta(t, 1, gap(2*time.Microsecond)-gap(time.Microsecond), 1e-9)

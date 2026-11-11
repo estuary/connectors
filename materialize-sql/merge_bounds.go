@@ -113,9 +113,9 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 			}
 		case ft != STRING || !b.stringRanges:
 		case isDateColumn(col):
-			b.spans[idx] = &spanSet{limit: limit, scale: instantScale{}, position: datePosition}
+			b.spans[idx] = &spanSet{limit: limit, scale: instantScale{}, sortKey: dateSortKey}
 		default:
-			b.spans[idx] = &spanSet{limit: limit, scale: new(byteAlphabet), position: stringPosition}
+			b.spans[idx] = &spanSet{limit: limit, scale: new(byteAlphabet), sortKey: stringSortKey}
 		}
 	}
 	return b
@@ -147,7 +147,7 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 			if lower, upper, ts, ok := MinMaxDatetime(b.lower[idx], b.upper[idx], k); ok {
 				b.lower[idx], b.upper[idx] = lower, upper
 				if spans != nil && !b.unbounded[idx] {
-					spans.add(datetimePosition(ts), k)
+					spans.add(datetimeSortKey(ts), k)
 				}
 			} else {
 				b.unbounded[idx] = true
@@ -318,9 +318,10 @@ const spansPerRange = 8
 // so 100 means 1/100 of the span.
 const minRangeGapDivisor = 100
 
-// keySpan is a closed range of observed keys, by their positions, along with
-// the keys at its ends for rendering as literals. A string key is its own
-// position.
+// keySpan is a closed range of observed keys, by their sort keys, along with
+// the keys at its ends for rendering as literals. A key's sort key is a byte
+// string which orders against other sort keys as the key orders in its
+// column.
 type keySpan struct {
 	lo, hi       string
 	loKey, hiKey any
@@ -328,21 +329,21 @@ type keySpan struct {
 	gap float64
 }
 
-// datetimePosition is the position of a date-time key: its instant as
+// datetimeSortKey is the sort key of a date-time key: its instant as
 // big-endian seconds followed by nanoseconds.
-func datetimePosition(ts time.Time) string {
+func datetimeSortKey(ts time.Time) string {
 	var out [12]byte
 	binary.BigEndian.PutUint64(out[:8], uint64(ts.Unix())^(1<<63))
 	binary.BigEndian.PutUint32(out[8:], uint32(ts.Nanosecond()))
 	return string(out[:])
 }
 
-// keyScale measures the distance between the positions of a column's keys.
+// keyScale measures the distance between the sort keys of a column's keys.
 type keyScale interface {
-	// observe takes account of the key at pos, reporting whether that changes
-	// the distance between positions observed before it.
-	observe(pos string) bool
-	// distance is the log2 distance from position x to the greater position
+	// observe takes account of the key with sort key sk, reporting whether
+	// that changes the distance between sort keys observed before it.
+	observe(sk string) bool
+	// distance is the log2 distance from sort key x to the greater sort key
 	// y, and whether float64 resolves it. An unresolved distance is no less
 	// than the true one.
 	distance(x, y string) (float64, bool)
@@ -350,7 +351,7 @@ type keyScale interface {
 	reset()
 }
 
-// instantScale measures the positions of datetimePosition by the time between
+// instantScale measures the sort keys of datetimeSortKey by the time between
 // their instants.
 type instantScale struct{}
 
@@ -364,17 +365,17 @@ func (instantScale) distance(x, y string) (float64, bool) {
 	return math.Log2(float64(seconds)*float64(time.Second) + nanos), true
 }
 
-// stringPosition is the position of a string key, which is the key itself.
-func stringPosition(key any) (string, bool) {
+// stringSortKey is the sort key of a string key, which is the key itself.
+func stringSortKey(key any) (string, bool) {
 	var s, ok = key.(string)
 	return s, ok
 }
 
-// datePosition is the position of a date key: that of its first instant.
-func datePosition(key any) (string, bool) {
+// dateSortKey is the sort key of a date key: that of its first instant.
+func dateSortKey(key any) (string, bool) {
 	var s, _ = key.(string)
 	var day, err = time.Parse(time.DateOnly, s)
-	return datetimePosition(day), err == nil
+	return datetimeSortKey(day), err == nil
 }
 
 // spanSet is the observed keys of a key column as sorted, disjoint spans.
@@ -382,11 +383,11 @@ type spanSet struct {
 	spans []keySpan
 	// limit is the most spans the set holds.
 	limit int
-	// position is the position of a key, reporting false if it has none.
-	position func(key any) (string, bool)
-	// scale measures the distance between positions.
+	// sortKey is the sort key of a key, reporting false if it has none.
+	sortKey func(key any) (string, bool)
+	// scale measures the distance between sort keys.
 	scale keyScale
-	// unmeasured marks a set missing an observed key, which had no position.
+	// unmeasured marks a set missing an observed key, which had no sort key.
 	unmeasured bool
 }
 
@@ -398,7 +399,7 @@ const alphabetPositions = 64
 // where a symbol is a byte or the end of the string. Reading a string as a
 // number in which each position's base is the count of its symbols makes
 // distances disregard symbols no string uses there. It is the keyScale of
-// strings that are their own positions.
+// strings that are their own sort keys.
 type byteAlphabet struct {
 	positions []positionSymbols
 }
@@ -506,39 +507,39 @@ func (s *spanSet) reset() {
 	s.scale.reset()
 }
 
-// gap is the log2 distance from position x to the greater position y.
+// gap is the log2 distance from sort key x to the greater sort key y.
 func (s *spanSet) gap(x, y string) float64 {
 	var d, _ = s.scale.distance(x, y)
 	return d
 }
 
-// observe adds key at its position.
+// observe adds key at its sort key.
 func (s *spanSet) observe(key any) {
-	if pos, ok := s.position(key); ok {
-		s.add(pos, key)
+	if sk, ok := s.sortKey(key); ok {
+		s.add(sk, key)
 	} else {
 		s.unmeasured = true
 	}
 }
 
-// add adds the key at position pos.
-func (s *spanSet) add(pos string, key any) {
-	if s.scale.observe(pos) {
+// add adds the key with sort key sk.
+func (s *spanSet) add(sk string, key any) {
+	if s.scale.observe(sk) {
 		for i := 0; i+1 < len(s.spans); i++ {
 			s.spans[i].gap = s.gap(s.spans[i].hi, s.spans[i+1].lo)
 		}
 	}
 
-	var i = sort.Search(len(s.spans), func(i int) bool { return s.spans[i].hi >= pos })
-	if i < len(s.spans) && s.spans[i].lo <= pos {
+	var i = sort.Search(len(s.spans), func(i int) bool { return s.spans[i].hi >= sk })
+	if i < len(s.spans) && s.spans[i].lo <= sk {
 		return
 	}
-	s.spans = slices.Insert(s.spans, i, keySpan{lo: pos, hi: pos, loKey: key, hiKey: key})
+	s.spans = slices.Insert(s.spans, i, keySpan{lo: sk, hi: sk, loKey: key, hiKey: key})
 	if i > 0 {
-		s.spans[i-1].gap = s.gap(s.spans[i-1].hi, pos)
+		s.spans[i-1].gap = s.gap(s.spans[i-1].hi, sk)
 	}
 	if i+1 < len(s.spans) {
-		s.spans[i].gap = s.gap(pos, s.spans[i+1].lo)
+		s.spans[i].gap = s.gap(sk, s.spans[i+1].lo)
 	}
 	if len(s.spans) > s.limit {
 		s.spans = mergeNarrowestGap(s.spans)
