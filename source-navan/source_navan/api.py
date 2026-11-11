@@ -127,6 +127,9 @@ async def fetch_bookings_changes(
             updated_to=updated_to,
         )
 
+        if response.page:
+            total_pages = response.page.totalPages
+
         for booking in response.data:
             modified_ts = booking.lastModified
 
