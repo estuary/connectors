@@ -2,6 +2,7 @@ from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.capture.task import (
     DEFAULT_ARRAY_BOUNDS,
     DEFAULT_NUMERIC_BOUNDS,
+    DEFAULT_NUMERIC_STRING_BOUNDS,
     DEFAULT_STRING_BOUNDS,
     with_sourced_schema_defaults,
 )
@@ -44,6 +45,7 @@ def test_numeric_and_boolean_locations():
                 "i": {"type": "integer"},
                 "n": {"type": "number"},
                 "b": {"type": "boolean"},
+                "s": {"type": "string", "format": "integer"},
             }
         }
     )
@@ -56,6 +58,13 @@ def test_numeric_and_boolean_locations():
     assert out["properties"]["n"]["maximum"] == NUMERIC_MAX
     # Booleans have nothing to bound.
     assert out["properties"]["b"] == {"type": "boolean"}
+    assert out["properties"]["s"] == {
+        "type": "string",
+        "format": "integer",
+        "minLength": STRING_MIN,
+        "maxLength": STRING_MAX,
+        **DEFAULT_NUMERIC_STRING_BOUNDS,
+    }
 
 
 def test_what_the_connector_declared_wins():

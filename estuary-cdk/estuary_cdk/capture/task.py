@@ -60,6 +60,7 @@ def serialize_response(message: Response[Any, Any, Any]) -> bytes:
 DEFAULT_STRING_BOUNDS = {"minLength": 1, "maxLength": 1}
 DEFAULT_NUMERIC_BOUNDS = {"minimum": 1, "maximum": 1}
 DEFAULT_ARRAY_BOUNDS = {"minItems": 1, "maxItems": 1}
+DEFAULT_NUMERIC_STRING_BOUNDS = {"x-str-minimum": "1", "x-str-maximum": "1"}
 
 
 def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
@@ -85,6 +86,9 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
       drops them when it says nothing.
     - item count bounds on arrays. The union keeps an inferred `maxItems` only
       if the SourcedSchema states one too.
+    - `x-str-minimum` and `x-str-maximum` on strings with `format: integer` or
+      `number`, for the same reason. Inference never adds them to a location
+      that already exists.
 
     Whatever the connector already declared wins, so one that knows better - a truer
     bound, its own `_meta` - keeps it. The input is left unmodified.
@@ -139,6 +143,8 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
         # ones, so a union of both types carries both sets.
         if "string" in types:
             out = {**DEFAULT_STRING_BOUNDS, **out}
+            if out.get("format") in ("integer", "number"):
+                out = {**DEFAULT_NUMERIC_STRING_BOUNDS, **out}
         if types & {"integer", "number"}:
             out = {**DEFAULT_NUMERIC_BOUNDS, **out}
         if "array" in types:
