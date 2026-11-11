@@ -313,8 +313,9 @@ func (b *MergeBoundsBuilder) Reset() {
 // that, the two spans with the narrowest gap between them merge.
 const spansPerRange = 8
 
-// minRangeGapDivisor sets the narrowest gap worth splitting a bound at, as a
-// fraction of the bound's span: a narrower one excludes too little to matter.
+// minRangeGapDivisor is the divisor that sets the narrowest gap worth
+// splitting a bound at. That gap is the bound's span over this denominator,
+// so 100 means 1/100 of the span.
 const minRangeGapDivisor = 100
 
 // keySpan is a closed range of observed keys, by their positions, along with
